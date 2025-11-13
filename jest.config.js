@@ -20,11 +20,9 @@ module.exports = {
     '!src/**/index.ts', // Exclude index.ts files that only re-export
     '!src/index.ts',
   ],
-  // Separate unit and integration tests
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
-    '**/index.test.[tj]s', // Ignore tests for index.ts
   ],
 };
 

@@ -9,4 +9,5 @@ export * from './lock';
 export * from './unlock';
 export * from './activation';
 export * from './check';
+export * from './run';
 
