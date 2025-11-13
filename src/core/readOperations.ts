@@ -3,7 +3,7 @@
  * All read-only methods are implemented here once and reused by clients
  */
 
-import { AbapConnection, AbapRequestOptions } from '@mcp-abap-adt/connection';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../utils/internalUtils';
 import { getTimeout } from '@mcp-abap-adt/connection';
