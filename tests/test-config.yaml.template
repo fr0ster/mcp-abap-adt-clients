@@ -1,0 +1,256 @@
+# Test Configuration Template for @mcp-abap-adt/adt-clients
+# Copy this file to test-config.yaml and configure for your environment
+# Tests for ReadOnlyClient, CrudClient, and ManagementClient
+#
+# Usage:
+#   cp tests/test-config.yaml.template tests/test-config.yaml
+#   # Edit test-config.yaml with your specific values
+
+# Test settings
+test_settings:
+  fail_fast: false
+  verbose: true
+  timeout: 30000
+  retry_on_failure: false
+  max_retries: 1
+  cleanup_after_test: false
+
+# Environment configuration
+environment:
+  default_transport: ""  # ⚠️ UPDATE WITH YOUR TRANSPORT REQUEST (if needed)
+  default_package: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE WITH YOUR TEST PACKAGE
+
+# ============================================================================
+# READ-ONLY CLIENT TESTS
+# ============================================================================
+
+# Get Program
+get_program:
+  test_cases:
+    - name: "test_program"
+      enabled: false
+      description: "Get test program (requires existing program)"
+      params:
+        program_name: "<YOUR_TEST_PROGRAM_NAME>"  # ⚠️ UPDATE WITH YOUR TEST PROGRAM
+    - name: "standard_program"
+      enabled: true
+      description: "Get standard SAP program (for integration tests)"
+      params:
+        program_name: "SAPMV45A"  # Standard SAP program - usually available
+
+# Get Class
+get_class:
+  test_cases:
+    - name: "test_class"
+      enabled: false
+      description: "Get test class (requires existing class)"
+      params:
+        class_name: "<YOUR_TEST_CLASS_NAME>"  # ⚠️ UPDATE WITH YOUR TEST CLASS
+    - name: "standard_class"
+      enabled: true
+      description: "Get standard SAP class"
+      params:
+        class_name: "CL_WB_PGEDITOR_INITIAL_SCREEN"  # Standard SAP class - usually available
+
+# Get Table
+get_table:
+  test_cases:
+    - name: "standard_table"
+      enabled: true
+      description: "Get standard SAP table"
+      params:
+        table_name: "DD02L"  # Standard SAP table - usually available
+    - name: "mara_table"
+      enabled: true
+      description: "Get MARA table (material master)"
+      params:
+        table_name: "MARA"  # Standard SAP table - usually available
+
+# Get Structure
+get_structure:
+  test_cases:
+    - name: "standard_structure"
+      enabled: true
+      description: "Get standard SAP structure"
+      params:
+        structure_name: "SYST"  # Standard SAP structure - usually available
+    - name: "mara_structure"
+      enabled: true
+      description: "Get MARA structure (using table as structure example)"
+      params:
+        structure_name: "MARA"  # Standard SAP structure - usually available
+
+# Get Domain
+get_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: false
+      description: "Get test domain (requires existing domain)"
+      params:
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE WITH YOUR TEST DOMAIN
+    - name: "standard_domain"
+      enabled: true
+      description: "Get standard SAP domain"
+      params:
+        domain_name: "SYST_SUBRC"  # Standard SAP domain - usually available
+
+# Get Data Element
+get_data_element:
+  test_cases:
+    - name: "test_data_element"
+      enabled: false
+      description: "Get test data element (requires existing data element)"
+      params:
+        data_element_name: "<YOUR_TEST_DATA_ELEMENT_NAME>"  # ⚠️ UPDATE WITH YOUR TEST DATA ELEMENT
+    - name: "standard_data_element"
+      enabled: true
+      description: "Get standard SAP data element"
+      params:
+        data_element_name: "SYST_SUBRC"  # Standard SAP data element - usually available
+
+# Get Interface
+get_interface:
+  test_cases:
+    - name: "test_interface"
+      enabled: false
+      description: "Get test interface (requires existing interface)"
+      params:
+        interface_name: "<YOUR_TEST_INTERFACE_NAME>"  # ⚠️ UPDATE WITH YOUR TEST INTERFACE
+    - name: "standard_interface"
+      enabled: true
+      description: "Get standard SAP interface"
+      params:
+        interface_name: "IF_T100_MESSAGE"  # Standard SAP interface - usually available
+
+# Get Function Group
+get_function_group:
+  test_cases:
+    - name: "test_function_group"
+      enabled: false
+      description: "Get test function group (requires existing function group)"
+      params:
+        function_group: "<YOUR_TEST_FUNCTION_GROUP>"  # ⚠️ UPDATE WITH YOUR TEST FUNCTION GROUP
+    - name: "standard_function_group"
+      enabled: true
+      description: "Get standard SAP function group"
+      params:
+        function_group: "WBABAP"  # Standard SAP function group - usually available
+    - name: "srf_function_group"
+      enabled: true
+      description: "Get SRFC function group (standard SAP)"
+      params:
+        function_group: "SRFC"  # Standard SAP function group - usually available
+
+# Get Function
+get_function:
+  test_cases:
+    - name: "test_function"
+      enabled: false
+      description: "Get test function module (requires existing function module)"
+      params:
+        function_name: "<YOUR_TEST_FUNCTION_NAME>"  # ⚠️ UPDATE WITH YOUR TEST FUNCTION
+        function_group: "<YOUR_TEST_FUNCTION_GROUP>"  # ⚠️ UPDATE WITH YOUR TEST FUNCTION GROUP
+    - name: "standard_function"
+      enabled: true
+      description: "Get standard SAP function module"
+      params:
+        function_name: "WB_PGEDITOR_INITIAL_SCREEN"  # Standard SAP function - usually available
+        function_group: "WBABAP"  # Standard SAP function group - usually available
+
+# Get Package
+get_package:
+  test_cases:
+    - name: "test_package"
+      enabled: false
+      description: "Get test package (requires existing package)"
+      params:
+        package_name: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE WITH YOUR TEST PACKAGE
+    - name: "standard_package"
+      enabled: true
+      description: "Get standard SAP package"
+      params:
+        package_name: "SABP_TYPES"  # Standard SAP package - usually available
+
+# Get View
+get_view:
+  test_cases:
+    - name: "test_view"
+      enabled: false
+      description: "Get test view (requires existing view)"
+      params:
+        view_name: "<YOUR_TEST_VIEW_NAME>"  # ⚠️ UPDATE WITH YOUR TEST VIEW
+    - name: "standard_view"
+      enabled: false
+      description: "Get standard SAP view (if available)"
+      params:
+        view_name: ""  # ⚠️ UPDATE WITH YOUR VIEW NAME (or leave empty to skip)
+
+# Fetch Node Structure
+fetch_node_structure:
+  test_cases:
+    - name: "program_includes"
+      enabled: true
+      description: "Fetch node structure for program includes"
+      params:
+        parent_name: "SAPMV45A"  # Standard SAP program - can be changed
+        parent_tech_name: "SAPMV45A"  # Standard SAP program - can be changed
+        parent_type: "PROG/P"
+        node_key: "006450"  # ⚠️ UPDATE WITH VALID NODE KEY FOR YOUR PROGRAM
+        with_short_descriptions: true
+    - name: "function_group_objects"
+      enabled: true
+      description: "Fetch node structure for function group objects"
+      params:
+        parent_name: "SRFC"  # Standard SAP function group - can be changed
+        parent_tech_name: "SRFC"  # Standard SAP function group - can be changed
+        parent_type: "FUGR"
+        node_key: "000000"  # ⚠️ UPDATE WITH VALID NODE KEY FOR YOUR FUNCTION GROUP
+        with_short_descriptions: true
+
+# Get System Information
+get_system_information:
+  test_cases:
+    - name: "system_info"
+      enabled: true
+      description: "Get system information (cloud systems only)"
+      params: {}
+
+# ============================================================================
+# MANAGEMENT CLIENT TESTS
+# ============================================================================
+
+# Activate Object
+activate_object:
+  test_cases:
+    - name: "test_objects"
+      enabled: false
+      description: "Activate test objects (requires existing objects)"
+      params:
+        objects:
+          - name: "<YOUR_TEST_CLASS_NAME>"  # ⚠️ UPDATE WITH YOUR TEST CLASS NAME
+            type: "CLAS/OC"
+          - name: "<YOUR_TEST_PROGRAM_NAME>"  # ⚠️ UPDATE WITH YOUR TEST PROGRAM NAME
+            type: "PROG/P"
+        preaudit: false
+
+# Check Object
+check_object:
+  test_cases:
+    - name: "test_objects"
+      enabled: false
+      description: "Check test objects syntax (requires existing objects)"
+      params:
+        objects:
+          - object_name: "<YOUR_TEST_CLASS_NAME>"  # ⚠️ UPDATE WITH YOUR TEST CLASS NAME
+            object_type: "class"
+            version: "active"
+          - object_name: "<YOUR_TEST_PROGRAM_NAME>"  # ⚠️ UPDATE WITH YOUR TEST PROGRAM NAME
+            object_type: "program"
+            version: "active"
+    - name: "single_test_class"
+      enabled: false
+      description: "Check single test class syntax"
+      params:
+        object_name: "<YOUR_TEST_CLASS_NAME>"  # ⚠️ UPDATE WITH YOUR TEST CLASS NAME
+        object_type: "CLAS/OC"
+        version: ""  # Optional: leave empty for latest version

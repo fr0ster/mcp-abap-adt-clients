@@ -63,7 +63,7 @@ ${objects.map(obj => `  <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/cla
 
 /**
  * Check ABAP object syntax
- * TODO: Implement full check logic from handleCheckObject
+ * Uses shared checkRun utility for all object types
  */
 export async function checkObject(
   connection: AbapConnection,
@@ -71,10 +71,7 @@ export async function checkObject(
   type: string,
   version?: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
-  // TODO: Build proper check URL based on object type
-  const url = `${baseUrl}/sap/bc/adt/oo/classes/${name.toLowerCase()}/source/main?check=true`;
-
-  return makeAdtRequest(connection, url, 'GET', 'default');
+  const { runCheckRun } = await import('./shared/checkRun');
+  return runCheckRun(connection, type, name, version || 'active', 'abapCheckRun');
 }
 
