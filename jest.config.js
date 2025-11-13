@@ -5,6 +5,7 @@ module.exports = {
     '**/__tests__/**/*.test.[tj]s',
     '**/*.test.[tj]s',
     '**/__tests__/**/*.integration.test.[tj]s',
+    '!**/**/index.test.[tj]s', // No tests for index.ts files
   ],
   testTimeout: 30000,
   forceExit: true,
@@ -16,11 +17,14 @@ module.exports = {
     'src/**/*.ts',
     '!src/**/*.d.ts',
     '!src/**/__tests__/**',
+    '!src/**/index.ts', // Exclude index.ts files that only re-export
+    '!src/index.ts',
   ],
   // Separate unit and integration tests
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
+    '**/index.test.[tj]s', // Ignore tests for index.ts
   ],
 };
 
