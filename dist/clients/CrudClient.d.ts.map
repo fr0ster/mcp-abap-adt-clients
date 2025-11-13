@@ -1,1 +1,0 @@
-{"version":3,"file":"CrudClient.d.ts","sourceRoot":"","sources":["../../src/clients/CrudClient.ts"],"names":[],"mappings":"AAAA;;;;;;;;GAQG;AAEH,OAAO,EAAE,cAAc,EAAE,MAAM,kBAAkB,CAAC;AAClD,OAAO,EAAE,cAAc,EAAE,MAAM,0BAA0B,CAAC;AAI1D,qBAAa,UAAW,SAAQ,cAAc;gBAChC,UAAU,EAAE,cAAc;CAmBvC"}
