@@ -91,6 +91,26 @@ export class ReadOnlyClient {
     return readOps.getView(this.connection, viewName);
   }
 
+  /**
+   * Fetch node structure from SAP ADT repository
+   */
+  async fetchNodeStructure(
+    parentName: string,
+    parentTechName: string,
+    parentType: string,
+    nodeKey: string,
+    withShortDescriptions: boolean = true
+  ): Promise<AxiosResponse> {
+    return readOps.fetchNodeStructure(this.connection, parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
+  }
+
+  /**
+   * Get system information from SAP ADT (for cloud systems)
+   */
+  async getSystemInformation(): Promise<{ systemID?: string; userName?: string } | null> {
+    return readOps.getSystemInformation(this.connection);
+  }
+
   // TODO: Add more read-only methods as needed
   // All will delegate to core/readOperations.ts
 }

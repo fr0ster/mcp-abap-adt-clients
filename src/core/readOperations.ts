@@ -153,6 +153,69 @@ export async function getView(connection: AbapConnection, viewName: string): Pro
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
+/**
+ * Fetches node structure from SAP ADT repository
+ */
+export async function fetchNodeStructure(
+  connection: AbapConnection,
+  parentName: string,
+  parentTechName: string,
+  parentType: string,
+  nodeKey: string,
+  withShortDescriptions: boolean = true
+): Promise<AxiosResponse> {
+  const baseUrl = await getBaseUrl(connection);
+  const url = `${baseUrl}/sap/bc/adt/repository/nodestructure`;
+
+  const params = {
+    parent_name: parentName,
+    parent_tech_name: parentTechName,
+    parent_type: parentType,
+    withShortDescriptions: withShortDescriptions.toString()
+  };
+
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+<asx:values>
+<DATA>
+<TV_NODEKEY>${nodeKey}</TV_NODEKEY>
+</DATA>
+</asx:values>
+</asx:abap>`;
+
+  return makeAdtRequest(connection, url, 'POST', 'default', xmlBody, params);
+}
+
+/**
+ * Get system information from SAP ADT (for cloud systems)
+ * Returns systemID and userName if available
+ */
+export async function getSystemInformation(
+  connection: AbapConnection
+): Promise<{ systemID?: string; userName?: string } | null> {
+  try {
+    const baseUrl = await getBaseUrl(connection);
+    const url = `${baseUrl}/sap/bc/adt/core/http/systeminformation`;
+
+    const headers = {
+      'Accept': 'application/json'
+    };
+
+    const response = await makeAdtRequest(connection, url, 'GET', 'default', undefined, undefined, headers);
+
+    if (response.data && typeof response.data === 'object') {
+      return {
+        systemID: response.data.systemID,
+        userName: response.data.userName
+      };
+    }
+
+    return null;
+  } catch (error) {
+    // If endpoint doesn't exist (on-premise), return null
+    return null;
+  }
+}
+
 // TODO: Add more read operations as needed
 // - getInclude
 // - getIncludesList

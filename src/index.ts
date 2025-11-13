@@ -14,3 +14,6 @@ export { ManagementClient } from './clients/ManagementClient';
 // Re-export types from connection package for convenience
 export type { AbapConnection, AbapRequestOptions } from '@mcp-abap-adt/connection';
 
+// Export utilities
+export { encodeSapObjectName } from './utils/internalUtils';
+
