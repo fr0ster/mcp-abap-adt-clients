@@ -12,7 +12,7 @@ import { AxiosResponse } from 'axios';
 import * as readOps from '../core/readOperations';
 
 export class ReadOnlyClient {
-  constructor(private connection: AbapConnection) {}
+  constructor(protected connection: AbapConnection) {}
 
   /**
    * Get ABAP program source code
