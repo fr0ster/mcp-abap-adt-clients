@@ -1,0 +1,48 @@
+{
+  "name": "@mcp-abap-adt/adt-clients",
+  "version": "0.1.0",
+  "description": "ADT clients for SAP ABAP systems - Read-only, CRUD, and Management operations",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "clients",
+    "read-only",
+    "crud",
+    "mcp"
+  ],
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/fr0ster/mcp-abap-adt-clients#readme",
+  "bugs": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt-clients/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt-clients.git"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/connection": "file:../connection",
+    "fast-xml-parser": "^5.2.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.1",
+    "typescript": "^5.9.2"
+  }
+}
+
