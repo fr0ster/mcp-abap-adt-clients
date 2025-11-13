@@ -5,6 +5,7 @@
 
 import { ReadOnlyClient } from '../clients/ReadOnlyClient';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { isCloudEnvironment as checkIsCloudEnvironment } from '../core/shared/systemInfo';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -13,7 +14,7 @@ import * as dotenv from 'dotenv';
 const { getEnabledTestCase } = require('../../tests/test-helper');
 
 // Load environment variables
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../.env');
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
@@ -62,8 +63,9 @@ describe('ReadOnlyClient Integration Tests', () => {
   let client: ReadOnlyClient;
   let connection: any;
   let hasConfig = false;
+  let isCloud = false;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, {
@@ -74,14 +76,22 @@ describe('ReadOnlyClient Integration Tests', () => {
       });
       client = new ReadOnlyClient(connection);
       hasConfig = true;
+
+      // Detect if this is BTP ABAP Cloud Environment by checking systeminformation endpoint
+      // On-premise systems don't have this endpoint, cloud systems do
+      isCloud = await checkIsCloudEnvironment(connection);
+
+      if (isCloud) {
+        console.log('ℹ️  Detected BTP ABAP Cloud Environment - programs not available');
+      } else {
+        console.log('ℹ️  Detected on-premise/S4HANA system - all object types available');
+      }
     } catch (error) {
       console.warn('⚠️  Integration tests skipped: No .env file or SAP configuration found');
       console.warn('   Create .env file in project root with SAP_URL, SAP_AUTH_TYPE, etc.');
       hasConfig = false;
     }
-  });
-
-  afterAll(async () => {
+  });  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
@@ -91,6 +101,11 @@ describe('ReadOnlyClient Integration Tests', () => {
     it('should retrieve standard program source code', async () => {
       if (!hasConfig) {
         console.log('Skipping: No SAP configuration');
+        return;
+      }
+
+      if (isCloud) {
+        console.log('Skipping: Programs not available in BTP ABAP Cloud Environment');
         return;
       }
 
@@ -108,6 +123,10 @@ describe('ReadOnlyClient Integration Tests', () => {
 
     it('should retrieve test program source code', async () => {
       if (!hasConfig) return;
+      if (isCloud) {
+        console.log('Skipping: Programs not available in BTP ABAP Cloud Environment');
+        return;
+      }
       const testCase = getEnabledTestCase('get_program', 'test_program');
       if (!testCase) return;
       const response = await client.getProgram(testCase.params.program_name);
@@ -179,8 +198,13 @@ describe('ReadOnlyClient Integration Tests', () => {
   describe('getDomain', () => {
     it('should retrieve standard domain definition', async () => {
       if (!hasConfig) return;
+
       const testCase = getEnabledTestCase('get_domain', 'standard_domain');
-      if (!testCase) return;
+      if (!testCase) {
+        console.log('Skipping: get_domain test case not configured');
+        return;
+      }
+
       const response = await client.getDomain(testCase.params.domain_name);
       expect(response.status).toBe(200);
       expect(typeof response.data).toBe('string');
@@ -188,8 +212,13 @@ describe('ReadOnlyClient Integration Tests', () => {
 
     it('should retrieve test domain definition', async () => {
       if (!hasConfig) return;
+
       const testCase = getEnabledTestCase('get_domain', 'test_domain');
-      if (!testCase) return;
+      if (!testCase) {
+        console.log('Skipping: test_domain test case not configured');
+        return;
+      }
+
       const response = await client.getDomain(testCase.params.domain_name);
       expect(response.status).toBe(200);
       expect(typeof response.data).toBe('string');

@@ -13,7 +13,7 @@ import * as dotenv from 'dotenv';
 const { getEnabledTestCase } = require('../../tests/test-helper');
 
 // Load environment variables
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../.env');
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
