@@ -30,3 +30,11 @@ export { unlockFunctionModule } from './core/functionModule/unlock';
 export { unlockDomain } from './core/domain/unlock';
 export { unlockDataElement } from './core/dataElement/unlock';
 
+// Export validation functions
+export type { ValidationResult } from './core/shared/validation';
+export { validateObjectName, validateAndThrow } from './core/shared/validation';
+export { validateClassName, validateClassSource } from './core/class/validation';
+export { validateFunctionModuleName, validateFunctionModuleSource } from './core/functionModule/validation';
+export { validateFunctionGroupName } from './core/functionGroup/validation';
+export { validateProgramName } from './core/program/validation';
+export { validateInterfaceName } from './core/interface/validation';

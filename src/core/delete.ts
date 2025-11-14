@@ -25,13 +25,13 @@ function getObjectUri(
 ): string {
   const encodedName = encodeSapObjectName(objectName);
 
-  // Normalize object type
+  // Normalize object type (order matters! Check longer patterns first)
   const type = objectType.toLowerCase()
     .replace('clas/oc', 'class')
     .replace('prog/p', 'program')
     .replace('intf/oi', 'interface')
+    .replace('fugr/ff', 'function_module')  // Check this BEFORE 'fugr/f'
     .replace('fugr/f', 'function_group')
-    .replace('fugr/ff', 'function_module')
     .replace('tabl/dt', 'table')
     .replace('ttyp/st', 'structure')
     .replace('ddls/df', 'view')
@@ -46,10 +46,8 @@ function getObjectUri(
     case 'interface':
       return `/sap/bc/adt/oo/interfaces/${encodedName}`;
     case 'function_group':
-    case 'FUGR/F':
       return `/sap/bc/adt/functions/groups/${encodedName}`;
     case 'function_module':
-    case 'FUGR/FF':
       if (!functionGroupName) {
         throw new Error('function_group_name is required for function_module deletion');
       }

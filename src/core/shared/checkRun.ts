@@ -25,8 +25,14 @@ export function getObjectUri(objectType: string, objectName: string): string {
       return `/sap/bc/adt/functions/groups/${encodedName}`;
     case 'function_module':
     case 'fugr/ff':
-      // Function module needs function group
-      throw new Error('Function module requires function group. Use functionModule/check.ts instead.');
+      // Function module needs function group in format: "FUGR_NAME/FM_NAME"
+      if (!objectName.includes('/')) {
+        throw new Error('Function module requires function group. Use format: "functionGroupName/functionModuleName"');
+      }
+      const [fugrName, fmName] = objectName.split('/');
+      const encodedFugr = encodeSapObjectName(fugrName.toLowerCase());
+      const encodedFm = encodeSapObjectName(fmName.toLowerCase());
+      return `/sap/bc/adt/functions/groups/${encodedFugr}/fmodules/${encodedFm}`;
     case 'table':
     case 'tabl/dt':
       return `/sap/bc/adt/ddic/tables/${encodedName}`;
@@ -185,7 +191,9 @@ export function parseCheckRunResponse(response: AxiosResponse): {
       }
     });
 
-    const isSuccess = (status === 'processed' || status === 'no_report') && errors.length === 0;
+    // If status is 'notProcessed', it's an error (object doesn't exist or can't be validated)
+    const hasErrors = errors.length > 0 || status === 'notProcessed';
+    const isSuccess = status === 'processed' && errors.length === 0;
 
     return {
       success: isSuccess,
@@ -195,7 +203,7 @@ export function parseCheckRunResponse(response: AxiosResponse): {
       warnings,
       info,
       total_messages: messageArray.length,
-      has_errors: errors.length > 0,
+      has_errors: hasErrors,
       has_warnings: warnings.length > 0
     };
   } catch (error) {

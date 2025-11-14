@@ -11,6 +11,10 @@ import { lockFunctionModule } from './lock';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
 import { CreateFunctionModuleParams } from './types';
+import { getFunctionGroup } from '../functionGroup/read';
+import { createFunctionGroup } from '../functionGroup/create';
+import { validateFunctionModuleName } from './validation';
+import { validateAndThrow } from '../shared/validation';
 
 /**
  * Create function module metadata
@@ -92,10 +96,41 @@ export async function createFunctionModule(
     throw new Error('Function module name must start with Z or Y (customer namespace)');
   }
 
+  // Validate function module name with SAP validation endpoint
+  const validationResult = await validateFunctionModuleName(
+    connection,
+    params.function_group_name,
+    params.function_module_name,
+    params.description || params.function_module_name
+  );
+  await validateAndThrow(validationResult, 'Function module');
+
   const sessionId = generateSessionId();
   let lockHandle: string | undefined;
 
   try {
+    // Ensure function group exists. If not found and package_name is provided, try to create it.
+    try {
+      await getFunctionGroup(connection, params.function_group_name);
+    } catch (err: any) {
+      // If not found (404) and package_name provided, create function group automatically
+      if (err.response?.status === 404) {
+        if (params.package_name) {
+          await createFunctionGroup(connection, {
+            function_group_name: params.function_group_name,
+            package_name: params.package_name,
+            description: params.description || params.function_group_name,
+            transport_request: params.transport_request,
+            activate: false
+          });
+        } else {
+          throw new Error(`Function group ${params.function_group_name} not found. Create the function group first or provide package_name to auto-create it.`);
+        }
+      } else {
+        throw err;
+      }
+    }
+
     await createFunctionModuleMetadata(
       connection,
       params.function_group_name,

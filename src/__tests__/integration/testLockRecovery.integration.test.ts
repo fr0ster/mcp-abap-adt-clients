@@ -10,6 +10,8 @@
  * 6. Client2 unlocks object using restored session
  *
  * This validates that the persistence system can recover from crashes.
+ *
+ * Enable debug logs: DEBUG_TESTS=true npm test -- testLockRecovery.integration.test
  */
 
 import { describe, it, expect, afterAll } from '@jest/globals';
@@ -38,13 +40,14 @@ if (fs.existsSync(configPath)) {
 
 const testEnabled = lockRecoveryConfig?.enabled !== false;
 
-// Logger for debugging
+// Enable debug logging with DEBUG_TESTS=true
+const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
-  debug: () => {},
-  info: () => {},
+  debug: debugEnabled ? console.log : () => {},
+  info: debugEnabled ? console.log : () => {},
   warn: console.warn,
-  error: () => {},
-  csrfToken: () => {},
+  error: debugEnabled ? console.error : () => {},
+  csrfToken: debugEnabled ? console.log : () => {},
 };
 
 function getConfig(): SapConfig {
@@ -101,28 +104,28 @@ describe('Lock Recovery Integration Test', () => {
 
     if (fs.existsSync(sessionFile)) {
       fs.unlinkSync(sessionFile);
-      console.log(`✓ Cleaned up session file: ${sessionFile}`);
+      logger.debug(`✓ Cleaned up session file: ${sessionFile}`);
     }
 
     if (fs.existsSync(lockFile)) {
       const lockManager = new LockStateManager(locksDir);
       lockManager.clearAll();
-      console.log(`✓ Cleaned up lock registry`);
+      logger.debug(`✓ Cleaned up lock registry`);
     }
   });
 
   it('should persist and restore session and lock state', async () => {
     if (!testEnabled) {
-      console.warn('⚠️ Lock recovery test is disabled in test-config.yaml');
+      logger.warn('⚠️ Lock recovery test is disabled in test-config.yaml');
       return;
     }
 
-    console.log('\n📍 Testing lock recovery mechanism...\n');
+    logger.info('\n📍 Testing lock recovery mechanism...\n');
 
     // ============================================================
     // PHASE 1: Save session and lock state
     // ============================================================
-    console.log('PHASE 1: Creating session and lock state...');
+    logger.info('PHASE 1: Creating session and lock state...');
 
     const sapConfig = getConfig();
     const client1 = createAbapConnection(sapConfig, logger);
@@ -145,7 +148,7 @@ describe('Lock Recovery Integration Test', () => {
 
     // Save session
     await sessionStorage1.save(sessionId, mockSessionState);
-    console.log(`  ✓ Session saved to file: ${sessionId}`);
+    logger.debug(`  ✓ Session saved to file: ${sessionId}`);
 
     // Initialize lock state manager and register a mock lock
     const lockManager = new LockStateManager(locksDir);
@@ -160,24 +163,24 @@ describe('Lock Recovery Integration Test', () => {
       objectName: mockObjectName,
       testFile: __filename
     });
-    console.log(`  ✓ Lock registered: ${mockObjectName} with handle ${mockLockHandle}`);
+    logger.debug(`  ✓ Lock registered: ${mockObjectName} with handle ${mockLockHandle}`);
 
     // Verify files exist
     const sessionFile = path.join(process.cwd(), sessionsDir, `${sessionId}.json`);
     const lockFile = path.join(process.cwd(), locksDir, 'active-locks.json');
     expect(fs.existsSync(sessionFile)).toBe(true);
     expect(fs.existsSync(lockFile)).toBe(true);
-    console.log(`  ✓ Session and lock files verified\n`);
+    logger.debug(`  ✓ Session and lock files verified\n`);
 
     // ============================================================
     // SIMULATE CRASH
     // ============================================================
-    console.log('💥 SIMULATING CRASH: Client1 destroyed...\n');
+    logger.info('💥 SIMULATING CRASH: Client1 destroyed...\n');
 
     // ============================================================
     // PHASE 2: Restore session and lock state
     // ============================================================
-    console.log('PHASE 2: Restoring session and lock state...');
+    logger.info('PHASE 2: Restoring session and lock state...');
 
     // Create new Client2 (different instance, simulating new process)
     const client2 = createAbapConnection(sapConfig, logger);
@@ -193,9 +196,9 @@ describe('Lock Recovery Integration Test', () => {
     expect(restoredSession).toBeDefined();
     expect(restoredSession!.csrfToken).toBe('mock_csrf_token_abcdef');
     expect(restoredSession!.cookies).toContain('SAP_SESSIONID_xxx=mock_session_12345');
-    console.log(`  ✓ Session loaded from file`);
-    console.log(`    - CSRF Token: ${restoredSession!.csrfToken}`);
-    console.log(`    - Cookies: ${restoredSession!.cookies?.split(';').length || 0} cookie(s)`);
+    logger.debug(`  ✓ Session loaded from file`);
+    logger.debug(`    - CSRF Token: ${restoredSession!.csrfToken}`);
+    logger.debug(`    - Cookies: ${restoredSession!.cookies?.split(';').length || 0} cookie(s)`);
 
     // Retrieve lock handle from lock manager
     const lockManagerPhase2 = new LockStateManager(locksDir);
@@ -203,23 +206,23 @@ describe('Lock Recovery Integration Test', () => {
     expect(lockState).toBeDefined();
     expect(lockState?.lockHandle).toBe(mockLockHandle);
     expect(lockState?.sessionId).toBe(sessionId);
-    console.log(`  ✓ Lock handle retrieved: ${lockState!.lockHandle}`);
-    console.log(`    - Session ID: ${lockState!.sessionId}`);
-    console.log(`    - Object: ${lockState!.objectName}`);
-    console.log(`    - Type: ${lockState!.objectType}`);
+    logger.debug(`  ✓ Lock handle retrieved: ${lockState!.lockHandle}`);
+    logger.debug(`    - Session ID: ${lockState!.sessionId}`);
+    logger.debug(`    - Object: ${lockState!.objectName}`);
+    logger.debug(`    - Type: ${lockState!.objectType}`);
 
     // Cleanup
     lockManagerPhase2.removeLock(mockObjectType, mockObjectName);
     await sessionStorage2.delete(sessionId);
-    console.log(`\n  ✓ Cleanup completed`);
+    logger.debug(`\n  ✓ Cleanup completed`);
 
-    console.log('\n✅ Lock recovery test completed successfully!\n');
-    console.log('This test validates that:');
-    console.log('  1. Sessions can be persisted to disk');
-    console.log('  2. Lock handles can be tracked in registry');
-    console.log('  3. After a crash, a new connection instance can:');
-    console.log('     - Restore session state from file');
-    console.log('     - Retrieve lock handles from registry');
-    console.log('     - Resume operations with restored state\n');
+    logger.info('\n✅ Lock recovery test completed successfully!\n');
+    logger.debug('This test validates that:');
+    logger.debug('  1. Sessions can be persisted to disk');
+    logger.debug('  2. Lock handles can be tracked in registry');
+    logger.debug('  3. After a crash, a new connection instance can:');
+    logger.debug('     - Restore session state from file');
+    logger.debug('     - Retrieve lock handles from registry');
+    logger.debug('     - Resume operations with restored state\n');
   }, 30000);
 });
