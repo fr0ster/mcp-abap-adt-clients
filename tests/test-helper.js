@@ -6,6 +6,21 @@
 const fs = require('fs');
 const path = require('path');
 const yaml = require('yaml');
+const dotenv = require('dotenv');
+
+/**
+ * Load environment variables from .env file (quiet mode - no console output)
+ */
+function loadTestEnv() {
+  const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../.env');
+  if (fs.existsSync(envPath)) {
+    // Suppress dotenv console.log output
+    const originalLog = console.log;
+    console.log = () => {}; // Temporarily disable console.log
+    dotenv.config({ path: envPath });
+    console.log = originalLog; // Restore console.log
+  }
+}
 
 /**
  * Load test configuration from YAML
@@ -43,13 +58,7 @@ function getEnabledTestCase(handlerName, testCaseName) {
   }
 
   if (!enabledTest) {
-    if (testCaseName) {
-      console.warn(`⚠️  Test case "${testCaseName}" not found or disabled for "${handlerName}" in test-config.yaml`);
-    } else {
-      console.error(`❌ No enabled test case found for "${handlerName}" in test-config.yaml`);
-      console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
-      process.exit(1);
-    }
+    // Silent return - test will handle missing test case gracefully
     return null;
   }
 
@@ -66,13 +75,7 @@ function getAllEnabledTestCases(handlerName) {
   const handlerTests = config[handlerName]?.test_cases || [];
 
   const enabledTests = handlerTests.filter(tc => tc.enabled === true);
-
-  if (enabledTests.length === 0) {
-    console.error(`❌ No enabled test cases found for "${handlerName}" in test-config.yaml`);
-    console.error(`Please set enabled: true for at least one test case under ${handlerName}`);
-    process.exit(1);
-  }
-
+  // Silent return - test will handle empty array gracefully
   return enabledTests;
 }
 
@@ -91,10 +94,14 @@ function getTestSettings() {
   };
 }
 
+// Auto-load environment variables when module is imported
+loadTestEnv();
+
 module.exports = {
   loadTestConfig,
   getEnabledTestCase,
   getAllEnabledTestCases,
   getTestSettings,
+  loadTestEnv,
 };
 

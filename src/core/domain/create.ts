@@ -171,8 +171,8 @@ export async function createDomain(
     // Step 3: Create domain with full data
     await lockAndCreateDomain(connection, params, lockHandle, sessionId, username);
 
-    // Step 4: Check domain syntax
-    await checkDomainSyntax(connection, params.domain_name, sessionId);
+    // Step 4: Check domain validity (inactive version after creation)
+    await checkDomainSyntax(connection, params.domain_name, 'inactive', sessionId);
 
     // Step 5: Unlock domain
     await unlockDomain(connection, params.domain_name, lockHandle, sessionId);

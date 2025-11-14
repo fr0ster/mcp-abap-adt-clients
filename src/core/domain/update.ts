@@ -132,7 +132,7 @@ export async function updateDomain(
 
     await updateDomainInternal(connection, params, lockHandle, sessionId, username);
 
-    await checkDomainSyntax(connection, params.domain_name, sessionId);
+    await checkDomainSyntax(connection, params.domain_name, 'inactive', sessionId);
 
     await unlockDomain(connection, params.domain_name, lockHandle, sessionId);
 

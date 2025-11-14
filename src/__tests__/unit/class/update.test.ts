@@ -8,16 +8,10 @@
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { updateClassSource } from '../../../core/class/update';
 import { getClass } from '../../../core/class/read';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { createClass } from '../../../core/class/create';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
-
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+// Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -89,17 +83,45 @@ describe('Class - Update', () => {
     }
   });
 
+  // Helper function to ensure object exists before test (idempotency)
+  async function ensureClassExists(testCase: any) {
+    try {
+      await getClass(connection, testCase.params.class_name);
+      logger.debug(`Class ${testCase.params.class_name} exists`);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
+        const createTestCase = getEnabledTestCase('create_class');
+        if (createTestCase) {
+          await createClass(connection, {
+            class_name: testCase.params.class_name,
+            description: testCase.params.description || `Test class for ${testCase.params.class_name}`,
+            package_name: createTestCase.params.package_name,
+            source_code: createTestCase.params.source_code || undefined,
+          });
+          logger.debug(`Class ${testCase.params.class_name} created successfully`);
+        } else {
+          throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+
   it('should update class source code', async () => {
     if (!hasConfig) {
       logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const testCase = getEnabledTestCase('update_class', 'basic_class');
+    const testCase = getEnabledTestCase('update_class');
     if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
+      return; // Skip silently if test case not configured
     }
+
+    // Ensure class exists before test (idempotency)
+    await ensureClassExists(testCase);
 
     const updatedSourceCode = `CLASS ${testCase.params.class_name} DEFINITION
   PUBLIC

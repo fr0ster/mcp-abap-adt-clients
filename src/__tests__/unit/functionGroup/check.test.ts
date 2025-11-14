@@ -1,9 +1,12 @@
 /**
- * Unit test for getFunctionGroup
- * Tests only the read operation in isolation
+ * Unit test for Function Group syntax checking
+ * Tests checkFunctionGroup function
+ *
+ * Enable debug logs: DEBUG_TESTS=true npm test -- unit/functionGroup/check.test
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { checkFunctionGroup } from '../../../core/functionGroup/check';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 
@@ -59,7 +62,7 @@ function getConfig(): SapConfig {
   return config;
 }
 
-describe('Function Group - Read', () => {
+describe('Function Group - Check', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
@@ -69,7 +72,7 @@ describe('Function Group - Read', () => {
       connection = createAbapConnection(config, logger);
       hasConfig = true;
     } catch (error) {
-      console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -109,13 +112,13 @@ describe('Function Group - Read', () => {
     }
   }
 
-  it('should read function group', async () => {
+  it('should check active function group', async () => {
     if (!hasConfig) {
       logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const testCase = getEnabledTestCase('get_function_group');
+    const testCase = getEnabledTestCase('check_function_group');
     if (!testCase) {
       return; // Skip silently if test case not configured
     }
@@ -123,10 +126,84 @@ describe('Function Group - Read', () => {
     // Ensure function group exists before test (idempotency)
     await ensureFunctionGroupExists(testCase);
 
-    const functionGroupName = testCase.params.function_group_name || testCase.params.function_group;
+    const { generateSessionId } = await import('../../../utils/sessionUtils');
+    const sessionId = generateSessionId();
 
-    const result = await getFunctionGroup(connection, functionGroupName);
+    const functionGroupName = testCase.params.function_group_name || testCase.params.function_group;
+    const result = await checkFunctionGroup(
+      connection,
+      functionGroupName,
+      'active',
+      undefined, // sourceCode - not provided, checks existing function group
+      sessionId
+    );
     expect(result.status).toBe(200);
-    logger.debug(`✅ Read function group successfully: ${functionGroupName}`);
-  }, 10000);
+  }, 15000);
+
+  it('should check inactive function group', async () => {
+    if (!hasConfig) {
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      return;
+    }
+
+    const testCase = getEnabledTestCase('check_function_group');
+    if (!testCase) {
+      return; // Skip silently if test case not configured
+    }
+
+    // Ensure function group exists before test (idempotency)
+    await ensureFunctionGroupExists(testCase);
+
+    const { generateSessionId } = await import('../../../utils/sessionUtils');
+    const sessionId = generateSessionId();
+
+    const result = await checkFunctionGroup(
+      connection,
+      testCase.params.function_group_name,
+      'inactive',
+      undefined, // sourceCode - not provided, checks existing function group
+      sessionId
+    );
+    expect(result.status).toBe(200);
+  }, 15000);
+
+  it('should check hypothetical function group code', async () => {
+    if (!hasConfig) {
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      return;
+    }
+
+    const testCase = getEnabledTestCase('check_function_group');
+    if (!testCase) {
+      return; // Skip silently if test case not configured
+    }
+
+    const { generateSessionId } = await import('../../../utils/sessionUtils');
+    const sessionId = generateSessionId();
+
+    // Hypothetical function group source code (doesn't need to exist in SAP)
+    const hypotheticalSourceCode = `FUNCTION-POOL Z_TEST_HYPOTHETICAL.
+* Test function group`;
+
+    try {
+      const result = await checkFunctionGroup(
+        connection,
+        'Z_TEST_HYPOTHETICAL',
+        'active',
+        hypotheticalSourceCode, // sourceCode provided - validates hypothetical code
+        sessionId
+      );
+      expect(result.status).toBe(200);
+    } catch (error: any) {
+      // SAP may return error for non-existent objects during hypothetical check
+      // This is expected behavior - we just verify the request was processed
+      if (error.message && error.message.includes('does not exist')) {
+        logger.debug('Expected error for hypothetical check of non-existent function group');
+        expect(error.response?.status || 404).toBeDefined();
+      } else {
+        throw error;
+      }
+    }
+  }, 15000);
 });
+

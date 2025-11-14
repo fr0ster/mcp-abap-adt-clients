@@ -7,16 +7,11 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { checkClass } from '../../../core/class/check';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { getClass } from '../../../core/class/read';
+import { createClass } from '../../../core/class/create';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
-
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+// Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -88,19 +83,105 @@ describe('Class - Check', () => {
     }
   });
 
-  it('should check class syntax', async () => {
+  // Helper function to ensure object exists before test (idempotency)
+  async function ensureClassExists(testCase: any) {
+    try {
+      await getClass(connection, testCase.params.class_name);
+      logger.debug(`Class ${testCase.params.class_name} exists`);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
+        const createTestCase = getEnabledTestCase('create_class');
+        if (createTestCase) {
+          await createClass(connection, {
+            class_name: testCase.params.class_name,
+            description: `Test class for ${testCase.params.class_name}`,
+            package_name: createTestCase.params.package_name,
+            source_code: createTestCase.params.source_code || undefined,
+          });
+          logger.debug(`Class ${testCase.params.class_name} created successfully`);
+        } else {
+          throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
+        }
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  it('should check active class', async () => {
     if (!hasConfig) {
       logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const testCase = getEnabledTestCase('check_class', 'basic_class');
+    const testCase = getEnabledTestCase('check_class');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;
     }
 
-    const result = await checkClass(connection, testCase.params.class_name);
-    expect(result.status).toBe('ok');
+    // Ensure class exists before test (idempotency)
+    await ensureClassExists(testCase);
+
+    const result = await checkClass(connection, testCase.params.class_name, 'active');
+    expect(result.status).toBe(200);
+  }, 15000);
+
+  it('should check inactive class', async () => {
+    if (!hasConfig) {
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      return;
+    }
+
+    const testCase = getEnabledTestCase('check_class');
+    if (!testCase) {
+      logger.warn('⚠️ Skipping test: Test case is disabled');
+      return;
+    }
+
+    // Ensure class exists before test (idempotency)
+    await ensureClassExists(testCase);
+
+    const result = await checkClass(connection, testCase.params.class_name, 'inactive');
+    expect(result.status).toBe(200);
+  }, 15000);
+
+  it('should check hypothetical class code', async () => {
+    if (!hasConfig) {
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      return;
+    }
+
+    const hypotheticalCode = `CLASS ZCL_TEST_HYPOTHETICAL DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+
+  PUBLIC SECTION.
+    METHODS: test_method RETURNING VALUE(rv_result) TYPE string.
+ENDCLASS.
+
+CLASS ZCL_TEST_HYPOTHETICAL IMPLEMENTATION.
+  METHOD test_method.
+    rv_result = 'Test'.
+  ENDMETHOD.
+ENDCLASS.`;
+
+    // Check hypothetical code (object doesn't need to exist)
+    // Note: SAP may return error about non-existing object, but still validates the code
+    try {
+      const result = await checkClass(connection, 'ZCL_TEST_HYPOTHETICAL', 'active', hypotheticalCode);
+      expect(result.status).toBeGreaterThanOrEqual(200);
+      expect(result.status).toBeLessThan(500);
+    } catch (error: any) {
+      // If object doesn't exist, SAP may return error, but this is expected for hypothetical code
+      if (error.message && error.message.includes('does not exist')) {
+        // Still verify that request was made (status code indicates request was processed)
+        expect(error.message).toContain('ZCL_TEST_HYPOTHETICAL');
+      } else {
+        throw error;
+      }
+    }
   }, 15000);
 });

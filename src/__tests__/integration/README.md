@@ -97,7 +97,7 @@ create_class:
       class_name: ZCL_TEST_INHERIT
       package_name: ZTEST
       description: "Test class with superclass"
-      superclass: CL_WB_PGEDITOR_INITIAL_SCREEN
+      superclass: ZCL_TEST_BASIC
       final: true
 ```
 

@@ -1,17 +1,25 @@
 /**
- * Unit test for Class validation
- * Tests validateClassSource function
+ * Unit test for Domain activation
+ * Tests activateDomain function
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/validate.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/activate.test
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { validateClassSource } from '../../../core/class/validation';
-import { getClass } from '../../../core/class/read';
-import { createClass } from '../../../core/class/create';
+import { activateDomain } from '../../../core/domain/activation';
+import { getDomain } from '../../../core/domain/read';
+import { createDomain } from '../../../core/domain/create';
+import { generateSessionId } from '../../../utils/sessionUtils';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
-// Environment variables are loaded automatically by test-helper
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -62,7 +70,7 @@ function getConfig(): SapConfig {
   return config;
 }
 
-describe('Class - Validate', () => {
+describe('Domain - Activate', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
@@ -83,25 +91,34 @@ describe('Class - Validate', () => {
     }
   });
 
-  // Helper function to ensure object exists before test (idempotency)
-  async function ensureClassExists(testCase: any) {
+  // Helper function to ensure domain exists before test (idempotency)
+  async function ensureDomainExists(testCase: any) {
     try {
-      await getClass(connection, testCase.params.class_name);
-      logger.debug(`Class ${testCase.params.class_name} exists`);
+      await getDomain(connection, testCase.params.domain_name);
+      logger.debug(`Domain ${testCase.params.domain_name} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_class');
+        logger.debug(`Domain ${testCase.params.domain_name} does not exist, creating...`);
+        const createTestCase = getEnabledTestCase('create_domain', 'test_domain');
         if (createTestCase) {
-          await createClass(connection, {
-            class_name: testCase.params.class_name,
-            description: `Test class for ${testCase.params.class_name}`,
-            package_name: createTestCase.params.package_name,
-            source_code: createTestCase.params.source_code || undefined,
-          });
-          logger.debug(`Class ${testCase.params.class_name} created successfully`);
+          try {
+            await createDomain(connection, {
+              domain_name: testCase.params.domain_name,
+              description: createTestCase.params.description || `Test domain for ${testCase.params.domain_name}`,
+              package_name: createTestCase.params.package_name,
+              transport_request: createTestCase.params.transport_request,
+              datatype: createTestCase.params.datatype || 'CHAR',
+              length: createTestCase.params.length || 10,
+              decimals: createTestCase.params.decimals,
+              lowercase: createTestCase.params.lowercase,
+              sign_exists: createTestCase.params.sign_exists,
+            });
+            logger.debug(`Domain ${testCase.params.domain_name} created successfully`);
+          } catch (createError: any) {
+            throw createError;
+          }
         } else {
-          throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
+          throw new Error(`Cannot create domain ${testCase.params.domain_name}: create_domain test case not found`);
         }
       } else {
         throw error;
@@ -109,26 +126,29 @@ describe('Class - Validate', () => {
     }
   }
 
-  it('should validate existing class source code', async () => {
+  it('should activate domain', async () => {
     if (!hasConfig) {
       logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const testCase = getEnabledTestCase('get_class');
+    const testCase = getEnabledTestCase('activate_domain', 'test_domain');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;
     }
 
-    // Ensure class exists before test (idempotency)
-    await ensureClassExists(testCase);
+    // Ensure domain exists before test (idempotency)
+    await ensureDomainExists(testCase);
 
-    // Validate existing class without passing source code
-    const response = await validateClassSource(
+    const sessionId = generateSessionId();
+    const response = await activateDomain(
       connection,
-      testCase.params.class_name
+      testCase.params.domain_name,
+      sessionId
     );
-    expect(response.status).toBe(200);
-  }, 15000);
+    expect(response.status).toBeGreaterThanOrEqual(200);
+    expect(response.status).toBeLessThan(500);
+  }, 30000);
 });
+

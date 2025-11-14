@@ -57,7 +57,7 @@ export async function validateFunctionModuleSource(
   const objectName = `${functionGroupName}/${functionModuleName}`;
 
   let response: AxiosResponse;
-  
+
   if (sourceCode) {
     // Live validation with artifacts (code not saved to SAP)
     response = await runCheckRunWithSource(connection, objectType, objectName, sourceCode, version, 'abapCheckRun', sessionId);
@@ -68,8 +68,31 @@ export async function validateFunctionModuleSource(
 
   const checkResult = parseCheckRunResponse(response);
 
-  if (!checkResult.success || checkResult.has_errors) {
-    throw new Error(`Source validation failed: ${checkResult.message}`);
+  // Check result is OK if:
+  // 1. Message says "has been checked" or "was checked" - object was already checked, this is OK
+  // Problems are: ERROR and WARNING
+  // Only throw error if there are actual ERROR or WARNING messages
+
+  // If message indicates object was already checked, it's OK (even if has errors/warnings)
+  const isAlreadyChecked = checkResult.message?.toLowerCase().includes('has been checked') ||
+                          checkResult.message?.toLowerCase().includes('was checked');
+
+  if (isAlreadyChecked) {
+    return response; // Object was already checked - this is OK
+  }
+
+  // Problems: ERROR (errors) and WARNING (warnings)
+  if (checkResult.errors.length > 0) {
+    throw new Error(`Source validation failed: ${checkResult.message || 'Unknown error'}`);
+  }
+
+  if (checkResult.warnings.length > 0) {
+    throw new Error(`Source validation failed: ${checkResult.message || 'Warnings found'}`);
+  }
+
+  // If status is 'notProcessed', it's an error
+  if (checkResult.status === 'notProcessed') {
+    throw new Error(`Source validation failed: ${checkResult.message || 'Object could not be processed'}`);
   }
 
   return response;

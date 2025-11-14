@@ -1,17 +1,24 @@
 /**
- * Unit test for Class activation
- * Tests activateClass function
+ * Unit test for Domain creation
+ * Tests createDomain function
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/activate.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/create.test
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { activateClass } from '../../../core/class/activation';
-import { getClass } from '../../../core/class/read';
-import { createClass } from '../../../core/class/create';
+import { createDomain } from '../../../core/domain/create';
+import { getDomain } from '../../../core/domain/read';
+import { deleteObject } from '../../../core/delete';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
-// Environment variables are loaded automatically by test-helper
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -62,7 +69,7 @@ function getConfig(): SapConfig {
   return config;
 }
 
-describe('Class - Activate', () => {
+describe('Domain - Create', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
@@ -83,51 +90,46 @@ describe('Class - Activate', () => {
     }
   });
 
-  // Helper function to ensure object exists before test (idempotency)
-  async function ensureClassExists(testCase: any) {
-    try {
-      await getClass(connection, testCase.params.class_name);
-      logger.debug(`Class ${testCase.params.class_name} exists`);
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_class');
-        if (createTestCase) {
-          await createClass(connection, {
-            class_name: testCase.params.class_name,
-            description: `Test class for ${testCase.params.class_name}`,
-            package_name: createTestCase.params.package_name,
-            source_code: createTestCase.params.source_code || undefined,
-          });
-          logger.debug(`Class ${testCase.params.class_name} created successfully`);
-        } else {
-          throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
-        }
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  it('should activate class', async () => {
+  it('should create basic domain', async () => {
     if (!hasConfig) {
       logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const testCase = getEnabledTestCase('activate_class');
+    const testCase = getEnabledTestCase('create_domain', 'test_domain');
     if (!testCase) {
-      return; // Skip silently if test case not configured
+      logger.warn('⚠️ Skipping test: Test case is disabled');
+      return;
     }
 
-    // Ensure class exists before test (idempotency)
-    await ensureClassExists(testCase);
+    // Delete domain if it already exists (idempotency)
+    try {
+      await deleteObject(connection, {
+        object_name: testCase.params.domain_name,
+        object_type: 'DOMA/DD',
+      });
+      console.log(`ℹ️  Deleted existing domain ${testCase.params.domain_name}`);
+    } catch (error: any) {
+      // Domain doesn't exist or can't be deleted - ignore error
+      console.log(`ℹ️  Domain ${testCase.params.domain_name} doesn't exist or already deleted`);
+    }
 
-    const result = await activateClass(
-      connection,
-      testCase.params.class_name,
-      'test-session-id'
-    );
+    await createDomain(connection, {
+      domain_name: testCase.params.domain_name,
+      description: testCase.params.description,
+      package_name: testCase.params.package_name,
+      transport_request: testCase.params.transport_request,
+      datatype: testCase.params.datatype,
+      length: testCase.params.length,
+      decimals: testCase.params.decimals,
+      lowercase: testCase.params.lowercase,
+      sign_exists: testCase.params.sign_exists,
+    });
+
+    // Verify creation by reading
+    const result = await getDomain(connection, testCase.params.domain_name);
     expect(result.status).toBe(200);
-  }, 20000);
+    expect(result.data).toContain(testCase.params.domain_name.toUpperCase());
+  }, 60000);
 });
+

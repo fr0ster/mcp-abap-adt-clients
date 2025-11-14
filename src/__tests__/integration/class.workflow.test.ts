@@ -171,9 +171,9 @@ ENDCLASS.`;
     expect(updatedResult.data).toContain('Updated Text from Workflow');
     console.log(`✅ Verified Class update`);
 
-    // Step 4: Check Class
+    // Step 4: Check Class (inactive version after update)
     console.log('\n✓ Step 4: Checking Class syntax...');
-    const checkResult = await checkClass(connection, className);
+    const checkResult = await checkClass(connection, className, 'inactive');
     expect(checkResult.status).toBe('ok');
     console.log(`✅ Class syntax check passed`);
 

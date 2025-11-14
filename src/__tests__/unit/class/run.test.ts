@@ -7,16 +7,9 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { runClass } from '../../../core/class/run';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
-
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+// Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -94,7 +87,7 @@ describe('Class - Run', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('run_class', 'runnable_class');
+    const testCase = getEnabledTestCase('run_class');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

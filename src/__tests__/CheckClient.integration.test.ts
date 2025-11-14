@@ -5,9 +5,6 @@
 
 import { CrudClient } from '../clients/CrudClient';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 import * as programCheck from '../core/program/check';
 import * as classCheck from '../core/class/check';
 import * as interfaceCheck from '../core/interface/check';
@@ -20,14 +17,8 @@ import * as functionModuleCheck from '../core/functionModule/check';
 import * as tableCheck from '../core/table/check';
 import * as packageCheck from '../core/package/check';
 
-// Load test helper
+// Load test helper (environment variables are loaded automatically)
 const { getEnabledTestCase } = require('../../tests/test-helper');
-
-// Load environment variables
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
 
 function getConfig(): SapConfig {
   const rawUrl = process.env.SAP_URL;
@@ -105,10 +96,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkProgram', () => {
     it('should check test program syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_program', 'test_program');
+      const testCase = getEnabledTestCase('check_program');
       if (!testCase) {
-        console.log('Skipping: check_program test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -131,10 +121,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkClass', () => {
     it('should check test class syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_class', 'test_class');
+      const testCase = getEnabledTestCase('check_class');
       if (!testCase) {
-        console.log('Skipping: check_class test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -143,6 +132,7 @@ describe('Check Operations Integration Tests', () => {
         connection,
         testCase.params.class_name,
         testCase.params.version || 'active',
+        undefined, // sourceCode - not provided, checks existing class
         sessionId
       );
       expect(response.status).toBeGreaterThanOrEqual(200);
@@ -157,10 +147,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkInterface', () => {
     it('should check test interface syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_interface', 'test_interface');
+      const testCase = getEnabledTestCase('check_interface');
       if (!testCase) {
-        console.log('Skipping: check_interface test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -183,10 +172,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkDomainSyntax', () => {
     it('should check test domain syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_domain', 'test_domain');
+      const testCase = getEnabledTestCase('check_domain');
       if (!testCase) {
-        console.log('Skipping: check_domain test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -194,8 +182,8 @@ describe('Check Operations Integration Tests', () => {
       const response = await domainCheck.checkDomainSyntax(
         connection,
         testCase.params.domain_name,
-        sessionId,
-        testCase.params.version || 'new'
+        testCase.params.version || 'inactive',
+        sessionId
       );
       expect(response.status).toBeGreaterThanOrEqual(200);
       expect(response.status).toBeLessThan(500);
@@ -209,10 +197,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkDataElement', () => {
     it('should check test data element syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_data_element', 'test_data_element');
+      const testCase = getEnabledTestCase('check_data_element');
       if (!testCase) {
-        console.log('Skipping: check_data_element test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -235,10 +222,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkStructure', () => {
     it('should check test structure syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_structure', 'test_structure');
+      const testCase = getEnabledTestCase('check_structure');
       if (!testCase) {
-        console.log('Skipping: check_structure test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -261,10 +247,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkView', () => {
     it('should check test view syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_view', 'test_view');
+      const testCase = getEnabledTestCase('check_view');
       if (!testCase) {
-        console.log('Skipping: check_view test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -287,10 +272,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkFunctionGroup', () => {
     it('should check test function group syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_function_group', 'test_function_group');
+      const testCase = getEnabledTestCase('check_function_group');
       if (!testCase) {
-        console.log('Skipping: check_function_group test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -299,6 +283,7 @@ describe('Check Operations Integration Tests', () => {
         connection,
         testCase.params.function_group_name,
         testCase.params.version || 'active',
+        undefined, // sourceCode - not provided, checks existing function group
         sessionId
       );
       expect(response.status).toBeGreaterThanOrEqual(200);
@@ -313,10 +298,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkFunctionModule', () => {
     it('should check test function module syntax', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_function_module', 'test_function_module');
+      const testCase = getEnabledTestCase('check_function_module');
       if (!testCase) {
-        console.log('Skipping: check_function_module test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -340,10 +324,9 @@ describe('Check Operations Integration Tests', () => {
   describe('runCheckRun (table)', () => {
     it('should run table status check', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_table', 'test_table');
+      const testCase = getEnabledTestCase('check_table');
       if (!testCase) {
-        console.log('Skipping: check_table test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -360,10 +343,9 @@ describe('Check Operations Integration Tests', () => {
 
     it('should run abap check run for table', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_table', 'test_table');
+      const testCase = getEnabledTestCase('check_table');
       if (!testCase) {
-        console.log('Skipping: check_table test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       const { generateSessionId } = await import('../utils/sessionUtils');
@@ -386,10 +368,9 @@ describe('Check Operations Integration Tests', () => {
   describe('checkPackage', () => {
     it('should check test package', async () => {
       if (!hasConfig) return;
-      const testCase = getEnabledTestCase('check_package', 'test_package');
+      const testCase = getEnabledTestCase('check_package');
       if (!testCase) {
-        console.log('Skipping: check_package test case not configured');
-        return;
+        return; // Skip silently if test case not configured
       }
 
       await packageCheck.checkPackage(connection, testCase.params.package_name);

@@ -51,7 +51,7 @@ get_class:
       enabled: true
       description: "Get standard SAP class"
       params:
-        class_name: "CL_WB_PGEDITOR_INITIAL_SCREEN"  # Standard SAP class - usually available
+        class_name: "ZCL_TEST_MCP_01"  # User-created test class (Z-namespace)
 
 # Get Table
 get_table:

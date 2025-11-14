@@ -5,16 +5,11 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { deleteObject } from '../../../core/delete';
+import { getFunctionGroup } from '../../../core/functionGroup/read';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
-
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+// Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -86,16 +81,84 @@ describe('Function Group - Create', () => {
     }
   });
 
+  // Helper function to ensure object does not exist before creation test (idempotency)
+  async function ensureFunctionGroupDoesNotExist(testCase: any): Promise<boolean> {
+    try {
+      await getFunctionGroup(connection, testCase.params.function_group_name);
+      // Object exists, try to delete it
+      logger.debug(`Function group ${testCase.params.function_group_name} exists, attempting to delete...`);
+      try {
+        await deleteObject(connection, {
+          object_name: testCase.params.function_group_name,
+          object_type: 'FUGR/F',
+        });
+        logger.debug(`Function group ${testCase.params.function_group_name} deleted successfully`);
+        // Wait a bit for SAP to process deletion
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Verify it's truly gone - try a few times as SAP may have delay
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            await getFunctionGroup(connection, testCase.params.function_group_name);
+            // Object still exists, wait a bit more and try again
+            if (attempt < 2) {
+              logger.debug(`Function group ${testCase.params.function_group_name} still exists, waiting... (attempt ${attempt + 1}/3)`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+              // After 3 attempts, object still exists - might be locked or has dependencies
+              logger.warn(`Function group ${testCase.params.function_group_name} still exists after deletion attempt (may be locked or have dependencies)`);
+              // Still proceed - deletion was successful, SAP may just need more time
+              return true;
+            }
+          } catch (verifyError: any) {
+            if (verifyError.response?.status === 404) {
+              logger.debug(`Function group ${testCase.params.function_group_name} confirmed deleted`);
+              return true; // Successfully deleted
+            }
+            throw verifyError;
+          }
+        }
+        return true; // Proceed even if object still exists - deletion was successful
+      } catch (deleteError: any) {
+        logger.warn(`Failed to delete function group ${testCase.params.function_group_name}: ${deleteError.message}`);
+        return false; // Cannot proceed - deletion failed
+      }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        logger.debug(`Function group ${testCase.params.function_group_name} does not exist`);
+        return true; // Object doesn't exist - can proceed
+      }
+      throw error;
+    }
+  }
+
   it('should create function group', async () => {
     if (!hasConfig) {
-      console.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const testCase = getEnabledTestCase('create_function_group', 'test_function_group');
+    const testCase = getEnabledTestCase('create_function_group');
     if (!testCase) {
-      console.warn('⚠️ Skipping test: Test case create_function_group.test_function_group is disabled');
+      return; // Skip silently if test case not configured
+    }
+
+    // Ensure function group does not exist before creation (idempotency)
+    const canProceed = await ensureFunctionGroupDoesNotExist(testCase);
+    if (!canProceed) {
+      logger.warn(`⚠️ Skipping test: Cannot ensure function group ${testCase.params.function_group_name} does not exist`);
       return;
+    }
+
+    // Final verification that object doesn't exist
+    try {
+      await getFunctionGroup(connection, testCase.params.function_group_name);
+      logger.warn(`⚠️ Function group ${testCase.params.function_group_name} still exists, skipping creation test`);
+      return;
+    } catch (error: any) {
+      if (error.response?.status !== 404) {
+        throw error;
+      }
+      // Object doesn't exist - proceed with creation
     }
 
     const functionGroupName = testCase.params.function_group_name;
@@ -107,6 +170,6 @@ describe('Function Group - Create', () => {
       package_name: packageName,
     });
 
-    console.log(`✅ Created function group: ${functionGroupName}`);
+    logger.debug(`✅ Created function group: ${functionGroupName}`);
   }, 30000);
 });

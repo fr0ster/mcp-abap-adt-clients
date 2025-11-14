@@ -9,6 +9,8 @@ module.exports = {
   ],
   testTimeout: 30000,
   forceExit: true,
+  silent: false, // Show test output
+  verbose: false, // Don't show individual test names unless failed
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },

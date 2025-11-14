@@ -7,31 +7,41 @@ import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../shared/checkRun';
 
 /**
- * Check class syntax via ATC/syntax checker
+ * Check class code (syntax, compilation, rules)
  *
- * Uses POST /sap/bc/adt/checkruns?reporters=abapCheckRun
+ * CheckRun validates everything: syntax, compilation errors, warnings, code quality rules.
  *
- * XML body format:
- * - version="inactive": Checks modified but not activated version (after create/update, before activate)
- *   <chkrun:checkObject adtcore:uri="..." chkrun:version="inactive"/>
- *
- * - version="active": Checks activated version (after activate)
- *   <chkrun:checkObject adtcore:uri="..." chkrun:version="active"/>
- *   (optionally can include source code in body, but SAP accepts without it)
+ * Can check:
+ * - Existing active class: provide className, version='active', omit sourceCode
+ * - Existing inactive class: provide className, version='inactive', omit sourceCode
+ * - Hypothetical code: provide className, sourceCode, version (object doesn't need to exist)
  *
  * @param connection - SAP connection
  * @param className - Class name
- * @param version - 'inactive' (default after create/update) or 'active' (after activate)
+ * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
+ * @param sourceCode - Optional: source code to validate. If provided, validates hypothetical code without creating object
  * @param sessionId - Optional session ID
  * @returns Check result with errors/warnings
  */
 export async function checkClass(
   connection: AbapConnection,
   className: string,
-  version: 'inactive' | 'active' = 'active',
+  version: 'active' | 'inactive',
+  sourceCode?: string,
   sessionId?: string
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'class', className, version, 'abapCheckRun', sessionId);
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../shared/checkRun');
+
+  let response: AxiosResponse;
+
+  if (sourceCode) {
+    // Validate hypothetical code (object doesn't need to exist)
+    response = await runCheckRunWithSource(connection, 'class', className, sourceCode, version, 'abapCheckRun', sessionId);
+  } else {
+    // Validate existing object in SAP (reads from system)
+    response = await runCheckRun(connection, 'class', className, version, 'abapCheckRun', sessionId);
+  }
+
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success || checkResult.has_errors) {
