@@ -46,8 +46,10 @@ function getObjectUri(
     case 'interface':
       return `/sap/bc/adt/oo/interfaces/${encodedName}`;
     case 'function_group':
+    case 'FUGR/F':
       return `/sap/bc/adt/functions/groups/${encodedName}`;
     case 'function_module':
+    case 'FUGR/FF':
       if (!functionGroupName) {
         throw new Error('function_group_name is required for function_module deletion');
       }

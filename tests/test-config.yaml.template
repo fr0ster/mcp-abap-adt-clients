@@ -13,7 +13,8 @@ test_settings:
   timeout: 30000
   retry_on_failure: false
   max_retries: 1
-  cleanup_after_test: false
+  cleanup_before_test: true   # Clean up test objects before running tests
+  cleanup_after_test: false   # Keep test objects after tests for debugging
 
 # Environment configuration
 environment:
@@ -289,3 +290,30 @@ run_class:
               out->write( 'Test runnable class executed successfully' ).
             ENDMETHOD.
           ENDCLASS.
+
+# ============================================================================
+# EXAMPLE: Test-level settings override
+# ============================================================================
+# This example shows how to override global test_settings for a specific test
+
+# Example test with custom cleanup settings
+example_custom_cleanup:
+  test_cases:
+    - name: "keep_artifacts"
+      enabled: false
+      description: "Example: Keep test objects for manual inspection"
+      # Override global settings for this specific test
+      test_settings:
+        cleanup_before_test: false  # Don't clean up before (use existing objects)
+        cleanup_after_test: false   # Don't clean up after (keep for inspection)
+      params:
+        object_name: "ZCL_DEBUG_EXAMPLE"
+    - name: "clean_environment"
+      enabled: false
+      description: "Example: Start fresh and clean up after"
+      # Override global settings for this specific test
+      test_settings:
+        cleanup_before_test: true   # Clean up before (ensure fresh start)
+        cleanup_after_test: true    # Clean up after (leave no trace)
+      params:
+        object_name: "ZCL_CLEAN_EXAMPLE"

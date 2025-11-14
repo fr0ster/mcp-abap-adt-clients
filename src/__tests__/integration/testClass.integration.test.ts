@@ -85,6 +85,7 @@ describe('Class Operations (Integration)', () => {
   let testClassNameInherit: string;
   let testPackage: string;
   let hasConfig = false;
+  let activeLockHandle: string | null = null;
 
   beforeAll(async () => {
     try {
@@ -127,6 +128,19 @@ describe('Class Operations (Integration)', () => {
     } catch (error) {
       console.error('Failed to create connection:', error);
       hasConfig = false;
+    }
+  });
+
+  afterEach(async () => {
+    // Clean up any active locks
+    if (activeLockHandle && testClassName) {
+      try {
+        logger.debug(`🔓 Cleaning up lock for class: ${testClassName}`);
+        await unlockClass(connection, testClassName, activeLockHandle, '');
+        activeLockHandle = null;
+      } catch (error) {
+        logger.warn(`⚠️ Failed to unlock class in cleanup: ${error}`);
+      }
     }
   });
 

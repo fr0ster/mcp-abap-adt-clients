@@ -1,0 +1,2 @@
+# This file keeps the .locks directory in git
+# Lock registry (active-locks.json) is ignored via .gitignore

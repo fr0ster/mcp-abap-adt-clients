@@ -4,8 +4,16 @@
   "description": "ADT clients for SAP ABAP systems - Read-only, CRUD, and Management operations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "adt-lock-object": "./bin/lock-object.js",
+    "adt-unlock-object": "./bin/unlock-object.js",
+    "adt-manage-locks": "./bin/manage-locks.js",
+    "adt-manage-sessions": "./bin/manage-sessions.js",
+    "adt-unlock-objects": "./bin/unlock-test-objects.js"
+  },
   "files": [
     "dist",
+    "bin",
     "README.md",
     "LICENSE"
   ],
@@ -29,7 +37,9 @@
     "url": "git+https://github.com/fr0ster/mcp-abap-adt-clients.git"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "build:fast": "tsc -p tsconfig.json",
     "test": "jest",
     "prepublishOnly": "npm run build"
   },
@@ -38,7 +48,8 @@
   },
   "dependencies": {
     "@mcp-abap-adt/connection": "file:../connection",
-    "fast-xml-parser": "^5.2.5"
+    "fast-xml-parser": "^5.2.5",
+    "yaml": "^2.3.4"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

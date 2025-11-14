@@ -147,7 +147,9 @@ export function parseCheckRunResponse(response: AxiosResponse): {
     const status = checkReport['@_chkrun:status'] || checkReport['chkrun:status'] || checkReport['@_status'] || checkReport['status'];
     const statusText = checkReport['chkrun:statusText'] || checkReport['@_chkrun:statusText'] || checkReport['statusText'] || checkReport['@_statusText'] || '';
 
-    const messages = checkReport['chkrun:messages']?.['msg']
+    const messages = checkReport['chkrun:checkMessageList']?.['chkrun:checkMessage']
+      || checkReport['checkMessageList']?.['checkMessage']
+      || checkReport['chkrun:messages']?.['msg']
       || checkReport['messages']?.['msg']
       || checkReport['chkrun:messages']
       || checkReport['messages']
@@ -162,10 +164,10 @@ export function parseCheckRunResponse(response: AxiosResponse): {
     messageArray.forEach((msg: any) => {
       if (!msg || typeof msg !== 'object') return;
 
-      const msgType = msg['@_type'] || msg['type'];
-      const shortText = msg['shortText']?.['#text'] || msg['shortText'] || msg['shortText']?.['txt'] || '';
+      const msgType = msg['@_chkrun:type'] || msg['@_type'] || msg['type'];
+      const shortText = msg['@_chkrun:shortText'] || msg['shortText']?.['#text'] || msg['shortText'] || msg['shortText']?.['txt'] || '';
       const line = msg['@_line'] || msg['line'];
-      const href = msg['@_href'] || msg['href'];
+      const href = msg['@_chkrun:uri'] || msg['@_href'] || msg['href'];
 
       const msgObj = {
         type: msgType,

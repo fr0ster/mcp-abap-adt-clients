@@ -1,0 +1,76 @@
+/**
+ * Test helper utilities for integration tests
+ * Manages lock state persistence and cleanup
+ */
+
+import { getLockStateManager, LockState } from '../../utils/lockStateManager';
+
+/**
+ * Register lock in persistent storage
+ */
+export function registerTestLock(
+  objectType: LockState['objectType'],
+  objectName: string,
+  sessionId: string,
+  lockHandle: string,
+  functionGroupName?: string,
+  testFile?: string
+): void {
+  const lockManager = getLockStateManager();
+  lockManager.registerLock({
+    objectType,
+    objectName,
+    sessionId,
+    lockHandle,
+    functionGroupName,
+    testFile,
+  });
+}
+
+/**
+ * Remove lock from persistent storage
+ */
+export function unregisterTestLock(
+  objectType: string,
+  objectName: string,
+  functionGroupName?: string
+): void {
+  const lockManager = getLockStateManager();
+  lockManager.removeLock(objectType, objectName, functionGroupName);
+}
+
+/**
+ * Get registered lock
+ */
+export function getTestLock(
+  objectType: string,
+  objectName: string,
+  functionGroupName?: string
+): LockState | undefined {
+  const lockManager = getLockStateManager();
+  return lockManager.getLock(objectType, objectName, functionGroupName);
+}
+
+/**
+ * Cleanup all locks for current test file
+ */
+export function cleanupTestLocks(testFile?: string): void {
+  const lockManager = getLockStateManager();
+  const allLocks = lockManager.getAllLocks();
+
+  if (testFile) {
+    // Remove only locks from this test file
+    allLocks
+      .filter((lock: LockState) => lock.testFile === testFile)
+      .forEach((lock: LockState) => {
+        lockManager.removeLock(lock.objectType, lock.objectName, lock.functionGroupName);
+      });
+  } else {
+    // Remove all locks from current process
+    allLocks
+      .filter((lock: LockState) => lock.pid === process.pid)
+      .forEach((lock: LockState) => {
+        lockManager.removeLock(lock.objectType, lock.objectName, lock.functionGroupName);
+      });
+  }
+}

@@ -9,3 +9,10 @@ coverage/
 tests/test-config.yaml
 
 coverage/**
+
+# Session and lock files - keep directories but ignore contents
+.sessions/*
+!.sessions/.keep
+
+.locks/*
+!.locks/.keep

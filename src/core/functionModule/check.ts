@@ -118,3 +118,71 @@ export async function checkFunctionModule(
   return response;
 }
 
+/**
+ * Validate function module source code that hasn't been saved to SAP yet (live validation).
+ *
+ * This performs real-time syntax/ATC checks on unsaved source code,
+ * similar to the validation Eclipse ADT editor does during typing.
+ * The source code is encoded as base64 and sent as an artifact in the check request.
+ *
+ * Use cases:
+ * - Validate code before saving to SAP
+ * - Real-time validation during code editing
+ * - Pre-flight checks before create/update operations
+ *
+ * @param connection - SAP connection
+ * @param functionGroupName - Function group name (for context)
+ * @param functionModuleName - Function module name (for context, doesn't need to exist in SAP)
+ * @param sourceCode - The ABAP source code to validate
+ * @param version - 'active' (default) or 'inactive' - version context for validation
+ * @param sessionId - Optional session ID
+ * @returns Check result with errors/warnings
+ * @throws Error if validation finds syntax errors
+ */
+export async function validateFunctionModuleSource(
+  connection: AbapConnection,
+  functionGroupName: string,
+  functionModuleName: string,
+  sourceCode: string,
+  version: 'inactive' | 'active' = 'active',
+  sessionId?: string
+): Promise<AxiosResponse> {
+  const { buildCheckRunXmlWithSource } = await import('../shared/checkRun');
+
+  const encodedGroup = encodeSapObjectName(functionGroupName).toLowerCase();
+  const encodedModule = encodeSapObjectName(functionModuleName).toLowerCase();
+  const objectUri = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedModule}`;
+
+  // Build XML with source code embedded
+  const xmlBody = buildCheckRunXmlWithSource(objectUri, sourceCode, version);
+
+  const headers = {
+    'Accept': 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+  };
+  const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
+
+  let response: AxiosResponse;
+  if (sessionId) {
+    const { makeAdtRequestWithSession } = await import('../../utils/sessionUtils');
+    response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, xmlBody, headers);
+  } else {
+    const baseUrl = await connection.getBaseUrl();
+    response = await connection.makeAdtRequest({
+      url: `${baseUrl}${url}`,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      data: xmlBody,
+      headers
+    });
+  }
+
+  const checkResult = parseCheckRunResponse(response);
+
+  if (!checkResult.success && checkResult.has_errors) {
+    throw new Error(`Source validation failed: ${checkResult.message}`);
+  }
+
+  return response;
+}
+

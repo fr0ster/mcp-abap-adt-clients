@@ -7,4 +7,5 @@ export * from './create';
 export * from './read';
 export * from './activation';
 export * from './check';
+export * from './lock';
 
