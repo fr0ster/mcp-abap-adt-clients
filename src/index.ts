@@ -31,6 +31,7 @@ export { StructureBuilder, type StructureBuilderConfig, type StructureBuilderLog
 export { TableBuilder, type TableBuilderConfig, type TableBuilderLogger, type TableBuilderState } from './core/table/TableBuilder';
 export { ViewBuilder, type ViewBuilderConfig, type ViewBuilderLogger, type ViewBuilderState } from './core/view/ViewBuilder';
 export { TransportBuilder, type TransportBuilderConfig, type TransportBuilderLogger, type TransportBuilderState } from './core/transport/TransportBuilder';
+export { PackageBuilder, type PackageBuilderConfig, type PackageBuilderLogger, type PackageBuilderState } from './core/package/PackageBuilder';
 
 // Re-export types from connection package for convenience
 export type { AbapConnection, AbapRequestOptions } from '@mcp-abap-adt/connection';
