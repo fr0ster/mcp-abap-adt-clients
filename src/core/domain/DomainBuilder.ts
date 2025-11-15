@@ -33,15 +33,17 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
-import { createDomain } from './create';
-import { lockDomain } from './lock';
+import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { createEmptyDomain, lockAndCreateDomain } from './create';
+import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
 import { CreateDomainParams, UpdateDomainParams } from './types';
 import { checkDomainSyntax } from './check';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { FixedValue } from './types';
+import { validateObjectName, ValidationResult } from '../shared/validation';
+import { getSystemInformation } from '../shared/systemInfo';
 
 export interface DomainBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -66,6 +68,7 @@ export interface DomainBuilderConfig {
 }
 
 export interface DomainBuilderState {
+  validationResult?: ValidationResult;
   createResult?: AxiosResponse;
   lockHandle?: string;
   updateResult?: AxiosResponse;
@@ -163,12 +166,44 @@ export class DomainBuilder {
 
   // Operation methods - return Promise<this> for Promise chaining
   // Chain is interrupted on error (standard Promise behavior)
+  async validate(): Promise<this> {
+    try {
+      this.logger.info?.('Validating domain name:', this.config.domainName);
+      const result = await validateObjectName(
+        this.connection,
+        'DOMA/DD',
+        this.config.domainName,
+        this.config.packageName ? { packagename: this.config.packageName } : undefined
+      );
+      this.state.validationResult = result;
+      if (!result.valid) {
+        throw new Error(`Domain name validation failed: ${result.message || 'Invalid domain name'}`);
+      }
+      this.logger.info?.('Domain name validation successful');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'validate',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Validation failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async create(): Promise<this> {
     try {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating domain:', this.config.domainName);
+      this.logger.info?.('Creating empty domain:', this.config.domainName);
+
+      // Get masterSystem and responsible (only for cloud systems)
+      const systemInfo = await getSystemInformation(this.connection);
+      const masterSystem = systemInfo?.systemID;
+      const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
       const params: CreateDomainParams = {
         domain_name: this.config.domainName,
         package_name: this.config.packageName,
@@ -181,12 +216,19 @@ export class DomainBuilder {
         lowercase: this.config.lowercase,
         sign_exists: this.config.sign_exists,
         value_table: this.config.value_table,
-        fixed_values: this.config.fixed_values,
-        activate: false // Don't activate in low-level function
+        fixed_values: this.config.fixed_values
       };
-      const result = await createDomain(this.connection, params);
+
+      // Create empty domain only (initial POST to register the name)
+      const result = await createEmptyDomain(
+        this.connection,
+        params,
+        this.sessionId,
+        username,
+        masterSystem
+      );
       this.state.createResult = result;
-      this.logger.info?.('Domain created successfully:', result.status);
+      this.logger.info?.('Empty domain created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -230,25 +272,64 @@ export class DomainBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Updating domain:', this.config.domainName);
-      const params: UpdateDomainParams = {
-        domain_name: this.config.domainName,
-        package_name: this.config.packageName,
-        transport_request: this.config.transportRequest,
-        description: this.config.description,
-        datatype: this.config.datatype,
-        length: this.config.length,
-        decimals: this.config.decimals,
-        conversion_exit: this.config.conversion_exit,
-        lowercase: this.config.lowercase,
-        sign_exists: this.config.sign_exists,
-        value_table: this.config.value_table,
-        fixed_values: this.config.fixed_values,
-        activate: false // Don't activate in low-level function
-      };
-      const result = await updateDomain(this.connection, params);
-      this.state.updateResult = result;
-      this.logger.info?.('Domain updated successfully:', result.status);
+
+      // Get masterSystem and responsible (only for cloud systems)
+      const systemInfo = await getSystemInformation(this.connection);
+      const masterSystem = systemInfo?.systemID;
+      const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+      // Check if this is a CREATE workflow (createResult exists) or UPDATE workflow
+      const isCreateWorkflow = !!this.state.createResult;
+
+      if (isCreateWorkflow) {
+        // For CREATE workflow: use lockAndCreateDomain to fill empty domain with data
+        this.logger.info?.('Filling domain with data (CREATE workflow):', this.config.domainName);
+        const createParams: CreateDomainParams = {
+          domain_name: this.config.domainName,
+          package_name: this.config.packageName,
+          transport_request: this.config.transportRequest,
+          description: this.config.description,
+          datatype: this.config.datatype,
+          length: this.config.length,
+          decimals: this.config.decimals,
+          conversion_exit: this.config.conversion_exit,
+          lowercase: this.config.lowercase,
+          sign_exists: this.config.sign_exists,
+          value_table: this.config.value_table,
+          fixed_values: this.config.fixed_values
+        };
+        const result = await lockAndCreateDomain(
+          this.connection,
+          createParams,
+          this.lockHandle,
+          this.sessionId,
+          username,
+          masterSystem
+        );
+        this.state.updateResult = result;
+        this.logger.info?.('Domain filled with data successfully:', result.status);
+      } else {
+        // For UPDATE workflow: use updateDomain to update existing domain
+        this.logger.info?.('Updating domain (UPDATE workflow):', this.config.domainName);
+        const updateParams: UpdateDomainParams = {
+          domain_name: this.config.domainName,
+          package_name: this.config.packageName,
+          transport_request: this.config.transportRequest,
+          description: this.config.description,
+          datatype: this.config.datatype,
+          length: this.config.length,
+          decimals: this.config.decimals,
+          conversion_exit: this.config.conversion_exit,
+          lowercase: this.config.lowercase,
+          sign_exists: this.config.sign_exists,
+          value_table: this.config.value_table,
+          fixed_values: this.config.fixed_values,
+          activate: false // Don't activate in low-level function
+        };
+        const result = await updateDomain(this.connection, updateParams);
+        this.state.updateResult = result;
+        this.logger.info?.('Domain updated successfully:', result.status);
+      }
       return this;
     } catch (error: any) {
       this.state.errors.push({

@@ -17,7 +17,7 @@ import { CreateDomainParams } from './types';
 /**
  * Create empty domain (initial POST to register the name)
  */
-async function createEmptyDomain(
+export async function createEmptyDomain(
   connection: AbapConnection,
   args: CreateDomainParams,
   sessionId: string,
@@ -52,7 +52,7 @@ async function createEmptyDomain(
  * Create domain with lock handle
  * Build XML from scratch using parameters
  */
-async function lockAndCreateDomain(
+export async function lockAndCreateDomain(
   connection: AbapConnection,
   args: CreateDomainParams,
   lockHandle: string,

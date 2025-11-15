@@ -19,6 +19,7 @@ import { CreateDataElementParams, UpdateDataElementParams } from './types';
 import { checkDataElement } from './check';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
+import { validateObjectName, ValidationResult } from '../shared/validation';
 
 export interface DataElementBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -45,6 +46,7 @@ export interface DataElementBuilderConfig {
 }
 
 export interface DataElementBuilderState {
+  validationResult?: ValidationResult;
   createResult?: AxiosResponse;
   lockHandle?: string;
   updateResult?: AxiosResponse;
@@ -151,6 +153,32 @@ export class DataElementBuilder {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
+  async validate(): Promise<this> {
+    try {
+      this.logger.info?.('Validating data element name:', this.config.dataElementName);
+      const result = await validateObjectName(
+        this.connection,
+        'DTEL/DE',
+        this.config.dataElementName,
+        this.config.packageName ? { packagename: this.config.packageName } : undefined
+      );
+      this.state.validationResult = result;
+      if (!result.valid) {
+        throw new Error(`Data element name validation failed: ${result.message || 'Invalid data element name'}`);
+      }
+      this.logger.info?.('Data element name validation successful');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'validate',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Validation failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async create(): Promise<this> {
     try {
       if (!this.config.packageName) {
