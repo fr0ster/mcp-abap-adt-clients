@@ -8,7 +8,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
-import { acquireLockHandleForUpdate } from './lock';
+import { lockDomain } from './lock';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
@@ -136,7 +136,7 @@ export async function updateDomain(
   let lockHandle = '';
 
   try {
-    lockHandle = await acquireLockHandleForUpdate(connection, params.domain_name, sessionId);
+    lockHandle = await lockDomain(connection, params.domain_name, sessionId);
 
     await new Promise(resolve => setTimeout(resolve, 500));
 

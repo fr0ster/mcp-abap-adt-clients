@@ -10,4 +10,6 @@ export * from './lock';
 export * from './unlock';
 export * from './activation';
 export * from './check';
+export * from './delete';
+export { DomainBuilder, type DomainBuilderConfig, type DomainBuilderLogger, type DomainBuilderState } from './DomainBuilder';
 

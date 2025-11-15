@@ -7,7 +7,7 @@ import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
-import { acquireLockHandleForUpdate } from './lock';
+import { lockDataElement } from './lock';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { UpdateDataElementParams } from './types';
@@ -202,7 +202,7 @@ export async function updateDataElement(
       domainInfo = await getDomainInfo(connection, domainName);
     }
 
-    lockHandle = await acquireLockHandleForUpdate(connection, params.data_element_name, sessionId);
+    lockHandle = await lockDataElement(connection, params.data_element_name, sessionId);
 
     await new Promise(resolve => setTimeout(resolve, 500));
 

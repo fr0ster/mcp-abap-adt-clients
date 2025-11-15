@@ -9,9 +9,10 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
- * Acquire lock handle for update
+ * Lock data element for modification
+ * Returns lock handle that must be used in subsequent requests
  */
-export async function acquireLockHandleForUpdate(
+export async function lockDataElement(
   connection: AbapConnection,
   dataElementName: string,
   sessionId: string

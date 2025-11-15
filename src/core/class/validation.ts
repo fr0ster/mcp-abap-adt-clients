@@ -9,6 +9,9 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { ValidationResult } from '../shared/validation';
 import { runCheckRunWithSource, parseCheckRunResponse } from '../shared/checkRun';
 
+// Re-export ValidationResult for convenience
+export type { ValidationResult } from '../shared/validation';
+
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},

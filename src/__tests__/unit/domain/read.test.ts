@@ -26,7 +26,7 @@ const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+  dotenv.config({ path: envPath, quiet: true });
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';

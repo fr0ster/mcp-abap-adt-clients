@@ -25,7 +25,7 @@ import * as yaml from 'yaml';
 // Load environment variables
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../.env');
 if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+  dotenv.config({ path: envPath, quiet: true });
 }
 
 // Load test configuration

@@ -55,9 +55,10 @@ export async function acquireLockHandle(
 }
 
 /**
- * Acquire lock handle for update
+ * Lock domain for modification
+ * Returns lock handle that must be used in subsequent requests
  */
-export async function acquireLockHandleForUpdate(
+export async function lockDomain(
   connection: AbapConnection,
   domainName: string,
   sessionId: string

@@ -16,7 +16,7 @@
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { acquireLockHandleForUpdate } from '../../../core/domain/lock';
+import { lockDomain } from '../../../core/domain/lock';
 import { unlockDomain } from '../../../core/domain/unlock';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
@@ -29,7 +29,7 @@ const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, get
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
+  dotenv.config({ path: envPath, quiet: true });
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -172,7 +172,7 @@ describe('Domain - Unlock', () => {
     const sessionId = generateSessionId();
 
     // First lock the domain to get a lock handle
-    const lockHandle = await acquireLockHandleForUpdate(
+    const lockHandle = await lockDomain(
       connection,
       testCase.params.domain_name,
       sessionId
