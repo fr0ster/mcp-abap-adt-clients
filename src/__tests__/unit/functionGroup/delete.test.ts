@@ -8,7 +8,7 @@ import { deleteObject } from '../../../core/delete';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -94,15 +94,15 @@ describe('Function Group - Delete', () => {
       if (error.response?.status === 404) {
         logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_function_group');
-        if (createTestCase && createTestCase.params.package_name) {
+        if (createTestCase) {
           await createFunctionGroup(connection, {
             function_group_name: functionGroupName,
             description: testCase.params.description || `Test function group for ${functionGroupName}`,
-            package_name: createTestCase.params.package_name,
+            package_name: createTestCase.params.package_name || getDefaultPackage(),
           });
           logger.debug(`Function group ${functionGroupName} created successfully`);
         } else {
-          throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found or missing package_name`);
+          throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found`);
         }
       } else {
         throw error;

@@ -20,7 +20,7 @@ import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { deleteObject } from '../../../core/delete';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -187,7 +187,7 @@ describe('Function Group - Create', () => {
     }
 
     const functionGroupName = testCase.params.function_group_name;
-    const packageName = testCase.params.package_name;
+    const packageName = testCase.params.package_name || getDefaultPackage();
 
     await createFunctionGroup(connection, {
       function_group_name: functionGroupName,

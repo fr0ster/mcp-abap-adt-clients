@@ -25,7 +25,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -125,8 +125,8 @@ describe('Domain - Unlock', () => {
             await createDomain(connection, {
               domain_name: domainName,
               description: createTestCase.params.description || `Test domain for ${domainName}`,
-              package_name: createTestCase.params.package_name,
-              transport_request: createTestCase.params.transport_request,
+              package_name: createTestCase.params.package_name || getDefaultPackage(),
+              transport_request: createTestCase.params.transport_request || getDefaultTransport(),
               datatype: createTestCase.params.datatype || 'CHAR',
               length: createTestCase.params.length || 10,
               decimals: createTestCase.params.decimals,
