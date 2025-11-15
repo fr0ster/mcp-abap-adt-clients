@@ -54,6 +54,8 @@ export interface ClassBuilderConfig {
   final?: boolean;
   abstract?: boolean;
   createProtected?: boolean;
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface ClassBuilderLogger {
@@ -188,6 +190,8 @@ export class ClassBuilder {
         final: this.config.final,
         abstract: this.config.abstract,
         create_protected: this.config.createProtected,
+        master_system: this.config.masterSystem,
+        responsible: this.config.responsible,
       });
       this.state.createResult = result;
       this.logger.info?.('Class created successfully:', result.status);
