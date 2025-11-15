@@ -7,6 +7,7 @@ import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId } from '../../utils/sessionUtils';
+import { getSystemInformation } from '../shared/systemInfo';
 import { activateDataElement } from './activation';
 import { CreateDataElementParams } from './types';
 import * as crypto from 'crypto';
@@ -56,7 +57,8 @@ async function createDataElementInternal(
   connection: AbapConnection,
   args: CreateDataElementParams,
   sessionId: string,
-  username: string
+  username: string,
+  masterSystem?: string
 ): Promise<AxiosResponse> {
   const baseUrl = await connection.getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
@@ -70,6 +72,7 @@ async function createDataElementInternal(
   const longLabel = args.long_label || '';
   const headingLabel = args.heading_label || '';
 
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel"
             xmlns:adtcore="http://www.sap.com/adt/core"
@@ -79,7 +82,7 @@ async function createDataElementInternal(
             adtcore:language="EN"
             adtcore:name="${args.data_element_name.toUpperCase()}"
             adtcore:type="DTEL/DE"
-            adtcore:masterLanguage="EN"
+            adtcore:masterLanguage="EN"${masterSystemAttr}
             adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
   <dtel:dataElement>
@@ -165,11 +168,17 @@ export async function createDataElement(
   }
 
   const sessionId = generateSessionId();
-  const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
+  const systemInfo = await getSystemInformation(connection);
+  const masterSystem = systemInfo?.systemID;
+  const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
   try {
     // Step 1: Create data element with POST
-    await createDataElementInternal(connection, params, sessionId, username);
+    await createDataElementInternal(connection, params, sessionId, username, masterSystem);
 
     // Step 2: Activate data element
     await activateDataElement(connection, params.data_element_name, sessionId);

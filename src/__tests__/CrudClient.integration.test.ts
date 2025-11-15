@@ -221,21 +221,7 @@ describe('CrudClient Integration Tests', () => {
     });
   });
 
-  describe('updateClassSource', () => {
-    it('should update test class source', async () => {
-      if (!hasConfig) return;
-      const testCase = getEnabledTestCase('update_class_source', 'test_class');
-      if (!testCase) {
-        console.log('Skipping: update_class_source test case not configured');
-        return;
-      }
-
-      const response = await client.updateClassSource(testCase.params);
-      expect(response.status).toBeGreaterThanOrEqual(200);
-      expect(response.status).toBeLessThan(500);
-      expect(response.data).toHaveProperty('success', true);
-    });
-  });
+  // updateClassSource removed - use low-level functions: lockClass -> updateClass -> unlockClass -> activateClass
 
   // ============================================================================
   // PROGRAM OPERATIONS

@@ -41,18 +41,20 @@ async function createInterfaceObject(
   masterSystem?: string,
   responsible?: string
 ): Promise<void> {
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
   let finalMasterSystem = masterSystem;
   let finalResponsible = responsible;
 
-  if (!finalMasterSystem || !finalResponsible) {
-    const systemInfo = await getSystemInformation(connection);
-    if (systemInfo) {
-      finalMasterSystem = finalMasterSystem || systemInfo.systemID;
-      finalResponsible = finalResponsible || systemInfo.userName;
-    }
+  const systemInfo = await getSystemInformation(connection);
+  if (systemInfo) {
+    finalMasterSystem = finalMasterSystem || systemInfo.systemID;
+    finalResponsible = finalResponsible || systemInfo.userName;
   }
 
-  finalMasterSystem = finalMasterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
+  // Only use masterSystem from getSystemInformation (cloud), not from env
+  // username can fallback to env if not provided
   finalResponsible = finalResponsible || process.env.SAP_USERNAME || process.env.SAP_USER || '';
 
   const masterSystemAttr = finalMasterSystem ? ` adtcore:masterSystem="${finalMasterSystem}"` : '';

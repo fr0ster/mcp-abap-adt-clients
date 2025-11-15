@@ -171,7 +171,7 @@ describe('Function Module - Complete Workflow', () => {
 
       // Step 5: Check Function Module syntax
       console.log('\n✓ Step 5: Checking FM syntax...');
-      const checkResult = await checkFunctionModule(connection, functionGroupName, functionModuleName);
+      const checkResult = await checkFunctionModule(connection, functionGroupName, functionModuleName, 'active');
       expect(checkResult.status).toBe('ok');
       console.log(`✅ FM syntax check passed`);
 

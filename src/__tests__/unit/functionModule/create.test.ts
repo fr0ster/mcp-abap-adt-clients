@@ -3,6 +3,16 @@
  * Tests only the create operation in isolation
  *
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/functionModule/create.test
+ *
+ * IDEMPOTENCY PRINCIPLE:
+ * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
+ * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
+ *   This ensures the test always starts from a clean state (object doesn't exist).
+ * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
+ *   check if the object exists and CREATE it if missing. This ensures the test has
+ *   the required object available.
+ *
+ * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
@@ -12,7 +22,7 @@ import { deleteObject } from '../../../core/delete';
 import { getFunction } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -194,6 +204,14 @@ describe('Function Module - Create', () => {
 
     if (!functionModuleName || !functionGroupName) {
       return; // Skip silently if required params missing
+    }
+
+    // Validate that function module and function group are in user space (Z_ or Y_)
+    try {
+      validateTestCaseForUserSpace(testCase, 'create_function_module');
+    } catch (error: any) {
+      logger.warn(`⚠️ Skipping test: ${error.message}`);
+      return;
     }
 
     // Ensure function group exists (idempotency)

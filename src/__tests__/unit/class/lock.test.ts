@@ -5,70 +5,37 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/lock.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { lockClass } from '../../../core/class/lock';
 import { unlockClass } from '../../../core/class/unlock';
 import { getClass } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
+import { activateClass } from '../../../core/class/activation';
+import { updateClass } from '../../../core/class/update';
+import { generateSessionId } from '../../../utils/sessionUtils';
+import { getConfigFromEnv } from '@mcp-abap-adt/connection';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const getConfig = getConfigFromEnv;
+
+const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
-  warn: console.warn,
+  warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
   csrfToken: debugEnabled ? console.log : () => {},
 };
-
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
 
 describe('Class - Lock/Unlock', () => {
   let connection: AbapConnection;
   let hasConfig = false;
   let lockHandle: string | null = null;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    lockHandle = null; // Reset lock handle for each test
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
@@ -79,10 +46,11 @@ describe('Class - Lock/Unlock', () => {
     }
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (connection) {
       connection.reset();
     }
+    lockHandle = null; // Clean up lock handle
   });
 
   // Helper function to ensure object exists before test (idempotency)
@@ -94,17 +62,45 @@ describe('Class - Lock/Unlock', () => {
       if (error.response?.status === 404) {
         logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_class');
-        if (createTestCase) {
-          await createClass(connection, {
-            class_name: testCase.params.class_name,
-            description: `Test class for ${testCase.params.class_name}`,
-            package_name: createTestCase.params.package_name,
-            source_code: createTestCase.params.source_code || undefined,
-          });
-          logger.debug(`Class ${testCase.params.class_name} created successfully`);
-        } else {
+        if (!createTestCase) {
           throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
         }
+
+        const sourceCode = createTestCase.params.source_code;
+        if (!sourceCode) {
+          throw new Error(`source_code is required for creating class ${testCase.params.class_name}`);
+        }
+
+        const className = testCase.params.class_name;
+        const sessionId = generateSessionId();
+
+        // Step 1: Create class object (metadata only)
+        await createClass(connection, {
+          class_name: className,
+          description: `Test class for ${className}`,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+        });
+
+        // Step 2: Lock class
+        const lockHandle = await lockClass(connection, className, sessionId);
+
+        // Step 3: Update source code
+        await updateClass(
+          connection,
+          className,
+          sourceCode,
+          lockHandle,
+          sessionId,
+          createTestCase.params.transport_request
+        );
+
+        // Step 4: Unlock class
+        await unlockClass(connection, className, lockHandle, sessionId);
+
+        // Step 5: Activate class
+        await activateClass(connection, className, sessionId);
+
+        logger.debug(`Class ${className} created and activated successfully`);
       } else {
         throw error;
       }

@@ -11,6 +11,7 @@ import { acquireLockHandle } from './lock';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
+import { getSystemInformation } from '../shared/systemInfo';
 import { CreateDomainParams } from './types';
 
 /**
@@ -20,11 +21,13 @@ async function createEmptyDomain(
   connection: AbapConnection,
   args: CreateDomainParams,
   sessionId: string,
-  username: string
+  username: string,
+  masterSystem?: string
 ): Promise<AxiosResponse> {
   const corrNrParam = args.transport_request ? `?corrNr=${args.transport_request}` : '';
   const url = `/sap/bc/adt/ddic/domains${corrNrParam}`;
 
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
              xmlns:adtcore="http://www.sap.com/adt/core"
@@ -32,7 +35,7 @@ async function createEmptyDomain(
              adtcore:language="EN"
              adtcore:name="${args.domain_name.toUpperCase()}"
              adtcore:type="DOMA/DD"
-             adtcore:masterLanguage="EN"
+             adtcore:masterLanguage="EN"${masterSystemAttr}
              adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </doma:domain>`;
@@ -54,7 +57,8 @@ async function lockAndCreateDomain(
   args: CreateDomainParams,
   lockHandle: string,
   sessionId: string,
-  username: string
+  username: string,
+  masterSystem?: string
 ): Promise<AxiosResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
 
@@ -75,6 +79,7 @@ async function lockAndCreateDomain(
     fixValuesXml = '    <doma:fixValues/>';
   }
 
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
              xmlns:adtcore="http://www.sap.com/adt/core"
@@ -82,7 +87,7 @@ async function lockAndCreateDomain(
              adtcore:language="EN"
              adtcore:name="${args.domain_name.toUpperCase()}"
              adtcore:type="DOMA/DD"
-             adtcore:masterLanguage="EN"
+             adtcore:masterLanguage="EN"${masterSystemAttr}
              adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
   <doma:content>
@@ -154,22 +159,33 @@ export async function createDomain(
     throw new Error('Package name is required');
   }
 
+  if (params.domain_name.length > 30) {
+    throw new Error('Domain name must not exceed 30 characters');
+  }
+
   const sessionId = generateSessionId();
-  const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
+  const systemInfo = await getSystemInformation(connection);
+  const masterSystem = systemInfo?.systemID;
+  const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
   let lockHandle = '';
 
   try {
     // Step 1: Create empty domain
-    await createEmptyDomain(connection, params, sessionId, username);
+    await createEmptyDomain(connection, params, sessionId, username, masterSystem);
 
-    // Step 2: Acquire lock handle
+    // Step 2: Acquire lock
     lockHandle = await acquireLockHandle(connection, params, sessionId);
 
     await new Promise(resolve => setTimeout(resolve, 500));
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Step 3: Create domain with full data
-    await lockAndCreateDomain(connection, params, lockHandle, sessionId, username);
+    await lockAndCreateDomain(connection, params, lockHandle, sessionId, username, masterSystem);
 
     // Step 4: Check domain validity (inactive version after creation)
     await checkDomainSyntax(connection, params.domain_name, 'inactive', sessionId);

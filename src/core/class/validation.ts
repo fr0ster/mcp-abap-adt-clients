@@ -2,26 +2,165 @@
  * Class validation
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { validateObjectName, ValidationResult } from '../shared/validation';
+import { XMLParser } from 'fast-xml-parser';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { ValidationResult } from '../shared/validation';
 import { runCheckRunWithSource, parseCheckRunResponse } from '../shared/checkRun';
 
+const debugEnabled = process.env.DEBUG_TESTS === 'true';
+const logger = {
+  debug: debugEnabled ? console.log : () => {},
+  error: debugEnabled ? console.error : () => {},
+};
+
 /**
- * Validate class name
+ * Validate class name and superclass
+ * Uses ADT validation endpoint: /sap/bc/adt/oo/validation/objectname
  */
 export async function validateClassName(
   connection: AbapConnection,
   className: string,
-  description?: string
+  packageName?: string,
+  description?: string,
+  superClass?: string
 ): Promise<ValidationResult> {
-  const params: Record<string, string> = {};
+  const baseUrl = await connection.getBaseUrl();
+  const encodedName = encodeSapObjectName(className);
 
-  if (description) {
-    params.description = description;
+  // Build query parameters for class validation
+  const params = new URLSearchParams({
+    objname: encodedName,
+    objtype: 'CLAS/OC'
+  });
+
+  if (packageName) {
+    params.append('packagename', packageName);
   }
 
-  return validateObjectName(connection, 'CLAS/OC', className, params);
+  if (description) {
+    params.append('description', description);
+  }
+
+  if (superClass) {
+    params.append('superClass', superClass);
+  }
+
+  const url = `${baseUrl}/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
+  const headers = {
+    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check'
+  };
+
+  // Log request details for debugging
+  logger.debug(`[DEBUG] Validating class - URL: ${url}`);
+  logger.debug(`[DEBUG] Validating class - Method: POST`);
+  logger.debug(`[DEBUG] Validating class - Headers:`, JSON.stringify(headers, null, 2));
+  logger.debug(`[DEBUG] Validating class - Query params:`, params.toString());
+
+  try {
+    const response = await connection.makeAdtRequest({
+      url,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      headers
+    });
+
+    // If validation succeeds, response should be empty or contain success message
+    return { valid: true };
+
+  } catch (error: any) {
+    // Log error details for debugging
+    if (error.response) {
+      logger.error(`[ERROR] Validation failed - Status: ${error.response.status}`);
+      logger.error(`[ERROR] Validation failed - StatusText: ${error.response.statusText}`);
+      logger.error(`[ERROR] Validation failed - Response headers:`, JSON.stringify(error.response.headers, null, 2));
+      logger.error(`[ERROR] Validation failed - Response data (first 1000 chars):`,
+        typeof error.response.data === 'string'
+          ? error.response.data.substring(0, 1000)
+          : JSON.stringify(error.response.data).substring(0, 1000));
+    }
+
+    // Parse error response to extract validation message
+    if (error.response?.data) {
+      const responseData = typeof error.response.data === 'string'
+        ? error.response.data
+        : JSON.stringify(error.response.data);
+
+      // Try to parse XML error response
+      try {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+          textNodeName: '#text'
+        });
+        const result = parser.parse(responseData);
+
+        const exception = result['exc:exception'];
+        if (exception) {
+          // Extract message - XML structure: <message lang="EN">text</message>
+          let message = '';
+          if (exception['message']) {
+            if (typeof exception['message'] === 'string') {
+              message = exception['message'];
+            } else if (exception['message']['#text']) {
+              message = exception['message']['#text'];
+            } else if (Array.isArray(exception['message']) && exception['message'][0]?.['#text']) {
+              message = exception['message'][0]['#text'];
+            }
+          }
+
+          // Fallback to localizedMessage
+          if (!message && exception['localizedMessage']) {
+            if (typeof exception['localizedMessage'] === 'string') {
+              message = exception['localizedMessage'];
+            } else if (exception['localizedMessage']['#text']) {
+              message = exception['localizedMessage']['#text'];
+            } else if (Array.isArray(exception['localizedMessage']) && exception['localizedMessage'][0]?.['#text']) {
+              message = exception['localizedMessage'][0]['#text'];
+            }
+          }
+
+          const type = typeof exception['type'] === 'string'
+            ? exception['type']
+            : exception['type']?.['#text'] || exception['type']?.['@_id'] || '';
+
+          return {
+            valid: false,
+            severity: 'ERROR',
+            message: message || 'Validation failed',
+            longText: message
+          };
+        }
+      } catch (parseError) {
+        // If parsing fails, use raw response
+      }
+
+      // Extract error message from response
+      const errorMatch = responseData.match(/<message[^>]*>([^<]+)<\/message>/i);
+      const message = errorMatch ? errorMatch[1] : 'Validation failed';
+
+      return {
+        valid: false,
+        severity: 'ERROR',
+        message: message,
+        longText: responseData.substring(0, 500)
+      };
+    }
+
+    // If validation endpoint returns 404, it may not be supported in this SAP version
+    if (error.response?.status === 404) {
+      // Silently pass - older SAP systems may not have validation endpoint
+      return { valid: true };
+    }
+
+    // For other errors, return as validation failure
+    return {
+      valid: false,
+      severity: 'ERROR',
+      message: error.message || 'Validation request failed'
+    };
+  }
 }
 
 /**

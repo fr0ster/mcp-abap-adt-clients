@@ -94,6 +94,101 @@ function getTestSettings() {
   };
 }
 
+/**
+ * Get environment configuration (default package, transport request, etc.)
+ * @returns {object} Environment config with default_package, default_transport, etc.
+ */
+function getEnvironmentConfig() {
+  const config = loadTestConfig();
+  return config.environment || {
+    default_package: process.env.SAP_PACKAGE || 'ZOK_TEST_PKG_01',
+    default_transport: process.env.SAP_TRANSPORT || ''
+  };
+}
+
+/**
+ * Get default package name from config (for creating objects)
+ * @returns {string} Default package name
+ */
+function getDefaultPackage() {
+  const envConfig = getEnvironmentConfig();
+  return envConfig.default_package || process.env.SAP_PACKAGE || 'ZOK_TEST_PKG_01';
+}
+
+/**
+ * Get default transport request from config
+ * @returns {string} Default transport request (may be empty)
+ */
+function getDefaultTransport() {
+  const envConfig = getEnvironmentConfig();
+  return envConfig.default_transport || process.env.SAP_TRANSPORT || '';
+}
+
+/**
+ * Validate that object name is in user space (starts with Z_ or Y_)
+ * @param {string} objectName - Object name to validate
+ * @param {string} objectType - Type of object (for error message)
+ * @throws {Error} If object is not in user space
+ */
+function validateUserSpaceObject(objectName, objectType = 'object') {
+  if (!objectName) {
+    return; // Skip validation if name is not provided
+  }
+
+  const upperName = objectName.toUpperCase();
+  // Check if object starts with Z or Y (for classes: ZCL_, YCL_; for domains: Z_, Y_; etc.)
+  // Also check for Z_ and Y_ patterns for objects that use underscore prefix
+  if (!upperName.startsWith('Z') && !upperName.startsWith('Y')) {
+    throw new Error(
+      `Invalid ${objectType} name: "${objectName}" is not in user space. ` +
+      `Only user-defined objects (starting with Z or Y) can be modified in tests. ` +
+      `Standard SAP objects cannot be created, updated, activated, locked, or deleted.`
+    );
+  }
+}
+
+/**
+ * Validate test case params for user space objects
+ * Checks common object name fields in test case params
+ * @param {object} testCase - Test case with params
+ * @param {string} operation - Operation name (for error message)
+ * @throws {Error} If any object is not in user space
+ */
+function validateTestCaseForUserSpace(testCase, operation = 'operation') {
+  if (!testCase || !testCase.params) {
+    return; // Skip if no params
+  }
+
+  const params = testCase.params;
+  const fieldsToCheck = [
+    'class_name',
+    'domain_name',
+    'function_group_name',
+    'function_module_name',
+    'function_name',
+    'program_name',
+    'interface_name',
+    'table_name',
+    'structure_name',
+    'view_name',
+    'data_element_name',
+    'object_name'
+  ];
+
+  for (const field of fieldsToCheck) {
+    if (params[field]) {
+      try {
+        validateUserSpaceObject(params[field], field.replace('_', ' '));
+      } catch (error) {
+        throw new Error(
+          `Test case validation failed for ${operation}: ${error.message} ` +
+          `(Field: ${field}, Value: ${params[field]})`
+        );
+      }
+    }
+  }
+}
+
 // Auto-load environment variables when module is imported
 loadTestEnv();
 
@@ -102,6 +197,11 @@ module.exports = {
   getEnabledTestCase,
   getAllEnabledTestCases,
   getTestSettings,
+  getEnvironmentConfig,
+  getDefaultPackage,
+  getDefaultTransport,
   loadTestEnv,
+  validateUserSpaceObject,
+  validateTestCaseForUserSpace,
 };
 

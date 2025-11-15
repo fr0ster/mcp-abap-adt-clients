@@ -7,6 +7,7 @@ import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getSystemInformation } from '../shared/systemInfo';
 import { lockDDLS } from './lock';
 import { unlockDDLS } from './unlock';
 import { activateDDLS } from './activation';
@@ -23,7 +24,17 @@ async function createDDLSObject(
   const description = args.description || args.view_name;
   const url = `/sap/bc/adt/ddic/ddl/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.view_name}" adtcore:type="DDLS/DF" adtcore:masterLanguage="EN">
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
+  const systemInfo = await getSystemInformation(connection);
+  const masterSystem = systemInfo?.systemID;
+  const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.view_name}" adtcore:type="DDLS/DF" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 </ddl:ddlSource>`;
 

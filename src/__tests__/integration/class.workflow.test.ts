@@ -16,7 +16,7 @@
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { createClass } from '../../core/class/create';
 import { getClass } from '../../core/class/read';
-import { updateClassSource } from '../../core/class/update';
+import { updateClass } from '../../core/class/update';
 import { checkClass } from '../../core/class/check';
 import { lockClass } from '../../core/class/lock';
 import { unlockClass } from '../../core/class/unlock';
@@ -24,6 +24,7 @@ import { activateClass } from '../../core/class/activation';
 import { validateClassSource } from '../../core/class/validation';
 import { runClass } from '../../core/class/run';
 import { deleteObject } from '../../core/delete';
+import { generateSessionId } from '../../utils/sessionUtils';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -123,16 +124,38 @@ describe('Class - Complete Workflow', () => {
 
     className = testCase.params.class_name;
     packageName = testCase.params.package_name;
-    sessionId = 'workflow-test-session';
 
     // Step 1: Create Class
     console.log('\n📦 Step 1: Creating Class...');
+    sessionId = generateSessionId();
+
+    // Step 1.1: Create class object (metadata only)
     await createClass(connection, {
       class_name: className,
       description: testCase.params.description,
       package_name: packageName,
-      source_code: testCase.params.source_code,
     });
+
+    // Step 1.2: Lock class
+    lockHandle = await lockClass(connection, className, sessionId);
+
+    // Step 1.3: Update source code
+    if (!testCase.params.source_code) {
+      throw new Error('source_code is required');
+    }
+    await updateClass(
+      connection,
+      className,
+      testCase.params.source_code,
+      lockHandle,
+      sessionId
+    );
+
+    // Step 1.4: Unlock class
+    await unlockClass(connection, className, lockHandle, sessionId);
+
+    // Step 1.5: Activate class
+    await activateClass(connection, className, sessionId);
     console.log(`✅ Created Class: ${className}`);
 
     // Step 2: Read Class
@@ -159,10 +182,23 @@ CLASS ${className} IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-    await updateClassSource(connection, {
-      class_name: className,
-      source_code: updatedSourceCode,
-    });
+    // Step 3.1: Lock class
+    const updateLockHandle = await lockClass(connection, className, sessionId);
+
+    // Step 3.2: Update source code
+    await updateClass(
+      connection,
+      className,
+      updatedSourceCode,
+      updateLockHandle,
+      sessionId
+    );
+
+    // Step 3.3: Unlock class
+    await unlockClass(connection, className, updateLockHandle, sessionId);
+
+    // Step 3.4: Activate class
+    await activateClass(connection, className, sessionId);
     console.log(`✅ Updated Class source`);
 
     // Verify update

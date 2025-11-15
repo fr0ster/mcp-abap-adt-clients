@@ -96,11 +96,11 @@ describe('Function Module - Read', () => {
         if (!fugrTestCase || !fugrTestCase.params.package_name) {
           throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found or missing package_name`);
         }
-        await createFunctionGroup(connection, {
-          function_group_name: functionGroupName,
+      await createFunctionGroup(connection, {
+        function_group_name: functionGroupName,
           description: fugrTestCase.params.description || `Test FUGR for ${functionGroupName}`,
           package_name: packageName || fugrTestCase.params.package_name,
-        });
+      });
         logger.debug(`Function group ${functionGroupName} created successfully`);
       } else {
         throw error;
@@ -123,14 +123,14 @@ describe('Function Module - Read', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function module ${functionModuleName} does not exist, creating...`);
-        try {
-          await createFunctionModule(connection, {
-            function_module_name: functionModuleName,
-            function_group_name: functionGroupName,
+    try {
+      await createFunctionModule(connection, {
+        function_module_name: functionModuleName,
+        function_group_name: functionGroupName,
             description: testCase.params?.description,
             package_name: testCase.params?.package_name,
             source_code: testCase.params?.source_code,
-          });
+      });
           logger.debug(`Function module ${functionModuleName} created successfully`);
         } catch (createError: any) {
           // S_ABPLNGVS error means function module name violates SAP naming rules

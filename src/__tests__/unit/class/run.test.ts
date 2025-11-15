@@ -15,7 +15,7 @@ const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
-  warn: console.warn,
+  warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
   csrfToken: debugEnabled ? console.log : () => {},
 };
@@ -64,7 +64,7 @@ describe('Class - Run', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
@@ -75,7 +75,7 @@ describe('Class - Run', () => {
     }
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (connection) {
       connection.reset();
     }

@@ -7,6 +7,7 @@ import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getSystemInformation } from '../shared/systemInfo';
 import { acquireLockHandleForUpdate } from './lock';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
@@ -21,7 +22,8 @@ async function updateDomainInternal(
   args: UpdateDomainParams,
   lockHandle: string,
   sessionId: string,
-  username: string
+  username: string,
+  masterSystem?: string
 ): Promise<AxiosResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
 
@@ -42,6 +44,7 @@ async function updateDomainInternal(
     fixValuesXml = '    <doma:fixValues/>';
   }
 
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
              xmlns:adtcore="http://www.sap.com/adt/core"
@@ -49,7 +52,7 @@ async function updateDomainInternal(
              adtcore:language="EN"
              adtcore:name="${args.domain_name.toUpperCase()}"
              adtcore:type="DOMA/DD"
-             adtcore:masterLanguage="EN"
+             adtcore:masterLanguage="EN"${masterSystemAttr}
              adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
   <doma:content>
@@ -122,7 +125,14 @@ export async function updateDomain(
   }
 
   const sessionId = generateSessionId();
-  const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
+  const systemInfo = await getSystemInformation(connection);
+  const masterSystem = systemInfo?.systemID;
+  const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
   let lockHandle = '';
 
   try {
@@ -130,7 +140,7 @@ export async function updateDomain(
 
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    await updateDomainInternal(connection, params, lockHandle, sessionId, username);
+    await updateDomainInternal(connection, params, lockHandle, sessionId, username, masterSystem);
 
     await checkDomainSyntax(connection, params.domain_name, 'inactive', sessionId);
 

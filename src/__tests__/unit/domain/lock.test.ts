@@ -3,6 +3,16 @@
  * Tests acquireLockHandle and acquireLockHandleForUpdate functions
  *
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/lock.test
+ *
+ * IDEMPOTENCY PRINCIPLE:
+ * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
+ * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
+ *   This ensures the test always starts from a clean state (object doesn't exist).
+ * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
+ *   check if the object exists and CREATE it if missing. This ensures the test has
+ *   the required object available.
+ *
+ * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
@@ -15,7 +25,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -94,18 +104,27 @@ describe('Domain - Lock', () => {
 
   // Helper function to ensure domain exists before test (idempotency)
   async function ensureDomainExists(testCase: any) {
+    const domainName = testCase.params.domain_name;
+    const isUserDomain = domainName && (domainName.toUpperCase().startsWith('Z_') || domainName.toUpperCase().startsWith('Y_'));
+
     try {
-      await getDomain(connection, testCase.params.domain_name);
-      logger.debug(`Domain ${testCase.params.domain_name} exists`);
+      await getDomain(connection, domainName);
+      logger.debug(`Domain ${domainName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Domain ${testCase.params.domain_name} does not exist, creating...`);
+        // Only try to create user-defined domains (Z_ or Y_)
+        if (!isUserDomain) {
+          logger.warn(`⚠️ Skipping test: Domain ${domainName} is a standard SAP domain and cannot be created`);
+          throw new Error(`Standard SAP domain ${domainName} does not exist and cannot be created`);
+        }
+
+        logger.debug(`Domain ${domainName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_domain', 'test_domain');
         if (createTestCase) {
           try {
             await createDomain(connection, {
-              domain_name: testCase.params.domain_name,
-              description: createTestCase.params.description || `Test domain for ${testCase.params.domain_name}`,
+              domain_name: domainName,
+              description: createTestCase.params.description || `Test domain for ${domainName}`,
               package_name: createTestCase.params.package_name,
               transport_request: createTestCase.params.transport_request,
               datatype: createTestCase.params.datatype || 'CHAR',
@@ -114,12 +133,12 @@ describe('Domain - Lock', () => {
               lowercase: createTestCase.params.lowercase,
               sign_exists: createTestCase.params.sign_exists,
             });
-            logger.debug(`Domain ${testCase.params.domain_name} created successfully`);
+            logger.debug(`Domain ${domainName} created successfully`);
           } catch (createError: any) {
             throw createError;
           }
         } else {
-          throw new Error(`Cannot create domain ${testCase.params.domain_name}: create_domain test case not found`);
+          throw new Error(`Cannot create domain ${domainName}: create_domain test case not found`);
         }
       } else {
         throw error;
@@ -136,6 +155,14 @@ describe('Domain - Lock', () => {
     const testCase = getEnabledTestCase('lock_domain', 'test_domain');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
+      return;
+    }
+
+    // Validate that domain is in user space (Z_ or Y_)
+    try {
+      validateTestCaseForUserSpace(testCase, 'lock_domain');
+    } catch (error: any) {
+      logger.warn(`⚠️ Skipping test: ${error.message}`);
       return;
     }
 

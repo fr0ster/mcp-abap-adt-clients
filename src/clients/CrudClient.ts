@@ -44,9 +44,6 @@ export class CrudClient extends ReadOnlyClient {
     return classOps.createClass(this.connection, params);
   }
 
-  async updateClassSource(params: classOps.UpdateClassSourceParams): Promise<AxiosResponse> {
-    return classOps.updateClassSource(this.connection, params);
-  }
 
   // Domain operations
   async createDomain(params: domainOps.CreateDomainParams): Promise<AxiosResponse> {

@@ -1,14 +1,18 @@
 /**
  * Unit test for Class update
- * Tests updateClassSource function
+ * Tests updateClass function (low-level)
  *
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/update.test
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { updateClassSource } from '../../../core/class/update';
+import { updateClass } from '../../../core/class/update';
 import { getClass } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
+import { lockClass } from '../../../core/class/lock';
+import { unlockClass } from '../../../core/class/unlock';
+import { activateClass } from '../../../core/class/activation';
+import { generateSessionId } from '../../../utils/sessionUtils';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
@@ -17,7 +21,7 @@ const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
-  warn: console.warn,
+  warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
   csrfToken: debugEnabled ? console.log : () => {},
 };
@@ -66,7 +70,7 @@ describe('Class - Update', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
@@ -77,7 +81,7 @@ describe('Class - Update', () => {
     }
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (connection) {
       connection.reset();
     }
@@ -92,17 +96,45 @@ describe('Class - Update', () => {
       if (error.response?.status === 404) {
         logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_class');
-        if (createTestCase) {
-          await createClass(connection, {
-            class_name: testCase.params.class_name,
-            description: testCase.params.description || `Test class for ${testCase.params.class_name}`,
-            package_name: createTestCase.params.package_name,
-            source_code: createTestCase.params.source_code || undefined,
-          });
-          logger.debug(`Class ${testCase.params.class_name} created successfully`);
-        } else {
+        if (!createTestCase) {
           throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
         }
+
+        const sourceCode = createTestCase.params.source_code;
+        if (!sourceCode) {
+          throw new Error(`source_code is required for creating class ${testCase.params.class_name}`);
+        }
+
+        const className = testCase.params.class_name;
+        const sessionId = generateSessionId();
+
+        // Step 1: Create class object (metadata only)
+        await createClass(connection, {
+          class_name: className,
+          description: testCase.params.description || `Test class for ${className}`,
+          package_name: createTestCase.params.package_name,
+        });
+
+        // Step 2: Lock class
+        const lockHandle = await lockClass(connection, className, sessionId);
+
+        // Step 3: Update source code
+        await updateClass(
+          connection,
+          className,
+          sourceCode,
+          lockHandle,
+          sessionId,
+          createTestCase.params.transport_request
+        );
+
+        // Step 4: Unlock class
+        await unlockClass(connection, className, lockHandle, sessionId);
+
+        // Step 5: Activate class
+        await activateClass(connection, className, sessionId);
+
+        logger.debug(`Class ${className} created and activated successfully`);
       } else {
         throw error;
       }
@@ -138,10 +170,27 @@ CLASS ${testCase.params.class_name} IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
-    await updateClassSource(connection, {
-      class_name: testCase.params.class_name,
-      source_code: updatedSourceCode,
-    });
+    const className = testCase.params.class_name;
+    const sessionId = generateSessionId();
+
+    // Step 1: Lock class
+    const lockHandle = await lockClass(connection, className, sessionId);
+
+    // Step 2: Update source code
+    await updateClass(
+      connection,
+      className,
+      updatedSourceCode,
+      lockHandle,
+      sessionId,
+      testCase.params.transport_request
+    );
+
+    // Step 3: Unlock class
+    await unlockClass(connection, className, lockHandle, sessionId);
+
+    // Step 4: Activate class
+    await activateClass(connection, className, sessionId);
 
     // Verify update by reading inactive version
     const result = await getClass(connection, testCase.params.class_name, 'inactive');

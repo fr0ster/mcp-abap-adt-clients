@@ -1,6 +1,18 @@
 /**
  * Unit test for createFunctionGroup
  * Tests only the create operation in isolation
+ *
+ * Enable debug logs: DEBUG_TESTS=true npm test -- unit/functionGroup/create.test
+ *
+ * IDEMPOTENCY PRINCIPLE:
+ * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
+ * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
+ *   This ensures the test always starts from a clean state (object doesn't exist).
+ * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
+ *   check if the object exists and CREATE it if missing. This ensures the test has
+ *   the required object available.
+ *
+ * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
@@ -8,7 +20,7 @@ import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { deleteObject } from '../../../core/delete';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -83,6 +95,10 @@ describe('Function Group - Create', () => {
 
   // Helper function to ensure object does not exist before creation test (idempotency)
   async function ensureFunctionGroupDoesNotExist(testCase: any): Promise<boolean> {
+    if (!connection || !hasConfig) {
+      logger.warn('⚠️ Connection not initialized, skipping ensureFunctionGroupDoesNotExist');
+      return false;
+    }
     try {
       await getFunctionGroup(connection, testCase.params.function_group_name);
       // Object exists, try to delete it
@@ -132,7 +148,7 @@ describe('Function Group - Create', () => {
   }
 
   it('should create function group', async () => {
-    if (!hasConfig) {
+    if (!hasConfig || !connection) {
       logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
@@ -142,7 +158,16 @@ describe('Function Group - Create', () => {
       return; // Skip silently if test case not configured
     }
 
+    // Validate that function group is in user space (Z_ or Y_)
+    try {
+      validateTestCaseForUserSpace(testCase, 'create_function_group');
+    } catch (error: any) {
+      logger.warn(`⚠️ Skipping test: ${error.message}`);
+      return;
+    }
+
     // Ensure function group does not exist before creation (idempotency)
+    // This will delete the object if it exists
     const canProceed = await ensureFunctionGroupDoesNotExist(testCase);
     if (!canProceed) {
       logger.warn(`⚠️ Skipping test: Cannot ensure function group ${testCase.params.function_group_name} does not exist`);

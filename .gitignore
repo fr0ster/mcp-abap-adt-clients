@@ -8,6 +8,10 @@ coverage/
 *.log
 tests/test-config.yaml
 
+# Compiled JS files in src (should be in dist)
+src/**/*.js
+src/**/*.js.map
+
 coverage/**
 
 # Session and lock files - keep directories but ignore contents

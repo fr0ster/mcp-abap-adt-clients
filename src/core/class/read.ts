@@ -13,7 +13,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * @param version - 'active' (default) or 'inactive' to read modified but not activated version
  */
 export async function getClass(
-  connection: AbapConnection, 
+  connection: AbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {

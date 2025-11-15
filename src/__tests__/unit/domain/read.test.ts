@@ -3,6 +3,16 @@
  * Tests getDomain function
  *
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/read.test
+ *
+ * IDEMPOTENCY PRINCIPLE:
+ * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
+ * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
+ *   This ensures the test always starts from a clean state (object doesn't exist).
+ * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
+ *   check if the object exists and CREATE it if missing. This ensures the test has
+ *   the required object available.
+ *
+ * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';

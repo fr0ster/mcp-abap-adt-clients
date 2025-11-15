@@ -23,17 +23,12 @@ async function createFunctionGroupObject(
   const baseUrl = await connection.getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/functions/groups${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
 
-  let masterSystem: string | undefined;
-  let username: string | undefined;
-
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
   const systemInfo = await getSystemInformation(connection);
-  if (systemInfo) {
-    masterSystem = systemInfo.systemID;
-    username = systemInfo.userName;
-  }
-
-  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
-  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
+  const masterSystem = systemInfo?.systemID;
+  const username = systemInfo?.userName || process.env.SAP_USERNAME || process.env.SAP_USER || '';
 
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';

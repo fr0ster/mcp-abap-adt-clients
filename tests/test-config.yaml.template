@@ -5,7 +5,20 @@
 # Usage:
 #   cp tests/test-config.yaml.template tests/test-config.yaml
 #   # Edit test-config.yaml with your specific values
-
+#
+# IMPORTANT: Object Naming
+# ========================
+# All object names (classes, domains, function modules, etc.) must be UNIQUE across all tests.
+# Names are used exactly as specified in YAML - no automatic suffix generation.
+#
+# Each test must use a different name to avoid conflicts:
+# - ZCL_TEST_BASIC_CREATE (for create tests)
+# - ZCL_TEST_BASIC_CHECK (for check tests)
+# - ZCL_TEST_BASIC_READ (for read tests)
+# - etc.
+#
+# See tests/TEST_NAMING.md for detailed guidelines.
+#
 # Test settings
 test_settings:
   fail_fast: false
@@ -18,8 +31,137 @@ test_settings:
 
 # Environment configuration
 environment:
-  default_transport: ""  # ⚠️ UPDATE WITH YOUR TRANSPORT REQUEST (if needed)
-  default_package: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE WITH YOUR TEST PACKAGE
+  default_package: "<YOUR_TEST_PACKAGE>"  # ⚠️ UPDATE: Default package for creating objects (used if not specified in test case)
+  default_transport: ""  # ⚠️ UPDATE: Default transport request (used if not specified in test case)
+
+# ============================================================================
+# READ-ONLY CLIENT TESTS
+# ============================================================================
+
+# ============================================================================
+# CREATE OPERATIONS (CRUD CLIENT)
+# ============================================================================
+
+# Create Package
+create_package:
+  test_cases:
+    - name: "test_package"
+      enabled: false  # Usually disabled - packages are created manually
+      description: "Create test package"
+      params:
+        package_name: "<YOUR_NEW_PACKAGE_NAME>"  # ⚠️ UPDATE: Name of the package to create (the object itself)
+        super_package: "<YOUR_PARENT_PACKAGE>"  # ⚠️ UPDATE: Parent package (package IN WHICH to create this package)
+        description: "Test package created via MCP"
+        package_type: "development"
+        # transport_request: if not specified, uses environment.default_transport
+        # transport_layer: optional, auto-detected if not specified
+        # software_component: optional, auto-detected if not specified
+
+# Create Domain
+create_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      description: "Create test domain"
+      params:
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test domain created via MCP"
+        datatype: "CHAR"  # CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
+        length: 10
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+
+# Create Class
+create_class:
+  test_cases:
+    - name: "basic_class"
+      enabled: false
+      description: "Create basic class"
+      params:
+        class_name: "<YOUR_TEST_CLASS_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Basic test class"
+        source_code: |
+          CLASS <YOUR_TEST_CLASS_NAME> DEFINITION
+            PUBLIC
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS: constructor.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_TEST_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Basic test class
+            ENDMETHOD.
+          ENDCLASS.
+
+# Check Domain
+check_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      description: "Check user-defined domain"
+      params:
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package (for creating domain if it doesn't exist)
+        version: "active"  # 'active' or 'inactive'
+
+# Lock Domain
+lock_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      description: "Lock user-defined domain"
+      params:
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+
+# Unlock Domain
+unlock_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      description: "Unlock user-defined domain"
+      params:
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+
+# Update Domain
+update_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      description: "Update user-defined domain"
+      params:
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Updated test domain description"
+        datatype: "CHAR"
+        length: 20
+        decimals: 0
+        lowercase: false
+        sign_exists: false
+
+# Activate Domain
+activate_domain:
+  test_cases:
+    - name: "test_domain"
+      enabled: true
+      description: "Activate user-defined domain"
+      params:
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
 
 # ============================================================================
 # READ-ONLY CLIENT TESTS

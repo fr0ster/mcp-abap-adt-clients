@@ -92,19 +92,20 @@ async function createProgramObject(
   const application = args.application || '*';
   const url = `/sap/bc/adt/programs/programs${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  // Get masterSystem and responsible
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
   let masterSystem = args.master_system;
   let username = args.responsible;
 
-  if (!masterSystem || !username) {
-    const systemInfo = await getSystemInformation(connection);
-    if (systemInfo) {
-      masterSystem = masterSystem || systemInfo.systemID;
-      username = username || systemInfo.userName;
-    }
+  const systemInfo = await getSystemInformation(connection);
+  if (systemInfo) {
+    masterSystem = masterSystem || systemInfo.systemID;
+    username = username || systemInfo.userName;
   }
 
-  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
+  // Only use masterSystem from getSystemInformation (cloud), not from env
+  // username can fallback to env if not provided
   username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
 
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';

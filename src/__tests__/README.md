@@ -2,6 +2,30 @@
 
 Tests are organized into two categories: **unit tests** and **integration workflow tests**.
 
+## Idempotency Principle
+
+All tests are designed to be **idempotent** - they can be run multiple times without manual cleanup or setup.
+
+### CREATE Tests
+- **Before creating an object**: Check if it exists and **DELETE it if found**.
+- This ensures the test always starts from a clean state (object doesn't exist).
+- Example: `create.test.ts` files use `ensureObjectDoesNotExist()` helper functions.
+
+### Other Tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK)
+- **Before testing**: Check if the object exists and **CREATE it if missing**.
+- This ensures the test has the required object available.
+- Example: `read.test.ts`, `update.test.ts`, `check.test.ts` files use `ensureObjectExists()` helper functions.
+
+### User Space Objects Only
+- All tests that **modify objects** (create, update, delete, activate, lock, unlock, check) use only **user-defined objects** (Z_ or Y_ prefix).
+- Standard SAP objects cannot be created, updated, activated, locked, or deleted.
+- Read-only operations (`get_*`) may use standard SAP objects for testing.
+
+This principle ensures:
+- Tests can be run repeatedly without manual intervention
+- Tests are independent and don't rely on external state
+- Tests are safe to run in any order
+
 ## Unit Tests (`__tests__/unit/`)
 
 Unit tests focus on testing **individual functions in isolation**. Each function has its own test file.

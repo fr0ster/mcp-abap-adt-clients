@@ -36,6 +36,7 @@ function getObjectUri(
     .replace('ttyp/st', 'structure')
     .replace('ddls/df', 'view')
     .replace('dtel/de', 'data_element')
+    .replace('doma/dd', 'domain')  // DOMA/DD is also used for domains
     .replace('doma/dm', 'domain');
 
   switch (type) {

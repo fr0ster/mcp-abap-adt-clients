@@ -17,7 +17,7 @@ const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
-  warn: console.warn,
+  warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
   csrfToken: debugEnabled ? console.log : () => {},
 };
@@ -66,7 +66,7 @@ describe('Class - Activate', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
@@ -77,7 +77,7 @@ describe('Class - Activate', () => {
     }
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (connection) {
       connection.reset();
     }
@@ -97,7 +97,6 @@ describe('Class - Activate', () => {
             class_name: testCase.params.class_name,
             description: `Test class for ${testCase.params.class_name}`,
             package_name: createTestCase.params.package_name,
-            source_code: createTestCase.params.source_code || undefined,
           });
           logger.debug(`Class ${testCase.params.class_name} created successfully`);
         } else {

@@ -10,7 +10,7 @@ import { checkFunctionGroup } from '../../../core/functionGroup/check';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -149,6 +149,14 @@ describe('Function Group - Check', () => {
     const testCase = getEnabledTestCase('check_function_group');
     if (!testCase) {
       return; // Skip silently if test case not configured
+    }
+
+    // Validate that function group is in user space (Z_ or Y_)
+    try {
+      validateTestCaseForUserSpace(testCase, 'check_function_group');
+    } catch (error: any) {
+      logger.warn(`⚠️ Skipping test: ${error.message}`);
+      return;
     }
 
     // Ensure function group exists before test (idempotency)

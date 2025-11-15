@@ -10,7 +10,7 @@ import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunction } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -118,14 +118,14 @@ describe('Function Module - Check', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function module ${functionModuleName} does not exist, creating...`);
-        try {
-          await createFunctionModule(connection, {
-            function_module_name: functionModuleName,
-            function_group_name: functionGroupName,
-            description: testCase.params.description,
+    try {
+      await createFunctionModule(connection, {
+        function_module_name: functionModuleName,
+        function_group_name: functionGroupName,
+        description: testCase.params.description,
             package_name: testCase.params.package_name,
-            source_code: testCase.params.source_code,
-          });
+        source_code: testCase.params.source_code,
+      });
           logger.debug(`Function module ${functionModuleName} created successfully`);
         } catch (createError: any) {
           // S_ABPLNGVS error means function module name violates SAP naming rules

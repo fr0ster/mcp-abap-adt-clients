@@ -56,7 +56,6 @@ describe('Example: Session Persistence', () => {
       class_name: 'ZCL_EXAMPLE',
       package_name: 'ZPACKAGE',
       description: 'Example class',
-      source_code: 'CLASS zcl_example DEFINITION PUBLIC. ENDCLASS.'
     });
 
     // Session is automatically saved to:

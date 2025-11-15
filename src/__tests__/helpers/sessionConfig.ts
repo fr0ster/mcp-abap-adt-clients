@@ -7,11 +7,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'yaml';
 import {
+  AbapConnection,
   BaseAbapConnection,
   ISessionStorage,
   FileSessionStorage
 } from '@mcp-abap-adt/connection';
-import { getLockStateManager } from '../../utils/lockStateManager';interface SessionConfig {
+import { getLockStateManager } from '../../utils/lockStateManager';
+
+interface SessionConfig {
   persist_session?: boolean;
   sessions_dir?: string;
   session_id_format?: string;
@@ -31,6 +34,7 @@ interface TestConfig {
 
 /**
  * Generate session ID based on test name and timestamp
+ * Includes random component to ensure uniqueness even when tests run in parallel
  */
 export function generateSessionId(testName: string, format: string = 'auto'): string {
   if (format !== 'auto') {
@@ -38,8 +42,9 @@ export function generateSessionId(testName: string, format: string = 'auto'): st
   }
 
   const timestamp = Date.now();
+  const random = Math.random().toString(36).substring(2, 9); // 7 random chars
   const sanitized = testName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  return `${sanitized}_${timestamp}`;
+  return `${sanitized}_${timestamp}_${random}`;
 }
 
 /**
@@ -71,7 +76,7 @@ export function loadTestConfig(configPath?: string): TestConfig {
  * Setup connection with session persistence based on test config
  */
 export async function setupConnectionWithSession(
-  connection: BaseAbapConnection,
+  connection: AbapConnection,
   testName: string,
   testConfig?: TestConfig
 ): Promise<{
@@ -91,7 +96,13 @@ export async function setupConnectionWithSession(
     prettyPrint: true
   });
 
-  await connection.enableStatefulSession(sessionId, sessionStorage);
+  // Type assertion: createAbapConnection returns BaseAbapConnection which has enableStatefulSession
+  const baseConnection = connection as unknown as BaseAbapConnection;
+  await baseConnection.enableStatefulSession(sessionId, sessionStorage);
+
+  // Note: Cookies will be obtained automatically on first POST request via ensureFreshCsrfToken
+  // For GET requests, if cookies are needed, they will be obtained from error responses
+  // (see updateCookiesFromResponse in fetchCsrfToken error handling)
 
   return { sessionId, sessionStorage };
 }
@@ -100,7 +111,7 @@ export async function setupConnectionWithSession(
  * Cleanup session after test
  */
 export async function cleanupSession(
-  connection: BaseAbapConnection,
+  connection: AbapConnection,
   sessionId: string | null,
   testConfig?: TestConfig
 ): Promise<void> {
@@ -112,7 +123,9 @@ export async function cleanupSession(
   const sessionConfig = config.session_config;
 
   if (sessionConfig?.cleanup_session_after_test) {
-    await connection.clearSessionState();
+    // Type assertion: createAbapConnection returns BaseAbapConnection which has clearSessionState
+    const baseConnection = connection as unknown as BaseAbapConnection;
+    await baseConnection.clearSessionState();
   }
 }
 
@@ -138,7 +151,7 @@ export function setupLockTracking(testConfig?: TestConfig): {
  * Complete test helper - setup both session and lock tracking
  */
 export async function setupTestEnvironment(
-  connection: BaseAbapConnection,
+  connection: AbapConnection,
   testName: string,
   testFile?: string
 ): Promise<{
@@ -178,9 +191,10 @@ export async function setupTestEnvironment(
  * Cleanup test environment
  */
 export async function cleanupTestEnvironment(
-  connection: BaseAbapConnection,
+  connection: AbapConnection,
   sessionId: string | null,
   testConfig?: TestConfig
 ): Promise<void> {
   await cleanupSession(connection, sessionId, testConfig);
 }
+

@@ -6,10 +6,13 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
-import { lockClass } from './lock';
-import { unlockClass } from './unlock';
-import { activateClass } from './activation';
 import { getSystemInformation } from '../shared/systemInfo';
+
+const debugEnabled = process.env.DEBUG_TESTS === 'true';
+const logger = {
+  debug: debugEnabled ? console.log : () => {},
+  error: debugEnabled ? console.error : () => {},
+};
 
 export interface CreateClassParams {
   class_name: string;
@@ -22,31 +25,8 @@ export interface CreateClassParams {
   final?: boolean;
   abstract?: boolean;
   create_protected?: boolean;
-  source_code?: string;
-  activate?: boolean;
 }
 
-/**
- * Generate minimal class source code if not provided
- */
-function generateClassTemplate(className: string, description: string): string {
-  return `CLASS ${className} DEFINITION
-  PUBLIC
-  FINAL
-  CREATE PUBLIC .
-
-  PUBLIC SECTION.
-    METHODS: constructor.
-  PROTECTED SECTION.
-  PRIVATE SECTION.
-ENDCLASS.
-
-CLASS ${className} IMPLEMENTATION.
-  METHOD constructor.
-    " ${description}
-  ENDMETHOD.
-ENDCLASS.`;
-}
 
 /**
  * Create class object with metadata
@@ -56,22 +36,23 @@ async function createClassObject(
   args: CreateClassParams,
   sessionId: string
 ): Promise<AxiosResponse> {
-  const description = args.description || args.class_name;
+  const description = args.description || args.class_name || '';
   const url = `/sap/bc/adt/oo/classes${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  // Get masterSystem and responsible
+  // Get masterSystem and responsible (only for cloud systems)
+  // On cloud, getSystemInformation returns systemID and userName
+  // On on-premise, it returns null, so we don't add these attributes
   let masterSystem = args.master_system;
   let username = args.responsible;
 
-  if (!masterSystem || !username) {
-    const systemInfo = await getSystemInformation(connection);
-    if (systemInfo) {
-      masterSystem = masterSystem || systemInfo.systemID;
-      username = username || systemInfo.userName;
-    }
+  const systemInfo = await getSystemInformation(connection);
+  if (systemInfo) {
+    masterSystem = masterSystem || systemInfo.systemID;
+    username = username || systemInfo.userName;
   }
 
-  masterSystem = masterSystem || process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || '';
+  // Only use masterSystem from getSystemInformation (cloud), not from env
+  // username can fallback to env if not provided
   username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
 
   const finalAttr = args.final ? 'true' : 'false';
@@ -107,114 +88,73 @@ async function createClassObject(
     'Content-Type': 'application/vnd.sap.adt.oo.classes.v4+xml'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, metadataXml, headers);
+  // Log request details for debugging authorization issues
+  const baseUrl = await connection.getBaseUrl();
+  const fullUrl = `${baseUrl}${url}`;
+  logger.debug(`[DEBUG] Creating class - URL: ${fullUrl}`);
+  logger.debug(`[DEBUG] Creating class - Method: POST`);
+  logger.debug(`[DEBUG] Creating class - Headers:`, JSON.stringify(headers, null, 2));
+  logger.debug(`[DEBUG] Creating class - Body (first 500 chars):`, metadataXml.substring(0, 500));
+
+  try {
+    const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, metadataXml, headers);
+    return response;
+  } catch (error: any) {
+    // Log error details for debugging
+    if (error.response) {
+      logger.error(`[ERROR] Create class failed - Status: ${error.response.status}`);
+      logger.error(`[ERROR] Create class failed - StatusText: ${error.response.statusText}`);
+      logger.error(`[ERROR] Create class failed - Response headers:`, JSON.stringify(error.response.headers, null, 2));
+      logger.error(`[ERROR] Create class failed - Response data (first 1000 chars):`,
+        typeof error.response.data === 'string'
+          ? error.response.data.substring(0, 1000)
+          : JSON.stringify(error.response.data).substring(0, 1000));
+    }
+    throw error;
+  }
 }
 
 /**
- * Upload class source code
- */
-async function uploadClassSource(
-  connection: AbapConnection,
-  className: string,
-  sourceCode: string,
-  lockHandle: string,
-  sessionId: string,
-  transportRequest?: string
-): Promise<AxiosResponse> {
-  const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}/source/main?${queryParams}`;
-
-  const headers = {
-    'Accept': 'text/plain',
-    'Content-Type': 'text/plain; charset=utf-8'
-  };
-
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
-}
-
-/**
- * Create ABAP class
- * Full workflow: create object -> lock -> upload source -> unlock -> activate
+ * Create ABAP class object (metadata only)
+ * Low-level function - only creates the class object with metadata
+ *
+ * To complete class creation workflow:
+ * 1. createClass() - create object
+ * 2. lockClass() - lock for modification
+ * 3. updateClass() - upload source code
+ * 4. unlockClass() - unlock
+ * 5. activateClass() - activate (optional)
  */
 export async function createClass(
   connection: AbapConnection,
   params: CreateClassParams
 ): Promise<AxiosResponse> {
+  if (!params.class_name) {
+    throw new Error('Class name is required');
+  }
+
+  if (params.class_name.length > 30) {
+    throw new Error('Class name must not exceed 30 characters');
+  }
+
+  if (!params.package_name) {
+    throw new Error('package_name is required');
+  }
+
   const className = params.class_name.toUpperCase();
   const sessionId = generateSessionId();
-  let lockHandle: string | null = null;
 
-  try {
-    // Step 1: Create class object with metadata
-    const createResponse = await createClassObject(connection, params, sessionId);
-    if (createResponse.status < 200 || createResponse.status >= 300) {
-      throw new Error(`Failed to create class object: ${createResponse.status} ${createResponse.statusText}`);
-    }
+  // Create class object with metadata
+  const createResponse = await createClassObject(connection, params, sessionId);
 
-    // Extract lock handle from response headers
-    lockHandle = createResponse.headers['sap-adt-lockhandle'] ||
-                 createResponse.headers['lockhandle'] ||
-                 createResponse.headers['x-sap-adt-lockhandle'];
-
-    if (!lockHandle) {
-      // Fallback: do explicit LOCK
-      lockHandle = await lockClass(connection, className, sessionId);
-    }
-
-    // Step 2: Upload source code
-    const sourceCode = params.source_code || generateClassTemplate(className, params.description || className);
-    const uploadResponse = await uploadClassSource(connection, className, sourceCode, lockHandle, sessionId, params.transport_request);
-    if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
-      throw new Error(`Failed to upload source: ${uploadResponse.status} ${uploadResponse.statusText}`);
-    }
-
-    // Step 3: Unlock the class
-    await unlockClass(connection, className, lockHandle, sessionId);
-    lockHandle = null;
-
-    // Step 4: Activate the class (optional)
-    const shouldActivate = params.activate !== false;
-    if (shouldActivate) {
-      await activateClass(connection, className, sessionId);
-    }
-
-    // Return success response
-    return {
-      data: {
-        success: true,
-        class_name: className,
-        package_name: params.package_name,
-        transport_request: params.transport_request || null,
-        type: 'CLAS/OC',
-        message: shouldActivate
-          ? `Class ${className} created and activated successfully`
-          : `Class ${className} created successfully (not activated)`,
-        uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
-        superclass: params.superclass || null,
-        final: params.final || false,
-        abstract: params.abstract || false
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
-
-  } catch (error: any) {
-    // Attempt to unlock if we have a lock handle
-    if (lockHandle) {
-      try {
-        await unlockClass(connection, className, lockHandle, sessionId);
-      } catch (unlockError) {
-        // Ignore unlock errors
-      }
-    }
-
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
-
+  if (createResponse.status < 200 || createResponse.status >= 300) {
+    const errorMessage = createResponse.data
+      ? (typeof createResponse.data === 'string' ? createResponse.data : JSON.stringify(createResponse.data))
+      : createResponse.statusText;
     throw new Error(`Failed to create class ${className}: ${errorMessage}`);
   }
+
+  // Return response from SAP
+  return createResponse;
 }
 
