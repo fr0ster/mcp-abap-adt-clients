@@ -20,8 +20,9 @@ function buildCheckRunPayload(tableName: string): string {
 
 /**
  * Run check run for table
+ * Note: This is a table-specific check function. For generic check, use runCheckRun from shared/checkRun
  */
-export async function runCheckRun(
+export async function runTableCheckRun(
   connection: AbapConnection,
   reporter: 'tableStatusCheck' | 'abapCheckRun',
   tableName: string,

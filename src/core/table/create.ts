@@ -10,7 +10,7 @@ import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessio
 import { acquireTableLockHandle } from './lock';
 import { unlockTable, deleteTableLock } from './unlock';
 import { activateTable } from './activation';
-import { runCheckRun } from './check';
+import { runTableCheckRun } from './check';
 import { CreateTableParams } from './types';
 
 /**
@@ -114,7 +114,7 @@ export async function createTable(
 
     // Step 1.1: Run table status check before locking (optional, continue on error)
     try {
-      await runCheckRun(connection, 'tableStatusCheck', params.table_name, sessionId);
+      await runTableCheckRun(connection, 'tableStatusCheck', params.table_name, sessionId);
     } catch (statusError) {
       // Continue even if status check fails
     }
@@ -136,7 +136,7 @@ export async function createTable(
 
     // Step 1.3.1: Run ABAP check before unlock (optional, continue on error)
     try {
-      await runCheckRun(connection, 'abapCheckRun', params.table_name, sessionId);
+      await runTableCheckRun(connection, 'abapCheckRun', params.table_name, sessionId);
     } catch (checkError) {
       // Continue even if check fails
     }
@@ -167,7 +167,7 @@ export async function createTable(
       } catch (attemptError: any) {
         if (attemptError.response?.data?.includes('No active nametab')) {
           try {
-            await runCheckRun(connection, 'abapCheckRun', params.table_name, sessionId);
+            await runTableCheckRun(connection, 'abapCheckRun', params.table_name, sessionId);
           } catch (retryCheckError) {
             // Ignore
           }

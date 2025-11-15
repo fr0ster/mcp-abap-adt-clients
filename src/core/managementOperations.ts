@@ -38,19 +38,23 @@ async function getBaseUrl(connection: AbapConnection): Promise<string> {
 }
 
 /**
- * Activate ABAP objects
- * TODO: Implement full activation logic from handleActivateObject
+ * Activate multiple ABAP objects in batch
+ * Uses ADT activation/runs endpoint for batch activation
  */
-export async function activateObject(
+export async function activateObjectsGroup(
   connection: AbapConnection,
-  objects: Array<{name: string, type: string}>
+  objects: Array<{ uri: string; name: string }>,
+  preaudit: boolean = true
 ): Promise<AxiosResponse> {
   const baseUrl = await getBaseUrl(connection);
-  const url = `${baseUrl}/sap/bc/adt/activation/runs?method=activate&preauditRequested=true`;
+  const url = `${baseUrl}/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`;
 
-  // TODO: Build activation XML from objects array
+  const objectReferences = objects.map(obj =>
+    `  <adtcore:objectReference adtcore:uri="${obj.uri}" adtcore:name="${obj.name}"/>`
+  ).join('\n');
+
   const activationXml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
-${objects.map(obj => `  <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/${obj.name.toLowerCase()}" adtcore:name="${obj.name}"/>`).join('\n')}
+${objectReferences}
 </adtcore:objectReferences>`;
 
   const headers = {
@@ -59,6 +63,65 @@ ${objects.map(obj => `  <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/cla
   };
 
   return makeAdtRequest(connection, url, 'POST', 'default', activationXml, undefined, headers);
+}
+
+/**
+ * Parse activation response to extract status and messages
+ */
+export function parseActivationResponse(responseData: string | any): {
+  activated: boolean;
+  checked: boolean;
+  generated: boolean;
+  messages: Array<{ type: string; text: string; line?: number; column?: number }>;
+} {
+  const { XMLParser } = require('fast-xml-parser');
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    parseAttributeValue: true
+  });
+
+  try {
+    const data = typeof responseData === 'string' ? responseData : responseData.data || JSON.stringify(responseData);
+    const result = parser.parse(data);
+
+    // Check for properties element
+    const properties = result['chkl:messages']?.['chkl:properties'];
+
+    const activated = properties?.['@_activationExecuted'] === 'true' || properties?.['@_activationExecuted'] === true;
+    const checked = properties?.['@_checkExecuted'] === 'true' || properties?.['@_checkExecuted'] === true;
+    const generated = properties?.['@_generationExecuted'] === 'true' || properties?.['@_generationExecuted'] === true;
+
+    // Parse messages (warnings/errors)
+    const messages: Array<{ type: string; text: string; line?: number; column?: number }> = [];
+    const msgData = result['chkl:messages']?.['msg'];
+
+    if (msgData) {
+      const msgArray = Array.isArray(msgData) ? msgData : [msgData];
+      msgArray.forEach((msg: any) => {
+        messages.push({
+          type: msg['@_type'] || 'info',
+          text: msg['shortText']?.['txt'] || msg['shortText'] || 'Unknown message',
+          line: msg['@_line'],
+          column: msg['@_column']
+        });
+      });
+    }
+
+    return {
+      activated,
+      checked,
+      generated,
+      messages
+    };
+  } catch (error) {
+    return {
+      activated: false,
+      checked: false,
+      generated: false,
+      messages: [{ type: 'error', text: 'Failed to parse activation response' }]
+    };
+  }
 }
 
 /**

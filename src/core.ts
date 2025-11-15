@@ -145,5 +145,7 @@ export * from './core/shared/search';
 export * from './core/shared/sqlQuery';
 export * from './core/shared/tableContents';
 export * from './core/shared/whereUsed';
+export * from './core/shared/checkRun';
 export * from './core/delete';
+export * from './core/managementOperations';
 

@@ -35,7 +35,7 @@ import { generateSessionId } from '../../utils/sessionUtils';
 import { createTable } from './create';
 import { acquireTableLockHandle } from './lock';
 import { updateTable } from './update';
-import { runCheckRun } from './check';
+import { runTableCheckRun } from './check';
 import { unlockTable } from './unlock';
 import { activateTable } from './activation';
 import { validateTableName } from './validation';
@@ -226,7 +226,7 @@ export class TableBuilder {
   async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
     try {
       this.logger.info?.('Checking table:', this.config.tableName, 'version:', version);
-      const result = await runCheckRun(
+      const result = await runTableCheckRun(
         this.connection,
         'abapCheckRun',
         this.config.tableName,
