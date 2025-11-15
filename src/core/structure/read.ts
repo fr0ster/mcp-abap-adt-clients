@@ -2,23 +2,39 @@
  * Structure read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { readObjectMetadata } from '../shared/readMetadata';
+import { readObjectSource } from '../shared/readSource';
 
 /**
- * Get ABAP structure
+ * Get ABAP structure metadata (without source code)
  */
-export async function getStructure(connection: AbapConnection, structureName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const encodedName = encodeSapObjectName(structureName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/structures/${encodedName}/source/main`;
+export async function getStructureMetadata(
+  connection: AbapConnection,
+  structureName: string
+): Promise<AxiosResponse> {
+  return readObjectMetadata(connection, 'structure', structureName);
+}
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {}
-  });
+/**
+ * Get ABAP structure source code
+ */
+export async function getStructureSource(
+  connection: AbapConnection,
+  structureName: string
+): Promise<AxiosResponse> {
+  return readObjectSource(connection, 'structure', structureName);
+}
+
+/**
+ * Get ABAP structure (source code by default for backward compatibility)
+ * @deprecated Use getStructureSource() or getStructureMetadata() instead
+ */
+export async function getStructure(
+  connection: AbapConnection,
+  structureName: string
+): Promise<AxiosResponse> {
+  return getStructureSource(connection, structureName);
 }
 

@@ -85,6 +85,43 @@ export * from './core/interface/activation';
 export * from './core/interface/check';
 export * from './core/interface/validation';
 
+// Structure operations
+export * from './core/structure/create';
+export * from './core/structure/read';
+export * from './core/structure/update';
+export * from './core/structure/delete';
+export * from './core/structure/lock';
+export * from './core/structure/unlock';
+export * from './core/structure/activation';
+export * from './core/structure/check';
+export * from './core/structure/validation';
+
+// Table operations
+export * from './core/table/create';
+export * from './core/table/read';
+export * from './core/table/update';
+export * from './core/table/delete';
+export * from './core/table/lock';
+export * from './core/table/unlock';
+export * from './core/table/activation';
+export * from './core/table/check';
+export * from './core/table/validation';
+
+// View operations
+export * from './core/view/create';
+export * from './core/view/read';
+export * from './core/view/update';
+export * from './core/view/delete';
+export * from './core/view/lock';
+export * from './core/view/unlock';
+export * from './core/view/activation';
+export * from './core/view/check';
+export * from './core/view/validation';
+
+// Transport operations
+export * from './core/transport/create';
+export * from './core/transport/read';
+
 // Builders (low-level API)
 export { ClassBuilder, type ClassBuilderConfig, type ClassBuilderLogger, type ClassBuilderState } from './core/class/ClassBuilder';
 export { DomainBuilder, type DomainBuilderConfig, type DomainBuilderLogger, type DomainBuilderState } from './core/domain/DomainBuilder';
@@ -93,9 +130,19 @@ export { ProgramBuilder, type ProgramBuilderConfig, type ProgramBuilderLogger, t
 export { InterfaceBuilder, type InterfaceBuilderConfig, type InterfaceBuilderLogger, type InterfaceBuilderState } from './core/interface/InterfaceBuilder';
 export { FunctionGroupBuilder, type FunctionGroupBuilderConfig, type FunctionGroupBuilderLogger, type FunctionGroupBuilderState } from './core/functionGroup/FunctionGroupBuilder';
 export { FunctionModuleBuilder, type FunctionModuleBuilderConfig, type FunctionModuleBuilderLogger, type FunctionModuleBuilderState } from './core/functionModule/FunctionModuleBuilder';
+export { StructureBuilder, type StructureBuilderConfig, type StructureBuilderLogger, type StructureBuilderState } from './core/structure/StructureBuilder';
+export { TableBuilder, type TableBuilderConfig, type TableBuilderLogger, type TableBuilderState } from './core/table/TableBuilder';
+export { ViewBuilder, type ViewBuilderConfig, type ViewBuilderLogger, type ViewBuilderState } from './core/view/ViewBuilder';
+export { TransportBuilder, type TransportBuilderConfig, type TransportBuilderLogger, type TransportBuilderState } from './core/transport/TransportBuilder';
 
 // Shared utilities
 export * from './core/shared/validation';
 export * from './core/shared/systemInfo';
+export * from './core/shared/readMetadata';
+export * from './core/shared/readSource';
+export * from './core/shared/search';
+export * from './core/shared/sqlQuery';
+export * from './core/shared/tableContents';
+export * from './core/shared/whereUsed';
 export * from './core/delete';
 

@@ -1,0 +1,408 @@
+/**
+ * StructureBuilder - Fluent API for structure operations with Promise chaining
+ *
+ * Supports:
+ * - Method chaining: builder.create().then(b => b.lock()).then(b => b.update())...
+ * - Error handling: .catch() for error callbacks
+ * - Cleanup: .finally() for guaranteed execution
+ * - Result storage: all results stored in logger/state
+ * - Chain interruption: chain stops on first error (standard Promise behavior)
+ *
+ * @example
+ * ```typescript
+ * const builder = new StructureBuilder(connection, logger, {
+ *   structureName: 'Z_TEST_STRUCT',
+ *   packageName: 'ZOK_TEST_PKG_01'
+ * });
+ *
+ * await builder
+ *   .setFields([{ name: 'FIELD1', data_type: 'CHAR', length: 10 }])
+ *   .create()
+ *   .then(b => b.lock())
+ *   .then(b => b.update())
+ *   .then(b => b.check())
+ *   .then(b => b.unlock())
+ *   .then(b => b.activate())
+ *   .catch(error => {
+ *     logger.error('Operation failed:', error);
+ *   });
+ * ```
+ */
+
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { generateSessionId } from '../../utils/sessionUtils';
+import { createStructure } from './create';
+import { lockStructure } from './lock';
+import { updateStructure } from './update';
+import { checkStructure } from './check';
+import { unlockStructure } from './unlock';
+import { activateStructure } from './activation';
+import { validateStructureName } from './validation';
+import { StructureField, StructureInclude, CreateStructureParams } from './types';
+import { UpdateStructureParams } from './update';
+import { ValidationResult } from '../shared/validation';
+
+export interface StructureBuilderLogger {
+  debug?: (message: string, ...args: any[]) => void;
+  info?: (message: string, ...args: any[]) => void;
+  warn?: (message: string, ...args: any[]) => void;
+  error?: (message: string, ...args: any[]) => void;
+}
+
+export interface StructureBuilderConfig {
+  structureName: string;
+  packageName?: string;
+  transportRequest?: string;
+  description?: string;
+  fields?: StructureField[];
+  includes?: StructureInclude[];
+}
+
+export interface StructureBuilderState {
+  validationResult?: ValidationResult;
+  createResult?: AxiosResponse;
+  lockHandle?: string;
+  updateResult?: AxiosResponse;
+  checkResult?: AxiosResponse;
+  unlockResult?: AxiosResponse;
+  activateResult?: AxiosResponse;
+  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+}
+
+export class StructureBuilder {
+  private connection: AbapConnection;
+  private logger: StructureBuilderLogger;
+  private config: StructureBuilderConfig;
+  private lockHandle?: string;
+  private sessionId: string;
+  private state: StructureBuilderState;
+
+  constructor(
+    connection: AbapConnection,
+    logger: StructureBuilderLogger,
+    config: StructureBuilderConfig
+  ) {
+    this.connection = connection;
+    this.logger = logger;
+    this.config = { ...config };
+    this.sessionId = generateSessionId();
+    this.state = {
+      errors: []
+    };
+  }
+
+  // Builder methods - return this for chaining
+  setPackage(packageName: string): this {
+    this.config.packageName = packageName;
+    this.logger.debug?.('Package set:', packageName);
+    return this;
+  }
+
+  setRequest(transportRequest: string): this {
+    this.config.transportRequest = transportRequest;
+    this.logger.debug?.('Transport request set:', transportRequest);
+    return this;
+  }
+
+  setName(structureName: string): this {
+    this.config.structureName = structureName;
+    this.logger.debug?.('Structure name set:', structureName);
+    return this;
+  }
+
+  setDescription(description: string): this {
+    this.config.description = description;
+    return this;
+  }
+
+  setFields(fields: StructureField[]): this {
+    this.config.fields = fields;
+    this.logger.debug?.('Fields set:', fields.length);
+    return this;
+  }
+
+  setIncludes(includes: StructureInclude[]): this {
+    this.config.includes = includes;
+    this.logger.debug?.('Includes set:', includes.length);
+    return this;
+  }
+
+  addField(field: StructureField): this {
+    if (!this.config.fields) {
+      this.config.fields = [];
+    }
+    this.config.fields.push(field);
+    return this;
+  }
+
+  addInclude(include: StructureInclude): this {
+    if (!this.config.includes) {
+      this.config.includes = [];
+    }
+    this.config.includes.push(include);
+    return this;
+  }
+
+  // Operation methods - return Promise<this> for Promise chaining
+  async validate(): Promise<this> {
+    try {
+      this.logger.info?.('Validating structure name:', this.config.structureName);
+      const result = await validateStructureName(
+        this.connection,
+        this.config.structureName,
+        this.config.description
+      );
+      this.state.validationResult = result;
+      if (!result.valid) {
+        throw new Error(`Structure name validation failed: ${result.message}`);
+      }
+      this.logger.info?.('Structure name validation successful');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'validate',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Validation failed:', error);
+      throw error;
+    }
+  }
+
+  async create(): Promise<this> {
+    try {
+      if (!this.config.packageName) {
+        throw new Error('Package name is required');
+      }
+      if (!this.config.fields || this.config.fields.length === 0) {
+        throw new Error('At least one field is required');
+      }
+      this.logger.info?.('Creating structure:', this.config.structureName);
+      const params: CreateStructureParams = {
+        structure_name: this.config.structureName,
+        package_name: this.config.packageName,
+        transport_request: this.config.transportRequest,
+        description: this.config.description,
+        fields: this.config.fields,
+        includes: this.config.includes
+      };
+      const result = await createStructure(this.connection, params);
+      this.state.createResult = result;
+      this.logger.info?.('Structure created successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'create',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Create failed:', error);
+      throw error;
+    }
+  }
+
+  async lock(): Promise<this> {
+    try {
+      this.logger.info?.('Locking structure:', this.config.structureName);
+      const lockHandle = await lockStructure(
+        this.connection,
+        this.config.structureName,
+        this.sessionId
+      );
+      this.lockHandle = lockHandle;
+      this.state.lockHandle = lockHandle;
+      this.logger.info?.('Structure locked, handle:', lockHandle.substring(0, 10) + '...');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'lock',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Lock failed:', error);
+      throw error;
+    }
+  }
+
+  async update(): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Structure must be locked before update. Call lock() first.');
+      }
+      if (!this.config.packageName) {
+        throw new Error('Package name is required');
+      }
+      if (!this.config.fields || this.config.fields.length === 0) {
+        throw new Error('At least one field is required');
+      }
+      this.logger.info?.('Updating structure:', this.config.structureName);
+      const params: UpdateStructureParams = {
+        structure_name: this.config.structureName,
+        package_name: this.config.packageName,
+        transport_request: this.config.transportRequest,
+        description: this.config.description,
+        fields: this.config.fields,
+        includes: this.config.includes
+      };
+      const result = await updateStructure(
+        this.connection,
+        params,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.state.updateResult = result;
+      this.logger.info?.('Structure updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'update',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update failed:', error);
+      throw error;
+    }
+  }
+
+  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+    try {
+      this.logger.info?.('Checking structure:', this.config.structureName, 'version:', version);
+      const result = await checkStructure(
+        this.connection,
+        this.config.structureName,
+        version,
+        this.sessionId
+      );
+      this.state.checkResult = result;
+      this.logger.info?.('Structure check successful:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'check',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Check failed:', error);
+      throw error;
+    }
+  }
+
+  async unlock(): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Structure is not locked. Call lock() first.');
+      }
+      this.logger.info?.('Unlocking structure:', this.config.structureName);
+      const result = await unlockStructure(
+        this.connection,
+        this.config.structureName,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.state.unlockResult = result;
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+      this.logger.info?.('Structure unlocked successfully');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'unlock',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Unlock failed:', error);
+      throw error;
+    }
+  }
+
+  async activate(): Promise<this> {
+    try {
+      this.logger.info?.('Activating structure:', this.config.structureName);
+      const result = await activateStructure(
+        this.connection,
+        this.config.structureName,
+        this.sessionId
+      );
+      this.state.activateResult = result;
+      this.logger.info?.('Structure activated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'activate',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Activate failed:', error);
+      throw error;
+    }
+  }
+
+  // Getters for accessing results
+  getState(): Readonly<StructureBuilderState> {
+    return { ...this.state };
+  }
+
+  getStructureName(): string {
+    return this.config.structureName;
+  }
+
+  getLockHandle(): string | undefined {
+    return this.lockHandle;
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  getValidationResult(): ValidationResult | undefined {
+    return this.state.validationResult;
+  }
+
+  getCreateResult(): AxiosResponse | undefined {
+    return this.state.createResult;
+  }
+
+  getUpdateResult(): AxiosResponse | undefined {
+    return this.state.updateResult;
+  }
+
+  getCheckResult(): AxiosResponse | undefined {
+    return this.state.checkResult;
+  }
+
+  getUnlockResult(): AxiosResponse | undefined {
+    return this.state.unlockResult;
+  }
+
+  getActivateResult(): AxiosResponse | undefined {
+    return this.state.activateResult;
+  }
+
+  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+    return [...this.state.errors];
+  }
+
+  getResults(): {
+    validate?: ValidationResult;
+    create?: AxiosResponse;
+    update?: AxiosResponse;
+    check?: AxiosResponse;
+    unlock?: AxiosResponse;
+    activate?: AxiosResponse;
+    lockHandle?: string;
+    errors: Array<{ method: string; error: Error; timestamp: Date }>;
+  } {
+    return {
+      validate: this.state.validationResult,
+      create: this.state.createResult,
+      update: this.state.updateResult,
+      check: this.state.checkResult,
+      unlock: this.state.unlockResult,
+      activate: this.state.activateResult,
+      lockHandle: this.lockHandle,
+      errors: [...this.state.errors]
+    };
+  }
+}
+

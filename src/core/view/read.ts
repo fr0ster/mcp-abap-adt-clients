@@ -2,23 +2,39 @@
  * View read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { readObjectMetadata } from '../shared/readMetadata';
+import { readObjectSource } from '../shared/readSource';
 
 /**
- * Get ABAP view (CDS or Classic)
+ * Get ABAP view metadata (without source code)
  */
-export async function getView(connection: AbapConnection, viewName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const encodedName = encodeSapObjectName(viewName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
+export async function getViewMetadata(
+  connection: AbapConnection,
+  viewName: string
+): Promise<AxiosResponse> {
+  return readObjectMetadata(connection, 'view', viewName);
+}
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {}
-  });
+/**
+ * Get ABAP view source code
+ */
+export async function getViewSource(
+  connection: AbapConnection,
+  viewName: string
+): Promise<AxiosResponse> {
+  return readObjectSource(connection, 'view', viewName);
+}
+
+/**
+ * Get ABAP view (source code by default for backward compatibility)
+ * @deprecated Use getViewSource() or getViewMetadata() instead
+ */
+export async function getView(
+  connection: AbapConnection,
+  viewName: string
+): Promise<AxiosResponse> {
+  return getViewSource(connection, viewName);
 }
 

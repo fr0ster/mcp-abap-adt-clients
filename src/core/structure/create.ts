@@ -13,7 +13,7 @@ import { CreateStructureParams } from './types';
 /**
  * Build XML for structure creation following DDIC structure pattern
  */
-function buildCreateStructureXml(args: CreateStructureParams): string {
+export function buildCreateStructureXml(args: CreateStructureParams): string {
   const description = args.description || args.structure_name;
 
   const fieldsXml = args.fields.map(field => {

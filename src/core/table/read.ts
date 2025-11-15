@@ -2,23 +2,39 @@
  * Table read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { readObjectMetadata } from '../shared/readMetadata';
+import { readObjectSource } from '../shared/readSource';
 
 /**
- * Get ABAP table structure
+ * Get ABAP table metadata (without source code)
  */
-export async function getTable(connection: AbapConnection, tableName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const encodedName = encodeSapObjectName(tableName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
+export async function getTableMetadata(
+  connection: AbapConnection,
+  tableName: string
+): Promise<AxiosResponse> {
+  return readObjectMetadata(connection, 'table', tableName);
+}
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {}
-  });
+/**
+ * Get ABAP table source code (DDL)
+ */
+export async function getTableSource(
+  connection: AbapConnection,
+  tableName: string
+): Promise<AxiosResponse> {
+  return readObjectSource(connection, 'table', tableName);
+}
+
+/**
+ * Get ABAP table (source code by default for backward compatibility)
+ * @deprecated Use getTableSource() or getTableMetadata() instead
+ */
+export async function getTable(
+  connection: AbapConnection,
+  tableName: string
+): Promise<AxiosResponse> {
+  return getTableSource(connection, tableName);
 }
 

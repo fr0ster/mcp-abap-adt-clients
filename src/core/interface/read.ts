@@ -2,23 +2,39 @@
  * Interface read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { readObjectMetadata } from '../shared/readMetadata';
+import { readObjectSource } from '../shared/readSource';
 
 /**
- * Get ABAP interface
+ * Get ABAP interface metadata (without source code)
  */
-export async function getInterface(connection: AbapConnection, interfaceName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const encodedName = encodeSapObjectName(interfaceName);
-  const url = `${baseUrl}/sap/bc/adt/oo/interfaces/${encodedName}/source/main`;
+export async function getInterfaceMetadata(
+  connection: AbapConnection,
+  interfaceName: string
+): Promise<AxiosResponse> {
+  return readObjectMetadata(connection, 'interface', interfaceName);
+}
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {}
-  });
+/**
+ * Get ABAP interface source code
+ */
+export async function getInterfaceSource(
+  connection: AbapConnection,
+  interfaceName: string
+): Promise<AxiosResponse> {
+  return readObjectSource(connection, 'interface', interfaceName);
+}
+
+/**
+ * Get ABAP interface (source code by default for backward compatibility)
+ * @deprecated Use getInterfaceSource() or getInterfaceMetadata() instead
+ */
+export async function getInterface(
+  connection: AbapConnection,
+  interfaceName: string
+): Promise<AxiosResponse> {
+  return getInterfaceSource(connection, interfaceName);
 }
 
