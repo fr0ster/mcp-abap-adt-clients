@@ -11,5 +11,5 @@ export * from './activation';
 export * from './check';
 export * from './run';
 export * from './validation';
-export { ClassBuilder, ClassBuilderConfig, ClassBuilderLogger, ClassBuilderState } from './ClassBuilder';
+export { ClassBuilder, type ClassBuilderConfig, type ClassBuilderLogger, type ClassBuilderState } from './ClassBuilder';
 
