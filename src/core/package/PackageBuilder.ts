@@ -8,8 +8,7 @@
  * - Result storage: all results stored in logger/state
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  *
- * Note: Packages don't support lock/unlock/update/activate operations.
- * Available operations: validate, create, read, check
+ * Available operations: validate, create, read, check, lock, unlock, update
  *
  * @example
  * ```typescript
@@ -34,7 +33,11 @@ import { createPackage } from './create';
 import { validatePackageBasic, validatePackageFull } from './validation';
 import { checkPackage } from './check';
 import { getPackage } from './read';
+import { lockPackage } from './lock';
+import { unlockPackage } from './unlock';
+import { updatePackage, UpdatePackageParams } from './update';
 import { CreatePackageParams } from './types';
+import { generateSessionId } from '../../utils/sessionUtils';
 
 export interface PackageBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -60,6 +63,11 @@ export interface PackageBuilderState {
   createResult?: AxiosResponse;
   readResult?: AxiosResponse;
   checkResult?: void;
+  lockResult?: string; // lock handle
+  unlockResult?: AxiosResponse;
+  updateResult?: AxiosResponse;
+  sessionId?: string;
+  lockHandle?: string;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -78,7 +86,8 @@ export class PackageBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.state = {
-      errors: []
+      errors: [],
+      sessionId: generateSessionId()
     };
   }
 
@@ -241,6 +250,105 @@ export class PackageBuilder {
     }
   }
 
+  async lock(): Promise<this> {
+    try {
+      if (!this.state.sessionId) {
+        this.state.sessionId = generateSessionId();
+      }
+      this.logger.info?.('Locking package:', this.config.packageName);
+      const lockHandle = await lockPackage(
+        this.connection,
+        this.config.packageName,
+        this.state.sessionId
+      );
+      this.state.lockHandle = lockHandle;
+      this.state.lockResult = lockHandle;
+      this.logger.info?.('Package locked successfully, lock handle:', lockHandle);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'lock',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Lock failed:', error);
+      throw error;
+    }
+  }
+
+  async unlock(): Promise<this> {
+    try {
+      if (!this.state.sessionId) {
+        this.state.sessionId = generateSessionId();
+      }
+      if (!this.state.lockHandle) {
+        throw new Error('Package must be locked before unlocking. Call lock() first.');
+      }
+      this.logger.info?.('Unlocking package:', this.config.packageName);
+      const result = await unlockPackage(
+        this.connection,
+        this.config.packageName,
+        this.state.lockHandle,
+        this.state.sessionId
+      );
+      this.state.unlockResult = result;
+      this.state.lockHandle = undefined;
+      this.logger.info?.('Package unlocked successfully');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'unlock',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Unlock failed:', error);
+      throw error;
+    }
+  }
+
+  async update(): Promise<this> {
+    try {
+      if (!this.state.sessionId) {
+        this.state.sessionId = generateSessionId();
+      }
+      if (!this.state.lockHandle) {
+        throw new Error('Package must be locked before updating. Call lock() first.');
+      }
+      if (!this.config.superPackage) {
+        throw new Error('Super package is required for update');
+      }
+      this.logger.info?.('Updating package:', this.config.packageName);
+      const params: UpdatePackageParams = {
+        package_name: this.config.packageName,
+        super_package: this.config.superPackage,
+        description: this.config.description,
+        package_type: this.config.packageType,
+        software_component: this.config.softwareComponent,
+        transport_layer: this.config.transportLayer,
+        transport_request: this.config.transportRequest,
+        application_component: this.config.applicationComponent,
+        responsible: this.config.responsible
+      };
+      const result = await updatePackage(
+        this.connection,
+        params,
+        this.state.lockHandle,
+        this.state.sessionId
+      );
+      this.state.updateResult = result;
+      this.logger.info?.('Package updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'update',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update failed:', error);
+      throw error;
+    }
+  }
+
   // Getters for accessing results
   getState(): Readonly<PackageBuilderState> {
     return { ...this.state };
@@ -270,11 +378,34 @@ export class PackageBuilder {
     return [...this.state.errors];
   }
 
+  getSessionId(): string | undefined {
+    return this.state.sessionId;
+  }
+
+  getLockHandle(): string | undefined {
+    return this.state.lockHandle;
+  }
+
+  getLockResult(): string | undefined {
+    return this.state.lockResult;
+  }
+
+  getUnlockResult(): AxiosResponse | undefined {
+    return this.state.unlockResult;
+  }
+
+  getUpdateResult(): AxiosResponse | undefined {
+    return this.state.updateResult;
+  }
+
   getResults(): {
     validate?: { basic?: void; full?: void };
     create?: AxiosResponse;
     read?: AxiosResponse;
     check?: void;
+    lock?: string;
+    unlock?: AxiosResponse;
+    update?: AxiosResponse;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
@@ -282,6 +413,9 @@ export class PackageBuilder {
       create: this.state.createResult,
       read: this.state.readResult,
       check: this.state.checkResult,
+      lock: this.state.lockResult,
+      unlock: this.state.unlockResult,
+      update: this.state.updateResult,
       errors: [...this.state.errors]
     };
   }

@@ -149,19 +149,12 @@ describe('Data Element - Lock', () => {
   // Helper function to ensure data element exists before test (idempotency)
   async function ensureDataElementExists(testCase: any) {
     const dataElementName = testCase.params.data_element_name;
-    const isUserDataElement = dataElementName && (dataElementName.toUpperCase().startsWith('Z_') || dataElementName.toUpperCase().startsWith('Y_'));
 
     try {
       await getDataElement(connection, dataElementName);
       logger.debug(`Data element ${dataElementName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        // Only try to create user-defined data elements (Z_ or Y_)
-        if (!isUserDataElement) {
-          logger.warn(`⚠️ Skipping test: Data element ${dataElementName} is a standard SAP data element and cannot be created`);
-          throw new Error(`Standard SAP data element ${dataElementName} does not exist and cannot be created`);
-        }
-
         logger.debug(`Data element ${dataElementName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_data_element', 'test_data_element');
         if (createTestCase) {

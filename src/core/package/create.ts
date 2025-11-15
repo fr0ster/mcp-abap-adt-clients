@@ -17,18 +17,17 @@ async function createPackageInternal(
   connection: AbapConnection,
   args: CreatePackageParams,
   swcomp: string,
-  transportLayer: string,
-  transportRequest?: string,
-  isLocalPackage?: boolean
+  transportLayer: string | undefined,
+  transportRequest?: string
 ): Promise<any> {
   const baseUrl = await connection.getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/packages`;
   const username = args.responsible || process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
 
-  const softwareComponentName = isLocalPackage ? 'ZLOCAL' : swcomp;
-  const transportLayerXml = isLocalPackage
-    ? '<pak:transportLayer/>'
-    : `<pak:transportLayer pak:name="${transportLayer}"/>`;
+  const softwareComponentName = swcomp;
+  const transportLayerXml = transportLayer
+    ? `<pak:transportLayer pak:name="${transportLayer}"/>`
+    : '<pak:transportLayer/>';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${args.description || args.package_name}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN" adtcore:masterSystem="${process.env.SAP_SYSTEM || 'E19'}" adtcore:responsible="${username}">
 
@@ -93,36 +92,30 @@ export async function createPackage(
     throw new Error('Super package (parent package) is required');
   }
 
-  const hasTransportRequest = !!params.transport_request;
-  const hasSoftwareComponent = !!params.software_component;
-  const hasTransportLayer = !!params.transport_layer;
-
-  const isLocalPackage = !hasTransportRequest && !hasSoftwareComponent && !hasTransportLayer;
-
   const swcomp = params.software_component || 'HOME';
-  const transportLayer = params.transport_layer || process.env.SAP_TRANSPORT_LAYER || 'ZE19';
+  const transportLayer = params.transport_layer;
 
   try {
     await validatePackageBasic(connection, params);
 
     let transportRequest = params.transport_request;
-    if (!isLocalPackage && transportLayer) {
+    if (transportLayer && !transportRequest) {
       const availableTransports = await checkTransportRequirements(connection, params, transportLayer);
 
-      if (!transportRequest && availableTransports.length > 0) {
+      if (availableTransports.length > 0) {
         transportRequest = availableTransports[0];
       }
     }
 
-    if (!transportRequest && !isLocalPackage) {
-      throw new Error('Transport request is required for transportable packages. Please provide transport_request parameter or create a transport first.');
+    if (transportLayer && !transportRequest) {
+      throw new Error('Transport request is required when transport_layer is specified. Please provide transport_request parameter or create a transport first.');
     }
 
-    if (!isLocalPackage) {
+    if (transportLayer) {
       await validatePackageFull(connection, params, swcomp, transportLayer);
     }
 
-    const packageData = await createPackageInternal(connection, params, swcomp, transportLayer, transportRequest, isLocalPackage);
+    const packageData = await createPackageInternal(connection, params, swcomp, transportLayer, transportRequest);
 
     await checkPackage(connection, params.package_name);
 

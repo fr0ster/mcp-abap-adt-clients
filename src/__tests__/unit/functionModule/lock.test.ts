@@ -8,7 +8,7 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { lockFunctionModule } from '../../../core/functionModule/lock';
 import { unlockFunctionModule } from '../../../core/functionModule/unlock';
-import { getFunction } from '../../../core/functionModule/read';
+import { getFunctionMetadata } from '../../../core/functionModule/read';
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
@@ -85,21 +85,12 @@ describe('FunctionModule - Lock', () => {
   async function ensureFunctionModuleExists(testCase: any) {
     const functionGroupName = testCase.params.function_group_name;
     const functionModuleName = testCase.params.function_module_name;
-    const isUserFunctionModule = functionModuleName && (functionModuleName.toUpperCase().startsWith('Z') || functionModuleName.toUpperCase().startsWith('Y'));
-
-    // Ensure function group exists first
-    await ensureFunctionGroupExists(functionGroupName, testCase.params.package_name);
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
+      await getFunctionMetadata(connection, functionModuleName, functionGroupName);
       logger.debug(`Function module ${functionModuleName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        if (!isUserFunctionModule) {
-          logger.warn(`⚠️ Skipping test: Function module ${functionModuleName} is a standard SAP function module and cannot be created`);
-          throw new Error(`Standard SAP function module ${functionModuleName} does not exist and cannot be created`);
-        }
-
         logger.debug(`Function module ${functionModuleName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_function_module');
         if (createTestCase) {

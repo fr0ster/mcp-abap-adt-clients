@@ -56,18 +56,12 @@ describe('FunctionGroup - Lock', () => {
   // Helper function to ensure object exists before test (idempotency)
   async function ensureFunctionGroupExists(testCase: any) {
     const functionGroupName = testCase.params.function_group_name;
-    const isUserFunctionGroup = functionGroupName && (functionGroupName.toUpperCase().startsWith('Z') || functionGroupName.toUpperCase().startsWith('Y'));
 
     try {
       await getFunctionGroup(connection, functionGroupName);
       logger.debug(`Function group ${functionGroupName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        if (!isUserFunctionGroup) {
-          logger.warn(`⚠️ Skipping test: Function group ${functionGroupName} is a standard SAP function group and cannot be created`);
-          throw new Error(`Standard SAP function group ${functionGroupName} does not exist and cannot be created`);
-        }
-
         logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_function_group');
         if (createTestCase) {

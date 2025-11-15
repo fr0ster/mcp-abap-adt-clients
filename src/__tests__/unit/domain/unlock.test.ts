@@ -105,19 +105,12 @@ describe('Domain - Unlock', () => {
   // Helper function to ensure domain exists before test (idempotency)
   async function ensureDomainExists(testCase: any) {
     const domainName = testCase.params.domain_name;
-    const isUserDomain = domainName && (domainName.toUpperCase().startsWith('Z_') || domainName.toUpperCase().startsWith('Y_'));
 
     try {
       await getDomain(connection, domainName);
       logger.debug(`Domain ${domainName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        // Only try to create user-defined domains (Z_ or Y_)
-        if (!isUserDomain) {
-          logger.warn(`⚠️ Skipping test: Domain ${domainName} is a standard SAP domain and cannot be created`);
-          throw new Error(`Standard SAP domain ${domainName} does not exist and cannot be created`);
-        }
-
         logger.debug(`Domain ${domainName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_domain', 'test_domain');
         if (createTestCase) {
