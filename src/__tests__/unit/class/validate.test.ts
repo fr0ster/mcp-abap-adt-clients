@@ -7,7 +7,7 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { validateClassSource } from '../../../core/class/validation';
-import { getClassMetadata } from '../../../core/class/read';
+import { getClass } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import * as path from 'path';
@@ -82,7 +82,7 @@ describe('Class - Validate', () => {
   // Helper function to ensure object exists before test (idempotency)
   async function ensureClassExists(testCase: any) {
     try {
-      await getClassMetadata(connection, testCase.params.class_name);
+      await getClass(connection, testCase.params.class_name);
       logger.debug(`Class ${testCase.params.class_name} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

@@ -7,7 +7,7 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { checkClass } from '../../../core/class/check';
-import { getClassMetadata } from '../../../core/class/read';
+import { getClass } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
 import { deleteObject } from '../../../core/delete';
 import { activateClass } from '../../../core/class/activation';
@@ -89,7 +89,7 @@ describe('Class - Check', () => {
   // Each test checks and prepares data before running
   async function ensureClassExists(testCase: any) {
     try {
-      await getClassMetadata(connection, testCase.params.class_name);
+      await getClass(connection, testCase.params.class_name);
       logger.debug(`Class ${testCase.params.class_name} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

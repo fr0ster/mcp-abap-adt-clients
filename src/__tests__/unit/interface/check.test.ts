@@ -6,14 +6,21 @@
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { checkInterface } from '../../../core/interface/check';
-import { getInterfaceMetadata, getInterfaceSource } from '../../../core/interface/read';
+import { getInterfaceMetadata } from '../../../core/interface/read';
 import { createInterface } from '../../../core/interface/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
+import { getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -27,16 +34,11 @@ const logger = {
 describe('Interface - Check', () => {
   let connection: AbapConnection;
   let hasConfig = false;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, '${module}_check', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -44,8 +46,7 @@ describe('Interface - Check', () => {
     }
   });
 
-  afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }

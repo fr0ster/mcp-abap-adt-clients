@@ -19,7 +19,7 @@ import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/c
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { deleteObject } from '../../../core/delete';
-import { getFunctionMetadata, getFunctionSource } from '../../../core/functionModule/read';
+import { getFunction } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import * as path from 'path';
@@ -126,7 +126,7 @@ describe('Function Module - Create', () => {
     }
 
     try {
-      await getFunctionMetadata(connection, functionGroupName, functionModuleName);
+      await getFunction(connection, functionGroupName, functionModuleName);
       // Object exists, try to delete it
       logger.debug(`Function module ${functionModuleName} exists, attempting to delete...`);
       try {
@@ -140,7 +140,7 @@ describe('Function Module - Create', () => {
         await new Promise(resolve => setTimeout(resolve, 2000));
         // Verify it's truly gone
         try {
-          await getFunctionMetadata(connection, functionGroupName, functionModuleName);
+          await getFunction(connection, functionGroupName, functionModuleName);
           logger.warn(`Function module ${functionModuleName} still exists after deletion attempt`);
           return false; // Cannot proceed - object still exists
         } catch (verifyError: any) {
@@ -234,7 +234,7 @@ describe('Function Module - Create', () => {
       logger.debug(`✅ Created function module: ${functionModuleName}`);
 
       // Verify creation
-      const result = await getFunctionSource(connection, functionGroupName, functionModuleName);
+      const result = await getFunction(connection, functionGroupName, functionModuleName);
       expect(result.status).toBe(200);
       expect(result.data).toContain(functionModuleName);
       logger.debug(`✅ Verified FM creation`);

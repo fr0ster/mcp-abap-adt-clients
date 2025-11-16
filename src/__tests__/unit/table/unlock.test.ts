@@ -5,16 +5,23 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/table/unlock.test
  */
 
-import { getTableMetadata } from '../../../core/table/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { acquireTableLockHandle } from '../../../core/table/lock';
 import { unlockTable } from '../../../core/table/unlock';
+import { getTableMetadata } from '../../../core/table/read';
 import { createTable } from '../../../core/table/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
+import { getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -28,16 +35,11 @@ const logger = {
 describe('Table - Unlock', () => {
   let connection: AbapConnection;
   let hasConfig = false;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, '${module}_unlock', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -45,8 +47,7 @@ describe('Table - Unlock', () => {
     }
   });
 
-  afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }

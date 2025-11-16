@@ -15,14 +15,21 @@
  * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
-import { getDomain } from '../../../core/domain/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { createDomain } from '../../../core/domain/create';
+import { getDomain } from '../../../core/domain/read';
 import { deleteObject } from '../../../core/delete';
+import { setupTestEnvironment, cleanupTestEnvironment } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -33,6 +40,45 @@ const logger = {
   csrfToken: debugEnabled ? console.log : () => {},
 };
 
+function getConfig(): SapConfig {
+  const rawUrl = process.env.SAP_URL;
+  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
+  const rawClient = process.env.SAP_CLIENT;
+  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
+  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
+  const authType = rawAuthType.split('#')[0].trim();
+
+  if (!url || !/^https?:\/\//.test(url)) {
+    throw new Error(`Missing or invalid SAP_URL: ${url}`);
+  }
+
+  const config: SapConfig = {
+    url,
+    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
+  };
+
+  if (client) {
+    config.client = client;
+  }
+
+  if (authType === 'jwt' || authType === 'xsuaa') {
+    const jwtToken = process.env.SAP_JWT_TOKEN;
+    if (!jwtToken) {
+      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
+    }
+    config.jwtToken = jwtToken;
+  } else {
+    const username = process.env.SAP_USERNAME;
+    const password = process.env.SAP_PASSWORD;
+    if (!username || !password) {
+      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+    }
+    config.username = username;
+    config.password = password;
+  }
+
+  return config;
+}
 
 describe('Domain - Create', () => {
   let connection: AbapConnection;
@@ -41,17 +87,16 @@ describe('Domain - Create', () => {
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, '${module}_create', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
 
       // Setup session and lock tracking based on test-config.yaml
       // This will enable stateful session if persist_session: true in YAML
-      
+      const env = await setupTestEnvironment(connection, 'domain_create', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
       lockTracking = env.lockTracking;
 
       if (sessionId) {
@@ -78,8 +123,7 @@ describe('Domain - Create', () => {
     }
   });
 
-  afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  afterAll(async () => {
     if (connection && sessionId) {
       await cleanupTestEnvironment(connection, sessionId, testConfig);
     }
@@ -95,6 +139,7 @@ describe('Domain - Create', () => {
       return false;
     }
     try {
+      await getDomain(connection, testCase.params.domain_name);
       // Object exists, try to delete it
       logger.debug(`Domain ${testCase.params.domain_name} exists, attempting to delete...`);
       try {
@@ -108,6 +153,7 @@ describe('Domain - Create', () => {
         // Verify it's truly gone - try a few times as SAP may have delay
         for (let attempt = 0; attempt < 5; attempt++) {
           try {
+            await getDomain(connection, testCase.params.domain_name);
             // Object still exists, wait a bit more and try again
             if (attempt < 4) {
               logger.debug(`Domain ${testCase.params.domain_name} still exists, waiting... (attempt ${attempt + 1}/5)`);
@@ -124,6 +170,7 @@ describe('Domain - Create', () => {
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 // Check one more time
                 try {
+                  await getDomain(connection, testCase.params.domain_name);
                   // Still exists - cannot proceed
                   logger.error(`Domain ${testCase.params.domain_name} still exists after final deletion attempt`);
                   return false;

@@ -5,13 +5,20 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/view/read.test
  */
 
-import { getViewMetadata, getViewSource } from '../../../core/view/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { getViewSource, getViewMetadata } from '../../../core/view/read';
 import { createView } from '../../../core/view/create';
+import { getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -25,16 +32,11 @@ const logger = {
 describe('View - Read', () => {
   let connection: AbapConnection;
   let hasConfig = false;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, '${module}_read', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -43,7 +45,6 @@ describe('View - Read', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }

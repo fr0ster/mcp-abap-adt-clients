@@ -9,10 +9,17 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { activateFunctionGroup } from '../../../core/functionGroup/activation';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger: ILogger = {
@@ -26,16 +33,11 @@ const logger: ILogger = {
 describe('FunctionGroup - Activate', () => {
   let connection: AbapConnection;
   let hasConfig = false;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, 'functionGroup_activate', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -44,7 +46,6 @@ describe('FunctionGroup - Activate', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }

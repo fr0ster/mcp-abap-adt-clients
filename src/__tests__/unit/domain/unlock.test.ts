@@ -15,16 +15,23 @@
  * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
-import { getDomain } from '../../../core/domain/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { lockDomain } from '../../../core/domain/lock';
 import { unlockDomain } from '../../../core/domain/unlock';
+import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -42,17 +49,16 @@ describe('Domain - Unlock', () => {
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, '${module}_unlock', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
 
       // Setup session and lock tracking based on test-config.yaml
       // This will enable stateful session if persist_session: true in YAML
-      
+      const env = await setupTestEnvironment(connection, 'domain_unlock', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
       lockTracking = env.lockTracking;
 
       if (sessionId) {
@@ -78,8 +84,7 @@ describe('Domain - Unlock', () => {
     }
   });
 
-  afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  afterAll(async () => {
     if (connection) {
       await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
@@ -91,6 +96,7 @@ describe('Domain - Unlock', () => {
     const domainName = testCase.params.domain_name;
 
     try {
+      await getDomain(connection, domainName);
       logger.debug(`Domain ${domainName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

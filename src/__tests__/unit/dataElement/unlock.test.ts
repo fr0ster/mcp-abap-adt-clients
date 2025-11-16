@@ -15,10 +15,10 @@
  * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
-import { getDataElement } from '../../../core/dataElement/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { lockDataElement } from '../../../core/dataElement/lock';
 import { unlockDataElement } from '../../../core/dataElement/unlock';
+import { getDataElement } from '../../../core/dataElement/read';
 import { createDataElement } from '../../../core/dataElement/create';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
@@ -31,6 +31,9 @@ import * as dotenv from 'dotenv';
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -129,6 +132,7 @@ describe('Data Element - Unlock', () => {
     const dataElementName = testCase.params.data_element_name;
 
     try {
+      await getDataElement(connection, dataElementName);
       logger.debug(`Data element ${dataElementName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

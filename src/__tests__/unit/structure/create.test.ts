@@ -5,14 +5,21 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/structure/create.test
  */
 
-import { getStructureMetadata } from '../../../core/structure/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { createStructure } from '../../../core/structure/create';
+import { getStructureMetadata } from '../../../core/structure/read';
 import { deleteStructure } from '../../../core/structure/delete';
+import { getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -26,16 +33,11 @@ const logger = {
 describe('Structure - Create', () => {
   let connection: AbapConnection;
   let hasConfig = false;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, '${module}_create', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
       await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
@@ -44,8 +46,7 @@ describe('Structure - Create', () => {
     }
   });
 
-  afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }

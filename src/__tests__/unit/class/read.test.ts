@@ -6,7 +6,7 @@
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { getClassMetadata, getClassSource } from '../../../core/class/read';
+import { getClass } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import * as path from 'path';
@@ -81,7 +81,7 @@ describe('Class - Read', () => {
   // Helper function to ensure object exists before test (idempotency)
   async function ensureClassExists(testCase: any) {
     try {
-      await getClassMetadata(connection, testCase.params.class_name);
+      await getClass(connection, testCase.params.class_name);
       // Class exists, nothing to do
       logger.debug(`Class ${testCase.params.class_name} exists`);
     } catch (error: any) {
@@ -120,7 +120,7 @@ describe('Class - Read', () => {
     // Ensure class exists before test (idempotency)
     await ensureClassExists(testCase);
 
-    const result = await getClassMetadata(connection, testCase.params.class_name);
+    const result = await getClass(connection, testCase.params.class_name);
     expect(result.status).toBe(200);
     expect(result.data).toContain('CLASS');
   }, 15000);
@@ -140,7 +140,7 @@ describe('Class - Read', () => {
     // Ensure class exists before test (idempotency)
     await ensureClassExists(testCase);
 
-    const result = await getClassMetadata(connection, testCase.params.class_name);
+    const result = await getClass(connection, testCase.params.class_name, 'inactive');
     expect(result.status).toBe(200);
     expect(result.data).toContain('CLASS');
   }, 15000);

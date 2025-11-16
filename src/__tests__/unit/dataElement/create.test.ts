@@ -15,9 +15,9 @@
  * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
-import { getDataElement } from '../../../core/dataElement/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { createDataElement } from '../../../core/dataElement/create';
+import { getDataElement } from '../../../core/dataElement/read';
 import { deleteObject } from '../../../core/delete';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
@@ -29,6 +29,9 @@ import * as dotenv from 'dotenv';
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -95,6 +98,7 @@ describe('Data Element - Create', () => {
       return false;
     }
     try {
+      await getDataElement(connection, testCase.params.data_element_name);
       // Object exists, try to delete it
       logger.debug(`Data element ${testCase.params.data_element_name} exists, attempting to delete...`);
       try {
@@ -108,6 +112,7 @@ describe('Data Element - Create', () => {
         // Verify it's truly gone - try a few times as SAP may have delay
         for (let attempt = 0; attempt < 5; attempt++) {
           try {
+            await getDataElement(connection, testCase.params.data_element_name);
             // Object still exists, wait a bit more and try again
             if (attempt < 4) {
               logger.debug(`Data element ${testCase.params.data_element_name} still exists, waiting... (attempt ${attempt + 1}/5)`);
@@ -124,6 +129,7 @@ describe('Data Element - Create', () => {
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 // Check one more time
                 try {
+                  await getDataElement(connection, testCase.params.data_element_name);
                   // Still exists - cannot proceed
                   logger.error(`Data element ${testCase.params.data_element_name} still exists after final deletion attempt`);
                   return false;

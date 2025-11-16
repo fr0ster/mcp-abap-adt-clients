@@ -6,17 +6,24 @@
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { lockProgram } from '../../../core/program/lock';
 import { unlockProgram } from '../../../core/program/unlock';
-import { getProgramMetadata, getProgramSource } from '../../../core/program/read';
+import { getProgramMetadata } from '../../../core/program/read';
 import { createProgram } from '../../../core/program/create';
 import { activateProgram } from '../../../core/program/activation';
 import { updateProgramSource } from '../../../core/program/update';
 import { generateSessionId } from '../../../utils/sessionUtils';
+import { getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -30,17 +37,12 @@ const logger = {
 describe('Program - Lock/Unlock', () => {
   let connection: AbapConnection;
   let hasConfig = false;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
   let lockHandle: string | null = null;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, '${module}_lock', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -48,8 +50,7 @@ describe('Program - Lock/Unlock', () => {
     }
   });
 
-  afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
