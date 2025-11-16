@@ -7,7 +7,7 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { updateClass } from '../../../core/class/update';
-import { getClass } from '../../../core/class/read';
+import { getClassMetadata, getClassSource } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
 import { lockClass } from '../../../core/class/lock';
 import { unlockClass } from '../../../core/class/unlock';
@@ -86,7 +86,7 @@ describe('Class - Update', () => {
   // Helper function to ensure object exists before test (idempotency)
   async function ensureClassExists(testCase: any) {
     try {
-      await getClass(connection, testCase.params.class_name);
+      await getClassMetadata(connection, testCase.params.class_name);
       logger.debug(`Class ${testCase.params.class_name} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -189,7 +189,7 @@ ENDCLASS.`;
     await activateClass(connection, className, sessionId);
 
     // Verify update by reading inactive version
-    const result = await getClass(connection, testCase.params.class_name, 'inactive');
+    const result = await getClassSource(connection, testCase.params.class_name, 'inactive');
     expect(result.status).toBe(200);
     expect(result.data).toContain('Updated Text');
   }, 30000);

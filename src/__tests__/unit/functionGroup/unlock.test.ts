@@ -10,12 +10,10 @@ import { lockFunctionGroup, unlockFunctionGroup } from '../../../core/functionGr
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger: ILogger = {

@@ -8,15 +8,12 @@
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { checkProgram } from '../../../core/program/check';
-import { getProgramMetadata } from '../../../core/program/read';
+import { getProgramMetadata, getProgramSource } from '../../../core/program/read';
 import { createProgram } from '../../../core/program/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

@@ -9,10 +9,9 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { StructureBuilder, StructureBuilderLogger } from '../../../core/structure';
 import { deleteStructure } from '../../../core/structure/delete';
+import { getStructureMetadata } from '../../../core/structure/read';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
-
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {
@@ -35,10 +34,6 @@ describe('StructureBuilder', () => {
   let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
   beforeEach(async () => {
     try {
@@ -55,15 +50,11 @@ describe('StructureBuilder', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }
   });
 
-  // Helper function to delete structure if exists (idempotency)
   async function deleteStructureIfExists(structureName: string): Promise<void> {
     try {
       await deleteStructure(connection, { structure_name: structureName });

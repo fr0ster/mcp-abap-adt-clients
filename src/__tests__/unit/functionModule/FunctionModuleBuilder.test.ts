@@ -12,8 +12,6 @@ import { deleteFunctionModule } from '../../../core/functionModule/delete';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-}
-
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {
   debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},

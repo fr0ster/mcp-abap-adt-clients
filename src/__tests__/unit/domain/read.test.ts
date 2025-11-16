@@ -15,16 +15,13 @@
  * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
+import { getDomain } from '../../../core/domain/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -40,8 +37,6 @@ describe('Domain - Read', () => {
   let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeEach(async () => {
@@ -54,9 +49,7 @@ describe('Domain - Read', () => {
 
       // Setup session and lock tracking based on test-config.yaml
       // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'domain_read', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
+
       lockTracking = env.lockTracking;
 
       if (sessionId) {
@@ -93,7 +86,6 @@ describe('Domain - Read', () => {
   // Helper function to ensure domain exists before test (idempotency)
   async function ensureDomainExists(domainName: string) {
     try {
-      await getDomain(connection, domainName);
       logger.debug(`Domain ${domainName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

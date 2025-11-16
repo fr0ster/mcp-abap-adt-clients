@@ -18,7 +18,7 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import {
   createClass,
-  getClass,
+  getClassSource,
   updateClass,
   activateClass,
   checkClass,
@@ -119,7 +119,7 @@ describe('Class - Complete Workflow', () => {
 
     // Step 2: Read Class
     console.log('\n📖 Step 2: Reading Class...');
-    const readResult = await getClass(connection, className);
+    const readResult = await getClassSource(connection, className);
     expect(readResult.status).toBe(200);
     expect(readResult.data).toContain(className);
     console.log(`✅ Read Class successfully`);
@@ -161,7 +161,7 @@ ENDCLASS.`;
     console.log(`✅ Updated Class source`);
 
     // Verify update
-    const updatedResult = await getClass(connection, className, 'inactive');
+    const updatedResult = await getClassSource(connection, className, 'inactive');
     expect(updatedResult.status).toBe(200);
     expect(updatedResult.data).toContain('Updated Text from Workflow');
     console.log(`✅ Verified Class update`);
@@ -216,7 +216,7 @@ ENDCLASS.`;
 
     // Verify deletion
     try {
-      await getClass(connection, className);
+      await getClassSource(connection, className);
       fail('Expected 404 error when reading deleted class');
     } catch (error: any) {
       expect(error.response?.status).toBe(404);

@@ -9,10 +9,9 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { ViewBuilder, ViewBuilderLogger } from '../../../core/view';
 import { deleteView } from '../../../core/view/delete';
+import { getViewMetadata } from '../../../core/view/read';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
-
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {
@@ -35,10 +34,6 @@ describe('ViewBuilder', () => {
   let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
   beforeEach(async () => {
     try {
@@ -55,15 +50,11 @@ describe('ViewBuilder', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }
   });
 
-  // Helper function to delete view if exists (idempotency)
   async function deleteViewIfExists(viewName: string): Promise<void> {
     try {
       await deleteView(connection, { view_name: viewName });

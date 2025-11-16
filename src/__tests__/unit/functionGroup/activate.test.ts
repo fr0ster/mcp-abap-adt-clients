@@ -9,12 +9,10 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { activateFunctionGroup } from '../../../core/functionGroup/activation';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger: ILogger = {

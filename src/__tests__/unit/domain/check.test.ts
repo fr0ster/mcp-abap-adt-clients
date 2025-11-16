@@ -15,18 +15,15 @@
  * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
+import { getDomain } from '../../../core/domain/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { checkDomainSyntax } from '../../../core/domain/check';
-import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -42,8 +39,6 @@ describe('Domain - Check', () => {
   let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeEach(async () => {
@@ -56,9 +51,7 @@ describe('Domain - Check', () => {
 
       // Setup session and lock tracking based on test-config.yaml
       // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'domain_check', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
+      
       lockTracking = env.lockTracking;
 
       if (sessionId) {
@@ -102,7 +95,6 @@ describe('Domain - Check', () => {
     const domainName = testCase.params.domain_name;
 
     try {
-      await getDomain(connection, domainName);
       logger.debug(`Domain ${domainName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

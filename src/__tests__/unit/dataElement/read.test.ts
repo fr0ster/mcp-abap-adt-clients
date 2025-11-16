@@ -15,8 +15,8 @@
  * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { getDataElement } from '../../../core/dataElement/read';
+import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { createDataElement } from '../../../core/dataElement/create';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
@@ -28,9 +28,6 @@ import * as dotenv from 'dotenv';
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -124,7 +121,6 @@ describe('Data Element - Read', () => {
   // Helper function to ensure data element exists before test (idempotency)
   async function ensureDataElementExists(dataElementName: string, domainName: string) {
     try {
-      await getDataElement(connection, dataElementName);
       logger.debug(`Data element ${dataElementName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -213,7 +209,7 @@ describe('Data Element - Read', () => {
       throw error;
     }
 
-    const result = await getDataElement(connection, testCase.params.data_element_name || 'Z_TEST_DTEL_01');
+    const result = await getDataElement(connection, testCase.params.data_element_name);
     expect(result.status).toBe(200);
     expect(result.data).toContain('dtel:dataElement');
   }, 15000);

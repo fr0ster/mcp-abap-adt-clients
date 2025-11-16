@@ -9,10 +9,9 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { TableBuilder, TableBuilderLogger } from '../../../core/table';
 import { deleteTable } from '../../../core/table/delete';
+import { getTableMetadata } from '../../../core/table/read';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
-
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {
@@ -35,10 +34,6 @@ describe('TableBuilder', () => {
   let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
   beforeEach(async () => {
     try {
@@ -55,15 +50,11 @@ describe('TableBuilder', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }
   });
 
-  // Helper function to delete table if exists (idempotency)
   async function deleteTableIfExists(tableName: string): Promise<void> {
     try {
       await deleteTable(connection, { table_name: tableName });

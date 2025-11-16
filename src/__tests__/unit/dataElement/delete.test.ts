@@ -3,10 +3,10 @@
  * Tests only the delete operation in isolation
  */
 
+import { getDataElement } from '../../../core/dataElement/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { deleteObject } from '../../../core/delete';
 import { createDataElement } from '../../../core/dataElement/create';
-import { getDataElement } from '../../../core/dataElement/read';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
@@ -110,7 +110,6 @@ describe('Data Element - Delete', () => {
       throw new Error('data_element_name or object_name is required in test case');
     }
     try {
-      await getDataElement(connection, dataElementName);
       logger.debug(`Data element ${dataElementName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

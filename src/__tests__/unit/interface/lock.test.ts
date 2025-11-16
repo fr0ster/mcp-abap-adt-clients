@@ -9,17 +9,14 @@ import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/c
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { lockInterface } from '../../../core/interface/lock';
 import { unlockInterface } from '../../../core/interface/unlock';
-import { getInterfaceMetadata } from '../../../core/interface/read';
+import { getInterfaceMetadata, getInterfaceSource } from '../../../core/interface/read';
 import { createInterface } from '../../../core/interface/create';
 import { activateInterface } from '../../../core/interface/activation';
 import { updateInterfaceSource } from '../../../core/interface/update';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

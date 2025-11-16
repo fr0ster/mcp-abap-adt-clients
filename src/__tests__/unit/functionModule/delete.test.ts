@@ -10,7 +10,7 @@ import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../h
 import { deleteObject } from '../../../core/delete';
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { getFunction } from '../../../core/functionModule/read';
+import { getFunctionMetadata } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
@@ -108,7 +108,7 @@ describe('Function Module - Delete', () => {
     }
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
+      await getFunctionMetadata(connection, functionGroupName, functionModuleName);
       logger.debug(`Function module ${functionModuleName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -187,7 +187,7 @@ describe('Function Module - Delete', () => {
 
     // Verify deletion
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
+      await getFunctionMetadata(connection, functionGroupName, functionModuleName);
       throw new Error('FM should have been deleted but still exists');
     } catch (error: any) {
       // Expected - FM should not exist

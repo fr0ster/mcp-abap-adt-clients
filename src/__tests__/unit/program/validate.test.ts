@@ -5,15 +5,13 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/program/validate.test
  */
 
+import { getProgramMetadata, getProgramSource } from '../../../core/program/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { validateProgramName } from '../../../core/program/validation';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

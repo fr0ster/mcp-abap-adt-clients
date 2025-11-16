@@ -8,7 +8,7 @@
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { lockClass } from '../../../core/class/lock';
 import { unlockClass } from '../../../core/class/unlock';
-import { getClass } from '../../../core/class/read';
+import { getClassMetadata } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
 import { activateClass } from '../../../core/class/activation';
 import { updateClass } from '../../../core/class/update';
@@ -58,10 +58,12 @@ describe('Class - Lock/Unlock', () => {
   // Helper function to ensure object exists before test (idempotency)
   async function ensureClassExists(testCase: any) {
     try {
-      await getClass(connection, testCase.params.class_name);
+      await getClassMetadata(connection, testCase.params.class_name);
       logger.debug(`Class ${testCase.params.class_name} exists`);
+      return; // Object exists, nothing to do
     } catch (error: any) {
       if (error.response?.status === 404) {
+        // Object doesn't exist - create it
         logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_class');
         if (!createTestCase) {
@@ -103,6 +105,7 @@ describe('Class - Lock/Unlock', () => {
 
         logger.debug(`Class ${className} created and activated successfully`);
       } else {
+        // Real error (not 404) - propagate it
         throw error;
       }
     }

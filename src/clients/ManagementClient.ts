@@ -18,7 +18,12 @@ export class ManagementClient {
    * Activate ABAP objects
    */
   async activateObject(objects: Array<{name: string, type: string}>): Promise<AxiosResponse> {
-    return mgmtOps.activateObject(this.connection, objects);
+    // Convert type to URI format expected by activateObjectsGroup
+    const objectsWithUri = objects.map(obj => ({
+      name: obj.name,
+      uri: `/sap/bc/adt/${obj.type}/${obj.name.toLowerCase()}`
+    }));
+    return mgmtOps.activateObjectsGroup(this.connection, objectsWithUri);
   }
 
   /**

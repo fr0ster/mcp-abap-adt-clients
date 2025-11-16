@@ -10,7 +10,7 @@ import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../h
 import { updateFunctionModuleSource } from '../../../core/functionModule/update';
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { getFunction } from '../../../core/functionModule/read';
+import { getFunctionMetadata, getFunctionSource } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
 const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
@@ -86,7 +86,7 @@ describe('Function Module - Update', () => {
     }
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
+      await getFunctionMetadata(connection, functionGroupName, functionModuleName);
       logger.debug(`Function module ${functionModuleName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -176,7 +176,7 @@ ENDFUNCTION.`;
       logger.debug(`✅ Updated function module source: ${functionModuleName}`);
 
       // Verify update
-      const result = await getFunction(connection, functionGroupName, functionModuleName);
+      const result = await getFunctionSource(connection, functionGroupName, functionModuleName);
       expect(result.status).toBe(200);
       if (updatedSourceCode.includes('Updated')) {
         expect(result.data).toContain('Updated');

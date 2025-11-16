@@ -5,17 +5,14 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/interface/validate.test
  */
 
+import { getInterfaceMetadata, getInterfaceSource } from '../../../core/interface/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { validateInterfaceName } from '../../../core/interface/validation';
-import { getInterfaceMetadata } from '../../../core/interface/read';
 import { createInterface } from '../../../core/interface/create';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

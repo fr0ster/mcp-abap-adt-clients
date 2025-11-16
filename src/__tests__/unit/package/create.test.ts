@@ -9,12 +9,9 @@ import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/c
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { createPackage } from '../../../core/package/create';
 import { getPackage } from '../../../core/package/read';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

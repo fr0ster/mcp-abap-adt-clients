@@ -13,12 +13,9 @@ import { createPackage } from '../../../core/package/create';
 import { lockPackage } from '../../../core/package/lock';
 import { unlockPackage } from '../../../core/package/unlock';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

@@ -5,19 +5,16 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/table/unlock.test
  */
 
+import { getTableMetadata } from '../../../core/table/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { acquireTableLockHandle } from '../../../core/table/lock';
 import { unlockTable } from '../../../core/table/unlock';
-import { getTableMetadata } from '../../../core/table/read';
 import { createTable } from '../../../core/table/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

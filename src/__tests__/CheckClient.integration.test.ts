@@ -331,7 +331,7 @@ describe('Check Operations Integration Tests', () => {
 
       const { generateSessionId } = await import('../utils/sessionUtils');
       const sessionId = generateSessionId();
-      const response = await tableCheck.runCheckRun(
+      const response = await tableCheck.runTableCheckRun(
         connection,
         'tableStatusCheck',
         testCase.params.table_name,
@@ -350,7 +350,7 @@ describe('Check Operations Integration Tests', () => {
 
       const { generateSessionId } = await import('../utils/sessionUtils');
       const sessionId = generateSessionId();
-      const response = await tableCheck.runCheckRun(
+      const response = await tableCheck.runTableCheckRun(
         connection,
         'abapCheckRun',
         testCase.params.table_name,

@@ -5,16 +5,13 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/structure/read.test
  */
 
+import { getStructureMetadata, getStructureSource } from '../../../core/structure/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import { getStructureSource, getStructureMetadata } from '../../../core/structure/read';
 import { createStructure } from '../../../core/structure/create';
-import { getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

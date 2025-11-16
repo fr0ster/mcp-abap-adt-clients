@@ -4,7 +4,7 @@
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';

@@ -5,17 +5,14 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/table/read.test
  */
 
+import { getTableMetadata, getTableSource } from '../../../core/table/read';
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import { getTableSource, getTableMetadata } from '../../../core/table/read';
 import { createTable } from '../../../core/table/create';
-import { getConfig } from '../../helpers/sessionConfig';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

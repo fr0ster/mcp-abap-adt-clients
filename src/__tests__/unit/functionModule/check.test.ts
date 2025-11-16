@@ -8,7 +8,7 @@ import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../h
 import { checkFunctionModule } from '../../../core/functionModule/check';
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { getFunction, getFunctionMetadata, getFunctionSource } from '../../../core/functionModule/read';
+import { getFunctionMetadata, getFunctionSource } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { activateFunctionModule } from '../../../core/functionModule/activation';
 
@@ -81,7 +81,7 @@ describe('Function Module - Check', () => {
     const functionGroupName = testCase.params.function_group_name;
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
+      await getFunctionMetadata(connection, functionGroupName, functionModuleName);
       logger.debug(`Function module ${functionModuleName} exists`);
     } catch (error: any) {
       // 500 error might mean FM exists but has issues - try to create anyway or skip

@@ -7,7 +7,7 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import { getFunction } from '../../../core/functionModule/read';
+import { getFunctionMetadata, getFunctionSource } from '../../../core/functionModule/read';
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
@@ -84,7 +84,7 @@ describe('Function Module - Read', () => {
     }
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
+      await getFunctionMetadata(connection, functionGroupName, functionModuleName);
       logger.debug(`Function module ${functionModuleName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -152,7 +152,7 @@ describe('Function Module - Read', () => {
     }
 
     // Read FM
-    const result = await getFunction(connection, functionGroupName, functionModuleName);
+    const result = await getFunctionSource(connection, functionGroupName, functionModuleName);
     expect(result.status).toBe(200);
     expect(result.data).toContain(functionModuleName);
     logger.debug(`✅ Read function module successfully: ${functionModuleName}`);

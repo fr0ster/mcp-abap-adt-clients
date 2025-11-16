@@ -5,14 +5,13 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/dataElement/DataElementBuilder.test
  */
 
+import { getDataElement } from '../../../core/dataElement/read';
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { DataElementBuilder, DataElementBuilderLogger } from '../../../core/dataElement';
 import { deleteDataElement } from '../../../core/dataElement/delete';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
-
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {

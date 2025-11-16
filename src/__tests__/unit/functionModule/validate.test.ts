@@ -10,7 +10,7 @@ import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../h
 import { validateFunctionModuleName, validateFunctionModuleSource } from '../../../core/functionModule/validation';
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { getFunction } from '../../../core/functionModule/read';
+import { getFunctionMetadata } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
@@ -86,7 +86,7 @@ describe('Function Module - Validate', () => {
     }
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
+      await getFunctionMetadata(connection, functionGroupName, functionModuleName);
       logger.debug(`Function module ${functionModuleName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

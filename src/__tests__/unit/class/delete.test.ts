@@ -7,7 +7,7 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { deleteObject } from '../../../core/delete';
-import { getClass } from '../../../core/class/read';
+import { getClassMetadata } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import * as path from 'path';
@@ -82,7 +82,7 @@ describe('Class - Delete', () => {
   // Helper function to ensure object exists before test (idempotency)
   async function ensureClassExists(testCase: any) {
     try {
-      await getClass(connection, testCase.params.class_name || testCase.params.object_name);
+      await getClassMetadata(connection, testCase.params.class_name || testCase.params.object_name);
       logger.debug(`Class ${testCase.params.class_name || testCase.params.object_name} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -125,7 +125,7 @@ describe('Class - Delete', () => {
 
     // Verify deletion - should return 404
     try {
-      await getClass(connection, testCase.params.class_name);
+      await getClassMetadata(connection, testCase.params.class_name);
       fail('Expected 404 error when reading deleted class');
     } catch (error: any) {
       expect(error.response?.status).toBe(404);

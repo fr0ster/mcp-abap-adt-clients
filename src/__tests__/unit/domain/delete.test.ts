@@ -5,16 +5,14 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/delete.test
  */
 
+import { getDomain } from '../../../core/domain/read';
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { deleteDomain } from '../../../core/domain/delete';
-import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-if (fs.existsSync(envPath)) {
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger: ILogger = {
@@ -30,8 +28,6 @@ describe('Domain - Delete', () => {
   let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeEach(async () => {
@@ -44,9 +40,7 @@ describe('Domain - Delete', () => {
 
       // Setup session and lock tracking based on test-config.yaml
       // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'domain_delete', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
+      
       lockTracking = env.lockTracking;
 
       if (sessionId) {
@@ -87,7 +81,6 @@ describe('Domain - Delete', () => {
       throw new Error('domain_name or object_name is required in test case');
     }
     try {
-      await getDomain(connection, domainName);
       logger.debug(`Domain ${domainName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {

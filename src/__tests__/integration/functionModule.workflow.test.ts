@@ -16,7 +16,7 @@ import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/c
 import { createFunctionGroup } from '../../core/functionGroup/create';
 import { getFunctionGroup } from '../../core/functionGroup/read';
 import { createFunctionModule } from '../../core/functionModule/create';
-import { getFunction } from '../../core/functionModule/read';
+import { getFunctionSource } from '../../core/functionModule/read';
 import { updateFunctionModuleSource } from '../../core/functionModule/update';
 import { checkFunctionModule } from '../../core/functionModule/check';
 import { validateFunctionModuleName, validateFunctionModuleSource } from '../../core/functionModule/validation';
@@ -123,7 +123,7 @@ describe('Function Module - Complete Workflow', () => {
 
       // Step 4: Read Function Module
       console.log('\n📖 Step 4: Reading Function Module...');
-      const fmResult = await getFunction(connection, functionGroupName, functionModuleName);
+      const fmResult = await getFunctionSource(connection, functionModuleName, functionGroupName);
       expect(fmResult.status).toBe(200);
       expect(fmResult.data).toContain(functionModuleName);
       console.log(`✅ Read FM successfully`);
@@ -156,7 +156,7 @@ ENDFUNCTION.`;
       console.log(`✅ Updated FM source`);
 
       // Verify update
-      const updatedResult = await getFunction(connection, functionGroupName, functionModuleName);
+      const updatedResult = await getFunctionSource(connection, functionModuleName, functionGroupName);
       expect(updatedResult.status).toBe(200);
       expect(updatedResult.data).toContain('Updated Result');
       console.log(`✅ Verified FM update`);

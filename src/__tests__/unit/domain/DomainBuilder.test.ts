@@ -5,14 +5,13 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/DomainBuilder.test
  */
 
+import { getDomain } from '../../../core/domain/read';
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { DomainBuilder, DomainBuilderLogger } from '../../../core/domain';
 import { deleteDomain } from '../../../core/domain/delete';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
-
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {
@@ -35,10 +34,6 @@ describe('DomainBuilder', () => {
   let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
 
   beforeEach(async () => {
     try {
@@ -55,8 +50,6 @@ describe('DomainBuilder', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
     await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
