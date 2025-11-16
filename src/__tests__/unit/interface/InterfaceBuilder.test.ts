@@ -93,7 +93,7 @@ describe('InterfaceBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_interface', 'basic_interface');
+      const testCase = getEnabledTestCase('create_interface', 'builder_interface');
       if (!testCase) {
         return;
       }
@@ -197,7 +197,7 @@ describe('InterfaceBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_interface', 'basic_interface');
+      const testCase = getEnabledTestCase('create_interface', 'builder_interface');
       if (!testCase) {
         return;
       }
@@ -237,7 +237,7 @@ describe('InterfaceBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_interface', 'basic_interface');
+      const testCase = getEnabledTestCase('create_interface', 'builder_interface');
       if (!testCase) {
         return;
       }
@@ -282,7 +282,7 @@ describe('InterfaceBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_interface', 'basic_interface');
+      const testCase = getEnabledTestCase('create_interface', 'builder_interface');
       if (!testCase) {
         return;
       }

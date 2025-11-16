@@ -73,6 +73,19 @@ create_domain:
         decimals: 0
         lowercase: false
         sign_exists: false
+    - name: "builder_domain"
+      enabled: false
+      description: "Create domain using DomainBuilder (separate from create.test.ts)"
+      params:
+        domain_name: "<YOUR_BUILDER_TEST_DOMAIN_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from test_domain (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test domain for DomainBuilder tests"
+        datatype: "CHAR"
+        length: 10
+        decimals: 0
+        lowercase: false
+        sign_exists: false
 
 # Create Class
 create_class:
@@ -99,6 +112,30 @@ create_class:
           CLASS <YOUR_TEST_CLASS_NAME> IMPLEMENTATION.
             METHOD constructor.
               " Basic test class
+            ENDMETHOD.
+          ENDCLASS.
+    - name: "builder_class"
+      enabled: false
+      description: "Create class using ClassBuilder (separate from create.test.ts)"
+      params:
+        class_name: "<YOUR_BUILDER_TEST_CLASS_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from basic_class (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test class for ClassBuilder tests"
+        source_code: |
+          CLASS <YOUR_BUILDER_TEST_CLASS_NAME> DEFINITION
+            PUBLIC
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS: constructor.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS <YOUR_BUILDER_TEST_CLASS_NAME> IMPLEMENTATION.
+            METHOD constructor.
+              " Builder test class
             ENDMETHOD.
           ENDCLASS.
 

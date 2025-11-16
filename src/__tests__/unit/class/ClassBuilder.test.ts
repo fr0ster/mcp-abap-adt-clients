@@ -186,7 +186,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -232,7 +232,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -257,7 +257,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -346,7 +346,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -389,7 +389,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -428,7 +428,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -458,7 +458,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -548,7 +548,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -592,7 +592,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -662,7 +662,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -759,7 +759,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
