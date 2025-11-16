@@ -28,7 +28,7 @@ const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger: ILogger = {
   debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
   info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: (message: string, meta?: any) => console.warn(message, meta),
+  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
   error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
   csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
 };

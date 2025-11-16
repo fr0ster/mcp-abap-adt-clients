@@ -24,7 +24,7 @@ const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {
   debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
   info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: (message: string, meta?: any) => console.warn(message, meta),
+  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
   error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
   csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
 };
@@ -32,7 +32,7 @@ const connectionLogger: ILogger = {
 const builderLogger: TableBuilderLogger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
-  warn: console.warn || (() => {}),
+  warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
 };
 

@@ -26,7 +26,7 @@ const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
-  warn: console.warn,
+  warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
   csrfToken: debugEnabled ? console.log : () => {},
 };
@@ -68,7 +68,7 @@ describe('View - Check', () => {
               view_name: viewName,
               package_name: createTestCase.params.package_name || getDefaultPackage(),
               transport_request: createTestCase.params.transport_request || getDefaultTransport(),
-              ddl_code: createTestCase.params.ddl_code
+              ddl_source: createTestCase.params.ddl_source || createTestCase.params.ddl_code
             });
             logger.debug(`View ${viewName} created successfully`);
           } catch (createError: any) {

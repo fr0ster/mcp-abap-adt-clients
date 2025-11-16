@@ -9,6 +9,7 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { getTableContents } from '../../../core/shared/tableContents';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -68,9 +69,10 @@ describe('Shared - getTableContents', () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      await connection.connect();
       hasConfig = true;
-      // Check if this is a cloud system (JWT auth typically indicates cloud)
-      isCloudSystem = config.authType === 'jwt';
+      // Check if this is a cloud system using system information endpoint
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
