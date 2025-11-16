@@ -48,7 +48,7 @@
   },
   "scripts": {
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "build": "npm run clean && tsc -p tsconfig.json",
+    "build": "npm run --silent clean && tsc -p tsconfig.json",
     "build:fast": "tsc -p tsconfig.json",
     "test": "jest",
     "prepublishOnly": "npm run build"

@@ -93,7 +93,7 @@ describe('TableBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_table');
+      const testCase = getEnabledTestCase('create_table', 'builder_table');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -172,7 +172,7 @@ describe('TableBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_table');
+      const testCase = getEnabledTestCase('create_table', 'builder_table');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;

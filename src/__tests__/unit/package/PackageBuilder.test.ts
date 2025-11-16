@@ -82,7 +82,7 @@ describe('PackageBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_package');
+      const testCase = getEnabledTestCase('create_package', 'builder_package');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -154,7 +154,7 @@ describe('PackageBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_package');
+      const testCase = getEnabledTestCase('create_package', 'builder_package');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;

@@ -91,7 +91,7 @@ describe('FunctionGroupBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_group', 'basic_function_group');
+      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
       if (!testCase) {
         return;
       }
@@ -190,7 +190,7 @@ describe('FunctionGroupBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_group', 'basic_function_group');
+      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
       if (!testCase) {
         return;
       }
@@ -227,7 +227,7 @@ describe('FunctionGroupBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_group', 'basic_function_group');
+      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
       if (!testCase) {
         return;
       }
@@ -270,7 +270,7 @@ describe('FunctionGroupBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_group', 'basic_function_group');
+      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
       if (!testCase) {
         return;
       }

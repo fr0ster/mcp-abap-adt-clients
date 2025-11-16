@@ -97,7 +97,7 @@ describe('FunctionModuleBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_module', 'basic_function_module');
+      const testCase = getEnabledTestCase('create_function_module', 'builder_function_module');
       if (!testCase) {
         return;
       }
@@ -206,7 +206,7 @@ describe('FunctionModuleBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_module', 'basic_function_module');
+      const testCase = getEnabledTestCase('create_function_module', 'builder_function_module');
       if (!testCase) {
         return;
       }
@@ -248,7 +248,7 @@ describe('FunctionModuleBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_module', 'basic_function_module');
+      const testCase = getEnabledTestCase('create_function_module', 'builder_function_module');
       if (!testCase) {
         return;
       }
@@ -295,7 +295,7 @@ describe('FunctionModuleBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_function_module', 'basic_function_module');
+      const testCase = getEnabledTestCase('create_function_module', 'builder_function_module');
       if (!testCase) {
         return;
       }

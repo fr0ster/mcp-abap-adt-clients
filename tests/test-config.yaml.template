@@ -56,6 +56,14 @@ create_package:
         # transport_request: if not specified, uses environment.default_transport
         # transport_layer: optional, auto-detected if not specified
         # software_component: optional, auto-detected if not specified
+    - name: "builder_package"
+      enabled: false
+      description: "Create package using PackageBuilder (separate from create.test.ts)"
+      params:
+        package_name: "<YOUR_BUILDER_NEW_PACKAGE_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from test_package (Z_ or Y_ prefix)
+        super_package: "<YOUR_PARENT_PACKAGE>"
+        description: "Test package for PackageBuilder tests"
+        package_type: "development"
 
 # Create Domain
 create_domain:
@@ -86,6 +94,36 @@ create_domain:
         decimals: 0
         lowercase: false
         sign_exists: false
+
+# Create Data Element
+create_data_element:
+  test_cases:
+    - name: "test_data_element"
+      enabled: false
+      description: "Create test data element"
+      params:
+        data_element_name: "<YOUR_TEST_DATA_ELEMENT_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test data element created via MCP"
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"
+        short_label: "Test"
+        medium_label: "Test DE"
+        long_label: "Test Data Element"
+        heading_label: "Test Data Element"
+    - name: "builder_data_element"
+      enabled: false
+      description: "Create data element using DataElementBuilder (separate from create.test.ts)"
+      params:
+        data_element_name: "<YOUR_BUILDER_TEST_DATA_ELEMENT_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from test_data_element (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test data element for DataElementBuilder tests"
+        domain_name: "<YOUR_TEST_DOMAIN_NAME>"
+        short_label: "Test"
+        medium_label: "Test DE"
+        long_label: "Test Data Element"
+        heading_label: "Test Data Element"
 
 # Create Class
 create_class:
@@ -138,6 +176,169 @@ create_class:
               " Builder test class
             ENDMETHOD.
           ENDCLASS.
+
+# Create Interface
+create_interface:
+  test_cases:
+    - name: "basic_interface"
+      enabled: false
+      description: "Create basic interface"
+      params:
+        interface_name: "<YOUR_TEST_INTERFACE_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Basic test interface"
+        source_code: |
+          INTERFACE <YOUR_TEST_INTERFACE_NAME>
+            PUBLIC .
+            METHODS: test_method.
+          ENDINTERFACE.
+    - name: "builder_interface"
+      enabled: false
+      description: "Create interface using InterfaceBuilder (separate from create.test.ts)"
+      params:
+        interface_name: "<YOUR_BUILDER_TEST_INTERFACE_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from basic_interface (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test interface for InterfaceBuilder tests"
+        source_code: |
+          INTERFACE <YOUR_BUILDER_TEST_INTERFACE_NAME>
+            PUBLIC .
+            METHODS: test_method.
+          ENDINTERFACE.
+
+# Create Program
+create_program:
+  test_cases:
+    - name: "test_program"
+      enabled: false
+      description: "Create test program"
+      params:
+        program_name: "<YOUR_TEST_PROGRAM_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test program created via MCP"
+        program_type: "executable"
+        source_code: |
+          REPORT <YOUR_TEST_PROGRAM_NAME>.
+          WRITE: / 'Test program'.
+    - name: "builder_program"
+      enabled: false
+      description: "Create program using ProgramBuilder (separate from create.test.ts)"
+      params:
+        program_name: "<YOUR_BUILDER_TEST_PROGRAM_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from test_program (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test program for ProgramBuilder tests"
+        program_type: "executable"
+        source_code: |
+          REPORT <YOUR_BUILDER_TEST_PROGRAM_NAME>.
+          WRITE: / 'Builder test program'.
+
+# Create Table
+create_table:
+  test_cases:
+    - name: "test_table"
+      enabled: false
+      description: "Create test table"
+      params:
+        table_name: "<YOUR_TEST_TABLE_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test table created via MCP"
+        delivery_class: "A"
+        data_class: "APPL0"
+    - name: "builder_table"
+      enabled: false
+      description: "Create table using TableBuilder (separate from create.test.ts)"
+      params:
+        table_name: "<YOUR_BUILDER_TEST_TABLE_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from test_table (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test table for TableBuilder tests"
+        delivery_class: "A"
+        data_class: "APPL0"
+
+# Create Structure
+create_structure:
+  test_cases:
+    - name: "test_structure"
+      enabled: false
+      description: "Create test structure"
+      params:
+        structure_name: "<YOUR_TEST_STRUCTURE_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test structure created via MCP"
+    - name: "builder_structure"
+      enabled: false
+      description: "Create structure using StructureBuilder (separate from create.test.ts)"
+      params:
+        structure_name: "<YOUR_BUILDER_TEST_STRUCTURE_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from test_structure (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test structure for StructureBuilder tests"
+
+# Create View
+create_view:
+  test_cases:
+    - name: "test_view"
+      enabled: false
+      description: "Create test view"
+      params:
+        view_name: "<YOUR_TEST_VIEW_NAME>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test view created via MCP"
+        view_type: "database_view"
+    - name: "builder_view"
+      enabled: false
+      description: "Create view using ViewBuilder (separate from create.test.ts)"
+      params:
+        view_name: "<YOUR_BUILDER_TEST_VIEW_NAME>"  # ⚠️ UPDATE: Must be DIFFERENT from test_view (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test view for ViewBuilder tests"
+        view_type: "database_view"
+
+# Create Function Group
+create_function_group:
+  test_cases:
+    - name: "test_function_group"
+      enabled: false
+      description: "Create test function group"
+      params:
+        function_group_name: "<YOUR_TEST_FUNCTION_GROUP>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test function group created via MCP"
+    - name: "builder_function_group"
+      enabled: false
+      description: "Create function group using FunctionGroupBuilder (separate from create.test.ts)"
+      params:
+        function_group_name: "<YOUR_BUILDER_TEST_FUNCTION_GROUP>"  # ⚠️ UPDATE: Must be DIFFERENT from test_function_group (Z_ or Y_ prefix)
+        # package_name: if not specified, uses environment.default_package
+        description: "Test function group for FunctionGroupBuilder tests"
+
+# Create Function Module
+create_function_module:
+  test_cases:
+    - name: "test_function_module"
+      enabled: false
+      description: "Create test function module"
+      params:
+        function_name: "<YOUR_TEST_FUNCTION_MODULE>"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
+        function_group: "<YOUR_TEST_FUNCTION_GROUP>"
+        # package_name: if not specified, uses environment.default_package
+        # transport_request: if not specified, uses environment.default_transport
+        description: "Test function module created via MCP"
+    - name: "builder_function_module"
+      enabled: false
+      description: "Create function module using FunctionModuleBuilder (separate from create.test.ts)"
+      params:
+        function_name: "<YOUR_BUILDER_TEST_FUNCTION_MODULE>"  # ⚠️ UPDATE: Must be DIFFERENT from test_function_module (Z_ or Y_ prefix)
+        function_group: "<YOUR_TEST_FUNCTION_GROUP>"
+        description: "Test function module for FunctionModuleBuilder tests"
 
 # Check Domain
 check_domain:

@@ -94,7 +94,7 @@ describe('StructureBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_structure');
+      const testCase = getEnabledTestCase('create_structure', 'builder_structure');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -174,7 +174,7 @@ describe('StructureBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_structure');
+      const testCase = getEnabledTestCase('create_structure', 'builder_structure');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;

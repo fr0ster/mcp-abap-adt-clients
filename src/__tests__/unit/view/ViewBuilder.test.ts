@@ -94,7 +94,7 @@ describe('ViewBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_view');
+      const testCase = getEnabledTestCase('create_view', 'builder_view');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -174,7 +174,7 @@ describe('ViewBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_view');
+      const testCase = getEnabledTestCase('create_view', 'builder_view');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;

@@ -1,64 +1,34 @@
 # Builder Tests Separation - Implementation Guide
 
-## Проблема
-Builder тести (ClassBuilder.test.ts, DomainBuilder.test.ts, та ін.) конкурують з create.test.ts за ті самі об'єкти в YAML конфігурації, що викликає конфлікти (403 помилки) коли тести запускаються разом.
+## Problem
+Builder tests (ClassBuilder.test.ts, DomainBuilder.test.ts, etc.) compete with create.test.ts for the same objects in YAML configuration, causing conflicts (403 errors) when tests run together.
 
-## Рішення
-Для кожного типу об'єкта створити окремий test case з ім'ям `builder_*` в test-config.yaml.template
+## Solution
+Create separate test cases named `builder_*` in test-config.yaml.template for each object type.
 
-## Статус виконання
+## Implementation Status
 
-### ✅ Виконано:
-- **class**: додано `builder_class` в template, ClassBuilder.test.ts оновлено
-- **domain**: додано `builder_domain` в template
+### ✅ Completed:
+- **All Builder test files updated** (11 files):
+  - class: ClassBuilder.test.ts → `builder_class`
+  - domain: DomainBuilder.test.ts → `builder_domain`
+  - dataElement: DataElementBuilder.test.ts → `builder_data_element`
+  - interface: InterfaceBuilder.test.ts → `builder_interface`
+  - program: ProgramBuilder.test.ts → `builder_program`
+  - table: TableBuilder.test.ts → `builder_table`
+  - structure: StructureBuilder.test.ts → `builder_structure`
+  - view: ViewBuilder.test.ts → `builder_view`
+  - package: PackageBuilder.test.ts → `builder_package`
+  - functionGroup: FunctionGroupBuilder.test.ts → `builder_function_group`
+  - functionModule: FunctionModuleBuilder.test.ts → `builder_function_module`
 
-### ⏳ Треба виконати:
+- **All YAML templates added** to test-config.yaml.template:
+  - All 11 create_* sections with builder_* test cases added
+  - Each builder test case has proper placeholders like `<YOUR_BUILDER_TEST_*_NAME>`
 
-1. **Додати в test-config.yaml.template** builder test cases для:
-   - dataElement
-   - interface  
-   - program
-   - table
-   - structure
-   - view
-   - package
-   - functionGroup
-   - functionModule
+### ✅ Implementation Complete!
 
-2. **Оновити Builder тести** щоб використовували `builder_*` замість основних test cases:
-   ```bash
-   cd /home/okyslytsia/prj/mcp-abap-adt/packages/adt-clients/src/__tests__/unit
-   
-   # DataElement
-   sed -i "s/'test_data_element'/'builder_data_element'/g" dataElement/DataElementBuilder.test.ts
-   
-   # Domain (вже зроблено для class)
-   sed -i "s/'test_domain'/'builder_domain'/g" domain/DomainBuilder.test.ts
-   
-   # Interface
-   sed -i "s/'basic_interface'/'builder_interface'/g" interface/InterfaceBuilder.test.ts
-   
-   # Program
-   sed -i "s/'test_program'/'builder_program'/g" program/ProgramBuilder.test.ts
-   
-   # Table
-   sed -i "s/'test_table'/'builder_table'/g" table/TableBuilder.test.ts
-   
-   # Structure
-   sed -i "s/'test_structure'/'builder_structure'/g" structure/StructureBuilder.test.ts
-   
-   # View
-   sed -i "s/'test_view'/'builder_view'/g" view/ViewBuilder.test.ts
-   
-   # Package
-   sed -i "s/'test_package'/'builder_package'/g" package/PackageBuilder.test.ts
-   
-   # Function Group
-   sed -i "s/'test_function_group'/'builder_function_group'/g" functionGroup/FunctionGroupBuilder.test.ts
-   
-   # Function Module
-   sed -i "s/'test_function_module'/'builder_function_module'/g" functionModule/FunctionModuleBuilder.test.ts
-   ```
+All Builder tests are now separated from create.test.ts tests. Running `npm test -- unit/class` (or any other unit test) will no longer cause conflicts between create.test.ts and Builder tests, because they use different test case configurations.
 
 ## Builder Test Case Templates
 
@@ -185,7 +155,7 @@ Builder тести (ClassBuilder.test.ts, DomainBuilder.test.ts, та ін.) к�
         description: "Test function module for FunctionModuleBuilder tests"
 ```
 
-## Важливо
-Після додавання всіх builder test cases в template і оновлення всіх Builder тестів, при запуску `npm test -- unit/class` не буде конфлікту між create.test.ts та ClassBuilder.test.ts, оскільки вони використовуватимуть різні об'єкти:
+## Important
+After adding all builder test cases to the template and updating all Builder tests, running `npm test -- unit/class` will no longer conflict between create.test.ts and ClassBuilder.test.ts, because they will use different objects:
 - create.test.ts → `basic_class` 
 - ClassBuilder.test.ts → `builder_class`

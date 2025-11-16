@@ -94,7 +94,7 @@ describe('ProgramBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_program', 'basic_program');
+      const testCase = getEnabledTestCase('create_program', 'builder_program');
       if (!testCase) {
         return;
       }
@@ -199,7 +199,7 @@ describe('ProgramBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_program', 'basic_program');
+      const testCase = getEnabledTestCase('create_program', 'builder_program');
       if (!testCase) {
         return;
       }
@@ -240,7 +240,7 @@ describe('ProgramBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_program', 'basic_program');
+      const testCase = getEnabledTestCase('create_program', 'builder_program');
       if (!testCase) {
         return;
       }
@@ -286,7 +286,7 @@ describe('ProgramBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_program', 'basic_program');
+      const testCase = getEnabledTestCase('create_program', 'builder_program');
       if (!testCase) {
         return;
       }

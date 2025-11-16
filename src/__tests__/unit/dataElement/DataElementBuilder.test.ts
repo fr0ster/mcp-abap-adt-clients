@@ -93,7 +93,7 @@ describe('DataElementBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_data_element', 'basic_data_element');
+      const testCase = getEnabledTestCase('create_data_element', 'builder_data_element');
       if (!testCase) {
         return;
       }
@@ -196,7 +196,7 @@ describe('DataElementBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_data_element', 'basic_data_element');
+      const testCase = getEnabledTestCase('create_data_element', 'builder_data_element');
       if (!testCase) {
         return;
       }
@@ -235,7 +235,7 @@ describe('DataElementBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_data_element', 'basic_data_element');
+      const testCase = getEnabledTestCase('create_data_element', 'builder_data_element');
       if (!testCase) {
         return;
       }
@@ -279,7 +279,7 @@ describe('DataElementBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_data_element', 'basic_data_element');
+      const testCase = getEnabledTestCase('create_data_element', 'builder_data_element');
       if (!testCase) {
         return;
       }
