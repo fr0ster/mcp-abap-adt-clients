@@ -1,6 +1,29 @@
 # Test Structure
 
-Tests are organized into two categories: **unit tests** and **integration workflow tests**.
+Tests are organized into two categories: **integration tests** (individual operations) and **end-to-end workflow tests** (complete scenarios).
+
+**Note:** All tests connect to a real SAP ABAP system via ADT REST API. There are no mock/unit tests - all tests are integration tests that verify actual API behavior.
+
+## Test Folders
+
+### 📁 `integration/` - Integration Tests (Individual Operations)
+Tests for individual operations (create, read, update, delete, lock, unlock, activate, check) for each object type.
+- Fast execution (1-2s per test)
+- Test one function at a time
+- Use other functions for setup/verification
+- Example: `integration/class/create.test.ts` tests only `createClass()`, uses `getClass()` to verify
+
+### 📁 `e2e/` - End-to-End Tests (Complete Workflows)  
+Tests for complete workflows from start to finish.
+- Slower execution (10-15s per workflow)
+- Test entire scenarios
+- Example: `e2e/class.workflow.test.ts` tests create → update → lock → check → activate → unlock → delete
+
+### 📁 `helpers/` - Shared Test Utilities
+Common helpers used across all tests:
+- `sessionConfig.ts` - Load configuration from `.env` and `test-config.yaml`
+- `setupTestEnvironment.ts` - Setup connection and configuration
+- Test helper functions
 
 ## Idempotency Principle
 
@@ -26,13 +49,13 @@ This principle ensures:
 - Tests are independent and don't rely on external state
 - Tests are safe to run in any order
 
-## Unit Tests (`__tests__/unit/`)
+## Integration Tests (`integration/`)
 
-Unit tests focus on testing **individual functions in isolation**. Each function has its own test file.
+Integration tests focus on testing **individual operations** against a real SAP system. Each operation has its own test file.
 
 ### Function Group Tests
 
-Location: `__tests__/unit/functionGroup/`
+Location: `integration/functionGroup/`
 
 - `create.test.ts` - Test `createFunctionGroup()` only
 - `read.test.ts` - Test `getFunctionGroup()` only
@@ -40,7 +63,7 @@ Location: `__tests__/unit/functionGroup/`
 
 ### Function Module Tests
 
-Location: `__tests__/unit/functionModule/`
+Location: `integration/functionModule/`
 
 - `create.test.ts` - Test `createFunctionModule()` only
 - `read.test.ts` - Test `getFunction()` only

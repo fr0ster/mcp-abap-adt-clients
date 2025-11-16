@@ -1,11 +1,17 @@
-# Integration Tests - Class Operations
+# Integration Tests
 
-Comprehensive integration tests for ABAP Class operations via ADT REST API.
+Comprehensive integration tests for ADT Client operations with real SAP ABAP systems.
+
+## Overview
+
+These tests verify individual operations (create, read, update, delete, lock, unlock, activate, check) for each object type by interacting with an actual SAP system via ADT REST API.
+
+**Note:** Despite being in the `integration/` folder, these tests connect to a real SAP system and are true integration tests, not unit tests. For complete workflow tests, see `../e2e/`.
 
 ## Features
 
 - ✅ **Separate test cases** - each operation tested independently
-- ✅ **Automatic cleanup** - classes deleted before/after tests
+- ✅ **Automatic cleanup** - objects deleted before/after tests
 - ✅ **Configurable debug logs** - control output verbosity
 - ✅ **Real SAP validation** - tests against actual SAP system
 - ✅ **YAML configuration** - all parameters from test-config.yaml

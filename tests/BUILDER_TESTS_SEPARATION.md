@@ -28,7 +28,11 @@ Create separate test cases named `builder_*` in test-config.yaml.template for ea
 
 ### ✅ Implementation Complete!
 
-All Builder tests are now separated from create.test.ts tests. Running `npm test -- unit/class` (or any other unit test) will no longer cause conflicts between create.test.ts and Builder tests, because they use different test case configurations.
+All Builder tests are now separated from create.test.ts tests. Running `npm test -- integration/class` (or any other integration test) will no longer cause conflicts between create.test.ts and Builder tests, because they use different test case configurations.
+
+**Note:** Test folder structure has been reorganized:
+- `src/__tests__/integration/` - Integration tests for individual operations (formerly `unit/`)
+- `src/__tests__/e2e/` - End-to-end workflow tests (formerly `integration/`)
 
 ## Builder Test Case Templates
 

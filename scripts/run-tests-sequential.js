@@ -23,7 +23,7 @@ const testGroups = [
   'functionModule',
   'transport',
   'shared',
-  'integration',
+  'e2e', // Lock recovery and advanced scenarios
 ];
 
 let totalPassed = 0;
@@ -39,15 +39,15 @@ for (const group of testGroups) {
 
   try {
     // Run tests for this group with parallel execution within the group
+    // E2E tests are directly in e2e/ folder, others are in integration/
+    const testPath = group === 'e2e' ? 'e2e' : `integration/${group}`;
     const result = execSync(
-      `npm test -- unit/${group}`,
+      `npm test -- ${testPath}`,
       {
         stdio: 'inherit',
         encoding: 'utf-8',
       }
-    );
-
-    console.log(`✅ ${group} tests completed successfully`);
+    );    console.log(`✅ ${group} tests completed successfully`);
     totalPassed++;
   } catch (error) {
     console.error(`❌ ${group} tests failed`);
