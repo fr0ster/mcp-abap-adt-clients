@@ -61,7 +61,7 @@ describe('Class - Lock/Unlock', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_class');
+        const createTestCase = getEnabledTestCase('create_class', 'test_class');
         if (!createTestCase) {
           throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
         }
@@ -114,7 +114,7 @@ describe('Class - Lock/Unlock', () => {
     }
 
     // Use create_class to ensure we test with user-created Z-class, not SAP system class
-    const testCase = getEnabledTestCase('create_class');
+    const testCase = getEnabledTestCase('create_class', 'test_class');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

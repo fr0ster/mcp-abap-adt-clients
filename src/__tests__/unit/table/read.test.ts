@@ -64,7 +64,7 @@ describe('Table - Read', () => {
       if (error.response?.status === 404 || error.response?.status === 406) {
         logger.debug(`Table ${testCase.params.table_name} does not exist (${error.response?.status}), creating...`);
         try {
-          const createTestCase = getEnabledTestCase('create_table');
+          const createTestCase = getEnabledTestCase('create_table', 'test_table');
           if (createTestCase) {
             await createTable(connection, {
               table_name: testCase.params.table_name,

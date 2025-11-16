@@ -63,7 +63,7 @@ describe('FunctionModule - Lock', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
-        const createFugrTestCase = getEnabledTestCase('create_function_group');
+        const createFugrTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
         if (createFugrTestCase) {
           await createFunctionGroup(connection, {
             function_group_name: functionGroupName,
@@ -92,7 +92,7 @@ describe('FunctionModule - Lock', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function module ${functionModuleName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_function_module');
+        const createTestCase = getEnabledTestCase('create_function_module', 'test_function_module');
         if (createTestCase) {
           try {
             await createFunctionModule(connection, {

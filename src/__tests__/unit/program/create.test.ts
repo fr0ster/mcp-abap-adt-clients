@@ -84,7 +84,7 @@ describe('Program - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_program');
+    const testCase = getEnabledTestCase('create_program', 'test_program');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

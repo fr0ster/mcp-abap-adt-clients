@@ -51,6 +51,7 @@
     "build": "npm run --silent clean && tsc -p tsconfig.json",
     "build:fast": "tsc -p tsconfig.json",
     "test": "jest",
+    "test:sequential": "node scripts/run-tests-sequential.js",
     "prepublishOnly": "npm run build"
   },
   "engines": {

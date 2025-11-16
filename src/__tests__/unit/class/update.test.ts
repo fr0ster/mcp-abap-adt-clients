@@ -91,7 +91,7 @@ describe('Class - Update', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_class');
+        const createTestCase = getEnabledTestCase('create_class', 'test_class');
         if (!createTestCase) {
           throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
         }

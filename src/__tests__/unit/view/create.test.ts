@@ -83,7 +83,7 @@ describe('View - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_view');
+    const testCase = getEnabledTestCase('create_view', 'test_view');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

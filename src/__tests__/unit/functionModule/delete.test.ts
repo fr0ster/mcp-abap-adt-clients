@@ -12,7 +12,7 @@ import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunction } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -93,14 +93,21 @@ describe('Function Module - Delete', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
-        const fugrTestCase = getEnabledTestCase('create_function_group');
-        if (!fugrTestCase || !fugrTestCase.params.package_name) {
-          throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found or missing package_name`);
+        // Try to find test_function_group, fallback to builder_function_group, or use default package
+        let fugrTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
+        if (!fugrTestCase) {
+          fugrTestCase = getEnabledTestCase('create_function_group', 'builder_function_group');
         }
+
+        const packageToUse = packageName || fugrTestCase?.params?.package_name || getDefaultPackage();
+        if (!packageToUse) {
+          throw new Error(`Cannot create function group ${functionGroupName}: no package specified and no default package configured`);
+        }
+
       await createFunctionGroup(connection, {
         function_group_name: functionGroupName,
-          description: fugrTestCase.params.description || `Test FUGR for ${functionGroupName}`,
-          package_name: packageName || fugrTestCase.params.package_name,
+          description: fugrTestCase?.params?.description || `Test FUGR for ${functionGroupName}`,
+          package_name: packageToUse,
       });
         logger.debug(`Function group ${functionGroupName} created successfully`);
       } else {
@@ -120,7 +127,7 @@ describe('Function Module - Delete', () => {
 
     if (!functionModuleName || !functionGroupName) {
       // If not found in testCase, try to get from create_function_module
-      const createTestCase = getEnabledTestCase('create_function_module');
+      const createTestCase = getEnabledTestCase('create_function_module', 'test_function_module');
       if (createTestCase) {
         const fmName = createTestCase.params?.function_module_name;
         const fgName = createTestCase.params?.function_group_name;
@@ -146,7 +153,7 @@ describe('Function Module - Delete', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function module ${functionModuleName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_function_module');
+        const createTestCase = getEnabledTestCase('create_function_module', 'test_function_module');
         if (createTestCase) {
     try {
       await createFunctionModule(connection, {
@@ -181,7 +188,7 @@ describe('Function Module - Delete', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('delete_function_module') || getEnabledTestCase('create_function_module');
+    const testCase = getEnabledTestCase('delete_function_module') || getEnabledTestCase('create_function_module', 'test_function_module');
     if (!testCase) {
       return; // Skip silently if test case not configured
     }

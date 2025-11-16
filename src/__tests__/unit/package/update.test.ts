@@ -63,7 +63,7 @@ describe('Package - Update', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Package ${packageName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_package');
+        const createTestCase = getEnabledTestCase('create_package', 'test_package');
         if (createTestCase) {
           try {
             await createPackage(connection, {

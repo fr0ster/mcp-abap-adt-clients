@@ -83,7 +83,7 @@ describe('Table - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_table');
+    const testCase = getEnabledTestCase('create_table', 'test_table');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

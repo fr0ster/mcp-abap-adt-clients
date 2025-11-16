@@ -83,7 +83,7 @@ describe('Structure - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_structure');
+    const testCase = getEnabledTestCase('create_structure', 'test_structure');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

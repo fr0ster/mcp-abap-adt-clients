@@ -57,7 +57,7 @@ describe('View - Read', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`View ${testCase.params.view_name} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_view');
+        const createTestCase = getEnabledTestCase('create_view', 'test_view');
         if (createTestCase) {
           await createView(connection, {
             view_name: testCase.params.view_name,

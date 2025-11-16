@@ -60,7 +60,7 @@ describe('Table - Update', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Table ${tableName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_table');
+        const createTestCase = getEnabledTestCase('create_table', 'test_table');
         if (createTestCase) {
           try {
             await createTable(connection, {

@@ -99,7 +99,7 @@ describe('Function Module - Create', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
-        const fugrTestCase = getEnabledTestCase('create_function_group');
+        const fugrTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
         if (!fugrTestCase) {
           throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found`);
         }
@@ -187,7 +187,7 @@ describe('Function Module - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_function_module');
+    const testCase = getEnabledTestCase('create_function_module', 'test_function_module');
     if (!testCase) {
       return; // Skip silently if test case not configured
     }

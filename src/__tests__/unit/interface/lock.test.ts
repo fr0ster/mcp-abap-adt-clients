@@ -66,7 +66,7 @@ describe('Interface - Lock/Unlock', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Interface ${interfaceName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_interface');
+        const createTestCase = getEnabledTestCase('create_interface', 'test_interface');
         if (!createTestCase) {
           throw new Error(`Cannot create interface ${interfaceName}: create_interface test case not found`);
         }
@@ -121,7 +121,7 @@ ENDINTERFACE.`;
       return;
     }
 
-    const testCase = getEnabledTestCase('create_interface');
+    const testCase = getEnabledTestCase('create_interface', 'test_interface');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

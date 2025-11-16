@@ -26,5 +26,7 @@ module.exports = {
     '/node_modules/',
     '/dist/',
   ],
+  // Allow parallel execution within test group
+  // Use scripts/run-tests-sequential.js to run groups sequentially
 };
 

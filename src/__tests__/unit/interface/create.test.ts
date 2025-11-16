@@ -84,7 +84,7 @@ describe('Interface - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_interface');
+    const testCase = getEnabledTestCase('create_interface', 'test_interface');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

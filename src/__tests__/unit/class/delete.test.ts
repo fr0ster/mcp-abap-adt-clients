@@ -87,7 +87,7 @@ describe('Class - Delete', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Class ${testCase.params.class_name || testCase.params.object_name} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_class');
+        const createTestCase = getEnabledTestCase('create_class', 'test_class');
         if (createTestCase) {
           await createClass(connection, {
             class_name: testCase.params.class_name || testCase.params.object_name,

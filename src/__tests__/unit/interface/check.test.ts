@@ -61,7 +61,7 @@ describe('Interface - Check', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Interface ${interfaceName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_interface');
+        const createTestCase = getEnabledTestCase('create_interface', 'test_interface');
         if (createTestCase) {
           try {
             await createInterface(connection, {

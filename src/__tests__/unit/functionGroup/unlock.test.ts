@@ -62,7 +62,7 @@ describe('FunctionGroup - Unlock', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_function_group');
+        const createTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
         if (createTestCase) {
           try {
             await createFunctionGroup(connection, {

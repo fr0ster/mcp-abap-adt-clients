@@ -149,7 +149,7 @@ describe('Function Group - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_function_group');
+    const testCase = getEnabledTestCase('create_function_group', 'test_function_group');
     if (!testCase) {
       return; // Skip silently if test case not configured
     }

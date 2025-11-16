@@ -92,7 +92,7 @@ describe('Function Module - Check', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
-        const fugrTestCase = getEnabledTestCase('create_function_group');
+        const fugrTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
         if (!fugrTestCase) {
           throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found`);
         }
@@ -129,7 +129,7 @@ describe('Function Module - Check', () => {
         let sourceCode = testCase.params.source_code;
         if (!sourceCode) {
           // Try to get source_code from create_function_module test case
-          const createTestCase = getEnabledTestCase('create_function_module');
+          const createTestCase = getEnabledTestCase('create_function_module', 'test_function_module');
           const fallbackSourceCode = createTestCase?.params?.source_code;
           if (!fallbackSourceCode) {
             throw new Error(`Cannot create function module ${functionModuleName}: source_code is required but not provided in test case`);
@@ -189,7 +189,7 @@ describe('Function Module - Check', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('check_function_module') || getEnabledTestCase('create_function_module');
+    const testCase = getEnabledTestCase('check_function_module') || getEnabledTestCase('create_function_module', 'test_function_module');
     if (!testCase) {
       return; // Skip silently if test case not configured
     }
@@ -256,7 +256,7 @@ describe('Function Module - Check', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('check_function_module') || getEnabledTestCase('create_function_module');
+    const testCase = getEnabledTestCase('check_function_module') || getEnabledTestCase('create_function_module', 'test_function_module');
     if (!testCase) {
       return; // Skip silently if test case not configured
     }

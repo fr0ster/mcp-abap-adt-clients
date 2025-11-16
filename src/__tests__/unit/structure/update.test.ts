@@ -63,7 +63,7 @@ describe('Structure - Update', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Structure ${structureName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_structure');
+        const createTestCase = getEnabledTestCase('create_structure', 'test_structure');
         if (createTestCase) {
           try {
             await createStructure(connection, {

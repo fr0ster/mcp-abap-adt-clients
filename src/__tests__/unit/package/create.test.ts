@@ -74,7 +74,7 @@ describe('Package - Create', () => {
       return;
     }
 
-    const testCase = getEnabledTestCase('create_package');
+    const testCase = getEnabledTestCase('create_package', 'test_package');
     if (!testCase) {
       logger.warn('⚠️ Skipping test: Test case is disabled');
       return;

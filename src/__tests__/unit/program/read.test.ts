@@ -59,7 +59,7 @@ describe('Program - Read', () => {
     } catch (error: any) {
       if (error.response?.status === 404) {
         logger.debug(`Program ${programName} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_program');
+        const createTestCase = getEnabledTestCase('create_program', 'test_program');
         if (createTestCase) {
           try {
             await createProgram(connection, {
