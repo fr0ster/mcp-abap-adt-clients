@@ -13,28 +13,23 @@
  * 10. Delete Class
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { createClass } from '../../core/class/create';
-import { getClass } from '../../core/class/read';
-import { updateClass } from '../../core/class/update';
-import { checkClass } from '../../core/class/check';
-import { lockClass } from '../../core/class/lock';
-import { unlockClass } from '../../core/class/unlock';
-import { activateClass } from '../../core/class/activation';
-import { validateClassSource } from '../../core/class/validation';
-import { runClass } from '../../core/class/run';
+import { describe, it, beforeEach, afterEach, expect } from '@jest/globals';
+import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import {
+  createClass,
+  getClass,
+  updateClass,
+  activateClass,
+  checkClass,
+  lockClass,
+  unlockClass,
+  validateClassSource,
+  runClass,
+} from '../../core/class';
 import { deleteObject } from '../../core/delete';
-import { generateSessionId } from '../../utils/sessionUtils';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
-
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../helpers/sessionConfig';
 const { getEnabledTestCase } = require('../../../tests/test-helper');
-
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -45,58 +40,22 @@ const logger = {
   csrfToken: debugEnabled ? console.log : () => {},
 };
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
 describe('Class - Complete Workflow', () => {
   let connection: AbapConnection;
   let hasConfig = false;
   let className: string;
   let packageName: string;
-  let sessionId: string;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
   let lockHandle: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      const env = await setupTestEnvironment(connection, 'class_workflow', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -104,7 +63,8 @@ describe('Class - Complete Workflow', () => {
     }
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }
@@ -127,7 +87,6 @@ describe('Class - Complete Workflow', () => {
 
     // Step 1: Create Class
     console.log('\n📦 Step 1: Creating Class...');
-    sessionId = generateSessionId();
 
     // Step 1.1: Create class object (metadata only)
     await createClass(connection, {
@@ -137,7 +96,7 @@ describe('Class - Complete Workflow', () => {
     });
 
     // Step 1.2: Lock class
-    lockHandle = await lockClass(connection, className, sessionId);
+    lockHandle = await lockClass(connection, className, sessionId!);
 
     // Step 1.3: Update source code
     if (!testCase.params.source_code) {
@@ -148,14 +107,14 @@ describe('Class - Complete Workflow', () => {
       className,
       testCase.params.source_code,
       lockHandle,
-      sessionId
+      sessionId!
     );
 
     // Step 1.4: Unlock class
-    await unlockClass(connection, className, lockHandle, sessionId);
+    await unlockClass(connection, className, lockHandle, sessionId!);
 
     // Step 1.5: Activate class
-    await activateClass(connection, className, sessionId);
+    await activateClass(connection, className, sessionId!);
     console.log(`✅ Created Class: ${className}`);
 
     // Step 2: Read Class
@@ -183,7 +142,7 @@ CLASS ${className} IMPLEMENTATION.
 ENDCLASS.`;
 
     // Step 3.1: Lock class
-    const updateLockHandle = await lockClass(connection, className, sessionId);
+    const updateLockHandle = await lockClass(connection, className, sessionId!);
 
     // Step 3.2: Update source code
     await updateClass(
@@ -191,14 +150,14 @@ ENDCLASS.`;
       className,
       updatedSourceCode,
       updateLockHandle,
-      sessionId
+      sessionId!
     );
 
     // Step 3.3: Unlock class
-    await unlockClass(connection, className, updateLockHandle, sessionId);
+    await unlockClass(connection, className, updateLockHandle, sessionId!);
 
     // Step 3.4: Activate class
-    await activateClass(connection, className, sessionId);
+    await activateClass(connection, className, sessionId!);
     console.log(`✅ Updated Class source`);
 
     // Verify update
@@ -215,19 +174,19 @@ ENDCLASS.`;
 
     // Step 5: Lock Class
     console.log('\n🔒 Step 5: Locking Class...');
-    lockHandle = await lockClass(connection, className, sessionId);
+    lockHandle = await lockClass(connection, className, sessionId!);
     expect(lockHandle).toBeDefined();
     expect(lockHandle).not.toBe('');
     console.log(`✅ Class locked, handle: ${lockHandle}`);
 
     // Step 6: Unlock Class
     console.log('\n🔓 Step 6: Unlocking Class...');
-    await unlockClass(connection, className, lockHandle, sessionId);
+    await unlockClass(connection, className, lockHandle, sessionId!);
     console.log(`✅ Class unlocked`);
 
     // Step 7: Activate Class
     console.log('\n⚡ Step 7: Activating Class...');
-    const activateResult = await activateClass(connection, className, sessionId);
+    const activateResult = await activateClass(connection, className, sessionId!);
     expect(activateResult.status).toBe(200);
     console.log(`✅ Class activated`);
 

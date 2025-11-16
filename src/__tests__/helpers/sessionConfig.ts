@@ -92,8 +92,29 @@ export async function setupConnectionWithSession(
   }
 
   const sessionId = generateSessionId(testName, sessionConfig.session_id_format || 'auto');
+
+  // Resolve sessions_dir: if absolute path, use as-is; if relative, resolve from process.cwd()
+  // This allows users to specify custom paths in their config or use relative paths from their working directory
+  // Standard behavior: relative paths are resolved from current working directory, not project root
+  let sessionDir = sessionConfig.sessions_dir || '.sessions';
+  if (!path.isAbsolute(sessionDir)) {
+    // Resolve relative to current working directory (standard behavior)
+    sessionDir = path.resolve(process.cwd(), sessionDir);
+  }
+
+  // Log session setup for debugging
+  if (process.env.DEBUG_TESTS === 'true') {
+    console.log(`[SessionConfig] Setting up session:`, {
+      testName,
+      sessionId,
+      sessionDir,
+      sessions_dir_from_config: sessionConfig.sessions_dir,
+      cwd: process.cwd()
+    });
+  }
+
   const sessionStorage = new FileSessionStorage({
-    sessionDir: sessionConfig.sessions_dir || '.sessions',
+    sessionDir: sessionDir,
     prettyPrint: true
   });
 

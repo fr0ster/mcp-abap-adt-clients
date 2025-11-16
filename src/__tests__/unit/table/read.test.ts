@@ -6,19 +6,15 @@
  */
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { getTableSource, getTableMetadata } from '../../../core/table/read';
 import { createTable } from '../../../core/table/create';
 import { getConfig } from '../../helpers/sessionConfig';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -33,12 +29,17 @@ const logger = {
 describe('Table - Read', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
   let isCloudSystem = false;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      const env = await setupTestEnvironment(connection, '${module}_read', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
       await connection.connect();
       hasConfig = true;
       // Check if this is a cloud system using system information endpoint
@@ -50,6 +51,7 @@ describe('Table - Read', () => {
   });
 
   afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }

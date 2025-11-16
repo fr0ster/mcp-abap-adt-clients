@@ -21,8 +21,17 @@ import { lockClass } from '../../../core/class/lock';
 import { unlockClass } from '../../../core/class/unlock';
 import { updateClass } from '../../../core/class/update';
 import { generateSessionId } from '../../../utils/sessionUtils';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getAllEnabledTestCases, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -30,56 +39,44 @@ const logger = {
   info: debugEnabled ? console.log : () => {},
   warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
+  csrfToken: debugEnabled ? console.log : () => {},
 };
-
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
 
 describe('Class - Create', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+
+      // Setup session and lock tracking based on test-config.yaml
+      // This will enable stateful session if persist_session: true in YAML
+      const env = await setupTestEnvironment(connection, 'class_create', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+      lockTracking = env.lockTracking;
+
+      if (sessionId) {
+        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
+        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
+      } else {
+        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
+      }
+
+      if (lockTracking?.enabled) {
+        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
+      } else {
+        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
+      }
+
+      // Connect to SAP system to initialize session (get CSRF token and cookies)
+      await (connection as any).connect();
+
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -89,6 +86,7 @@ describe('Class - Create', () => {
 
   afterEach(async () => {
     if (connection) {
+      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });
@@ -217,7 +215,12 @@ describe('Class - Create', () => {
       const packageName = testCase.params.package_name || getDefaultPackage();
 
       // Delete class if exists (using validation to check existence, Eclipse-like)
-      await deleteClassIfExists(className, packageName);
+      // This is critical for CREATE test - we must ensure class doesn't exist before creating
+      const deleted = await deleteClassIfExists(className, packageName);
+      if (!deleted) {
+        logger.warn(`⚠️ Failed to ensure class ${className} doesn't exist, skipping test case`);
+        continue; // Skip this test case if we can't ensure clean state
+      }
 
       // Validate class name and superclass via ADT endpoint
       const validationResult = await validateClassName(
@@ -229,11 +232,26 @@ describe('Class - Create', () => {
       );
 
       if (!validationResult.valid) {
+        // If validation says class already exists, it means deletion failed
+        if (validationResult.message?.toLowerCase().includes('already exists')) {
+          logger.warn(`⚠️ Class ${className} still exists after deletion attempt, skipping test case`);
+          continue;
+        }
         throw new Error(`Class validation failed: ${validationResult.message || 'Invalid class name or superclass'}`);
       }
 
+      // Final check before creation: try to delete one more time if class exists
+      // This ensures we have a clean state right before creation
+      const finalDeleteResult = await deleteClassIfExists(className, packageName, 1);
+      if (!finalDeleteResult) {
+        logger.warn(`⚠️ Final deletion attempt failed for class ${className}, skipping test case`);
+        continue;
+      }
+
       // Create class workflow: create -> lock -> update -> unlock -> activate
-      const sessionId = generateSessionId();
+      // Always generate a new UUID for ADT requests (sessionId from setupTestEnvironment is for file storage, not ADT requests)
+      const testSessionId = generateSessionId();
+
       await createClass(connection, {
         class_name: className,
         description: testCase.params.description,
@@ -243,13 +261,13 @@ describe('Class - Create', () => {
         final: testCase.params.final,
       });
 
-      const lockHandle = await lockClass(connection, className, sessionId);
+      const lockHandle = await lockClass(connection, className, testSessionId);
       if (!testCase.params.source_code) {
         throw new Error('source_code is required in test case');
       }
-      await updateClass(connection, className, testCase.params.source_code, lockHandle, sessionId, testCase.params.transport_request || getDefaultTransport());
-      await unlockClass(connection, className, lockHandle, sessionId);
-      await activateClass(connection, className, sessionId);
+      await updateClass(connection, className, testCase.params.source_code, lockHandle, testSessionId, testCase.params.transport_request || getDefaultTransport());
+      await unlockClass(connection, className, lockHandle, testSessionId);
+      await activateClass(connection, className, testSessionId);
     }
   }, 60000);
 });

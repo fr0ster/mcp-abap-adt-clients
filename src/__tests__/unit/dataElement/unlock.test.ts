@@ -23,6 +23,7 @@ import { createDataElement } from '../../../core/dataElement/create';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -43,56 +44,43 @@ const logger = {
   csrfToken: debugEnabled ? console.log : () => {},
 };
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
 describe('Data Element - Unlock', () => {
   let connection: AbapConnection;
   let hasConfig = false;
   let lockHandle: string | null = null;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeEach(async () => {
     lockHandle = null; // Reset lock handle for each test
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+
+      // Setup session and lock tracking based on test-config.yaml
+      // This will enable stateful session if persist_session: true in YAML
+      const env = await setupTestEnvironment(connection, 'dataElement_unlock', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+      lockTracking = env.lockTracking;
+
+      if (sessionId) {
+        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
+        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
+      } else {
+        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
+      }
+
+      if (lockTracking?.enabled) {
+        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
+      } else {
+        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
+      }
+
+      // Connect to SAP system to initialize session (get CSRF token and cookies)
+      await (connection as any).connect();
+
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -102,6 +90,7 @@ describe('Data Element - Unlock', () => {
 
   afterEach(async () => {
     if (connection) {
+      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
     lockHandle = null;

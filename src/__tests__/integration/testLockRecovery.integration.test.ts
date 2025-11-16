@@ -14,19 +14,13 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- testLockRecovery.integration.test
  */
 
-import { describe, it, expect, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { createAbapConnection, SapConfig, FileSessionStorage } from '@mcp-abap-adt/connection';
 import { LockStateManager } from '../../utils/lockStateManager';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 import * as yaml from 'yaml';
-
-// Load environment variables
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
 
 // Load test configuration
 const configPath = path.join(__dirname, '../../../tests/test-config.yaml');
@@ -50,46 +44,6 @@ const logger = {
   csrfToken: debugEnabled ? console.log : () => {},
 };
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
 describe('Lock Recovery Integration Test', () => {
   const phase1Config = lockRecoveryConfig?.phase1_lock;
 
@@ -97,8 +51,25 @@ describe('Lock Recovery Integration Test', () => {
   const sessionsDir = phase1Config?.session_config?.sessions_dir || '.sessions';
   const locksDir = phase1Config?.lock_config?.locks_dir || '.locks';
 
-  afterAll(async () => {
-    // Cleanup session and lock files
+  let globalSessionId: string | null = null;
+  let testConfig: any = null;
+  let connection: any = null;
+
+  beforeEach(async () => {
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    const env = await setupTestEnvironment(connection, 'lock_recovery', __filename);
+    globalSessionId = env.sessionId;
+    testConfig = env.testConfig;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, globalSessionId, testConfig);
+    if (connection) {
+      connection.reset();
+    }
+
+    // Cleanup session and lock files for lock recovery test
     const sessionFile = path.join(process.cwd(), sessionsDir, `${sessionId}.json`);
     const lockFile = path.join(process.cwd(), locksDir, 'active-locks.json');
 

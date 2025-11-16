@@ -21,16 +21,9 @@ import { updateFunctionModuleSource } from '../../core/functionModule/update';
 import { checkFunctionModule } from '../../core/functionModule/check';
 import { validateFunctionModuleName, validateFunctionModuleSource } from '../../core/functionModule/validation';
 import { deleteObject } from '../../core/delete';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../helpers/sessionConfig';
 
 const { getEnabledTestCase } = require('../../../tests/test-helper');
-
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -41,46 +34,6 @@ const logger = {
   csrfToken: debugEnabled ? console.log : () => {},
 };
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
 describe('Function Module - Complete Workflow', () => {
   let connection: AbapConnection;
   let hasConfig = false;
@@ -88,11 +41,16 @@ describe('Function Module - Complete Workflow', () => {
   let functionModuleName: string;
   let packageName: string;
   let sourceCode: string;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      const env = await setupTestEnvironment(connection, 'function_module_workflow', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -100,7 +58,8 @@ describe('Function Module - Complete Workflow', () => {
     }
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }

@@ -6,18 +6,12 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import { FunctionModuleBuilder, FunctionModuleBuilderLogger } from '../../../core/functionModule';
 import { deleteFunctionModule } from '../../../core/functionModule/delete';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -39,11 +33,16 @@ const builderLogger: FunctionModuleBuilderLogger = {
 describe('FunctionModuleBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      const env = await setupTestEnvironment(connection, 'builder', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');

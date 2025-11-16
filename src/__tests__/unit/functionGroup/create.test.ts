@@ -19,9 +19,17 @@ import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/c
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { deleteObject } from '../../../core/delete';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
-// Environment variables are loaded automatically by test-helper
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -32,63 +40,51 @@ const logger = {
   csrfToken: debugEnabled ? console.log : () => {},
 };
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
 describe('Function Group - Create', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+
+      // Setup session and lock tracking based on test-config.yaml
+      // This will enable stateful session if persist_session: true in YAML
+      const env = await setupTestEnvironment(connection, 'functionGroup_create', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+      lockTracking = env.lockTracking;
+
+      if (sessionId) {
+        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
+        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
+      } else {
+        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
+      }
+
+      if (lockTracking?.enabled) {
+        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
+      } else {
+        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
+      }
+
+      // Connect to SAP system to initialize session (get CSRF token and cookies)
+      await (connection as any).connect();
+
       hasConfig = true;
     } catch (error) {
-      console.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
   afterAll(async () => {
     if (connection) {
+      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });

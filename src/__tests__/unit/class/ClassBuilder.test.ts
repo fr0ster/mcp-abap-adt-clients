@@ -9,6 +9,7 @@ import { AbapConnection, createAbapConnection, SapConfig, ILogger } from '@mcp-a
 import { ClassBuilder, ClassBuilderLogger } from '../../../core/class';
 import { deleteObject } from '../../../core/delete';
 import { validateClassName } from '../../../core/class/validation';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -36,54 +37,41 @@ const builderLogger: ClassBuilderLogger = {
   error: debugEnabled ? console.error : () => {},
 };
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
 describe('ClassBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+
+      // Setup session and lock tracking based on test-config.yaml
+      // This will enable stateful session if persist_session: true in YAML
+      const env = await setupTestEnvironment(connection, 'class_builder', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+      lockTracking = env.lockTracking;
+
+      if (sessionId) {
+        builderLogger.debug?.(`✓ Session persistence enabled: ${sessionId}`);
+        builderLogger.debug?.(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
+      } else {
+        builderLogger.debug?.('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
+      }
+
+      if (lockTracking?.enabled) {
+        builderLogger.debug?.(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
+      } else {
+        builderLogger.debug?.('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
+      }
+
+      // Connect to SAP system to initialize session (get CSRF token and cookies)
+      await (connection as any).connect();
+
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -93,6 +81,7 @@ describe('ClassBuilder', () => {
 
   afterEach(async () => {
     if (connection) {
+      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });
@@ -197,7 +186,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -243,7 +232,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -268,7 +257,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -357,7 +346,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -400,7 +389,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -439,7 +428,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -469,7 +458,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -559,7 +548,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -603,7 +592,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -628,32 +617,39 @@ describe('ClassBuilder', () => {
 
       let cleanupCalled = false;
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => {
-          // Verify lock was successful before simulating error
-          const lockHandle = b.getLockHandle();
-          if (!lockHandle) {
-            throw new Error('Lock failed, cannot test cleanup');
-          }
-          // Simulate error
-          throw new Error('Test error');
-        })
-        .catch(error => {
+      try {
+        await builder
+          .validate()
+          .then(b => b.create())
+          .then(b => b.lock())
+          .then(b => {
+            // Verify lock was successful before simulating error
+            const lockHandle = b.getLockHandle();
+            if (!lockHandle) {
+              builderLogger.warn?.('⚠️ Lock failed, cannot test cleanup');
+              return b; // Don't throw error if lock failed
+            }
+            // Simulate error only if lock succeeded
+            throw new Error('Test error');
+          });
+      } catch (error: any) {
+        // Only test cleanup if error is our test error (not from create/lock)
+        if (error.message === 'Test error') {
           // Cleanup in catch handler - verify lockHandle is accessible
           const lockHandle = builder.getLockHandle();
           if (lockHandle) {
             cleanupCalled = true;
-            return builder.unlock().catch(() => {
+            await builder.unlock().catch(() => {
               // Ignore unlock errors during cleanup
             });
           } else {
-            // If lock failed, we can't test cleanup
-            builderLogger.warn?.(`⚠️ Lock failed, cannot test cleanup`);
+            builderLogger.warn?.('⚠️ Lock handle not available for cleanup');
           }
-        });
+        } else {
+          // If create or lock failed, we can't test cleanup
+          builderLogger.warn?.(`⚠️ Operation failed before cleanup test: ${error.message}`);
+        }
+      }
 
       expect(cleanupCalled).toBe(true);
     }, 60000);
@@ -666,7 +662,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;
@@ -763,7 +759,7 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testCase = getEnabledTestCase('create_class', 'basic_class');
+      const testCase = getEnabledTestCase('create_class', 'builder_class');
       if (!testCase) {
         builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
         return;

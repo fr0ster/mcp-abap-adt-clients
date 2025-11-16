@@ -12,13 +12,9 @@ import { getClass } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
 import { activateClass } from '../../../core/class/activation';
 import { updateClass } from '../../../core/class/update';
-import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfigFromEnv } from '@mcp-abap-adt/connection';
-
-const getConfig = getConfigFromEnv;
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
-// Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -33,12 +29,17 @@ describe('Class - Lock/Unlock', () => {
   let connection: AbapConnection;
   let hasConfig = false;
   let lockHandle: string | null = null;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
 
   beforeEach(async () => {
-    lockHandle = null; // Reset lock handle for each test
+    lockHandle = null;
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      const env = await setupTestEnvironment(connection, 'class_lock', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -47,10 +48,11 @@ describe('Class - Lock/Unlock', () => {
   });
 
   afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }
-    lockHandle = null; // Clean up lock handle
+    lockHandle = null;
   });
 
   // Helper function to ensure object exists before test (idempotency)
@@ -72,7 +74,6 @@ describe('Class - Lock/Unlock', () => {
         }
 
         const className = testCase.params.class_name;
-        const sessionId = generateSessionId();
 
         // Step 1: Create class object (metadata only)
         await createClass(connection, {
@@ -82,23 +83,23 @@ describe('Class - Lock/Unlock', () => {
         });
 
         // Step 2: Lock class
-        const lockHandle = await lockClass(connection, className, sessionId);
+        const tempLockHandle = await lockClass(connection, className, sessionId!);
 
         // Step 3: Update source code
         await updateClass(
           connection,
           className,
           sourceCode,
-          lockHandle,
-          sessionId,
+          tempLockHandle,
+          sessionId!,
           createTestCase.params.transport_request
         );
 
         // Step 4: Unlock class
-        await unlockClass(connection, className, lockHandle, sessionId);
+        await unlockClass(connection, className, tempLockHandle, sessionId!);
 
         // Step 5: Activate class
-        await activateClass(connection, className, sessionId);
+        await activateClass(connection, className, sessionId!);
 
         logger.debug(`Class ${className} created and activated successfully`);
       } else {
@@ -123,13 +124,11 @@ describe('Class - Lock/Unlock', () => {
     // Ensure class exists before test (idempotency)
     await ensureClassExists(testCase);
 
-    const sessionId = 'test-session-id';
-
     // Lock class (should work for user-created Z-classes)
     lockHandle = await lockClass(
       connection,
       testCase.params.class_name,
-      sessionId
+      sessionId!
     );
     expect(lockHandle).toBeDefined();
     expect(lockHandle).not.toBe('');
@@ -139,7 +138,7 @@ describe('Class - Lock/Unlock', () => {
       connection,
       testCase.params.class_name,
       lockHandle,
-      sessionId
+      sessionId!
     );
   }, 20000);
 });
