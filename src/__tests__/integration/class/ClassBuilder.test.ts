@@ -116,69 +116,20 @@ describe('ClassBuilder', () => {
    */
   async function ensureClassReady(className: string, packageName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: false, reason: 'No connection' };
+      return { success: true }; // No connection = nothing to clean
     }
 
+    // Try to delete (ignore all errors)
     try {
-      // Check if class exists using validation
-      // valid: true = class doesn't exist (can be created)
-      // valid: false = class already exists
-      const validationResult = await validateClassName(connection, className, packageName);
-
-      if (!validationResult.valid) {
-        // Class exists, delete it
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Class ${className} exists, deleting...`);
-        }
-        try {
-        await deleteObject(connection, {
-          object_name: className,
-          object_type: 'CLAS/OC',
-        });
-          if (debugEnabled) {
-            builderLogger.debug?.(`[CLEANUP] Class ${className} deleted`);
-          }
-        } catch (deleteError: any) {
-          const errorMsg = `Failed to delete class ${className}: ${deleteError.message}`;
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
-          }
-          return { success: false, reason: errorMsg };
-        }
-      } else {
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Class ${className} doesn't exist`);
-        }
-      }
-
-      // Verify class doesn't exist (wait a bit for async deletion)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      try {
-        const verifyResult = await validateClassName(connection, className, packageName);
-        if (!verifyResult.valid) {
-          // Class still exists
-          const errorMsg = `Class ${className} still exists after cleanup attempt (may be locked or in use)`;
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
-          }
-          return { success: false, reason: errorMsg };
-        }
-        return { success: true };
-      } catch (error: any) {
-        const errorMsg = `Cannot verify cleanup status for ${className} (may be locked)`;
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
-        }
-        return { success: false, reason: errorMsg };
-      }
-    } catch (error: any) {
-      const errorMsg = `Error checking/deleting class ${className}: ${error.message}`;
-      if (debugEnabled) {
-        builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
+      await deleteObject(connection, {
+        object_name: className,
+        object_type: 'CLAS/OC',
+      });
+    } catch (error) {
+      // Ignore all errors (404, locked, etc.)
     }
-      return { success: false, reason: errorMsg };
-    }
+
+    return { success: true };
   }
 
   describe('Full workflow', () => {

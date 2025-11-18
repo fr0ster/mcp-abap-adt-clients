@@ -8,9 +8,12 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { FunctionModuleBuilder, FunctionModuleBuilderLogger } from '../../../core/functionModule';
 import { deleteFunctionModule } from '../../../core/functionModule/delete';
+import { getFunctionSource } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
+import { unlockFunctionModule } from '../../../core/functionModule/unlock';
+import { LockStateManager } from '../../../utils/lockStateManager';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestStart,
@@ -76,7 +79,32 @@ describe('FunctionModuleBuilder', () => {
   });
 
   /**
+   * Ensure Function Module is deleted (cleanup before test)
+   */
+  async function ensureFunctionModuleReady(
+    functionGroupName: string,
+    functionModuleName: string
+  ): Promise<{ success: boolean; reason?: string }> {
+    if (!connection) {
+      return { success: true }; // No connection = nothing to clean
+    }
+
+    // Try to delete (ignore all errors)
+    try {
+      await deleteFunctionModule(connection, {
+        function_group_name: functionGroupName,
+        function_module_name: functionModuleName
+      });
+    } catch (error) {
+      // Ignore all errors (404, locked, etc.)
+    }
+
+    return { success: true };
+  }
+
+  /**
    * Ensure Function Group exists, create if it doesn't
+   * Ignores only "already exists" errors (409)
    */
   async function ensureFunctionGroupExists(
     functionGroupName: string,
@@ -87,150 +115,59 @@ describe('FunctionModuleBuilder', () => {
       return { success: false, reason: 'No connection' };
     }
 
-    // Check if Function Group exists
+    // Try to create (ignore "already exists" errors)
     try {
-      await getFunctionGroup(connection, functionGroupName);
-      // Function Group exists
-      if (debugEnabled) {
-        builderLogger.debug?.(`[SETUP] Function group ${functionGroupName} already exists`);
-      }
+      await createFunctionGroup(connection, {
+        function_group_name: functionGroupName,
+        package_name: packageName,
+        transport_request: transportRequest,
+        description: `Test function group for ${functionGroupName}`,
+        activate: false
+      });
       return { success: true };
     } catch (error: any) {
-      // 404 = Function Group doesn't exist, create it
-      if (error.response?.status === 404) {
-        try {
-          if (debugEnabled) {
-            builderLogger.debug?.(`[SETUP] Creating function group ${functionGroupName}`);
-          }
-          await createFunctionGroup(connection, {
-            function_group_name: functionGroupName,
-            package_name: packageName,
-            transport_request: transportRequest,
-            description: `Test function group for ${functionGroupName}`,
-            activate: false
-          });
-          if (debugEnabled) {
-            builderLogger.debug?.(`[SETUP] Function group ${functionGroupName} created`);
-          }
-          return { success: true };
-        } catch (createError: any) {
-          const errorMsg = `Failed to create function group ${functionGroupName}: ${createError.message}`;
-          if (debugEnabled) {
-            builderLogger.warn?.(`[SETUP] ${errorMsg}`);
-          }
-          return { success: false, reason: errorMsg };
-        }
+      // 409 = already exists, that's fine
+      if (error.response?.status === 409) {
+        return { success: true };
       }
-      // Other error
-      const errorMsg = `Cannot check/create function group ${functionGroupName}: ${error.message}`;
-      if (debugEnabled) {
-        builderLogger.warn?.(`[SETUP] ${errorMsg}`);
-      }
-      return { success: false, reason: errorMsg };
+      // Other errors - return failure
+      return { success: false, reason: error.message || 'Failed to create function group' };
     }
   }
 
   /**
    * Cleanup: delete Function Module and Function Group
+   * Ignores all errors - just tries to delete
    */
   async function cleanupFunctionModuleAndGroup(
     functionGroupName: string,
     functionModuleName: string
   ): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: false, reason: 'No connection' };
+      return { success: true }; // No connection = nothing to clean
     }
 
-    // Delete Function Module first
+    // Try to delete Function Module (ignore errors)
     try {
       await deleteFunctionModule(connection, {
         function_group_name: functionGroupName,
         function_module_name: functionModuleName
       });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Function module ${functionModuleName} deleted`);
-      }
-    } catch (error: any) {
-      const rawMessage =
-        error?.response?.data ||
-        error?.message ||
-        (typeof error === 'string' ? error : JSON.stringify(error));
-
-      // 404 = doesn't exist, that's fine
-      if (
-        error.response?.status === 404 ||
-        rawMessage?.toLowerCase?.().includes('not found') ||
-        rawMessage?.toLowerCase?.().includes('does not exist')
-      ) {
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Function module ${functionModuleName} already absent`);
-        }
-      } else {
-        // Other errors - log only in debug mode
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to delete function module ${functionModuleName}:`, rawMessage);
-      }
-      }
+    } catch (error) {
+      // Ignore all errors (404, locked, etc.)
     }
 
-    // Wait a bit for async deletion
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Delete Function Group
+    // Try to delete Function Group (ignore errors)
     try {
       await deleteFunctionGroup(connection, {
         function_group_name: functionGroupName,
         transport_request: getDefaultTransport() || undefined
       });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Function group ${functionGroupName} deleted`);
-      }
-    } catch (error: any) {
-      const rawMessage =
-        error?.response?.data ||
-        error?.message ||
-        (typeof error === 'string' ? error : JSON.stringify(error));
-
-      // 404 = doesn't exist, that's fine
-      if (
-        error.response?.status === 404 ||
-        rawMessage?.toLowerCase?.().includes('not found') ||
-        rawMessage?.toLowerCase?.().includes('does not exist')
-      ) {
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Function group ${functionGroupName} already absent`);
-        }
-      } else {
-        // Other errors - log only in debug mode
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to delete function group ${functionGroupName}:`, rawMessage);
-        }
-      }
+    } catch (error) {
+      // Ignore all errors (404, locked, etc.)
     }
 
-    // Verify cleanup (wait a bit more)
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    try {
-      await getFunctionGroup(connection, functionGroupName);
-      // Function Group still exists
-      const errorMsg = `Function group ${functionGroupName} still exists after cleanup attempt (may be locked or in use)`;
-      if (debugEnabled) {
-        builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
-      }
-      return { success: false, reason: errorMsg };
-    } catch (error: any) {
-      // 404 = Function Group doesn't exist, cleanup successful
-      if (error.response?.status === 404) {
-        return { success: true };
-      }
-      // Other error
-      const errorMsg = `Cannot verify cleanup status for ${functionGroupName} (may be locked)`;
-      if (debugEnabled) {
-        builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
-      }
-      return { success: false, reason: errorMsg };
-      }
+    return { success: true };
   }
 
   function getBuilderTestDefinition() {
@@ -269,6 +206,18 @@ describe('FunctionModuleBuilder', () => {
       testCase = tc;
       functionGroupName = tc.params.function_group_name;
       functionModuleName = tc.params.function_module_name;
+
+      // Cleanup before test: delete Function Module if exists
+      if (functionGroupName && functionModuleName) {
+        const cleanup = await ensureFunctionModuleReady(functionGroupName, functionModuleName);
+        if (!cleanup.success) {
+          skipReason = cleanup.reason || 'Failed to cleanup Function Module before test';
+          testCase = null;
+          functionGroupName = null;
+          functionModuleName = null;
+          return;
+        }
+      }
 
       // Ensure Function Group exists before test
       if (functionGroupName) {

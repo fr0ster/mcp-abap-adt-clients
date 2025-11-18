@@ -57,11 +57,11 @@ describe('Lock Recovery Integration Test', () => {
 
   beforeEach(async () => {
     try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      const env = await setupTestEnvironment(connection, 'lock_recovery', __filename);
-      globalSessionId = env.sessionId;
-      testConfig = env.testConfig;
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    const env = await setupTestEnvironment(connection, 'lock_recovery', __filename);
+    globalSessionId = env.sessionId;
+    testConfig = env.testConfig;
     } catch (error: any) {
       if (error.message?.includes('Missing or invalid SAP_URL')) {
         // Skip test if no SAP configuration

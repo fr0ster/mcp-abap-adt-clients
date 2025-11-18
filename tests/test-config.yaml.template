@@ -273,7 +273,7 @@ create_function_module:
       description: "Function module reserved for FunctionModuleBuilder tests"
       params:
         function_module_name: "Z_ADT_BLD_FM01"  # Must start with Z_ or Y_ (with underscore)
-        function_group_name: "ZADT_BLD_FGR01"
+        function_group_name: "ZADT_BLD_FGR02"  # Different from FunctionGroupBuilder test (ZADT_BLD_FGR01)
         description: "FunctionModuleBuilder workflow FM"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
