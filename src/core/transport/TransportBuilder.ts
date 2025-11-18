@@ -111,7 +111,7 @@ export class TransportBuilder {
 
       // Extract transport number from response if available
       if (result.data && typeof result.data === 'object') {
-        this.state.transportNumber = result.data.transport_number;
+        this.state.transportNumber = result.data.transport_request || result.data.transport_number;
         this.state.taskNumber = result.data.task_number;
       }
 

@@ -10,6 +10,7 @@ import { ProgramBuilder, ProgramBuilderLogger } from '../../../core/program';
 import { deleteProgram } from '../../../core/program/delete';
 import { getProgramSource } from '../../../core/program/read';
 import { getConfig } from '../../helpers/sessionConfig';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -54,6 +55,7 @@ const builderLogger: ProgramBuilderLogger = {
 describe('ProgramBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
@@ -61,6 +63,8 @@ describe('ProgramBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system (programs are not supported in cloud)
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -116,6 +120,11 @@ describe('ProgramBuilder', () => {
 
       if (!hasConfig) {
         skipReason = 'No SAP configuration';
+        return;
+      }
+
+      if (isCloudSystem) {
+        skipReason = 'Programs are not supported in cloud systems (BTP ABAP Environment)';
         return;
       }
 
@@ -229,7 +238,7 @@ describe('ProgramBuilder', () => {
   describe('Read standard object', () => {
     it('should read standard SAP program', async () => {
       // Standard SAP program (exists in most ABAP systems)
-      const standardProgramName = 'SAPLSETT';
+      const standardProgramName = 'SAPLSETT'; // Standard SAP program (Settings)
       logBuilderTestStart(builderLogger, 'ProgramBuilder - read standard object', {
         name: 'read_standard',
         params: { program_name: standardProgramName }
@@ -237,6 +246,11 @@ describe('ProgramBuilder', () => {
 
       if (!hasConfig) {
         logBuilderTestSkip(builderLogger, 'ProgramBuilder - read standard object', 'No SAP configuration');
+        return;
+      }
+
+      if (isCloudSystem) {
+        logBuilderTestSkip(builderLogger, 'ProgramBuilder - read standard object', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
         return;
       }
 

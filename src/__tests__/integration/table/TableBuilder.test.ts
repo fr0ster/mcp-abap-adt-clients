@@ -8,8 +8,10 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { TableBuilder, TableBuilderLogger } from '../../../core/table';
 import { deleteTable } from '../../../core/table/delete';
+import { unlockTable } from '../../../core/table/unlock';
 import { getTableSource } from '../../../core/table/read';
-import { getConfig } from '../../helpers/sessionConfig';
+import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
+import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -78,11 +80,36 @@ describe('TableBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
-    // Try to delete (ignore all errors)
+    // Step 1: Check for locks and unlock if needed
+    const lock = getTestLock('table', tableName);
+    if (lock) {
+      try {
+        const sessionId = lock.sessionId || generateSessionId('cleanup');
+        await unlockTable(connection, tableName, lock.lockHandle, sessionId);
+        if (debugEnabled) {
+          builderLogger.debug?.(`[CLEANUP] Unlocked table ${tableName} before deletion`);
+        }
+      } catch (unlockError: any) {
+        // Log but continue - lock might be stale
+        if (debugEnabled) {
+          builderLogger.warn?.(`[CLEANUP] Failed to unlock table ${tableName}: ${unlockError.message}`);
+        }
+      }
+    }
+
+    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
     try {
       await deleteTable(connection, { table_name: tableName });
-    } catch (error) {
-      // Ignore all errors (404, locked, etc.)
+      if (debugEnabled) {
+        builderLogger.debug?.(`[CLEANUP] Successfully deleted table ${tableName}`);
+      }
+    } catch (error: any) {
+      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
+      if (debugEnabled) {
+        const errorMsg = error.message || '';
+        const errorData = error.response?.data || '';
+        builderLogger.warn?.(`[CLEANUP] Failed to delete table ${tableName}: ${errorMsg} ${errorData}`);
+      }
     }
 
     return { success: true };

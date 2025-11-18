@@ -71,7 +71,28 @@ export async function createTransport(
     throw new Error('Transport description is required');
   }
 
-  const username = process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
+  // Get username from connection config or system information
+  const config = connection.getConfig();
+  let username = params.owner || config.username || process.env.SAP_USERNAME || process.env.SAP_USER;
+
+  // If username not found in config, try to get from system information
+  if (!username) {
+    try {
+      const { getSystemInformation } = await import('../shared/systemInfo');
+      const systemInfo = await getSystemInformation(connection);
+      if (systemInfo?.userName) {
+        username = systemInfo.userName;
+      }
+    } catch (error) {
+      // Ignore errors - fallback to default
+    }
+  }
+
+  // If username still not found, throw error (cannot create transport without valid user)
+  if (!username) {
+    throw new Error('Cannot create transport request: username not found. Please provide owner in params, set SAP_USERNAME in config, or ensure system information endpoint is available.');
+  }
+
   const baseUrl = await connection.getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/cts/transportrequests`;
 

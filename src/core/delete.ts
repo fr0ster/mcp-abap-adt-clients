@@ -33,6 +33,7 @@ function getObjectUri(
     .replace('fugr/ff', 'function_module')  // Check this BEFORE 'fugr/f'
     .replace('fugr/f', 'function_group')
     .replace('tabl/dt', 'table')
+    .replace('stru/dt', 'structure')  // STRU/DT is used for structures
     .replace('ttyp/st', 'structure')
     .replace('ddls/df', 'view')
     .replace('dtel/de', 'data_element')
@@ -59,7 +60,7 @@ function getObjectUri(
     case 'structure':
       return `/sap/bc/adt/ddic/structures/${encodedName}`;
     case 'view':
-      return `/sap/bc/adt/ddic/ddlsources/${encodedName}`;
+      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
     case 'domain':
       return `/sap/bc/adt/ddic/domains/${encodedName}`;
     case 'data_element':
@@ -70,7 +71,52 @@ function getObjectUri(
 }
 
 /**
+ * Check if object can be deleted (deletion check)
+ */
+export async function checkDeletion(
+  connection: AbapConnection,
+  params: DeleteObjectParams
+): Promise<AxiosResponse> {
+  const {
+    object_name,
+    object_type,
+    function_group_name
+  } = params;
+
+  // Validation
+  if (!object_name || !object_type) {
+    throw new Error('object_name and object_type are required');
+  }
+
+  // Build object URI from object_name and object_type
+  const objectUri = getObjectUri(object_type, object_name, function_group_name);
+
+  const baseUrl = await connection.getBaseUrl();
+  const checkUrl = `${baseUrl}/sap/bc/adt/deletion/check`;
+
+  // Build XML check request (no transportNumber in check request)
+  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="${objectUri}"/>
+</del:checkRequest>`;
+
+  const headers = {
+    'Accept': 'application/vnd.sap.adt.deletion.check.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml'
+  };
+
+  return await connection.makeAdtRequest({
+    url: checkUrl,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlPayload,
+    headers
+  });
+}
+
+/**
  * Delete ABAP object using ADT deletion API
+ * For some object types (like interfaces), empty transportNumber tag is required
  */
 export async function deleteObject(
   connection: AbapConnection,
@@ -95,10 +141,26 @@ export async function deleteObject(
   const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
 
   // Build XML deletion request
+  // For interfaces and some other object types, empty transportNumber tag is required
+  // For structures, empty tag causes failure, so we omit it entirely
+  const normalizedType = object_type.toLowerCase();
+  const requiresEmptyTransportTag = normalizedType.includes('intf') ||
+                                    normalizedType.includes('clas') ||
+                                    normalizedType.includes('prog');
+
+  let transportNumberTag = '';
+  if (transport_request && transport_request.trim()) {
+    transportNumberTag = `<del:transportNumber>${transport_request}</del:transportNumber>`;
+  } else if (requiresEmptyTransportTag) {
+    // For interfaces, classes, programs: add empty self-closing tag
+    transportNumberTag = '<del:transportNumber/>';
+  }
+  // For structures and other types: omit tag entirely if no transport_request
+
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri}">
-    ${transport_request ? `<del:transportNumber>${transport_request}</del:transportNumber>` : ''}
+    ${transportNumberTag}
   </del:object>
 </del:deletionRequest>`;
 

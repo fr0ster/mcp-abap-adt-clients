@@ -25,6 +25,7 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/dist/',
+    '/e2e/', // E2E tests should be run separately
   ],
   // Force sequential execution for integration tests (--runInBand in package.json)
   // Integration tests must run sequentially to avoid conflicts with shared SAP objects

@@ -8,8 +8,10 @@
 import { AbapConnection, createAbapConnection, SapConfig, ILogger } from '@mcp-abap-adt/connection';
 import { ClassBuilder, ClassBuilderLogger } from '../../../core/class';
 import { deleteObject } from '../../../core/delete';
+import { unlockClass } from '../../../core/class/unlock';
 import { validateClassName } from '../../../core/class/validation';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, generateSessionId } from '../../helpers/sessionConfig';
+import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -119,14 +121,39 @@ describe('ClassBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
-    // Try to delete (ignore all errors)
+    // Step 1: Check for locks and unlock if needed
+    const lock = getTestLock('class', className);
+    if (lock) {
+      try {
+        const sessionId = lock.sessionId || generateSessionId('cleanup');
+        await unlockClass(connection, className, lock.lockHandle, sessionId);
+        if (debugEnabled) {
+          builderLogger.debug?.(`[CLEANUP] Unlocked class ${className} before deletion`);
+        }
+      } catch (unlockError: any) {
+        // Log but continue - lock might be stale
+        if (debugEnabled) {
+          builderLogger.warn?.(`[CLEANUP] Failed to unlock class ${className}: ${unlockError.message}`);
+        }
+      }
+    }
+
+    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
     try {
       await deleteObject(connection, {
         object_name: className,
         object_type: 'CLAS/OC',
       });
-    } catch (error) {
-      // Ignore all errors (404, locked, etc.)
+      if (debugEnabled) {
+        builderLogger.debug?.(`[CLEANUP] Successfully deleted class ${className}`);
+      }
+    } catch (error: any) {
+      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
+      if (debugEnabled) {
+        const errorMsg = error.message || '';
+        const errorData = error.response?.data || '';
+        builderLogger.warn?.(`[CLEANUP] Failed to delete class ${className}: ${errorMsg} ${errorData}`);
+      }
     }
 
     return { success: true };

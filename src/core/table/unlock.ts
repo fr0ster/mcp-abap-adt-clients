@@ -5,9 +5,11 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock the table after DDL content is added
+ * Must use same session and lock handle from lock operation
  */
 export async function unlockTable(
   connection: AbapConnection,
@@ -17,21 +19,7 @@ export async function unlockTable(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const fullUrl = `${baseUrl}${url}`;
-
-  const headers: Record<string, string> = {
-    'User-Agent': 'mcp-abap-adt/1.1.0',
-    'X-sap-adt-profiling': 'server-time'
-  };
-
-  return connection.makeAdtRequest({
-    url: fullUrl,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    data: '',
-    headers
-  });
+  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
 }
 
 /**
