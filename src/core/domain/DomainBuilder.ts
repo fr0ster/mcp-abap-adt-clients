@@ -44,6 +44,7 @@ import { activateDomain } from './activation';
 import { FixedValue } from './types';
 import { validateObjectName, ValidationResult } from '../shared/validation';
 import { getSystemInformation } from '../shared/systemInfo';
+import { getDomain } from './read';
 
 export interface DomainBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -65,6 +66,9 @@ export interface DomainBuilderConfig {
   sign_exists?: boolean;
   value_table?: string;
   fixed_values?: FixedValue[];
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface DomainBuilderState {
@@ -75,6 +79,7 @@ export interface DomainBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -251,6 +256,12 @@ export class DomainBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Domain locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -415,6 +426,24 @@ export class DomainBuilder {
     }
   }
 
+  async read(): Promise<this> {
+    try {
+      this.logger.info?.('Reading domain:', this.config.domainName);
+      const result = await getDomain(this.connection, this.config.domainName);
+      this.state.readResult = result;
+      this.logger.info?.('Domain read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -470,6 +499,10 @@ export class DomainBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

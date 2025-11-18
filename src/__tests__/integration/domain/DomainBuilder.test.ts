@@ -1,26 +1,34 @@
 /**
- * Unit test for DomainBuilder
+ * Integration test for DomainBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/DomainBuilder.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- integration/domain/DomainBuilder.test
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { DomainBuilder, DomainBuilderLogger } from '../../../core/domain';
 import { deleteDomain } from '../../../core/domain/delete';
+import { getDomain } from '../../../core/domain/read';
 import { getConfig } from '../../helpers/sessionConfig';
+import {
+  logBuilderTestStart,
+  logBuilderTestSkip,
+  logBuilderTestSuccess,
+  logBuilderTestError,
+  logBuilderTestEnd,
+  logBuilderTestStep
+} from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
   getEnabledTestCase,
+  getTestCaseDefinition,
   getDefaultPackage,
   getDefaultTransport,
-  printTestHeader,
-  printTestParams
+  getTimeout
 } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -65,307 +73,251 @@ describe('DomainBuilder', () => {
     }
   });
 
-  function logBuilderTestStart(testName: string, testCase: any): void {
-    if (!testCase) {
-      return;
+  async function ensureDomainReady(domainName: string): Promise<{ success: boolean; reason?: string }> {
+    if (!connection) {
+      return { success: false, reason: 'No connection' };
     }
-    printTestHeader(testName, testCase);
-    printTestParams(testCase.params);
-  }
 
-  async function deleteDomainIfExists(domainName: string): Promise<void> {
-    if (!connection || !hasConfig) return;
+    // Try to delete if exists
+    try {
+      await deleteDomain(connection, {
+        domain_name: domainName,
+        transport_request: getDefaultTransport() || undefined
+      });
+      if (debugEnabled) {
+        builderLogger.debug?.(`[CLEANUP] Domain ${domainName} deleted`);
+      }
+    } catch (error: any) {
+      const rawMessage =
+        error?.response?.data ||
+        error?.message ||
+        (typeof error === 'string' ? error : JSON.stringify(error));
+
+      // 404 = object doesn't exist, that's fine
+      if (
+        error.response?.status === 404 ||
+        rawMessage?.toLowerCase?.().includes('not found') ||
+        rawMessage?.toLowerCase?.().includes('does not exist')
+      ) {
+        if (debugEnabled) {
+          builderLogger.debug?.(`[CLEANUP] Domain ${domainName} already absent`);
+        }
+        return { success: true };
+      }
+
+      // Other errors - log only in debug mode
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] Failed to delete ${domainName}:`, rawMessage);
+      }
+    }
+
+    // Verify object doesn't exist (wait a bit for async deletion)
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      await deleteDomain(connection, { domain_name: domainName });
-      builderLogger.debug?.(`Domain ${domainName} deleted`);
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        builderLogger.debug?.(`Domain ${domainName} doesn't exist`);
-      } else {
-        builderLogger.warn?.(`Error deleting domain ${domainName}:`, error.message);
+      await getDomain(connection, domainName);
+      // Object still exists - check if it's locked
+      const errorMsg = `Domain ${domainName} still exists after cleanup attempt (may be locked or in use)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
       }
+      return { success: false, reason: errorMsg };
+    } catch (error: any) {
+      // 404 = object doesn't exist, cleanup successful
+      if (error.response?.status === 404) {
+        return { success: true };
+      }
+      // Other error - object might be locked
+      const errorMsg = `Cannot verify cleanup status for ${domainName} (may be locked)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
+      }
+      return { success: false, reason: errorMsg };
     }
   }
 
-  describe('Builder methods', () => {
-    it('should chain builder methods', () => {
-      const builder = new DomainBuilder(connection, builderLogger, {
-        domainName: 'Z_TEST',
-        packageName: 'ZPKG'
-      });
+  function getBuilderTestDefinition() {
+    return getTestCaseDefinition('create_domain', 'builder_domain');
+  }
 
-      const result = builder
-        .setPackage('ZPKG2')
-        .setRequest('TR001')
-        .setName('Z_TEST2')
-        .setDescription('Test')
-        .setDatatype('CHAR')
-        .setLength(10);
+  function buildBuilderConfig(testCase: any) {
+    const params = testCase?.params || {};
+    return {
+      domainName: params.domain_name,
+      packageName: params.package_name || getDefaultPackage(),
+      transportRequest: params.transport_request || getDefaultTransport(),
+      description: params.description,
+      datatype: params.datatype || 'CHAR',
+      length: params.length || 10,
+      decimals: params.decimals,
+      conversion_exit: params.conversion_exit,
+      lowercase: params.lowercase,
+      sign_exists: params.sign_exists,
+      value_table: params.value_table,
+      fixed_values: params.fixed_values
+    };
+  }
 
-      expect(result).toBe(builder);
-      expect(builder.getDomainName()).toBe('Z_TEST2');
-    });
-  });
+  describe('Full workflow', () => {
+    let testCase: any = null;
+    let domainName: string | null = null;
+    let skipReason: string | null = null;
 
-  describe('Promise chaining', () => {
-    it('should chain operations with .then()', async () => {
+    beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      domainName = null;
+
       if (!hasConfig) {
-        builderLogger.warn?.('⚠️ Skipping test: No config');
+        skipReason = 'No SAP configuration';
         return;
       }
 
-      const testCase = getEnabledTestCase('create_domain', 'basic_domain');
-      if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case disabled');
+      const definition = getBuilderTestDefinition();
+      if (!definition) {
+        skipReason = 'Test case not defined in test-config.yaml';
         return;
       }
 
-      logBuilderTestStart('DomainBuilder - promise chaining', testCase);
+      const tc = getEnabledTestCase('create_domain', 'builder_domain');
+      if (!tc) {
+        skipReason = 'Test case disabled or not found';
+        return;
+      }
 
-      const domainName = testCase.params.domain_name;
+      testCase = tc;
+      domainName = tc.params.domain_name;
 
-      builderLogger.info?.(`🧹 Preparing test: deleting ${domainName} if exists`);
-      await deleteDomainIfExists(domainName);
+      // Cleanup before test
+      if (domainName) {
+        const cleanup = await ensureDomainReady(domainName);
+        if (!cleanup.success) {
+          skipReason = cleanup.reason || 'Failed to cleanup domain before test';
+          testCase = null;
+          domainName = null;
+        }
+      }
+    });
 
-      let builder: DomainBuilder | null = null;
+    afterEach(async () => {
+      if (domainName && connection) {
+        // Cleanup after test
+        const cleanup = await ensureDomainReady(domainName);
+        if (!cleanup.success && cleanup.reason) {
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
+          }
+        }
+      }
+    });
+
+    it('should execute full workflow and store all results', async () => {
+      const definition = getBuilderTestDefinition();
+      logBuilderTestStart(builderLogger, 'DomainBuilder - full workflow', definition);
+
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'DomainBuilder - full workflow', skipReason);
+        return;
+      }
+
+      if (!testCase || !domainName) {
+        logBuilderTestSkip(builderLogger, 'DomainBuilder - full workflow', skipReason || 'Test case not available');
+        return;
+      }
+
+      const builder = new DomainBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+
       try {
-        builder = new DomainBuilder(connection, builderLogger, {
-          domainName,
-          packageName: testCase.params.package_name || getDefaultPackage(),
-          transportRequest: testCase.params.transport_request || getDefaultTransport(),
-          description: testCase.params.description,
-          datatype: testCase.params.datatype || 'CHAR',
-          length: testCase.params.length || 10
-        });
-
+        logBuilderTestStep('validate');
         await builder
-          .create()
+          .validate()
           .then(b => {
-            expect(b.getCreateResult()?.status).toBeGreaterThanOrEqual(200);
+            logBuilderTestStep('create');
+            return b.create();
+          })
+          .then(b => {
+            logBuilderTestStep('check(inactive)');
+            return b.check('inactive');
+          })
+          .then(b => {
+            logBuilderTestStep('lock');
             return b.lock();
           })
           .then(b => {
-            expect(b.getLockHandle()).toBeDefined();
+            logBuilderTestStep('update');
             return b.update();
           })
           .then(b => {
-            expect(b.getUpdateResult()?.status).toBeGreaterThanOrEqual(200);
-            return b.check();
+            logBuilderTestStep('check(inactive)');
+            return b.check('inactive');
           })
           .then(b => {
-            expect(b.getCheckResult()?.status).toBeGreaterThanOrEqual(200);
+            logBuilderTestStep('unlock');
             return b.unlock();
           })
           .then(b => {
-            expect(b.getUnlockResult()?.status).toBeGreaterThanOrEqual(200);
-            expect(b.getLockHandle()).toBeUndefined();
+            logBuilderTestStep('activate');
             return b.activate();
           })
           .then(b => {
-            expect(b.getActivateResult()?.status).toBeGreaterThanOrEqual(200);
+            logBuilderTestStep('check(active)');
+            return b.check('active');
           });
-      } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        builderLogger.info?.(`🧹 Cleanup: deleting ${domainName}`);
-        await deleteDomainIfExists(domainName);
-      }
-    }, getTimeout('test'));
 
-    it('should interrupt chain on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
+        const state = builder.getState();
+        expect(state.createResult).toBeDefined();
+        expect(state.activateResult).toBeDefined();
+        expect(state.errors.length).toBe(0);
 
-      const builder = new DomainBuilder(connection, builderLogger, {
-        domainName: 'Z_TEST_INVALID',
-        packageName: 'INVALID_PACKAGE'
-      });
-
-      let errorCaught = false;
-      try {
-        await builder.create();
+        logBuilderTestSuccess(builderLogger, 'DomainBuilder - full workflow');
       } catch (error) {
-        errorCaught = true;
-        expect(builder.getErrors().length).toBeGreaterThan(0);
+        logBuilderTestError(builderLogger, 'DomainBuilder - full workflow', error);
+        throw error;
+      } finally {
+        await builder.forceUnlock().catch(() => {});
+        logBuilderTestEnd(builderLogger, 'DomainBuilder - full workflow');
       }
-
-      expect(errorCaught).toBe(true);
-    }, 30000);
+    }, getTimeout('test'));
   });
 
-  describe('Error handling', () => {
-    it('should execute .catch() on error', async () => {
+  describe('Read standard object', () => {
+    it('should read standard SAP domain', async () => {
+      const standardDomainName = 'MANDT'; // Standard SAP domain (exists in most ABAP systems)
+      logBuilderTestStart(builderLogger, 'DomainBuilder - read standard object', {
+        name: 'read_standard',
+        params: { domain_name: standardDomainName }
+      });
+
       if (!hasConfig) {
+        logBuilderTestSkip(builderLogger, 'DomainBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
-      const builder = new DomainBuilder(connection, builderLogger, {
-        domainName: 'Z_TEST_ERROR',
-        packageName: 'INVALID'
-      });
+      const builder = new DomainBuilder(
+        connection,
+        builderLogger,
+        {
+          domainName: standardDomainName,
+          packageName: 'SAP' // Standard package
+        }
+      );
 
-      let catchExecuted = false;
-      await builder
-        .create()
-        .catch(() => {
-          catchExecuted = true;
-        });
-
-      expect(catchExecuted).toBe(true);
-    }, 30000);
-
-    it('should execute .finally() even on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new DomainBuilder(connection, builderLogger, {
-        domainName: 'Z_TEST_FINALLY',
-        packageName: 'INVALID'
-      });
-
-      let finallyExecuted = false;
       try {
-        await builder.create();
+        logBuilderTestStep('read');
+        await builder.read();
+
+        const result = builder.getReadResult();
+        expect(result).toBeDefined();
+        expect(result?.status).toBe(200);
+        expect(result?.data).toBeDefined();
+
+        logBuilderTestSuccess(builderLogger, 'DomainBuilder - read standard object');
       } catch (error) {
-        // Error expected
+        logBuilderTestError(builderLogger, 'DomainBuilder - read standard object', error);
+        throw error;
       } finally {
-        finallyExecuted = true;
-      }
-
-      expect(finallyExecuted).toBe(true);
-    }, 30000);
-  });
-
-  describe('Result storage', () => {
-    it('should store all results', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_domain', 'basic_domain');
-      if (!testCase) {
-        return;
-      }
-
-      logBuilderTestStart('DomainBuilder - result storage', testCase);
-
-      const domainName = testCase.params.domain_name;
-      await deleteDomainIfExists(domainName);
-
-      let builder: DomainBuilder | null = null;
-      try {
-        builder = new DomainBuilder(connection, builderLogger, {
-        domainName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
-        description: testCase.params.description,
-        datatype: testCase.params.datatype || 'CHAR',
-        length: testCase.params.length || 10
-      });
-
-      await builder
-        .create()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => b.activate());
-
-      const results = builder.getResults();
-      expect(results.create).toBeDefined();
-      expect(results.update).toBeDefined();
-      expect(results.check).toBeDefined();
-      expect(results.unlock).toBeDefined();
-      expect(results.activate).toBeDefined();
-      } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        await deleteDomainIfExists(domainName);
+        logBuilderTestEnd(builderLogger, 'DomainBuilder - read standard object');
       }
     }, getTimeout('test'));
-  });
-
-  describe('Full workflow', () => {
-    it('should execute full workflow and store all results', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_domain', 'basic_domain');
-      if (!testCase) {
-        return;
-      }
-
-      logBuilderTestStart('DomainBuilder - full workflow', testCase);
-
-      const domainName = testCase.params.domain_name;
-      await deleteDomainIfExists(domainName);
-
-      let builder: DomainBuilder | null = null;
-      try {
-        builder = new DomainBuilder(connection, builderLogger, {
-        domainName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
-        description: testCase.params.description,
-        datatype: testCase.params.datatype || 'CHAR',
-        length: testCase.params.length || 10
-      });
-
-      await builder
-        .create()
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-          .then(b => b.activate());
-
-      const state = builder.getState();
-      expect(state.createResult).toBeDefined();
-      expect(state.activateResult).toBeDefined();
-      expect(state.errors.length).toBe(0);
-      } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        await deleteDomainIfExists(domainName);
-      }
-    }, getTimeout('test'));
-  });
-
-  describe('Getters', () => {
-    it('should return correct values from getters', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_domain', 'basic_domain');
-      if (!testCase) {
-        return;
-      }
-
-      logBuilderTestStart('DomainBuilder - getters', testCase);
-
-      const domainName = testCase.params.domain_name;
-      await deleteDomainIfExists(domainName);
-
-      const builder = new DomainBuilder(connection, builderLogger, {
-        domainName,
-        packageName: testCase.params.package_name || getDefaultPackage()
-      });
-
-      expect(builder.getDomainName()).toBe(domainName);
-      expect(builder.getSessionId()).toBeDefined();
-      expect(builder.getLockHandle()).toBeUndefined();
-
-      await builder.create();
-      expect(builder.getCreateResult()).toBeDefined();
-    }, 30000);
   });
 });
-

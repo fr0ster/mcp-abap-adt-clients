@@ -15,12 +15,13 @@ import { generateSessionId } from '../../utils/sessionUtils';
 import { validateFunctionModuleName } from './validation';
 import { createFunctionModule } from './create';
 import { lockFunctionModule } from './lock';
-import { updateFunctionModuleSource } from './update';
+import { updateFunctionModuleSource, updateFunctionModuleSourceInternal } from './update';
 import { CreateFunctionModuleParams, UpdateFunctionModuleSourceParams } from './types';
 import { ValidationResult } from '../shared/validation';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
+import { getFunctionSource } from './read';
 
 export interface FunctionModuleBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -36,6 +37,9 @@ export interface FunctionModuleBuilderConfig {
   transportRequest?: string;
   description?: string;
   sourceCode: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface FunctionModuleBuilderState {
@@ -46,6 +50,7 @@ export interface FunctionModuleBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -171,6 +176,12 @@ export class FunctionModuleBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Function module locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -194,13 +205,15 @@ export class FunctionModuleBuilder {
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
       this.logger.info?.('Updating function module source:', this.config.functionModuleName);
-      const params: UpdateFunctionModuleSourceParams = {
-        function_group_name: this.config.functionGroupName,
-        function_module_name: this.config.functionModuleName,
-        source_code: code,
-        activate: false // Don't activate in low-level function
-      };
-      const result = await updateFunctionModuleSource(this.connection, params);
+      const result = await updateFunctionModuleSourceInternal(
+        this.connection,
+        this.config.functionGroupName,
+        this.config.functionModuleName,
+        this.lockHandle,
+        code,
+        this.sessionId,
+        this.config.transportRequest
+      );
       this.state.updateResult = result;
       this.logger.info?.('Function module updated successfully:', result.status);
       return this;
@@ -290,6 +303,29 @@ export class FunctionModuleBuilder {
     }
   }
 
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+    try {
+      this.logger.info?.('Reading function module:', this.config.functionModuleName);
+      const result = await getFunctionSource(
+        this.connection,
+        this.config.functionModuleName,
+        this.config.functionGroupName,
+        version
+      );
+      this.state.readResult = result;
+      this.logger.info?.('Function module read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -354,6 +390,10 @@ export class FunctionModuleBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

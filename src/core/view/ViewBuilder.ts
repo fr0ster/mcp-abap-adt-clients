@@ -41,6 +41,7 @@ import { activateDDLS } from './activation';
 import { validateViewName } from './validation';
 import { CreateViewParams, UpdateViewSourceParams } from './types';
 import { ValidationResult } from '../shared/validation';
+import { getViewSource } from './read';
 
 export interface ViewBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -55,6 +56,9 @@ export interface ViewBuilderConfig {
   transportRequest?: string;
   description?: string;
   ddlSource?: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface ViewBuilderState {
@@ -65,6 +69,7 @@ export interface ViewBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -187,6 +192,12 @@ export class ViewBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('View locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -302,6 +313,24 @@ export class ViewBuilder {
     }
   }
 
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+    try {
+      this.logger.info?.('Reading view:', this.config.viewName);
+      const result = await getViewSource(this.connection, this.config.viewName);
+      this.state.readResult = result;
+      this.logger.info?.('View read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error;
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -361,6 +390,10 @@ export class ViewBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

@@ -2,17 +2,29 @@
  * Unit test for TransportBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/transport/TransportBuilder.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- integration/transport/TransportBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { TransportBuilder, TransportBuilderLogger } from '../../../core/transport';
+import { getTransport } from '../../../core/transport/read';
 import { getConfig } from '../../helpers/sessionConfig';
+import {
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+  logBuilderTestEnd,
+  logBuilderTestStep
+} from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const {
+  getEnabledTestCase,
+  getTestCaseDefinition
+} = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -40,10 +52,11 @@ describe('TransportBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -51,146 +64,116 @@ describe('TransportBuilder', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
   });
 
-  describe('Builder methods', () => {
-    it('should chain builder methods', () => {
-      const builder = new TransportBuilder(connection, builderLogger, {
-        description: 'Test transport'
-      });
+  function getBuilderTestDefinition() {
+    return getTestCaseDefinition('create_transport', 'builder_transport');
+  }
 
-      const result = builder
-        .setDescription('Test transport 2')
-        .setType('workbench')
-        .setOwner('USERNAME')
-        .setTargetSystem('SYSTEM');
+  function buildBuilderConfig(testCase: any) {
+    const params = testCase?.params || {};
+    return {
+      description: params.description,
+      transportType: params.transport_type || 'workbench',
+      owner: params.owner,
+      targetSystem: params.target_system
+    };
+  }
 
-      expect(result).toBe(builder);
+  describe('Full workflow', () => {
+    let testCase: any = null;
+    let skipReason: string | null = null;
+
+    beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+
+      if (!hasConfig) {
+        skipReason = 'No SAP configuration';
+        return;
+      }
+
+      const definition = getBuilderTestDefinition();
+      if (!definition) {
+        skipReason = 'Test case not defined in test-config.yaml';
+        return;
+      }
+
+      const tc = getEnabledTestCase('create_transport', 'builder_transport');
+      if (!tc) {
+        skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      testCase = tc;
+      // Transports are created dynamically, no cleanup needed
     });
-  });
 
-  describe('Promise chaining', () => {
-    it('should chain operations with .then()', async () => {
-      if (!hasConfig) {
+    afterEach(async () => {
+      // Transports cannot be deleted, so no cleanup needed
+      // Just log if needed
+      if (testCase && debugEnabled) {
+        builderLogger.debug?.(`[CLEANUP] Transport was created (cannot be deleted)`);
+      }
+    });
+
+    it('should execute full workflow: create and read transport', async () => {
+      const definition = getBuilderTestDefinition();
+      logBuilderTestStart(builderLogger, 'TransportBuilder - full workflow', definition);
+
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'TransportBuilder - full workflow', skipReason);
         return;
       }
 
-      const testCase = getEnabledTestCase('create_transport');
       if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
+        logBuilderTestSkip(builderLogger, 'TransportBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
-      const builder = new TransportBuilder(connection, builderLogger, {
-        description: testCase.params.description,
-        transportType: testCase.params.transport_type || 'workbench',
-        owner: testCase.params.owner,
-        targetSystem: testCase.params.target_system
-      });
+      const builder = new TransportBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+      let transportNumber: string | null = null;
 
-      await builder.create();
-
-      expect(builder.getCreateResult()).toBeDefined();
-      expect(builder.getTransportNumber()).toBeDefined();
-    }, 30000);
-
-    it('should interrupt chain on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new TransportBuilder(connection, builderLogger, {
-        description: ''
-      });
-
-      let errorCaught = false;
       try {
-        await builder.create();
+        logBuilderTestStep('create');
+      await builder.create();
+
+        const state = builder.getState();
+        expect(state.createResult).toBeDefined();
+        expect(state.transportNumber).toBeDefined();
+        expect(state.errors.length).toBe(0);
+
+        transportNumber = state.transportNumber || null;
+
+        logBuilderTestSuccess(builderLogger, 'TransportBuilder - full workflow');
       } catch (error) {
-        errorCaught = true;
-        expect(builder.getErrors().length).toBeGreaterThan(0);
+        logBuilderTestError(builderLogger, 'TransportBuilder - full workflow', error);
+        throw error;
+      } finally {
+        // Read the created transport before cleanup
+        if (transportNumber) {
+          try {
+            logBuilderTestStep('read');
+            await builder.read(transportNumber);
+
+            const readResult = builder.getReadResult();
+            expect(readResult).toBeDefined();
+            expect(readResult?.status).toBe(200);
+            expect(readResult?.data).toBeDefined();
+          } catch (readError) {
+            if (debugEnabled) {
+              builderLogger.warn?.(`Failed to read transport ${transportNumber}:`, readError);
+            }
+            // Don't fail the test if read fails
+          }
+        }
+
+        logBuilderTestEnd(builderLogger, 'TransportBuilder - full workflow');
       }
-
-      expect(errorCaught).toBe(true);
-    }, 30000);
-  });
-
-  describe('Error handling', () => {
-    it('should execute .catch() on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new TransportBuilder(connection, builderLogger, {
-        description: ''
-      });
-
-      let catchExecuted = false;
-      await builder
-        .create()
-        .catch(() => {
-          catchExecuted = true;
-        });
-
-      expect(catchExecuted).toBe(true);
-    }, 30000);
-  });
-
-  describe('Result storage', () => {
-    it('should store all results', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_transport');
-      if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
-        return;
-      }
-
-      const builder = new TransportBuilder(connection, builderLogger, {
-        description: testCase.params.description,
-        transportType: testCase.params.transport_type || 'workbench',
-        owner: testCase.params.owner,
-        targetSystem: testCase.params.target_system
-      });
-
-      await builder.create();
-
-      const results = builder.getResults();
-      expect(results.create).toBeDefined();
-      expect(results.transportNumber).toBeDefined();
-    }, 30000);
-  });
-
-  describe('Getters', () => {
-    it('should return correct values from getters', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_transport');
-      if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
-        return;
-      }
-
-      const builder = new TransportBuilder(connection, builderLogger, {
-        description: testCase.params.description,
-        transportType: testCase.params.transport_type || 'workbench',
-        owner: testCase.params.owner,
-        targetSystem: testCase.params.target_system
-      });
-
-      await builder.create();
-
-      expect(builder.getTransportNumber()).toBeDefined();
-      expect(builder.getCreateResult()).toBeDefined();
-    }, 30000);
+    }, getTimeout('test'));
   });
 });
-

@@ -20,6 +20,7 @@ import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
+import { getFunctionGroup } from './read';
 
 export interface FunctionGroupBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -33,6 +34,9 @@ export interface FunctionGroupBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   description?: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface FunctionGroupBuilderState {
@@ -42,6 +46,7 @@ export interface FunctionGroupBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -152,6 +157,12 @@ export class FunctionGroupBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Function group locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -195,15 +206,16 @@ export class FunctionGroupBuilder {
         throw new Error('Function group is not locked. Call lock() first.');
       }
       this.logger.info?.('Unlocking function group:', this.config.functionGroupName);
-      await unlockFunctionGroup(
+      const result = await unlockFunctionGroup(
         this.connection,
         this.config.functionGroupName,
         this.lockHandle,
         this.sessionId
       );
+      this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.logger.info?.('Function group unlocked successfully');
+      this.logger.info?.('Function group unlocked successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -233,6 +245,24 @@ export class FunctionGroupBuilder {
         timestamp: new Date()
       });
       this.logger.error?.('Activate failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async read(): Promise<this> {
+    try {
+      this.logger.info?.('Reading function group:', this.config.functionGroupName);
+      const result = await getFunctionGroup(this.connection, this.config.functionGroupName);
+      this.state.readResult = result;
+      this.logger.info?.('Function group read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -292,6 +322,10 @@ export class FunctionGroupBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

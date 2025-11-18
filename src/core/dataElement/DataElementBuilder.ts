@@ -44,6 +44,9 @@ export interface DataElementBuilderConfig {
   headingLabel?: string;
   typeKind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
   typeName?: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface DataElementBuilderState {
@@ -289,6 +292,12 @@ export class DataElementBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Data element locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {

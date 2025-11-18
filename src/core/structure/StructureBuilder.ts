@@ -39,9 +39,9 @@ import { checkStructure } from './check';
 import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
 import { validateStructureName } from './validation';
-import { StructureField, StructureInclude, CreateStructureParams } from './types';
-import { UpdateStructureParams } from './update';
+import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams } from './types';
 import { ValidationResult } from '../shared/validation';
+import { getStructureSource } from './read';
 
 export interface StructureBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -55,8 +55,13 @@ export interface StructureBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   description?: string;
+  ddlCode?: string; // DDL SQL source code for structure (required for create operation)
+  // Legacy fields (deprecated, use ddlCode instead)
   fields?: StructureField[];
   includes?: StructureInclude[];
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface StructureBuilderState {
@@ -67,6 +72,7 @@ export interface StructureBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -113,6 +119,12 @@ export class StructureBuilder {
 
   setDescription(description: string): this {
     this.config.description = description;
+    return this;
+  }
+
+  setDdlCode(ddlCode: string): this {
+    this.config.ddlCode = ddlCode;
+    this.logger.debug?.('DDL code set');
     return this;
   }
 
@@ -175,8 +187,8 @@ export class StructureBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      if (!this.config.fields || this.config.fields.length === 0) {
-        throw new Error('At least one field is required');
+      if (!this.config.ddlCode) {
+        throw new Error('DDL code is required');
       }
       this.logger.info?.('Creating structure:', this.config.structureName);
       const params: CreateStructureParams = {
@@ -184,8 +196,7 @@ export class StructureBuilder {
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
         description: this.config.description,
-        fields: this.config.fields,
-        includes: this.config.includes
+        ddl_code: this.config.ddlCode
       };
       const result = await createStructure(this.connection, params);
       this.state.createResult = result;
@@ -212,6 +223,12 @@ export class StructureBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Structure locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -225,25 +242,20 @@ export class StructureBuilder {
     }
   }
 
-  async update(): Promise<this> {
+  async update(ddlCode?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
         throw new Error('Structure must be locked before update. Call lock() first.');
       }
-      if (!this.config.packageName) {
-        throw new Error('Package name is required');
-      }
-      if (!this.config.fields || this.config.fields.length === 0) {
-        throw new Error('At least one field is required');
+      const code = ddlCode || this.config.ddlCode;
+      if (!code) {
+        throw new Error('DDL code is required. Use setDdlCode() or pass as parameter.');
       }
       this.logger.info?.('Updating structure:', this.config.structureName);
       const params: UpdateStructureParams = {
         structure_name: this.config.structureName,
-        package_name: this.config.packageName,
-        transport_request: this.config.transportRequest,
-        description: this.config.description,
-        fields: this.config.fields,
-        includes: this.config.includes
+        ddl_code: code,
+        transport_request: this.config.transportRequest
       };
       const result = await updateStructure(
         this.connection,
@@ -338,6 +350,24 @@ export class StructureBuilder {
     }
   }
 
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+    try {
+      this.logger.info?.('Reading structure:', this.config.structureName);
+      const result = await getStructureSource(this.connection, this.config.structureName);
+      this.state.readResult = result;
+      this.logger.info?.('Structure read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error;
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -397,6 +427,10 @@ export class StructureBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

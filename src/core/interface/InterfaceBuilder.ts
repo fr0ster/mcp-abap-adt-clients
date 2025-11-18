@@ -21,6 +21,7 @@ import { ValidationResult } from '../shared/validation';
 import { checkInterface } from './check';
 import { unlockInterface } from './unlock';
 import { activateInterface } from './activation';
+import { getInterfaceSource } from './read';
 
 export interface InterfaceBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -35,6 +36,9 @@ export interface InterfaceBuilderConfig {
   transportRequest?: string;
   description?: string;
   sourceCode?: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface InterfaceBuilderState {
@@ -45,6 +49,7 @@ export interface InterfaceBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -164,6 +169,12 @@ export class InterfaceBuilder {
       );
       this.lockHandle = lockData.lockHandle;
       this.state.lockHandle = lockData.lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockData.lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Interface locked, handle:', lockData.lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -280,6 +291,24 @@ export class InterfaceBuilder {
     }
   }
 
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+    try {
+      this.logger.info?.('Reading interface:', this.config.interfaceName);
+      const result = await getInterfaceSource(this.connection, this.config.interfaceName);
+      this.state.readResult = result;
+      this.logger.info?.('Interface read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -339,6 +368,10 @@ export class InterfaceBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

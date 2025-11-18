@@ -74,3 +74,18 @@ export function cleanupTestLocks(testFile?: string): void {
       });
   }
 }
+
+/**
+ * Create onLock callback for Builder config
+ * This callback will register the lock in persistent storage when Builder.lock() is called
+ */
+export function createOnLockCallback(
+  objectType: LockState['objectType'],
+  objectName: string,
+  functionGroupName?: string,
+  testFile?: string
+): (lockHandle: string, sessionId: string) => void {
+  return (lockHandle: string, sessionId: string) => {
+    registerTestLock(objectType, objectName, sessionId, lockHandle, functionGroupName, testFile);
+  };
+}

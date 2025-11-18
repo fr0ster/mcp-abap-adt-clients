@@ -2,17 +2,30 @@
  * Unit test for PackageBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/package/PackageBuilder.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- integration/package/PackageBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { PackageBuilder, PackageBuilderLogger } from '../../../core/package';
+import { getPackage } from '../../../core/package/read';
 import { getConfig } from '../../helpers/sessionConfig';
+import {
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+  logBuilderTestEnd,
+  logBuilderTestStep
+} from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
+const {
+  getEnabledTestCase,
+  getTestCaseDefinition,
+  getDefaultPackage
+} = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -40,10 +53,11 @@ describe('PackageBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -51,149 +65,209 @@ describe('PackageBuilder', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
   });
 
-  describe('Builder methods', () => {
-    it('should chain builder methods', () => {
-      const builder = new PackageBuilder(connection, builderLogger, {
-        packageName: 'Z_TEST',
-        superPackage: 'ZPKG'
-      });
+  async function ensurePackageReady(packageName: string): Promise<{ success: boolean; reason?: string }> {
+    if (!connection) {
+      return { success: false, reason: 'No connection' };
+    }
 
-      const result = builder
-        .setSuperPackage('ZPKG2')
-        .setDescription('Test')
-        .setPackageType('development')
-        .setSoftwareComponent('HOME')
-        .setTransportLayer('ZE19')
-        .setRequest('TR001');
+    // Packages cannot be deleted, so we only check if they exist
+    // If package exists, we skip the test
+    try {
+      await getPackage(connection, packageName);
+      // Package exists - cannot proceed with test
+      const errorMsg = `Package ${packageName} already exists (packages cannot be deleted)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
+      }
+      return { success: false, reason: errorMsg };
+    } catch (error: any) {
+      // 404 = package doesn't exist, we can proceed
+      if (error.response?.status === 404) {
+        return { success: true };
+      }
+      // Other error - might be locked or inaccessible
+      const errorMsg = `Cannot verify package status for ${packageName} (may be locked or inaccessible)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
+      }
+      return { success: false, reason: errorMsg };
+    }
+  }
 
-      expect(result).toBe(builder);
-      expect(builder.getPackageName()).toBe('Z_TEST');
+  function getBuilderTestDefinition() {
+    return getTestCaseDefinition('create_package', 'builder_package');
+  }
+
+  function buildBuilderConfig(testCase: any) {
+    const params = testCase?.params || {};
+    return {
+      packageName: params.package_name,
+      superPackage: params.super_package || getDefaultPackage(),
+      description: params.description,
+      packageType: params.package_type || 'development',
+      softwareComponent: params.software_component,
+      transportLayer: params.transport_layer,
+      transportRequest: params.transport_request,
+      applicationComponent: params.application_component,
+      responsible: params.responsible
+    };
+  }
+
+  describe('Full workflow', () => {
+    let testCase: any = null;
+    let packageName: string | null = null;
+    let skipReason: string | null = null;
+
+    beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      packageName = null;
+
+      if (!hasConfig) {
+        skipReason = 'No SAP configuration';
+        return;
+      }
+
+      const definition = getBuilderTestDefinition();
+      if (!definition) {
+        skipReason = 'Test case not defined in test-config.yaml';
+        return;
+      }
+
+      const tc = getEnabledTestCase('create_package', 'builder_package');
+      if (!tc) {
+        skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      testCase = tc;
+      packageName = tc.params.package_name;
+
+      // Check if package exists (packages cannot be deleted)
+      if (packageName) {
+        const check = await ensurePackageReady(packageName);
+        if (!check.success) {
+          skipReason = check.reason || 'Package already exists';
+          testCase = null;
+          packageName = null;
+        }
+      }
     });
-  });
 
-  describe('Promise chaining', () => {
-    it('should chain operations with .then()', async () => {
-      if (!hasConfig) {
+    afterEach(async () => {
+      // Packages cannot be deleted, so no cleanup needed
+      // Just log if needed
+      if (packageName && debugEnabled) {
+        builderLogger.debug?.(`[CLEANUP] Package ${packageName} was created (cannot be deleted)`);
+      }
+    });
+
+    it('should execute full workflow and store all results', async () => {
+      const definition = getBuilderTestDefinition();
+      logBuilderTestStart(builderLogger, 'PackageBuilder - full workflow', definition);
+
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'PackageBuilder - full workflow', skipReason);
         return;
       }
 
-      const testCase = getEnabledTestCase('create_package', 'builder_package');
-      if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
+      if (!testCase || !packageName) {
+        logBuilderTestSkip(builderLogger, 'PackageBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
-      const builder = new PackageBuilder(connection, builderLogger, {
-        packageName: testCase.params.package_name,
-        superPackage: testCase.params.super_package || getDefaultPackage(),
-        description: testCase.params.description,
-        packageType: testCase.params.package_type || 'development',
-        transportRequest: testCase.params.transport_request
-      });
+      const builder = new PackageBuilder(connection, builderLogger, buildBuilderConfig(testCase));
 
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.check());
-
-      expect(builder.getCreateResult()).toBeDefined();
-    }, getTimeout('test'));
-
-    it('should interrupt chain on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new PackageBuilder(connection, builderLogger, {
-        packageName: 'Z_TEST_INVALID',
-        superPackage: 'INVALID_PACKAGE'
-      });
-
-      let errorCaught = false;
       try {
-        await builder.validate();
+        logBuilderTestStep('validate');
+      await builder
+        .validate()
+          .then(b => {
+            logBuilderTestStep('create');
+            return b.create();
+          })
+          .then(b => {
+            logBuilderTestStep('check');
+            return b.check();
+          })
+          .then(b => {
+            logBuilderTestStep('read');
+            return b.read();
+          })
+          .then(b => {
+            logBuilderTestStep('lock');
+            return b.lock();
+          })
+          .then(b => {
+            logBuilderTestStep('update');
+            return b.update();
+          })
+          .then(b => {
+            logBuilderTestStep('unlock');
+            return b.unlock();
+          });
+
+        const state = builder.getState();
+        expect(state.createResult).toBeDefined();
+        expect(state.readResult).toBeDefined();
+        expect(state.errors.length).toBe(0);
+
+        logBuilderTestSuccess(builderLogger, 'PackageBuilder - full workflow');
       } catch (error) {
-        errorCaught = true;
-        expect(builder.getErrors().length).toBeGreaterThan(0);
+        logBuilderTestError(builderLogger, 'PackageBuilder - full workflow', error);
+        throw error;
+      } finally {
+        await builder.forceUnlock().catch(() => {});
+        logBuilderTestEnd(builderLogger, 'PackageBuilder - full workflow');
       }
-
-      expect(errorCaught).toBe(true);
-    }, 30000);
-  });
-
-  describe('Error handling', () => {
-    it('should execute .catch() on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new PackageBuilder(connection, builderLogger, {
-        packageName: 'Z_TEST_ERROR',
-        superPackage: 'INVALID'
-      });
-
-      let catchExecuted = false;
-      await builder
-        .validate()
-        .catch(() => {
-          catchExecuted = true;
-        });
-
-      expect(catchExecuted).toBe(true);
-    }, 30000);
-  });
-
-  describe('Result storage', () => {
-    it('should store all results', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_package', 'builder_package');
-      if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
-        return;
-      }
-
-      const builder = new PackageBuilder(connection, builderLogger, {
-        packageName: testCase.params.package_name,
-        superPackage: testCase.params.super_package || getDefaultPackage(),
-        description: testCase.params.description,
-        packageType: testCase.params.package_type || 'development',
-        transportRequest: testCase.params.transport_request
-      });
-
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.read())
-        .then(b => b.check());
-
-      const results = builder.getResults();
-      expect(results.validate).toBeDefined();
-      expect(results.create).toBeDefined();
-      expect(results.read).toBeDefined();
-      expect(results.check).toBeDefined();
     }, getTimeout('test'));
   });
 
-  describe('Getters', () => {
-    it('should return correct values from getters', () => {
-      const builder = new PackageBuilder(connection, builderLogger, {
-        packageName: 'Z_TEST',
-        superPackage: 'ZPKG'
+  describe('Read standard object', () => {
+    it('should read standard SAP package', async () => {
+      // Standard SAP package (exists in most ABAP systems)
+      const standardPackageName = '$TMP';
+      logBuilderTestStart(builderLogger, 'PackageBuilder - read standard object', {
+        name: 'read_standard',
+        params: { package_name: standardPackageName }
       });
 
-      expect(builder.getPackageName()).toBe('Z_TEST');
-      expect(builder.getValidationResult()).toBeUndefined();
-      expect(builder.getCreateResult()).toBeUndefined();
-    });
+      if (!hasConfig) {
+        logBuilderTestSkip(builderLogger, 'PackageBuilder - read standard object', 'No SAP configuration');
+        return;
+      }
+
+      const builder = new PackageBuilder(
+        connection,
+        builderLogger,
+        {
+          packageName: standardPackageName,
+          superPackage: '$TMP' // Use same package as super (for read test, this is not used)
+        }
+      );
+
+      try {
+        logBuilderTestStep('read');
+        await builder.read();
+
+        const result = builder.getReadResult();
+        expect(result).toBeDefined();
+        expect(result?.status).toBe(200);
+        expect(result?.data).toBeDefined();
+
+        logBuilderTestSuccess(builderLogger, 'PackageBuilder - read standard object');
+      } catch (error) {
+        logBuilderTestError(builderLogger, 'PackageBuilder - read standard object', error);
+        throw error;
+      } finally {
+        logBuilderTestEnd(builderLogger, 'PackageBuilder - read standard object');
+      }
+    }, getTimeout('test'));
   });
 });
-

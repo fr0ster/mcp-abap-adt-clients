@@ -5,13 +5,14 @@
  * - ReadOnlyClient: Read-only operations
  * - CrudClient: Full CRUD operations (extends ReadOnlyClient)
  * - ManagementClient: Activation and syntax checking
- * - ClassBuilder: Fluent API for class operations with Promise chaining
+ * - Builders: Fluent API for object operations with Promise chaining
  *
- * For low-level functions, import from '@mcp-abap-adt/adt-clients/core'
  * @example
  * ```typescript
- * import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
- * import { createClass, lockClass, updateClass } from '@mcp-abap-adt/adt-clients/core';
+ * import { ClassBuilder, DataElementBuilder } from '@mcp-abap-adt/adt-clients';
+ *
+ * const builder = new ClassBuilder(connection, logger, config);
+ * await builder.validate().then(b => b.create()).then(b => b.activate());
  * ```
  */
 

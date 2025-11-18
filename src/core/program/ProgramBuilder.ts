@@ -20,6 +20,7 @@ import { ValidationResult } from '../shared/validation';
 import { checkProgram } from './check';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
+import { getProgramSource } from './read';
 
 export interface ProgramBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -36,6 +37,9 @@ export interface ProgramBuilderConfig {
   programType?: string;
   application?: string;
   sourceCode?: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface ProgramBuilderState {
@@ -46,6 +50,7 @@ export interface ProgramBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -177,6 +182,12 @@ export class ProgramBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Program locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -293,6 +304,24 @@ export class ProgramBuilder {
     }
   }
 
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+    try {
+      this.logger.info?.('Reading program:', this.config.programName);
+      const result = await getProgramSource(this.connection, this.config.programName);
+      this.state.readResult = result;
+      this.logger.info?.('Program read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -352,6 +381,10 @@ export class ProgramBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

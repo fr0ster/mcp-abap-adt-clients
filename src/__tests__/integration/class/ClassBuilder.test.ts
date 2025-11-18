@@ -111,12 +111,12 @@ describe('ClassBuilder', () => {
   }
 
   /**
-   * Delete class if it exists
+   * Ensure class is ready for test (delete if exists)
    * Uses validateClassName to check existence
    */
-  async function deleteClassIfExists(className: string, packageName: string): Promise<void> {
-    if (!connection || !hasConfig) {
-      return;
+  async function ensureClassReady(className: string, packageName: string): Promise<{ success: boolean; reason?: string }> {
+    if (!connection) {
+      return { success: false, reason: 'No connection' };
     }
 
     try {
@@ -127,42 +127,84 @@ describe('ClassBuilder', () => {
 
       if (!validationResult.valid) {
         // Class exists, delete it
-        builderLogger.debug?.(`Class ${className} exists, deleting...`);
+        if (debugEnabled) {
+          builderLogger.debug?.(`[CLEANUP] Class ${className} exists, deleting...`);
+        }
+        try {
         await deleteObject(connection, {
           object_name: className,
           object_type: 'CLAS/OC',
         });
-        builderLogger.debug?.(`Class ${className} deleted`);
+          if (debugEnabled) {
+            builderLogger.debug?.(`[CLEANUP] Class ${className} deleted`);
+          }
+        } catch (deleteError: any) {
+          const errorMsg = `Failed to delete class ${className}: ${deleteError.message}`;
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
+          }
+          return { success: false, reason: errorMsg };
+        }
       } else {
-        builderLogger.debug?.(`Class ${className} doesn't exist`);
+        if (debugEnabled) {
+          builderLogger.debug?.(`[CLEANUP] Class ${className} doesn't exist`);
+        }
+      }
+
+      // Verify class doesn't exist (wait a bit for async deletion)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      try {
+        const verifyResult = await validateClassName(connection, className, packageName);
+        if (!verifyResult.valid) {
+          // Class still exists
+          const errorMsg = `Class ${className} still exists after cleanup attempt (may be locked or in use)`;
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
+          }
+          return { success: false, reason: errorMsg };
+        }
+        return { success: true };
+      } catch (error: any) {
+        const errorMsg = `Cannot verify cleanup status for ${className} (may be locked)`;
+        if (debugEnabled) {
+          builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
+        }
+        return { success: false, reason: errorMsg };
       }
     } catch (error: any) {
-      builderLogger.warn?.(`Error deleting class ${className}:`, error.message);
+      const errorMsg = `Error checking/deleting class ${className}: ${error.message}`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
+    }
+      return { success: false, reason: errorMsg };
     }
   }
 
   describe('Full workflow', () => {
     let testCase: any = null;
     let testClassName: string | null = null;
+    let skipReason: string | null = null;
 
     beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      testClassName = null;
+
       if (!hasConfig) {
-        testCase = null;
-        testClassName = null;
+        skipReason = 'No SAP configuration';
         return;
       }
 
       const definition = getBuilderTestDefinition();
       if (!definition) {
-        testCase = null;
-        testClassName = null;
+        skipReason = 'Test case not defined in test-config.yaml';
         return;
       }
 
       const tc = getEnabledTestCase('create_class', 'builder_class');
       if (!tc) {
-        testCase = null;
-        testClassName = null;
+        skipReason = 'Test case disabled or not found';
         return;
       }
 
@@ -171,14 +213,26 @@ describe('ClassBuilder', () => {
 
       // Cleanup before test
       if (testClassName) {
-        await deleteClassIfExists(testClassName, tc.params.package_name || getDefaultPackage());
+        const packageName = tc.params.package_name || getDefaultPackage();
+        const cleanup = await ensureClassReady(testClassName, packageName);
+        if (!cleanup.success) {
+          skipReason = cleanup.reason || 'Failed to cleanup class before test';
+          testCase = null;
+          testClassName = null;
+        }
       }
     });
 
     afterEach(async () => {
       if (testClassName && connection) {
         // Cleanup after test
-        await deleteClassIfExists(testClassName, testCase?.params.package_name || getDefaultPackage());
+        const packageName = testCase?.params.package_name || getDefaultPackage();
+        const cleanup = await ensureClassReady(testClassName, packageName);
+        if (!cleanup.success && cleanup.reason) {
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
+          }
+        }
       }
     });
 
@@ -186,62 +240,53 @@ describe('ClassBuilder', () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'ClassBuilder - full workflow', definition);
 
-      if (!definition) {
-        logBuilderTestSkip(
-          builderLogger,
-          'ClassBuilder - full workflow',
-          'Test case not defined in test-config.yaml'
-        );
-        return;
-      }
-
-      if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', 'No SAP configuration');
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !testClassName) {
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', 'Test case disabled or not found');
+        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
       const testPackageName = testCase.params.package_name || getDefaultPackage();
       const sourceCode = testCase.params.source_code || `CLASS ${testClassName} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
 
-      const builder = new ClassBuilder(connection, builderLogger, {
-        className: testClassName,
-        packageName: testPackageName,
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
+        const builder = new ClassBuilder(connection, builderLogger, {
+          className: testClassName,
+          packageName: testPackageName,
+          transportRequest: testCase.params.transport_request || getDefaultTransport(),
       }).setCode(sourceCode);
 
       try {
         logBuilderTestStep('validate');
-        await builder
-          .validate()
-          .then(b => {
+      await builder
+        .validate()
+        .then(b => {
             logBuilderTestStep('create');
-            return b.create();
-          })
-          .then(b => {
+          return b.create();
+        })
+        .then(b => {
             logBuilderTestStep('check(inactive)');
             return b.check('inactive');
           })
           .then(b => {
             logBuilderTestStep('lock');
-            return b.lock();
-          })
+          return b.lock();
+        })
           .then(b => {
             logBuilderTestStep('update');
-            return b.update();
-          })
+          return b.update();
+        })
           .then(b => {
             logBuilderTestStep('check(inactive)');
             return b.check('inactive');
-          })
-          .then(b => {
+        })
+        .then(b => {
             logBuilderTestStep('unlock');
-            return b.unlock();
-          })
+          return b.unlock();
+        })
           .then(b => {
             logBuilderTestStep('activate');
             return b.activate();

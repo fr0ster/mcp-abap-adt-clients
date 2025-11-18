@@ -57,20 +57,15 @@ describe('DataElementBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     // Count total tests for progress tracking
     const testCount = 2; // Full workflow + Read standard object
     setTotalTests(testCount);
-  });
 
-  afterAll(() => {
-    resetTestCounter();
-  });
-
-  beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -78,7 +73,8 @@ describe('DataElementBuilder', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
+    resetTestCounter();
     if (connection) {
       connection.reset();
     }
@@ -144,7 +140,7 @@ describe('DataElementBuilder', () => {
         builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
       }
       return { success: false, reason: errorMsg };
-    }
+      }
   }
 
   function getBuilderTestDefinition() {
@@ -175,25 +171,27 @@ describe('DataElementBuilder', () => {
   describe('Full workflow', () => {
     let testCase: any = null;
     let dataElementName: string | null = null;
+    let skipReason: string | null = null;
 
     beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      dataElementName = null;
+
       if (!hasConfig) {
-        testCase = null;
-        dataElementName = null;
+        skipReason = 'No SAP configuration';
         return;
       }
 
       const definition = getBuilderTestDefinition();
       if (!definition) {
-        testCase = null;
-        dataElementName = null;
+        skipReason = 'Test case not defined in test-config.yaml';
         return;
       }
 
       const tc = getEnabledTestCase('create_data_element', 'builder_data_element');
       if (!tc) {
-        testCase = null;
-        dataElementName = null;
+        skipReason = 'Test case disabled or not found';
         return;
       }
 
@@ -202,36 +200,37 @@ describe('DataElementBuilder', () => {
 
       // Cleanup before test
       if (dataElementName) {
-        await ensureDataElementReady(dataElementName);
+        const cleanup = await ensureDataElementReady(dataElementName);
+        if (!cleanup.success) {
+          skipReason = cleanup.reason || 'Failed to cleanup data element before test';
+          testCase = null;
+          dataElementName = null;
+        }
       }
     });
 
     afterEach(async () => {
       if (dataElementName && connection) {
         // Cleanup after test
-        await ensureDataElementReady(dataElementName);
+        const cleanup = await ensureDataElementReady(dataElementName);
+        if (!cleanup.success && cleanup.reason) {
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
+          }
+        }
       }
     });
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'DataElementBuilder - full workflow', definition);
 
-      if (!definition) {
-        logBuilderTestSkip(
-          builderLogger,
-          'DataElementBuilder - full workflow',
-          'Test case not defined in test-config.yaml'
-        );
-        return;
-      }
-
-      if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', 'No SAP configuration');
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !dataElementName) {
-        logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', 'Test case disabled or not found');
+        logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -243,7 +242,7 @@ describe('DataElementBuilder', () => {
 
       try {
         logBuilderTestStep('validate');
-        await builder
+      await builder
           .validate()
           .then(b => {
             logBuilderTestStep('create');
@@ -268,7 +267,7 @@ describe('DataElementBuilder', () => {
           .then(b => {
             logBuilderTestStep('unlock');
             return b.unlock();
-          })
+        })
           .then(b => {
             logBuilderTestStep('activate');
             return b.activate();
@@ -276,12 +275,12 @@ describe('DataElementBuilder', () => {
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('active');
-          });
+        });
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
-        expect(state.errors.length).toBe(0);
+      const state = builder.getState();
+      expect(state.createResult).toBeDefined();
+      expect(state.activateResult).toBeDefined();
+      expect(state.errors.length).toBe(0);
 
         // Log success BEFORE finally block to ensure it's displayed
         logBuilderTestSuccess(builderLogger, 'DataElementBuilder - full workflow');

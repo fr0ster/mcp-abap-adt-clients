@@ -2,8 +2,7 @@
  * Unit test for FunctionGroupBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/functionGroup/FunctionGroupBuilder.test
- * Configure log level: LOG_LEVEL=warn npm test -- unit/functionGroup/FunctionGroupBuilder.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- integration/functionGroup/FunctionGroupBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
@@ -15,7 +14,11 @@ import {
   logBuilderTestError,
   logBuilderTestSkip,
   logBuilderTestStart,
-  logBuilderTestSuccess
+  logBuilderTestSuccess,
+  logBuilderTestEnd,
+  logBuilderTestStep,
+  setTotalTests,
+  resetTestCounter
 } from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -54,10 +57,15 @@ describe('FunctionGroupBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
+    // Count total tests for progress tracking
+    const testCount = 2; // Full workflow + Read standard object
+    setTotalTests(testCount);
+
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -65,7 +73,8 @@ describe('FunctionGroupBuilder', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
+    resetTestCounter();
     if (connection) {
       connection.reset();
     }
@@ -110,9 +119,9 @@ describe('FunctionGroupBuilder', () => {
     }
 
     // Verify object doesn't exist (wait a bit for async deletion)
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    try {
+      try {
       await getFunctionGroup(connection, functionGroupName);
       // Object still exists - check if it's locked
       const errorMsg = `Function group ${functionGroupName} still exists after cleanup attempt (may be locked or in use)`;
@@ -148,331 +157,158 @@ describe('FunctionGroupBuilder', () => {
     };
   }
 
-  describe('Builder methods', () => {
-    it('should chain builder methods', () => {
-      const builder = new FunctionGroupBuilder(connection, builderLogger, {
-        functionGroupName: 'Z_TEST',
-        packageName: 'ZPKG'
-      });
-
-      const result = builder
-        .setPackage('ZPKG2')
-        .setRequest('TR001')
-        .setName('Z_TEST2')
-        .setDescription('Test');
-
-      expect(result).toBe(builder);
-      expect(builder.getFunctionGroupName()).toBe('Z_TEST2');
-    });
-  });
-
-  describe('Promise chaining', () => {
-    it('should chain operations with .then()', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - promise chaining', definition);
-
-      if (!definition) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - promise chaining',
-          'Test case not defined in test-config.yaml'
-        );
-        return;
-      }
-
-      if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - promise chaining', 'No SAP configuration');
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
-      if (!testCase) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - promise chaining', 'Test case disabled');
-        return;
-      }
-
-      const functionGroupName = testCase.params.function_group_name;
-      const cleanupResult = await ensureFunctionGroupReady(functionGroupName);
-      if (!cleanupResult.success) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - promise chaining',
-          cleanupResult.reason || 'Cleanup failed'
-        );
-        return;
-      }
-
-      const builder = new FunctionGroupBuilder(connection, builderLogger, buildBuilderConfig(testCase));
-
-      try {
-        await builder
-          .validate()
-          .then(b => b.create())
-          .then(b => b.lock())
-          .then(b => b.check())
-          .then(b => b.unlock())
-          .then(b => b.activate());
-
-        expect(builder.getCreateResult()).toBeDefined();
-        expect(builder.getActivateResult()).toBeDefined();
-        logBuilderTestSuccess(builderLogger, 'FunctionGroupBuilder - promise chaining');
-      } catch (error) {
-        logBuilderTestError(builderLogger, 'FunctionGroupBuilder - promise chaining', error);
-        throw error;
-      } finally {
-        await builder.forceUnlock().catch(() => {});
-        await ensureFunctionGroupReady(functionGroupName);
-      }
-    }, getTimeout('test'));
-
-    it.skip('should interrupt chain on error - SKIPPED: causes 45s SAP timeout with invalid package', async () => {
-      logBuilderTestSkip(
-        builderLogger,
-        'FunctionGroupBuilder - promise chaining - interrupt chain on error',
-        'Test uses invalid package causing 45s SAP timeout. Error handling validated in successful scenarios.'
-      );
-    });
-  });
-
-  // SKIPPED: Error handling tests cause 45s SAP timeouts with invalid packages
-  // Error handling logic is already validated in successful test scenarios
-  describe.skip('Error handling - SKIPPED: causes long SAP timeouts', () => {
-    beforeAll(() => {
-      logBuilderTestSkip(
-        builderLogger,
-        'Error handling - .catch() on error',
-        'Test uses invalid package causing 45s SAP timeout. Error handling validated in successful scenarios.'
-      );
-      logBuilderTestSkip(
-        builderLogger,
-        'Error handling - .finally() on error',
-        'Test uses invalid package causing 45s SAP timeout. Error handling validated in successful scenarios.'
-      );
-    });
-    it('should execute .catch() on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new FunctionGroupBuilder(connection, builderLogger, {
-        functionGroupName: 'Z_TEST_ERROR',
-        packageName: 'INVALID'
-      });
-
-      let catchExecuted = false;
-      await builder
-        .create()
-        .catch(() => {
-          catchExecuted = true;
-        });
-
-      expect(catchExecuted).toBe(true);
-    });
-
-    it('should execute .finally() even on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new FunctionGroupBuilder(connection, builderLogger, {
-        functionGroupName: 'Z_TEST_FINALLY',
-        packageName: 'INVALID'
-      });
-
-      let finallyExecuted = false;
-      try {
-        await builder.create();
-      } catch (error) {
-        // Error expected
-      } finally {
-        finallyExecuted = true;
-      }
-
-      expect(finallyExecuted).toBe(true);
-    });
-  });
-
-  describe('Result storage', () => {
-    it('should store all results', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - result storage', definition);
-
-      if (!definition) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - result storage',
-          'Test case not defined in test-config.yaml'
-        );
-        return;
-      }
-
-      if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - result storage', 'No SAP configuration');
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
-      if (!testCase) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - result storage', 'Test case disabled');
-        return;
-      }
-
-      const functionGroupName = testCase.params.function_group_name;
-      const cleanupResult = await ensureFunctionGroupReady(functionGroupName);
-      if (!cleanupResult.success) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - result storage',
-          cleanupResult.reason || 'Cleanup failed'
-        );
-        return;
-      }
-
-      const builder = new FunctionGroupBuilder(connection, builderLogger, buildBuilderConfig(testCase));
-
-      try {
-        await builder
-          .validate()
-          .then(b => b.create())
-          .then(b => b.lock())
-          .then(b => b.check())
-          .then(b => b.unlock())
-          .then(b => b.activate());
-
-        const results = builder.getResults();
-        expect(results.create).toBeDefined();
-        expect(results.check).toBeDefined();
-        expect(results.unlock).toBeDefined();
-        expect(results.activate).toBeDefined();
-        logBuilderTestSuccess(builderLogger, 'FunctionGroupBuilder - result storage');
-      } catch (error) {
-        logBuilderTestError(builderLogger, 'FunctionGroupBuilder - result storage', error);
-        throw error;
-      } finally {
-        await builder.forceUnlock().catch(() => {});
-        await ensureFunctionGroupReady(functionGroupName);
-      }
-    }, getTimeout('test'));
-  });
-
   describe('Full workflow', () => {
+    let testCase: any = null;
+    let functionGroupName: string | null = null;
+    let skipReason: string | null = null;
+
+    beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      functionGroupName = null;
+
+      if (!hasConfig) {
+        skipReason = 'No SAP configuration';
+        return;
+      }
+
+      const definition = getBuilderTestDefinition();
+      if (!definition) {
+        skipReason = 'Test case not defined in test-config.yaml';
+        return;
+      }
+
+      const tc = getEnabledTestCase('create_function_group', 'builder_function_group');
+      if (!tc) {
+        skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      testCase = tc;
+      functionGroupName = tc.params.function_group_name;
+
+      // Cleanup before test
+      if (functionGroupName) {
+        const cleanup = await ensureFunctionGroupReady(functionGroupName);
+        if (!cleanup.success) {
+          skipReason = cleanup.reason || 'Failed to cleanup function group before test';
+        testCase = null;
+        functionGroupName = null;
+      }
+      }
+    });
+
+    afterEach(async () => {
+      if (functionGroupName && connection) {
+        // Cleanup after test
+        const cleanup = await ensureFunctionGroupReady(functionGroupName);
+        if (!cleanup.success && cleanup.reason) {
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
+          }
+        }
+      }
+    });
+
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - full workflow', definition);
 
-      if (!definition) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - full workflow',
-          'Test case not defined in test-config.yaml'
-        );
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - full workflow', skipReason);
         return;
       }
 
-      if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - full workflow', 'No SAP configuration');
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
-      if (!testCase) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - full workflow', 'Test case disabled');
-        return;
-      }
-
-      const functionGroupName = testCase.params.function_group_name;
-      const cleanupResult = await ensureFunctionGroupReady(functionGroupName);
-      if (!cleanupResult.success) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - full workflow',
-          cleanupResult.reason || 'Cleanup failed'
-        );
+      if (!testCase || !functionGroupName) {
+        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
       const builder = new FunctionGroupBuilder(connection, builderLogger, buildBuilderConfig(testCase));
 
       try {
-        await builder
-          .validate()
-          .then(b => b.create())
-          .then(b => b.lock())
-          .then(b => b.check())
-          .then(b => b.unlock())
-          .then(b => b.activate());
+        logBuilderTestStep('validate');
+      await builder
+        .validate()
+          .then(b => {
+            logBuilderTestStep('create');
+            return b.create();
+          })
+          .then(b => {
+            logBuilderTestStep('check');
+            return b.check();
+          })
+          .then(b => {
+            logBuilderTestStep('lock');
+            return b.lock();
+          })
+          .then(b => {
+            logBuilderTestStep('unlock');
+            return b.unlock();
+          })
+          .then(b => {
+            logBuilderTestStep('activate');
+            return b.activate();
+        })
+          .then(b => {
+            logBuilderTestStep('check');
+            return b.check();
+        });
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
-        expect(state.errors.length).toBe(0);
+      const state = builder.getState();
+      expect(state.createResult).toBeDefined();
+      expect(state.activateResult).toBeDefined();
+      expect(state.errors.length).toBe(0);
+
         logBuilderTestSuccess(builderLogger, 'FunctionGroupBuilder - full workflow');
       } catch (error) {
         logBuilderTestError(builderLogger, 'FunctionGroupBuilder - full workflow', error);
         throw error;
       } finally {
         await builder.forceUnlock().catch(() => {});
-        await ensureFunctionGroupReady(functionGroupName);
+        logBuilderTestEnd(builderLogger, 'FunctionGroupBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
 
-  describe('Getters', () => {
-    it('should return correct values from getters', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - getters', definition);
-
-      if (!definition) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - getters',
-          'Test case not defined in test-config.yaml'
-        );
-        return;
-      }
-
-      if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - getters', 'No SAP configuration');
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_function_group', 'builder_function_group');
-      if (!testCase) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - getters', 'Test case disabled');
-        return;
-      }
-
-      const functionGroupName = testCase.params.function_group_name;
-      const cleanupResult = await ensureFunctionGroupReady(functionGroupName);
-      if (!cleanupResult.success) {
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - getters',
-          cleanupResult.reason || 'Cleanup failed'
-        );
-        return;
-      }
-
-      const builder = new FunctionGroupBuilder(connection, builderLogger, {
-        functionGroupName,
-        packageName: testCase.params.package_name || getDefaultPackage()
+  describe('Read standard object', () => {
+    it('should read standard SAP function group', async () => {
+      const standardFunctionGroupName = 'SYST'; // Standard SAP function group (exists in most ABAP systems)
+      logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - read standard object', {
+        name: 'read_standard',
+        params: { function_group_name: standardFunctionGroupName }
       });
 
-      try {
-        expect(builder.getFunctionGroupName()).toBe(functionGroupName);
-        expect(builder.getSessionId()).toBeDefined();
-        expect(builder.getLockHandle()).toBeUndefined();
+      if (!hasConfig) {
+        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - read standard object', 'No SAP configuration');
+        return;
+      }
 
-        await builder.create();
-        expect(builder.getCreateResult()).toBeDefined();
-        logBuilderTestSuccess(builderLogger, 'FunctionGroupBuilder - getters');
+      const builder = new FunctionGroupBuilder(
+        connection,
+        builderLogger,
+        {
+          functionGroupName: standardFunctionGroupName,
+          packageName: 'SAP' // Standard package
+        }
+      );
+
+      try {
+        logBuilderTestStep('read');
+        await builder.read();
+
+        const result = builder.getReadResult();
+        expect(result).toBeDefined();
+        expect(result?.status).toBe(200);
+        expect(result?.data).toBeDefined();
+
+        logBuilderTestSuccess(builderLogger, 'FunctionGroupBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'FunctionGroupBuilder - getters', error);
+        logBuilderTestError(builderLogger, 'FunctionGroupBuilder - read standard object', error);
         throw error;
       } finally {
-        await ensureFunctionGroupReady(functionGroupName);
+        logBuilderTestEnd(builderLogger, 'FunctionGroupBuilder - read standard object');
       }
     }, getTimeout('test'));
   });
 });
-

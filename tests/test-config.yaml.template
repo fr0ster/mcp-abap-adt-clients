@@ -1,66 +1,109 @@
 # Test Configuration Template for @mcp-abap-adt/adt-clients
 # Copy this file to test-config.yaml and configure for your environment
-# Tests for ReadOnlyClient, CrudClient, and ManagementClient
+# Builder Tests Configuration
 #
 # Usage:
 #   cp tests/test-config.yaml.template tests/test-config.yaml
 #   # Edit test-config.yaml with your specific values
 #
-# IMPORTANT: Object Naming
-# ========================
-# All object names (classes, domains, function modules, etc.) must be UNIQUE across all tests.
-# Names are used exactly as specified in YAML - no automatic suffix generation.
-#
-# Each test must use a different name to avoid conflicts:
-# - ZCL_TEST_BASIC_CREATE (for create tests)
-# - ZCL_TEST_BASIC_CHECK (for check tests)
-# - ZCL_TEST_BASIC_READ (for read tests)
-# - etc.
-#
-# See tests/TEST_NAMING.md for detailed guidelines.
+# IMPORTANT: Object Naming Convention
+# ===================================
+# All test objects must use the ZADT_BLD_* naming convention:
+# - Classes: ZADT_BLD_CLS01, ZADT_BLD_CLS02, etc.
+# - Domains: ZADT_BLD_DOM01, ZADT_BLD_DOM02, etc.
+# - Data Elements: ZADT_BLD_DTEL01, ZADT_BLD_DTEL02, etc.
+# - Function Modules: Z_ADT_BLD_FM01, Z_ADT_BLD_FM02, etc. (must start with Z_ or Y_)
+# - Function Groups: ZADT_BLD_FGR01, ZADT_BLD_FGR02, etc.
+# - Interfaces: ZADT_BLD_IF01, ZADT_BLD_IF02, etc.
+# - Programs: ZADT_BLD_PROG01, ZADT_BLD_PROG02, etc.
+# - Tables: ZADT_BLD_TAB01, ZADT_BLD_TAB02, etc.
+# - Structures: ZADT_BLD_STRU01, ZADT_BLD_STRU02, etc.
+# - Views: ZADT_BLD_VIEW01, ZADT_BLD_VIEW02, etc.
+# - Packages: ZADT_BLD_PKG01, ZADT_BLD_PKG02, etc.
 #
 # Test settings
 test_settings:
   fail_fast: false
   verbose: true
-  timeout: 30000
+  timeout: 60000  # Global test timeout (60 seconds)
   retry_on_failure: false
   max_retries: 1
-  cleanup_before_test: true   # Clean up test objects before running tests (ensures fresh start)
-  cleanup_after_test: true    # Clean up test objects after tests (keeps SAP system clean)
+  cleanup_after_test: false
+  # Timeouts for different operations (in milliseconds)
+  timeouts:
+    default: 60000
+    create: 60000
+    delay: 3000  # Delay after delete/create operations
+
+# Session persistence configuration
+session_config:
+  # Enable session persistence (saves cookies and CSRF tokens)
+  persist_session: true
+  # Directory for session files (relative to project root)
+  sessions_dir: ".sessions"
+  # Session ID format: {test_name}_{timestamp} or custom
+  session_id_format: "auto"  # "auto" or custom string
+  # Clean up session after test
+  cleanup_session_after_test: false
+
+# Lock persistence configuration
+lock_config:
+  # Directory for lock files (relative to project root)
+  locks_dir: ".locks"
+  # Track locks in persistent storage
+  persist_locks: true
+  # Auto-cleanup locks after test
+  cleanup_locks_after_test: true
 
 # Environment configuration
 environment:
-  default_package: "ZADT_BLD_PKG01"  # Default package for builder workflows
-  # default_transport: ""  # Optional transport request used when not overridden
+  default_package: "ZADT_BLD_PKG01"  # Default package for creating objects (used if not specified in test case)
+  # default_transport: ""  # Default transport request (used if not specified in test case)
 
 # ============================================================================
-# READ-ONLY CLIENT TESTS
+# BUILDER TESTS
 # ============================================================================
 
-# ============================================================================
-# CREATE OPERATIONS (CRUD CLIENT)
-# ============================================================================
+# Create Class
+create_class:
+  test_cases:
+    - name: "builder_class"
+      enabled: false
+      description: "Create test class for ClassBuilder tests"
+      params:
+        class_name: "ZADT_BLD_CLS01"
+        description: "ClassBuilder workflow class"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        superclass: ""
+        final: true
+        source_code: |
+          CLASS ZADT_BLD_CLS01 DEFINITION
+            PUBLIC
+            FINAL
+            CREATE PUBLIC .
+
+            PUBLIC SECTION.
+              METHODS:
+                get_text RETURNING VALUE(rv_text) TYPE string.
+            PROTECTED SECTION.
+            PRIVATE SECTION.
+          ENDCLASS.
+
+          CLASS ZADT_BLD_CLS01 IMPLEMENTATION.
+            METHOD get_text.
+              rv_text = 'Builder Test'.
+            ENDMETHOD.
+          ENDCLASS.
 
 # Create Package
 create_package:
   test_cases:
-    - name: "test_package"
-      enabled: false  # Usually disabled - packages are created manually
-      description: "Create test package"
-      params:
-        package_name: "ZADT_BLD_PKG_NEW"  # ⚠️ UPDATE: Name of the package to create (the object itself)
-        super_package: "ZADT_BLD_SUPER"  # ⚠️ UPDATE: Parent package (package IN WHICH to create this package)
-        description: "Test package created via MCP"
-        package_type: "development"
-        # transport_request: if not specified, uses environment.default_transport
-        # transport_layer: optional, auto-detected if not specified
-        # software_component: optional, auto-detected if not specified
     - name: "builder_package"
       enabled: false
-      description: "Create package using PackageBuilder (separate from create.test.ts)"
+      description: "Package reserved for PackageBuilder tests"
       params:
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
+        package_name: "ZADT_BLD_PKG01"
         super_package: "ZADT_BLD_SUPER"
         description: "PackageBuilder workflow package"
         package_type: "development"
@@ -68,26 +111,14 @@ create_package:
 # Create Domain
 create_domain:
   test_cases:
-    - name: "test_domain"
-      enabled: true
-      description: "Create test domain"
-      params:
-        domain_name: "ZADT_BLD_DOM_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test domain created via MCP"
-        datatype: "CHAR"  # CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
-        length: 10
-        decimals: 0
-        lowercase: false
-        sign_exists: false
     - name: "builder_domain"
       enabled: false
-      description: "Create domain using DomainBuilder (separate from create.test.ts)"
+      description: "Domain used by DomainBuilder workflow tests"
       params:
         domain_name: "ZADT_BLD_DOM01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
         description: "DomainBuilder workflow domain"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         datatype: "CHAR"
         length: 5
         decimals: 0
@@ -95,28 +126,16 @@ create_domain:
         sign_exists: false
 
 # Create Data Element
-create_dataElement:
+create_data_element:
   test_cases:
-    - name: "test_data_element"
-      enabled: false
-      description: "Create test data element"
-      params:
-        data_element_name: "ZADT_BLD_DTEL_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test data element created via MCP"
-        domain_name: "ZADT_BLD_DOM_BASE"
-        short_label: "Test"
-        medium_label: "Test DE"
-        long_label: "Test Data Element"
-        heading_label: "Test Data Element"
     - name: "builder_data_element"
       enabled: false
-      description: "Create data element using DataElementBuilder (separate from create.test.ts)"
+      description: "Data element reserved for DataElementBuilder tests"
       params:
         data_element_name: "ZADT_BLD_DTEL01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
         description: "DataElementBuilder workflow data element"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         # Allowed type_kind values:
         #   - domain
         #   - predefinedAbapType
@@ -132,80 +151,17 @@ create_dataElement:
         long_label: "Builder Data Element"
         heading_label: "Builder Data Element"
 
-# Create Class
-create_class:
-  test_cases:
-    - name: "basic_class"
-      enabled: false
-      description: "Create basic class"
-      params:
-        class_name: "ZADT_BLD_CLS_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Basic test class"
-        source_code: |
-          CLASS ZADT_BLD_CLS_BASE DEFINITION
-            PUBLIC
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-              METHODS: constructor.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS ZADT_BLD_CLS_BASE IMPLEMENTATION.
-            METHOD constructor.
-              " Basic test class
-            ENDMETHOD.
-          ENDCLASS.
-    - name: "builder_class"
-      enabled: false
-      description: "Create class using ClassBuilder (separate from create.test.ts)"
-      params:
-        class_name: "ZADT_BLD_CLS01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
-        description: "ClassBuilder workflow class"
-        source_code: |
-          CLASS ZADT_BLD_CLS01 DEFINITION
-            PUBLIC
-            CREATE PUBLIC .
-
-            PUBLIC SECTION.
-              METHODS: constructor.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS ZADT_BLD_CLS01 IMPLEMENTATION.
-            METHOD constructor.
-              " Builder test class
-            ENDMETHOD.
-          ENDCLASS.
-
 # Create Interface
 create_interface:
   test_cases:
-    - name: "basic_interface"
-      enabled: false
-      description: "Create basic interface"
-      params:
-        interface_name: "ZADT_BLD_IF_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Basic test interface"
-        source_code: |
-          INTERFACE ZADT_BLD_IF_BASE
-            PUBLIC .
-            METHODS: test_method.
-          ENDINTERFACE.
     - name: "builder_interface"
       enabled: false
-      description: "Create interface using InterfaceBuilder (separate from create.test.ts)"
+      description: "Interface reserved for InterfaceBuilder tests"
       params:
         interface_name: "ZADT_BLD_IF01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
         description: "InterfaceBuilder workflow interface"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         source_code: |
           INTERFACE ZADT_BLD_IF01
             PUBLIC .
@@ -215,25 +171,14 @@ create_interface:
 # Create Program
 create_program:
   test_cases:
-    - name: "test_program"
-      enabled: false
-      description: "Create test program"
-      params:
-        program_name: "ZADT_BLD_PROG_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test program created via MCP"
-        program_type: "executable"
-        source_code: |
-          REPORT ZADT_BLD_PROG_BASE.
-          WRITE: / 'Test program'.
     - name: "builder_program"
       enabled: false
-      description: "Create program using ProgramBuilder (separate from create.test.ts)"
+      description: "Program reserved for ProgramBuilder tests"
       params:
         program_name: "ZADT_BLD_PROG01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
         description: "ProgramBuilder workflow report"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         program_type: "executable"
         source_code: |
           REPORT ZADT_BLD_PROG01.
@@ -242,23 +187,14 @@ create_program:
 # Create Table
 create_table:
   test_cases:
-    - name: "test_table"
-      enabled: false
-      description: "Create test table"
-      params:
-        table_name: "ZADT_BLD_TAB_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test table created via MCP"
-        delivery_class: "A"
-        data_class: "APPL0"
     - name: "builder_table"
       enabled: false
-      description: "Create table using TableBuilder (separate from create.test.ts)"
+      description: "Table reserved for TableBuilder tests"
       params:
         table_name: "ZADT_BLD_TAB01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
         description: "TableBuilder workflow table"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         delivery_class: "A"
         data_class: "APPL0"
         ddl_code: |
@@ -277,41 +213,33 @@ create_table:
 # Create Structure
 create_structure:
   test_cases:
-    - name: "test_structure"
-      enabled: false
-      description: "Create test structure"
-      params:
-        structure_name: "ZADT_BLD_STRU_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test structure created via MCP"
     - name: "builder_structure"
       enabled: false
-      description: "Create structure using StructureBuilder (separate from create.test.ts)"
+      description: "Structure reserved for StructureBuilder tests"
       params:
         structure_name: "ZADT_BLD_STRU01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
         description: "StructureBuilder workflow structure"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
+        ddl_code: |
+          @EndUserText.label: 'StructureBuilder workflow structure'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure ZADT_BLD_STRU01 {
+            mandt : abap.clnt;
+            field1 : abap.int1;
+          }
 
 # Create View
 create_view:
   test_cases:
-    - name: "test_view"
-      enabled: false
-      description: "Create test view"
-      params:
-        view_name: "ZADT_BLD_VIEW_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test view created via MCP"
-        view_type: "database_view"
     - name: "builder_view"
       enabled: false
-      description: "Create view using ViewBuilder (separate from create.test.ts)"
+      description: "View reserved for ViewBuilder tests"
       params:
         view_name: "ZADT_BLD_VIEW01"
-        # package_name: "ZADT_BLD_PKG01"  # uses environment.default_package if omitted
         description: "ViewBuilder workflow view"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         ddl_source: |
           @EndUserText.label: 'Builder view on MARA'
           @AbapCatalog.sqlViewName: 'ZADTVW01'
@@ -324,401 +252,46 @@ create_view:
             mara.ersda,
             mara.pstat
           }
-        view_type: "database_view"
 
 # Create Function Group
 create_function_group:
   test_cases:
-    - name: "test_function_group"
-      enabled: false
-      description: "Create test function group"
-      params:
-        function_group_name: "ZADT_BLD_FGR_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test function group created via MCP"
     - name: "builder_function_group"
       enabled: false
-      description: "Create function group using FunctionGroupBuilder (separate from create.test.ts)"
+      description: "Function group reserved for FunctionGroupBuilder tests"
       params:
-        function_group_name: "ZADT_BLD_FGR01"  # ⚠️ UPDATE: Must be DIFFERENT from test_function_group (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        description: "Test function group for FunctionGroupBuilder tests"
+        function_group_name: "ZADT_BLD_FGR01"
+        description: "FunctionGroupBuilder workflow FUGR"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
 
 # Create Function Module
 create_function_module:
   test_cases:
-    - name: "test_function_module"
-      enabled: false
-      description: "Create test function module"
-      params:
-        function_name: "ZADT_BLD_FM_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        function_group: "ZADT_BLD_FGR_BASE"
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Test function module created via MCP"
     - name: "builder_function_module"
       enabled: false
-      description: "Create function module using FunctionModuleBuilder (separate from create.test.ts)"
+      description: "Function module reserved for FunctionModuleBuilder tests"
       params:
-        function_name: "ZADT_BLD_FM01"  # ⚠️ UPDATE: Must be DIFFERENT from test_function_module (Z_ or Y_ prefix)
-        function_group: "ZADT_BLD_FGR_BASE"
-        description: "Test function module for FunctionModuleBuilder tests"
-
-# Check Domain
-check_domain:
-  test_cases:
-    - name: "test_domain"
-      enabled: true
-      description: "Check user-defined domain"
-      params:
-        domain_name: "ZADT_BLD_DOM_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package (for creating domain if it doesn't exist)
-        version: "active"  # 'active' or 'inactive'
-
-# Lock Domain
-lock_domain:
-  test_cases:
-    - name: "test_domain"
-      enabled: true
-      description: "Lock user-defined domain"
-      params:
-        domain_name: "ZADT_BLD_DOM_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-
-# Unlock Domain
-unlock_domain:
-  test_cases:
-    - name: "test_domain"
-      enabled: true
-      description: "Unlock user-defined domain"
-      params:
-        domain_name: "ZADT_BLD_DOM_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-
-# Update Domain
-update_domain:
-  test_cases:
-    - name: "test_domain"
-      enabled: true
-      description: "Update user-defined domain"
-      params:
-        domain_name: "ZADT_BLD_DOM_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-        description: "Updated test domain description"
-        datatype: "CHAR"
-        length: 20
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-
-# Activate Domain
-activate_domain:
-  test_cases:
-    - name: "test_domain"
-      enabled: true
-      description: "Activate user-defined domain"
-      params:
-        domain_name: "ZADT_BLD_DOM_BASE"  # ⚠️ UPDATE: Must be user-defined (Z_ or Y_ prefix)
-        # package_name: if not specified, uses environment.default_package
-        # transport_request: if not specified, uses environment.default_transport
-
-# ============================================================================
-# READ-ONLY CLIENT TESTS
-# ============================================================================
-
-# Get Program
-get_program:
-  test_cases:
-    - name: "test_program"
-      enabled: false
-      description: "Get test program (requires existing program)"
-      params:
-        program_name: "ZADT_BLD_PROG_BASE"  # ⚠️ UPDATE WITH YOUR TEST PROGRAM
-    - name: "standard_program"
-      enabled: true
-      description: "Get standard SAP program (for integration tests)"
-      params:
-        program_name: "SAPMV45A"  # Standard SAP program - usually available
-
-# Get Class
-get_class:
-  test_cases:
-    - name: "test_class"
-      enabled: false
-      description: "Get test class (requires existing class)"
-      params:
-        class_name: "ZADT_BLD_CLS_BASE"  # ⚠️ UPDATE WITH YOUR TEST CLASS
-    - name: "standard_class"
-      enabled: true
-      description: "Get standard SAP class"
-      params:
-        class_name: "ZCL_TEST_MCP_01"  # User-created test class (Z-namespace)
-
-# Get Table
-get_table:
-  test_cases:
-    - name: "standard_table"
-      enabled: true
-      description: "Get standard SAP table"
-      params:
-        table_name: "DD02L"  # Standard SAP table - usually available
-    - name: "mara_table"
-      enabled: true
-      description: "Get MARA table (material master)"
-      params:
-        table_name: "MARA"  # Standard SAP table - usually available
-
-# Get Structure
-get_structure:
-  test_cases:
-    - name: "standard_structure"
-      enabled: true
-      description: "Get standard SAP structure"
-      params:
-        structure_name: "SYST"  # Standard SAP structure - usually available
-    - name: "mara_structure"
-      enabled: true
-      description: "Get MARA structure (using table as structure example)"
-      params:
-        structure_name: "MARA"  # Standard SAP structure - usually available
-
-# Get Domain
-get_domain:
-  test_cases:
-    - name: "test_domain"
-      enabled: false
-      description: "Get test domain (requires existing domain)"
-      params:
-        domain_name: "ZADT_BLD_DOM_BASE"  # ⚠️ UPDATE WITH YOUR TEST DOMAIN
-    - name: "standard_domain"
-      enabled: true
-      description: "Get standard SAP domain"
-      params:
-        domain_name: "SYST_SUBRC"  # Standard SAP domain - usually available
-
-# Get Data Element
-get_data_element:
-  test_cases:
-    - name: "test_data_element"
-      enabled: false
-      description: "Get test data element (requires existing data element)"
-      params:
-        data_element_name: "ZADT_BLD_DTEL_BASE"  # ⚠️ UPDATE WITH YOUR TEST DATA ELEMENT
-    - name: "standard_data_element"
-      enabled: true
-      description: "Get standard SAP data element"
-      params:
-        data_element_name: "SYST_SUBRC"  # Standard SAP data element - usually available
-
-# Get Interface
-get_interface:
-  test_cases:
-    - name: "test_interface"
-      enabled: false
-      description: "Get test interface (requires existing interface)"
-      params:
-        interface_name: "ZADT_BLD_IF_BASE"  # ⚠️ UPDATE WITH YOUR TEST INTERFACE
-    - name: "standard_interface"
-      enabled: true
-      description: "Get standard SAP interface"
-      params:
-        interface_name: "IF_T100_MESSAGE"  # Standard SAP interface - usually available
-
-# Get Function Group
-get_function_group:
-  test_cases:
-    - name: "test_function_group"
-      enabled: false
-      description: "Get test function group (requires existing function group)"
-      params:
-        function_group: "ZADT_BLD_FGR_BASE"  # ⚠️ UPDATE WITH YOUR TEST FUNCTION GROUP
-    - name: "standard_function_group"
-      enabled: true
-      description: "Get standard SAP function group"
-      params:
-        function_group: "WBABAP"  # Standard SAP function group - usually available
-    - name: "srf_function_group"
-      enabled: true
-      description: "Get SRFC function group (standard SAP)"
-      params:
-        function_group: "SRFC"  # Standard SAP function group - usually available
-
-# Get Function
-get_function:
-  test_cases:
-    - name: "test_function"
-      enabled: false
-      description: "Get test function module (requires existing function module)"
-      params:
-        function_name: "ZADT_BLD_FUNC_BASE"  # ⚠️ UPDATE WITH YOUR TEST FUNCTION
-        function_group: "ZADT_BLD_FGR_BASE"  # ⚠️ UPDATE WITH YOUR TEST FUNCTION GROUP
-    - name: "standard_function"
-      enabled: true
-      description: "Get standard SAP function module"
-      params:
-        function_name: "WB_PGEDITOR_INITIAL_SCREEN"  # Standard SAP function - usually available
-        function_group: "WBABAP"  # Standard SAP function group - usually available
-
-# Get Package
-get_package:
-  test_cases:
-    - name: "test_package"
-      enabled: false
-      description: "Get test package (requires existing package)"
-      params:
-        package_name: "ZADT_BLD_PKG_BASE"  # ⚠️ UPDATE WITH YOUR TEST PACKAGE
-    - name: "standard_package"
-      enabled: true
-      description: "Get standard SAP package"
-      params:
-        package_name: "SABP_TYPES"  # Standard SAP package - usually available
-
-# Get View
-get_view:
-  test_cases:
-    - name: "test_view"
-      enabled: false
-      description: "Get test view (requires existing view)"
-      params:
-        view_name: "ZADT_BLD_VIEW_BASE"  # ⚠️ UPDATE WITH YOUR TEST VIEW
-    - name: "standard_view"
-      enabled: false
-      description: "Get standard SAP view (if available)"
-      params:
-        view_name: ""  # ⚠️ UPDATE WITH YOUR VIEW NAME (or leave empty to skip)
-
-# Fetch Node Structure
-fetch_node_structure:
-  test_cases:
-    - name: "program_includes"
-      enabled: true
-      description: "Fetch node structure for program includes"
-      params:
-        parent_name: "SAPMV45A"  # Standard SAP program - can be changed
-        parent_tech_name: "SAPMV45A"  # Standard SAP program - can be changed
-        parent_type: "PROG/P"
-        node_key: "006450"  # ⚠️ UPDATE WITH VALID NODE KEY FOR YOUR PROGRAM
-        with_short_descriptions: true
-    - name: "function_group_objects"
-      enabled: true
-      description: "Fetch node structure for function group objects"
-      params:
-        parent_name: "SRFC"  # Standard SAP function group - can be changed
-        parent_tech_name: "SRFC"  # Standard SAP function group - can be changed
-        parent_type: "FUGR"
-        node_key: "000000"  # ⚠️ UPDATE WITH VALID NODE KEY FOR YOUR FUNCTION GROUP
-        with_short_descriptions: true
-
-# Get System Information
-get_system_information:
-  test_cases:
-    - name: "system_info"
-      enabled: true
-      description: "Get system information (cloud systems only)"
-      params: {}
-
-# ============================================================================
-# MANAGEMENT CLIENT TESTS
-# ============================================================================
-
-# Activate Object
-activate_object:
-  test_cases:
-    - name: "test_objects"
-      enabled: false
-      description: "Activate test objects (requires existing objects)"
-      params:
-        objects:
-          - name: "ZADT_BLD_CLS_BASE"  # ⚠️ UPDATE WITH YOUR TEST CLASS NAME
-            type: "CLAS/OC"
-          - name: "ZADT_BLD_PROG_BASE"  # ⚠️ UPDATE WITH YOUR TEST PROGRAM NAME
-            type: "PROG/P"
-        preaudit: false
-
-# Check Object
-check_object:
-  test_cases:
-    - name: "test_objects"
-      enabled: false
-      description: "Check test objects syntax (requires existing objects)"
-      params:
-        objects:
-          - object_name: "ZADT_BLD_CLS_BASE"  # ⚠️ UPDATE WITH YOUR TEST CLASS NAME
-            object_type: "class"
-            version: "active"
-          - object_name: "ZADT_BLD_PROG_BASE"  # ⚠️ UPDATE WITH YOUR TEST PROGRAM NAME
-            object_type: "program"
-            version: "active"
-    - name: "single_test_class"
-      enabled: false
-      description: "Check single test class syntax"
-      params:
-        object_name: "ZADT_BLD_CLS_BASE"  # ⚠️ UPDATE WITH YOUR TEST CLASS NAME
-        object_type: "CLAS/OC"
-        version: ""  # Optional: leave empty for latest version
-
-# ============================================================================
-# RUN CLASS (Execute runnable classes)
-# ============================================================================
-
-# Run Class
-run_class:
-  test_cases:
-    - name: "runnable_class"
-      enabled: true
-      description: "Create and run a class that implements if_oo_adt_classrun interface"
-      params:
-        class_name: "ZCL_TEST_RUNNABLE_01"
-        description: "Test runnable ABAP Class via MCP ABAP ADT"
-        package_name: "ZADT_BLD_PKG_BASE"  # ⚠️ UPDATE WITH YOUR TEST PACKAGE
-        runnable: true
+        function_module_name: "Z_ADT_BLD_FM01"  # Must start with Z_ or Y_ (with underscore)
+        function_group_name: "ZADT_BLD_FGR01"
+        description: "FunctionModuleBuilder workflow FM"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
         source_code: |
-          CLASS ZCL_TEST_RUNNABLE_01 DEFINITION
-            PUBLIC
-            FINAL
-            CREATE PUBLIC .
+          FUNCTION Z_ADT_BLD_FM01
+            IMPORTING
+              VALUE(IV_PARAM) TYPE STRING
+            EXPORTING
+              VALUE(EV_RESULT) TYPE STRING.
+            ev_result = |Result: { iv_param }|.
+          ENDFUNCTION.
 
-            PUBLIC SECTION.
-              INTERFACES if_oo_adt_classrun.
-            PROTECTED SECTION.
-            PRIVATE SECTION.
-          ENDCLASS.
-
-          CLASS ZCL_TEST_RUNNABLE_01 IMPLEMENTATION.
-            METHOD if_oo_adt_classrun~main.
-              out->write( 'Hello from ADT Class Run!' ).
-              out->write( |System time: { cl_abap_context_info=>get_system_time( ) }| ).
-              out->write( 'Test runnable class executed successfully' ).
-            ENDMETHOD.
-          ENDCLASS.
-
-# ============================================================================
-# EXAMPLE: Test-level settings override
-# ============================================================================
-# This example shows how to override global test_settings for a specific test
-
-# Example test with custom cleanup settings
-example_custom_cleanup:
+# Create Transport
+create_transport:
   test_cases:
-    - name: "keep_artifacts"
+    - name: "builder_transport"
       enabled: false
-      description: "Example: Keep test objects for manual inspection (debugging)"
-      # Override global settings for this specific test
-      test_settings:
-        cleanup_before_test: false  # Don't clean up before (use existing objects)
-        cleanup_after_test: false   # Don't clean up after (keep for inspection)
+      description: "Transport reserved for TransportBuilder tests"
       params:
-        object_name: "ZCL_DEBUG_EXAMPLE"
-    - name: "clean_environment"
-      enabled: false
-      description: "Example: Ensure completely clean environment (default behavior)"
-      # These are the defaults, shown here for clarity
-      test_settings:
-        cleanup_before_test: true   # Clean up before (ensure fresh start)
-        cleanup_after_test: true    # Clean up after (leave no trace)
-      params:
-        object_name: "ZCL_CLEAN_EXAMPLE"
+        description: "TransportBuilder workflow transport"
+        # package_name: "ZADT_BLD_PKG01"

@@ -24,7 +24,15 @@ export interface CreateStructureParams {
   description?: string;
   package_name: string;
   transport_request?: string;
-  fields: StructureField[];
+  ddl_code: string; // DDL SQL source code for structure
+  // Legacy fields (deprecated, use ddl_code instead)
+  fields?: StructureField[];
   includes?: StructureInclude[];
+}
+
+export interface UpdateStructureParams {
+  structure_name: string;
+  ddl_code: string; // DDL SQL source code for structure
+  transport_request?: string;
 }
 

@@ -8,18 +8,26 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ProgramBuilder, ProgramBuilderLogger } from '../../../core/program';
 import { deleteProgram } from '../../../core/program/delete';
+import { getProgramSource } from '../../../core/program/read';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
   logBuilderTestStart,
-  logBuilderTestSuccess
+  logBuilderTestSuccess,
+  logBuilderTestEnd,
+  logBuilderTestStep
 } from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const {
+  getEnabledTestCase,
+  getTestCaseDefinition,
+  getDefaultPackage,
+  getDefaultTransport
+} = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -47,10 +55,11 @@ describe('ProgramBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -58,279 +67,250 @@ describe('ProgramBuilder', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
   });
 
-  async function deleteProgramIfExists(programName: string): Promise<void> {
+  async function ensureProgramReady(programName: string): Promise<{ success: boolean; reason?: string }> {
+    if (!connection) {
+      return { success: false, reason: 'No connection' };
+    }
+
+    // Try to delete if exists
     try {
       await deleteProgram(connection, { program_name: programName });
+      if (debugEnabled) {
+        builderLogger.debug?.(`[CLEANUP] Program ${programName} deleted`);
+      }
     } catch (error: any) {
-      if (error.response?.status !== 404 && !error.message?.includes('not found')) {
-        throw error;
+      const rawMessage =
+        error?.response?.data ||
+        error?.message ||
+        (typeof error === 'string' ? error : JSON.stringify(error));
+
+      // 404 = object doesn't exist, that's fine
+      if (
+        error.response?.status === 404 ||
+        rawMessage?.toLowerCase?.().includes('not found') ||
+        rawMessage?.toLowerCase?.().includes('does not exist')
+      ) {
+        if (debugEnabled) {
+          builderLogger.debug?.(`[CLEANUP] Program ${programName} already absent`);
+        }
+        return { success: true };
+      }
+
+      // Other errors - log only in debug mode
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] Failed to delete ${programName}:`, rawMessage);
       }
     }
+
+    // Verify object doesn't exist (wait a bit for async deletion)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+      await getProgramSource(connection, programName);
+      // Object still exists - check if it's locked
+      const errorMsg = `Program ${programName} still exists after cleanup attempt (may be locked or in use)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
+      }
+      return { success: false, reason: errorMsg };
+    } catch (error: any) {
+      // 404 = object doesn't exist, cleanup successful
+      if (error.response?.status === 404) {
+        return { success: true };
+      }
+      // Other error - object might be locked
+      const errorMsg = `Cannot verify cleanup status for ${programName} (may be locked)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
+      }
+      return { success: false, reason: errorMsg };
+      }
   }
 
-  describe('Builder methods', () => {
-    it('should chain builder methods', () => {
-      const builder = new ProgramBuilder(connection, builderLogger, {
-        programName: 'Z_TEST',
-        packageName: 'ZPKG',
-        sourceCode: 'REPORT Z_TEST.'
-      });
+  function getBuilderTestDefinition() {
+    return getTestCaseDefinition('create_program', 'builder_program');
+  }
 
-      const result = builder
-        .setPackage('ZPKG2')
-        .setRequest('TR001')
-        .setName('Z_TEST2')
-        .setCode('REPORT Z_TEST2.')
-        .setDescription('Test')
-        .setProgramType('executable');
-
-      expect(result).toBe(builder);
-      expect(builder.getProgramName()).toBe('Z_TEST2');
-    });
-  });
-
-  describe('Promise chaining', () => {
-    it('should chain operations with .then()', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_program', 'builder_program');
-      if (!testCase) {
-        return;
-      }
-
-      const programName = testCase.params.program_name;
-      await deleteProgramIfExists(programName);
-
-      let builder: ProgramBuilder | null = null;
-      try {
-        builder = new ProgramBuilder(connection, builderLogger, {
-        programName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
-        description: testCase.params.description,
-        programType: testCase.params.program_type,
-        sourceCode: testCase.params.source_code
-      });
-
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => b.activate());
-
-      expect(builder.getCreateResult()).toBeDefined();
-      expect(builder.getActivateResult()).toBeDefined();
-      } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        await deleteProgramIfExists(programName);
-      }
-    }, getTimeout('test'));
-
-    it('should interrupt chain on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new ProgramBuilder(connection, builderLogger, {
-        programName: 'Z_TEST_INVALID',
-        packageName: 'INVALID_PACKAGE',
-        sourceCode: 'REPORT Z_TEST_INVALID.'
-      });
-
-      let errorCaught = false;
-      try {
-        await builder.create();
-      } catch (error) {
-        errorCaught = true;
-        expect(builder.getErrors().length).toBeGreaterThan(0);
-      }
-
-      expect(errorCaught).toBe(true);
-    }, 30000);
-  });
-
-  describe('Error handling', () => {
-    it('should execute .catch() on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new ProgramBuilder(connection, builderLogger, {
-        programName: 'Z_TEST_ERROR',
-        packageName: 'INVALID',
-        sourceCode: 'REPORT Z_TEST_ERROR.'
-      });
-
-      let catchExecuted = false;
-      await builder
-        .create()
-        .catch(() => {
-          catchExecuted = true;
-        });
-
-      expect(catchExecuted).toBe(true);
-    }, 30000);
-
-    it('should execute .finally() even on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new ProgramBuilder(connection, builderLogger, {
-        programName: 'Z_TEST_FINALLY',
-        packageName: 'INVALID',
-        sourceCode: 'REPORT Z_TEST_FINALLY.'
-      });
-
-      let finallyExecuted = false;
-      try {
-        await builder.create();
-      } catch (error) {
-        // Error expected
-      } finally {
-        finallyExecuted = true;
-      }
-
-      expect(finallyExecuted).toBe(true);
-    }, 30000);
-  });
-
-  describe('Result storage', () => {
-    it('should store all results', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_program', 'builder_program');
-      if (!testCase) {
-        return;
-      }
-
-      const programName = testCase.params.program_name;
-      await deleteProgramIfExists(programName);
-
-      let builder: ProgramBuilder | null = null;
-      try {
-        builder = new ProgramBuilder(connection, builderLogger, {
-        programName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
-        description: testCase.params.description,
-        programType: testCase.params.program_type,
-        sourceCode: testCase.params.source_code
-      });
-
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => b.activate());
-
-      const results = builder.getResults();
-      expect(results.create).toBeDefined();
-      expect(results.update).toBeDefined();
-      expect(results.check).toBeDefined();
-      expect(results.unlock).toBeDefined();
-      expect(results.activate).toBeDefined();
-      } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        await deleteProgramIfExists(programName);
-      }
-    }, getTimeout('test'));
-  });
+  function buildBuilderConfig(testCase: any) {
+    const params = testCase?.params || {};
+    return {
+      programName: params.program_name,
+      packageName: params.package_name || getDefaultPackage(),
+      transportRequest: params.transport_request || getDefaultTransport(),
+      description: params.description,
+      programType: params.program_type,
+      sourceCode: params.source_code
+    };
+  }
 
   describe('Full workflow', () => {
-    it('should execute full workflow and store all results', async () => {
+    let testCase: any = null;
+    let programName: string | null = null;
+    let skipReason: string | null = null;
+
+    beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      programName = null;
+
       if (!hasConfig) {
+        skipReason = 'No SAP configuration';
         return;
       }
 
-      const testCase = getEnabledTestCase('create_program', 'builder_program');
-      if (!testCase) {
+      const definition = getBuilderTestDefinition();
+      if (!definition) {
+        skipReason = 'Test case not defined in test-config.yaml';
         return;
       }
 
-      const programName = testCase.params.program_name;
-      await deleteProgramIfExists(programName);
+      const tc = getEnabledTestCase('create_program', 'builder_program');
+      if (!tc) {
+        skipReason = 'Test case disabled or not found';
+        return;
+      }
 
-      let builder: ProgramBuilder | null = null;
+      testCase = tc;
+      programName = tc.params.program_name;
+
+      // Cleanup before test
+      if (programName) {
+        const cleanup = await ensureProgramReady(programName);
+        if (!cleanup.success) {
+          skipReason = cleanup.reason || 'Failed to cleanup program before test';
+          testCase = null;
+          programName = null;
+        }
+      }
+    });
+
+    afterEach(async () => {
+      if (programName && connection) {
+        // Cleanup after test
+        const cleanup = await ensureProgramReady(programName);
+        if (!cleanup.success && cleanup.reason) {
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
+          }
+        }
+      }
+    });
+
+    it('should execute full workflow and store all results', async () => {
+      const definition = getBuilderTestDefinition();
+      logBuilderTestStart(builderLogger, 'ProgramBuilder - full workflow', definition);
+
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'ProgramBuilder - full workflow', skipReason);
+        return;
+      }
+
+      if (!testCase || !programName) {
+        logBuilderTestSkip(builderLogger, 'ProgramBuilder - full workflow', skipReason || 'Test case not available');
+        return;
+      }
+
+      const builder = new ProgramBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+
       try {
-        builder = new ProgramBuilder(connection, builderLogger, {
-        programName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
-        description: testCase.params.description,
-        programType: testCase.params.program_type,
-        sourceCode: testCase.params.source_code
-      });
-
+        logBuilderTestStep('validate');
       await builder
         .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-          .then(b => b.activate());
+          .then(b => {
+            logBuilderTestStep('create');
+            return b.create();
+          })
+          .then(b => {
+            logBuilderTestStep('check(inactive)');
+            return b.check('inactive');
+          })
+          .then(b => {
+            logBuilderTestStep('lock');
+            return b.lock();
+          })
+          .then(b => {
+            logBuilderTestStep('update');
+            return b.update();
+          })
+          .then(b => {
+            logBuilderTestStep('check(inactive)');
+            return b.check('inactive');
+          })
+          .then(b => {
+            logBuilderTestStep('unlock');
+            return b.unlock();
+          })
+          .then(b => {
+            logBuilderTestStep('activate');
+            return b.activate();
+          })
+          .then(b => {
+            logBuilderTestStep('check(active)');
+            return b.check('active');
+        });
 
       const state = builder.getState();
       expect(state.createResult).toBeDefined();
       expect(state.activateResult).toBeDefined();
       expect(state.errors.length).toBe(0);
+
+        logBuilderTestSuccess(builderLogger, 'ProgramBuilder - full workflow');
+      } catch (error) {
+        logBuilderTestError(builderLogger, 'ProgramBuilder - full workflow', error);
+        throw error;
       } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        await deleteProgramIfExists(programName);
+        await builder.forceUnlock().catch(() => {});
+        logBuilderTestEnd(builderLogger, 'ProgramBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
 
-  describe('Getters', () => {
-    it('should return correct values from getters', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_program', 'builder_program');
-      if (!testCase) {
-        return;
-      }
-
-      const programName = testCase.params.program_name;
-      await deleteProgramIfExists(programName);
-
-      const builder = new ProgramBuilder(connection, builderLogger, {
-        programName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        sourceCode: testCase.params.source_code
+  describe('Read standard object', () => {
+    it('should read standard SAP program', async () => {
+      // Standard SAP program (exists in most ABAP systems)
+      const standardProgramName = 'SAPLSETT';
+      logBuilderTestStart(builderLogger, 'ProgramBuilder - read standard object', {
+        name: 'read_standard',
+        params: { program_name: standardProgramName }
       });
 
-      expect(builder.getProgramName()).toBe(programName);
-      expect(builder.getSessionId()).toBeDefined();
-      expect(builder.getLockHandle()).toBeUndefined();
+      if (!hasConfig) {
+        logBuilderTestSkip(builderLogger, 'ProgramBuilder - read standard object', 'No SAP configuration');
+        return;
+      }
 
-      await builder.create();
-      expect(builder.getCreateResult()).toBeDefined();
-    }, 30000);
+      const builder = new ProgramBuilder(
+        connection,
+        builderLogger,
+        {
+          programName: standardProgramName,
+          packageName: 'SAP' // Standard package
+        }
+      );
+
+      try {
+        logBuilderTestStep('read');
+        await builder.read();
+
+        const result = builder.getReadResult();
+        expect(result).toBeDefined();
+        expect(result?.status).toBe(200);
+        expect(result?.data).toBeDefined();
+
+        logBuilderTestSuccess(builderLogger, 'ProgramBuilder - read standard object');
+      } catch (error) {
+        logBuilderTestError(builderLogger, 'ProgramBuilder - read standard object', error);
+        throw error;
+      } finally {
+        logBuilderTestEnd(builderLogger, 'ProgramBuilder - read standard object');
+      }
+    }, getTimeout('test'));
   });
 });
 

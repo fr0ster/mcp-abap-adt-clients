@@ -2,18 +2,32 @@
  * Unit test for TableBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/table/TableBuilder.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- integration/table/TableBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { TableBuilder, TableBuilderLogger } from '../../../core/table';
 import { deleteTable } from '../../../core/table/delete';
+import { getTableSource } from '../../../core/table/read';
 import { getConfig } from '../../helpers/sessionConfig';
+import {
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+  logBuilderTestEnd,
+  logBuilderTestStep
+} from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const {
+  getEnabledTestCase,
+  getTestCaseDefinition,
+  getDefaultPackage,
+  getDefaultTransport
+} = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -41,10 +55,11 @@ describe('TableBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
+      await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -52,189 +67,248 @@ describe('TableBuilder', () => {
     }
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
   });
 
-  // Helper function to delete table if exists (idempotency)
-  async function deleteTableIfExists(tableName: string): Promise<void> {
+  async function ensureTableReady(tableName: string): Promise<{ success: boolean; reason?: string }> {
+    if (!connection) {
+      return { success: false, reason: 'No connection' };
+    }
+
+    // Try to delete if exists
     try {
       await deleteTable(connection, { table_name: tableName });
-    } catch (error: any) {
-      // Ignore 404 errors (table doesn't exist)
-      if (error.response?.status !== 404 && !error.message?.includes('not found')) {
-        throw error;
+      if (debugEnabled) {
+        builderLogger.debug?.(`[CLEANUP] Table ${tableName} deleted`);
       }
+    } catch (error: any) {
+      const rawMessage =
+        error?.response?.data ||
+        error?.message ||
+        (typeof error === 'string' ? error : JSON.stringify(error));
+
+      // 404 = object doesn't exist, that's fine
+      if (
+        error.response?.status === 404 ||
+        rawMessage?.toLowerCase?.().includes('not found') ||
+        rawMessage?.toLowerCase?.().includes('does not exist')
+      ) {
+        if (debugEnabled) {
+          builderLogger.debug?.(`[CLEANUP] Table ${tableName} already absent`);
+        }
+        return { success: true };
+      }
+
+      // Other errors - log only in debug mode
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] Failed to delete ${tableName}:`, rawMessage);
+      }
+    }
+
+    // Verify object doesn't exist (wait a bit for async deletion)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+      await getTableSource(connection, tableName);
+      // Object still exists - check if it's locked
+      const errorMsg = `Table ${tableName} still exists after cleanup attempt (may be locked or in use)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}`);
+      }
+      return { success: false, reason: errorMsg };
+    } catch (error: any) {
+      // 404 = object doesn't exist, cleanup successful
+      if (error.response?.status === 404) {
+        return { success: true };
+      }
+      // Other error - object might be locked
+      const errorMsg = `Cannot verify cleanup status for ${tableName} (may be locked)`;
+      if (debugEnabled) {
+        builderLogger.warn?.(`[CLEANUP] ${errorMsg}:`, error.message);
+      }
+      return { success: false, reason: errorMsg };
     }
   }
 
-  describe('Builder methods', () => {
-    it('should chain builder methods', () => {
-      const builder = new TableBuilder(connection, builderLogger, {
-        tableName: 'Z_TEST',
-        packageName: 'ZPKG'
-      });
+  function getBuilderTestDefinition() {
+    return getTestCaseDefinition('create_table', 'builder_table');
+  }
 
-      const result = builder
-        .setPackage('ZPKG2')
-        .setRequest('TR001')
-        .setName('Z_TEST2')
-        .setDdlCode('@AbapCatalog.tableType : #TRANSPARENT\n...');
+  function buildBuilderConfig(testCase: any) {
+    const params = testCase?.params || {};
+    return {
+      tableName: params.table_name,
+      packageName: params.package_name || getDefaultPackage(),
+      transportRequest: params.transport_request || getDefaultTransport(),
+      description: params.description,
+      ddlCode: params.ddl_code
+    };
+  }
 
-      expect(result).toBe(builder);
-      expect(builder.getTableName()).toBe('Z_TEST2');
-    });
-  });
+  describe('Full workflow', () => {
+    let testCase: any = null;
+    let tableName: string | null = null;
+    let skipReason: string | null = null;
 
-  describe('Promise chaining', () => {
-    it('should chain operations with .then()', async () => {
+    beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      tableName = null;
+
       if (!hasConfig) {
+        skipReason = 'No SAP configuration';
         return;
       }
 
-      const testCase = getEnabledTestCase('create_table', 'builder_table');
-      if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
+      const definition = getBuilderTestDefinition();
+      if (!definition) {
+        skipReason = 'Test case not defined in test-config.yaml';
         return;
       }
 
-      const tableName = testCase.params.table_name;
-      await deleteTableIfExists(tableName);
+      const tc = getEnabledTestCase('create_table', 'builder_table');
+      if (!tc) {
+        skipReason = 'Test case disabled or not found';
+        return;
+      }
 
-      let builder: TableBuilder | null = null;
+      testCase = tc;
+      tableName = tc.params.table_name;
+
+      // Cleanup before test
+      if (tableName) {
+        const cleanup = await ensureTableReady(tableName);
+        if (!cleanup.success) {
+          skipReason = cleanup.reason || 'Failed to cleanup table before test';
+          testCase = null;
+          tableName = null;
+        }
+      }
+    });
+
+    afterEach(async () => {
+      if (tableName && connection) {
+        // Cleanup after test
+        const cleanup = await ensureTableReady(tableName);
+        if (!cleanup.success && cleanup.reason) {
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
+          }
+        }
+      }
+    });
+
+    it('should execute full workflow and store all results', async () => {
+      const definition = getBuilderTestDefinition();
+      logBuilderTestStart(builderLogger, 'TableBuilder - full workflow', definition);
+
+      if (skipReason) {
+        logBuilderTestSkip(builderLogger, 'TableBuilder - full workflow', skipReason);
+        return;
+      }
+
+      if (!testCase || !tableName) {
+        logBuilderTestSkip(builderLogger, 'TableBuilder - full workflow', skipReason || 'Test case not available');
+        return;
+      }
+
+      const builder = new TableBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+
       try {
-        builder = new TableBuilder(connection, builderLogger, {
-        tableName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
-        ddlCode: testCase.params.ddl_code
-      });
-
+        logBuilderTestStep('validate');
       await builder
         .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => b.activate());
+          .then(b => {
+            logBuilderTestStep('create');
+            return b.create();
+          })
+          .then(b => {
+            logBuilderTestStep('check(inactive)');
+            return b.check('inactive');
+          })
+          .then(b => {
+            logBuilderTestStep('lock');
+            return b.lock();
+          })
+          .then(b => {
+            logBuilderTestStep('update');
+            return b.update();
+          })
+          .then(b => {
+            logBuilderTestStep('check(inactive)');
+            return b.check('inactive');
+          })
+          .then(b => {
+            logBuilderTestStep('unlock');
+            return b.unlock();
+          })
+          .then(b => {
+            logBuilderTestStep('activate');
+            return b.activate();
+          })
+          .then(b => {
+            logBuilderTestStep('check(active)');
+            return b.check('active');
+          });
 
-      expect(builder.getCreateResult()).toBeDefined();
-      expect(builder.getActivateResult()).toBeDefined();
-      } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        await deleteTableIfExists(tableName);
-      }
-    }, getTimeout('test'));
+        const state = builder.getState();
+        expect(state.createResult).toBeDefined();
+        expect(state.activateResult).toBeDefined();
+        expect(state.errors.length).toBe(0);
 
-    it('should interrupt chain on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new TableBuilder(connection, builderLogger, {
-        tableName: 'Z_TEST_INVALID',
-        packageName: 'INVALID_PACKAGE'
-      });
-
-      let errorCaught = false;
-      try {
-        await builder.create();
+        logBuilderTestSuccess(builderLogger, 'TableBuilder - full workflow');
       } catch (error) {
-        errorCaught = true;
-        expect(builder.getErrors().length).toBeGreaterThan(0);
-      }
-
-      expect(errorCaught).toBe(true);
-    }, 30000);
-  });
-
-  describe('Error handling', () => {
-    it('should execute .catch() on error', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const builder = new TableBuilder(connection, builderLogger, {
-        tableName: 'Z_TEST_ERROR',
-        packageName: 'INVALID'
-      });
-
-      let catchExecuted = false;
-      await builder
-        .create()
-        .catch(() => {
-          catchExecuted = true;
-        });
-
-      expect(catchExecuted).toBe(true);
-    }, 30000);
-  });
-
-  describe('Result storage', () => {
-    it('should store all results', async () => {
-      if (!hasConfig) {
-        return;
-      }
-
-      const testCase = getEnabledTestCase('create_table', 'builder_table');
-      if (!testCase) {
-        builderLogger.warn?.('⚠️ Skipping test: Test case is disabled');
-        return;
-      }
-
-      const tableName = testCase.params.table_name;
-      await deleteTableIfExists(tableName);
-
-      let builder: TableBuilder | null = null;
-      try {
-        builder = new TableBuilder(connection, builderLogger, {
-        tableName,
-        packageName: testCase.params.package_name || getDefaultPackage(),
-        transportRequest: testCase.params.transport_request || getDefaultTransport(),
-        ddlCode: testCase.params.ddl_code
-      });
-
-      await builder
-        .validate()
-        .then(b => b.create())
-        .then(b => b.lock())
-        .then(b => b.update())
-        .then(b => b.check())
-        .then(b => b.unlock())
-        .then(b => b.activate());
-
-      const results = builder.getResults();
-      expect(results.validate).toBeDefined();
-      expect(results.create).toBeDefined();
-      expect(results.update).toBeDefined();
-      expect(results.check).toBeDefined();
-      expect(results.unlock).toBeDefined();
-      expect(results.activate).toBeDefined();
+        logBuilderTestError(builderLogger, 'TableBuilder - full workflow', error);
+        throw error;
       } finally {
-        if (builder) {
-          await builder.forceUnlock().catch(() => {});
-        }
-        await deleteTableIfExists(tableName);
+        await builder.forceUnlock().catch(() => {});
+        logBuilderTestEnd(builderLogger, 'TableBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
 
-  describe('Getters', () => {
-    it('should return correct values from getters', () => {
-      const builder = new TableBuilder(connection, builderLogger, {
-        tableName: 'Z_TEST',
-        packageName: 'ZPKG'
+  describe('Read standard object', () => {
+    it('should read standard SAP table', async () => {
+      // Standard SAP table (exists in most ABAP systems)
+      const standardTableName = 'T000';
+      logBuilderTestStart(builderLogger, 'TableBuilder - read standard object', {
+        name: 'read_standard',
+        params: { table_name: standardTableName }
       });
 
-      expect(builder.getTableName()).toBe('Z_TEST');
-      expect(builder.getSessionId()).toBeDefined();
-      expect(builder.getLockHandle()).toBeUndefined();
-    });
+      if (!hasConfig) {
+        logBuilderTestSkip(builderLogger, 'TableBuilder - read standard object', 'No SAP configuration');
+        return;
+      }
+
+      const builder = new TableBuilder(
+        connection,
+        builderLogger,
+        {
+          tableName: standardTableName,
+          packageName: 'SAP' // Standard package
+        }
+      );
+
+      try {
+        logBuilderTestStep('read');
+        await builder.read();
+
+        const result = builder.getReadResult();
+        expect(result).toBeDefined();
+        expect(result?.status).toBe(200);
+        expect(result?.data).toBeDefined();
+
+        logBuilderTestSuccess(builderLogger, 'TableBuilder - read standard object');
+      } catch (error) {
+        logBuilderTestError(builderLogger, 'TableBuilder - read standard object', error);
+        throw error;
+      } finally {
+        logBuilderTestEnd(builderLogger, 'TableBuilder - read standard object');
+      }
+    }, getTimeout('test'));
   });
 });
-

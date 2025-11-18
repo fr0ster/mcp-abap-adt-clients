@@ -4,86 +4,13 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { XMLParser, XMLBuilder } from 'fast-xml-parser';
+import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId } from '../../utils/sessionUtils';
+import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { lockStructure } from './lock';
+import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
 import { CreateStructureParams } from './types';
-
-/**
- * Build XML for structure creation following DDIC structure pattern
- */
-export function buildCreateStructureXml(args: CreateStructureParams): string {
-  const description = args.description || args.structure_name;
-
-  const fieldsXml = args.fields.map(field => {
-    const fieldProps: any = {
-      'ddic:name': field.name,
-      'ddic:description': field.description || ''
-    };
-
-    if (field.data_element) {
-      fieldProps['ddic:dataElement'] = field.data_element;
-    } else if (field.domain) {
-      fieldProps['ddic:domainName'] = field.domain;
-    } else if (field.structure_ref) {
-      fieldProps['ddic:structureRef'] = field.structure_ref;
-    } else if (field.table_ref) {
-      fieldProps['ddic:tableRef'] = field.table_ref;
-    } else if (field.data_type) {
-      fieldProps['ddic:dataType'] = field.data_type;
-      if (field.length !== undefined) {
-        fieldProps['ddic:length'] = field.length;
-      }
-      if (field.decimals !== undefined) {
-        fieldProps['ddic:decimals'] = field.decimals;
-      }
-    }
-
-    return fieldProps;
-  });
-
-  let includesXml: any = undefined;
-  if (args.includes && args.includes.length > 0) {
-    includesXml = {
-      'ddic:include': args.includes.map(inc => ({
-        'ddic:structureName': inc.name,
-        ...(inc.suffix && { 'ddic:suffix': inc.suffix })
-      }))
-    };
-  }
-
-  const structureData: any = {
-    'ddic:structure': {
-      'adtcore:objectType': 'STRU/DT',
-      'adtcore:name': args.structure_name,
-      'adtcore:description': description,
-      'adtcore:language': 'EN',
-      'adtcore:packageRef': {
-        'adtcore:name': args.package_name
-      },
-      ...(args.transport_request && {
-        'adtcore:transport': {
-          'adtcore:name': args.transport_request
-        }
-      }),
-      ...(includesXml && { 'ddic:includes': includesXml }),
-      'ddic:fields': {
-        'ddic:field': fieldsXml
-      }
-    }
-  };
-
-  const builder = new XMLBuilder({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    format: true,
-    suppressEmptyNode: true
-  });
-
-  const xmlHeader = '<?xml version="1.0" encoding="UTF-8"?>\n';
-  return xmlHeader + builder.build(structureData);
-}
 
 /**
  * Parse XML response to extract structure creation information
@@ -147,8 +74,8 @@ async function verifyStructureCreation(
 }
 
 /**
- * Create ABAP structure
- * Full workflow: create -> activate -> verify
+ * Create ABAP structure using DDL SQL
+ * Full workflow: create empty -> lock -> add DDL -> unlock -> activate -> verify
  */
 export async function createStructure(
   connection: AbapConnection,
@@ -160,40 +87,72 @@ export async function createStructure(
   if (!params.package_name) {
     throw new Error('Package name is required');
   }
-  if (!params.fields || !Array.isArray(params.fields) || params.fields.length === 0) {
-    throw new Error('At least one field is required');
+  if (!params.ddl_code) {
+    throw new Error('DDL code is required');
   }
 
   const sessionId = generateSessionId();
-  let verifyResult: any = null;
+  let lockHandle: string | null = null;
 
   try {
-    const baseUrl = await connection.getBaseUrl();
-    const createUrl = `${baseUrl}/sap/bc/adt/ddic/structures/${encodeSapObjectName(params.structure_name)}`;
-    const structureXml = buildCreateStructureXml(params);
+    // Step 1: Create empty structure with POST
+    const createUrl = `/sap/bc/adt/ddic/structures${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
+    const description = params.description || params.structure_name;
 
-    const createResponse = await connection.makeAdtRequest({
-      url: createUrl,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: structureXml,
-      headers: {
-        'Content-Type': 'application/vnd.sap.adt.ddic.structures.v1+xml'
-      }
-    });
+    const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.structure_name.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN" adtcore:masterSystem="${process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || 'DEV'}" adtcore:responsible="${process.env.SAP_USER || process.env.SAP_USERNAME || 'DEVELOPER'}">
+  <adtcore:packageRef adtcore:name="${params.package_name.toUpperCase()}"/>
+</blue:blueSource>`;
 
-    parseStructureCreationResponse(createResponse.data);
+    const headers = {
+      'Accept': 'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.structures.v2+xml',
+      'Content-Type': 'application/vnd.sap.adt.structures.v2+xml'
+    };
 
+    const createResponse = await makeAdtRequestWithSession(connection, createUrl, 'POST', sessionId, structureXml, headers);
+
+    // Step 2: Get lockHandle for the created structure
+    lockHandle = await lockStructure(connection, params.structure_name, sessionId);
+
+    // Step 3: Add DDL content to the structure with lockHandle
+    const ddlUrl = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(params.structure_name)}/source/main?lockHandle=${lockHandle}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
+
+    const ddlHeaders = {
+      'Accept': 'application/xml, application/json, text/plain, */*',
+      'Content-Type': 'text/plain; charset=utf-8'
+    };
+
+    const ddlResponse = await makeAdtRequestWithSession(connection, ddlUrl, 'PUT', sessionId, params.ddl_code, ddlHeaders);
+
+    parseStructureCreationResponse(ddlResponse.data);
+
+    // Step 4: Unlock the structure after DDL content is added
+    try {
+      await unlockStructure(connection, params.structure_name, lockHandle, sessionId);
+      lockHandle = null;
+    } catch (unlockError) {
+      // Continue even if unlock fails
+    }
+
+    // Step 5: Activate structure
     try {
       await activateStructure(connection, params.structure_name, sessionId);
     } catch (activateError) {
       // Continue even if activation fails
     }
 
-    // Return the real response from SAP
-    return createResponse;
+    // Return the DDL response
+    return ddlResponse;
 
   } catch (error: any) {
+    // Try to unlock if still locked
+    if (lockHandle) {
+      try {
+        await unlockStructure(connection, params.structure_name, lockHandle, sessionId);
+      } catch (unlockError) {
+        // Ignore unlock errors
+      }
+    }
+
     const errorMessage = error.response?.data
       ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
       : error.message;

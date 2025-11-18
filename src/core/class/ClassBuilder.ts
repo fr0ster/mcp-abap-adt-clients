@@ -57,6 +57,9 @@ export interface ClassBuilderConfig {
   createProtected?: boolean;
   masterSystem?: string;
   responsible?: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface ClassBuilderLogger {
@@ -262,6 +265,13 @@ export class ClassBuilder {
         this.sessionId
       );
       this.lockHandle = lockHandle;
+      this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Class locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {

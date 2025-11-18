@@ -3,6 +3,7 @@
  */
 
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
 import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -51,14 +52,15 @@ export async function lockFunctionGroup(
  * @param functionGroupName - Name of the function group
  * @param lockHandle - Lock handle from lockFunctionGroup
  * @param sessionId - Optional session ID for tracking
+ * @returns AxiosResponse from unlock request
  */
 export async function unlockFunctionGroup(
   connection: AbapConnection,
   functionGroupName: string,
   lockHandle: string,
   sessionId: string = ''
-): Promise<void> {
+): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  await makeAdtRequestWithSession(connection, url, 'POST', sessionId);
+  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
 }

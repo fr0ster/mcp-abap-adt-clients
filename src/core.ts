@@ -1,16 +1,17 @@
 /**
  * Low-level functions export
  *
- * This module exports all low-level functions for direct use.
- * For high-level API, use ClassBuilder from the main package.
+ * NOTE: This module is for INTERNAL USE ONLY within the package.
+ * Low-level functions are not exported externally - use Builders instead.
  *
+ * For high-level API, use Builders from the main package:
  * @example
  * ```typescript
- * import { createClass, lockClass, updateClass, unlockClass, activateClass } from '@mcp-abap-adt/adt-clients/core';
+ * import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
  * ```
  */
 
-// Class operations
+// Class operations (internal use only)
 export * from './core/class/create';
 export * from './core/class/update';
 export * from './core/class/read';

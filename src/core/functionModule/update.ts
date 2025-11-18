@@ -40,6 +40,39 @@ async function uploadFunctionModuleSourceForUpdate(
 }
 
 /**
+ * Update function module source code (internal - uses existing lockHandle)
+ * This function does NOT lock/unlock - it assumes the object is already locked
+ */
+export async function updateFunctionModuleSourceInternal(
+  connection: AbapConnection,
+  functionGroupName: string,
+  functionModuleName: string,
+  lockHandle: string,
+  sourceCode: string,
+  sessionId: string,
+  corrNr?: string
+): Promise<AxiosResponse> {
+  const encodedModuleName = functionModuleName.toUpperCase();
+  await uploadFunctionModuleSourceForUpdate(connection, functionGroupName, encodedModuleName, lockHandle, corrNr, sourceCode, sessionId);
+
+  return {
+    data: {
+      success: true,
+      function_module_name: encodedModuleName,
+      function_group_name: functionGroupName,
+      type: 'FUGR/FF',
+      message: `Function module ${encodedModuleName} source updated successfully`,
+      uri: `/sap/bc/adt/functions/groups/${encodeSapObjectName(functionGroupName).toLowerCase()}/fmodules/${encodeSapObjectName(encodedModuleName).toLowerCase()}`,
+      source_size_bytes: sourceCode.length
+    },
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    config: {} as any
+  } as AxiosResponse;
+}
+
+/**
  * Update function module source code
  * Full workflow: lock -> upload source -> unlock -> activate (optional)
  */

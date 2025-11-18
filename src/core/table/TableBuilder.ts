@@ -42,6 +42,7 @@ import { validateTableName } from './validation';
 import { CreateTableParams } from './types';
 import { UpdateTableParams } from './update';
 import { ValidationResult } from '../shared/validation';
+import { getTableSource } from './read';
 
 export interface TableBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -55,6 +56,9 @@ export interface TableBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   ddlCode?: string;
+  // Optional callback to register lock in persistent storage
+  // Called after successful lock() with: lockHandle, sessionId
+  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface TableBuilderState {
@@ -65,6 +69,7 @@ export interface TableBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -180,6 +185,12 @@ export class TableBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
       this.logger.info?.('Table locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
     } catch (error: any) {
@@ -296,6 +307,24 @@ export class TableBuilder {
     }
   }
 
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+    try {
+      this.logger.info?.('Reading table:', this.config.tableName);
+      const result = await getTableSource(this.connection, this.config.tableName);
+      this.state.readResult = result;
+      this.logger.info?.('Table read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error;
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -355,6 +384,10 @@ export class TableBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
