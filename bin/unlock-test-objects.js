@@ -89,6 +89,7 @@ const { unlockDomain } = require('../dist/core/domain/unlock');
 const { unlockDataElement } = require('../dist/core/dataElement/unlock');
 const { unlockDDLS } = require('../dist/core/view/unlock');
 const { unlockStructure } = require('../dist/core/structure/unlock');
+const { unlockTable } = require('../dist/core/table/unlock');
 const { unlockPackage } = require('../dist/core/package/unlock');
 
 function getConfig() {
@@ -171,6 +172,8 @@ async function unlockObject(connection, lock) {
       return await unlockDDLS(connection, objectName, lockHandle, sessionId);
     case 'structure':
       return await unlockStructure(connection, objectName, lockHandle, sessionId);
+    case 'table':
+      return await unlockTable(connection, objectName, lockHandle, sessionId);
     case 'package':
       return await unlockPackage(connection, objectName, lockHandle, sessionId);
     default:

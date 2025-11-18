@@ -56,11 +56,19 @@ describe('Lock Recovery Integration Test', () => {
   let connection: any = null;
 
   beforeEach(async () => {
-    const config = getConfig();
-    connection = createAbapConnection(config, logger);
-    const env = await setupTestEnvironment(connection, 'lock_recovery', __filename);
-    globalSessionId = env.sessionId;
-    testConfig = env.testConfig;
+    try {
+      const config = getConfig();
+      connection = createAbapConnection(config, logger);
+      const env = await setupTestEnvironment(connection, 'lock_recovery', __filename);
+      globalSessionId = env.sessionId;
+      testConfig = env.testConfig;
+    } catch (error: any) {
+      if (error.message?.includes('Missing or invalid SAP_URL')) {
+        // Skip test if no SAP configuration
+        return;
+      }
+      throw error;
+    }
   });
 
   afterEach(async () => {
@@ -91,6 +99,11 @@ describe('Lock Recovery Integration Test', () => {
       return;
     }
 
+    if (!connection) {
+      logger.warn('⚠️ Skipping test: No SAP configuration available');
+      return;
+    }
+
     logger.info('\n📍 Testing lock recovery mechanism...\n');
 
     // ============================================================
@@ -98,7 +111,16 @@ describe('Lock Recovery Integration Test', () => {
     // ============================================================
     logger.info('PHASE 1: Creating session and lock state...');
 
-    const sapConfig = getConfig();
+    let sapConfig: SapConfig;
+    try {
+      sapConfig = getConfig();
+    } catch (error: any) {
+      if (error.message?.includes('Missing or invalid SAP_URL')) {
+        logger.warn('⚠️ Skipping test: No SAP configuration available');
+        return;
+      }
+      throw error;
+    }
     const client1 = createAbapConnection(sapConfig, logger);
 
     // Setup session persistence for Client1
