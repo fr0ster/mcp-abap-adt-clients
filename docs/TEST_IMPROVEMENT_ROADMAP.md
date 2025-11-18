@@ -1,7 +1,8 @@
 # Test Improvement Roadmap - @mcp-abap-adt/adt-clients
 
 **Created:** 2025-01-XX  
-**Status:** 🚧 Active  
+**Status:** ✅ Mostly Complete  
+**Last Updated:** 2025-01-XX  
 **Goal:** Fix test independence issues and ensure all parameters come from YAML
 
 ---
@@ -34,16 +35,21 @@
 
 ### 🔄 Active Roadmaps
 
-1. **TEST_STRATEGY.md** - 🚧 In Progress
-   - Phase 1: YAML Config Migration - ✅ 100%
-   - Phase 2: Auth + Lock Persistence - ✅ 100%
-   - Phase 3: Test Logging Pattern - ⏳ 20.5%
-   - Phase 4: Cleanup - ⏳ 5%
-   - Phase 5: setupTestEnvironment Migration - ⏳ 20.5%
+1. **TEST_IMPROVEMENT_ROADMAP.md** (this file) - ✅ Mostly Complete
+   - Phase 1: Builder Tests Refactoring - ✅ 100%
+   - Phase 2: Remove Low-Level Tests - ✅ 100%
+   - Phase 3: YAML Parameter Compliance - ⏳ In Progress
 
 2. **TEST_COVERAGE_PLAN.md** - 📋 Planning
    - Focus: Unit tests (not integration tests)
    - Status: Planning phase
+
+### 📦 Archived Roadmaps (Completed/Superseded)
+
+1. **TEST_STRATEGY.md** - ✅ Archived (superseded by TEST_IMPROVEMENT_ROADMAP.md)
+2. **TEST_FIXES_ROADMAP.md** - ✅ Archived (completed)
+3. **TESTING_ROADMAP.md** - ✅ Archived (100% complete)
+4. **TESTS_REFACTORING_ROADMAP.md** - ✅ Archived (merged into TEST_STRATEGY.md)
 
 ---
 
@@ -209,18 +215,18 @@ builder_tests:
 ### 1.4 Files to Update
 
 **All Builder test files (12 files):**
-- [ ] `class/ClassBuilder.test.ts`
-- [ ] `domain/DomainBuilder.test.ts`
-- [ ] `dataElement/DataElementBuilder.test.ts`
-- [ ] `program/ProgramBuilder.test.ts`
-- [ ] `interface/InterfaceBuilder.test.ts`
-- [ ] `functionGroup/FunctionGroupBuilder.test.ts`
-- [ ] `functionModule/FunctionModuleBuilder.test.ts`
-- [ ] `structure/StructureBuilder.test.ts`
-- [ ] `table/TableBuilder.test.ts`
-- [ ] `view/ViewBuilder.test.ts`
-- [ ] `package/PackageBuilder.test.ts`
-- [ ] `transport/TransportBuilder.test.ts` (may not have read, adjust accordingly)
+- [x] `class/ClassBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `domain/DomainBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `dataElement/DataElementBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `program/ProgramBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `interface/InterfaceBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `functionGroup/FunctionGroupBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `functionModule/FunctionModuleBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `structure/StructureBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `table/TableBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `view/ViewBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `package/PackageBuilder.test.ts` ✅ (2 tests: Full workflow + Read standard object)
+- [x] `transport/TransportBuilder.test.ts` ✅ (1 test: Full workflow with read - transports are dynamic)
 
 **YAML structure:**
 ```yaml
@@ -630,28 +636,29 @@ it('should read standard SAP class', async () => {
 
 ## 📊 Implementation Checklist
 
-### Phase 1: Refactor Builder Tests to Two-Test Structure
-- [ ] 1.1 Update all Builder tests to have exactly 2 tests
-- [ ] 1.2 Test 1: Full workflow (validate → create → check inactive → lock → update → check inactive → unlock → activate → check active)
-- [ ] 1.3 Test 2: Read standard object (independent)
-- [ ] 1.4 Add YAML configuration for all Builder tests
+### Phase 1: Refactor Builder Tests to Two-Test Structure ✅ COMPLETE
+- [x] 1.1 Update all Builder tests to have exactly 2 tests ✅ (11 builders with 2 tests, 1 with 1 test - TransportBuilder)
+- [x] 1.2 Test 1: Full workflow (validate → create → check inactive → lock → update → check inactive → unlock → activate → check active) ✅
+- [x] 1.3 Test 2: Read standard object (independent) ✅
+- [x] 1.4 Add YAML configuration for all Builder tests ✅
 
-### Phase 2: Remove Low-Level Function Tests
-- [ ] 2.1 Delete all `read.test.ts` files (11 files)
-- [ ] 2.2 Delete all `check.test.ts` files (11 files)
-- [ ] 2.3 Delete all `lock.test.ts` files (11 files)
-- [ ] 2.4 Delete all `unlock.test.ts` files (10 files)
-- [ ] 2.5 Delete all `create.test.ts` files (11 files)
-- [ ] 2.6 Delete all `update.test.ts` files (11 files)
-- [ ] 2.7 Delete all `activate.test.ts` files (10 files)
-- [ ] 2.8 Delete all `delete.test.ts` files (5 files)
-- [ ] 2.9 Delete all `validate.test.ts` files (2 files)
-- [ ] 2.10 Keep special tests (`run.test.ts`, `shared/*.test.ts`)
+### Phase 2: Remove Low-Level Function Tests ✅ COMPLETE
+- [x] 2.1 Delete all `read.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.2 Delete all `check.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.3 Delete all `lock.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.4 Delete all `unlock.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.5 Delete all `create.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.6 Delete all `update.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.7 Delete all `activate.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.8 Delete all `delete.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.9 Delete all `validate.test.ts` files ✅ (0 files found - all deleted)
+- [x] 2.10 Keep special tests (`run.test.ts`, `shared/*.test.ts`) ✅
+- [x] 2.11 Delete old Client tests (ReadOnlyClient, CrudClient, CheckClient, ManagementClient) ✅
 
-### Phase 3: YAML Parameter Compliance
-- [ ] 3.1 Audit Builder tests for hardcoded values
-- [ ] 3.2 Move all hardcoded values to YAML
-- [ ] 3.3 Remove fallbacks to `getDefaultPackage()`/`getDefaultTransport()`
+### Phase 3: YAML Parameter Compliance ⏳ IN PROGRESS
+- [x] 3.1 Audit Builder tests for hardcoded values ✅ (found getDefaultPackage/getDefaultTransport usage)
+- [ ] 3.2 Move all hardcoded values to YAML ⏳ (some tests still use getDefaultPackage/getDefaultTransport)
+- [ ] 3.3 Remove fallbacks to `getDefaultPackage()`/`getDefaultTransport()` ⏳ (11 files still use fallbacks)
 
 ### Phase 4: Standard Objects Registry
 - [ ] 4.1 Create standard objects registry in YAML
@@ -666,12 +673,12 @@ it('should read standard SAP class', async () => {
 
 ## 🎯 Success Criteria
 
-1. ✅ **Only Builder tests remain** - All low-level function tests removed
-2. ✅ **Two tests per Builder** - Full workflow + read standard object
-3. ✅ **All parameters from YAML** - Zero hardcoded values
-4. ✅ **Test independence** - Read test uses standard objects (no dependencies)
-5. ✅ **Complete coverage** - Full workflow covers all operations
-6. ✅ **Documentation complete** - Builder test pattern and YAML schema documented
+1. ✅ **Only Builder tests remain** - All low-level function tests removed ✅ COMPLETE
+2. ✅ **Two tests per Builder** - Full workflow + read standard object ✅ COMPLETE (11 builders with 2 tests, TransportBuilder with 1)
+3. ⏳ **All parameters from YAML** - Zero hardcoded values ⏳ IN PROGRESS (11 files still use getDefaultPackage/getDefaultTransport)
+4. ✅ **Test independence** - Read test uses standard objects (no dependencies) ✅ COMPLETE
+5. ✅ **Complete coverage** - Full workflow covers all operations ✅ COMPLETE
+6. ⏳ **Documentation complete** - Builder test pattern and YAML schema documented ⏳ PENDING
 
 ---
 
@@ -806,5 +813,23 @@ describe('ClassBuilder', () => {
 ---
 
 **Last Updated:** 2025-01-XX  
-**Status:** 🚧 Planning Phase
+**Status:** ✅ Mostly Complete (Phase 1-2 done, Phase 3 in progress)
+
+## 📊 Current Status Summary
+
+### ✅ Completed
+- **Phase 1:** All Builder tests refactored to 2-test structure (11 builders with 2 tests, TransportBuilder with 1)
+- **Phase 2:** All low-level function tests removed (0 files found)
+- **Phase 2.11:** Old Client tests removed (ReadOnlyClient, CrudClient, CheckClient, ManagementClient)
+- **Lock registration:** All Builders now support `onLock` callback for persistent lock tracking
+- **DDL for structures:** Structures now use DDL SQL instead of XML
+- **E2E test:** testLockRecovery.integration.test.ts fixed to handle missing configuration
+
+### ⏳ In Progress
+- **Phase 3:** YAML parameter compliance - 11 Builder test files still use `getDefaultPackage()`/`getDefaultTransport()` fallbacks
+
+### 📋 Remaining Tasks
+- Remove `getDefaultPackage()`/`getDefaultTransport()` fallbacks from Builder tests
+- Use `environment` section in YAML for common parameters
+- Complete documentation (Phase 5)
 
