@@ -99,38 +99,10 @@ export async function createView(
     await unlockDDLS(connection, viewName, lockHandle, sessionId);
     lockHandle = null;
 
-    const activateResponse = await activateDDLS(connection, viewName, sessionId);
+    await activateDDLS(connection, viewName, sessionId);
 
-    let activationWarnings: string[] = [];
-    if (typeof activateResponse.data === 'string' && activateResponse.data.includes('<chkl:messages')) {
-      const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
-      const result = parser.parse(activateResponse.data);
-      const messages = result?.['chkl:messages']?.['msg'];
-      if (messages) {
-        const msgArray = Array.isArray(messages) ? messages : [messages];
-        activationWarnings = msgArray.map((msg: any) =>
-          `${msg['@_type']}: ${msg['shortText']?.['txt'] || 'Unknown'}`
-        );
-      }
-    }
-
-    return {
-      data: {
-        success: true,
-        view_name: viewName,
-        package_name: params.package_name,
-        transport_request: params.transport_request || null,
-        type: 'DDLS',
-        message: `View ${viewName} created and activated successfully`,
-        uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`,
-        steps_completed: ['create_object', 'lock', 'upload_source', 'unlock', 'activate'],
-        activation_warnings: activationWarnings.length > 0 ? activationWarnings : undefined
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     if (lockHandle) {

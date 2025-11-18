@@ -192,25 +192,8 @@ export async function createProgram(
       await activateProgram(connection, programName, sessionId);
     }
 
-    // Return success response
-    return {
-      data: {
-        success: true,
-        program_name: programName,
-        package_name: params.package_name,
-        transport_request: params.transport_request || null,
-        program_type: params.program_type || '1',
-        type: 'PROG/P',
-        message: shouldActivate
-          ? `Program ${programName} created and activated successfully`
-          : `Program ${programName} created successfully (not activated)`,
-        uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     // Attempt to unlock if we have a lock handle

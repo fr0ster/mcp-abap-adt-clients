@@ -1,49 +1,35 @@
 /**
- * Unit test for Table creation
- * Tests createTable function
+ * Integration test for Table creation
+ * Tests createTable function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/table/create.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/table/create.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { createTable } from '../../../core/table/create';
 import { getTableMetadata } from '../../../core/table/read';
-import { deleteTable } from '../../../core/table/delete';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { deleteObject } from '../../../core/delete';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Table - Create';
+const logger = createTestLogger('TABLE-CREATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Table - Create', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let tableName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      await (connection as any).connect();
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -52,65 +38,113 @@ describe('Table - Create', () => {
     }
   });
 
-  async function ensureTableDoesNotExist(testCase: any): Promise<boolean> {
-    if (!connection || !hasConfig) {
-      return false;
+  beforeEach(async () => {
+    testCase = null;
+    tableName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
     }
+
+    const env = await setupTestEnvironment(connection, 'table_create', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('create_table');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
     try {
-      await getTableMetadata(connection, testCase.params.table_name);
-      logger.debug(`Table ${testCase.params.table_name} exists, attempting to delete...`);
-      try {
-        await deleteTable(connection, { table_name: testCase.params.table_name });
-        logger.debug(`Table ${testCase.params.table_name} deleted successfully`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return true;
-      } catch (deleteError: any) {
-        logger.warn(`Failed to delete table ${testCase.params.table_name}: ${deleteError.message}`);
-        return false;
-      }
+      validateTestCaseForUserSpace(tc, 'create_table');
     } catch (error: any) {
-      if (error.response?.status === 404 || error.response?.status === 401) {
-        logger.debug(`Table ${testCase.params.table_name} does not exist`);
-        return true;
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    tableName = tc.params.table_name;
+
+    // Delete if exists (idempotency)
+    if (tableName) {
+      await deleteIfExists(tableName);
+    }
+  });
+
+  afterEach(async () => {
+    // Cleanup created table
+    if (tableName) {
+      await deleteIgnoringErrors(tableName);
+    }
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function deleteIfExists(name: string): Promise<void> {
+    try {
+      await getTableMetadata(connection, name);
+      logger.debug(`Table ${name} exists, deleting...`);
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'TABL/DT'
+      });
+      const delay = 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      logger.debug(`Table ${name} deleted`);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        logger.debug(`Table ${name} does not exist (OK)`);
+      } else {
+        throw error;
       }
-      throw error;
+    }
+  }
+
+  async function deleteIgnoringErrors(name: string): Promise<void> {
+    try {
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'TABL/DT'
+      });
+      logger.debug(`Cleanup: deleted table ${name}`);
+    } catch (error: any) {
+      logger.debug(`Cleanup: could not delete table ${name} (${error.message})`);
     }
   }
 
   it('should create basic table', async () => {
-    if (!hasConfig || !connection) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !tableName) {
+      logger.skip('Create Test', testCase ? 'Table name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('create_table', 'test_table');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.debug(`Testing create for table: ${tableName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'create_table');
+      const result = await createTable(connection, {
+        table_name: testCase.params.table_name,
+        ddl_code: testCase.params.ddl_code || '',
+        package_name: testCase.params.package_name || getDefaultPackage(),
+        transport_request: testCase.params.transport_request || getDefaultTransport()
+      });
+
+      expect([200, 201]).toContain(result.status);
+      logger.debug(`✓ Table ${tableName} created successfully (status: ${result.status})`);
+
+      // Wait for SAP to register the object
+      const delay = 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Verify table exists
+      const getResult = await getTableMetadata(connection, tableName);
+      expect(getResult.status).toBe(200);
+      logger.debug(`✓ Table ${tableName} verified to exist`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to create table: ${error.message}`);
+      throw error;
     }
-
-    const canProceed = await ensureTableDoesNotExist(testCase);
-    if (!canProceed) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure table ${testCase.params.table_name} does not exist`);
-      return;
-    }
-
-    await createTable(connection, {
-      table_name: testCase.params.table_name,
-      package_name: testCase.params.package_name || getDefaultPackage(),
-      transport_request: testCase.params.transport_request || getDefaultTransport(),
-      ddl_code: testCase.params.ddl_code
-    });
-
-    const result = await getTableMetadata(connection, testCase.params.table_name);
-    expect(result.status).toBe(200);
-  }, 60000);
+  }, getTimeout('test'));
 });
-

@@ -15,6 +15,54 @@ import {
 } from '@mcp-abap-adt/connection';
 import { getLockStateManager } from '../../utils/lockStateManager';
 
+// Track authentication failures to skip dependent tests
+const authFailureMap = new Map<string, boolean>();
+
+/**
+ * Mark authentication as failed for a test suite
+ */
+export function markAuthFailed(testSuiteName: string): void {
+  authFailureMap.set(testSuiteName, true);
+}
+
+/**
+ * Check if authentication failed for a test suite
+ */
+export function hasAuthFailed(testSuiteName: string): boolean {
+  return authFailureMap.get(testSuiteName) === true;
+}
+
+/**
+ * Clear authentication failure flag for a test suite
+ */
+export function clearAuthFailure(testSuiteName: string): void {
+  authFailureMap.delete(testSuiteName);
+}
+
+/**
+ * Check if error is an authentication error and mark test suite as failed if so
+ * @param error The error to check
+ * @param testSuiteName The test suite name to mark as failed
+ * @returns true if it's an auth error, false otherwise
+ */
+export function isAuthError(error: any, testSuiteName?: string): boolean {
+  const isAuth = !!(
+    error?.message?.includes('JWT token has expired') ||
+    error?.message?.includes('authentication') ||
+    error?.message?.includes('Authentication') ||
+    error?.message?.includes('401') ||
+    error?.message?.includes('403') ||
+    error?.response?.status === 401 ||
+    error?.response?.status === 403
+  );
+
+  if (isAuth && testSuiteName) {
+    markAuthFailed(testSuiteName);
+  }
+
+  return isAuth;
+}
+
 interface SessionConfig {
   persist_session?: boolean;
   sessions_dir?: string;
@@ -31,21 +79,38 @@ interface LockConfig {
 interface TestConfig {
   session_config?: SessionConfig;
   lock_config?: LockConfig;
+  test_settings?: {
+    cleanup_before_test?: boolean;
+    cleanup_after_test?: boolean;
+    fail_fast?: boolean;
+    verbose?: boolean;
+    timeout?: number;
+    retry_on_failure?: boolean;
+    max_retries?: number;
+  };
 }
+
+// Global session ID for current test run - shared across all tests in one npm test run
+let currentTestRunSessionId: string | null = null;
 
 /**
  * Generate session ID based on test name and timestamp
- * Includes random component to ensure uniqueness even when tests run in parallel
+ * For integration tests, use single shared session ID per test run
  */
 export function generateSessionId(testName: string, format: string = 'auto'): string {
   if (format !== 'auto') {
     return format;
   }
 
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 9); // 7 random chars
-  const sanitized = testName.replace(/[^a-zA-Z0-9_-]/g, '_');
-  return `${sanitized}_${timestamp}_${random}`;
+  // Use single shared session ID for all tests in current test run
+  // This ensures all tests in one npm test run share the same SAP session (CSRF token, cookies)
+  // But different test runs get different sessions
+  if (!currentTestRunSessionId) {
+    const timestamp = Date.now();
+    currentTestRunSessionId = `integration_test_${timestamp}`;
+  }
+
+  return currentTestRunSessionId;
 }
 
 /**
@@ -185,6 +250,8 @@ export async function setupTestEnvironment(
     autoCleanup: boolean;
   };
   testConfig: TestConfig;
+  shouldCleanupBefore: boolean;
+  shouldCleanupAfter: boolean;
 }> {
   const testConfig = loadTestConfig();
 
@@ -201,11 +268,17 @@ export async function setupTestEnvironment(
     getLockStateManager(lockTracking.locksDir);
   }
 
+  // Read cleanup configuration from test-config.yaml
+  const shouldCleanupBefore = testConfig?.test_settings?.cleanup_before_test ?? true;
+  const shouldCleanupAfter = testConfig?.test_settings?.cleanup_after_test ?? true;
+
   return {
     sessionId,
     sessionStorage,
     lockTracking,
-    testConfig
+    testConfig,
+    shouldCleanupBefore,
+    shouldCleanupAfter
   };
 }
 
@@ -251,6 +324,20 @@ export function getConfig(): SapConfig {
       throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
     }
     config.jwtToken = jwtToken;
+
+    // Add refresh token and UAA credentials for auto-refresh capability
+    const refreshToken = process.env.SAP_REFRESH_TOKEN;
+    if (refreshToken) {
+      config.refreshToken = refreshToken;
+    }
+
+    const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
+    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+
+    if (uaaUrl) config.uaaUrl = uaaUrl;
+    if (uaaClientId) config.uaaClientId = uaaClientId;
+    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
   } else {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;

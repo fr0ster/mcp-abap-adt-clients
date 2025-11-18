@@ -1,257 +1,186 @@
 /**
- * Unit test for createFunctionModule
- * Tests only the create operation in isolation
+ * Integration test for Function Module creation
+ * Tests createFunctionModule function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/functionModule/create.test
- *
- * IDEMPOTENCY PRINCIPLE:
- * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
- * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
- *   This ensures the test always starts from a clean state (object doesn't exist).
- * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
- *   check if the object exists and CREATE it if missing. This ensures the test has
- *   the required object available.
- *
- * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/functionModule/create.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { createFunctionModule } from '../../../core/functionModule/create';
+import { getFunctionMetadata } from '../../../core/functionModule/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { deleteObject } from '../../../core/delete';
-import { getFunction } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { deleteObject } from '../../../core/delete';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'FunctionModule - Create';
+const logger = createTestLogger('FUNC-CREATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Function Module - Create', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let functionModuleName: string | null = null;
+  let functionGroupName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'functionModule_create', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
-      lockTracking = env.lockTracking;
-
-      if (sessionId) {
-        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
-      if (lockTracking?.enabled) {
-        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
-      }
-
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
-      await (connection as any).connect();
-
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
     if (connection) {
-      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });
 
-  // Helper function to ensure function group exists (idempotency)
-  async function ensureFunctionGroupExists(functionGroupName: string, packageName?: string) {
+  beforeEach(async () => {
+    testCase = null;
+    functionModuleName = null;
+    functionGroupName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'functionmodule_create', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('create_function_module', 'test_function_module');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
     try {
-      await getFunctionGroup(connection, functionGroupName);
-      logger.debug(`Function group ${functionGroupName} exists`);
+      validateTestCaseForUserSpace(tc, 'create_function_module');
+    } catch (error: any) {
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    functionModuleName = tc.params.function_module_name;
+    functionGroupName = tc.params.function_group_name;
+
+    // Delete if exists (idempotency)
+    if (functionModuleName && functionGroupName) {
+      await deleteIfExists(functionModuleName);
+    }
+
+    // Ensure function group exists
+    if (functionGroupName) {
+      await ensureFunctionGroupExists(functionGroupName);
+    }
+  });
+
+  afterEach(async () => {
+    // Cleanup created function module
+    if (functionModuleName) {
+      await deleteIgnoringErrors(functionModuleName);
+    }
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureFunctionGroupExists(groupName: string): Promise<void> {
+    try {
+      await getFunctionGroup(connection, groupName);
+      logger.debug(`Function group ${groupName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
-        const fugrTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
-        if (!fugrTestCase) {
-          throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found`);
+        logger.debug(`Function group ${groupName} does not exist, creating...`);
+        const createFGTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
+        if (!createFGTestCase) {
+          throw new Error(`Cannot create function group ${groupName}: create_function_group test case not found`);
         }
         await createFunctionGroup(connection, {
-          function_group_name: functionGroupName,
-          description: fugrTestCase.params.description || `Test FUGR for ${functionGroupName}`,
-          package_name: packageName || fugrTestCase.params.package_name || getDefaultPackage(),
+          function_group_name: groupName,
+          description: createFGTestCase.params.description || `Test FG for ${groupName}`,
+          package_name: createFGTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createFGTestCase.params.transport_request || getDefaultTransport()
         });
-        logger.debug(`Function group ${functionGroupName} created successfully`);
+        logger.debug(`Function group ${groupName} created successfully`);
       } else {
         throw error;
       }
     }
   }
 
-  // Helper function to ensure function module does not exist before creation test (idempotency)
-  async function ensureFunctionModuleDoesNotExist(testCase: any): Promise<boolean> {
-    const functionModuleName = testCase.params?.function_module_name;
-    const functionGroupName = testCase.params?.function_group_name;
-    const objectType = testCase.params?.object_type || 'FUGR/FF';
-
-    if (!functionModuleName || !functionGroupName) {
-      return false;
-    }
+  async function deleteIfExists(name: string): Promise<void> {
+    if (!functionGroupName) return;
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
-      // Object exists, try to delete it
-      logger.debug(`Function module ${functionModuleName} exists, attempting to delete...`);
-      try {
-        await deleteObject(connection, {
-          object_name: functionModuleName,
-          object_type: objectType,
-          function_group_name: functionGroupName,
-        });
-        logger.debug(`Function module ${functionModuleName} deleted successfully`);
-        // Wait a bit for SAP to process deletion
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        // Verify it's truly gone
-        try {
-          await getFunction(connection, functionGroupName, functionModuleName);
-          logger.warn(`Function module ${functionModuleName} still exists after deletion attempt`);
-          return false; // Cannot proceed - object still exists
-        } catch (verifyError: any) {
-          if (verifyError.response?.status === 404) {
-            logger.debug(`Function module ${functionModuleName} confirmed deleted`);
-            return true; // Successfully deleted
-          }
-          throw verifyError;
-        }
-      } catch (deleteError: any) {
-        logger.warn(`Failed to delete function module ${functionModuleName}: ${deleteError.message}`);
-        return false; // Cannot proceed - deletion failed
-      }
+      await getFunctionMetadata(connection, name, functionGroupName);
+      logger.debug(`FunctionModule ${name} exists, deleting...`);
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'FUGR/FF'
+      });
+      const delay = 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      logger.debug(`FunctionModule ${name} deleted`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Function module ${functionModuleName} does not exist`);
-        return true; // Object doesn't exist - can proceed
+        logger.debug(`FunctionModule ${name} does not exist (OK)`);
+      } else {
+        throw error;
       }
-      // If server error (500), try to delete object in case it exists
-      if (error.response?.status >= 500) {
-        logger.warn(`⚠️ Server error checking FM ${functionModuleName}, attempting to delete in case it exists: ${error.message}`);
-        try {
-          await deleteObject(connection, {
-            object_name: functionModuleName,
-            object_type: objectType,
-            function_group_name: functionGroupName,
-          });
-          logger.debug(`Function module ${functionModuleName} deleted after 500 error`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          return true; // Proceed after deletion attempt
-        } catch (deleteError: any) {
-          // If deletion also fails, assume object doesn't exist and proceed
-          logger.warn(`⚠️ Could not delete FM ${functionModuleName} after 500 error: ${deleteError.message}`);
-          return true; // Assume object doesn't exist - can proceed
-        }
-      }
-      throw error;
     }
   }
 
-  it('should create function module', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
-      return;
-    }
-
-    const testCase = getEnabledTestCase('create_function_module', 'test_function_module');
-    if (!testCase) {
-      return; // Skip silently if test case not configured
-    }
-
-    const functionModuleName = testCase.params?.function_module_name;
-    const functionGroupName = testCase.params?.function_group_name;
-    const packageName = testCase.params?.package_name;
-    const sourceCode = testCase.params?.source_code;
-    const objectType = testCase.params?.object_type || 'FUGR/FF';
-
-    if (!functionModuleName || !functionGroupName) {
-      return; // Skip silently if required params missing
-    }
-
-    // Validate that function module and function group are in user space (Z_ or Y_)
+  async function deleteIgnoringErrors(name: string): Promise<void> {
     try {
-      validateTestCaseForUserSpace(testCase, 'create_function_module');
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'FUNC/F'
+      });
+      logger.debug(`Cleanup: deleted function module ${name}`);
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
+      logger.debug(`Cleanup: could not delete function module ${name} (${error.message})`);
+    }
+  }
+
+  it('should create basic function module', async () => {
+    if (!testCase || !functionModuleName || !functionGroupName) {
+      logger.skip('Create Test', testCase ? 'FunctionModule or FunctionGroup name not set' : 'Test case not configured');
       return;
     }
 
-    // Ensure function group exists (idempotency)
-    await ensureFunctionGroupExists(functionGroupName, packageName);
+    logger.debug(`Testing create for function module: ${functionModuleName} in ${functionGroupName}`);
 
-    // Ensure function module does not exist before creation (idempotency)
-    // This will delete the object if it exists
-    const canProceed = await ensureFunctionModuleDoesNotExist(testCase);
-    if (!canProceed) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure function module ${functionModuleName} does not exist`);
-      return;
-    }
-
-    // Create FM
     try {
-      await createFunctionModule(connection, {
-        function_module_name: functionModuleName,
-        function_group_name: functionGroupName,
-        description: testCase.params?.description,
-        package_name: packageName,
-        source_code: sourceCode,
+      const result = await createFunctionModule(connection, {
+        function_module_name: testCase.params.function_module_name,
+        function_group_name: testCase.params.function_group_name,
+        description: testCase.params.description,
+        source_code: testCase.params.source_code || ''
       });
 
-      logger.debug(`✅ Created function module: ${functionModuleName}`);
+      expect([200, 201]).toContain(result.status);
+      logger.debug(`✓ Function module ${functionModuleName} created successfully (status: ${result.status})`);
 
-      // Verify creation
-      const result = await getFunction(connection, functionGroupName, functionModuleName);
-      expect(result.status).toBe(200);
-      expect(result.data).toContain(functionModuleName);
-      logger.debug(`✅ Verified FM creation`);
+      // Wait for SAP to register the object
+      const delay = 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Verify function module exists
+      const getResult = await getFunctionMetadata(connection, functionModuleName, functionGroupName);
+      expect(getResult.status).toBe(200);
+      logger.debug(`✓ FunctionModule ${functionModuleName} verified to exist`);
+
     } catch (error: any) {
-      // S_ABPLNGVS error means function module name violates SAP naming rules
-      // (must start with Z_ or Y_ for non-SAP/non-partner users)
-      // This is caught by validation, not an authorization issue
-      if (error.message.includes('S_ABPLNGVS')) {
-        logger.warn(`⚠️ Skipping create test: ${error.message} (Function module name must start with Z_ or Y_ for non-SAP/non-partner users)`);
-        return;
-      }
-      // If server error (500), might be due to missing source_code or other issues
-      if (error.response?.status >= 500) {
-        logger.warn(`⚠️ Skipping create test: Server error creating FM: ${error.message}`);
-        return;
-      }
+      logger.error(`✗ Failed to create function module: ${error.message}`);
       throw error;
     }
-  }, 30000);
+  }, getTimeout('test'));
 });

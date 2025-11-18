@@ -1,97 +1,73 @@
 /**
- * Unit test for Data Element update
- * Tests updateDataElement function
+ * Integration test for Data Element update
+ * Tests updateDataElement function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/dataElement/update.test
- *
- * IDEMPOTENCY PRINCIPLE:
- * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
- * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
- *   This ensures the test always starts from a clean state (object doesn't exist).
- * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
- *   check if the object exists and CREATE it if missing. This ensures the test has
- *   the required object available.
- *
- * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/dataElement/update.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { updateDataElement } from '../../../core/dataElement/update';
 import { getDataElement } from '../../../core/dataElement/read';
 import { createDataElement } from '../../../core/dataElement/create';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Data Element - Update';
+const logger = createTestLogger('DTEL-UPDATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Data Element - Update', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let dataElementName: string | null = null;
 
-  beforeEach(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'dataElement_update', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
-      lockTracking = env.lockTracking;
-
-      if (sessionId) {
-        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
-      if (lockTracking?.enabled) {
-        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
-      }
-
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
-      await (connection as any).connect();
-
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+  beforeAll(async () => {
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
-      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });
 
-  // Helper function to ensure domain exists (data elements require a domain)
+  beforeEach(async () => {
+    testCase = null;
+    dataElementName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'dataElement_update', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('update_data_element', 'test_data_element');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    dataElementName = tc.params.data_element_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
   async function ensureDomainExists(domainName: string): Promise<void> {
     try {
       await getDomain(connection, domainName);
@@ -100,62 +76,55 @@ describe('Data Element - Update', () => {
       if (error.response?.status === 404) {
         logger.debug(`Domain ${domainName} does not exist, creating...`);
         const createDomainTestCase = getEnabledTestCase('create_domain', 'test_domain');
-        if (createDomainTestCase) {
-          await createDomain(connection, {
-            domain_name: domainName,
-            description: `Test domain for ${domainName}`,
-            package_name: createDomainTestCase.params.package_name || getDefaultPackage(),
-            transport_request: createDomainTestCase.params.transport_request || getDefaultTransport(),
-            datatype: createDomainTestCase.params.datatype || 'CHAR',
-            length: createDomainTestCase.params.length || 10,
-            decimals: createDomainTestCase.params.decimals,
-            lowercase: createDomainTestCase.params.lowercase,
-            sign_exists: createDomainTestCase.params.sign_exists,
-          });
-          logger.debug(`Domain ${domainName} created successfully`);
-        } else {
+        if (!createDomainTestCase) {
           throw new Error(`Cannot create domain ${domainName}: create_domain test case not found`);
         }
+        await createDomain(connection, {
+          domain_name: domainName,
+          description: `Test domain for ${domainName}`,
+          package_name: createDomainTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createDomainTestCase.params.transport_request || getDefaultTransport(),
+          datatype: createDomainTestCase.params.datatype || 'CHAR',
+          length: createDomainTestCase.params.length || 10,
+          decimals: createDomainTestCase.params.decimals,
+          lowercase: createDomainTestCase.params.lowercase,
+          sign_exists: createDomainTestCase.params.sign_exists,
+        });
+        logger.debug(`Domain ${domainName} created successfully`);
       } else {
         throw error;
       }
     }
   }
 
-  // Helper function to ensure data element exists before test (idempotency)
-  async function ensureDataElementExists(testCase: any) {
-    const dataElementName = testCase.params.data_element_name;
+  async function ensureDataElementExists(testCase: any): Promise<void> {
+    const dtelName = testCase.params.data_element_name;
 
     try {
-      await getDataElement(connection, dataElementName);
-      logger.debug(`Data element ${dataElementName} exists`);
+      await getDataElement(connection, dtelName);
+      logger.debug(`Data element ${dtelName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Data element ${dataElementName} does not exist, creating...`);
+        logger.debug(`Data element ${dtelName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_data_element', 'test_data_element');
-        if (createTestCase) {
-          try {
-            // Ensure domain exists first
-            await ensureDomainExists(createTestCase.params.domain_name);
-
-            await createDataElement(connection, {
-              data_element_name: dataElementName,
-              description: createTestCase.params.description || `Test data element for ${dataElementName}`,
-              package_name: createTestCase.params.package_name || getDefaultPackage(),
-              transport_request: createTestCase.params.transport_request || getDefaultTransport(),
-              domain_name: createTestCase.params.domain_name,
-              short_label: createTestCase.params.short_label,
-              medium_label: createTestCase.params.medium_label,
-              long_label: createTestCase.params.long_label,
-              heading_label: createTestCase.params.heading_label,
-            });
-            logger.debug(`Data element ${dataElementName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create data element ${dataElementName}: create_data_element test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create data element ${dtelName}: create_data_element test case not found`);
         }
+
+        await ensureDomainExists(createTestCase.params.domain_name);
+
+        await createDataElement(connection, {
+          data_element_name: dtelName,
+          description: createTestCase.params.description || `Test data element for ${dtelName}`,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createTestCase.params.transport_request || getDefaultTransport(),
+          domain_name: createTestCase.params.domain_name,
+          short_label: createTestCase.params.short_label,
+          medium_label: createTestCase.params.medium_label,
+          long_label: createTestCase.params.long_label,
+          heading_label: createTestCase.params.heading_label,
+        });
+        logger.debug(`Data element ${dtelName} created successfully`);
       } else {
         throw error;
       }
@@ -163,36 +132,25 @@ describe('Data Element - Update', () => {
   }
 
   it('should update data element', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !dataElementName) {
+      logger.skip('Update Test', testCase ? 'Data element name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('update_data_element', 'test_data_element');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    // Validate that data element is in user space (Z_ or Y_)
     try {
       validateTestCaseForUserSpace(testCase, 'update_data_element');
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
+      logger.skip('Update Test', error.message);
       return;
     }
 
-    // Ensure data element exists before test (idempotency)
+    logger.info(`Testing update for data element: ${dataElementName}`);
+
     try {
       await ensureDataElementExists(testCase);
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure data element exists: ${error.message}`);
-      return;
-    }
 
-    try {
       await updateDataElement(connection, {
-        data_element_name: testCase.params.data_element_name,
+        data_element_name: dataElementName,
         description: testCase.params.description,
         package_name: testCase.params.package_name || getDefaultPackage(),
         transport_request: testCase.params.transport_request || getDefaultTransport(),
@@ -203,40 +161,22 @@ describe('Data Element - Update', () => {
         heading_label: testCase.params.heading_label,
         activate: testCase.params.activate,
       });
+      logger.debug(`✓ Data element ${dataElementName} updated`);
+
+      const result = await getDataElement(connection, dataElementName);
+      expect(result.status).toBe(200);
+      if (testCase.params.description) {
+        expect(result.data).toContain(testCase.params.description);
+      }
+      logger.info(`✓ Data element ${dataElementName} updated successfully`);
+
     } catch (error: any) {
-      // If update fails with 400, it might be because object doesn't exist or is not locked
       if (error.response?.status === 400) {
-        logger.warn(`⚠️ Update failed with 400 Bad Request - data element ${testCase.params.data_element_name} may not exist or may not be locked`);
-        // Verify if object exists
-        try {
-          const checkResult = await getDataElement(connection, testCase.params.data_element_name);
-          if (checkResult.status === 200) {
-            logger.warn(`⚠️ Data element exists but update failed - may need to be locked first or object is locked by another user`);
-            // Skip test - object exists but cannot be updated
-            return;
-          }
-        } catch (checkError: any) {
-          if (checkError.response?.status === 404) {
-            logger.warn(`⚠️ Data element does not exist - skipping update test`);
-            return;
-          }
-          // If we can't check, skip the test
-          logger.warn(`⚠️ Cannot verify data element existence - skipping update test`);
-          return;
-        }
-        // If we get here, object exists but update failed - skip test
+        logger.skip('Update Test', `Update failed (400) - object may be locked by another user`);
         return;
       }
-      // For other errors, fail the test
+      logger.error(`✗ Failed to update data element: ${error.message}`);
       throw error;
     }
-
-    // Verify update by reading
-    const result = await getDataElement(connection, testCase.params.data_element_name);
-    expect(result.status).toBe(200);
-    if (testCase.params.description) {
-      expect(result.data).toContain(testCase.params.description);
-    }
-  }, 60000);
+  }, getTimeout('test'));
 });
-

@@ -1,49 +1,36 @@
 /**
- * Unit test for View syntax checking
- * Tests checkView function
+ * Integration test for View syntax check
+ * Tests checkView function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/view/check.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/view/check.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { checkView } from '../../../core/view/check';
 import { getViewMetadata } from '../../../core/view/read';
 import { createView } from '../../../core/view/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'View - Check';
+const logger = createTestLogger('VIEW-CHECK');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('View - Check', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let viewName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -52,31 +39,62 @@ describe('View - Check', () => {
     }
   });
 
-  async function ensureViewExists(testCase: any) {
-    const viewName = testCase.params.view_name;
+  beforeEach(async () => {
+    testCase = null;
+    viewName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'view_check', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('check_view');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
 
     try {
-      await getViewMetadata(connection, viewName);
-      logger.debug(`View ${viewName} exists`);
+      validateTestCaseForUserSpace(tc, 'check_view');
+    } catch (error: any) {
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    viewName = tc.params.view_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureViewExists(testCase: any): Promise<void> {
+    const vName = testCase.params.view_name;
+
+    try {
+      await getViewMetadata(connection, vName);
+      logger.debug(`View ${vName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`View ${viewName} does not exist, creating...`);
+        logger.debug(`View ${vName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_view', 'test_view');
-        if (createTestCase) {
-          try {
-            await createView(connection, {
-              view_name: viewName,
-              package_name: createTestCase.params.package_name || getDefaultPackage(),
-              transport_request: createTestCase.params.transport_request || getDefaultTransport(),
-              ddl_source: createTestCase.params.ddl_source || createTestCase.params.ddl_code
-            });
-            logger.debug(`View ${viewName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create view ${viewName}: create_view test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create view ${vName}: create_view test case not found`);
         }
+
+        await createView(connection, {
+          view_name: vName,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createTestCase.params.transport_request || getDefaultTransport(),
+          ddl_source: createTestCase.params.ddl_source || createTestCase.params.ddl_code
+        });
+        logger.debug(`View ${vName} created successfully`);
       } else {
         throw error;
       }
@@ -84,67 +102,48 @@ describe('View - Check', () => {
   }
 
   it('should check view syntax (active version)', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !viewName) {
+      logger.skip('Check Test', testCase ? 'View name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('check_view');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing syntax check for view (active): ${viewName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'check_view');
+      await ensureViewExists(testCase);
+
+      const checkSessionId = generateSessionId();
+      const result = await checkView(connection, viewName, 'active', checkSessionId);
+      expect(result.status).toBeGreaterThanOrEqual(200);
+      expect(result.status).toBeLessThan(500);
+      logger.info(`✓ View ${viewName} syntax check (active) completed`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to check view syntax: ${error.message}`);
+      throw error;
     }
-
-    await ensureViewExists(testCase);
-
-    const sessionId = generateSessionId();
-    const result = await checkView(
-      connection,
-      testCase.params.view_name,
-      'active',
-      sessionId
-    );
-    expect(result.status).toBeGreaterThanOrEqual(200);
-    expect(result.status).toBeLessThan(500);
-  }, 30000);
+  }, getTimeout('test'));
 
   it('should check view syntax (inactive version)', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !viewName) {
+      logger.skip('Check Test', testCase ? 'View name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('check_view');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing syntax check for view (inactive): ${viewName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'check_view');
+      await ensureViewExists(testCase);
+
+      const checkSessionId = generateSessionId();
+      const result = await checkView(connection, viewName, 'inactive', checkSessionId);
+      expect(result.status).toBeGreaterThanOrEqual(200);
+      expect(result.status).toBeLessThan(500);
+      logger.info(`✓ View ${viewName} syntax check (inactive) completed`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to check view syntax: ${error.message}`);
+      throw error;
     }
-
-    await ensureViewExists(testCase);
-
-    const sessionId = generateSessionId();
-    const result = await checkView(
-      connection,
-      testCase.params.view_name,
-      'inactive',
-      sessionId
-    );
-    expect(result.status).toBeGreaterThanOrEqual(200);
-    expect(result.status).toBeLessThan(500);
-  }, 30000);
+  }, getTimeout('test'));
 });
-

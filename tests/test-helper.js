@@ -189,13 +189,64 @@ function validateTestCaseForUserSpace(testCase, operation = 'operation') {
   }
 }
 
+/**
+ * Get timeout for specific operation type or handler
+ * @param {string} operationType - Type of operation (e.g., 'create', 'read', 'update')
+ * @param {string} [handlerName] - Optional handler name for handler-specific timeout
+ * @returns {number} Timeout in milliseconds
+ */
+function getTimeout(operationType, handlerName) {
+  const config = loadTestConfig();
+  const timeouts = config.test_settings?.timeouts || {};
+
+  // Check for handler-specific timeout override
+  if (handlerName && timeouts[handlerName]) {
+    return timeouts[handlerName];
+  }
+
+  // Check for operation-specific timeout
+  if (timeouts[operationType]) {
+    return timeouts[operationType];
+  }
+
+  // Fall back to default timeout
+  return timeouts.default || 60000;
+}
+
+/**
+ * Get global test timeout from configuration
+ * @returns {number} Test timeout in milliseconds
+ */
+function getTestTimeout() {
+  const config = loadTestConfig();
+  return config.test_settings?.timeout || 60000;
+}
+
 // Auto-load environment variables when module is imported
 loadTestEnv();
+
+/**
+ * Get test case definition regardless of enabled flag
+ * @param {string} handlerName
+ * @param {string} testCaseName
+ * @returns {object|null}
+ */
+function getTestCaseDefinition(handlerName, testCaseName) {
+  const config = loadTestConfig();
+  const handlerTests = config[handlerName]?.test_cases || [];
+
+  if (!testCaseName) {
+    return handlerTests[0] || null;
+  }
+
+  return handlerTests.find(tc => tc.name === testCaseName) || null;
+}
 
 module.exports = {
   loadTestConfig,
   getEnabledTestCase,
   getAllEnabledTestCases,
+  getTestCaseDefinition,
   getTestSettings,
   getEnvironmentConfig,
   getDefaultPackage,
@@ -203,5 +254,7 @@ module.exports = {
   loadTestEnv,
   validateUserSpaceObject,
   validateTestCaseForUserSpace,
+  getTimeout,  // Add getTimeout from root helper
+  getTestTimeout,  // Add getTestTimeout from root helper
 };
 

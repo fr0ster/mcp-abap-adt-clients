@@ -293,6 +293,26 @@ export class ProgramBuilder {
     }
   }
 
+  async forceUnlock(): Promise<void> {
+    if (!this.lockHandle) {
+      return;
+    }
+    try {
+      await unlockProgram(
+        this.connection,
+        this.config.programName,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.logger.info?.('Force unlock successful for', this.config.programName);
+    } catch (error: any) {
+      this.logger.warn?.('Force unlock failed:', error);
+    } finally {
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+    }
+  }
+
   // Getters for accessing results
   getState(): Readonly<ProgramBuilderState> {
     return { ...this.state };

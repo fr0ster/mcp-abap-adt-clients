@@ -13,50 +13,93 @@ import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, markAuthFailed, hasAuthFailed, getConfig } from '../../helpers/sessionConfig';
+import { registerTestLock, unregisterTestLock } from '../../helpers/lockHelper';
+import { createTestLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
+const logger = createTestLogger('FunctionModule - Lock/Unlock');
 
-describe('FunctionModule - Lock', () => {
+const TEST_SUITE_NAME = 'FunctionModule - Lock';
+
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let lockHandle: string | null = null;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let functionModuleName: string | null = null;
 
   beforeEach(async () => {
+    lockHandle = null;
+    testCase = null;
+    functionModuleName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Lock/Unlock test', 'Authentication failed in previous test');
+      return;
+    }
+
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+
+      const env = await setupTestEnvironment(connection, 'functionModule_lock', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+      lockTracking = env.lockTracking;
+
+      if (lockTracking?.enabled) {
+        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
+      }
+
+      await (connection as any).connect();
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+
+      // Get and validate test case
+      const tc = getEnabledTestCase('lock_functionModule', 'test_functionModule_lock');
+      if (!tc) {
+        logger.skip('Lock/Unlock test', 'Test case not enabled in test-config.yaml');
+        testCase = null;
+        functionModuleName = null;
+        return;
+      }
+
+      testCase = tc;
+      functionModuleName = tc.params.function_module_name;
+    } catch (error: any) {
+      logger.error('❌ Authentication/Connection failed - marking all tests to skip');
+      logger.error(`   Error: ${error.message}`);
+      markAuthFailed(TEST_SUITE_NAME);
       hasConfig = false;
+      testCase = null;
+      functionModuleName = null;
     }
   });
 
   afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }
+    lockHandle = null;
   });
 
   // Helper function to ensure function group exists
-  async function ensureFunctionGroupExists(functionGroupName: string, packageName?: string) {
+  async function ensureFunctionGroupExists(testCase: any) {
+    const functionGroupName = testCase.params.function_group_name;
     try {
       await getFunctionGroup(connection, functionGroupName);
       logger.debug(`Function group ${functionGroupName} exists`);
@@ -68,7 +111,7 @@ describe('FunctionModule - Lock', () => {
           await createFunctionGroup(connection, {
             function_group_name: functionGroupName,
             description: `Test function group for ${functionGroupName}`,
-            package_name: packageName || createFugrTestCase.params.package_name || getDefaultPackage(),
+            package_name: testCase.params.package_name || createFugrTestCase.params.package_name || getDefaultPackage(),
             transport_request: createFugrTestCase.params.transport_request,
           });
           logger.debug(`Function group ${functionGroupName} created successfully`);
@@ -80,7 +123,6 @@ describe('FunctionModule - Lock', () => {
       }
     }
   }
-
   // Helper function to ensure function module exists before test (idempotency)
   async function ensureFunctionModuleExists(testCase: any) {
     const functionGroupName = testCase.params.function_group_name;
@@ -117,50 +159,57 @@ describe('FunctionModule - Lock', () => {
   }
 
   it('should lock function module and get lock handle', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
-      return;
+    if (!testCase || !functionModuleName) {
+      return; // Already logged in beforeEach
     }
 
-    const testCase = getEnabledTestCase('lock_function_module');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    try {
-      validateTestCaseForUserSpace(testCase, 'lock_function_module');
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
-    }
-
+    await ensureFunctionGroupExists(testCase);
     await ensureFunctionModuleExists(testCase);
 
-    const sessionId = generateSessionId();
-    const lockHandle = await lockFunctionModule(
+    const testSessionId = sessionId || generateSessionId();
+    lockHandle = await lockFunctionModule(
       connection,
+      functionModuleName,
       testCase.params.function_group_name,
-      testCase.params.function_module_name,
-      sessionId
+      testSessionId
     );
 
     expect(lockHandle).toBeDefined();
     expect(typeof lockHandle).toBe('string');
     expect(lockHandle.length).toBeGreaterThan(0);
 
+    // Register lock in persistent storage
+    if (lockTracking?.enabled) {
+      registerTestLock(
+        'fm',
+        functionModuleName,
+        testSessionId,
+        lockHandle,
+        testCase.params.function_group_name,
+        __filename
+      );
+      logger.debug(`✓ Lock registered in ${lockTracking.locksDir}`);
+    }
+
     // Unlock after test
     try {
       await unlockFunctionModule(
         connection,
         testCase.params.function_group_name,
-        testCase.params.function_module_name,
+        functionModuleName,
         lockHandle,
-        sessionId
+        testSessionId
       );
+
+      // Unregister lock from persistent storage
+      if (lockTracking?.enabled) {
+        unregisterTestLock('fm', functionModuleName, testCase.params.function_group_name);
+        logger.debug(`✓ Lock unregistered from ${lockTracking.locksDir}`);
+      }
     } catch (error) {
-      // Ignore unlock errors
+      logger.error(`Failed to unlock function module: ${error}`);
+      throw error;
     }
-  }, 30000);
+  }, getTimeout('test'));
 });
 

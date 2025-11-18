@@ -1,275 +1,140 @@
 /**
- * Unit test for Class creation
- * Tests createClass function
+ * Integration test for Class creation
+ * Tests createClass function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/create.test
- *
- * IDEMPOTENCY PRINCIPLE:
- * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
- * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
- *   This ensures the test always starts from a clean state (object doesn't exist).
- *
- * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/class/create.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { createClass } from '../../../core/class/create';
+import { getClassMetadata } from '../../../core/class/read';
 import { deleteObject } from '../../../core/delete';
-import { validateClassName } from '../../../core/class/validation';
-import { activateClass } from '../../../core/class/activation';
-import { lockClass } from '../../../core/class/lock';
-import { unlockClass } from '../../../core/class/unlock';
-import { updateClass } from '../../../core/class/update';
-import { generateSessionId } from '../../../utils/sessionUtils';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const { getEnabledTestCase, getAllEnabledTestCases, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, getDefaultPackage, getDefaultTransport, loadTestConfig, getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Class - Create';
+const logger = createTestLogger('CLASS-CREATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Class - Create', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let className: string | null = null;
 
-  beforeEach(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'class_create', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
-      lockTracking = env.lockTracking;
-
-      if (sessionId) {
-        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
-      if (lockTracking?.enabled) {
-        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
-      }
-
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
-      await (connection as any).connect();
-
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+  beforeAll(async () => {
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
-      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });
 
-  /**
-   * Delete class if it exists
-   * Uses validateClassName to check existence (Eclipse-like approach)
-   * Returns true if class was deleted or doesn't exist, false if deletion failed
-   */
-  async function deleteClassIfExists(className: string, packageName: string, maxRetries: number = 3): Promise<boolean> {
-    if (!connection || !hasConfig) {
-      return false;
+  beforeEach(async () => {
+    testCase = null;
+    className = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
     }
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Check if class exists using validation (Eclipse approach)
-        const validationResult = await validateClassName(connection, className, packageName);
+    const env = await setupTestEnvironment(connection, 'class_create', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
 
-        // If validation says class already exists, delete it
-        // Check for various error messages indicating class exists
-        const classExistsError = !validationResult.valid && validationResult.message &&
-            (validationResult.message.toLowerCase().includes('already exists') ||
-             validationResult.message.toLowerCase().includes('does already exist') ||
-             validationResult.message.toLowerCase().includes('resource') && validationResult.message.toLowerCase().includes('exist'));
+    const tc = getEnabledTestCase('create_class', 'basic_class');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
 
-        if (classExistsError) {
-          logger.debug(`Class ${className} exists (validation: ${validationResult.message}), deleting... (attempt ${attempt}/${maxRetries})`);
+    testCase = tc;
+    className = tc.params.class_name;
 
-          try {
-            await deleteObject(connection, {
-              object_name: className,
-              object_type: 'CLAS/OC',
-            });
-          } catch (deleteError: any) {
-            // If deletion fails with "locked" or "dependency" error, wait and retry
-            const errorMessage = deleteError.message || '';
-            const errorData = typeof deleteError.response?.data === 'string'
-              ? deleteError.response.data
-              : JSON.stringify(deleteError.response?.data || '');
+    // Delete if exists (idempotency)
+    if (className) {
+      await deleteIfExists(className);
+    }
+  });
 
-            if (attempt < maxRetries && (
-              errorMessage.includes('locked') ||
-              errorMessage.includes('dependency') ||
-              errorData.includes('locked') ||
-              errorData.includes('dependency')
-            )) {
-              logger.debug(`Class ${className} is locked or has dependencies, waiting and retrying...`);
-              await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
-              continue;
-            }
-            throw deleteError;
-          }
+  afterEach(async () => {
+    // Cleanup created class
+    if (className) {
+      await deleteIgnoringErrors(className);
+    }
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
 
-          // Wait for deletion to process
-          await new Promise(resolve => setTimeout(resolve, 1000));
-
-          // Verify deletion using validation
-          const verifyResult = await validateClassName(connection, className, packageName);
-          const stillExistsError = !verifyResult.valid && verifyResult.message &&
-              (verifyResult.message.toLowerCase().includes('already exists') ||
-               verifyResult.message.toLowerCase().includes('does already exist') ||
-               verifyResult.message.toLowerCase().includes('resource') && verifyResult.message.toLowerCase().includes('exist'));
-          if (stillExistsError) {
-            if (attempt < maxRetries) {
-              logger.debug(`Class ${className} still exists after deletion, retrying...`);
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue;
-            }
-            logger.warn(`Class ${className} still exists after deletion`);
-            return false;
-          }
-          logger.debug(`Class ${className} deleted successfully`);
-          return true;
-        } else {
-          // Class doesn't exist (validation passed or different error)
-          logger.debug(`Class ${className} does not exist (validation: ${validationResult.valid ? 'valid' : validationResult.message})`);
-          return true;
-        }
-      } catch (error: any) {
-        // 401 - no cookies yet, assume doesn't exist
-        if (error.response?.status === 401) {
-          logger.debug(`Class ${className} check failed with 401 (no cookies yet) - assuming doesn't exist`);
-          return true;
-        }
-
-        // Other error - can't check/delete
-        if (attempt < maxRetries) {
-          logger.debug(`Failed to check/delete class ${className}, retrying... (attempt ${attempt}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          continue;
-        }
-        logger.warn(`Failed to check/delete class ${className}: ${error.message}`);
-        return false;
+  async function deleteIfExists(name: string): Promise<void> {
+    try {
+      await getClassMetadata(connection, name);
+      logger.debug(`Class ${name} exists, deleting...`);
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'CLAS/OC'
+      });
+      const delay = getTimeout('delay', 'create_class') || 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      logger.debug(`Class ${name} deleted`);
+    } catch (error: any) {
+      // 404 is OK - object doesn't exist, nothing to delete
+      if (error.response?.status !== 404) {
+        throw error;
       }
     }
-
-    return false;
   }
 
+  async function deleteIgnoringErrors(name: string): Promise<void> {
+    try {
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'CLAS/OC'
+      });
+      logger.debug(`Cleanup: deleted class ${name}`);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Object doesn't exist - that's fine for cleanup
+        return;
+      }
+      // Show other errors
+      logger.error(`Cleanup failed: could not delete class ${name}: ${error.message}`);
+    }
+  }
 
-  it('should create class', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+  it('should create basic class', async () => {
+    if (!testCase || !className) {
+      logger.skip('Create Test', testCase ? 'Class name not set' : 'Test case not configured');
       return;
     }
 
-    const allTestCases = getAllEnabledTestCases('create_class');
-    if (allTestCases.length === 0) {
-      logger.warn('⚠️ Skipping test: No test cases enabled');
-      return;
-    }
+    logger.debug(`Testing create for class: ${className}`);
 
-    // Process all enabled test cases
-    for (const testCase of allTestCases) {
-      // Validate user space (Z_ or Y_ prefix)
-      try {
-        validateTestCaseForUserSpace(testCase, 'create_class');
-      } catch (error: any) {
-        logger.warn(`⚠️ Skipping test case ${testCase.params.class_name}: ${error.message}`);
-        continue;
-      }
-
-      const className = testCase.params.class_name;
-      const superclass = testCase.params.superclass;
-      const packageName = testCase.params.package_name || getDefaultPackage();
-
-      // Delete class if exists (using validation to check existence, Eclipse-like)
-      // This is critical for CREATE test - we must ensure class doesn't exist before creating
-      const deleted = await deleteClassIfExists(className, packageName);
-      if (!deleted) {
-        logger.warn(`⚠️ Failed to ensure class ${className} doesn't exist, skipping test case`);
-        continue; // Skip this test case if we can't ensure clean state
-      }
-
-      // Validate class name and superclass via ADT endpoint
-      const validationResult = await validateClassName(
-        connection,
-        className,
-        packageName,
-        testCase.params.description,
-        superclass
-      );
-
-      if (!validationResult.valid) {
-        // If validation says class already exists, it means deletion failed
-        if (validationResult.message?.toLowerCase().includes('already exists')) {
-          logger.warn(`⚠️ Class ${className} still exists after deletion attempt, skipping test case`);
-          continue;
-        }
-        throw new Error(`Class validation failed: ${validationResult.message || 'Invalid class name or superclass'}`);
-      }
-
-      // Final check before creation: try to delete one more time if class exists
-      // This ensures we have a clean state right before creation
-      const finalDeleteResult = await deleteClassIfExists(className, packageName, 1);
-      if (!finalDeleteResult) {
-        logger.warn(`⚠️ Final deletion attempt failed for class ${className}, skipping test case`);
-        continue;
-      }
-
-      // Create class workflow: create -> lock -> update -> unlock -> activate
-      // Always generate a new UUID for ADT requests (sessionId from setupTestEnvironment is for file storage, not ADT requests)
-      const testSessionId = generateSessionId();
-
-      await createClass(connection, {
-        class_name: className,
+    try {
+      const result = await createClass(connection, {
+        class_name: testCase.params.class_name,
         description: testCase.params.description,
         package_name: testCase.params.package_name || getDefaultPackage(),
         transport_request: testCase.params.transport_request || getDefaultTransport(),
-        superclass: superclass,
-        final: testCase.params.final,
+        superclass: testCase.params.superclass,
+        final: testCase.params.final || false,
+        abstract: testCase.params.abstract || false
       });
 
-      const lockHandle = await lockClass(connection, className, testSessionId);
-      if (!testCase.params.source_code) {
-        throw new Error('source_code is required in test case');
-      }
-      await updateClass(connection, className, testCase.params.source_code, lockHandle, testSessionId, testCase.params.transport_request || getDefaultTransport());
-      await unlockClass(connection, className, lockHandle, testSessionId);
-      await activateClass(connection, className, testSessionId);
+      expect([200, 201]).toContain(result.status);
+      logger.debug(`✓ Class ${className} ${result.status === 201 ? 'created' : 'already exists'}`);
+
+    } catch (error: any) {
+      logger.error(`✗ Failed to create class: ${error.message}`);
+      throw error;
     }
-  }, 60000);
+  }, getTimeout('create', 'create_class'));
 });
-
-

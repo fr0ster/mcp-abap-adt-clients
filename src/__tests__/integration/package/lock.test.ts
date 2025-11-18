@@ -11,38 +11,50 @@ import { unlockPackage } from '../../../core/package/unlock';
 import { getPackage } from '../../../core/package/read';
 import { createPackage } from '../../../core/package/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, markAuthFailed, hasAuthFailed, getConfig } from '../../helpers/sessionConfig';
+import { registerTestLock, unregisterTestLock } from '../../helpers/lockHelper';
+import { createTestLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
+const logger = createTestLogger('Package - Lock/Unlock');
 
-describe('Package - Lock', () => {
+const TEST_SUITE_NAME = 'Package - Lock';
+
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let lockHandle: string | null = null;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let packageName: string | null = null;
 
   beforeAll(async () => {
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Lock/Unlock test', 'Authentication failed in previous test');
+      return;
+    }
+
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      await (connection as any).connect();
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (error: any) {
+      logger.error('❌ Authentication/Connection failed - marking all tests to skip');
+      logger.error(`   Error: ${error.message}`);
+      markAuthFailed(TEST_SUITE_NAME);
       hasConfig = false;
     }
   });
@@ -51,6 +63,54 @@ describe('Package - Lock', () => {
     if (connection) {
       connection.reset();
     }
+  });
+
+  beforeEach(async () => {
+    lockHandle = null;
+    testCase = null;
+    packageName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Lock/Unlock test', 'Authentication failed in previous test');
+      return;
+    }
+
+    if (!hasConfig) {
+      return;
+    }
+
+    try {
+      const env = await setupTestEnvironment(connection, 'package_lock', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+      lockTracking = env.lockTracking;
+
+      if (lockTracking?.enabled) {
+        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
+      }
+
+      const tc = getEnabledTestCase('lock_package', 'test_package_lock');
+      if (!tc) {
+        logger.skip('Lock/Unlock test', 'Test case not enabled in test-config.yaml');
+        testCase = null;
+        packageName = null;
+        return;
+      }
+
+      testCase = tc;
+      packageName = tc.params.package_name;
+    } catch (error: any) {
+      logger.error('Setup failed:', error.message);
+      testCase = null;
+      packageName = null;
+    }
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+    sessionId = null;
+    testConfig = null;
+    lockTracking = null;
   });
 
   async function ensurePackageExists(testCase: any) {
@@ -86,43 +146,33 @@ describe('Package - Lock', () => {
   }
 
   it('should lock package and get lock handle', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
-      return;
-    }
-
-    const testCase = getEnabledTestCase('lock_package');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    try {
-      validateTestCaseForUserSpace(testCase, 'lock_package');
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+    if (!testCase || !packageName) {
+      return; // Already logged in beforeEach
     }
 
     await ensurePackageExists(testCase);
 
-    const sessionId = generateSessionId();
-    const lockHandle = await lockPackage(
+    const testSessionId = sessionId || generateSessionId();
+    lockHandle = await lockPackage(
       connection,
-      testCase.params.package_name,
-      sessionId
+      packageName,
+      testSessionId
     );
 
     expect(lockHandle).toBeDefined();
     expect(typeof lockHandle).toBe('string');
     expect(lockHandle.length).toBeGreaterThan(0);
 
+    // Note: Package locks not tracked in lock registry (not supported by lockHelper)
+
     // Unlock after test
     try {
-      await unlockPackage(connection, testCase.params.package_name, lockHandle, sessionId);
+      await unlockPackage(connection, packageName, lockHandle, testSessionId);
+      lockHandle = null;
+      logger.debug(`✓ Package unlocked successfully`);
     } catch (error) {
-      // Ignore unlock errors
+      logger.error(`Failed to unlock package: ${error}`);
+      throw error;
     }
-  }, 30000);
+  }, getTimeout('test'));
 });
-

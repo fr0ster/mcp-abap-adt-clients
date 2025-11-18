@@ -1,102 +1,83 @@
 /**
- * Unit test for Data Element unlocking
- * Tests unlockDataElement function
+ * Integration test for Data Element unlock
+ * Tests unlockDataElement function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/dataElement/unlock.test
- *
- * IDEMPOTENCY PRINCIPLE:
- * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
- * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
- *   This ensures the test always starts from a clean state (object doesn't exist).
- * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
- *   check if the object exists and CREATE it if missing. This ensures the test has
- *   the required object available.
- *
- * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/dataElement/unlock.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { lockDataElement } from '../../../core/dataElement/lock';
 import { unlockDataElement } from '../../../core/dataElement/unlock';
 import { getDataElement } from '../../../core/dataElement/read';
 import { createDataElement } from '../../../core/dataElement/create';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
-import { generateSessionId } from '../../../utils/sessionUtils';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'DataElement - Unlock';
+const logger = createTestLogger('DTEL-UNLOCK');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Data Element - Unlock', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
-  let lockHandle: string | null = null;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
-  beforeEach(async () => {
-    lockHandle = null; // Reset lock handle for each test
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
+  // Suite-level test case data
+  let testCase: any = null;
+  let dataElementName: string | null = null;
 
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'dataElement_unlock', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
-      lockTracking = env.lockTracking;
+  beforeAll(async () => {
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
+  });
 
-      if (sessionId) {
-        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
-      if (lockTracking?.enabled) {
-        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
-      }
-
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
-      await (connection as any).connect();
-
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
+  afterAll(async () => {
+    if (connection) {
+      connection.reset();
     }
+  });
+
+  beforeEach(async () => {
+    // Reset suite variables
+    testCase = null;
+    dataElementName = null;
+
+    // Check for auth failures first
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    // Setup test environment
+    const env = await setupTestEnvironment(connection, 'dataElement_unlock', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    // Get test case
+    const tc = getEnabledTestCase('unlock_data_element', 'test_data_element');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    dataElementName = tc.params.data_element_name;
   });
 
   afterEach(async () => {
-    if (connection) {
-      await cleanupTestEnvironment(connection, sessionId, testConfig);
-      connection.reset();
-    }
-    lockHandle = null;
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
   });
 
-  // Helper function to ensure domain exists (data elements require a domain)
+  /**
+   * Ensure domain exists (data elements require a domain)
+   */
   async function ensureDomainExists(domainName: string): Promise<void> {
     try {
       await getDomain(connection, domainName);
@@ -127,40 +108,38 @@ describe('Data Element - Unlock', () => {
     }
   }
 
-  // Helper function to ensure data element exists before test (idempotency)
-  async function ensureDataElementExists(testCase: any) {
-    const dataElementName = testCase.params.data_element_name;
+  /**
+   * Ensure data element exists before test
+   */
+  async function ensureDataElementExists(testCase: any): Promise<void> {
+    const dtelName = testCase.params.data_element_name;
 
     try {
-      await getDataElement(connection, dataElementName);
-      logger.debug(`Data element ${dataElementName} exists`);
+      await getDataElement(connection, dtelName);
+      logger.debug(`Data element ${dtelName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Data element ${dataElementName} does not exist, creating...`);
+        logger.debug(`Data element ${dtelName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_data_element', 'test_data_element');
-        if (createTestCase) {
-          try {
-            // Ensure domain exists first
-            await ensureDomainExists(createTestCase.params.domain_name);
-
-            await createDataElement(connection, {
-              data_element_name: dataElementName,
-              description: createTestCase.params.description || `Test data element for ${dataElementName}`,
-              package_name: createTestCase.params.package_name || getDefaultPackage(),
-              transport_request: createTestCase.params.transport_request || getDefaultTransport(),
-              domain_name: createTestCase.params.domain_name,
-              short_label: createTestCase.params.short_label,
-              medium_label: createTestCase.params.medium_label,
-              long_label: createTestCase.params.long_label,
-              heading_label: createTestCase.params.heading_label,
-            });
-            logger.debug(`Data element ${dataElementName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create data element ${dataElementName}: create_data_element test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create data element ${dtelName}: create_data_element test case not found`);
         }
+
+        // Ensure domain exists first
+        await ensureDomainExists(createTestCase.params.domain_name);
+
+        await createDataElement(connection, {
+          data_element_name: dtelName,
+          description: createTestCase.params.description || `Test data element for ${dtelName}`,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createTestCase.params.transport_request || getDefaultTransport(),
+          domain_name: createTestCase.params.domain_name,
+          short_label: createTestCase.params.short_label,
+          medium_label: createTestCase.params.medium_label,
+          long_label: createTestCase.params.long_label,
+          heading_label: createTestCase.params.heading_label,
+        });
+        logger.debug(`Data element ${dtelName} created successfully`);
       } else {
         throw error;
       }
@@ -168,47 +147,31 @@ describe('Data Element - Unlock', () => {
   }
 
   it('should unlock data element', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    // Skip if no test case configured
+    if (!testCase || !dataElementName) {
+      logger.skip('Unlock Test', testCase ? 'Data element name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('unlock_data_element', 'test_data_element');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing unlock for data element: ${dataElementName}`);
 
-    // Validate that data element is in user space (Z_ or Y_)
     try {
-      validateTestCaseForUserSpace(testCase, 'unlock_data_element');
+      // Ensure data element exists
+      await ensureDataElementExists(testCase);
+
+      // Lock data element first
+      const lockHandle = await lockDataElement(connection, dataElementName, sessionId || '');
+      expect(lockHandle).toBeDefined();
+      expect(lockHandle).not.toBe('');
+      logger.debug(`✓ Acquired lock handle: ${lockHandle}`);
+
+      // Unlock data element
+      await unlockDataElement(connection, dataElementName, lockHandle, sessionId || '');
+      logger.info(`✓ Data element ${dataElementName} unlocked successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to unlock data element: ${error.message}`);
+      throw error;
     }
-
-    // Ensure data element exists before test (idempotency)
-    await ensureDataElementExists(testCase);
-
-    const sessionId = generateSessionId();
-
-    // First lock the data element to get a lock handle
-    lockHandle = await lockDataElement(
-      connection,
-      testCase.params.data_element_name,
-      sessionId
-    );
-    expect(lockHandle).toBeDefined();
-    expect(lockHandle).not.toBe('');
-
-    // Unlock data element
-    await unlockDataElement(
-      connection,
-      testCase.params.data_element_name,
-      lockHandle,
-      sessionId
-    );
-    lockHandle = null;
-  }, 20000);
+  }, getTimeout('test'));
 });
-

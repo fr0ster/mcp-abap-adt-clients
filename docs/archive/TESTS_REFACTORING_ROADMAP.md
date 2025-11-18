@@ -1,6 +1,12 @@
-# 🗺️ ROADMAP: Рефакторинг тестів adt-clients
+# 🗺️ ROADMAP: adt-clients Tests Refactoring
+
+**⚠️ ARCHIVED: This file is no longer active**  
+**Current roadmap:** [../TEST_STRATEGY.md](../TEST_STRATEGY.md)
+
+---
 
 **Створено:** 2025-11-16  
+**Статус:** Phase 1-2 завершено, об'єднано в TEST_STRATEGY.md  
 **Пакет:** `@mcp-abap-adt/adt-clients`  
 **Мета:** Уніфікувати всі тести під `setupTestEnvironment` та загальний `getConfig`
 
@@ -9,36 +15,36 @@
 ## 📊 Статус
 
 - **Всього файлів:** ~112 тестів
-- **Виправлено:** 0
-- **Залишилось:** ~112
+- **Виправлено:** 15 (setupTestEnvironment) + 8 (auth+locks) = 23
+- **Залишилось:** ~89
 
 ### Прогрес по категоріях
 
-| Категорія | Всього | Виправлено | Залишилось |
-|-----------|--------|------------|------------|
-| 🔴 КРИТИЧНО: ClassBuilder конфлікт | 1 | 0 | 1 |
-| Integration тести | 3 | 0 | 3 |
-| Client тести | 4 | 0 | 4 |
-| unit/class | 9 | 8 | 1 |
-| unit/functionModule | 9 | 1 | 8 |
-| unit/functionGroup | 7 | 3 | 4 |
-| unit/program | 9 | 0 | 9 |
-| unit/interface | 9 | 0 | 9 |
-| unit/table | 8 | 0 | 8 |
-| unit/structure | 8 | 0 | 8 |
-| unit/view | 8 | 0 | 8 |
-| unit/package | 9 | 0 | 9 |
-| unit/shared | 6 | 0 | 6 |
-| unit/domain | 1 | 0 | 1 |
-| unit/dataElement | 1 | 1 | 0 |
-| unit/transport | 1 | 0 | 1 |
+| Категорія | Всього | Виправлено | Залишилось | Примітки |
+|-----------|--------|------------|------------|----------|
+| � КРИТИЧНО: ClassBuilder конфлікт | 1 | 1 | 0 | ✅ DONE |
+| Integration тести | 3 | 3 | 0 | ✅ DONE |
+| Client тести | 4 | 0 | 4 | |
+| unit/class | 9 | 9 | 0 | ✅ DONE (incl. auth+locks) |
+| unit/functionModule | 9 | 2 | 7 | 1 create + 1 lock (auth+locks) |
+| unit/functionGroup | 7 | 4 | 3 | 3 + 1 lock (auth only) |
+| unit/program | 9 | 1 | 8 | 1 lock (auth+locks) |
+| unit/interface | 9 | 1 | 8 | 1 lock (auth+locks) |
+| unit/table | 8 | 0 | 8 | |
+| unit/structure | 8 | 0 | 8 | |
+| unit/view | 8 | 1 | 7 | 1 lock (auth+locks) |
+| unit/package | 9 | 0 | 9 | |
+| unit/shared | 6 | 0 | 6 | |
+| unit/domain | 1 | 1 | 0 | ✅ DONE (auth+locks) |
+| unit/dataElement | 1 | 1 | 0 | ✅ DONE (auth+locks) |
+| unit/transport | 1 | 0 | 1 | |
 
 ---
 
 ## Phase 1: CRITICAL - ClassBuilder Conflict ✅ COMPLETE
 **Priority:** CRITICAL (blocks parallel test execution)  
 **Time:** 15 min  
-**Status:** ✅ DONE
+**Status:** ✅ DONE (2025-11-16)
 
 Conflicts:
 - `ClassBuilder.test.ts` uses `getEnabledTestCase('create_class', 'basic_class')`
@@ -54,7 +60,7 @@ Solution:
 ## Phase 2: Integration Tests ✅ COMPLETE
 **Priority:** HIGH  
 **Time:** 30 min  
-**Status:** ✅ DONE
+**Status:** ✅ DONE (2025-11-16)
 
 Files (3):
 - [x] `integration/class.workflow.test.ts`
@@ -328,3 +334,25 @@ describe('Test', () => {
 ## 🚀 Початок роботи
 
 **Наступний крок:** Починаємо з ФАЗИ 1 - виправлення ClassBuilder конфлікту
+
+---
+
+## 📌 ВАЖЛИВО: Є також TEST_FIXES_ROADMAP.md
+
+**Статус:** В процесі (2025-11-17)
+
+Цей roadmap фокусується на **setupTestEnvironment міграції**.
+
+Для **auth pattern, lock persistence, та test logging** дивіться:
+- `/TEST_FIXES_ROADMAP.md` - основний roadmap для виправлення тестів
+  - Phase 1: Lock Tests - ✅ 100% (8/8) - auth + lock persistence
+  - Phase 2: Create Tests Cleanup - ⏳ 5% - unlock-before-delete + logging
+  - Phase 5: Test Logging Pattern - ⏳ 3% - configurable LOG_LEVEL
+
+Обидва roadmap'и працюють паралельно:
+- `TESTS_REFACTORING_ROADMAP.md` - міграція на setupTestEnvironment
+- `TEST_FIXES_ROADMAP.md` - auth, locks, cleanup, logging
+
+---
+
+**Останнє оновлення:** 2025-11-17

@@ -1,82 +1,96 @@
 /**
- * Unit test for Structure reading
- * Tests getStructure function
+ * Integration test for Structure read
+ * Tests getStructureMetadata and getStructureSource functions (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/structure/read.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/structure/read.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { getStructureSource, getStructureMetadata } from '../../../core/structure/read';
 import { createStructure } from '../../../core/structure/create';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Structure - Read';
+const logger = createTestLogger('STRUCT-READ');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Structure - Read', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let structureName: string | null = null;
 
-  beforeEach(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+  beforeAll(async () => {
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
   });
 
-  async function ensureStructureExists(testCase: any) {
+  beforeEach(async () => {
+    testCase = null;
+    structureName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'structure_read', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('get_structure');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    structureName = tc.params.structure_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureStructureExists(testCase: any): Promise<void> {
+    const sName = testCase.params.structure_name;
+
     try {
-      await getStructureMetadata(connection, testCase.params.structure_name);
-      logger.debug(`Structure ${testCase.params.structure_name} exists`);
+      await getStructureMetadata(connection, sName);
+      logger.debug(`Structure ${sName} exists`);
     } catch (error: any) {
-      // 404 or 406 means structure doesn't exist or cannot be read
       if (error.response?.status === 404 || error.response?.status === 406) {
-        logger.debug(`Structure ${testCase.params.structure_name} does not exist (${error.response?.status}), creating...`);
+        logger.debug(`Structure ${sName} does not exist (${error.response?.status}), creating...`);
         try {
           await createStructure(connection, {
-            structure_name: testCase.params.structure_name,
-            description: testCase.params.description || `Test structure for ${testCase.params.structure_name}`,
+            structure_name: sName,
+            description: testCase.params.description || `Test structure for ${sName}`,
             package_name: testCase.params.package_name || getDefaultPackage(),
             transport_request: testCase.params.transport_request || getDefaultTransport(),
             fields: testCase.params.fields
           });
-          logger.debug(`Structure ${testCase.params.structure_name} created successfully`);
-          // Wait a bit for structure to be available
+          logger.debug(`Structure ${sName} created successfully`);
           await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (createError: any) {
-          // If structure already exists, that's OK
           if (createError.message?.includes('already exists') ||
               createError.message?.includes('does already exist') ||
               (createError.response?.data &&
                typeof createError.response.data === 'string' &&
                createError.response.data.includes('already exists'))) {
-            logger.debug(`Structure ${testCase.params.structure_name} already exists`);
+            logger.debug(`Structure ${sName} already exists`);
             return;
           }
           throw createError;
@@ -87,75 +101,56 @@ describe('Structure - Read', () => {
     }
   }
 
-  it('should read existing structure', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+  it('should read structure metadata', async () => {
+    if (!testCase || !structureName) {
+      logger.skip('Read Test', testCase ? 'Structure name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('get_structure');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing read metadata for structure: ${structureName}`);
 
     try {
       await ensureStructureExists(testCase);
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure structure exists: ${error.message}`);
-      return;
-    }
 
-    const result = await getStructureMetadata(connection, testCase.params.structure_name);
-    expect(result.status).toBe(200);
-  }, 15000);
+      const result = await getStructureMetadata(connection, structureName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      logger.info(`✓ Structure ${structureName} metadata read successfully`);
+
+    } catch (error: any) {
+      if (error.message?.includes('Cannot ensure structure exists')) {
+        logger.skip('Read Test', error.message);
+        return;
+      }
+      logger.error(`✗ Failed to read structure metadata: ${error.message}`);
+      throw error;
+    }
+  }, getTimeout('test'));
 
   it('should read structure source code', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !structureName) {
+      logger.skip('Read Test', testCase ? 'Structure name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('get_structure');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing read source for structure: ${structureName}`);
 
     try {
       await ensureStructureExists(testCase);
+
+      const result = await getStructureSource(connection, structureName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      expect(typeof result.data).toBe('string');
+      logger.info(`✓ Structure ${structureName} source read successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure structure exists: ${error.message}`);
-      return;
+      if (error.message?.includes('Cannot ensure structure exists')) {
+        logger.skip('Read Test', error.message);
+        return;
+      }
+      logger.error(`✗ Failed to read structure source: ${error.message}`);
+      throw error;
     }
-
-    const result = await getStructureSource(connection, testCase.params.structure_name);
-    expect(result.status).toBe(200);
-    expect(typeof result.data).toBe('string');
-  }, 15000);
-
-  it('should read structure metadata', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
-      return;
-    }
-
-    const testCase = getEnabledTestCase('get_structure');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    try {
-      await ensureStructureExists(testCase);
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure structure exists: ${error.message}`);
-      return;
-    }
-
-    const result = await getStructureMetadata(connection, testCase.params.structure_name);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-  }, 15000);
+  }, getTimeout('test'));
 });
-

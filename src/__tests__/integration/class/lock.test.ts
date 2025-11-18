@@ -1,145 +1,122 @@
 /**
- * Unit test for Class lock/unlock operations
+ * Integration test for Class lock/unlock operations
  * Tests lockClass and unlockClass functions
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/lock.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/class/lock.test
  */
 
 import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { lockClass } from '../../../core/class/lock';
 import { unlockClass } from '../../../core/class/unlock';
-import { getClass } from '../../../core/class/read';
 import { createClass } from '../../../core/class/create';
-import { activateClass } from '../../../core/class/activation';
-import { updateClass } from '../../../core/class/update';
+import { deleteObject } from '../../../core/delete';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfigFromEnv } from '@mcp-abap-adt/connection';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const getConfig = getConfigFromEnv;
+const { getEnabledTestCase, getTimeout } = require('../../../../tests/test-helper');
 
-const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
-// Environment variables are loaded automatically by test-helper
+const TEST_SUITE_NAME = 'Class - Lock/Unlock';
+const logger = createTestLogger('CLASS-LOCK');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Class - Lock/Unlock', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
-  let lockHandle: string | null = null;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let className: string;
+  let packageName: string;
 
-  beforeEach(async () => {
-    lockHandle = null; // Reset lock handle for each test
+  beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+
+      // Setup session and lock tracking based on test-config.yaml
+      const env = await setupTestEnvironment(connection, 'class_lock', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+
+      // Connect to SAP system to initialize session
+      await (connection as any).connect();
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
-  });
 
-  afterEach(async () => {
-    if (connection) {
-      connection.reset();
-    }
-    lockHandle = null; // Clean up lock handle
-  });
+      // Get test case params
+      const testCase = getEnabledTestCase('create_class', 'test_class');
+      if (!testCase) {
+        throw new Error('Test case not enabled');
+      }
 
-  // Helper function to ensure object exists before test (idempotency)
-  async function ensureClassExists(testCase: any) {
-    try {
-      await getClass(connection, testCase.params.class_name);
-      logger.debug(`Class ${testCase.params.class_name} exists`);
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        logger.debug(`Class ${testCase.params.class_name} does not exist, creating...`);
-        const createTestCase = getEnabledTestCase('create_class', 'test_class');
-        if (!createTestCase) {
-          throw new Error(`Cannot create class ${testCase.params.class_name}: create_class test case not found`);
-        }
+      className = testCase.params.class_name;
+      packageName = testCase.params.package_name;
 
-        const sourceCode = createTestCase.params.source_code;
-        if (!sourceCode) {
-          throw new Error(`source_code is required for creating class ${testCase.params.class_name}`);
-        }
-
-        const className = testCase.params.class_name;
-        const sessionId = generateSessionId();
-
-        // Step 1: Create class object (metadata only)
+      // Create class for testing (ignore if already exists or no rights)
+      try {
         await createClass(connection, {
           class_name: className,
-          description: `Test class for ${className}`,
-          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          description: `Test class for lock/unlock`,
+          package_name: packageName,
         });
+        logger.debug(`Class ${className} created`);
+      } catch (error: any) {
+        // Ignore 403 (no rights), 409 (already exists), etc
+        if (error.response?.status === 403) {
+          logger.debug(`No rights to create class, assuming ${className} exists`);
+        } else {
+          logger.debug(`Class ${className} already exists or error: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      logger.error('❌ Configuration/Connection failed');
+      hasConfig = false;
+    }
+  }, 60000); // Add timeout for beforeAll
 
-        // Step 2: Lock class
-        const lockHandle = await lockClass(connection, className, sessionId);
-
-        // Step 3: Update source code
-        await updateClass(
-          connection,
-          className,
-          sourceCode,
-          lockHandle,
-          sessionId,
-          createTestCase.params.transport_request
-        );
-
-        // Step 4: Unlock class
-        await unlockClass(connection, className, lockHandle, sessionId);
-
-        // Step 5: Activate class
-        await activateClass(connection, className, sessionId);
-
-        logger.debug(`Class ${className} created and activated successfully`);
-      } else {
-        throw error;
+  afterAll(async () => {
+    if (hasConfig && className) {
+      // Delete test class
+      try {
+        await deleteObject(connection, {
+          object_name: className,
+          object_type: 'CLAS/OC',
+        });
+        logger.debug(`Class ${className} deleted`);
+      } catch (error: any) {
+        logger.warn(`Error deleting class: ${error.message}`);
       }
     }
-  }
+    if (connection) {
+      await cleanupTestEnvironment(connection, sessionId, testConfig);
+      connection.reset();
+    }
+  });
 
   it('should lock and unlock class', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.skip('Test', 'No config');
       return;
     }
 
-    // Use create_class to ensure we test with user-created Z-class, not SAP system class
-    const testCase = getEnabledTestCase('create_class', 'test_class');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
+    const sessionId = generateSessionId();
+    let lockHandle: string | null = null;
+
+    try {
+      // Lock
+      logger.debug(`Locking class: ${className}`);
+      const lockResult = await lockClass(connection, className, sessionId);
+      lockHandle = lockResult;
+
+      expect(lockHandle).toBeDefined();
+      expect(lockHandle).not.toBe('');
+      logger.debug(`✓ Class locked: ${lockHandle}`);
+
+    } finally {
+      // Unlock (always in finally)
+      if (lockHandle) {
+        logger.debug(`Unlocking class: ${className}`);
+        await unlockClass(connection, className, lockHandle, sessionId);
+        logger.debug(`✓ Class unlocked`);
+      }
     }
-
-    // Ensure class exists before test (idempotency)
-    await ensureClassExists(testCase);
-
-    const sessionId = 'test-session-id';
-
-    // Lock class (should work for user-created Z-classes)
-    lockHandle = await lockClass(
-      connection,
-      testCase.params.class_name,
-      sessionId
-    );
-    expect(lockHandle).toBeDefined();
-    expect(lockHandle).not.toBe('');
-
-    // Unlock class
-    await unlockClass(
-      connection,
-      testCase.params.class_name,
-      lockHandle,
-      sessionId
-    );
-  }, 20000);
+  }, getTimeout('test'));
 });

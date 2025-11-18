@@ -1,83 +1,101 @@
 /**
- * Unit test for FunctionGroup unlocking
- * Tests unlockFunctionGroup function
+ * Integration test for FunctionGroup unlock
+ * Tests unlockFunctionGroup function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/functionGroup/unlock.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/functionGroup/unlock.test
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { lockFunctionGroup, unlockFunctionGroup } from '../../../core/functionGroup/lock';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'FunctionGroup - Unlock';
+const logger = createTestLogger('FG-UNLOCK');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
-
-describe('FunctionGroup - Unlock', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
-  beforeEach(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+  // Suite-level test case data
+  let testCase: any = null;
+  let functionGroupName: string | null = null;
+
+  beforeAll(async () => {
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
     if (connection) {
       connection.reset();
     }
   });
 
-  // Helper function to ensure object exists before test (idempotency)
-  async function ensureFunctionGroupExists(testCase: any) {
-    const functionGroupName = testCase.params.function_group_name;
+  beforeEach(async () => {
+    // Reset suite variables
+    testCase = null;
+    functionGroupName = null;
+
+    // Check for auth failures first
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    // Setup test environment
+    const env = await setupTestEnvironment(connection, 'functionGroup_unlock', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    // Get test case
+    const tc = getEnabledTestCase('unlock_function_group');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    functionGroupName = tc.params.function_group_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  /**
+   * Ensure function group exists before test
+   */
+  async function ensureFunctionGroupExists(testCase: any): Promise<void> {
+    const fgName = testCase.params.function_group_name;
 
     try {
-      await getFunctionGroup(connection, functionGroupName);
-      logger.debug(`Function group ${functionGroupName} exists`);
+      await getFunctionGroup(connection, fgName);
+      logger.debug(`Function group ${fgName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
+        logger.debug(`Function group ${fgName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
-        if (createTestCase) {
-          try {
-            await createFunctionGroup(connection, {
-              function_group_name: functionGroupName,
-              description: createTestCase.params.description || `Test function group for ${functionGroupName}`,
-              package_name: createTestCase.params.package_name || getDefaultPackage(),
-              transport_request: createTestCase.params.transport_request,
-            });
-            logger.debug(`Function group ${functionGroupName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create function group ${fgName}: create_function_group test case not found`);
         }
+
+        await createFunctionGroup(connection, {
+          function_group_name: fgName,
+          description: createTestCase.params.description || `Test function group for ${fgName}`,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createTestCase.params.transport_request,
+        });
+        logger.debug(`Function group ${fgName} created successfully`);
       } else {
         throw error;
       }
@@ -85,46 +103,30 @@ describe('FunctionGroup - Unlock', () => {
   }
 
   it('should unlock function group', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    // Skip if no test case configured
+    if (!testCase || !functionGroupName) {
+      logger.skip('Unlock Test', testCase ? 'Function group name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('unlock_function_group');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing unlock for function group: ${functionGroupName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'unlock_function_group');
+      // Ensure function group exists
+      await ensureFunctionGroupExists(testCase);
+
+      // Lock function group first
+      const lockHandle = await lockFunctionGroup(connection, functionGroupName, sessionId || '');
+      expect(lockHandle).toBeDefined();
+      logger.debug(`✓ Acquired lock handle: ${lockHandle}`);
+
+      // Unlock function group
+      await unlockFunctionGroup(connection, functionGroupName, lockHandle, sessionId || '');
+      logger.info(`✓ Function group ${functionGroupName} unlocked successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to unlock function group: ${error.message}`);
+      throw error;
     }
-
-    await ensureFunctionGroupExists(testCase);
-
-    const sessionId = generateSessionId();
-
-    // First lock the function group to get a lock handle
-    const lockHandle = await lockFunctionGroup(
-      connection,
-      testCase.params.function_group_name,
-      sessionId
-    );
-
-    expect(lockHandle).toBeDefined();
-
-    // Now unlock it
-    await unlockFunctionGroup(
-      connection,
-      testCase.params.function_group_name,
-      lockHandle,
-      sessionId
-    );
-
-    logger.debug(`✅ Unlocked function group: ${testCase.params.function_group_name}`);
-  }, 30000);
+  }, getTimeout('test'));
 });
-

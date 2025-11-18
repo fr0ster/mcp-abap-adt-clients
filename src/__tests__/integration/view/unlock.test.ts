@@ -1,50 +1,38 @@
 /**
- * Unit test for View unlocking
- * Tests unlockDDLS function
+ * Integration test for View unlock
+ * Tests unlockDDLS function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/view/unlock.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/view/unlock.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { lockDDLS } from '../../../core/view/lock';
 import { unlockDDLS } from '../../../core/view/unlock';
 import { getViewMetadata } from '../../../core/view/read';
 import { createView } from '../../../core/view/create';
-import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'View - Unlock';
+const logger = createTestLogger('VIEW-UNLOCK');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('View - Unlock', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+
+  // Suite-level test case data
+  let testCase: any = null;
+  let viewName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -53,32 +41,63 @@ describe('View - Unlock', () => {
     }
   });
 
-  async function ensureViewExists(testCase: any) {
-    const viewName = testCase.params.view_name;
+  beforeEach(async () => {
+    // Reset suite variables
+    testCase = null;
+    viewName = null;
+
+    // Check for auth failures first
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    // Setup test environment
+    const env = await setupTestEnvironment(connection, 'view_unlock', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    // Get test case
+    const tc = getEnabledTestCase('unlock_view');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    viewName = tc.params.view_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  /**
+   * Ensure view exists before test
+   */
+  async function ensureViewExists(testCase: any): Promise<void> {
+    const vName = testCase.params.view_name;
 
     try {
-      await getViewMetadata(connection, viewName);
-      logger.debug(`View ${viewName} exists`);
+      await getViewMetadata(connection, vName);
+      logger.debug(`View ${vName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`View ${viewName} does not exist, creating...`);
+        logger.debug(`View ${vName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_view', 'test_view');
-        if (createTestCase) {
-          try {
-            await createView(connection, {
-              view_name: viewName,
-              description: createTestCase.params.description || `Test view for ${viewName}`,
-              package_name: createTestCase.params.package_name || getDefaultPackage(),
-              transport_request: createTestCase.params.transport_request || getDefaultTransport(),
-              ddl_source: createTestCase.params.ddl_source
-            });
-            logger.debug(`View ${viewName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create view ${viewName}: create_view test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create view ${vName}: create_view test case not found`);
         }
+
+        await createView(connection, {
+          view_name: vName,
+          description: createTestCase.params.description || `Test view for ${vName}`,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createTestCase.params.transport_request || getDefaultTransport(),
+          ddl_source: createTestCase.params.ddl_source
+        });
+        logger.debug(`View ${vName} created successfully`);
       } else {
         throw error;
       }
@@ -86,47 +105,32 @@ describe('View - Unlock', () => {
   }
 
   it('should unlock view', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    // Skip if no test case configured
+    if (!testCase || !viewName) {
+      logger.skip('Unlock Test', testCase ? 'View name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('unlock_view');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing unlock for view: ${viewName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'unlock_view');
+      // Ensure view exists
+      await ensureViewExists(testCase);
+
+      // Lock view first
+      const lockHandle = await lockDDLS(connection, viewName, sessionId || '');
+      expect(lockHandle).toBeDefined();
+      logger.debug(`✓ Acquired lock handle: ${lockHandle}`);
+
+      // Unlock view
+      const result = await unlockDDLS(connection, viewName, lockHandle, sessionId || '');
+      expect(result.status).toBeGreaterThanOrEqual(200);
+      expect(result.status).toBeLessThan(500);
+      logger.info(`✓ View ${viewName} unlocked successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to unlock view: ${error.message}`);
+      throw error;
     }
-
-    await ensureViewExists(testCase);
-
-    const sessionId = generateSessionId();
-
-    // First lock the view to get a lock handle
-    const lockHandle = await lockDDLS(
-      connection,
-      testCase.params.view_name,
-      sessionId
-    );
-
-    expect(lockHandle).toBeDefined();
-
-    // Now unlock it
-    const response = await unlockDDLS(
-      connection,
-      testCase.params.view_name,
-      lockHandle,
-      sessionId
-    );
-
-    expect(response.status).toBeGreaterThanOrEqual(200);
-    expect(response.status).toBeLessThan(500);
-  }, 30000);
+  }, getTimeout('test'));
 });
-

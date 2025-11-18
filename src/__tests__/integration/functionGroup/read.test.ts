@@ -1,104 +1,93 @@
 /**
- * Unit test for getFunctionGroup
- * Tests only the read operation in isolation
+ * Integration test for Function Group read
+ * Tests getFunctionGroup function (low-level)
+ *
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/functionGroup/read.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Function Group - Read';
+const logger = createTestLogger('FUGR-READ');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Function Group - Read', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let functionGroupName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'functionGroup_read', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
-      lockTracking = env.lockTracking;
-
-      if (sessionId) {
-        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
-      if (lockTracking?.enabled) {
-        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
-      }
-
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
-      await (connection as any).connect();
-
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
     if (connection) {
-      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });
 
-  // Helper function to ensure object exists before test (idempotency)
-  async function ensureFunctionGroupExists(testCase: any) {
-    const functionGroupName = testCase.params.function_group_name || testCase.params.function_group;
-    if (!functionGroupName) {
+  beforeEach(async () => {
+    testCase = null;
+    functionGroupName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'functionGroup_read', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('get_function_group');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    functionGroupName = tc.params.function_group_name || tc.params.function_group;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureFunctionGroupExists(testCase: any): Promise<void> {
+    const fgName = testCase.params.function_group_name || testCase.params.function_group;
+    if (!fgName) {
       throw new Error('function_group_name or function_group is required in test case');
     }
+
     try {
-      await getFunctionGroup(connection, functionGroupName);
-      logger.debug(`Function group ${functionGroupName} exists`);
+      await getFunctionGroup(connection, fgName);
+      logger.debug(`Function group ${fgName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
+        logger.debug(`Function group ${fgName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
-        if (createTestCase && createTestCase.params.package_name) {
-          await createFunctionGroup(connection, {
-            function_group_name: functionGroupName,
-            description: testCase.params.description || `Test function group for ${functionGroupName}`,
-            package_name: createTestCase.params.package_name,
-          });
-          logger.debug(`Function group ${functionGroupName} created successfully`);
-        } else {
-          throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found or missing package_name`);
+        if (!createTestCase || !createTestCase.params.package_name) {
+          throw new Error(`Cannot create function group ${fgName}: create_function_group test case not found or missing package_name`);
         }
+
+        await createFunctionGroup(connection, {
+          function_group_name: fgName,
+          description: testCase.params.description || `Test function group for ${fgName}`,
+          package_name: createTestCase.params.package_name
+        });
+        logger.debug(`Function group ${fgName} created successfully`);
       } else {
         throw error;
       }
@@ -106,23 +95,24 @@ describe('Function Group - Read', () => {
   }
 
   it('should read function group', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !functionGroupName) {
+      logger.skip('Read Test', testCase ? 'Function group name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('get_function_group');
-    if (!testCase) {
-      return; // Skip silently if test case not configured
+    logger.info(`Testing read for function group: ${functionGroupName}`);
+
+    try {
+      await ensureFunctionGroupExists(testCase);
+
+      const result = await getFunctionGroup(connection, functionGroupName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      logger.info(`✓ Function group ${functionGroupName} read successfully`);
+
+    } catch (error: any) {
+      logger.error(`✗ Failed to read function group: ${error.message}`);
+      throw error;
     }
-
-    // Ensure function group exists before test (idempotency)
-    await ensureFunctionGroupExists(testCase);
-
-    const functionGroupName = testCase.params.function_group_name || testCase.params.function_group;
-
-    const result = await getFunctionGroup(connection, functionGroupName);
-    expect(result.status).toBe(200);
-    logger.debug(`✅ Read function group successfully: ${functionGroupName}`);
-  }, 10000);
+  }, getTimeout('test'));
 });

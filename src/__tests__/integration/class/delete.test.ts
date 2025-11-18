@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -130,5 +131,5 @@ describe('Class - Delete', () => {
     } catch (error: any) {
       expect(error.response?.status).toBe(404);
     }
-  }, 30000);
+  }, getTimeout('test'));
 });

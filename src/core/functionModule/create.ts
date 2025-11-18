@@ -152,7 +152,7 @@ export async function createFunctionModule(
 
     lockHandle = await lockFunctionModule(connection, params.function_group_name, params.function_module_name, sessionId);
 
-    await uploadFunctionModuleSource(
+    const uploadResponse = await uploadFunctionModuleSource(
       connection,
       params.function_group_name,
       params.function_module_name,
@@ -170,20 +170,8 @@ export async function createFunctionModule(
       await activateFunctionModule(connection, params.function_group_name, params.function_module_name, sessionId);
     }
 
-    return {
-      data: {
-        success: true,
-        function_module_name: params.function_module_name,
-        function_group_name: params.function_group_name,
-        transport_request: params.transport_request || 'local',
-        activated: shouldActivate,
-        message: `Function module ${params.function_module_name} created successfully${shouldActivate ? ' and activated' : ''}`
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from upload (last significant operation)
+    return uploadResponse;
 
   } catch (error: any) {
     if (lockHandle) {

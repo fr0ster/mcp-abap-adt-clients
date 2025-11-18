@@ -1,50 +1,38 @@
 /**
- * Unit test for Package unlocking
- * Tests unlockPackage function
+ * Integration test for Package unlock
+ * Tests unlockPackage function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/package/unlock.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/package/unlock.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { lockPackage } from '../../../core/package/lock';
 import { unlockPackage } from '../../../core/package/unlock';
 import { getPackage } from '../../../core/package/read';
 import { createPackage } from '../../../core/package/create';
-import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Package - Unlock';
+const logger = createTestLogger('PKG-UNLOCK');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Package - Unlock', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+
+  // Suite-level test case data
+  let testCase: any = null;
+  let packageName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -53,32 +41,63 @@ describe('Package - Unlock', () => {
     }
   });
 
-  async function ensurePackageExists(testCase: any) {
-    const packageName = testCase.params.package_name;
+  beforeEach(async () => {
+    // Reset suite variables
+    testCase = null;
+    packageName = null;
+
+    // Check for auth failures first
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    // Setup test environment
+    const env = await setupTestEnvironment(connection, 'package_unlock', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    // Get test case
+    const tc = getEnabledTestCase('unlock_package');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    packageName = tc.params.package_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  /**
+   * Ensure package exists before test
+   */
+  async function ensurePackageExists(testCase: any): Promise<void> {
+    const pkgName = testCase.params.package_name;
 
     try {
-      await getPackage(connection, packageName);
-      logger.debug(`Package ${packageName} exists`);
+      await getPackage(connection, pkgName);
+      logger.debug(`Package ${pkgName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Package ${packageName} does not exist, creating...`);
+        logger.debug(`Package ${pkgName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_package', 'test_package');
-        if (createTestCase) {
-          try {
-            await createPackage(connection, {
-              package_name: packageName,
-              super_package: createTestCase.params.super_package || getDefaultPackage(),
-              description: createTestCase.params.description || `Test package for ${packageName}`,
-              package_type: createTestCase.params.package_type || 'development',
-              transport_request: createTestCase.params.transport_request || getDefaultTransport()
-            });
-            logger.debug(`Package ${packageName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create package ${packageName}: create_package test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create package ${pkgName}: create_package test case not found`);
         }
+
+        await createPackage(connection, {
+          package_name: pkgName,
+          super_package: createTestCase.params.super_package || getDefaultPackage(),
+          description: createTestCase.params.description || `Test package for ${pkgName}`,
+          package_type: createTestCase.params.package_type || 'development',
+          transport_request: createTestCase.params.transport_request || getDefaultTransport()
+        });
+        logger.debug(`Package ${pkgName} created successfully`);
       } else {
         throw error;
       }
@@ -86,47 +105,33 @@ describe('Package - Unlock', () => {
   }
 
   it('should unlock package', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    // Skip if no test case configured
+    if (!testCase || !packageName) {
+      logger.skip('Unlock Test', testCase ? 'Package name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('unlock_package');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing unlock for package: ${packageName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'unlock_package');
+      // Ensure package exists
+      await ensurePackageExists(testCase);
+
+      // Lock package first
+      const lockHandle = await lockPackage(connection, packageName, sessionId || '');
+      expect(lockHandle).toBeDefined();
+      logger.debug(`✓ Acquired lock handle: ${lockHandle}`);
+
+      // Unlock package
+      const result = await unlockPackage(connection, packageName, lockHandle, sessionId || '');
+      expect(result.status).toBeGreaterThanOrEqual(200);
+      expect(result.status).toBeLessThan(500);
+      logger.info(`✓ Package ${packageName} unlocked successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to unlock package: ${error.message}`);
+      throw error;
     }
-
-    await ensurePackageExists(testCase);
-
-    const sessionId = generateSessionId();
-
-    // First lock the package to get a lock handle
-    const lockHandle = await lockPackage(
-      connection,
-      testCase.params.package_name,
-      sessionId
-    );
-
-    expect(lockHandle).toBeDefined();
-
-    // Now unlock it
-    const response = await unlockPackage(
-      connection,
-      testCase.params.package_name,
-      lockHandle,
-      sessionId
-    );
-
-    expect(response.status).toBeGreaterThanOrEqual(200);
-    expect(response.status).toBeLessThan(500);
-  }, 30000);
+  }, getTimeout('test'));
 });
 

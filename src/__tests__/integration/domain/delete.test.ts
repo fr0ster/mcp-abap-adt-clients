@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -135,6 +136,6 @@ describe('Domain - Delete', () => {
       transport_request: testCase.params.transport_request || getDefaultTransport(),
     });
     logger.debug(`✅ Deleted domain: ${domainName}`);
-  }, 10000);
+  }, getTimeout('test'));
 });
 

@@ -178,6 +178,12 @@ Similar patterns for:
 - Packages
 - Transports
 
+## Development & Testing
+
+For test strategy, development roadmap, and contribution guidelines, see:
+- **[docs/TEST_STRATEGY.md](docs/TEST_STRATEGY.md)** - Test strategy and development focus
+- **[docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md)** - Package architecture
+
 ## License
 
 MIT

@@ -349,6 +349,28 @@ export class PackageBuilder {
     }
   }
 
+  async forceUnlock(): Promise<void> {
+    if (!this.state.lockHandle) {
+      return;
+    }
+    if (!this.state.sessionId) {
+      this.state.sessionId = generateSessionId();
+    }
+    try {
+      await unlockPackage(
+        this.connection,
+        this.config.packageName,
+        this.state.lockHandle,
+        this.state.sessionId
+      );
+      this.logger.info?.('Force unlock successful for', this.config.packageName);
+    } catch (error: any) {
+      this.logger.warn?.('Force unlock failed:', error);
+    } finally {
+      this.state.lockHandle = undefined;
+    }
+  }
+
   // Getters for accessing results
   getState(): Readonly<PackageBuilderState> {
     return { ...this.state };

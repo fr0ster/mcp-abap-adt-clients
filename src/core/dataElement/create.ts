@@ -9,6 +9,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 import { activateDataElement } from './activation';
+import { getDomainInfo } from './update';
 import { CreateDataElementParams } from './types';
 import * as crypto from 'crypto';
 
@@ -64,13 +65,74 @@ async function createDataElementInternal(
   const url = `${baseUrl}/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   const description = args.description || args.data_element_name;
-  const dataType = args.data_type || 'CHAR';
-  const length = args.length || 100;
-  const decimals = args.decimals || 0;
+  if (!args.type_kind) {
+    throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
+  }
+  const requestedTypeKind = args.type_kind;
+  // Use requestedTypeKind directly for XML (it's already one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType)
+  const typeKindXml = requestedTypeKind;
+
+  // Determine typeName based on typeKind
+  let typeName = '';
+  if (requestedTypeKind === 'domain') {
+    typeName = (args.domain_name || args.type_name || '').toUpperCase();
+  } else if (requestedTypeKind === 'predefinedAbapType' || requestedTypeKind === 'refToPredefinedAbapType') {
+    // For predefinedAbapType and refToPredefinedAbapType, typeName is empty
+    typeName = '';
+  } else if (requestedTypeKind === 'refToDictionaryType' || requestedTypeKind === 'refToClifType') {
+    // For refToDictionaryType and refToClifType, type_name is required
+    typeName = (args.type_name || '').toUpperCase();
+  }
+
+  // Get dataType, length, decimals based on typeKind
+  let dataType = '';
+  let length = 0;
+  let decimals = 0;
+
+  if (requestedTypeKind === 'domain') {
+    // For domain type, get information from the domain
+    const domainName = (args.domain_name || args.type_name || '').toUpperCase();
+    if (domainName) {
+      try {
+        const domainInfo = await getDomainInfo(connection, domainName);
+        dataType = domainInfo.dataType;
+        length = domainInfo.length;
+        decimals = domainInfo.decimals;
+      } catch (error: any) {
+        // If domain info cannot be retrieved, use defaults
+        dataType = 'CHAR';
+        length = 100;
+        decimals = 0;
+      }
+    } else {
+      dataType = 'CHAR';
+      length = 100;
+      decimals = 0;
+    }
+  } else if (requestedTypeKind === 'predefinedAbapType' || requestedTypeKind === 'refToPredefinedAbapType') {
+    // For predefinedAbapType and refToPredefinedAbapType, use provided values
+    dataType = args.data_type || 'CHAR';
+    length = args.length || 100;
+    decimals = args.decimals || 0;
+  } else {
+    // For refToDictionaryType and refToClifType, dataType is empty, length/decimals are 0
+    dataType = '';
+    length = 0;
+    decimals = 0;
+  }
+
   const shortLabel = args.short_label || '';
   const mediumLabel = args.medium_label || '';
   const longLabel = args.long_label || '';
   const headingLabel = args.heading_label || '';
+  const searchHelp = args.search_help !== undefined ? args.search_help : '';
+  const searchHelpParameter = args.search_help_parameter !== undefined ? args.search_help_parameter : '';
+  const setGetParameter = args.set_get_parameter !== undefined ? args.set_get_parameter : '';
+  const defaultComponentName = args.default_component_name !== undefined ? args.default_component_name : '';
+  const deactivateInputHistory = args.deactivate_input_history !== undefined ? args.deactivate_input_history : false;
+  const changeDocument = args.change_document !== undefined ? args.change_document : false;
+  const leftToRightDirection = args.left_to_right_direction !== undefined ? args.left_to_right_direction : false;
+  const deactivateBIDIFiltering = args.deactivate_bidi_filtering !== undefined ? args.deactivate_bidi_filtering : false;
 
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
@@ -86,11 +148,11 @@ async function createDataElementInternal(
             adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
   <dtel:dataElement>
-    <dtel:typeKind>domain</dtel:typeKind>
-    <dtel:typeName>${args.domain_name.toUpperCase()}</dtel:typeName>
-    <dtel:dataType>${dataType}</dtel:dataType>
-    <dtel:dataTypeLength>${length}</dtel:dataTypeLength>
-    <dtel:dataTypeDecimals>${decimals}</dtel:dataTypeDecimals>
+    <dtel:typeKind>${typeKindXml}</dtel:typeKind>
+    ${typeName ? `<dtel:typeName>${typeName}</dtel:typeName>` : '<dtel:typeName/>'}
+    ${dataType ? `<dtel:dataType>${dataType}</dtel:dataType>` : '<dtel:dataType/>'}
+    <dtel:dataTypeLength>${String(length).padStart(6, '0')}</dtel:dataTypeLength>
+    <dtel:dataTypeDecimals>${String(decimals).padStart(6, '0')}</dtel:dataTypeDecimals>
     <dtel:shortFieldLabel>${shortLabel}</dtel:shortFieldLabel>
     <dtel:shortFieldLength>10</dtel:shortFieldLength>
     <dtel:shortFieldMaxLength>10</dtel:shortFieldMaxLength>
@@ -103,14 +165,14 @@ async function createDataElementInternal(
     <dtel:headingFieldLabel>${headingLabel}</dtel:headingFieldLabel>
     <dtel:headingFieldLength>55</dtel:headingFieldLength>
     <dtel:headingFieldMaxLength>55</dtel:headingFieldMaxLength>
-    <dtel:searchHelp/>
-    <dtel:searchHelpParameter/>
-    <dtel:setGetParameter/>
-    <dtel:defaultComponentName/>
-    <dtel:deactivateInputHistory>false</dtel:deactivateInputHistory>
-    <dtel:changeDocument>false</dtel:changeDocument>
-    <dtel:leftToRightDirection>false</dtel:leftToRightDirection>
-    <dtel:deactivateBIDIFiltering>false</dtel:deactivateBIDIFiltering>
+    ${searchHelp ? `<dtel:searchHelp>${searchHelp}</dtel:searchHelp>` : '<dtel:searchHelp/>'}
+    ${searchHelpParameter ? `<dtel:searchHelpParameter>${searchHelpParameter}</dtel:searchHelpParameter>` : '<dtel:searchHelpParameter/>'}
+    ${setGetParameter ? `<dtel:setGetParameter>${setGetParameter}</dtel:setGetParameter>` : '<dtel:setGetParameter/>'}
+    ${defaultComponentName ? `<dtel:defaultComponentName>${defaultComponentName}</dtel:defaultComponentName>` : '<dtel:defaultComponentName/>'}
+    <dtel:deactivateInputHistory>${deactivateInputHistory}</dtel:deactivateInputHistory>
+    <dtel:changeDocument>${changeDocument}</dtel:changeDocument>
+    <dtel:leftToRightDirection>${leftToRightDirection}</dtel:leftToRightDirection>
+    <dtel:deactivateBIDIFiltering>${deactivateBIDIFiltering}</dtel:deactivateBIDIFiltering>
   </dtel:dataElement>
 </blue:wbobj>`;
 
@@ -163,8 +225,13 @@ export async function createDataElement(
   if (!params.package_name) {
     throw new Error('Package name is required');
   }
-  if (!params.domain_name) {
-    throw new Error('Domain name is required');
+
+  if (!params.type_kind) {
+    throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
+  }
+  const typeKind = params.type_kind;
+  if (typeKind === 'domain' && !params.domain_name) {
+    throw new Error('Domain name is required when type_kind is domain');
   }
 
   const sessionId = generateSessionId();
@@ -178,39 +245,22 @@ export async function createDataElement(
 
   try {
     // Step 1: Create data element with POST
-    await createDataElementInternal(connection, params, sessionId, username, masterSystem);
+    const createResponse = await createDataElementInternal(
+      connection,
+      {
+        ...params,
+        type_kind: typeKind
+      },
+      sessionId,
+      username,
+      masterSystem
+    );
 
     // Step 2: Activate data element
     await activateDataElement(connection, params.data_element_name, sessionId);
 
-    // Step 3: Verify activation
-    const finalDataElement = await getDataElementForVerification(connection, params.data_element_name, sessionId);
-
-    // Return success response
-    return {
-      data: {
-        success: true,
-        data_element_name: params.data_element_name,
-        package: params.package_name,
-        transport_request: params.transport_request,
-        domain_name: params.domain_name,
-        status: 'active',
-        version: finalDataElement['adtcore:version'] || 'unknown',
-        session_id: sessionId,
-        message: `Data element ${params.data_element_name} created and activated successfully`,
-        data_element_details: {
-          type_kind: finalDataElement['dtel:dataElement']?.['dtel:typeKind'],
-          type_name: finalDataElement['dtel:dataElement']?.['dtel:typeName'],
-          data_type: finalDataElement['dtel:dataElement']?.['dtel:dataType'],
-          length: finalDataElement['dtel:dataElement']?.['dtel:dataTypeLength'],
-          decimals: finalDataElement['dtel:dataElement']?.['dtel:dataTypeDecimals']
-        }
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     const errorMessage = error.response?.data

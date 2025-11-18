@@ -115,28 +115,12 @@ export async function createPackage(
       await validatePackageFull(connection, params, swcomp, transportLayer);
     }
 
-    const packageData = await createPackageInternal(connection, params, swcomp, transportLayer, transportRequest);
+    const createResponse = await createPackageInternal(connection, params, swcomp, transportLayer, transportRequest);
 
     await checkPackage(connection, params.package_name);
 
-    return {
-      data: {
-        success: true,
-        package_name: params.package_name,
-        description: params.description || params.package_name,
-        super_package: params.super_package,
-        package_type: params.package_type || 'development',
-        software_component: swcomp,
-        transport_layer: transportLayer,
-        transport_request: transportRequest,
-        uri: `/sap/bc/adt/packages/${params.package_name.toLowerCase()}`,
-        message: `Package ${params.package_name} created successfully`
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     const errorMessage = error.response?.data

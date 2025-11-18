@@ -1,47 +1,34 @@
 /**
- * Unit test for Program reading
- * Tests getProgramMetadata and getProgramSource functions
+ * Integration test for Program read
+ * Tests getProgramMetadata and getProgramSource functions (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/program/read.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/program/read.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { getProgramMetadata, getProgramSource } from '../../../core/program/read';
 import { createProgram } from '../../../core/program/create';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Program - Read';
+const logger = createTestLogger('PROG-READ');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Program - Read', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let programName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -50,32 +37,63 @@ describe('Program - Read', () => {
     }
   });
 
-  async function ensureProgramExists(testCase: any) {
-    const programName = testCase.params.program_name;
+  beforeEach(async () => {
+    testCase = null;
+    programName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'program_read', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('read_program');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
 
     try {
-      await getProgramMetadata(connection, programName);
-      logger.debug(`Program ${programName} exists`);
+      validateTestCaseForUserSpace(tc, 'read_program');
+    } catch (error: any) {
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    programName = tc.params.program_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureProgramExists(testCase: any): Promise<void> {
+    const progName = testCase.params.program_name;
+
+    try {
+      await getProgramMetadata(connection, progName);
+      logger.debug(`Program ${progName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Program ${programName} does not exist, creating...`);
+        logger.debug(`Program ${progName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_program', 'test_program');
-        if (createTestCase) {
-          try {
-            await createProgram(connection, {
-              program_name: programName,
-              description: createTestCase.params.description || `Test program for ${programName}`,
-              package_name: createTestCase.params.package_name || getDefaultPackage(),
-              transport_request: createTestCase.params.transport_request || getDefaultTransport(),
-              source_code: createTestCase.params.source_code
-            });
-            logger.debug(`Program ${programName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create program ${programName}: create_program test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create program ${progName}: create_program test case not found`);
         }
+
+        await createProgram(connection, {
+          program_name: progName,
+          description: createTestCase.params.description || `Test program for ${progName}`,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createTestCase.params.transport_request || getDefaultTransport(),
+          source_code: createTestCase.params.source_code
+        });
+        logger.debug(`Program ${progName} created successfully`);
       } else {
         throw error;
       }
@@ -83,56 +101,47 @@ describe('Program - Read', () => {
   }
 
   it('should read program metadata', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !programName) {
+      logger.skip('Read Test', testCase ? 'Program name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('read_program');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing read metadata for program: ${programName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'read_program');
+      await ensureProgramExists(testCase);
+
+      const result = await getProgramMetadata(connection, programName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      logger.info(`✓ Program ${programName} metadata read successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to read program metadata: ${error.message}`);
+      throw error;
     }
-
-    await ensureProgramExists(testCase);
-
-    const result = await getProgramMetadata(connection, testCase.params.program_name);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-  }, 30000);
+  }, getTimeout('test'));
 
   it('should read program source code', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !programName) {
+      logger.skip('Read Test', testCase ? 'Program name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('read_program');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing read source for program: ${programName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'read_program');
+      await ensureProgramExists(testCase);
+
+      const result = await getProgramSource(connection, programName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      expect(typeof result.data).toBe('string');
+      logger.info(`✓ Program ${programName} source read successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to read program source: ${error.message}`);
+      throw error;
     }
-
-    await ensureProgramExists(testCase);
-
-    const result = await getProgramSource(connection, testCase.params.program_name);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-    expect(typeof result.data).toBe('string');
-  }, 30000);
+  }, getTimeout('test'));
 });
-

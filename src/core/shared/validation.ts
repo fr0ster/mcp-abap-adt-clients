@@ -81,6 +81,52 @@ export async function validateObjectName(
       return { valid: true };
     }
 
+    // For 400 errors, try to extract meaningful error message
+    if (error.response?.status === 400) {
+      let errorMessage = 'Validation request failed with status 400';
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          // Try to parse XML error
+          try {
+            const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+            const parsed = parser.parse(error.response.data);
+            const errorText = parsed['exc:exception']?.message?.['#text'] ||
+                             parsed['exc:exception']?.message ||
+                             parsed['exc:exception']?.reason?.['#text'] ||
+                             parsed['exc:exception']?.reason;
+            if (errorText) {
+              errorMessage = errorText;
+            }
+          } catch {
+            // Not XML, use raw message
+            errorMessage = error.response.data.substring(0, 200);
+          }
+        } else if (typeof error.response.data === 'object') {
+          errorMessage = JSON.stringify(error.response.data).substring(0, 200);
+        }
+      }
+
+      // If validation is not supported for this object type, return valid (skip validation)
+      const errorMsgLower = errorMessage.toLowerCase();
+      if (errorMsgLower.includes('not supported') ||
+          (errorMsgLower.includes('object type') && errorMsgLower.includes('not supported'))) {
+        return { valid: true }; // Skip validation if not supported
+      }
+
+      return {
+        valid: false,
+        severity: 'ERROR',
+        message: errorMessage
+      };
+    }
+
+    // For other errors, check if it's about unsupported object type
+    const errorMsg = error.message || '';
+    if (errorMsg.toLowerCase().includes('not supported') ||
+        (errorMsg.toLowerCase().includes('object type') && errorMsg.toLowerCase().includes('not supported'))) {
+      return { valid: true }; // Skip validation if not supported
+    }
+
     // For other errors, return as validation failure
     return {
       valid: false,

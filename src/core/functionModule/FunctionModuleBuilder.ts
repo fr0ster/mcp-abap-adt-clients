@@ -290,6 +290,27 @@ export class FunctionModuleBuilder {
     }
   }
 
+  async forceUnlock(): Promise<void> {
+    if (!this.lockHandle) {
+      return;
+    }
+    try {
+      await unlockFunctionModule(
+        this.connection,
+        this.config.functionGroupName,
+        this.config.functionModuleName,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.logger.info?.('Force unlock successful for', this.config.functionModuleName);
+    } catch (error: any) {
+      this.logger.warn?.('Force unlock failed:', error);
+    } finally {
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+    }
+  }
+
   // Getters for accessing results
   getState(): Readonly<FunctionModuleBuilderState> {
     return { ...this.state };

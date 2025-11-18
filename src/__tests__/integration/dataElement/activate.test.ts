@@ -28,6 +28,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -195,6 +196,6 @@ describe('Data Element - Activate', () => {
 
     expect(response.status).toBe(200);
     logger.debug(`✅ Activated data element: ${testCase.params.data_element_name}`);
-  }, 30000);
+  }, getTimeout('test'));
 });
 

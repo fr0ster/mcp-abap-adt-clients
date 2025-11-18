@@ -15,7 +15,7 @@ import { UpdateDataElementParams } from './types';
 /**
  * Get domain info to extract dataType, length, decimals
  */
-async function getDomainInfo(
+export async function getDomainInfo(
   connection: AbapConnection,
   domainName: string
 ): Promise<{ dataType: string; length: number; decimals: number }> {
@@ -83,8 +83,9 @@ async function getDataElementForVerification(
 
 /**
  * Update data element with new data
+ * Requires object to be locked first (lockHandle must be provided)
  */
-async function updateDataElementInternal(
+export async function updateDataElementInternal(
   connection: AbapConnection,
   args: UpdateDataElementParams,
   lockHandle: string,
@@ -97,8 +98,22 @@ async function updateDataElementInternal(
   const corrNrParam = args.transport_request ? `&corrNr=${args.transport_request}` : '';
   const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?lockHandle=${lockHandle}${corrNrParam}`;
 
-  const typeKind = args.type_kind || 'domain';
-  const typeName = args.type_name || args.domain_name || '';
+  if (!args.type_kind) {
+    throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
+  }
+  const typeKind = args.type_kind;
+
+  // Determine typeName based on typeKind (same logic as in create.ts)
+  let typeName = '';
+  if (typeKind === 'domain') {
+    typeName = (args.domain_name || args.type_name || '').toUpperCase();
+  } else if (typeKind === 'predefinedAbapType' || typeKind === 'refToPredefinedAbapType') {
+    // For predefinedAbapType and refToPredefinedAbapType, typeName is empty
+    typeName = '';
+  } else if (typeKind === 'refToDictionaryType' || typeKind === 'refToClifType') {
+    // For refToDictionaryType and refToClifType, type_name is required
+    typeName = (args.type_name || '').toUpperCase();
+  }
 
   let dataType = '';
   let dataTypeLength = 0;
@@ -108,11 +123,13 @@ async function updateDataElementInternal(
     dataType = domainInfo.dataType;
     dataTypeLength = domainInfo.length;
     dataTypeDecimals = domainInfo.decimals;
-  } else if (typeKind === 'builtin') {
+  } else if (typeKind === 'predefinedAbapType' || typeKind === 'refToPredefinedAbapType') {
+    // For predefinedAbapType and refToPredefinedAbapType, use provided values
     dataType = args.data_type || 'CHAR';
     dataTypeLength = args.length || 100;
     dataTypeDecimals = args.decimals || 0;
   } else {
+    // For refToDictionaryType and refToClifType, dataType is empty, length/decimals are 0
     dataType = '';
     dataTypeLength = 0;
     dataTypeDecimals = 0;
@@ -133,6 +150,15 @@ async function updateDataElementInternal(
   const longLength = longLabel.length || longMaxLength;
   const headingLength = headingLabel.length || headingMaxLength;
 
+  const searchHelp = args.search_help !== undefined ? args.search_help : '';
+  const searchHelpParameter = args.search_help_parameter !== undefined ? args.search_help_parameter : '';
+  const setGetParameter = args.set_get_parameter !== undefined ? args.set_get_parameter : '';
+  const defaultComponentName = args.default_component_name !== undefined ? args.default_component_name : '';
+  const deactivateInputHistory = args.deactivate_input_history !== undefined ? args.deactivate_input_history : false;
+  const changeDocument = args.change_document !== undefined ? args.change_document : false;
+  const leftToRightDirection = args.left_to_right_direction !== undefined ? args.left_to_right_direction : false;
+  const deactivateBIDIFiltering = args.deactivate_bidi_filtering !== undefined ? args.deactivate_bidi_filtering : false;
+
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel"
             xmlns:adtcore="http://www.sap.com/adt/core"
@@ -147,10 +173,10 @@ async function updateDataElementInternal(
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
   <dtel:dataElement>
     <dtel:typeKind>${typeKind}</dtel:typeKind>
-    <dtel:typeName>${typeName.toUpperCase()}</dtel:typeName>
-    <dtel:dataType>${dataType}</dtel:dataType>
-    <dtel:dataTypeLength>${dataTypeLength}</dtel:dataTypeLength>
-    <dtel:dataTypeDecimals>${dataTypeDecimals}</dtel:dataTypeDecimals>
+    ${typeName ? `<dtel:typeName>${typeName}</dtel:typeName>` : '<dtel:typeName/>'}
+    ${dataType ? `<dtel:dataType>${dataType}</dtel:dataType>` : '<dtel:dataType/>'}
+    <dtel:dataTypeLength>${String(dataTypeLength).padStart(6, '0')}</dtel:dataTypeLength>
+    <dtel:dataTypeDecimals>${String(dataTypeDecimals).padStart(6, '0')}</dtel:dataTypeDecimals>
     <dtel:shortFieldLabel>${shortLabel}</dtel:shortFieldLabel>
     <dtel:shortFieldLength>${shortLength}</dtel:shortFieldLength>
     <dtel:shortFieldMaxLength>${shortMaxLength}</dtel:shortFieldMaxLength>
@@ -163,6 +189,14 @@ async function updateDataElementInternal(
     <dtel:headingFieldLabel>${headingLabel}</dtel:headingFieldLabel>
     <dtel:headingFieldLength>${headingLength}</dtel:headingFieldLength>
     <dtel:headingFieldMaxLength>${headingMaxLength}</dtel:headingFieldMaxLength>
+    ${searchHelp ? `<dtel:searchHelp>${searchHelp}</dtel:searchHelp>` : '<dtel:searchHelp/>'}
+    ${searchHelpParameter ? `<dtel:searchHelpParameter>${searchHelpParameter}</dtel:searchHelpParameter>` : '<dtel:searchHelpParameter/>'}
+    ${setGetParameter ? `<dtel:setGetParameter>${setGetParameter}</dtel:setGetParameter>` : '<dtel:setGetParameter/>'}
+    ${defaultComponentName ? `<dtel:defaultComponentName>${defaultComponentName}</dtel:defaultComponentName>` : '<dtel:defaultComponentName/>'}
+    <dtel:deactivateInputHistory>${deactivateInputHistory}</dtel:deactivateInputHistory>
+    <dtel:changeDocument>${changeDocument}</dtel:changeDocument>
+    <dtel:leftToRightDirection>${leftToRightDirection}</dtel:leftToRightDirection>
+    <dtel:deactivateBIDIFiltering>${deactivateBIDIFiltering}</dtel:deactivateBIDIFiltering>
   </dtel:dataElement>
 </blue:wbobj>`;
 
@@ -170,6 +204,28 @@ async function updateDataElementInternal(
     'Accept': 'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
     'Content-Type': 'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8'
   };
+
+  // Debug: log XML when DEBUG_TESTS is enabled (formatted for readability)
+  if (process.env.DEBUG_TESTS === 'true') {
+    console.log('[UPDATE XML]');
+    // Format XML with indentation for readability
+    try {
+      const { XMLParser, XMLBuilder } = require('fast-xml-parser');
+      const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
+      const builder = new XMLBuilder({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+        format: true,
+        indentBy: '  '
+      });
+      const parsed = parser.parse(xmlBody);
+      const formatted = builder.build(parsed);
+      console.log(formatted);
+    } catch {
+      // If formatting fails, just log as-is
+      console.log(xmlBody);
+    }
+  }
 
   return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, xmlBody, headers);
 }
@@ -194,12 +250,21 @@ export async function updateDataElement(
   let lockHandle = '';
 
   try {
-    const typeKind = params.type_kind || 'domain';
+    if (!params.type_kind) {
+      throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
+    }
+    const typeKind = params.type_kind;
     let domainInfo = { dataType: 'CHAR', length: 100, decimals: 0 };
 
     if (typeKind === 'domain') {
       const domainName = params.type_name || params.domain_name || 'CHAR100';
       domainInfo = await getDomainInfo(connection, domainName);
+    } else if (typeKind === 'predefinedAbapType') {
+      domainInfo = {
+        dataType: params.data_type || 'CHAR',
+        length: params.length || 100,
+        decimals: params.decimals || 0
+      };
     }
 
     lockHandle = await lockDataElement(connection, params.data_element_name, sessionId);

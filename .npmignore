@@ -1,0 +1,49 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+tsconfig.json
+tsconfig.tsbuildinfo
+
+# Tests (both source and compiled)
+__tests__/
+dist/__tests__/
+*.test.ts
+*.test.js
+jest.config.js
+jest.setup.js
+test-*.js
+tests/
+
+# Development
+.vscode/
+.git/
+.github/
+node_modules/
+
+# Build artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+test-config.yaml
+test-config.yaml.template
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Session and lock files (runtime artifacts)
+.sessions/
+.locks/

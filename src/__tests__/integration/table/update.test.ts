@@ -1,48 +1,35 @@
 /**
- * Unit test for Table update
- * Tests updateTable function
+ * Integration test for Table update
+ * Tests updateTable function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/table/update.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/table/update.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { updateTable } from '../../../core/table/update';
 import { getTableMetadata } from '../../../core/table/read';
 import { createTable } from '../../../core/table/create';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Table - Update';
+const logger = createTestLogger('TABLE-UPDATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Table - Update', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let tableName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -51,31 +38,55 @@ describe('Table - Update', () => {
     }
   });
 
-  async function ensureTableExists(testCase: any) {
-    const tableName = testCase.params.table_name;
+  beforeEach(async () => {
+    testCase = null;
+    tableName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'table_update', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('update_table');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    tableName = tc.params.table_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureTableExists(testCase: any): Promise<void> {
+    const tblName = testCase.params.table_name;
 
     try {
-      await getTableMetadata(connection, tableName);
-      logger.debug(`Table ${tableName} exists`);
+      await getTableMetadata(connection, tblName);
+      logger.debug(`Table ${tblName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Table ${tableName} does not exist, creating...`);
+        logger.debug(`Table ${tblName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_table', 'test_table');
-        if (createTestCase) {
-          try {
-            await createTable(connection, {
-              table_name: tableName,
-              package_name: createTestCase.params.package_name || getDefaultPackage(),
-              transport_request: createTestCase.params.transport_request || getDefaultTransport(),
-              ddl_code: createTestCase.params.ddl_code
-            });
-            logger.debug(`Table ${tableName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create table ${tableName}: create_table test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create table ${tblName}: create_table test case not found`);
         }
+
+        await createTable(connection, {
+          table_name: tblName,
+          package_name: createTestCase.params.package_name || getDefaultPackage(),
+          transport_request: createTestCase.params.transport_request || getDefaultTransport(),
+          ddl_code: createTestCase.params.ddl_code
+        });
+        logger.debug(`Table ${tblName} created successfully`);
       } else {
         throw error;
       }
@@ -83,36 +94,31 @@ describe('Table - Update', () => {
   }
 
   it('should update table', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !tableName) {
+      logger.skip('Update Test', testCase ? 'Table name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('update_table');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing update for table: ${tableName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'update_table');
+      await ensureTableExists(testCase);
+
+      await updateTable(connection, {
+        table_name: tableName,
+        ddl_code: testCase.params.ddl_code,
+        transport_request: testCase.params.transport_request || getDefaultTransport(),
+        activate: testCase.params.activate || false
+      });
+      logger.debug(`✓ Table ${tableName} updated`);
+
+      const result = await getTableMetadata(connection, tableName);
+      expect(result.status).toBe(200);
+      logger.info(`✓ Table ${tableName} updated successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to update table: ${error.message}`);
+      throw error;
     }
-
-    await ensureTableExists(testCase);
-
-    await updateTable(connection, {
-      table_name: testCase.params.table_name,
-      ddl_code: testCase.params.ddl_code,
-      transport_request: testCase.params.transport_request || getDefaultTransport(),
-      activate: testCase.params.activate || false
-    });
-
-    // Verify update by reading
-    const result = await getTableMetadata(connection, testCase.params.table_name);
-    expect(result.status).toBe(200);
-  }, 60000);
+  }, getTimeout('test'));
 });
-

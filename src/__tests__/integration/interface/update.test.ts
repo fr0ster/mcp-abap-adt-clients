@@ -1,48 +1,35 @@
 /**
- * Unit test for Interface update
- * Tests updateInterfaceSource function
+ * Integration test for Interface update
+ * Tests updateInterfaceSource function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/interface/update.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/interface/update.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { updateInterfaceSource } from '../../../core/interface/update';
 import { getInterfaceMetadata } from '../../../core/interface/read';
 import { createInterface } from '../../../core/interface/create';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Interface - Update';
+const logger = createTestLogger('INTF-UPDATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Interface - Update', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let interfaceName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -51,21 +38,49 @@ describe('Interface - Update', () => {
     }
   });
 
-  async function ensureInterfaceExists(testCase: any) {
-    const interfaceName = testCase.params.interface_name;
+  beforeEach(async () => {
+    testCase = null;
+    interfaceName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'interface_update', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('update_interface');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    interfaceName = tc.params.interface_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureInterfaceExists(testCase: any): Promise<void> {
+    const intfName = testCase.params.interface_name;
 
     try {
-      await getInterfaceMetadata(connection, interfaceName);
-      logger.debug(`Interface ${interfaceName} exists`);
+      await getInterfaceMetadata(connection, intfName);
+      logger.debug(`Interface ${intfName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Interface ${interfaceName} does not exist, creating...`);
+        logger.debug(`Interface ${intfName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_interface', 'test_interface');
         if (!createTestCase) {
-          throw new Error(`Cannot create interface ${interfaceName}: create_interface test case not found`);
+          throw new Error(`Cannot create interface ${intfName}: create_interface test case not found`);
         }
 
-        const sourceCode = createTestCase.params.source_code || `INTERFACE ${interfaceName}
+        const sourceCode = createTestCase.params.source_code || `INTERFACE ${intfName}
   PUBLIC.
 
   METHODS: get_value
@@ -74,13 +89,13 @@ describe('Interface - Update', () => {
 ENDINTERFACE.`;
 
         await createInterface(connection, {
-          interface_name: interfaceName,
-          description: `Test interface for ${interfaceName}`,
+          interface_name: intfName,
+          description: `Test interface for ${intfName}`,
           package_name: createTestCase.params.package_name || getDefaultPackage(),
           transport_request: createTestCase.params.transport_request || getDefaultTransport(),
           source_code: sourceCode
         });
-        logger.debug(`Interface ${interfaceName} created successfully`);
+        logger.debug(`Interface ${intfName} created successfully`);
       } else {
         throw error;
       }
@@ -88,27 +103,17 @@ ENDINTERFACE.`;
   }
 
   it('should update interface source code', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !interfaceName) {
+      logger.skip('Update Test', testCase ? 'Interface name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('update_interface');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing update for interface: ${interfaceName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'update_interface');
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
-    }
+      await ensureInterfaceExists(testCase);
 
-    await ensureInterfaceExists(testCase);
-
-    const updatedSourceCode = testCase.params.source_code || `INTERFACE ${testCase.params.interface_name}
+      const updatedSourceCode = testCase.params.source_code || `INTERFACE ${interfaceName}
   PUBLIC.
 
   METHODS: get_value
@@ -118,13 +123,18 @@ ENDINTERFACE.`;
 
 ENDINTERFACE.`;
 
-    const result = await updateInterfaceSource(connection, {
-      interface_name: testCase.params.interface_name,
-      source_code: updatedSourceCode,
-      activate: false
-    });
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-  }, 30000);
-});
+      const result = await updateInterfaceSource(connection, {
+        interface_name: interfaceName,
+        source_code: updatedSourceCode,
+        activate: false
+      });
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      logger.info(`✓ Interface ${interfaceName} updated successfully`);
 
+    } catch (error: any) {
+      logger.error(`✗ Failed to update interface: ${error.message}`);
+      throw error;
+    }
+  }, getTimeout('test'));
+});

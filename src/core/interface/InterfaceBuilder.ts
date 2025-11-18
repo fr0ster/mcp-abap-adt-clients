@@ -280,6 +280,26 @@ export class InterfaceBuilder {
     }
   }
 
+  async forceUnlock(): Promise<void> {
+    if (!this.lockHandle) {
+      return;
+    }
+    try {
+      await unlockInterface(
+        this.connection,
+        this.config.interfaceName,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.logger.info?.('Force unlock successful for', this.config.interfaceName);
+    } catch (error: any) {
+      this.logger.warn?.('Force unlock failed:', error);
+    } finally {
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+    }
+  }
+
   // Getters for accessing results
   getState(): Readonly<InterfaceBuilderState> {
     return { ...this.state };

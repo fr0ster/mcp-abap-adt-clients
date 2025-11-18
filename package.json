@@ -50,8 +50,9 @@
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "build": "npm run --silent clean && tsc -p tsconfig.json",
     "build:fast": "tsc -p tsconfig.json",
-    "test": "jest",
+    "test": "jest --runInBand",
     "test:sequential": "node scripts/run-tests-sequential.js",
+    "test:module": "node scripts/test-module.js",
     "prepublishOnly": "npm run build"
   },
   "engines": {

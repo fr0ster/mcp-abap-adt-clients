@@ -12,6 +12,7 @@ import { createDomain } from '../../../core/domain/create';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -178,6 +179,6 @@ describe('Data Element - Delete', () => {
       // For other errors, fail the test
       throw error;
     }
-  }, 60000);
+  }, getTimeout('test'));
 });
 

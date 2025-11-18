@@ -1,82 +1,38 @@
 /**
- * Unit test for updateFunctionModuleSource
- * Tests only the update operation in isolation
+ * Integration test for Function Module update
+ * Tests updateFunctionModuleSource function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/functionModule/update.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/functionModule/update.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { updateFunctionModuleSource } from '../../../core/functionModule/update';
 import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunction } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
-// Environment variables are loaded automatically by test-helper
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
+const TEST_SUITE_NAME = 'Function Module - Update';
+const logger = createTestLogger('FM-UPDATE');
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
-describe('Function Module - Update', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let functionModuleName: string | null = null;
+  let functionGroupName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -85,68 +41,81 @@ describe('Function Module - Update', () => {
     }
   });
 
-  // Helper function to ensure function group exists (idempotency)
-  async function ensureFunctionGroupExists(functionGroupName: string, packageName?: string) {
+  beforeEach(async () => {
+    testCase = null;
+    functionModuleName = null;
+    functionGroupName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'function_module_update', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('update_function_module_source') || getEnabledTestCase('create_function_module', 'test_function_module');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
+    testCase = tc;
+    functionModuleName = tc.params?.function_module_name;
+    functionGroupName = tc.params?.function_group_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensureFunctionGroupExists(fgName: string, packageName?: string): Promise<void> {
     try {
-      await getFunctionGroup(connection, functionGroupName);
-      logger.debug(`Function group ${functionGroupName} exists`);
+      await getFunctionGroup(connection, fgName);
+      logger.debug(`Function group ${fgName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Function group ${functionGroupName} does not exist, creating...`);
+        logger.debug(`Function group ${fgName} does not exist, creating...`);
         const fugrTestCase = getEnabledTestCase('create_function_group', 'test_function_group');
         if (!fugrTestCase) {
-          throw new Error(`Cannot create function group ${functionGroupName}: create_function_group test case not found`);
+          throw new Error(`Cannot create function group ${fgName}: create_function_group test case not found`);
         }
         await createFunctionGroup(connection, {
-          function_group_name: functionGroupName,
-          description: fugrTestCase.params.description || `Test FUGR for ${functionGroupName}`,
+          function_group_name: fgName,
+          description: fugrTestCase.params.description || `Test FUGR for ${fgName}`,
           package_name: packageName || fugrTestCase.params.package_name || getDefaultPackage(),
         });
-        logger.debug(`Function group ${functionGroupName} created successfully`);
+        logger.debug(`Function group ${fgName} created successfully`);
       } else {
         throw error;
       }
     }
   }
 
-  // Helper function to ensure function module exists before test (idempotency)
-  async function ensureFunctionModuleExists(testCase: any) {
-    const functionModuleName = testCase.params?.function_module_name;
-    const functionGroupName = testCase.params?.function_group_name;
+  async function ensureFunctionModuleExists(testCase: any): Promise<void> {
+    const fmName = testCase.params?.function_module_name;
+    const fgName = testCase.params?.function_group_name;
 
-    if (!functionModuleName || !functionGroupName) {
+    if (!fmName || !fgName) {
       throw new Error('function_module_name and function_group_name are required in test case');
     }
 
     try {
-      await getFunction(connection, functionGroupName, functionModuleName);
-      logger.debug(`Function module ${functionModuleName} exists`);
+      await getFunction(connection, fgName, fmName);
+      logger.debug(`Function module ${fmName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Function module ${functionModuleName} does not exist, creating...`);
-        try {
-          await createFunctionModule(connection, {
-            function_module_name: functionModuleName,
-            function_group_name: functionGroupName,
-            description: testCase.params?.description,
-            package_name: testCase.params?.package_name,
-            source_code: testCase.params?.source_code,
-          });
-          logger.debug(`Function module ${functionModuleName} created successfully`);
-        } catch (createError: any) {
-          // S_ABPLNGVS error means function module name violates SAP naming rules
-          // (must start with Z_ or Y_ for non-SAP/non-partner users)
-          if (createError.message.includes('S_ABPLNGVS')) {
-            logger.warn(`⚠️ Skipping test: ${createError.message} (Function module name must start with Z_ or Y_ for non-SAP/non-partner users)`);
-            throw createError; // Re-throw to skip test
-          }
-          // If creation fails with 500 or other server error, log and re-throw
-          if (createError.response?.status >= 500) {
-            logger.warn(`⚠️ Server error creating FM ${functionModuleName}: ${createError.message}`);
-            throw createError; // Re-throw to skip test
-          }
-          throw createError;
-        }
+        logger.debug(`Function module ${fmName} does not exist, creating...`);
+        await createFunctionModule(connection, {
+          function_module_name: fmName,
+          function_group_name: fgName,
+          description: testCase.params?.description,
+          package_name: testCase.params?.package_name,
+          source_code: testCase.params?.source_code,
+        });
+        logger.debug(`Function module ${fmName} created successfully`);
       } else {
         throw error;
       }
@@ -154,40 +123,18 @@ describe('Function Module - Update', () => {
   }
 
   it('should update function module source code', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !functionModuleName || !functionGroupName) {
+      logger.skip('Update Test', testCase ? 'Function module/group name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('update_function_module_source') || getEnabledTestCase('create_function_module', 'test_function_module');
-    if (!testCase) {
-      return; // Skip silently if test case not configured
-    }
+    logger.info(`Testing update for FM: ${functionModuleName} in ${functionGroupName}`);
 
-    const functionModuleName = testCase.params?.function_module_name;
-    const functionGroupName = testCase.params?.function_group_name;
-    const packageName = testCase.params?.package_name;
-
-    if (!functionModuleName || !functionGroupName) {
-      return; // Skip silently if required params missing
-    }
-
-    // Ensure function group exists (idempotency)
-    await ensureFunctionGroupExists(functionGroupName, packageName);
-
-    // Ensure function module exists (idempotency)
     try {
+      await ensureFunctionGroupExists(functionGroupName, testCase.params?.package_name);
       await ensureFunctionModuleExists(testCase);
-    } catch (error: any) {
-      // S_ABPLNGVS error means function module name violates SAP naming rules
-      if (error.message.includes('S_ABPLNGVS') || error.response?.status >= 500) {
-        return; // Skip test if name violates naming rules or server error
-      }
-      throw error;
-    }
 
-    // Update FM with new source code
-    const updatedSourceCode = testCase.params?.source_code || `FUNCTION ${functionModuleName}.
+      const updatedSourceCode = testCase.params?.source_code || `FUNCTION ${functionModuleName}.
 *"----------------------------------------------------------------------
 *"*"Local Interface:
 *"  IMPORTING
@@ -199,29 +146,27 @@ describe('Function Module - Update', () => {
   RESULT = |Updated: { INPUT }|.
 ENDFUNCTION.`;
 
-    try {
       await updateFunctionModuleSource(connection, {
         function_module_name: functionModuleName,
         function_group_name: functionGroupName,
         source_code: updatedSourceCode,
       });
+      logger.debug(`✓ Function module ${functionModuleName} updated`);
 
-      logger.debug(`✅ Updated function module source: ${functionModuleName}`);
-
-      // Verify update
       const result = await getFunction(connection, functionGroupName, functionModuleName);
       expect(result.status).toBe(200);
       if (updatedSourceCode.includes('Updated')) {
         expect(result.data).toContain('Updated');
       }
-      logger.debug(`✅ Verified FM update`);
+      logger.info(`✓ FM ${functionModuleName} updated successfully`);
+
     } catch (error: any) {
-      // S_ABPLNGVS error means function module name violates SAP naming rules
       if (error.message.includes('S_ABPLNGVS')) {
-        logger.warn(`⚠️ Skipping update test: ${error.message} (Function module name must start with Z_ or Y_ for non-SAP/non-partner users)`);
+        logger.skip('Update Test', 'Function module name violates SAP naming rules');
         return;
       }
+      logger.error(`✗ Failed to update function module: ${error.message}`);
       throw error;
     }
-  }, 30000);
+  }, getTimeout('test'));
 });

@@ -237,6 +237,26 @@ export class FunctionGroupBuilder {
     }
   }
 
+  async forceUnlock(): Promise<void> {
+    if (!this.lockHandle) {
+      return;
+    }
+    try {
+      await unlockFunctionGroup(
+        this.connection,
+        this.config.functionGroupName,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.logger.info?.('Force unlock successful for', this.config.functionGroupName);
+    } catch (error: any) {
+      this.logger.warn?.('Force unlock failed:', error);
+    } finally {
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+    }
+  }
+
   // Getters for accessing results
   getState(): Readonly<FunctionGroupBuilderState> {
     return { ...this.state };

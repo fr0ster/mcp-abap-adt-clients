@@ -11,8 +11,10 @@ import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunction } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
+import { getConfig, markAuthFailed, hasAuthFailed } from '../../helpers/sessionConfig';
 
 const { getEnabledTestCase } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 // Environment variables are loaded automatically by test-helper
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -24,57 +26,27 @@ const logger = {
   csrfToken: debugEnabled ? console.log : () => {},
 };
 
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
 
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
-describe('Function Module - Validate', () => {
+const TEST_SUITE_NAME = 'Function Module - Validate';
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
   beforeAll(async () => {
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.warn('⚠️ Skipping test suite - authentication failed in previous suite');
+      return;
+    }
+
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      await connection.connect();
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (error: any) {
+      logger.error('❌ Authentication/Connection failed - marking all tests to skip');
+      logger.error(`   Error: ${error.message}`);
+      markAuthFailed(TEST_SUITE_NAME);
       hasConfig = false;
     }
   });

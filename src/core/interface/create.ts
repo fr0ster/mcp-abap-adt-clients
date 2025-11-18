@@ -40,7 +40,7 @@ async function createInterfaceObject(
   sessionId: string,
   masterSystem?: string,
   responsible?: string
-): Promise<void> {
+): Promise<AxiosResponse> {
   // Get masterSystem and responsible (only for cloud systems)
   // On cloud, getSystemInformation returns systemID and userName
   // On on-premise, it returns null, so we don't add these attributes
@@ -73,7 +73,7 @@ async function createInterfaceObject(
   const url = `/sap/bc/adt/oo/interfaces`;
   const params = transportRequest ? `?corrNr=${transportRequest}` : '';
 
-  await makeAdtRequestWithSession(
+  return makeAdtRequestWithSession(
     connection,
     url + params,
     'POST',
@@ -132,7 +132,7 @@ export async function createInterface(
 
   try {
     // Step 1: Create interface object with metadata
-    await createInterfaceObject(
+    const createResponse = await createInterfaceObject(
       connection,
       params.interface_name,
       finalDescription,
@@ -163,34 +163,13 @@ export async function createInterface(
     lockHandle = undefined;
 
     // Step 5: Activate interface (optional)
-    let activationResult;
     const shouldActivate = params.activate !== false;
     if (shouldActivate) {
-      const activateResponse = await activateInterface(connection, params.interface_name, sessionId);
-
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@_'
-      });
-      activationResult = parser.parse(activateResponse.data);
+      await activateInterface(connection, params.interface_name, sessionId);
     }
 
-    // Return success response
-    return {
-      data: {
-        success: true,
-        interface_name: params.interface_name,
-        package_name: params.package_name,
-        transport_request: params.transport_request || 'local',
-        activated: shouldActivate,
-        activation_result: activationResult,
-        message: `Interface ${params.interface_name} created successfully${shouldActivate ? ' and activated' : ''}`
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     // Attempt to unlock if we have a lock handle

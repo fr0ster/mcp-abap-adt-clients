@@ -1,49 +1,35 @@
 /**
- * Unit test for View creation
- * Tests createView function
+ * Integration test for View creation
+ * Tests createView function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/view/create.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/view/create.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { createView } from '../../../core/view/create';
 import { getViewMetadata } from '../../../core/view/read';
-import { deleteView } from '../../../core/view/delete';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { deleteObject } from '../../../core/delete';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'View - Create';
+const logger = createTestLogger('VIEW-CREATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('View - Create', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let viewName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      await (connection as any).connect();
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -52,66 +38,114 @@ describe('View - Create', () => {
     }
   });
 
-  async function ensureViewDoesNotExist(testCase: any): Promise<boolean> {
-    if (!connection || !hasConfig) {
-      return false;
+  beforeEach(async () => {
+    testCase = null;
+    viewName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
     }
+
+    const env = await setupTestEnvironment(connection, 'view_create', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('create_view');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
     try {
-      await getViewMetadata(connection, testCase.params.view_name);
-      logger.debug(`View ${testCase.params.view_name} exists, attempting to delete...`);
-      try {
-        await deleteView(connection, { view_name: testCase.params.view_name });
-        logger.debug(`View ${testCase.params.view_name} deleted successfully`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return true;
-      } catch (deleteError: any) {
-        logger.warn(`Failed to delete view ${testCase.params.view_name}: ${deleteError.message}`);
-        return false;
-      }
+      validateTestCaseForUserSpace(tc, 'create_view');
     } catch (error: any) {
-      if (error.response?.status === 404 || error.response?.status === 401) {
-        logger.debug(`View ${testCase.params.view_name} does not exist`);
-        return true;
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    viewName = tc.params.view_name;
+
+    // Delete if exists (idempotency)
+    if (viewName) {
+      await deleteIfExists(viewName);
+    }
+  });
+
+  afterEach(async () => {
+    // Cleanup created view
+    if (viewName) {
+      await deleteIgnoringErrors(viewName);
+    }
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function deleteIfExists(name: string): Promise<void> {
+    try {
+      await getViewMetadata(connection, name);
+      logger.debug(`View ${name} exists, deleting...`);
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'VIEW/VW'
+      });
+      const delay = 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      logger.debug(`View ${name} deleted`);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        logger.debug(`View ${name} does not exist (OK)`);
+      } else {
+        throw error;
       }
-      throw error;
+    }
+  }
+
+  async function deleteIgnoringErrors(name: string): Promise<void> {
+    try {
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'VIEW/DV'
+      });
+      logger.debug(`Cleanup: deleted view ${name}`);
+    } catch (error: any) {
+      logger.debug(`Cleanup: could not delete view ${name} (${error.message})`);
     }
   }
 
   it('should create basic view', async () => {
-    if (!hasConfig || !connection) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !viewName) {
+      logger.skip('Create Test', testCase ? 'View name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('create_view', 'test_view');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.debug(`Testing create for view: ${viewName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'create_view');
+      const result = await createView(connection, {
+        view_name: testCase.params.view_name,
+        ddl_source: testCase.params.ddl_source || '',
+        package_name: testCase.params.package_name || getDefaultPackage(),
+        transport_request: testCase.params.transport_request || getDefaultTransport(),
+        description: testCase.params.description
+      });
+
+      expect([200, 201]).toContain(result.status);
+      logger.debug(`✓ View ${viewName} created successfully (status: ${result.status})`);
+
+      // Wait for SAP to register the object
+      const delay = 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Verify view exists
+      const getResult = await getViewMetadata(connection, viewName);
+      expect(getResult.status).toBe(200);
+      logger.debug(`✓ View ${viewName} verified to exist`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to create view: ${error.message}`);
+      throw error;
     }
-
-    const canProceed = await ensureViewDoesNotExist(testCase);
-    if (!canProceed) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure view ${testCase.params.view_name} does not exist`);
-      return;
-    }
-
-    await createView(connection, {
-      view_name: testCase.params.view_name,
-      description: testCase.params.description,
-      package_name: testCase.params.package_name || getDefaultPackage(),
-      transport_request: testCase.params.transport_request || getDefaultTransport(),
-      ddl_source: testCase.params.ddl_source
-    });
-
-    const result = await getViewMetadata(connection, testCase.params.view_name);
-    expect(result.status).toBe(200);
-  }, 60000);
+  }, getTimeout('test'));
 });
-

@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -102,7 +103,9 @@ describe('TableBuilder', () => {
       const tableName = testCase.params.table_name;
       await deleteTableIfExists(tableName);
 
-      const builder = new TableBuilder(connection, builderLogger, {
+      let builder: TableBuilder | null = null;
+      try {
+        builder = new TableBuilder(connection, builderLogger, {
         tableName,
         packageName: testCase.params.package_name || getDefaultPackage(),
         transportRequest: testCase.params.transport_request || getDefaultTransport(),
@@ -120,7 +123,13 @@ describe('TableBuilder', () => {
 
       expect(builder.getCreateResult()).toBeDefined();
       expect(builder.getActivateResult()).toBeDefined();
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteTableIfExists(tableName);
+      }
+    }, getTimeout('test'));
 
     it('should interrupt chain on error', async () => {
       if (!hasConfig) {
@@ -181,7 +190,9 @@ describe('TableBuilder', () => {
       const tableName = testCase.params.table_name;
       await deleteTableIfExists(tableName);
 
-      const builder = new TableBuilder(connection, builderLogger, {
+      let builder: TableBuilder | null = null;
+      try {
+        builder = new TableBuilder(connection, builderLogger, {
         tableName,
         packageName: testCase.params.package_name || getDefaultPackage(),
         transportRequest: testCase.params.transport_request || getDefaultTransport(),
@@ -204,7 +215,13 @@ describe('TableBuilder', () => {
       expect(results.check).toBeDefined();
       expect(results.unlock).toBeDefined();
       expect(results.activate).toBeDefined();
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteTableIfExists(tableName);
+      }
+    }, getTimeout('test'));
   });
 
   describe('Getters', () => {

@@ -12,12 +12,13 @@ import { createFunctionModule } from '../../../core/functionModule/create';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
+import { getConfig, markAuthFailed, hasAuthFailed } from '../../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -33,17 +34,28 @@ const logger: ILogger = {
   csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
 };
 
-describe('FunctionModule - Activate', () => {
+const TEST_SUITE_NAME = 'FunctionModule - Activate';
+
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
 
   beforeEach(async () => {
+    // Skip all tests if authentication failed
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.warn('⚠️ Skipping test - authentication failed in previous setup');
+      return;
+    }
+
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      await (connection as any).connect();
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (error: any) {
+      logger.error('❌ Authentication/Connection failed - marking all tests to skip');
+      logger.error(`   Error: ${error.message}`);
+      markAuthFailed(TEST_SUITE_NAME);
       hasConfig = false;
     }
   });
@@ -145,6 +157,6 @@ describe('FunctionModule - Activate', () => {
     );
     expect(response.status).toBeGreaterThanOrEqual(200);
     expect(response.status).toBeLessThan(500);
-  }, 30000);
+  }, getTimeout('test'));
 });
 

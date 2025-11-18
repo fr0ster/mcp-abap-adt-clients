@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -102,7 +103,7 @@ describe('PackageBuilder', () => {
         .then(b => b.check());
 
       expect(builder.getCreateResult()).toBeDefined();
-    }, 60000);
+    }, getTimeout('test'));
 
     it('should interrupt chain on error', async () => {
       if (!hasConfig) {
@@ -179,7 +180,7 @@ describe('PackageBuilder', () => {
       expect(results.create).toBeDefined();
       expect(results.read).toBeDefined();
       expect(results.check).toBeDefined();
-    }, 60000);
+    }, getTimeout('test'));
   });
 
   describe('Getters', () => {

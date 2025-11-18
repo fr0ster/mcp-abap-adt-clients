@@ -1,47 +1,34 @@
 /**
- * Unit test for Package reading
- * Tests getPackage function
+ * Integration test for Package read
+ * Tests getPackage function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/package/read.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/package/read.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { getPackage } from '../../../core/package/read';
 import { createPackage } from '../../../core/package/create';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getEnabledTestCase, validateTestCaseForUserSpace } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Package - Read';
+const logger = createTestLogger('PKG-READ');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Package - Read', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let packageName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -50,30 +37,65 @@ describe('Package - Read', () => {
     }
   });
 
-  async function ensurePackageExists(testCase: any) {
-    const packageName = testCase.params.package_name;
+  beforeEach(async () => {
+    testCase = null;
+    packageName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
+    }
+
+    const env = await setupTestEnvironment(connection, 'package_read', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('read_package');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
 
     try {
-      await getPackage(connection, packageName);
-      logger.debug(`Package ${packageName} exists`);
+      validateTestCaseForUserSpace(tc, 'read_package');
+    } catch (error: any) {
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    packageName = tc.params.package_name;
+  });
+
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function ensurePackageExists(testCase: any): Promise<void> {
+    const pkgName = testCase.params.package_name;
+
+    try {
+      await getPackage(connection, pkgName);
+      logger.debug(`Package ${pkgName} exists`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Package ${packageName} does not exist, creating...`);
+        logger.debug(`Package ${pkgName} does not exist, creating...`);
         const createTestCase = getEnabledTestCase('create_package', 'test_package');
-        if (createTestCase) {
-          try {
-            await createPackage(connection, {
-              package_name: packageName,
-              description: createTestCase.params.description || `Test package for ${packageName}`,
-              package_type: createTestCase.params.package_type || 'development',
-              super_package: createTestCase.params.super_package
-            });
-            logger.debug(`Package ${packageName} created successfully`);
-          } catch (createError: any) {
-            throw createError;
-          }
-        } else {
-          throw new Error(`Cannot create package ${packageName}: create_package test case not found`);
+        if (!createTestCase) {
+          throw new Error(`Cannot create package ${pkgName}: create_package test case not found`);
+        }
+
+        try {
+          await createPackage(connection, {
+            package_name: pkgName,
+            description: createTestCase.params.description || `Test package for ${pkgName}`,
+            package_type: createTestCase.params.package_type || 'development',
+            super_package: createTestCase.params.super_package
+          });
+          logger.debug(`Package ${pkgName} created successfully`);
+        } catch (createError: any) {
+          throw createError;
         }
       } else {
         throw error;
@@ -82,29 +104,24 @@ describe('Package - Read', () => {
   }
 
   it('should read package', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !packageName) {
+      logger.skip('Read Test', testCase ? 'Package name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('read_package');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.info(`Testing read for package: ${packageName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'read_package');
+      await ensurePackageExists(testCase);
+
+      const result = await getPackage(connection, packageName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      logger.info(`✓ Package ${packageName} read successfully`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to read package: ${error.message}`);
+      throw error;
     }
-
-    await ensurePackageExists(testCase);
-
-    const result = await getPackage(connection, testCase.params.package_name);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-  }, 30000);
+  }, getTimeout('test'));
 });
-

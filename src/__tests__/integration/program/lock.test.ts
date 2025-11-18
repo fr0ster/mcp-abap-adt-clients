@@ -13,48 +13,97 @@ import { createProgram } from '../../../core/program/create';
 import { activateProgram } from '../../../core/program/activation';
 import { updateProgramSource } from '../../../core/program/update';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, markAuthFailed, hasAuthFailed, getConfig } from '../../helpers/sessionConfig';
+import { registerTestLock, unregisterTestLock } from '../../helpers/lockHelper';
+import { createTestLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
+const logger = createTestLogger('Program - Lock/Unlock');
 
-describe('Program - Lock/Unlock', () => {
+const TEST_SUITE_NAME = 'Program - Lock/Unlock';
+
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
   let lockHandle: string | null = null;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let programName: string | null = null;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    lockHandle = null;
+    testCase = null;
+    programName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Lock/Unlock test', 'Authentication failed in previous test');
+      return;
+    }
+
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+
+      // Setup session and lock tracking
+      const env = await setupTestEnvironment(connection, 'program_lock', __filename);
+      sessionId = env.sessionId;
+      testConfig = env.testConfig;
+      lockTracking = env.lockTracking;
+
+      if (lockTracking?.enabled) {
+        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
+      }
+
+      // Connect to SAP system (triggers auth & auto-refresh)
+      await (connection as any).connect();
+
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+
+      // Prepare test case
+      const tc = getEnabledTestCase('create_program', 'test_program');
+      if (!tc) {
+        logger.skip('Lock/Unlock test', 'Test case not enabled in test-config.yaml');
+        testCase = null;
+        programName = null;
+        return;
+      }
+
+      testCase = tc;
+      programName = tc.params.program_name;
+
+      // Ensure program exists before test
+      await ensureProgramExists(tc);
+
+    } catch (error: any) {
+      logger.error('❌ Authentication/Connection failed - marking all tests to skip');
+      logger.error(`   Error: ${error.message}`);
+      markAuthFailed(TEST_SUITE_NAME);
       hasConfig = false;
+      testCase = null;
+      programName = null;
     }
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
     if (connection) {
       connection.reset();
     }
     lockHandle = null;
+    testCase = null;
+    programName = null;
   });
 
   async function ensureProgramExists(testCase: any) {
@@ -111,45 +160,59 @@ WRITE: 'Hello World'.`;
   }
 
   it('should lock and unlock program', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
-      return;
-    }
-
-    const testCase = getEnabledTestCase('create_program', 'test_program');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
+    if (!testCase || !programName) {
+      return; // Already logged in beforeEach
     }
 
     try {
       validateTestCaseForUserSpace(testCase, 'create_program');
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
+      logger.skip('Lock/Unlock test', error.message);
       return;
     }
 
-    await ensureProgramExists(testCase);
-
-    const sessionId = generateSessionId();
+    const testSessionId = sessionId || generateSessionId();
 
     // Lock program
     lockHandle = await lockProgram(
       connection,
-      testCase.params.program_name,
-      sessionId
+      programName,
+      testSessionId
     );
     expect(lockHandle).toBeDefined();
     expect(lockHandle).not.toBe('');
 
-    // Unlock program
-    await unlockProgram(
-      connection,
-      testCase.params.program_name,
-      lockHandle,
-      sessionId
-    );
-    lockHandle = null;
-  }, 30000);
-});
+    // Register lock in persistent storage
+    if (lockTracking?.enabled) {
+      registerTestLock(
+        'program',
+        programName,
+        testSessionId,
+        lockHandle,
+        undefined,
+        __filename
+      );
+      logger.debug(`✓ Lock registered in ${lockTracking.locksDir}`);
+    }
 
+    // Unlock program
+    try {
+      await unlockProgram(
+        connection,
+        programName,
+        lockHandle,
+        testSessionId
+      );
+      lockHandle = null;
+
+      // Unregister lock from persistent storage
+      if (lockTracking?.enabled) {
+        unregisterTestLock('program', programName);
+        logger.debug(`✓ Lock unregistered from ${lockTracking.locksDir}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to unlock program: ${error}`);
+      throw error;
+    }
+  }, getTimeout('test'));
+});

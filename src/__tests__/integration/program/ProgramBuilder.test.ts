@@ -9,11 +9,18 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { ProgramBuilder, ProgramBuilderLogger } from '../../../core/program';
 import { deleteProgram } from '../../../core/program/delete';
 import { getConfig } from '../../helpers/sessionConfig';
+import {
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess
+} from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -102,7 +109,9 @@ describe('ProgramBuilder', () => {
       const programName = testCase.params.program_name;
       await deleteProgramIfExists(programName);
 
-      const builder = new ProgramBuilder(connection, builderLogger, {
+      let builder: ProgramBuilder | null = null;
+      try {
+        builder = new ProgramBuilder(connection, builderLogger, {
         programName,
         packageName: testCase.params.package_name || getDefaultPackage(),
         transportRequest: testCase.params.transport_request || getDefaultTransport(),
@@ -122,7 +131,13 @@ describe('ProgramBuilder', () => {
 
       expect(builder.getCreateResult()).toBeDefined();
       expect(builder.getActivateResult()).toBeDefined();
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteProgramIfExists(programName);
+      }
+    }, getTimeout('test'));
 
     it('should interrupt chain on error', async () => {
       if (!hasConfig) {
@@ -207,7 +222,9 @@ describe('ProgramBuilder', () => {
       const programName = testCase.params.program_name;
       await deleteProgramIfExists(programName);
 
-      const builder = new ProgramBuilder(connection, builderLogger, {
+      let builder: ProgramBuilder | null = null;
+      try {
+        builder = new ProgramBuilder(connection, builderLogger, {
         programName,
         packageName: testCase.params.package_name || getDefaultPackage(),
         transportRequest: testCase.params.transport_request || getDefaultTransport(),
@@ -231,7 +248,13 @@ describe('ProgramBuilder', () => {
       expect(results.check).toBeDefined();
       expect(results.unlock).toBeDefined();
       expect(results.activate).toBeDefined();
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteProgramIfExists(programName);
+      }
+    }, getTimeout('test'));
   });
 
   describe('Full workflow', () => {
@@ -248,7 +271,9 @@ describe('ProgramBuilder', () => {
       const programName = testCase.params.program_name;
       await deleteProgramIfExists(programName);
 
-      const builder = new ProgramBuilder(connection, builderLogger, {
+      let builder: ProgramBuilder | null = null;
+      try {
+        builder = new ProgramBuilder(connection, builderLogger, {
         programName,
         packageName: testCase.params.package_name || getDefaultPackage(),
         transportRequest: testCase.params.transport_request || getDefaultTransport(),
@@ -264,20 +289,19 @@ describe('ProgramBuilder', () => {
         .then(b => b.update())
         .then(b => b.check())
         .then(b => b.unlock())
-        .then(b => b.activate())
-        .catch(error => {
-          builderLogger.error?.('Workflow failed:', error);
-          throw error;
-        })
-        .finally(() => {
-          // Cleanup if needed
-        });
+          .then(b => b.activate());
 
       const state = builder.getState();
       expect(state.createResult).toBeDefined();
       expect(state.activateResult).toBeDefined();
       expect(state.errors.length).toBe(0);
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteProgramIfExists(programName);
+      }
+    }, getTimeout('test'));
   });
 
   describe('Getters', () => {

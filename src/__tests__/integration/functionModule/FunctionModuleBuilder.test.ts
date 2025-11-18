@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -106,7 +107,9 @@ describe('FunctionModuleBuilder', () => {
       const functionModuleName = testCase.params.function_module_name;
       await deleteFunctionModuleIfExists(functionGroupName, functionModuleName);
 
-      const builder = new FunctionModuleBuilder(connection, builderLogger, {
+      let builder: FunctionModuleBuilder | null = null;
+      try {
+        builder = new FunctionModuleBuilder(connection, builderLogger, {
         functionGroupName,
         functionModuleName,
         sourceCode: testCase.params.source_code,
@@ -126,7 +129,13 @@ describe('FunctionModuleBuilder', () => {
 
       expect(builder.getCreateResult()).toBeDefined();
       expect(builder.getActivateResult()).toBeDefined();
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteFunctionModuleIfExists(functionGroupName, functionModuleName);
+      }
+    }, getTimeout('test'));
 
     it('should interrupt chain on error', async () => {
       if (!hasConfig) {
@@ -215,7 +224,9 @@ describe('FunctionModuleBuilder', () => {
       const functionModuleName = testCase.params.function_module_name;
       await deleteFunctionModuleIfExists(functionGroupName, functionModuleName);
 
-      const builder = new FunctionModuleBuilder(connection, builderLogger, {
+      let builder: FunctionModuleBuilder | null = null;
+      try {
+        builder = new FunctionModuleBuilder(connection, builderLogger, {
         functionGroupName,
         functionModuleName,
         sourceCode: testCase.params.source_code,
@@ -239,7 +250,13 @@ describe('FunctionModuleBuilder', () => {
       expect(results.check).toBeDefined();
       expect(results.unlock).toBeDefined();
       expect(results.activate).toBeDefined();
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteFunctionModuleIfExists(functionGroupName, functionModuleName);
+      }
+    }, getTimeout('test'));
   });
 
   describe('Full workflow', () => {
@@ -257,7 +274,9 @@ describe('FunctionModuleBuilder', () => {
       const functionModuleName = testCase.params.function_module_name;
       await deleteFunctionModuleIfExists(functionGroupName, functionModuleName);
 
-      const builder = new FunctionModuleBuilder(connection, builderLogger, {
+      let builder: FunctionModuleBuilder | null = null;
+      try {
+        builder = new FunctionModuleBuilder(connection, builderLogger, {
         functionGroupName,
         functionModuleName,
         sourceCode: testCase.params.source_code,
@@ -273,20 +292,19 @@ describe('FunctionModuleBuilder', () => {
         .then(b => b.update())
         .then(b => b.check())
         .then(b => b.unlock())
-        .then(b => b.activate())
-        .catch(error => {
-          builderLogger.error?.('Workflow failed:', error);
-          throw error;
-        })
-        .finally(() => {
-          // Cleanup if needed
-        });
+          .then(b => b.activate());
 
       const state = builder.getState();
       expect(state.createResult).toBeDefined();
       expect(state.activateResult).toBeDefined();
       expect(state.errors.length).toBe(0);
-    }, 60000);
+      } finally {
+        if (builder) {
+          await builder.forceUnlock().catch(() => {});
+        }
+        await deleteFunctionModuleIfExists(functionGroupName, functionModuleName);
+      }
+    }, getTimeout('test'));
   });
 
   describe('Getters', () => {

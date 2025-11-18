@@ -1,50 +1,35 @@
 /**
- * Unit test for Interface creation
- * Tests createInterface function
+ * Integration test for Interface creation
+ * Tests createInterface function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/interface/create.test
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/interface/create.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { createInterface } from '../../../core/interface/create';
 import { getInterfaceMetadata } from '../../../core/interface/read';
-import { deleteInterface } from '../../../core/interface/delete';
-import { validateInterfaceName } from '../../../core/interface/validation';
-import { getConfig } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { deleteObject } from '../../../core/delete';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Interface - Create';
+const logger = createTestLogger('INTF-CREATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-describe('Interface - Create', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
+  let sessionId: string | null = null;
+  let testConfig: any = null;
+  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let interfaceName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      await (connection as any).connect();
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
@@ -53,66 +38,113 @@ describe('Interface - Create', () => {
     }
   });
 
-  async function ensureInterfaceDoesNotExist(testCase: any): Promise<boolean> {
-    if (!connection || !hasConfig) {
-      return false;
+  beforeEach(async () => {
+    testCase = null;
+    interfaceName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
     }
+
+    const env = await setupTestEnvironment(connection, 'interface_create', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('create_interface');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
     try {
-      await getInterfaceMetadata(connection, testCase.params.interface_name);
-      logger.debug(`Interface ${testCase.params.interface_name} exists, attempting to delete...`);
-      try {
-        await deleteInterface(connection, { interface_name: testCase.params.interface_name });
-        logger.debug(`Interface ${testCase.params.interface_name} deleted successfully`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        return true;
-      } catch (deleteError: any) {
-        logger.warn(`Failed to delete interface ${testCase.params.interface_name}: ${deleteError.message}`);
-        return false;
-      }
+      validateTestCaseForUserSpace(tc, 'create_interface');
     } catch (error: any) {
-      if (error.response?.status === 404 || error.response?.status === 401) {
-        logger.debug(`Interface ${testCase.params.interface_name} does not exist`);
-        return true;
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    interfaceName = tc.params.interface_name;
+
+    // Delete if exists (idempotency)
+    if (interfaceName) {
+      await deleteIfExists(interfaceName);
+    }
+  });
+
+  afterEach(async () => {
+    // Cleanup created interface
+    if (interfaceName) {
+      await deleteIgnoringErrors(interfaceName);
+    }
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function deleteIfExists(name: string): Promise<void> {
+    try {
+      await getInterfaceMetadata(connection, name);
+      logger.debug(`Interface ${name} exists, deleting...`);
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'INTF/OI'
+      });
+      const delay = 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      logger.debug(`Interface ${name} deleted`);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        logger.debug(`Interface ${name} does not exist (OK)`);
+      } else {
+        throw error;
       }
-      throw error;
+    }
+  }
+
+  async function deleteIgnoringErrors(name: string): Promise<void> {
+    try {
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'INTF/OI'
+      });
+      logger.debug(`Cleanup: deleted interface ${name}`);
+    } catch (error: any) {
+      logger.debug(`Cleanup: could not delete interface ${name} (${error.message})`);
     }
   }
 
   it('should create basic interface', async () => {
-    if (!hasConfig || !connection) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    if (!testCase || !interfaceName) {
+      logger.skip('Create Test', testCase ? 'Interface name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('create_interface', 'test_interface');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
+    logger.debug(`Testing create for interface: ${interfaceName}`);
 
     try {
-      validateTestCaseForUserSpace(testCase, 'create_interface');
+      const result = await createInterface(connection, {
+        interface_name: testCase.params.interface_name,
+        description: testCase.params.description,
+        package_name: testCase.params.package_name || getDefaultPackage(),
+        transport_request: testCase.params.transport_request || getDefaultTransport()
+      });
+
+      expect([200, 201]).toContain(result.status);
+      logger.debug(`✓ Interface ${interfaceName} created successfully (status: ${result.status})`);
+
+      // Wait for SAP to register the object
+      const delay = 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Verify interface exists
+      const getResult = await getInterfaceMetadata(connection, interfaceName);
+      expect(getResult.status).toBe(200);
+      logger.debug(`✓ Interface ${interfaceName} verified to exist`);
+
     } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+      logger.error(`✗ Failed to create interface: ${error.message}`);
+      throw error;
     }
-
-    const canProceed = await ensureInterfaceDoesNotExist(testCase);
-    if (!canProceed) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure interface ${testCase.params.interface_name} does not exist`);
-      return;
-    }
-
-    await createInterface(connection, {
-      interface_name: testCase.params.interface_name,
-      description: testCase.params.description || `Test interface for ${testCase.params.interface_name}`,
-      package_name: testCase.params.package_name || getDefaultPackage(),
-      transport_request: testCase.params.transport_request || getDefaultTransport(),
-      source_code: testCase.params.source_code
-    });
-
-    const result = await getInterfaceMetadata(connection, testCase.params.interface_name);
-    expect(result.status).toBe(200);
-  }, 60000);
+  }, getTimeout('test'));
 });
-

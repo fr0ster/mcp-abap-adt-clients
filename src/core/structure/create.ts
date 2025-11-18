@@ -187,40 +187,11 @@ export async function createStructure(
     try {
       await activateStructure(connection, params.structure_name, sessionId);
     } catch (activateError) {
-      // Continue to verification even if activation fails
+      // Continue even if activation fails
     }
 
-    try {
-      const verifyResponse = await verifyStructureCreation(connection, params.structure_name);
-
-      if (typeof verifyResponse.data === 'string' && verifyResponse.data.trim().startsWith('<?xml')) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '',
-          parseAttributeValue: true,
-          trimValues: true
-        });
-        verifyResult = parser.parse(verifyResponse.data);
-      }
-    } catch (verifyError) {
-      // Ignore verification errors
-    }
-
-    return {
-      data: {
-        success: true,
-        structure_name: params.structure_name,
-        package: params.package_name,
-        transport_request: params.transport_request,
-        status: 'created',
-        message: `Structure ${params.structure_name} created successfully`,
-        structure_details: verifyResult
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP
+    return createResponse;
 
   } catch (error: any) {
     const errorMessage = error.response?.data

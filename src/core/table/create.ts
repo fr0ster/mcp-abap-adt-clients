@@ -110,7 +110,7 @@ export async function createTable(
       'Content-Type': 'application/vnd.sap.adt.tables.v2+xml'
     };
 
-    await makeAdtRequestWithSession(connection, createUrl, 'POST', sessionId, tableXml, headers);
+    const createResponse = await makeAdtRequestWithSession(connection, createUrl, 'POST', sessionId, tableXml, headers);
 
     // Step 1.1: Run table status check before locking (optional, continue on error)
     try {
@@ -154,7 +154,6 @@ export async function createTable(
     }
 
     // Step 2: Activate table
-    let activateResponse: AxiosResponse | undefined;
     let activationAttempt = 0;
     const maxActivationAttempts = 2;
 
@@ -162,7 +161,7 @@ export async function createTable(
       activationAttempt++;
 
       try {
-        activateResponse = await activateTable(connection, params.table_name, sessionId);
+        await activateTable(connection, params.table_name, sessionId);
         break;
       } catch (attemptError: any) {
         if (attemptError.response?.data?.includes('No active nametab')) {
@@ -184,45 +183,8 @@ export async function createTable(
       }
     }
 
-    // Step 3: Verify table creation
-    let verifyResult: any = null;
-    try {
-      const verifyResponse = await verifyTableCreation(connection, params.table_name);
-
-      if (typeof verifyResponse.data === 'string' && verifyResponse.data.trim().startsWith('<?xml')) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '',
-          parseAttributeValue: true,
-          trimValues: true
-        });
-        const parsed = parser.parse(verifyResponse.data);
-        verifyResult = {
-          name: parsed?.['ddic:table']?.['adtcore:name'] || params.table_name,
-          status: 'verified',
-          objectType: 'table'
-        };
-      }
-    } catch (verifyError) {
-      // Ignore verification errors
-    }
-
-    // Return success response
-    return {
-      data: {
-        success: true,
-        table_name: params.table_name,
-        package: params.package_name,
-        transport_request: params.transport_request,
-        status: activateResponse ? 'active' : 'created',
-        message: `Table ${params.table_name} created${activateResponse ? ' and activated' : ''} successfully`,
-        table_details: verifyResult
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     // Try to unlock if we have a lock handle

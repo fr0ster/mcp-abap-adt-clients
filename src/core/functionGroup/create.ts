@@ -73,7 +73,7 @@ export async function createFunctionGroup(
   }
 
   try {
-    await createFunctionGroupObject(
+    const createResponse = await createFunctionGroupObject(
       connection,
       params.function_group_name,
       params.description || params.function_group_name,
@@ -86,20 +86,8 @@ export async function createFunctionGroup(
       await activateFunctionGroup(connection, params.function_group_name);
     }
 
-    return {
-      data: {
-        success: true,
-        function_group_name: params.function_group_name,
-        package_name: params.package_name,
-        transport_request: params.transport_request || 'local',
-        activated: shouldActivate,
-        message: `Function group ${params.function_group_name} created successfully${shouldActivate ? ' and activated' : ''}`
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     let errorMessage = `Failed to create function group: ${error}`;

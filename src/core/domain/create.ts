@@ -173,10 +173,11 @@ export async function createDomain(
   const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
   let lockHandle = '';
+  let createResponse: AxiosResponse | null = null;
 
   try {
     // Step 1: Create empty domain
-    await createEmptyDomain(connection, params, sessionId, username, masterSystem);
+    createResponse = await createEmptyDomain(connection, params, sessionId, username, masterSystem);
 
     // Step 2: Acquire lock
     lockHandle = await acquireLockHandle(connection, params, sessionId);
@@ -199,26 +200,8 @@ export async function createDomain(
       await activateDomain(connection, params.domain_name, sessionId);
     }
 
-    // Step 7: Verify creation
-    const finalDomain = await getDomainForVerification(connection, params.domain_name, sessionId);
-
-    // Return success response
-    return {
-      data: {
-        success: true,
-        domain_name: params.domain_name,
-        package: params.package_name,
-        transport_request: params.transport_request,
-        status: shouldActivate ? 'active' : 'inactive',
-        session_id: sessionId,
-        message: `Domain ${params.domain_name} created${shouldActivate ? ' and activated' : ''} successfully`,
-        domain_details: finalDomain
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
+    // Return the real response from SAP (from initial POST)
+    return createResponse;
 
   } catch (error: any) {
     // Try to unlock if we have a lock handle

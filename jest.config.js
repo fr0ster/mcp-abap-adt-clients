@@ -26,7 +26,8 @@ module.exports = {
     '/node_modules/',
     '/dist/',
   ],
-  // Allow parallel execution within test group
-  // Use scripts/run-tests-sequential.js to run groups sequentially
+  // Force sequential execution for integration tests (--runInBand in package.json)
+  // Integration tests must run sequentially to avoid conflicts with shared SAP objects
+  maxWorkers: 1,
 };
 

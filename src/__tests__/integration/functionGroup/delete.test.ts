@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -128,5 +129,5 @@ describe('Function Group - Delete', () => {
       object_type: objectType,
     });
     logger.debug(`✅ Deleted function group: ${functionGroupName}`);
-  }, 10000);
+  }, getTimeout('test'));
 });

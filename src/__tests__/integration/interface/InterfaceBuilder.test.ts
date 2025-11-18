@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -120,7 +121,7 @@ describe('InterfaceBuilder', () => {
 
       expect(builder.getCreateResult()).toBeDefined();
       expect(builder.getActivateResult()).toBeDefined();
-    }, 60000);
+    }, getTimeout('test'));
 
     it('should interrupt chain on error', async () => {
       if (!hasConfig) {
@@ -228,7 +229,7 @@ describe('InterfaceBuilder', () => {
       expect(results.check).toBeDefined();
       expect(results.unlock).toBeDefined();
       expect(results.activate).toBeDefined();
-    }, 60000);
+    }, getTimeout('test'));
   });
 
   describe('Full workflow', () => {
@@ -273,7 +274,7 @@ describe('InterfaceBuilder', () => {
       expect(state.createResult).toBeDefined();
       expect(state.activateResult).toBeDefined();
       expect(state.errors.length).toBe(0);
-    }, 60000);
+    }, getTimeout('test'));
   });
 
   describe('Getters', () => {

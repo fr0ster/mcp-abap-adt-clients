@@ -69,7 +69,73 @@ export async function validateClassName(
       headers
     });
 
-    // If validation succeeds, response should be empty or contain success message
+    logger.debug(`[DEBUG] Validation response - Status: ${response.status}`);
+    logger.debug(`[DEBUG] Validation response - Data:`, typeof response.data === 'string' ? response.data.substring(0, 500) : JSON.stringify(response.data).substring(0, 500));
+
+    // Parse response data - Eclipse returns XML with CHECK_RESULT
+    if (response.data) {
+      const responseData = typeof response.data === 'string'
+        ? response.data
+        : JSON.stringify(response.data);
+
+      try {
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+          textNodeName: '#text'
+        });
+        const result = parser.parse(responseData);
+
+        // Check for validation result in Eclipse format:
+        // <asx:abap><asx:values><DATA><CHECK_RESULT>X</CHECK_RESULT></DATA></asx:values></asx:abap>
+        const checkResult = result?.['asx:abap']?.['asx:values']?.['DATA']?.['CHECK_RESULT'];
+
+        if (checkResult === 'X') {
+          logger.debug(`[DEBUG] Validation succeeded - CHECK_RESULT=X`);
+          return { valid: true };
+        }
+
+        // Check if response contains exception/error
+        const exception = result['exc:exception'];
+        if (exception) {
+          // Extract message
+          let message = '';
+          if (exception['message']) {
+            if (typeof exception['message'] === 'string') {
+              message = exception['message'];
+            } else if (exception['message']['#text']) {
+              message = exception['message']['#text'];
+            } else if (Array.isArray(exception['message']) && exception['message'][0]?.['#text']) {
+              message = exception['message'][0]['#text'];
+            }
+          }
+
+          // Fallback to localizedMessage
+          if (!message && exception['localizedMessage']) {
+            if (typeof exception['localizedMessage'] === 'string') {
+              message = exception['localizedMessage'];
+            } else if (exception['localizedMessage']['#text']) {
+              message = exception['localizedMessage']['#text'];
+            } else if (Array.isArray(exception['localizedMessage']) && exception['localizedMessage'][0]?.['#text']) {
+              message = exception['localizedMessage'][0]['#text'];
+            }
+          }
+
+          logger.debug(`[DEBUG] Validation failed - Exception: ${message}`);
+          return {
+            valid: false,
+            severity: 'ERROR',
+            message: message || 'Validation failed',
+            longText: message
+          };
+        }
+      } catch (parseError) {
+        logger.debug(`[DEBUG] Failed to parse validation response:`, parseError);
+      }
+    }
+
+    // If no CHECK_RESULT found but no exception, assume valid
+    logger.debug(`[DEBUG] Validation succeeded - no exceptions found`);
     return { valid: true };
 
   } catch (error: any) {

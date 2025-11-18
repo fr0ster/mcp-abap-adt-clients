@@ -2,7 +2,7 @@
  * FunctionGroup activation operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -27,7 +27,7 @@ export async function activateFunctionGroup(
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default'),
+    timeout: 30000, // 30 seconds for activation
     data: xmlPayload,
     headers: {
       'Content-Type': 'application/xml',

@@ -21,41 +21,50 @@ import { unlockDomain } from '../../../core/domain/unlock';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, markAuthFailed, hasAuthFailed, getConfig } from '../../helpers/sessionConfig';
+import { registerTestLock, unregisterTestLock } from '../../helpers/lockHelper';
+import { createTestLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
+const logger = createTestLogger('Domain - Lock/Unlock');
 
-describe('Domain - Lock', () => {
+const TEST_SUITE_NAME = 'Domain - Lock';
+
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let lockHandle: string | null = null;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let domainName: string | null = null;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
+    lockHandle = null;
+    testCase = null;
+    domainName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Lock/Unlock test', 'Authentication failed in previous test');
+      return;
+    }
+
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
 
       // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
       const env = await setupTestEnvironment(connection, 'domain_lock', __filename);
       sessionId = env.sessionId;
       testConfig = env.testConfig;
@@ -63,24 +72,35 @@ describe('Domain - Lock', () => {
 
       if (sessionId) {
         logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
       }
 
       if (lockTracking?.enabled) {
         logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
       }
 
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
+      // Connect to SAP system (triggers auth & auto-refresh)
       await (connection as any).connect();
 
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+
+      // Get and validate test case
+      const tc = getEnabledTestCase('lock_domain', 'test_domain_lock');
+      if (!tc) {
+        logger.skip('Lock/Unlock test', 'Test case not enabled in test-config.yaml');
+        testCase = null;
+        domainName = null;
+        return;
+      }
+
+      testCase = tc;
+      domainName = tc.params.domain_name;
+    } catch (error: any) {
+      logger.error('❌ Authentication/Connection failed - marking all tests to skip');
+      logger.error(`   Error: ${error.message}`);
+      markAuthFailed(TEST_SUITE_NAME);
       hasConfig = false;
+      testCase = null;
+      domainName = null;
     }
   });
 
@@ -129,45 +149,49 @@ describe('Domain - Lock', () => {
   }
 
   it('should lock domain and get lock handle', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
-      return;
-    }
-
-    const testCase = getEnabledTestCase('lock_domain', 'test_domain');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    // Validate that domain is in user space (Z_ or Y_)
-    try {
-      validateTestCaseForUserSpace(testCase, 'lock_domain');
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+    if (!testCase || !domainName) {
+      return; // Already logged in beforeEach
     }
 
     // Ensure domain exists before test (idempotency)
     await ensureDomainExists(testCase);
 
-    const sessionId = generateSessionId();
+    const testSessionId = sessionId || generateSessionId();
     const lockHandle = await lockDomain(
       connection,
-      testCase.params.domain_name,
-      sessionId
+      domainName,
+      testSessionId
     );
 
     expect(lockHandle).toBeDefined();
     expect(typeof lockHandle).toBe('string');
     expect(lockHandle.length).toBeGreaterThan(0);
 
+    // Register lock in persistent storage
+    if (lockTracking?.enabled) {
+      registerTestLock(
+        'domain',
+        domainName,
+        testSessionId,
+        lockHandle,
+        undefined,
+        __filename
+      );
+      logger.debug(`✓ Lock registered in ${lockTracking.locksDir}`);
+    }
+
     // Unlock after test
     try {
-      await unlockDomain(connection, testCase.params.domain_name, lockHandle, sessionId);
-    } catch (error) {
-      // Ignore unlock errors
-    }
-  }, 30000);
-});
+      await unlockDomain(connection, testCase.params.domain_name, lockHandle, testSessionId);
 
+      // Unregister lock from persistent storage
+      if (lockTracking?.enabled) {
+        unregisterTestLock('domain', domainName);
+        logger.debug(`✓ Lock unregistered from ${lockTracking.locksDir}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to unlock domain: ${error}`);
+      throw error;
+    }
+  }, getTimeout('test'));
+});

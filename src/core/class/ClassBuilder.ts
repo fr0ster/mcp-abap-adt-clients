@@ -39,6 +39,7 @@ import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { validateClassName, ValidationResult } from './validation';
 import { createClass, CreateClassParams } from './create';
+import { getClassSource, getClassMetadata } from './read';
 import { lockClass } from './lock';
 import { updateClass } from './update';
 import { checkClass } from './check';
@@ -68,6 +69,8 @@ export interface ClassBuilderLogger {
 export interface ClassBuilderState {
   validationResult?: ValidationResult;
   createResult?: AxiosResponse;
+  readResult?: AxiosResponse;
+  metadataResult?: AxiosResponse;
   lockHandle?: string;
   updateResult?: AxiosResponse;
   checkResult?: AxiosResponse;
@@ -207,6 +210,49 @@ export class ClassBuilder {
     }
   }
 
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+    try {
+      this.logger.info?.('Reading class source:', this.config.className, 'version:', version);
+      const result = await getClassSource(this.connection, this.config.className, version);
+      this.state.readResult = result;
+      this.logger.info?.('Class source read successfully:', result.status, 'bytes:', result.data?.length || 0);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', {
+        className: this.config.className,
+        version,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw error; // Interrupts chain
+    }
+  }
+
+  async readMetadata(): Promise<this> {
+    try {
+      this.logger.info?.('Reading class metadata:', this.config.className);
+      const result = await getClassMetadata(this.connection, this.config.className);
+      this.state.metadataResult = result;
+      this.logger.info?.('Class metadata read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'readMetadata',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read metadata failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking class:', this.config.className);
@@ -334,6 +380,26 @@ export class ClassBuilder {
     }
   }
 
+  async forceUnlock(): Promise<void> {
+    if (!this.lockHandle) {
+      return;
+    }
+    try {
+      await unlockClass(
+        this.connection,
+        this.config.className,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.logger.info?.('Force unlock successful for', this.config.className);
+    } catch (error: any) {
+      this.logger.warn?.('Force unlock failed:', error);
+    } finally {
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+    }
+  }
+
   // Getters for accessing results
   getState(): Readonly<ClassBuilderState> {
     return { ...this.state };
@@ -345,6 +411,14 @@ export class ClassBuilder {
 
   getCreateResult(): AxiosResponse | undefined {
     return this.state.createResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
+  }
+
+  getMetadataResult(): AxiosResponse | undefined {
+    return this.state.metadataResult;
   }
 
   getLockHandle(): string | undefined {
@@ -383,6 +457,8 @@ export class ClassBuilder {
   getResults(): {
     validation?: ValidationResult;
     create?: AxiosResponse;
+    read?: AxiosResponse;
+    metadata?: AxiosResponse;
     update?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
@@ -393,6 +469,8 @@ export class ClassBuilder {
     return {
       validation: this.state.validationResult,
       create: this.state.createResult,
+      read: this.state.readResult,
+      metadata: this.state.metadataResult,
       update: this.state.updateResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,

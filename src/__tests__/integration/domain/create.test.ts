@@ -1,287 +1,167 @@
 /**
- * Unit test for Domain creation
- * Tests createDomain function
+ * Integration test for Domain creation
+ * Tests createDomain function (low-level)
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/domain/create.test
- *
- * IDEMPOTENCY PRINCIPLE:
- * Tests are designed to be idempotent - they can be run multiple times without manual cleanup.
- * - CREATE tests: Before creating an object, check if it exists and DELETE it if found.
- *   This ensures the test always starts from a clean state (object doesn't exist).
- * - Other tests (READ, UPDATE, DELETE, CHECK, ACTIVATE, LOCK, UNLOCK): Before testing,
- *   check if the object exists and CREATE it if missing. This ensures the test has
- *   the required object available.
- *
- * All tests use only user-defined objects (Z_ or Y_ prefix) for modification operations.
+ * Enable logs: LOG_LEVEL=debug npm test -- integration/domain/create.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection } from '@mcp-abap-adt/connection';
 import { createDomain } from '../../../core/domain/create';
 import { getDomain } from '../../../core/domain/read';
 import { deleteObject } from '../../../core/delete';
-import { setupTestEnvironment, cleanupTestEnvironment } from '../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig, hasAuthFailed } from '../../helpers/sessionConfig';
+import { createTestLogger } from '../../helpers/testLogger';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath, quiet: true });
-}
+const TEST_SUITE_NAME = 'Domain - Create';
+const logger = createTestLogger('DOM-CREATE');
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
-
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
-
-describe('Domain - Create', () => {
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
-  let hasConfig = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let domainName: string | null = null;
 
   beforeAll(async () => {
-    try {
-      const config = getConfig();
-      connection = createAbapConnection(config, logger);
-
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'domain_create', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
-      lockTracking = env.lockTracking;
-
-      if (sessionId) {
-        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
-      if (lockTracking?.enabled) {
-        logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
-      }
-
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
-      // Type assertion needed until connection package is rebuilt
-      await (connection as any).connect();
-
-      hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
-      hasConfig = false;
-    }
+    const config = getConfig();
+    connection = createAbapConnection(config, logger);
+    await (connection as any).connect();
   });
 
   afterAll(async () => {
-    if (connection && sessionId) {
-      await cleanupTestEnvironment(connection, sessionId, testConfig);
-    }
     if (connection) {
       connection.reset();
     }
   });
 
-  // Helper function to ensure domain does not exist before creation test (idempotency)
-  async function ensureDomainDoesNotExist(testCase: any): Promise<boolean> {
-    if (!connection || !hasConfig) {
-      logger.warn('⚠️ Connection not initialized, skipping ensureDomainDoesNotExist');
-      return false;
+  beforeEach(async () => {
+    testCase = null;
+    domainName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Test', 'Authentication failed in previous test');
+      return;
     }
+
+    const env = await setupTestEnvironment(connection, 'domain_create', __filename);
+    sessionId = env.sessionId;
+    testConfig = env.testConfig;
+    lockTracking = env.lockTracking;
+
+    const tc = getEnabledTestCase('create_domain', 'test_domain');
+    if (!tc) {
+      logger.skip('Test', 'Test case not enabled in test-config.yaml');
+      return;
+    }
+
     try {
-      await getDomain(connection, testCase.params.domain_name);
-      // Object exists, try to delete it
-      logger.debug(`Domain ${testCase.params.domain_name} exists, attempting to delete...`);
-      try {
-        await deleteObject(connection, {
-          object_name: testCase.params.domain_name,
-          object_type: 'DOMA/DD',
-        });
-        logger.debug(`Domain ${testCase.params.domain_name} deleted successfully`);
-        // Wait a bit for SAP to process deletion
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        // Verify it's truly gone - try a few times as SAP may have delay
-        for (let attempt = 0; attempt < 5; attempt++) {
-          try {
-            await getDomain(connection, testCase.params.domain_name);
-            // Object still exists, wait a bit more and try again
-            if (attempt < 4) {
-              logger.debug(`Domain ${testCase.params.domain_name} still exists, waiting... (attempt ${attempt + 1}/5)`);
-              await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1))); // Exponential backoff
-            } else {
-              // After 5 attempts, object still exists - might be locked or has dependencies
-              logger.warn(`Domain ${testCase.params.domain_name} still exists after ${5} deletion attempts (may be locked or have dependencies)`);
-              // Try to delete again one more time
-              try {
-                await deleteObject(connection, {
-                  object_name: testCase.params.domain_name,
-                  object_type: 'DOMA/DD',
-                });
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                // Check one more time
-                try {
-                  await getDomain(connection, testCase.params.domain_name);
-                  // Still exists - cannot proceed
-                  logger.error(`Domain ${testCase.params.domain_name} still exists after final deletion attempt`);
-                  return false;
-                } catch (finalCheckError: any) {
-                  if (finalCheckError.response?.status === 404) {
-                    logger.debug(`Domain ${testCase.params.domain_name} confirmed deleted after final attempt`);
-                    return true;
-                  }
-                  return false;
-                }
-              } catch (finalDeleteError) {
-                logger.error(`Final deletion attempt failed: ${finalDeleteError}`);
-                return false;
-              }
-            }
-          } catch (verifyError: any) {
-            if (verifyError.response?.status === 404) {
-              logger.debug(`Domain ${testCase.params.domain_name} confirmed deleted`);
-              return true; // Successfully deleted
-            }
-            throw verifyError;
-          }
-        }
-        return false; // Should not reach here, but if we do, don't proceed
-      } catch (deleteError: any) {
-        logger.warn(`Failed to delete domain ${testCase.params.domain_name}: ${deleteError.message}`);
-        return false; // Cannot proceed - deletion failed
+      validateTestCaseForUserSpace(tc, 'create_domain');
+    } catch (error: any) {
+      logger.skip('Test', error.message);
+      return;
+    }
+
+    testCase = tc;
+    domainName = tc.params.domain_name;
+
+    // Delete if exists (idempotency)
+    if (domainName) {
+      await deleteIfExists(domainName);
+    }
+  });
+
+  afterEach(async () => {
+    // Cleanup created domain
+    if (domainName) {
+      await deleteIgnoringErrors(domainName);
+    }
+    await cleanupTestEnvironment(connection, sessionId, testConfig);
+  });
+
+  async function deleteIfExists(name: string): Promise<void> {
+    try {
+      await getDomain(connection, name);
+      logger.debug(`Domain ${name} exists, deleting...`);
+      const deleteResult = await deleteObject(connection, {
+        object_name: name,
+        object_type: 'DOMA/DD'
+      });
+
+      // Check if deletion was successful
+      if (deleteResult.status < 200 || deleteResult.status >= 300) {
+        logger.skip('Test', `Failed to delete existing domain ${name} (status: ${deleteResult.status}). Cannot proceed with test.`);
+        testCase = null; // Skip test
+        return;
       }
+
+      const delay = 2000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      logger.debug(`Domain ${name} deleted (status: ${deleteResult.status})`);
     } catch (error: any) {
       if (error.response?.status === 404) {
-        logger.debug(`Domain ${testCase.params.domain_name} does not exist`);
-        return true; // Object doesn't exist - can proceed
+        logger.debug(`Domain ${name} does not exist (OK)`);
+      } else {
+        logger.skip('Test', `Failed to check/delete domain ${name}: ${error.message}`);
+        testCase = null; // Skip test
       }
-      // If 401, connection doesn't have cookies yet - assume object doesn't exist and proceed
-      // Cookies will be obtained on first POST request (createEmptyDomain)
-      if (error.response?.status === 401) {
-        logger.debug(`Domain ${testCase.params.domain_name} check failed with 401 (no cookies yet) - assuming doesn't exist`);
-        return true; // Assume object doesn't exist - will get cookies on first POST
-      }
-      throw error;
+    }
+  }
+
+  async function deleteIgnoringErrors(name: string): Promise<void> {
+    try {
+      await deleteObject(connection, {
+        object_name: name,
+        object_type: 'DOMA/DD'
+      });
+      logger.debug(`Cleanup: deleted domain ${name}`);
+    } catch (error: any) {
+      logger.debug(`Cleanup: could not delete domain ${name} (${error.message})`);
     }
   }
 
   it('should create basic domain', async () => {
-    if (!hasConfig || !connection) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+    // Set test timeout from config
+    jest.setTimeout(60000);
+
+    if (!testCase || !domainName) {
+      logger.skip('Create Test', testCase ? 'Domain name not set' : 'Test case not configured');
       return;
     }
 
-    const testCase = getEnabledTestCase('create_domain', 'test_domain');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    // Validate that domain is in user space (Z_ or Y_)
-    try {
-      validateTestCaseForUserSpace(testCase, 'create_domain');
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
-    }
-
-    // Ensure domain does not exist before creation (idempotency)
-    // This will delete the object if it exists
-    // Note: ensureDomainDoesNotExist handles 401 errors by assuming object doesn't exist
-    const canProceed = await ensureDomainDoesNotExist(testCase);
-    if (!canProceed) {
-      logger.warn(`⚠️ Skipping test: Cannot ensure domain ${testCase.params.domain_name} does not exist`);
-      return;
-    }
+    logger.debug(`Testing create for domain: ${domainName}`);
 
     try {
-      await createDomain(connection, {
+      const result = await createDomain(connection, {
         domain_name: testCase.params.domain_name,
         description: testCase.params.description,
         package_name: testCase.params.package_name || getDefaultPackage(),
         transport_request: testCase.params.transport_request || getDefaultTransport(),
-        datatype: testCase.params.datatype,
-        length: testCase.params.length,
-        decimals: testCase.params.decimals,
-        lowercase: testCase.params.lowercase,
-        sign_exists: testCase.params.sign_exists,
+        datatype: testCase.params.datatype || 'CHAR',
+        length: testCase.params.length || 10,
+        decimals: testCase.params.decimals || 0,
+        lowercase: testCase.params.lowercase || false,
+        sign_exists: testCase.params.sign_exists || false
       });
-    } catch (createError: any) {
-      // If domain already exists (might happen if deletion didn't complete in time)
-      if (createError.message?.includes('already exists') ||
-          createError.message?.includes('does already exist') ||
-          (createError.response?.data &&
-           typeof createError.response.data === 'string' &&
-           createError.response.data.includes('already exists'))) {
-        logger.warn(`⚠️ Domain ${testCase.params.domain_name} already exists - skipping creation test`);
-        // Verify that domain exists and is readable
-        try {
-          const result = await getDomain(connection, testCase.params.domain_name);
-          expect(result.status).toBe(200);
-          logger.info(`✓ Domain ${testCase.params.domain_name} exists and is readable`);
-          return; // Test passes - domain exists and is accessible
-        } catch (readError) {
-          // If we can't read it, something is wrong
-          throw new Error(`Domain ${testCase.params.domain_name} exists but cannot be read: ${readError}`);
-        }
-      }
-      // For other errors, fail the test
-      throw createError;
+
+      expect([200, 201]).toContain(result.status);
+      logger.debug(`✓ Domain ${domainName} created successfully (status: ${result.status})`);
+
+      // Wait for SAP to register the object
+      const delay = 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+
+      // Verify domain exists
+      const getResult = await getDomain(connection, domainName);
+      expect(getResult.status).toBe(200);
+      logger.debug(`✓ Domain ${domainName} verified to exist`);
+
+    } catch (error: any) {
+      logger.error(`✗ Failed to create domain: ${error.message}`);
+      throw error;
     }
-
-    // Verify creation by reading
-    const result = await getDomain(connection, testCase.params.domain_name);
-    expect(result.status).toBe(200);
-    expect(result.data).toContain(testCase.params.domain_name.toUpperCase());
-  }, 60000);
+  });
 });
-

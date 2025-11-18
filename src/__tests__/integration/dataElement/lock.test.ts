@@ -23,68 +23,82 @@ import { createDataElement } from '../../../core/dataElement/create';
 import { getDomain } from '../../../core/domain/read';
 import { createDomain } from '../../../core/domain/create';
 import { generateSessionId } from '../../../utils/sessionUtils';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { setupTestEnvironment, cleanupTestEnvironment, markAuthFailed, hasAuthFailed, getConfig } from '../../helpers/sessionConfig';
+import { registerTestLock, unregisterTestLock } from '../../helpers/lockHelper';
+import { createTestLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase, validateTestCaseForUserSpace, getDefaultPackage, getDefaultTransport } = require('../../../../tests/test-helper');
+const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
+const logger = createTestLogger('DataElement - Lock/Unlock');
 
-describe('Data Element - Lock', () => {
+const TEST_SUITE_NAME = 'Data Element - Lock';
+
+describe(TEST_SUITE_NAME, () => {
   let connection: AbapConnection;
   let hasConfig = false;
   let lockHandle: string | null = null;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
+  let testCase: any = null;
+  let dataElementName: string | null = null;
 
   beforeEach(async () => {
-    lockHandle = null; // Reset lock handle for each test
+    lockHandle = null;
+    testCase = null;
+    dataElementName = null;
+
+    if (hasAuthFailed(TEST_SUITE_NAME)) {
+      logger.skip('Lock/Unlock test', 'Authentication failed in previous test');
+      return;
+    }
+
+    lockHandle = null;
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
 
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
       const env = await setupTestEnvironment(connection, 'dataElement_lock', __filename);
       sessionId = env.sessionId;
       testConfig = env.testConfig;
       lockTracking = env.lockTracking;
 
-      if (sessionId) {
-        logger.debug(`✓ Session persistence enabled: ${sessionId}`);
-        logger.debug(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        logger.debug('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
       if (lockTracking?.enabled) {
         logger.debug(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        logger.debug('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
       }
 
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
+      // Connect to SAP system (triggers auth & auto-refresh)
       await (connection as any).connect();
 
       hasConfig = true;
-    } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+
+      // Get and validate test case
+      const tc = getEnabledTestCase('lock_dataElement', 'test_dataElement_lock');
+      if (!tc) {
+        logger.skip('Lock/Unlock test', 'Test case not enabled in test-config.yaml');
+        testCase = null;
+        dataElementName = null;
+        return;
+      }
+
+      testCase = tc;
+      dataElementName = tc.params.data_element_name;
+    } catch (error: any) {
+      logger.error('❌ Authentication/Connection failed - marking all tests to skip');
+      logger.error(`   Error: ${error.message}`);
+      markAuthFailed(TEST_SUITE_NAME);
       hasConfig = false;
+      testCase = null;
+      dataElementName = null;
     }
   });
 
@@ -176,46 +190,55 @@ describe('Data Element - Lock', () => {
   }
 
   it('should lock data element and get lock handle', async () => {
-    if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
-      return;
-    }
-
-    const testCase = getEnabledTestCase('lock_data_element', 'test_data_element');
-    if (!testCase) {
-      logger.warn('⚠️ Skipping test: Test case is disabled');
-      return;
-    }
-
-    // Validate that data element is in user space (Z_ or Y_)
-    try {
-      validateTestCaseForUserSpace(testCase, 'lock_data_element');
-    } catch (error: any) {
-      logger.warn(`⚠️ Skipping test: ${error.message}`);
-      return;
+    if (!testCase || !dataElementName) {
+      return; // Already logged in beforeEach
     }
 
     // Ensure data element exists before test (idempotency)
     await ensureDataElementExists(testCase);
 
-    const sessionId = generateSessionId();
+    const testSessionId = sessionId || generateSessionId();
     lockHandle = await lockDataElement(
       connection,
-      testCase.params.data_element_name,
-      sessionId
+      dataElementName,
+      testSessionId
     );
 
     expect(lockHandle).toBeDefined();
     expect(lockHandle).not.toBe('');
 
+    // Register lock in persistent storage
+    if (lockTracking?.enabled) {
+      registerTestLock(
+        'dataElement',
+        dataElementName,
+        testSessionId,
+        lockHandle,
+        undefined,
+        __filename
+      );
+      logger.debug(`✓ Lock registered in ${lockTracking.locksDir}`);
+    }
+
     // Unlock after test
-    await unlockDataElement(
-      connection,
-      testCase.params.data_element_name,
-      lockHandle,
-      sessionId
-    );
-    lockHandle = null;
-  }, 20000);
+    try {
+      await unlockDataElement(
+        connection,
+        dataElementName,
+        lockHandle,
+        testSessionId
+      );
+      lockHandle = null;
+
+      // Unregister lock from persistent storage
+      if (lockTracking?.enabled) {
+        unregisterTestLock('dataElement', dataElementName);
+        logger.debug(`✓ Lock unregistered from ${lockTracking.locksDir}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to unlock data element: ${error}`);
+      throw error;
+    }
+  }, getTimeout('test'));
 });
 
