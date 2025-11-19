@@ -291,5 +291,4 @@ Tests skip gracefully with clear reasons:
 
 **Related Documentation:**
 - [TEST_CONFIG_SCHEMA.md](./TEST_CONFIG_SCHEMA.md) - YAML configuration schema
-- [TEST_IMPROVEMENT_ROADMAP.md](./TEST_IMPROVEMENT_ROADMAP.md) - Roadmap and implementation details
 

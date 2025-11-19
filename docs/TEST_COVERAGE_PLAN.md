@@ -1,7 +1,7 @@
 # Test Coverage Improvement Plan - @mcp-abap-adt/adt-clients
 
 **⚠️ NOTE: This is a plan for UNIT tests, separate from the integration test roadmap.**  
-**Related:** [TEST_IMPROVEMENT_ROADMAP.md](./TEST_IMPROVEMENT_ROADMAP.md) – integration test roadmap.
+**Related:** Integration test improvements completed. See [BUILDER_TEST_PATTERN.md](./BUILDER_TEST_PATTERN.md) and [TEST_CONFIG_SCHEMA.md](./TEST_CONFIG_SCHEMA.md) for current test structure.
 
 **Current state:** 32.8% overall coverage | 61 integration tests | 0 unit tests
 

@@ -490,5 +490,4 @@ Use `scripts/verify-builder-tests.js` to validate:
 
 **Related Documentation:**
 - [BUILDER_TEST_PATTERN.md](./BUILDER_TEST_PATTERN.md) - Test pattern documentation
-- [TEST_IMPROVEMENT_ROADMAP.md](./TEST_IMPROVEMENT_ROADMAP.md) - Implementation roadmap
 

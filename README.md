@@ -174,7 +174,8 @@ See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
 ## Development & Testing
 
 For test strategy, development roadmap, and contribution guidelines, see:
-- **[docs/TEST_STRATEGY.md](docs/TEST_STRATEGY.md)** - Test strategy and development focus
+- **[docs/BUILDER_TEST_PATTERN.md](docs/BUILDER_TEST_PATTERN.md)** - Builder test pattern and structure
+- **[docs/TEST_CONFIG_SCHEMA.md](docs/TEST_CONFIG_SCHEMA.md)** - YAML test configuration schema
 - **[docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md)** - Package architecture
 
 ### Logging levels
