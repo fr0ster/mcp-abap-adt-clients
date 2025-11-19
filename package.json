@@ -44,8 +44,8 @@
   },
   "scripts": {
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "build": "npm run --silent clean && tsc -p tsconfig.json",
-    "build:fast": "tsc -p tsconfig.json",
+    "build": "npm run --silent clean && npx tsc -p tsconfig.json",
+    "build:fast": "npx tsc -p tsconfig.json",
     "test": "jest --runInBand",
     "test:sequential": "node scripts/run-tests-sequential.js",
     "test:module": "node scripts/test-module.js",
