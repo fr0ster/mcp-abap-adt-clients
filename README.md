@@ -115,7 +115,7 @@ await lockClient.unlock({
 });
 ```
 
-> ℹ️ Need to persist the `sessionId` / cookies between processes? See [doc/STATEFUL_SESSION_GUIDE.md](../../doc/STATEFUL_SESSION_GUIDE.md) and the `@mcp-abap-adt/connection` README for details.
+> ℹ️ Need to persist the `sessionId` / cookies between processes? See [doc/architecture/STATEFUL_SESSION_GUIDE.md](../../doc/architecture/STATEFUL_SESSION_GUIDE.md) and the `@mcp-abap-adt/connection` README for details.
 
 ## CLI Tools
 
@@ -164,7 +164,7 @@ Refer to the TypeScript typings (`src/index.ts`) or the generated docs in `docs/
 - [Lock State Management](docs/archive/LOCK_STATE_MANAGEMENT.md) – background on `.locks`
 - [Session State Management](docs/archive/SESSION_STATE_MANAGEMENT.md) – restoring HTTP sessions
 - [Stateful Session Guide (Builders)](docs/STATEFUL_SESSION_GUIDE.md) – how Builders, `LockClient`, and tests manage `sessionId`, `lockHandle`, and the lock registry
-- [Stateful Session Guide (Server)](../../doc/STATEFUL_SESSION_GUIDE.md) – handler-level orchestration and workflows shared with the MCP server
+- [Stateful Session Guide (Server)](../../doc/architecture/STATEFUL_SESSION_GUIDE.md) – handler-level orchestration and workflows shared with the MCP server
 - [Stateful Session Guide (Connection)](../connection/docs/STATEFUL_SESSION_GUIDE.md) – HTTP session, cookies, and CSRF token persistence
 
 ## Changelog
