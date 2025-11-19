@@ -9,7 +9,6 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { StructureBuilder, StructureBuilderLogger } from '../../../core/structure';
 import { deleteStructure } from '../../../core/structure/delete';
 import { unlockStructure } from '../../../core/structure/unlock';
-import { getStructureSource } from '../../../core/structure/read';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -80,6 +79,8 @@ describe('StructureBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
+    let lockedReason: string | null = null;
+
     // Step 1: Check for locks and unlock if needed
     const lock = getTestLock('structure', structureName);
     if (lock) {
@@ -104,14 +105,19 @@ describe('StructureBuilder', () => {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted structure ${structureName}`);
       }
     } catch (error: any) {
-      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
-      if (debugEnabled) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        builderLogger.warn?.(`[CLEANUP] Failed to delete structure ${structureName}: ${errorMsg} ${errorData}`);
+      const status = error.response?.status;
+      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+      const errorMsg = error.message || '';
+      const errorData = error.response?.data || '';
+      console.warn(`[CLEANUP][Structure] Failed to delete ${structureName} (${statusText}): ${errorMsg} ${errorData}`);
+      if (status === 423) {
+        lockedReason = `Structure ${structureName} is locked by another user (HTTP 423 Locked)`;
       }
     }
 
+    if (lockedReason) {
+      return { success: false, reason: lockedReason };
+    }
     return { success: true };
   }
 
@@ -176,9 +182,7 @@ describe('StructureBuilder', () => {
         // Cleanup after test
         const cleanup = await ensureStructureReady(structureName);
         if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
+          console.warn(`[CLEANUP][Structure] ${cleanup.reason}`);
         }
       }
     });
@@ -249,13 +253,15 @@ describe('StructureBuilder', () => {
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
-        // If structure already exists (cleanup failed), skip test instead of failing
-        if (fullErrorText.includes('exceptionresourcealreadyexists') ||
-            fullErrorText.includes('resourcealreadyexists') ||
-            fullErrorText.includes('already exists')) {
-          logBuilderTestSkip(builderLogger, 'StructureBuilder - full workflow', `Structure ${structureName} already exists (cleanup failed)`);
+        // Check if object is locked by someone else (currently editing)
+        if (fullErrorText.includes('currently editing') ||
+            fullErrorText.includes('exceptionresourcenoaccess') ||
+            fullErrorText.includes('eu510')) {
+          logBuilderTestSkip(builderLogger, 'StructureBuilder - full workflow', `Structure ${structureName} is locked (currently editing)`);
           return; // Skip test
         }
+
+        // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(builderLogger, 'StructureBuilder - full workflow', error);
         throw error;
       } finally {

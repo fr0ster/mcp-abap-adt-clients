@@ -8,7 +8,6 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { FunctionModuleBuilder, FunctionModuleBuilderLogger } from '../../../core/functionModule';
 import { deleteFunctionModule } from '../../../core/functionModule/delete';
-import { getFunctionSource } from '../../../core/functionModule/read';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
@@ -90,6 +89,8 @@ describe('FunctionModuleBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
+    let lockedReason: string | null = null;
+
     // Step 1: Check for locks and unlock if needed
     const lock = getTestLock('fm', functionModuleName, functionGroupName);
     if (lock) {
@@ -117,14 +118,19 @@ describe('FunctionModuleBuilder', () => {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted function module ${functionGroupName}/${functionModuleName}`);
       }
     } catch (error: any) {
-      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
-      if (debugEnabled) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        builderLogger.warn?.(`[CLEANUP] Failed to delete function module ${functionGroupName}/${functionModuleName}: ${errorMsg} ${errorData}`);
+      const status = error.response?.status;
+      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+      const errorMsg = error.message || '';
+      const errorData = error.response?.data || '';
+      console.warn(`[CLEANUP][FunctionModule] Failed to delete ${functionGroupName}/${functionModuleName} (${statusText}): ${errorMsg} ${errorData}`);
+      if (status === 423) {
+        lockedReason = `Function module ${functionModuleName} is locked by another user (HTTP 423 Locked)`;
       }
     }
 
+    if (lockedReason) {
+      return { success: false, reason: lockedReason };
+    }
     return { success: true };
   }
 
@@ -264,9 +270,7 @@ describe('FunctionModuleBuilder', () => {
         // Cleanup after test: delete Function Module and Function Group
         const cleanup = await cleanupFunctionModuleAndGroup(functionGroupName, functionModuleName);
         if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
+          console.warn(`[CLEANUP][FunctionModule] ${cleanup.reason}`);
         }
       }
     });
@@ -341,13 +345,15 @@ describe('FunctionModuleBuilder', () => {
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
-        // If function module already exists (cleanup failed), skip test instead of failing
-        if (fullErrorText.includes('already exists') ||
-            fullErrorText.includes('exceptionresourcealreadyexists') ||
-            fullErrorText.includes('resourcealreadyexists')) {
-          logBuilderTestSkip(builderLogger, 'FunctionModuleBuilder - full workflow', `Function module ${functionModuleName} already exists (cleanup failed)`);
+        // Check if object is locked by someone else (currently editing)
+        if (fullErrorText.includes('currently editing') ||
+            fullErrorText.includes('exceptionresourcenoaccess') ||
+            fullErrorText.includes('eu510')) {
+          logBuilderTestSkip(builderLogger, 'FunctionModuleBuilder - full workflow', `Function module ${functionModuleName} is locked (currently editing)`);
           return; // Skip test
         }
+
+        // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(builderLogger, 'FunctionModuleBuilder - full workflow', error);
         throw error;
       } finally {

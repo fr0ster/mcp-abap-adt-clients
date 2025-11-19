@@ -199,15 +199,16 @@ create_table:
         data_class: "APPL0"
         ddl_code: |
           @EndUserText.label: 'Builder test table'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
           @AbapCatalog.tableCategory: #TRANSPARENT
           @AbapCatalog.deliveryClass: #A
-          @AbapCatalog.dataBrowser: #ALLOWED
+          @AbapCatalog.dataMaintenance: #RESTRICTED
           define table ZADT_BLD_TAB01 {
-            key client : abap.clnt not null;
-            key builder_id : abap.char(10) not null;
-            description : abap.char(40);
-            last_changed_by : abap.char(12);
-            last_changed_on : abap.dats;
+            key mandt          : abap.clnt not null;
+            key builder_id     : abap.char(10) not null;
+            description        : abap.char(40);
+            last_changed_by    : abap.char(12);
+            last_changed_on    : abap.dats;
           }
 
 # Create Structure

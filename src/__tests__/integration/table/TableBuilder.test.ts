@@ -9,7 +9,6 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { TableBuilder, TableBuilderLogger } from '../../../core/table';
 import { deleteTable } from '../../../core/table/delete';
 import { unlockTable } from '../../../core/table/unlock';
-import { getTableSource } from '../../../core/table/read';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -80,6 +79,8 @@ describe('TableBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
+    let lockedReason: string | null = null;
+
     // Step 1: Check for locks and unlock if needed
     const lock = getTestLock('table', tableName);
     if (lock) {
@@ -104,14 +105,19 @@ describe('TableBuilder', () => {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted table ${tableName}`);
       }
     } catch (error: any) {
-      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
-      if (debugEnabled) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        builderLogger.warn?.(`[CLEANUP] Failed to delete table ${tableName}: ${errorMsg} ${errorData}`);
+      const status = error.response?.status;
+      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+      const errorMsg = error.message || '';
+      const errorData = error.response?.data || '';
+      console.warn(`[CLEANUP][Table] Failed to delete ${tableName} (${statusText}): ${errorMsg} ${errorData}`);
+      if (status === 423) {
+        lockedReason = `Table ${tableName} is locked by another user (HTTP 423 Locked)`;
       }
     }
 
+    if (lockedReason) {
+      return { success: false, reason: lockedReason };
+    }
     return { success: true };
   }
 
@@ -176,9 +182,7 @@ describe('TableBuilder', () => {
         // Cleanup after test
         const cleanup = await ensureTableReady(tableName);
         if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
+          console.warn(`[CLEANUP][Table] ${cleanup.reason}`);
         }
       }
     });
@@ -243,16 +247,32 @@ describe('TableBuilder', () => {
 
         logBuilderTestSuccess(builderLogger, 'TableBuilder - full workflow');
       } catch (error: any) {
-        // If table already exists (cleanup failed), skip test instead of failing
+        const status = error.response?.status;
+        const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+        // Extract error message from error object
         const errorMsg = error.message || '';
-        if (errorMsg.includes('ExceptionResourceAlreadyExists') ||
-            errorMsg.includes('ResourceAlreadyExists') ||
-            errorMsg.includes('already exists')) {
-          logBuilderTestSkip(builderLogger, 'TableBuilder - full workflow', `Table ${tableName} already exists (cleanup failed)`);
+        const errorData = error.response?.data || '';
+        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
+        const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
+
+        // Check if object is locked by someone else (currently editing)
+        if (fullErrorText.includes('currently editing') ||
+            fullErrorText.includes('exceptionresourcenoaccess') ||
+            fullErrorText.includes('eu510')) {
+          logBuilderTestSkip(
+            builderLogger,
+            'TableBuilder - full workflow',
+            `Table ${tableName} is locked (currently editing, ${statusText})`
+          );
           return; // Skip test
         }
-        logBuilderTestError(builderLogger, 'TableBuilder - full workflow', error);
-        throw error;
+
+        // "Already exists" errors should fail the test (cleanup must work)
+        const enhancedError = status
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(builderLogger, 'TableBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'TableBuilder - full workflow');

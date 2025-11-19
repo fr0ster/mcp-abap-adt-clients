@@ -9,7 +9,6 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { DataElementBuilder, DataElementBuilderLogger } from '../../../core/dataElement';
 import { deleteDataElement } from '../../../core/dataElement/delete';
 import { unlockDataElement } from '../../../core/dataElement/unlock';
-import { getDataElement } from '../../../core/dataElement/read';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -87,6 +86,8 @@ describe('DataElementBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
+    let lockedReason: string | null = null;
+
     // Step 1: Check for locks and unlock if needed
     const lock = getTestLock('dataElement', dataElementName);
     if (lock) {
@@ -114,14 +115,19 @@ describe('DataElementBuilder', () => {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted data element ${dataElementName}`);
       }
     } catch (error: any) {
-      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
-      if (debugEnabled) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        builderLogger.warn?.(`[CLEANUP] Failed to delete data element ${dataElementName}: ${errorMsg} ${errorData}`);
+      const status = error.response?.status;
+      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+      const errorMsg = error.message || '';
+      const errorData = error.response?.data || '';
+      console.warn(`[CLEANUP][DataElement] Failed to delete ${dataElementName} (${statusText}): ${errorMsg} ${errorData}`);
+      if (status === 423) {
+        lockedReason = `Data element ${dataElementName} is locked by another user (HTTP 423 Locked)`;
       }
     }
 
+    if (lockedReason) {
+      return { success: false, reason: lockedReason };
+    }
     return { success: true };
   }
 
@@ -196,9 +202,7 @@ describe('DataElementBuilder', () => {
         // Cleanup after test
         const cleanup = await ensureDataElementReady(dataElementName);
         if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
+          console.warn(`[CLEANUP][DataElement] ${cleanup.reason}`);
         }
       }
     });
@@ -276,14 +280,15 @@ describe('DataElementBuilder', () => {
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
-        // If data element already exists (cleanup failed), skip test instead of failing
-        if (fullErrorText.includes('already exists') ||
-            fullErrorText.includes('exceptionresourcealreadyexists') ||
-            fullErrorText.includes('resourcealreadyexists') ||
-            fullErrorText.includes('error when creating object directory entry')) {
-          logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', `Data element ${dataElementName} already exists (cleanup failed)`);
+        // Check if object is locked by someone else (currently editing)
+        if (fullErrorText.includes('currently editing') ||
+            fullErrorText.includes('exceptionresourcenoaccess') ||
+            fullErrorText.includes('eu510')) {
+          logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', `Data element ${dataElementName} is locked (currently editing)`);
           return; // Skip test
         }
+
+        // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(builderLogger, 'DataElementBuilder - full workflow', error);
         throw error;
       } finally {

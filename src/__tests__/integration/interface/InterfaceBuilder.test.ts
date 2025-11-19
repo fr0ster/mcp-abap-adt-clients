@@ -8,7 +8,6 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { InterfaceBuilder, InterfaceBuilderLogger } from '../../../core/interface';
 import { deleteInterface } from '../../../core/interface/delete';
-import { getInterfaceSource } from '../../../core/interface/read';
 import { unlockInterface } from '../../../core/interface/unlock';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
@@ -80,6 +79,8 @@ describe('InterfaceBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
+    let lockedReason: string | null = null;
+
     // Step 1: Check for locks and unlock if needed
     const lock = getTestLock('interface', interfaceName);
     if (lock) {
@@ -104,14 +105,19 @@ describe('InterfaceBuilder', () => {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted interface ${interfaceName}`);
       }
     } catch (error: any) {
-      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
-      if (debugEnabled) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        builderLogger.warn?.(`[CLEANUP] Failed to delete interface ${interfaceName}: ${errorMsg} ${errorData}`);
+      const status = error.response?.status;
+      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+      const errorMsg = error.message || '';
+      const errorData = error.response?.data || '';
+      console.warn(`[CLEANUP][Interface] Failed to delete ${interfaceName} (${statusText}): ${errorMsg} ${errorData}`);
+      if (status === 423) {
+        lockedReason = `Interface ${interfaceName} is locked by another user (HTTP 423 Locked)`;
       }
     }
 
+    if (lockedReason) {
+      return { success: false, reason: lockedReason };
+    }
     return { success: true };
   }
 
@@ -176,9 +182,7 @@ describe('InterfaceBuilder', () => {
         // Cleanup after test
         const cleanup = await ensureInterfaceReady(interfaceName);
         if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
+          console.warn(`[CLEANUP][Interface] ${cleanup.reason}`);
         }
       }
     });
@@ -252,20 +256,15 @@ describe('InterfaceBuilder', () => {
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
-        // If interface is locked (currently editing), skip test instead of failing
+        // Check if object is locked by someone else (currently editing)
         if (fullErrorText.includes('currently editing') ||
             fullErrorText.includes('exceptionresourcenoaccess') ||
             fullErrorText.includes('eu510')) {
           logBuilderTestSkip(builderLogger, 'InterfaceBuilder - full workflow', `Interface ${interfaceName} is locked (currently editing)`);
           return; // Skip test
         }
-        // If interface already exists (cleanup failed), skip test
-        if (fullErrorText.includes('exceptionresourcealreadyexists') ||
-            fullErrorText.includes('resourcealreadyexists') ||
-            fullErrorText.includes('already exists')) {
-          logBuilderTestSkip(builderLogger, 'InterfaceBuilder - full workflow', `Interface ${interfaceName} already exists (cleanup failed)`);
-          return; // Skip test
-        }
+
+        // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(builderLogger, 'InterfaceBuilder - full workflow', error);
         throw error;
       } finally {

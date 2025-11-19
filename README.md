@@ -135,6 +135,10 @@ See [bin/README.md](bin/README.md) for details.
 - [Lock State Management](LOCK_STATE_MANAGEMENT.md) - Persistent lock handles
 - [Session State Management](SESSION_STATE_MANAGEMENT.md) - HTTP session persistence
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
+
 ## API Reference
 
 ### Class Operations

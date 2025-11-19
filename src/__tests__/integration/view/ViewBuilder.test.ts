@@ -8,7 +8,6 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ViewBuilder, ViewBuilderLogger } from '../../../core/view';
 import { deleteView } from '../../../core/view/delete';
-import { getViewSource } from '../../../core/view/read';
 import { unlockDDLS } from '../../../core/view/unlock';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
@@ -79,6 +78,7 @@ describe('ViewBuilder', () => {
     if (!connection) {
       return { success: true }; // No connection = nothing to clean
     }
+    let lockedReason: string | null = null;
 
     // Step 1: Check for locks and unlock if needed
     const lock = getTestLock('view', viewName);
@@ -104,14 +104,19 @@ describe('ViewBuilder', () => {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted view ${viewName}`);
       }
     } catch (error: any) {
-      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
-      if (debugEnabled) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        builderLogger.warn?.(`[CLEANUP] Failed to delete view ${viewName}: ${errorMsg} ${errorData}`);
+      const status = error.response?.status;
+      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+      const errorMsg = error.message || '';
+      const errorData = error.response?.data || '';
+      console.warn(`[CLEANUP][View] Failed to delete ${viewName} (${statusText}): ${errorMsg} ${errorData}`);
+      if (status === 423) {
+        lockedReason = `View ${viewName} is locked by another user (HTTP 423 Locked)`;
       }
     }
 
+    if (lockedReason) {
+      return { success: false, reason: lockedReason };
+    }
     return { success: true };
   }
 
@@ -176,9 +181,7 @@ describe('ViewBuilder', () => {
         // Cleanup after test
         const cleanup = await ensureViewReady(viewName);
         if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
+          console.warn(`[CLEANUP][View] ${cleanup.reason}`);
         }
       }
     });
@@ -246,28 +249,32 @@ describe('ViewBuilder', () => {
 
         logBuilderTestSuccess(builderLogger, 'ViewBuilder - full workflow');
       } catch (error: any) {
+        const status = error.response?.status;
+        const statusText = status ? `HTTP ${status}` : 'HTTP ?';
         // Extract error message from error object (may be in message or response.data)
         const errorMsg = error.message || '';
         const errorData = error.response?.data || '';
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
-        // If view is locked (currently editing), skip test instead of failing
+        // Check if object is locked by someone else (currently editing)
         if (fullErrorText.includes('currently editing') ||
             fullErrorText.includes('exceptionresourcenoaccess') ||
             fullErrorText.includes('eu510')) {
-          logBuilderTestSkip(builderLogger, 'ViewBuilder - full workflow', `View ${viewName} is locked (currently editing)`);
+          logBuilderTestSkip(
+            builderLogger,
+            'ViewBuilder - full workflow',
+            `View ${viewName} is locked (currently editing, ${statusText})`
+          );
           return; // Skip test
         }
-        // If view already exists (cleanup failed), skip test instead of failing
-        if (fullErrorText.includes('exceptionresourcealreadyexists') ||
-            fullErrorText.includes('resourcealreadyexists') ||
-            fullErrorText.includes('already exists')) {
-          logBuilderTestSkip(builderLogger, 'ViewBuilder - full workflow', `View ${viewName} already exists (cleanup failed)`);
-          return; // Skip test
-        }
-        logBuilderTestError(builderLogger, 'ViewBuilder - full workflow', error);
-        throw error;
+
+        // "Already exists" errors should fail the test (cleanup must work)
+        const enhancedError = status
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(builderLogger, 'ViewBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         // Read the created view before cleanup
         if (viewName) {
