@@ -166,11 +166,12 @@ describe('TransportBuilder', () => {
         logBuilderTestError(builderLogger, 'TransportBuilder - full workflow', error);
         throw error;
       } finally {
-        // Read the created transport before cleanup
+        // Read the created transport before cleanup (using transportNumber from state)
         if (transportNumber) {
           try {
             logBuilderTestStep('read');
-            await builder.read(transportNumber);
+            // Read without parameter - uses transportNumber from state
+            await builder.read();
 
             const readResult = builder.getReadResult();
             expect(readResult).toBeDefined();

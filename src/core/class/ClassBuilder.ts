@@ -39,7 +39,7 @@ import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { validateClassName, ValidationResult } from './validation';
 import { createClass, CreateClassParams } from './create';
-import { getClassSource, getClassMetadata } from './read';
+import { getClassSource, getClassMetadata, getClassTransport } from './read';
 import { lockClass } from './lock';
 import { updateClass } from './update';
 import { checkClass } from './check';
@@ -75,6 +75,7 @@ export interface ClassBuilderState {
   createResult?: AxiosResponse;
   readResult?: AxiosResponse;
   metadataResult?: AxiosResponse;
+  transportResult?: AxiosResponse;
   lockHandle?: string;
   updateResult?: AxiosResponse;
   checkResult?: AxiosResponse;
@@ -257,6 +258,24 @@ export class ClassBuilder {
     }
   }
 
+  async readTransport(): Promise<this> {
+    try {
+      this.logger.info?.('Reading transport request for class:', this.config.className);
+      const result = await getClassTransport(this.connection, this.config.className);
+      this.state.transportResult = result;
+      this.logger.info?.('Transport request read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'readTransport',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read transport failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking class:', this.config.className);
@@ -430,6 +449,10 @@ export class ClassBuilder {
 
   getMetadataResult(): AxiosResponse | undefined {
     return this.state.metadataResult;
+  }
+
+  getTransportResult(): AxiosResponse | undefined {
+    return this.state.transportResult;
   }
 
   getLockHandle(): string | undefined {

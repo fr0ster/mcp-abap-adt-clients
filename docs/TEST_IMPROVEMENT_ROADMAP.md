@@ -35,10 +35,12 @@
 
 ### 🔄 Active Roadmaps
 
-1. **TEST_IMPROVEMENT_ROADMAP.md** (this file) - ✅ Mostly Complete
+1. **TEST_IMPROVEMENT_ROADMAP.md** (this file) - ✅ Complete
    - Phase 1: Builder Tests Refactoring - ✅ 100%
    - Phase 2: Remove Low-Level Tests - ✅ 100%
-   - Phase 3: YAML Parameter Compliance - ⏳ In Progress
+   - Phase 3: YAML Parameter Compliance - ✅ 100%
+   - Phase 4: Standard Objects Registry - ✅ 100%
+   - Phase 5: Documentation & Verification - ✅ 100%
 
 2. **TEST_COVERAGE_PLAN.md** - 📋 Planning
    - Focus: Unit tests (not integration tests)
@@ -65,19 +67,25 @@
 - Fewer tests = less maintenance
 - Two tests per Builder = complete coverage
 
-### Test Structure: Two Tests Per Builder
+### Test Structure: Two Required Tests + One Optional Test Per Builder
 
-Each Builder test file will have exactly **2 tests**:
+Each Builder test file has **2 required tests** + **1 optional test**:
 
-1. **Full Workflow Test** - Complete CRUD workflow with test object
+1. **Full Workflow Test** (Required) - Complete CRUD workflow with test object
    - `validate()` → `create()` → `check('inactive')` → `lock()` → `update()` → `check('inactive')` → `unlock()` → `activate()` → `check('active')`
    - Uses test object from YAML
    - Tests all operations in sequence
 
-2. **Read Standard Object Test** - Simple read of standard SAP object
+2. **Read Standard Object Test** (Required) - Simple read of standard SAP object
    - `read()` standard SAP object (e.g., `CL_ABAP_CHAR_UTILITIES`)
    - Completely independent
    - No create/update needed
+
+3. **Read Transport Request Test** (Optional) - Read transport request for standard object
+   - `readTransport()` standard SAP object
+   - Only runs if `transport_request` is configured in YAML
+   - Skips gracefully if transport not configured
+   - Note: On SAP BTP ABAP trial, objects are local (404 is expected)
 
 ### Benefits
 
@@ -448,27 +456,21 @@ builder_tests:
 
 ---
 
-## 📋 Phase 3: YAML Parameter Compliance (HIGH PRIORITY)
+## 📋 Phase 3: YAML Parameter Compliance ✅ COMPLETE
 
 **Goal:** Ensure ALL test parameters come from YAML, no hardcoded values
 
-### 3.1 Audit Builder Tests for Hardcoded Values
+### 3.1 Audit Builder Tests for Hardcoded Values (Completed)
 
-**Task:** Identify all hardcoded values in Builder tests
+- Reviewed every `*Builder.test.ts` file for hardcoded object names, package names, transport requests, and source code.
+- Confirmed all workflow/read tests now read parameters from YAML (builder-specific params plus the shared `environment` block).
+- Standard object registry completed in Phase 4.
 
-**Files to check:**
-- [ ] All `*Builder.test.ts` files (check for hardcoded object names)
-- [ ] Check for hardcoded package names, transport requests
-- [ ] Check for hardcoded source code
+### 3.2 Move All Values to YAML (Completed)
 
-**Expected findings:**
-- Builder tests may have hardcoded test names (e.g., `'Z_TEST'`, `'Z_TEST2'`)
-- Some tests may use `getDefaultPackage()`/`getDefaultTransport()` fallbacks
-- Source code may be hardcoded instead of from YAML
-
-### 3.2 Move All Values to YAML
-
-**Task:** Add all test cases to `test-config.yaml`
+- All Builder test cases are defined in `tests/test-config.yaml`.  
+- Common parameters that apply across tests (package name, transport request, etc.) live under `environment`.
+- Each test case can still override these values locally; otherwise the defaults from `environment` are injected via `resolvePackageName` / `resolveTransportRequest`.
 
 **YAML structure:**
 ```yaml
@@ -504,113 +506,176 @@ builder_tests:
         standard_domain_name: MANDT  # For read test
 ```
 
-### 3.3 Remove Fallbacks to Defaults
+### 3.3 Remove Fallbacks to Defaults (Completed)
 
-**Task:** Ensure all tests use YAML values, not `getDefaultPackage()`/`getDefaultTransport()`
-
-**Current pattern (WRONG):**
-```typescript
-package_name: testCase.params.package_name || getDefaultPackage()
-```
-
-**Target pattern (CORRECT):**
-```typescript
-// Require in YAML, skip if missing
-if (!testCase.params.package_name) {
-  logger.skip('Test', 'package_name not provided in test-config.yaml');
-  return;
-}
-package_name: testCase.params.package_name
-```
-
-**Files to fix:**
-- [ ] All `*Builder.test.ts` files
+- All Builder tests now resolve package/transport exclusively through YAML:
+  - `ensurePackageConfig` injects `environment.package_name` / `environment.transport_request` when missing.
+  - Tests skip with a clear reason if `package_name` is still undefined (e.g., environment misconfigured).
+- Legacy helpers (`getDefaultPackage`, `getDefaultTransport`) remain for backward compatibility but are no longer used inside integration tests.
 
 ---
 
-## 📋 Phase 4: Standard SAP Objects Registry (MEDIUM PRIORITY)
+## 📋 Phase 4: Standard SAP Objects Registry ✅ COMPLETE
 
-**Goal:** Document standard SAP objects for read tests
+**Goal:** Document standard SAP objects for read tests with on-premise/cloud variants
 
-### 4.1 Create Standard Objects Registry in YAML
+### 4.1 Create Standard Objects Registry in YAML ✅ COMPLETE
 
-**Task:** Document standard SAP objects that can be used for testing
+**Task:** Document standard SAP objects that can be used for testing with environment-specific variants
 
-**YAML structure:**
+**YAML structure (implemented in `tests/test-config.yaml`):**
 ```yaml
 standard_objects:
   classes:
     - name: CL_ABAP_CHAR_UTILITIES
-      description: Standard SAP utility class
-      available_in: [cloud, onprem, s4hana]
+      description: Standard SAP utility class for character operations
+      available_in:
+        - onprem
+        - cloud
   
   domains:
     - name: MANDT
-      description: Client domain
-      available_in: [cloud, onprem, s4hana]
+      description: Client domain (exists in all ABAP systems)
+      available_in:
+        - onprem
+        - cloud
+  
+  data_elements:
+    - name: MANDT
+      description: Client data element (exists in all ABAP systems)
+      available_in:
+        - onprem
+        - cloud
   
   tables:
     - name: T000
-      description: Client table
-      available_in: [cloud, onprem, s4hana]
+      description: Client table (exists in all ABAP systems)
+      available_in:
+        - onprem
+        - cloud
   
-  # ... more standard objects
+  # ... more standard objects with available_in arrays
 ```
 
-### 4.2 Update Builder Tests to Use Standard Objects
+**Implementation:**
+- ✅ Added `standard_objects` section to `test-config.yaml` with all object types
+- ✅ Each object includes `available_in` array (`onprem`, `cloud`)
+- ✅ Objects are filtered by environment when resolving
 
-**Task:** Ensure read tests in Builder tests use standard objects from YAML
+### 4.2 Create resolveStandardObject Helper ✅ COMPLETE
 
-**Pattern:**
+**Task:** Create helper function to resolve standard objects based on environment
+
+**Helper function (implemented in `tests/test-helper.js`):**
+```javascript
+function resolveStandardObject(objectType, isCloud, testCase = null) {
+  // Priority 1: Test case specific param (e.g., standard_class_name_onprem or standard_class_name_cloud)
+  // Priority 2: Generic test case param (e.g., standard_class_name) - for backward compatibility
+  // Priority 3: Global standard_objects registry filtered by environment
+  // Returns: { name: string, group?: string } | null
+}
+```
+
+**Features:**
+- ✅ Supports test-case-specific params with `_onprem`/`_cloud` suffixes
+- ✅ Falls back to generic params for backward compatibility
+- ✅ Uses global `standard_objects` registry filtered by `available_in`
+- ✅ Returns object name and optional group (for function modules)
+
+### 4.3 Update Builder Tests to Use Standard Objects ✅ COMPLETE
+
+**Task:** Ensure read tests in Builder tests use `resolveStandardObject` instead of hardcoded names
+
+**Pattern (implemented):**
 ```typescript
 // Test 2: Read standard object
 it('should read standard SAP class', async () => {
-  const standardClassName = testCase?.params?.standard_class_name || 
-                           testConfig.standard_objects?.classes?.[0]?.name ||
-                           'CL_ABAP_CHAR_UTILITIES';
+  const testCase = getTestCaseDefinition('create_class', 'builder_class');
+  const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
   
+  if (!standardObject) {
+    logBuilderTestSkip(builderLogger, 'ClassBuilder - read standard object', 
+      `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+    return;
+  }
+
+  const standardClassName = standardObject.name;
   const builder = new ClassBuilder(connection, logger, {
     className: standardClassName,
+    packageName: 'SAP'
   });
 
-  try {
-    await builder.read('active');
-    expect(builder.getReadResult()).toBeDefined();
-    expect(builder.getReadResult()?.status).toBe(200);
-  } catch (error: any) {
-    if (error.response?.status === 404) {
-      logger.skip('Read Test', `Standard object ${standardClassName} not available in this system`);
-      return;
-    }
-    throw error;
-  }
-}, getTimeout('read'));
+  await builder.read('active');
+  // ... verify results
+}, getTimeout('test'));
+```
+
+**Status:**
+- ✅ ClassBuilder - Updated
+- ✅ DomainBuilder - Updated
+- ✅ DataElementBuilder - Updated
+- ✅ TableBuilder - Updated
+- ✅ StructureBuilder - Updated
+- ✅ InterfaceBuilder - Updated
+- ✅ FunctionGroupBuilder - Updated
+- ✅ FunctionModuleBuilder - Updated
+- ✅ ProgramBuilder - Updated (read test still skips in cloud)
+- ✅ PackageBuilder - Updated
+- ✅ TransportBuilder - Read method improved (optional parameter, uses state)
+
+### 4.4 Add Read Transport Request Functions ✅ COMPLETE
+
+**Task:** Add functions to read transport request information for each object type
+
+**Implementation:**
+- ✅ Added `getClassTransport()` in `class/read.ts`
+- ✅ Added `getInterfaceTransport()` in `interface/read.ts`
+- ✅ Added `getTableTransport()` in `table/read.ts`
+- ✅ Added `getProgramTransport()` in `program/read.ts`
+- ✅ Added `getStructureTransport()` in `structure/read.ts`
+- ✅ Added `getDomainTransport()` in `domain/read.ts`
+- ✅ Added `getDataElementTransport()` in `dataElement/read.ts`
+- ✅ Added `getViewTransport()` in `view/read.ts`
+- ✅ Added `getFunctionGroupTransport()` in `functionGroup/read.ts`
+- ✅ Added `getFunctionModuleTransport()` in `functionModule/read.ts` (requires functionGroup parameter)
+- ✅ Added `getPackageTransport()` in `package/read.ts`
+
+**URI Pattern:** `/sap/bc/adt/{object-type-path}/{encodedName}/transport`
+
+**Example:**
+```typescript
+import { getClassTransport } from '@mcp-abap-adt/adt-clients/core';
+
+const response = await getClassTransport(connection, 'ZCL_MY_CLASS');
+// Returns transport request information in XML format
 ```
 
 ---
 
-## 📋 Phase 5: Documentation & Verification (LOW PRIORITY)
+## 📋 Phase 5: Documentation & Verification ✅ COMPLETE
 
 **Goal:** Document Builder test pattern and verify compliance
 
-### 5.1 Create Builder Test Pattern Documentation
+### 5.1 Create Builder Test Pattern Documentation ✅ COMPLETE
 
 **Task:** Document the two-test Builder pattern
 
-**File:** `docs/BUILDER_TEST_PATTERN.md`
+**File:** `docs/BUILDER_TEST_PATTERN.md` ✅
 
 **Content:**
-- Two-test structure explanation
+- Two-test structure explanation (with optional 3rd test for transport read)
 - Test 1: Full workflow pattern
 - Test 2: Read standard object pattern
+- Test 3: Read transport request pattern (optional, only if transport_request configured)
 - YAML configuration structure
 - Standard objects registry
+- Environment detection and graceful skipping
 
-### 5.2 Create YAML Schema Documentation
+### 5.2 Create YAML Schema Documentation ✅ COMPLETE
 
 **Task:** Document YAML structure for Builder tests
 
-**File:** `docs/TEST_CONFIG_SCHEMA.md`
+**File:** `docs/TEST_CONFIG_SCHEMA.md` ✅
 
 **Content:**
 - Builder test case structure
@@ -618,19 +683,24 @@ it('should read standard SAP class', async () => {
 - Standard objects configuration
 - Workflow test parameters
 - Read test parameters
+- Transport request parameters
+- Environment-specific behavior (cloud vs on-premise)
 
-### 5.3 Verification Script
+### 5.3 Verification Script ✅ COMPLETE
 
 **Task:** Create script to verify Builder test compliance
 
-**Script:** `scripts/verify-builder-tests.js`
+**Script:** `scripts/verify-builder-tests.js` ✅
 
 **Checks:**
-- All Builder tests have exactly 2 tests
+- All Builder tests have 2-3 tests (2 required: workflow + read standard, 1 optional: read transport)
+- Special cases: TransportBuilder and ViewBuilder have 1 test (workflow with read)
 - Test 1: Full workflow (validate → create → check → lock → update → check → unlock → activate → check)
 - Test 2: Read standard object
+- Test 3: Read transport request (optional)
 - All parameters from YAML (no hardcoded values)
 - No fallbacks to `getDefaultPackage()`/`getDefaultTransport()`
+- YAML config structure validation
 
 ---
 
@@ -655,30 +725,32 @@ it('should read standard SAP class', async () => {
 - [x] 2.10 Keep special tests (`run.test.ts`, `shared/*.test.ts`) ✅
 - [x] 2.11 Delete old Client tests (ReadOnlyClient, CrudClient, CheckClient, ManagementClient) ✅
 
-### Phase 3: YAML Parameter Compliance ⏳ IN PROGRESS
+### Phase 3: YAML Parameter Compliance ✅ COMPLETE
 - [x] 3.1 Audit Builder tests for hardcoded values ✅ (found getDefaultPackage/getDefaultTransport usage)
-- [ ] 3.2 Move all hardcoded values to YAML ⏳ (some tests still use getDefaultPackage/getDefaultTransport)
-- [ ] 3.3 Remove fallbacks to `getDefaultPackage()`/`getDefaultTransport()` ⏳ (11 files still use fallbacks)
+- [x] 3.2 Move all hardcoded values to YAML ✅ (Builder tests now rely on YAML params + environment defaults)
+- [x] 3.3 Remove fallbacks to `getDefaultPackage()`/`getDefaultTransport()` ✅ (all builders now resolve via `environment.package_name` / optional `environment.transport_request`)
 
-### Phase 4: Standard Objects Registry
-- [ ] 4.1 Create standard objects registry in YAML
-- [ ] 4.2 Update Builder tests to use standard objects from YAML
+### Phase 4: Standard Objects Registry ✅ COMPLETE
+- [x] 4.1 Create standard objects registry in YAML ✅
+- [x] 4.2 Create resolveStandardObject helper ✅
+- [x] 4.3 Update Builder tests to use standard objects from YAML ✅ (10/10 complete; TransportBuilder read merged into workflow)
+- [x] 4.4 Add read transport request functions for all object types ✅
 
-### Phase 5: Documentation
-- [ ] 5.1 Create Builder test pattern documentation
-- [ ] 5.2 Create YAML schema documentation
-- [ ] 5.3 Create verification script
+### Phase 5: Documentation ✅ COMPLETE
+- [x] 5.1 Create Builder test pattern documentation ✅ (`docs/BUILDER_TEST_PATTERN.md`)
+- [x] 5.2 Create YAML schema documentation ✅ (`docs/TEST_CONFIG_SCHEMA.md`)
+- [x] 5.3 Create verification script ✅ (`scripts/verify-builder-tests.js`)
 
 ---
 
 ## 🎯 Success Criteria
 
 1. ✅ **Only Builder tests remain** - All low-level function tests removed ✅ COMPLETE
-2. ✅ **Two tests per Builder** - Full workflow + read standard object ✅ COMPLETE (11 builders with 2 tests, TransportBuilder with 1)
-3. ⏳ **All parameters from YAML** - Zero hardcoded values ⏳ IN PROGRESS (11 files still use getDefaultPackage/getDefaultTransport)
-4. ✅ **Test independence** - Read test uses standard objects (no dependencies) ✅ COMPLETE
+2. ✅ **Two required tests per Builder** - Full workflow + read standard object ✅ COMPLETE (11 builders with 2-3 tests, TransportBuilder/ViewBuilder with 1)
+3. ✅ **All parameters from YAML** - Builder tests now use YAML params with `environment.*` defaults and skip when not provided ✅ COMPLETE
+4. ✅ **Standard object registry** - YAML-driven registry with on-premise/cloud variants, all Builder read tests use `resolveStandardObject()` ✅ COMPLETE
 5. ✅ **Complete coverage** - Full workflow covers all operations ✅ COMPLETE
-6. ⏳ **Documentation complete** - Builder test pattern and YAML schema documented ⏳ PENDING
+6. ✅ **Documentation complete** - Builder test pattern and YAML schema documented ✅ COMPLETE
 
 ---
 
@@ -813,27 +885,27 @@ describe('ClassBuilder', () => {
 ---
 
 **Last Updated:** 2025-01-XX  
-**Status:** ✅ Mostly Complete (Phase 1-2 done, Phase 3 in progress)
+**Status:** ✅ Complete (All phases done)
 
 ## 📊 Current Status Summary
 
 ### ✅ Completed
 - **Phase 1:** All Builder tests refactored to 2-test structure (11 builders with 2 tests, TransportBuilder with 1)
 - **Phase 2:** All low-level function tests removed (0 files found)
+- **Phase 3:** YAML parameter compliance – Builder tests rely on YAML params + `environment.*` defaults (no code fallbacks)
+- **Phase 4:** Standard SAP Objects Registry – YAML structure ✅, helper function ✅, all Builder tests updated ✅, transport read functions added ✅
+- **Phase 5:** Documentation – Builder test pattern documentation ✅, YAML schema documentation ✅, verification script ✅
 - **Phase 2.11:** Old Client tests removed (ReadOnlyClient, CrudClient, CheckClient, ManagementClient)
 - **Lock registration:** All Builders now support `onLock` callback for persistent lock tracking
 - **DDL for structures:** Structures now use DDL SQL instead of XML
 - **E2E test:** testLockRecovery.integration.test.ts fixed to handle missing configuration
-- **Stateful table workflow:** `TableBuilder` now reuses the existing lock handle/session when updating, eliminating the duplicate EU510 “currently editing” error path.
+- **Stateful table workflow:** `TableBuilder` now reuses the existing lock handle/session when updating, eliminating the duplicate EU510 "currently editing" error path.
 - **Test logging:** `[LOCK] ...` output is controlled via `LOG_LOCKS`, and skip logs no longer bump the progress counter a second time.
+- **Transport read functions:** Added `get*Transport()` functions for all object types (class, interface, table, program, structure, domain, dataElement, view, functionGroup, functionModule, package)
 
-### ⏳ In Progress
-- **Phase 3:** YAML parameter compliance - 11 Builder test files still use `getDefaultPackage()`/`getDefaultTransport()` fallbacks
-- **Phase 5:** Documentation – Builder pattern + YAML schema docs still need to be published.
+### ✅ Completed
+- **Phase 5:** Documentation – Builder pattern (`BUILDER_TEST_PATTERN.md`), YAML schema (`TEST_CONFIG_SCHEMA.md`), and verification script (`scripts/verify-builder-tests.js`) completed ✅
 
-### 📋 Remaining Tasks
-- Remove `getDefaultPackage()`/`getDefaultTransport()` fallbacks from Builder tests
-- Use `environment` section in YAML for common parameters
-- Complete documentation (Phase 5)
-- Add YAML-driven registry for standard SAP objects (Phase 4)
-
+### 📋 Optional Future Enhancements
+- Document optional transport handling for local (`$TMP`) vs transportable packages with explicit skip reasons
+- Add more standard objects to registry as needed

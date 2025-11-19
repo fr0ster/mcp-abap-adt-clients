@@ -2,8 +2,9 @@
  * FunctionModule read operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -45,4 +46,31 @@ export async function getFunction(
   version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {
   return getFunctionSource(connection, functionName, functionGroup, version);
+}
+
+/**
+ * Get transport request for ABAP function module
+ * @param connection - SAP connection
+ * @param functionName - Function module name
+ * @param functionGroup - Function group name
+ * @returns Transport request information
+ */
+export async function getFunctionModuleTransport(
+  connection: AbapConnection,
+  functionName: string,
+  functionGroup: string
+): Promise<AxiosResponse> {
+  const baseUrl = await connection.getBaseUrl();
+  const encodedGroup = encodeSapObjectName(functionGroup);
+  const encodedName = encodeSapObjectName(functionName);
+  const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/transport`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    }
+  });
 }

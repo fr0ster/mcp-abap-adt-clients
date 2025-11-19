@@ -131,11 +131,24 @@ export class TransportBuilder {
     }
   }
 
-  async read(transportNumber: string): Promise<this> {
+  async read(transportNumber?: string): Promise<this> {
     try {
-      this.logger.info?.('Reading transport request:', transportNumber);
-      const result = await getTransport(this.connection, transportNumber);
+      // If transportNumber not provided, try to use from state (after create)
+      const numberToRead = transportNumber || this.state.transportNumber;
+
+      if (!numberToRead) {
+        throw new Error('Transport number is required. Provide transportNumber parameter or create transport first.');
+      }
+
+      this.logger.info?.('Reading transport request:', numberToRead);
+      const result = await getTransport(this.connection, numberToRead);
       this.state.readResult = result;
+
+      // Update transportNumber in state if it was read from parameter
+      if (transportNumber && transportNumber !== this.state.transportNumber) {
+        this.state.transportNumber = transportNumber;
+      }
+
       this.logger.info?.('Transport request read successfully:', result.status);
       return this;
     } catch (error: any) {

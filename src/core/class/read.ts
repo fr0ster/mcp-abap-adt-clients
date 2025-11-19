@@ -49,3 +49,27 @@ export async function getClass(
   return getClassSource(connection, className, version);
 }
 
+/**
+ * Get transport request for ABAP class
+ * @param connection - SAP connection
+ * @param className - Class name
+ * @returns Transport request information
+ */
+export async function getClassTransport(
+  connection: AbapConnection,
+  className: string
+): Promise<AxiosResponse> {
+  const baseUrl = await connection.getBaseUrl();
+  const encodedName = encodeSapObjectName(className);
+  const url = `${baseUrl}/sap/bc/adt/oo/classes/${encodedName}/transport`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    }
+  });
+}
+

@@ -10,6 +10,7 @@ import { ClassBuilder, ClassBuilderLogger } from '../../../core/class';
 import { deleteObject } from '../../../core/delete';
 import { unlockClass } from '../../../core/class/unlock';
 import { validateClassName } from '../../../core/class/validation';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -28,9 +29,11 @@ import * as dotenv from 'dotenv';
 
 const {
   getEnabledTestCase,
-  getDefaultPackage,
-  getDefaultTransport,
-  getTestCaseDefinition
+  getTestCaseDefinition,
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -58,13 +61,14 @@ const builderLogger: ClassBuilderLogger = {
 describe('ClassBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
   let sessionId: string | null = null;
   let testConfig: any = null;
   let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeAll(async () => {
     // Count total tests for progress tracking
-    const testCount = 2; // Full workflow + Read standard object
+    const testCount = 3; // Full workflow + Read standard object + Read transport request
     setTotalTests(testCount);
     try {
       const config = getConfig();
@@ -94,6 +98,8 @@ describe('ClassBuilder', () => {
       await (connection as any).connect();
 
       hasConfig = true;
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -186,12 +192,18 @@ describe('ClassBuilder', () => {
         return;
       }
 
+      const packageCheck = ensurePackageConfig(tc.params, 'ClassBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
+        return;
+      }
+
       testCase = tc;
       testClassName = tc.params.class_name;
 
       // Cleanup before test
       if (testClassName) {
-        const packageName = tc.params.package_name || getDefaultPackage();
+        const packageName = resolvePackageName(tc.params.package_name);
         const cleanup = await ensureClassReady(testClassName, packageName);
         if (!cleanup.success) {
           skipReason = cleanup.reason || 'Failed to cleanup class before test';
@@ -202,9 +214,9 @@ describe('ClassBuilder', () => {
     });
 
     afterEach(async () => {
-      if (testClassName && connection) {
+      if (testClassName && connection && testCase?.params) {
         // Cleanup after test
-        const packageName = testCase?.params.package_name || getDefaultPackage();
+        const packageName = resolvePackageName(testCase.params.package_name);
         const cleanup = await ensureClassReady(testClassName, packageName);
         if (!cleanup.success && cleanup.reason) {
           if (debugEnabled) {
@@ -228,13 +240,17 @@ describe('ClassBuilder', () => {
         return;
       }
 
-      const testPackageName = testCase.params.package_name || getDefaultPackage();
+      const testPackageName = resolvePackageName(testCase.params.package_name);
+      if (!testPackageName) {
+        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', 'package_name not configured');
+        return;
+      }
       const sourceCode = testCase.params.source_code || `CLASS ${testClassName} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
 
         const builder = new ClassBuilder(connection, builderLogger, {
           className: testClassName,
           packageName: testPackageName,
-          transportRequest: testCase.params.transport_request || getDefaultTransport(),
+          transportRequest: resolveTransportRequest(testCase.params.transport_request),
       }).setCode(sourceCode);
 
       try {
@@ -292,7 +308,20 @@ describe('ClassBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP class', async () => {
-      const standardClassName = 'CL_ABAP_CHAR_UTILITIES'; // Standard SAP class
+      const testCase = getTestCaseDefinition('create_class', 'builder_class');
+      const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'ClassBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(builderLogger, 'ClassBuilder - read standard object',
+          `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+        return;
+      }
+
+      const standardClassName = standardObject.name;
       logBuilderTestStart(builderLogger, 'ClassBuilder - read standard object', {
         name: 'read_standard',
         params: { class_name: standardClassName }
@@ -327,6 +356,73 @@ describe('ClassBuilder', () => {
         throw error;
       } finally {
         logBuilderTestEnd(builderLogger, 'ClassBuilder - read standard object');
+      }
+    }, getTimeout('test'));
+  });
+
+  describe('Read transport request', () => {
+    it('should read transport request for class', async () => {
+      const testCase = getTestCaseDefinition('create_class', 'builder_class');
+      const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'ClassBuilder - read transport request', {
+          name: 'read_transport',
+          params: {}
+        });
+        logBuilderTestSkip(builderLogger, 'ClassBuilder - read transport request',
+          `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+        return;
+      }
+
+      const standardClassName = standardObject.name;
+
+      // Check if transport_request is configured in YAML
+      const transportRequest = resolveTransportRequest(testCase?.params?.transport_request);
+      if (!transportRequest) {
+        logBuilderTestStart(builderLogger, 'ClassBuilder - read transport request', {
+          name: 'read_transport',
+          params: { class_name: standardClassName }
+        });
+        logBuilderTestSkip(builderLogger, 'ClassBuilder - read transport request',
+          'transport_request not configured in test-config.yaml (required for transport read test)');
+        return;
+      }
+
+      logBuilderTestStart(builderLogger, 'ClassBuilder - read transport request', {
+        name: 'read_transport',
+        params: { class_name: standardClassName, transport_request: transportRequest }
+      });
+
+      if (!hasConfig) {
+        logBuilderTestSkip(builderLogger, 'ClassBuilder - read transport request', 'No SAP configuration');
+        return;
+      }
+
+      const builder = new ClassBuilder(
+        connection,
+        builderLogger,
+        {
+          className: standardClassName,
+          packageName: 'SAP' // Standard package
+        }
+      );
+
+      try {
+        logBuilderTestStep('readTransport');
+        await builder.readTransport();
+
+        const result = builder.getTransportResult();
+        expect(result).toBeDefined();
+        expect(result?.status).toBe(200);
+        expect(result?.data).toBeDefined();
+
+        logBuilderTestSuccess(builderLogger, 'ClassBuilder - read transport request');
+      } catch (error) {
+        logBuilderTestError(builderLogger, 'ClassBuilder - read transport request', error);
+        throw error;
+      } finally {
+        logBuilderTestEnd(builderLogger, 'ClassBuilder - read transport request');
       }
     }, getTimeout('test'));
   });

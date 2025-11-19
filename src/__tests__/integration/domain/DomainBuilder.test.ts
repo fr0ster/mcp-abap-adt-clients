@@ -9,6 +9,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { DomainBuilder, DomainBuilderLogger } from '../../../core/domain';
 import { deleteDomain } from '../../../core/domain/delete';
 import { getDomain } from '../../../core/domain/read';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestStart,
@@ -25,8 +26,10 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
-  getDefaultPackage,
-  getDefaultTransport,
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject,
   getTimeout
 } = require('../../../../tests/test-helper');
 
@@ -54,6 +57,7 @@ const builderLogger: DomainBuilderLogger = {
 describe('DomainBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
@@ -61,6 +65,8 @@ describe('DomainBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -82,7 +88,7 @@ describe('DomainBuilder', () => {
     try {
       await deleteDomain(connection, {
         domain_name: domainName,
-        transport_request: getDefaultTransport() || undefined
+        transport_request: resolveTransportRequest(undefined) || undefined
       });
     } catch (error) {
       // Ignore all errors (404, locked, etc.)
@@ -97,10 +103,14 @@ describe('DomainBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const packageName = resolvePackageName(params.package_name);
+    if (!packageName) {
+      throw new Error('package_name not configured for DomainBuilder test');
+    }
     return {
       domainName: params.domain_name,
-      packageName: params.package_name || getDefaultPackage(),
-      transportRequest: params.transport_request || getDefaultTransport(),
+      packageName,
+      transportRequest: resolveTransportRequest(params.transport_request),
       description: params.description,
       datatype: params.datatype || 'CHAR',
       length: params.length || 10,
@@ -137,6 +147,12 @@ describe('DomainBuilder', () => {
       const tc = getEnabledTestCase('create_domain', 'builder_domain');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'DomainBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -237,7 +253,20 @@ describe('DomainBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP domain', async () => {
-      const standardDomainName = 'MANDT'; // Standard SAP domain (exists in most ABAP systems)
+      const testCase = getTestCaseDefinition('create_domain', 'builder_domain');
+      const standardObject = resolveStandardObject('domain', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'DomainBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(builderLogger, 'DomainBuilder - read standard object',
+          `Standard domain not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+        return;
+      }
+
+      const standardDomainName = standardObject.name;
       logBuilderTestStart(builderLogger, 'DomainBuilder - read standard object', {
         name: 'read_standard',
         params: { domain_name: standardDomainName }

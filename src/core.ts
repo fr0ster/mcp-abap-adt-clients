@@ -119,6 +119,15 @@ export * from './core/view/activation';
 export * from './core/view/check';
 export * from './core/view/validation';
 
+// Package operations
+export * from './core/package/read';
+export * from './core/package/create';
+export * from './core/package/update';
+export * from './core/package/lock';
+export * from './core/package/unlock';
+export * from './core/package/check';
+export * from './core/package/validation';
+
 // Transport operations
 export * from './core/transport/create';
 export * from './core/transport/read';

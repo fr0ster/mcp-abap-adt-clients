@@ -44,7 +44,7 @@ import { activateDomain } from './activation';
 import { FixedValue } from './types';
 import { validateObjectName, ValidationResult } from '../shared/validation';
 import { getSystemInformation } from '../shared/systemInfo';
-import { getDomain } from './read';
+import { getDomain, getDomainTransport } from './read';
 
 export interface DomainBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -81,6 +81,7 @@ export interface DomainBuilderState {
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
   readResult?: AxiosResponse;
+  transportResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -445,6 +446,24 @@ export class DomainBuilder {
     }
   }
 
+  async readTransport(): Promise<this> {
+    try {
+      this.logger.info?.('Reading transport request for domain:', this.config.domainName);
+      const result = await getDomainTransport(this.connection, this.config.domainName);
+      this.state.transportResult = result;
+      this.logger.info?.('Transport request read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'readTransport',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read transport failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -504,6 +523,10 @@ export class DomainBuilder {
 
   getReadResult(): AxiosResponse | undefined {
     return this.state.readResult;
+  }
+
+  getTransportResult(): AxiosResponse | undefined {
+    return this.state.transportResult;
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

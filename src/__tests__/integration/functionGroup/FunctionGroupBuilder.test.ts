@@ -9,6 +9,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { FunctionGroupBuilder, FunctionGroupBuilderLogger } from '../../../core/functionGroup';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
@@ -26,9 +27,11 @@ import * as dotenv from 'dotenv';
 
 const {
   getEnabledTestCase,
-  getDefaultPackage,
-  getDefaultTransport,
-  getTestCaseDefinition
+  getTestCaseDefinition,
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -56,6 +59,7 @@ const builderLogger: FunctionGroupBuilderLogger = {
 describe('FunctionGroupBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     // Count total tests for progress tracking
@@ -67,6 +71,8 @@ describe('FunctionGroupBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -89,7 +95,7 @@ describe('FunctionGroupBuilder', () => {
     try {
       await deleteFunctionGroup(connection, {
         function_group_name: functionGroupName,
-        transport_request: getDefaultTransport() || undefined
+        transport_request: resolveTransportRequest(undefined) || undefined
       });
     } catch (error) {
       // Ignore all errors (404, locked, etc.)
@@ -104,10 +110,14 @@ describe('FunctionGroupBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const packageName = resolvePackageName(params.package_name);
+    if (!packageName) {
+      throw new Error('package_name not configured for FunctionGroupBuilder test');
+    }
     return {
       functionGroupName: params.function_group_name,
-      packageName: params.package_name || getDefaultPackage(),
-      transportRequest: params.transport_request || getDefaultTransport(),
+      packageName,
+      transportRequest: resolveTransportRequest(params.transport_request),
       description: params.description
     };
   }
@@ -136,6 +146,12 @@ describe('FunctionGroupBuilder', () => {
       const tc = getEnabledTestCase('create_function_group', 'builder_function_group');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'FunctionGroupBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -228,7 +244,23 @@ describe('FunctionGroupBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP function group', async () => {
-      const standardFunctionGroupName = 'SYST'; // Standard SAP function group (exists in most ABAP systems)
+      const testCase = getTestCaseDefinition('create_function_group', 'builder_function_group');
+      const standardObject = resolveStandardObject('function_group', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(
+          builderLogger,
+          'FunctionGroupBuilder - read standard object',
+          `Standard function group not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`
+        );
+        return;
+      }
+
+      const standardFunctionGroupName = standardObject.name;
       logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - read standard object', {
         name: 'read_standard',
         params: { function_group_name: standardFunctionGroupName }
@@ -239,14 +271,10 @@ describe('FunctionGroupBuilder', () => {
         return;
       }
 
-      const builder = new FunctionGroupBuilder(
-        connection,
-        builderLogger,
-        {
-          functionGroupName: standardFunctionGroupName,
-          packageName: 'SAP' // Standard package
-        }
-      );
+      const builder = new FunctionGroupBuilder(connection, builderLogger, {
+        functionGroupName: standardFunctionGroupName,
+        packageName: 'SAP' // Standard package
+      });
 
       try {
         logBuilderTestStep('read');

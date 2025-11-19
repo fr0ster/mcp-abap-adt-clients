@@ -2,8 +2,9 @@
  * Program read operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -36,5 +37,29 @@ export async function getProgram(
   programName: string
 ): Promise<AxiosResponse> {
   return getProgramSource(connection, programName);
+}
+
+/**
+ * Get transport request for ABAP program
+ * @param connection - SAP connection
+ * @param programName - Program name
+ * @returns Transport request information
+ */
+export async function getProgramTransport(
+  connection: AbapConnection,
+  programName: string
+): Promise<AxiosResponse> {
+  const baseUrl = await connection.getBaseUrl();
+  const encodedName = encodeSapObjectName(programName);
+  const url = `${baseUrl}/sap/bc/adt/programs/programs/${encodedName}/transport`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    }
+  });
 }
 

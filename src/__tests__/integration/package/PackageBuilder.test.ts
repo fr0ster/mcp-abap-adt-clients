@@ -8,6 +8,7 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { PackageBuilder, PackageBuilderLogger } from '../../../core/package';
 import { getPackage } from '../../../core/package/read';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
@@ -24,7 +25,8 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
-  getDefaultPackage
+  resolvePackageName,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -52,6 +54,7 @@ const builderLogger: PackageBuilderLogger = {
 describe('PackageBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
@@ -59,6 +62,8 @@ describe('PackageBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system (for environment-specific standard packages)
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -106,9 +111,13 @@ describe('PackageBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const superPackage = params.super_package || resolvePackageName(undefined);
+    if (!superPackage) {
+      throw new Error('super_package not configured for PackageBuilder test');
+    }
     return {
       packageName: params.package_name,
-      superPackage: params.super_package || getDefaultPackage(),
+      superPackage,
       description: params.description,
       packageType: params.package_type || 'development',
       softwareComponent: params.software_component,
@@ -144,6 +153,15 @@ describe('PackageBuilder', () => {
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
+      }
+
+      const parentPackage = tc.params.super_package || resolvePackageName(undefined);
+      if (!parentPackage) {
+        skipReason = 'Super package is not configured. Set params.super_package or environment.default_package';
+        return;
+      }
+      if (!tc.params.super_package) {
+        tc.params.super_package = parentPackage;
       }
 
       testCase = tc;
@@ -231,8 +249,23 @@ describe('PackageBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP package', async () => {
-      // Standard SAP package (exists in most ABAP systems)
-      const standardPackageName = '$TMP';
+      const testCase = getTestCaseDefinition('create_package', 'builder_package');
+      const standardObject = resolveStandardObject('package', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'PackageBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(
+          builderLogger,
+          'PackageBuilder - read standard object',
+          `Standard package not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`
+        );
+        return;
+      }
+
+      const standardPackageName = standardObject.name;
       logBuilderTestStart(builderLogger, 'PackageBuilder - read standard object', {
         name: 'read_standard',
         params: { package_name: standardPackageName }
@@ -243,14 +276,11 @@ describe('PackageBuilder', () => {
         return;
       }
 
-      const builder = new PackageBuilder(
-        connection,
-        builderLogger,
-        {
-          packageName: standardPackageName,
-          superPackage: '$TMP' // Use same package as super (for read test, this is not used)
-        }
-      );
+      const builder = new PackageBuilder(connection, builderLogger, {
+        packageName: standardPackageName,
+        // superPackage is not used in read mode, fallback to resolved package
+        superPackage: standardObject.superPackage || '$TMP'
+      });
 
       try {
         logBuilderTestStep('read');

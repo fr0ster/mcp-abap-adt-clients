@@ -9,6 +9,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { StructureBuilder, StructureBuilderLogger } from '../../../core/structure';
 import { deleteStructure } from '../../../core/structure/delete';
 import { unlockStructure } from '../../../core/structure/unlock';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -26,8 +27,10 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
-  getDefaultPackage,
-  getDefaultTransport
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -55,6 +58,7 @@ const builderLogger: StructureBuilderLogger = {
 describe('StructureBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
@@ -62,6 +66,8 @@ describe('StructureBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -127,10 +133,14 @@ describe('StructureBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const packageName = resolvePackageName(params.package_name);
+    if (!packageName) {
+      throw new Error('package_name not configured for StructureBuilder test');
+    }
     return {
       structureName: params.structure_name,
-      packageName: params.package_name || getDefaultPackage(),
-      transportRequest: params.transport_request || getDefaultTransport(),
+      packageName,
+      transportRequest: resolveTransportRequest(params.transport_request),
       description: params.description,
       ddlCode: params.ddl_code
     };
@@ -160,6 +170,12 @@ describe('StructureBuilder', () => {
       const tc = getEnabledTestCase('create_structure', 'builder_structure');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'StructureBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -273,8 +289,20 @@ describe('StructureBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP structure', async () => {
-      // Standard SAP structure (exists in most ABAP systems)
-      const standardStructureName = 'SYST';
+      const testCase = getTestCaseDefinition('create_structure', 'builder_structure');
+      const standardObject = resolveStandardObject('structure', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'StructureBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(builderLogger, 'StructureBuilder - read standard object',
+          `Standard structure not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+        return;
+      }
+
+      const standardStructureName = standardObject.name;
       logBuilderTestStart(builderLogger, 'StructureBuilder - read standard object', {
         name: 'read_standard',
         params: { structure_name: standardStructureName }

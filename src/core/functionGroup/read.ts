@@ -22,3 +22,27 @@ export async function getFunctionGroup(connection: AbapConnection, functionGroup
   });
 }
 
+/**
+ * Get transport request for ABAP function group
+ * @param connection - SAP connection
+ * @param functionGroupName - Function group name
+ * @returns Transport request information
+ */
+export async function getFunctionGroupTransport(
+  connection: AbapConnection,
+  functionGroupName: string
+): Promise<AxiosResponse> {
+  const baseUrl = await connection.getBaseUrl();
+  const encodedName = encodeSapObjectName(functionGroupName);
+  const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedName}/transport`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    }
+  });
+}
+

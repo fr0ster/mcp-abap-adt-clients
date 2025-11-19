@@ -9,6 +9,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { InterfaceBuilder, InterfaceBuilderLogger } from '../../../core/interface';
 import { deleteInterface } from '../../../core/interface/delete';
 import { unlockInterface } from '../../../core/interface/unlock';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -27,8 +28,10 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
-  getDefaultPackage,
-  getDefaultTransport
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -56,6 +59,7 @@ const builderLogger: InterfaceBuilderLogger = {
 describe('InterfaceBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
@@ -63,6 +67,8 @@ describe('InterfaceBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -128,10 +134,14 @@ describe('InterfaceBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const packageName = resolvePackageName(params.package_name);
+    if (!packageName) {
+      throw new Error('package_name not configured for InterfaceBuilder test');
+    }
     return {
       interfaceName: params.interface_name,
-      packageName: params.package_name || getDefaultPackage(),
-      transportRequest: params.transport_request || getDefaultTransport(),
+      packageName,
+      transportRequest: resolveTransportRequest(params.transport_request),
       description: params.description,
       sourceCode: params.source_code
     };
@@ -161,6 +171,12 @@ describe('InterfaceBuilder', () => {
       const tc = getEnabledTestCase('create_interface', 'builder_interface');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'InterfaceBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -285,7 +301,23 @@ describe('InterfaceBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP interface', async () => {
-      const standardInterfaceName = 'IF_HTTP_CLIENT'; // Standard SAP interface (exists in most ABAP systems)
+      const testCase = getTestCaseDefinition('create_interface', 'builder_interface');
+      const standardObject = resolveStandardObject('interface', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'InterfaceBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(
+          builderLogger,
+          'InterfaceBuilder - read standard object',
+          `Standard interface not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`
+        );
+        return;
+      }
+
+      const standardInterfaceName = standardObject.name;
       logBuilderTestStart(builderLogger, 'InterfaceBuilder - read standard object', {
         name: 'read_standard',
         params: { interface_name: standardInterfaceName }
@@ -296,14 +328,10 @@ describe('InterfaceBuilder', () => {
         return;
       }
 
-      const builder = new InterfaceBuilder(
-        connection,
-        builderLogger,
-        {
-          interfaceName: standardInterfaceName,
-          packageName: 'SAP' // Standard package
-        }
-      );
+      const builder = new InterfaceBuilder(connection, builderLogger, {
+        interfaceName: standardInterfaceName,
+        packageName: 'SAP' // Standard package
+      });
 
       try {
         logBuilderTestStep('read');

@@ -12,6 +12,7 @@ import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { unlockFunctionModule } from '../../../core/functionModule/unlock';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { LockStateManager } from '../../../utils/lockStateManager';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
@@ -30,8 +31,10 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
-  getDefaultPackage,
-  getDefaultTransport
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -59,6 +62,7 @@ const builderLogger: FunctionModuleBuilderLogger = {
 describe('FunctionModuleBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
@@ -66,6 +70,8 @@ describe('FunctionModuleBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -193,7 +199,7 @@ describe('FunctionModuleBuilder', () => {
     try {
       await deleteFunctionGroup(connection, {
         function_group_name: functionGroupName,
-        transport_request: getDefaultTransport() || undefined
+        transport_request: resolveTransportRequest(undefined) || undefined
       });
     } catch (error) {
       // Ignore all errors (404, locked, etc.)
@@ -235,6 +241,12 @@ describe('FunctionModuleBuilder', () => {
         return;
       }
 
+      const packageCheck = ensurePackageConfig(tc.params, 'FunctionModuleBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
+        return;
+      }
+
       testCase = tc;
       functionGroupName = tc.params.function_group_name;
       functionModuleName = tc.params.function_module_name;
@@ -253,8 +265,8 @@ describe('FunctionModuleBuilder', () => {
 
       // Ensure Function Group exists before test
       if (functionGroupName) {
-        const packageName = tc.params.package_name || getDefaultPackage();
-        const transportRequest = tc.params.transport_request || getDefaultTransport();
+        const packageName = resolvePackageName(tc.params.package_name);
+        const transportRequest = resolveTransportRequest(tc.params.transport_request);
         const setup = await ensureFunctionGroupExists(functionGroupName, packageName, transportRequest);
         if (!setup.success) {
           skipReason = setup.reason || 'Failed to setup Function Group';
@@ -291,12 +303,17 @@ describe('FunctionModuleBuilder', () => {
 
       let builder: FunctionModuleBuilder | null = null;
       try {
+        const packageName = resolvePackageName(testCase.params.package_name);
+        if (!packageName) {
+          logBuilderTestSkip(builderLogger, 'FunctionModuleBuilder - full workflow', 'package_name not configured');
+          return;
+        }
         builder = new FunctionModuleBuilder(connection, builderLogger, {
           functionGroupName,
           functionModuleName,
           sourceCode: testCase.params.source_code,
-          packageName: testCase.params.package_name || getDefaultPackage(),
-          transportRequest: testCase.params.transport_request || getDefaultTransport(),
+          packageName,
+          transportRequest: resolveTransportRequest(testCase.params.transport_request),
           description: testCase.params.description,
           onLock: createOnLockCallback('fm', functionModuleName, functionGroupName, __filename)
         });
@@ -368,9 +385,24 @@ describe('FunctionModuleBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP function module', async () => {
-      // Standard SAP function module (exists in most ABAP systems)
-      const standardFunctionGroupName = 'SYST'; // Standard SAP function group
-      const standardFunctionModuleName = 'SYSTEM_INFO'; // Standard SAP function module (in SYST group)
+      const testCase = getTestCaseDefinition('create_function_module', 'builder_function_module');
+      const standardObject = resolveStandardObject('function_module', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'FunctionModuleBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(
+          builderLogger,
+          'FunctionModuleBuilder - read standard object',
+          `Standard function module not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`
+        );
+        return;
+      }
+
+      const standardFunctionGroupName = standardObject.group || 'SYST';
+      const standardFunctionModuleName = standardObject.name;
       logBuilderTestStart(builderLogger, 'FunctionModuleBuilder - read standard object', {
         name: 'read_standard',
         params: {
@@ -384,15 +416,11 @@ describe('FunctionModuleBuilder', () => {
         return;
       }
 
-      const builder = new FunctionModuleBuilder(
-        connection,
-        builderLogger,
-        {
-          functionGroupName: standardFunctionGroupName,
-          functionModuleName: standardFunctionModuleName,
-          sourceCode: '' // Not needed for read
-        }
-      );
+      const builder = new FunctionModuleBuilder(connection, builderLogger, {
+        functionGroupName: standardFunctionGroupName,
+        functionModuleName: standardFunctionModuleName,
+        sourceCode: '' // Not needed for read
+      });
 
       try {
         logBuilderTestStep('read');

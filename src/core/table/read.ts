@@ -2,8 +2,9 @@
  * Table read operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -36,5 +37,29 @@ export async function getTable(
   tableName: string
 ): Promise<AxiosResponse> {
   return getTableSource(connection, tableName);
+}
+
+/**
+ * Get transport request for ABAP table
+ * @param connection - SAP connection
+ * @param tableName - Table name
+ * @returns Transport request information
+ */
+export async function getTableTransport(
+  connection: AbapConnection,
+  tableName: string
+): Promise<AxiosResponse> {
+  const baseUrl = await connection.getBaseUrl();
+  const encodedName = encodeSapObjectName(tableName);
+  const url = `${baseUrl}/sap/bc/adt/ddic/tables/${encodedName}/transport`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    }
+  });
 }
 

@@ -2,8 +2,9 @@
  * Interface read operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -36,5 +37,29 @@ export async function getInterface(
   interfaceName: string
 ): Promise<AxiosResponse> {
   return getInterfaceSource(connection, interfaceName);
+}
+
+/**
+ * Get transport request for ABAP interface
+ * @param connection - SAP connection
+ * @param interfaceName - Interface name
+ * @returns Transport request information
+ */
+export async function getInterfaceTransport(
+  connection: AbapConnection,
+  interfaceName: string
+): Promise<AxiosResponse> {
+  const baseUrl = await connection.getBaseUrl();
+  const encodedName = encodeSapObjectName(interfaceName);
+  const url = `${baseUrl}/sap/bc/adt/oo/interfaces/${encodedName}/transport`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    }
+  });
 }
 

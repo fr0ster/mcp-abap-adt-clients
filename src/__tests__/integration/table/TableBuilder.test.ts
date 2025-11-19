@@ -9,6 +9,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { TableBuilder, TableBuilderLogger } from '../../../core/table';
 import { deleteTable } from '../../../core/table/delete';
 import { unlockTable } from '../../../core/table/unlock';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -27,8 +28,10 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
-  getDefaultPackage,
-  getDefaultTransport
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -56,6 +59,7 @@ const builderLogger: TableBuilderLogger = {
 describe('TableBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
@@ -63,6 +67,8 @@ describe('TableBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -128,10 +134,14 @@ describe('TableBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const packageName = resolvePackageName(params.package_name);
+    if (!packageName) {
+      throw new Error('package_name not configured for TableBuilder test');
+    }
     return {
       tableName: params.table_name,
-      packageName: params.package_name || getDefaultPackage(),
-      transportRequest: params.transport_request || getDefaultTransport(),
+      packageName,
+      transportRequest: resolveTransportRequest(params.transport_request),
       description: params.description,
       ddlCode: params.ddl_code
     };
@@ -161,6 +171,12 @@ describe('TableBuilder', () => {
       const tc = getEnabledTestCase('create_table', 'builder_table');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'TableBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -289,12 +305,24 @@ describe('TableBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP table', async () => {
-      // Standard SAP table (exists in most ABAP systems)
-      const standardTableName = 'T000';
+      const testCase = getTestCaseDefinition('create_table', 'builder_table');
+      const standardObject = resolveStandardObject('table', isCloudSystem, testCase);
+
+      if (!standardObject) {
         logBuilderTestStart(builderLogger, 'TableBuilder - read standard object', {
           name: 'read_standard',
-          params: { table_name: standardTableName }
+          params: {}
         });
+        logBuilderTestSkip(builderLogger, 'TableBuilder - read standard object',
+          `Standard table not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+        return;
+      }
+
+      const standardTableName = standardObject.name;
+      logBuilderTestStart(builderLogger, 'TableBuilder - read standard object', {
+        name: 'read_standard',
+        params: { table_name: standardTableName }
+      });
 
       if (!hasConfig) {
         logBuilderTestSkip(builderLogger, 'TableBuilder - read standard object', 'No SAP configuration');

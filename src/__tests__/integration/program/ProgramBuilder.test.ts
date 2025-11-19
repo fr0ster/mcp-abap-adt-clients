@@ -26,8 +26,10 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition,
-  getDefaultPackage,
-  getDefaultTransport
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -98,10 +100,14 @@ describe('ProgramBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const packageName = resolvePackageName(params.package_name);
+    if (!packageName) {
+      throw new Error('package_name not configured for ProgramBuilder test');
+    }
     return {
       programName: params.program_name,
-      packageName: params.package_name || getDefaultPackage(),
-      transportRequest: params.transport_request || getDefaultTransport(),
+      packageName,
+      transportRequest: resolveTransportRequest(params.transport_request),
       description: params.description,
       programType: params.program_type,
       sourceCode: params.source_code
@@ -137,6 +143,12 @@ describe('ProgramBuilder', () => {
       const tc = getEnabledTestCase('create_program', 'builder_program');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'ProgramBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -237,13 +249,6 @@ describe('ProgramBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP program', async () => {
-      // Standard SAP program (exists in most ABAP systems)
-      const standardProgramName = 'SAPLSETT'; // Standard SAP program (Settings)
-      logBuilderTestStart(builderLogger, 'ProgramBuilder - read standard object', {
-        name: 'read_standard',
-        params: { program_name: standardProgramName }
-      });
-
       if (!hasConfig) {
         logBuilderTestSkip(builderLogger, 'ProgramBuilder - read standard object', 'No SAP configuration');
         return;
@@ -254,14 +259,32 @@ describe('ProgramBuilder', () => {
         return;
       }
 
-      const builder = new ProgramBuilder(
-        connection,
-        builderLogger,
-        {
-          programName: standardProgramName,
-          packageName: 'SAP' // Standard package
-        }
-      );
+      const testCase = getTestCaseDefinition('create_program', 'builder_program');
+      const standardObject = resolveStandardObject('program', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'ProgramBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(
+          builderLogger,
+          'ProgramBuilder - read standard object',
+          'Standard program not configured for on-premise environment'
+        );
+        return;
+      }
+
+      const standardProgramName = standardObject.name;
+      logBuilderTestStart(builderLogger, 'ProgramBuilder - read standard object', {
+        name: 'read_standard',
+        params: { program_name: standardProgramName }
+      });
+
+      const builder = new ProgramBuilder(connection, builderLogger, {
+        programName: standardProgramName,
+        packageName: 'SAP' // Standard package
+      });
 
       try {
         logBuilderTestStep('read');

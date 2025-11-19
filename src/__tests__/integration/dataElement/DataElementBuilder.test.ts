@@ -9,6 +9,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { DataElementBuilder, DataElementBuilderLogger } from '../../../core/dataElement';
 import { deleteDataElement } from '../../../core/dataElement/delete';
 import { unlockDataElement } from '../../../core/dataElement/unlock';
+import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -27,9 +28,11 @@ import * as dotenv from 'dotenv';
 
 const {
   getEnabledTestCase,
-  getDefaultPackage,
-  getDefaultTransport,
-  getTestCaseDefinition
+  getTestCaseDefinition,
+  resolvePackageName,
+  resolveTransportRequest,
+  ensurePackageConfig,
+  resolveStandardObject
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -57,6 +60,7 @@ const builderLogger: DataElementBuilderLogger = {
 describe('DataElementBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     // Count total tests for progress tracking
@@ -67,6 +71,8 @@ describe('DataElementBuilder', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      // Check if this is a cloud system
+      isCloudSystem = await isCloudEnvironment(connection);
       hasConfig = true;
     } catch (error) {
       builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -109,7 +115,7 @@ describe('DataElementBuilder', () => {
     try {
       await deleteDataElement(connection, {
         data_element_name: dataElementName,
-        transport_request: getDefaultTransport() || undefined
+        transport_request: resolveTransportRequest(undefined) || undefined
       });
       if (debugEnabled) {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted data element ${dataElementName}`);
@@ -137,10 +143,14 @@ describe('DataElementBuilder', () => {
 
   function buildBuilderConfig(testCase: any) {
     const params = testCase?.params || {};
+    const packageName = resolvePackageName(params.package_name);
+    if (!packageName) {
+      throw new Error('package_name not configured for DataElementBuilder test');
+    }
     return {
       dataElementName: params.data_element_name,
-      packageName: params.package_name || getDefaultPackage(),
-      transportRequest: params.transport_request || getDefaultTransport(),
+      packageName,
+      transportRequest: resolveTransportRequest(params.transport_request),
       description: params.description,
       domainName: params.domain_name,
       dataType: params.data_type,
@@ -180,6 +190,12 @@ describe('DataElementBuilder', () => {
       const tc = getEnabledTestCase('create_data_element', 'builder_data_element');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'DataElementBuilder - full workflow');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
         return;
       }
 
@@ -300,7 +316,20 @@ describe('DataElementBuilder', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP data element', async () => {
-      const standardDataElementName = 'MANDT'; // Standard SAP data element (exists in most ABAP systems)
+      const testCase = getTestCaseDefinition('create_data_element', 'builder_data_element');
+      const standardObject = resolveStandardObject('dataElement', isCloudSystem, testCase);
+
+      if (!standardObject) {
+        logBuilderTestStart(builderLogger, 'DataElementBuilder - read standard object', {
+          name: 'read_standard',
+          params: {}
+        });
+        logBuilderTestSkip(builderLogger, 'DataElementBuilder - read standard object',
+          `Standard data element not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+        return;
+      }
+
+      const standardDataElementName = standardObject.name;
       logBuilderTestStart(builderLogger, 'DataElementBuilder - read standard object', {
         name: 'read_standard',
         params: { data_element_name: standardDataElementName }
