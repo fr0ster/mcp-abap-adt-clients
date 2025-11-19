@@ -56,6 +56,7 @@ export interface PackageBuilderConfig {
   transportRequest?: string;
   applicationComponent?: string;
   responsible?: string;
+  sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId
   onLock?: (lockHandle: string, sessionId: string) => void;
@@ -90,7 +91,7 @@ export class PackageBuilder {
     this.config = { ...config };
     this.state = {
       errors: [],
-      sessionId: generateSessionId()
+      sessionId: config.sessionId || generateSessionId()
     };
   }
 

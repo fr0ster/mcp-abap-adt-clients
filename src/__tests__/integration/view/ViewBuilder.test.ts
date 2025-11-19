@@ -17,7 +17,8 @@ import {
   logBuilderTestStart,
   logBuilderTestSuccess,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -249,8 +250,7 @@ describe('ViewBuilder', () => {
 
         logBuilderTestSuccess(builderLogger, 'ViewBuilder - full workflow');
       } catch (error: any) {
-        const status = error.response?.status;
-        const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+        const statusText = getHttpStatusText(error);
         // Extract error message from error object (may be in message or response.data)
         const errorMsg = error.message || '';
         const errorData = error.response?.data || '';
@@ -264,13 +264,13 @@ describe('ViewBuilder', () => {
           logBuilderTestSkip(
             builderLogger,
             'ViewBuilder - full workflow',
-            `View ${viewName} is locked (currently editing, ${statusText})`
+            `View ${viewName} is locked (currently editing, ${statusText}). Details: ${errorMsg}`
           );
           return; // Skip test
         }
 
         // "Already exists" errors should fail the test (cleanup must work)
-        const enhancedError = status
+        const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
         logBuilderTestError(builderLogger, 'ViewBuilder - full workflow', enhancedError);

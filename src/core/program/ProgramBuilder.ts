@@ -37,6 +37,7 @@ export interface ProgramBuilderConfig {
   programType?: string;
   application?: string;
   sourceCode?: string;
+  sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId
   onLock?: (lockHandle: string, sessionId: string) => void;
@@ -72,7 +73,7 @@ export class ProgramBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
-    this.sessionId = generateSessionId();
+    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };

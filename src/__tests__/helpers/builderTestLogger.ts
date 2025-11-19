@@ -5,6 +5,8 @@ export interface BuilderTestLogger {
 }
 
 const debugLogsEnabled = process.env.DEBUG_TESTS === 'true';
+const lockLogsSetting = (process.env.LOG_LOCKS || 'true').toLowerCase();
+const lockLogsEnabled = lockLogsSetting !== 'false' && lockLogsSetting !== '0' && lockLogsSetting !== 'off';
 
 // Track test progress
 let testCounter = 0;
@@ -123,8 +125,8 @@ export function resetTestCounter(): void {
 }
 
 export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testName: string, reason: string): void {
-  testCounter++;
-  const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
+  const currentCounter = testCounter > 0 ? testCounter : 1;
+  const progress = totalTests > 0 ? `[${currentCounter}/${totalTests}]` : `[${currentCounter}]`;
   const message = `${progress} ⏭ SKIP ${testName} – ${reason}`;
   logImmediate(message);
   logger?.warn?.(message);
@@ -184,5 +186,48 @@ export function logBuilderTestStep(step: string): void {
   if (debugLogsEnabled) {
     logImmediate(`  → ${step}`);
   }
+}
+
+export function logBuilderLockEvent(
+  objectType: string,
+  objectName: string,
+  sessionId: string,
+  lockHandle: string
+): void {
+  if (!lockLogsEnabled) {
+    return;
+  }
+  const target = objectType === 'fm' && objectName.includes('/') ? objectName : `${objectType}:${objectName}`;
+  logImmediate(`[LOCK] ${target} (session=${sessionId}, handle=${lockHandle})`);
+}
+
+export function getHttpStatusText(error: any): string {
+  const primaryStatus = typeof error?.response?.status === 'number'
+    ? error.response.status
+    : typeof error?.status === 'number'
+      ? error.status
+      : undefined;
+  if (typeof primaryStatus === 'number') {
+    return `HTTP ${primaryStatus}`;
+  }
+
+  const messageSources: string[] = [];
+  if (typeof error?.message === 'string') {
+    messageSources.push(error.message);
+  }
+  if (typeof error?.response?.statusText === 'string') {
+    messageSources.push(error.response.statusText);
+  }
+  if (typeof error?.response?.data === 'string') {
+    messageSources.push(error.response.data);
+  }
+
+  const combined = messageSources.join(' ');
+  const match = combined.match(/http\s+(\d{3})/i);
+  if (match) {
+    return `HTTP ${match[1]}`;
+  }
+
+  return 'HTTP ?';
 }
 

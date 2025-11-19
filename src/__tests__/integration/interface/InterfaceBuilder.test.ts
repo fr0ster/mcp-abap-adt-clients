@@ -17,7 +17,8 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -250,6 +251,7 @@ describe('InterfaceBuilder', () => {
 
         logBuilderTestSuccess(builderLogger, 'InterfaceBuilder - full workflow');
       } catch (error: any) {
+        const statusText = getHttpStatusText(error);
         // Extract error message from error object (may be in message or response.data)
         const errorMsg = error.message || '';
         const errorData = error.response?.data || '';
@@ -260,13 +262,20 @@ describe('InterfaceBuilder', () => {
         if (fullErrorText.includes('currently editing') ||
             fullErrorText.includes('exceptionresourcenoaccess') ||
             fullErrorText.includes('eu510')) {
-          logBuilderTestSkip(builderLogger, 'InterfaceBuilder - full workflow', `Interface ${interfaceName} is locked (currently editing)`);
+          logBuilderTestSkip(
+            builderLogger,
+            'InterfaceBuilder - full workflow',
+            `Interface ${interfaceName} is locked (currently editing, ${statusText}). Details: ${errorMsg}`
+          );
           return; // Skip test
         }
 
         // "Already exists" errors should fail the test (cleanup must work)
-        logBuilderTestError(builderLogger, 'InterfaceBuilder - full workflow', error);
-        throw error;
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(builderLogger, 'InterfaceBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'InterfaceBuilder - full workflow');

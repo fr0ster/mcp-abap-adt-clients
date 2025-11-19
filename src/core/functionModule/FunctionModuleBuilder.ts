@@ -36,7 +36,8 @@ export interface FunctionModuleBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   description?: string;
-  sourceCode: string;
+  sourceCode?: string;
+  sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId
   onLock?: (lockHandle: string, sessionId: string) => void;
@@ -58,7 +59,7 @@ export class FunctionModuleBuilder {
   private connection: AbapConnection;
   private logger: FunctionModuleBuilderLogger;
   private config: FunctionModuleBuilderConfig;
-  private sourceCode: string;
+  private sourceCode?: string;
   private lockHandle?: string;
   private sessionId: string;
   private state: FunctionModuleBuilderState;
@@ -72,7 +73,7 @@ export class FunctionModuleBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
-    this.sessionId = generateSessionId();
+    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -140,6 +141,9 @@ export class FunctionModuleBuilder {
 
   async create(): Promise<this> {
     try {
+      if (!this.sourceCode) {
+        throw new Error('Source code is required before calling create(). Use setCode().');
+      }
       this.logger.info?.('Creating function module:', this.config.functionModuleName);
       const params: CreateFunctionModuleParams = {
         function_group_name: this.config.functionGroupName,

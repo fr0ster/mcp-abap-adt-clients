@@ -4,6 +4,7 @@
  */
 
 import { getLockStateManager, LockState } from '../../utils/lockStateManager';
+import { logBuilderLockEvent } from './builderTestLogger';
 
 /**
  * Register lock in persistent storage
@@ -86,6 +87,8 @@ export function createOnLockCallback(
   testFile?: string
 ): (lockHandle: string, sessionId: string) => void {
   return (lockHandle: string, sessionId: string) => {
+    const targetName = functionGroupName ? `${functionGroupName}/${objectName}` : objectName;
+    logBuilderLockEvent(objectType, targetName, sessionId, lockHandle);
     registerTestLock(objectType, objectName, sessionId, lockHandle, functionGroupName, testFile);
   };
 }

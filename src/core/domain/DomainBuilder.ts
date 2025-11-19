@@ -66,6 +66,7 @@ export interface DomainBuilderConfig {
   sign_exists?: boolean;
   value_table?: string;
   fixed_values?: FixedValue[];
+  sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId
   onLock?: (lockHandle: string, sessionId: string) => void;
@@ -99,7 +100,7 @@ export class DomainBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = generateSessionId();
+    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };

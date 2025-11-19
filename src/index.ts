@@ -19,6 +19,9 @@
 export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
 export { ManagementClient } from './clients/ManagementClient';
+export { LockClient } from './clients/LockClient';
+export { ValidationClient } from './clients/ValidationClient';
+export { parseActivationResponse } from './core/managementOperations';
 
 // Export Builders for high-level operations
 export { ClassBuilder, type ClassBuilderConfig, type ClassBuilderLogger, type ClassBuilderState } from './core/class/ClassBuilder';

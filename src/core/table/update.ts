@@ -40,15 +40,8 @@ export async function updateTable(
     // Step 1: Lock the table
     lockHandle = await acquireTableLockHandle(connection, tableName, sessionId);
 
-    // Step 2: Upload new DDL code
-    const queryParams = `lockHandle=${lockHandle}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
-    const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName).toLowerCase()}/source/main?${queryParams}`;
-
-    const headers = {
-      'Content-Type': 'text/plain; charset=utf-8'
-    };
-
-    await makeAdtRequestWithSession(connection, url, 'PUT', sessionId, params.ddl_code, headers);
+    // Step 2: Upload new DDL code using internal logic
+    await updateTableInternal(connection, params, lockHandle, sessionId);
 
     // Step 3: Unlock the table
     await unlockTable(connection, tableName, lockHandle, sessionId);
@@ -94,5 +87,38 @@ export async function updateTable(
 
     throw new Error(`Failed to update table ${tableName}: ${errorMessage}`);
   }
+}
+
+/**
+ * Internal helper to update table using existing lock/session
+ */
+export async function updateTableInternal(
+  connection: AbapConnection,
+  params: UpdateTableParams,
+  lockHandle: string,
+  sessionId: string
+): Promise<AxiosResponse> {
+  if (!params.table_name) {
+    throw new Error('table_name is required');
+  }
+  if (!params.ddl_code) {
+    throw new Error('ddl_code is required');
+  }
+  if (!lockHandle) {
+    throw new Error('lockHandle is required');
+  }
+  if (!sessionId) {
+    throw new Error('sessionId is required');
+  }
+
+  const tableName = params.table_name.toUpperCase();
+  const queryParams = `lockHandle=${lockHandle}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
+  const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName).toLowerCase()}/source/main?${queryParams}`;
+
+  const headers = {
+    'Content-Type': 'text/plain; charset=utf-8'
+  };
+
+  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, params.ddl_code, headers);
 }
 

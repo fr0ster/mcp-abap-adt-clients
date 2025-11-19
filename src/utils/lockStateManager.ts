@@ -9,7 +9,17 @@ import * as path from 'path';
 export interface LockState {
   sessionId: string;
   lockHandle: string;
-  objectType: 'class' | 'interface' | 'program' | 'fm' | 'domain' | 'dataElement' | 'view';
+  objectType:
+    | 'class'
+    | 'interface'
+    | 'program'
+    | 'fm'
+    | 'domain'
+    | 'dataElement'
+    | 'view'
+    | 'table'
+    | 'structure'
+    | 'package';
   objectName: string;
   functionGroupName?: string; // Required for FM
   timestamp: number;

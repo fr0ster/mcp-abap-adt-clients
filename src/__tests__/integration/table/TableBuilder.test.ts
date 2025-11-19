@@ -17,7 +17,8 @@ import {
   logBuilderTestStart,
   logBuilderTestSuccess,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -197,11 +198,18 @@ describe('TableBuilder', () => {
       }
 
       if (!testCase || !tableName) {
-        logBuilderTestSkip(builderLogger, 'TableBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(
+          builderLogger,
+          'TableBuilder - full workflow',
+          skipReason || 'Test case not available'
+        );
         return;
       }
 
-      const builder = new TableBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+      const builder = new TableBuilder(connection, builderLogger, {
+        ...buildBuilderConfig(testCase),
+        onLock: createOnLockCallback('table', tableName, undefined, __filename)
+      });
 
       try {
         logBuilderTestStep('validate');
@@ -213,7 +221,7 @@ describe('TableBuilder', () => {
           })
           .then(b => {
             logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
+            return b.check('abapCheckRun');
           })
           .then(b => {
             logBuilderTestStep('lock');
@@ -225,7 +233,7 @@ describe('TableBuilder', () => {
           })
           .then(b => {
             logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
+            return b.check('abapCheckRun');
           })
           .then(b => {
             logBuilderTestStep('unlock');
@@ -237,7 +245,7 @@ describe('TableBuilder', () => {
           })
           .then(b => {
             logBuilderTestStep('check(active)');
-            return b.check('active');
+            return b.check('abapCheckRun');
           });
 
         const state = builder.getState();
@@ -247,8 +255,7 @@ describe('TableBuilder', () => {
 
         logBuilderTestSuccess(builderLogger, 'TableBuilder - full workflow');
       } catch (error: any) {
-        const status = error.response?.status;
-        const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+        const statusText = getHttpStatusText(error);
         // Extract error message from error object
         const errorMsg = error.message || '';
         const errorData = error.response?.data || '';
@@ -262,13 +269,13 @@ describe('TableBuilder', () => {
           logBuilderTestSkip(
             builderLogger,
             'TableBuilder - full workflow',
-            `Table ${tableName} is locked (currently editing, ${statusText})`
+            `Table ${tableName} is locked (currently editing, ${statusText}). Details: ${errorMsg}`
           );
           return; // Skip test
         }
 
         // "Already exists" errors should fail the test (cleanup must work)
-        const enhancedError = status
+        const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
         logBuilderTestError(builderLogger, 'TableBuilder - full workflow', enhancedError);
@@ -284,10 +291,10 @@ describe('TableBuilder', () => {
     it('should read standard SAP table', async () => {
       // Standard SAP table (exists in most ABAP systems)
       const standardTableName = 'T000';
-      logBuilderTestStart(builderLogger, 'TableBuilder - read standard object', {
-        name: 'read_standard',
-        params: { table_name: standardTableName }
-      });
+        logBuilderTestStart(builderLogger, 'TableBuilder - read standard object', {
+          name: 'read_standard',
+          params: { table_name: standardTableName }
+        });
 
       if (!hasConfig) {
         logBuilderTestSkip(builderLogger, 'TableBuilder - read standard object', 'No SAP configuration');

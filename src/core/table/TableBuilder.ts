@@ -56,6 +56,7 @@ export interface TableBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   ddlCode?: string;
+  sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId
   onLock?: (lockHandle: string, sessionId: string) => void;
@@ -89,7 +90,7 @@ export class TableBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = generateSessionId();
+    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -219,7 +220,12 @@ export class TableBuilder {
         transport_request: this.config.transportRequest,
         activate: false
       };
-      const result = await updateTable(this.connection, params);
+      const result = await updateTable(
+        this.connection,
+        params,
+        this.lockHandle,
+        this.sessionId
+      );
       this.state.updateResult = result;
       this.logger.info?.('Table updated successfully:', result.status);
       return this;
@@ -234,12 +240,12 @@ export class TableBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun'): Promise<this> {
     try {
-      this.logger.info?.('Checking table:', this.config.tableName, 'version:', version);
+      this.logger.info?.('Checking table:', this.config.tableName, 'reporter:', reporter);
       const result = await runTableCheckRun(
         this.connection,
-        'abapCheckRun',
+        reporter,
         this.config.tableName,
         this.sessionId
       );

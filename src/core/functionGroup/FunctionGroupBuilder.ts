@@ -34,6 +34,7 @@ export interface FunctionGroupBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   description?: string;
+  sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId
   onLock?: (lockHandle: string, sessionId: string) => void;
@@ -66,7 +67,7 @@ export class FunctionGroupBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = generateSessionId();
+    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };

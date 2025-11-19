@@ -188,6 +188,11 @@ For test strategy, development roadmap, and contribution guidelines, see:
 - **[docs/TEST_STRATEGY.md](docs/TEST_STRATEGY.md)** - Test strategy and development focus
 - **[docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md)** - Package architecture
 
+### Logging levels
+
+- `DEBUG_TESTS=true` – verbose step-by-step logging (existing flag).
+- `LOG_LOCKS=false` – disable `[LOCK] ...` lines that show session/handle every time a test locks an object (enabled by default).
+
 ## License
 
 MIT
