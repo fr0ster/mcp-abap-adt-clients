@@ -292,9 +292,8 @@ Ensure these directories are in `.gitignore`:
 
 ## See Also
 
-- [Lock/Unlock Detailed Guide](./README_LOCK_UNLOCK.md)
-- [Session State Management](../SESSION_STATE_MANAGEMENT.md)
-- [Lock State Management](../LOCK_STATE_MANAGEMENT.md)
+- [Session State Management](../docs/archive/SESSION_STATE_MANAGEMENT.md)
+- [Lock State Management](../docs/archive/LOCK_STATE_MANAGEMENT.md)
 - [Lock Recovery Test](../src/__tests__/integration/README_LOCK_RECOVERY.md)
 
 
@@ -365,5 +364,5 @@ Both directories are in `.gitignore` and should not be committed.
 ## Documentation
 
 For detailed information, see:
-- [Lock State Management](../LOCK_STATE_MANAGEMENT.md)
-- [Session State Management](../SESSION_STATE_MANAGEMENT.md)
+- [Lock State Management](../docs/archive/LOCK_STATE_MANAGEMENT.md)
+- [Session State Management](../docs/archive/SESSION_STATE_MANAGEMENT.md)
