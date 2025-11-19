@@ -1,15 +1,15 @@
 # @mcp-abap-adt/adt-clients
 
-ADT (ABAP Development Tools) clients for SAP ABAP systems - Read-only, CRUD, and Management operations.
+ADT (ABAP Development Tools) clients for SAP ABAP systems with a **Builder-first API**.  
+Low-level helpers stay internal; consumers interact via Builders and high-level clients (Management, Lock, Validation).
 
 ## Features
 
-- ✅ **Read-Only Operations** - Query ABAP objects without modifications
-- ✅ **CRUD Operations** - Create, Read, Update, Delete ABAP objects
-- ✅ **Management Operations** - Lock, unlock, activate, check objects
-- ✅ **Session Management** - Persistent HTTP sessions with cookies and CSRF tokens
-- ✅ **Lock Tracking** - Persist lock handles for recovery after crashes
-- ✅ **CLI Tools** - Manage sessions and locks from command line
+- ✅ **Builder-first workflow** – every supported object type exposes a fluent Builder (`ClassBuilder`, `TableBuilder`, …) that wraps validate/create/lock/update/activate in one chain.
+- ✅ **High-level clients** – `ManagementClient`, `LockClient`, `ValidationClient` cover cross-object tasks (activation, ad-hoc locking, name validation) without touching internal modules.
+- ✅ **Stateful session propagation** – builders and clients keep the same `sap-adt-connection-id` across lock/update/unlock; session state can be exported/imported via the connection package.
+- ✅ **Lock registry + CLI** – persistent `.locks/active-locks.json` plus `adt-manage-locks` / `adt-unlock-objects` scripts to recover from crashes.
+- ✅ **Test-friendly logging** – `DEBUG_TESTS=true` for per-step output, `LOG_LOCKS=false` to silence `[LOCK] ...` lines.
 
 ## Installation
 
@@ -53,50 +53,69 @@ See [CLI Tools documentation](./bin/README.md) for details.
 ## Quick Start
 
 ```typescript
-import { createAbapConnection, FileSessionStorage } from '@mcp-abap-adt/connection';
-import { createClass, getClass, updateClassSource } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { ClassBuilder, LockClient, ManagementClient } from '@mcp-abap-adt/adt-clients';
 
-// Create connection with session persistence
 const connection = createAbapConnection({
-  url: 'https://your-sap-system.com:443',
+  url: 'https://your-sap-system.example.com',
   client: '100',
   authType: 'basic',
-  username: 'your-username',
-  password: 'your-password'
+  username: process.env.SAP_USERNAME!,
+  password: process.env.SAP_PASSWORD!
 }, console);
 
-// Enable stateful session
-const sessionStorage = new FileSessionStorage();
-await connection.enableStatefulSession('my-session', sessionStorage);
+// Full builder workflow
+const builder = new ClassBuilder(connection, console, {
+  className: 'ZCL_MY_CLASS',
+  packageName: 'ZADT_BLD_PKG01',
+  description: 'Demo builder class',
+  transportRequest: 'E19K900001'
+});
 
-// Create class
-await createClass(connection, {
-  class_name: 'ZCL_MY_CLASS',
-  package_name: 'ZPACKAGE',
-  description: 'My test class',
-  source_code: `CLASS zcl_my_class DEFINITION PUBLIC.
+await builder
+  .setCode(`CLASS zcl_my_class DEFINITION PUBLIC.
   PUBLIC SECTION.
     METHODS: hello.
 ENDCLASS.
 
 CLASS zcl_my_class IMPLEMENTATION.
   METHOD hello.
-    WRITE: 'Hello World!'.
+    WRITE: 'Hello from builder'.
   ENDMETHOD.
-ENDCLASS.`
+ENDCLASS.`)
+  .validate()
+  .then(b => b.create())
+  .then(b => b.check('inactive'))
+  .then(b => b.lock())
+  .then(b => {
+    b.setCode(b.getState().sourceCode!.replace('builder', 'builder v2'));
+    return b.update();
+  })
+  .then(b => b.check('inactive'))
+  .then(b => b.unlock())
+  .then(b => b.activate())
+  .then(b => b.check('active'));
+
+// Ad-hoc management helpers
+const lockClient = new LockClient(connection);
+const mgmtClient = new ManagementClient(connection);
+
+const { lockHandle, sessionId } = await lockClient.lock({
+  objectType: 'class',
+  objectName: 'ZCL_MY_CLASS'
 });
 
-// Read class
-const result = await getClass(connection, 'ZCL_MY_CLASS');
-console.log(result.data); // Source code
+await mgmtClient.activateObjectsGroup([{ name: 'ZCL_MY_CLASS', uri: '/sap/bc/adt/oo/classes/zcl_my_class' }]);
 
-// Update class
-await updateClassSource(connection, {
-  class_name: 'ZCL_MY_CLASS',
-  source_code: updatedCode,
-  activate: true
+await lockClient.unlock({
+  objectType: 'class',
+  objectName: 'ZCL_MY_CLASS',
+  lockHandle,
+  sessionId
 });
 ```
+
+> ℹ️ Need to persist the `sessionId` / cookies between processes? See [doc/STATEFUL_SESSION_GUIDE.md](../../doc/STATEFUL_SESSION_GUIDE.md) and the `@mcp-abap-adt/connection` README for details.
 
 ## CLI Tools
 
@@ -130,57 +149,27 @@ adt-manage-sessions cleanup
 
 See [bin/README.md](bin/README.md) for details.
 
+## Builders & Clients
+
+- **Builders**: classes, interfaces, programs, domains, data elements, tables, structures, views, packages, transports, function groups, function modules.  
+  Each builder exposes `.validate()`, `.create()`, `.lock()`, `.update()`, `.activate()`, `.check()`, `.read()`, `.forceUnlock()`.
+- **ManagementClient**: batch activation + check operations.
+- **LockClient**: explicit lock/unlock helpers that integrate with the `.locks` registry (used by tests and CLI tools).
+- **ValidationClient**: name validation helper mirroring ADT validation endpoint.
+
+Refer to the TypeScript typings (`src/index.ts`) or the generated docs in `docs/reference` for the full surface area.
+
 ## Documentation
 
-- [Lock State Management](LOCK_STATE_MANAGEMENT.md) - Persistent lock handles
-- [Session State Management](SESSION_STATE_MANAGEMENT.md) - HTTP session persistence
+- [Lock State Management](docs/archive/LOCK_STATE_MANAGEMENT.md) – background on `.locks`
+- [Session State Management](docs/archive/SESSION_STATE_MANAGEMENT.md) – restoring HTTP sessions
+- [Stateful Session Guide (Builders)](docs/STATEFUL_SESSION_GUIDE.md) – how Builders, `LockClient`, and tests manage `sessionId`, `lockHandle`, and the lock registry
+- [Stateful Session Guide (Server)](../../doc/STATEFUL_SESSION_GUIDE.md) – handler-level orchestration and workflows shared with the MCP server
+- [Stateful Session Guide (Connection)](../connection/docs/STATEFUL_SESSION_GUIDE.md) – HTTP session, cookies, and CSRF token persistence
 
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
-
-## API Reference
-
-### Class Operations
-
-```typescript
-import {
-  createClass,
-  getClass,
-  updateClassSource,
-  deleteObject,
-  checkClass,
-  validateClassSource,
-  activateClass,
-  runClass
-} from '@mcp-abap-adt/adt-clients';
-```
-
-### Function Module Operations
-
-```typescript
-import {
-  createFunctionGroup,
-  createFunctionModule,
-  getFunction,
-  updateFunctionModuleSource,
-  checkFunctionModule,
-  validateFunctionModuleSource,
-  activateFunctionModule
-} from '@mcp-abap-adt/adt-clients';
-```
-
-### Other Object Types
-
-Similar patterns for:
-- Interfaces
-- Programs  
-- Domains
-- Data Elements
-- CDS Views
-- Tables/Structures
-- Packages
-- Transports
 
 ## Development & Testing
 

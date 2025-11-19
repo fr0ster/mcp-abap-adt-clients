@@ -824,12 +824,16 @@ describe('ClassBuilder', () => {
 - **Lock registration:** All Builders now support `onLock` callback for persistent lock tracking
 - **DDL for structures:** Structures now use DDL SQL instead of XML
 - **E2E test:** testLockRecovery.integration.test.ts fixed to handle missing configuration
+- **Stateful table workflow:** `TableBuilder` now reuses the existing lock handle/session when updating, eliminating the duplicate EU510 “currently editing” error path.
+- **Test logging:** `[LOCK] ...` output is controlled via `LOG_LOCKS`, and skip logs no longer bump the progress counter a second time.
 
 ### ⏳ In Progress
 - **Phase 3:** YAML parameter compliance - 11 Builder test files still use `getDefaultPackage()`/`getDefaultTransport()` fallbacks
+- **Phase 5:** Documentation – Builder pattern + YAML schema docs still need to be published.
 
 ### 📋 Remaining Tasks
 - Remove `getDefaultPackage()`/`getDefaultTransport()` fallbacks from Builder tests
 - Use `environment` section in YAML for common parameters
 - Complete documentation (Phase 5)
+- Add YAML-driven registry for standard SAP objects (Phase 4)
 
