@@ -157,31 +157,23 @@ See [bin/README.md](bin/README.md) for details.
 - **LockClient**: explicit lock/unlock helpers that integrate with the `.locks` registry (used by tests and CLI tools).
 - **ValidationClient**: name validation helper mirroring ADT validation endpoint.
 
-Refer to the TypeScript typings (`src/index.ts`) or the generated docs in `docs/reference` for the full surface area.
+Refer to the TypeScript typings (`src/index.ts`) for the full API surface.
 
 ## Documentation
 
-- [Lock State Management](docs/archive/LOCK_STATE_MANAGEMENT.md) – background on `.locks`
-- [Session State Management](docs/archive/SESSION_STATE_MANAGEMENT.md) – restoring HTTP sessions
-- [Stateful Session Guide (Builders)](docs/STATEFUL_SESSION_GUIDE.md) – how Builders, `LockClient`, and tests manage `sessionId`, `lockHandle`, and the lock registry
-- [Stateful Session Guide (Server)](../../doc/architecture/STATEFUL_SESSION_GUIDE.md) – handler-level orchestration and workflows shared with the MCP server
-- [Stateful Session Guide (Connection)](../connection/docs/STATEFUL_SESSION_GUIDE.md) – HTTP session, cookies, and CSRF token persistence
+- **[Stateful Session Guide](docs/STATEFUL_SESSION_GUIDE.md)** – how Builders and clients manage `sessionId`, `lockHandle`, and the lock registry
+- **[Architecture](docs/reference/ARCHITECTURE.md)** – package structure and design decisions
+- **[Builder Test Pattern](docs/BUILDER_TEST_PATTERN.md)** – test structure and patterns for contributors
+- **[Test Configuration Schema](docs/TEST_CONFIG_SCHEMA.md)** – YAML test configuration reference
+
+## Logging
+
+- `DEBUG_TESTS=true` – verbose step-by-step logging for tests
+- `LOG_LOCKS=false` – disable `[LOCK] ...` lines (enabled by default)
 
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
-
-## Development & Testing
-
-For test strategy, development roadmap, and contribution guidelines, see:
-- **[docs/BUILDER_TEST_PATTERN.md](docs/BUILDER_TEST_PATTERN.md)** - Builder test pattern and structure
-- **[docs/TEST_CONFIG_SCHEMA.md](docs/TEST_CONFIG_SCHEMA.md)** - YAML test configuration schema
-- **[docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md)** - Package architecture
-
-### Logging levels
-
-- `DEBUG_TESTS=true` – verbose step-by-step logging (existing flag).
-- `LOG_LOCKS=false` – disable `[LOCK] ...` lines that show session/handle every time a test locks an object (enabled by default).
 
 ## License
 
