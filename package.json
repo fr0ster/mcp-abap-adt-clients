@@ -42,6 +42,9 @@
     "type": "git",
     "url": "git+https://github.com/fr0ster/mcp-abap-adt-clients.git"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "build": "npm run --silent clean && npx tsc -p tsconfig.json",
