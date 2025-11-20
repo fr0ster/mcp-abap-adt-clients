@@ -41,18 +41,28 @@ export async function updateViewSource(
   params: UpdateViewSourceParams
 ): Promise<AxiosResponse> {
   const viewName = params.view_name.toUpperCase();
-  const sessionId = generateSessionId();
-  let lockHandle: string | null = null;
+  const reuseLock = Boolean(params.lock_handle);
+  const sessionId = params.session_id || generateSessionId();
+  let lockHandle: string | null = params.lock_handle || null;
+  let corrNr: string | undefined = params.transport_request;
 
   try {
-    const lockResult = await lockDDLSForUpdate(connection, viewName, sessionId);
-    lockHandle = lockResult.lockHandle;
-    const corrNr = lockResult.corrNr;
+    if (!reuseLock) {
+      const lockResult = await lockDDLSForUpdate(connection, viewName, sessionId);
+      lockHandle = lockResult.lockHandle;
+      corrNr = lockResult.corrNr ?? corrNr;
+    }
+
+    if (!lockHandle) {
+      throw new Error('lock_handle is required for updateViewSource');
+    }
 
     await uploadDDLSourceForUpdate(connection, viewName, params.ddl_source, lockHandle, sessionId, corrNr);
 
-    await unlockDDLS(connection, viewName, lockHandle, sessionId);
-    lockHandle = null;
+    if (!reuseLock) {
+      await unlockDDLS(connection, viewName, lockHandle, sessionId);
+      lockHandle = null;
+    }
 
     const shouldActivate = params.activate === true;
 
@@ -78,19 +88,26 @@ export async function updateViewSource(
     } as AxiosResponse;
 
   } catch (error: any) {
-    if (lockHandle) {
+    if (!reuseLock && lockHandle) {
       try {
         await unlockDDLS(connection, viewName, lockHandle, sessionId);
-      } catch (unlockError) {
-        // Ignore unlock errors
+      } catch {
+        // Ignore unlock errors for auto-managed locks
       }
     }
 
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
+    const baseError = error instanceof Error ? error : new Error(String(error));
+    if ((error as any)?.response && !(baseError as any).response) {
+      (baseError as any).response = (error as any).response;
+    }
+    if ((error as any)?.status && !(baseError as any).status) {
+      (baseError as any).status = (error as any).status;
+    }
+    if ((error as any)?.config && !(baseError as any).config) {
+      (baseError as any).config = (error as any).config;
+    }
 
-    throw new Error(`Failed to update view ${viewName}: ${errorMessage}`);
+    throw baseError;
   }
 }
 

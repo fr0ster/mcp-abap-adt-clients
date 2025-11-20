@@ -35,7 +35,7 @@ import { checkPackage } from './check';
 import { getPackage } from './read';
 import { lockPackage } from './lock';
 import { unlockPackage } from './unlock';
-import { updatePackage, UpdatePackageParams } from './update';
+import { updatePackageDescription } from './update';
 import { CreatePackageParams } from './types';
 import { generateSessionId } from '../../utils/sessionUtils';
 
@@ -50,6 +50,7 @@ export interface PackageBuilderConfig {
   packageName: string;
   superPackage: string;
   description?: string;
+  updatedDescription?: string; // Description to use for update operation
   packageType?: string;
   softwareComponent?: string;
   transportLayer?: string;
@@ -161,17 +162,29 @@ export class PackageBuilder {
       };
 
       // Basic validation
-      await validatePackageBasic(this.connection, params);
-      this.state.validationResult = { basic: undefined };
-      this.logger.info?.('Package basic validation successful');
+      try {
+        await validatePackageBasic(this.connection, params);
+        this.state.validationResult = { basic: undefined };
+        this.logger.info?.('Package basic validation successful');
+      } catch (validationError: any) {
+        // If package already exists, log warning but continue (cleanup may have failed)
+        const errorMsg = validationError.message || '';
+        if (errorMsg.includes('already exists') || errorMsg.includes('PAK042')) {
+          this.logger.warn?.(`Package ${this.config.packageName} already exists. Validation skipped.`);
+          this.state.validationResult = { basic: undefined }; // Mark as successful to continue
+        } else {
+          throw validationError; // Re-throw other validation errors
+        }
+      }
 
-      // Full validation if transport layer is provided
-      if (this.config.transportLayer || this.config.softwareComponent) {
-        const swcomp = this.config.softwareComponent || 'HOME';
-        const transportLayer = this.config.transportLayer || process.env.SAP_TRANSPORT_LAYER || 'ZE19';
-        await validatePackageFull(this.connection, params, swcomp, transportLayer);
+      // Full validation only if both transport layer and software component are explicitly provided
+      // SAP requires transport layer for full validation, so we skip it if not provided
+      if (this.config.transportLayer && this.config.softwareComponent) {
+        await validatePackageFull(this.connection, params, this.config.softwareComponent, this.config.transportLayer);
         this.state.validationResult.full = undefined;
         this.logger.info?.('Package full validation successful');
+      } else {
+        this.logger.info?.('Skipping full validation (transport layer or software component not provided)');
       }
 
       return this;
@@ -208,6 +221,27 @@ export class PackageBuilder {
       this.logger.info?.('Package created successfully:', result.status);
       return this;
     } catch (error: any) {
+      const errorMsg = error.message || '';
+      // If package already exists, try to read it instead of failing
+      if (errorMsg.includes('already exists') || errorMsg.includes('PAK042')) {
+        this.logger.warn?.(`Package ${this.config.packageName} already exists. Attempting to read existing package.`);
+        try {
+          const existingResult = await getPackage(this.connection, this.config.packageName);
+          this.state.createResult = existingResult; // Store read result as create result
+          this.logger.info?.('Package already exists, read successfully:', existingResult.status);
+          return this;
+        } catch (readError: any) {
+          // If read also fails, throw original create error
+          this.state.errors.push({
+            method: 'create',
+            error: error instanceof Error ? error : new Error(String(error)),
+            timestamp: new Date()
+          });
+          this.logger.error?.('Create failed and read also failed:', error);
+          throw error;
+        }
+      }
+      // For other errors, throw as usual
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
@@ -324,29 +358,20 @@ export class PackageBuilder {
       if (!this.state.lockHandle) {
         throw new Error('Package must be locked before updating. Call lock() first.');
       }
-      if (!this.config.superPackage) {
-        throw new Error('Super package is required for update');
+      const descriptionToUpdate = this.config.updatedDescription || this.config.description;
+      if (!descriptionToUpdate) {
+        throw new Error('Description or updatedDescription is required for package update');
       }
-      this.logger.info?.('Updating package:', this.config.packageName);
-      const params: UpdatePackageParams = {
-        package_name: this.config.packageName,
-        super_package: this.config.superPackage,
-        description: this.config.description,
-        package_type: this.config.packageType,
-        software_component: this.config.softwareComponent,
-        transport_layer: this.config.transportLayer,
-        transport_request: this.config.transportRequest,
-        application_component: this.config.applicationComponent,
-        responsible: this.config.responsible
-      };
-      const result = await updatePackage(
+      this.logger.info?.('Updating package description:', this.config.packageName);
+      const result = await updatePackageDescription(
         this.connection,
-        params,
+        this.config.packageName,
+        descriptionToUpdate,
         this.state.lockHandle,
         this.state.sessionId
       );
       this.state.updateResult = result;
-      this.logger.info?.('Package updated successfully:', result.status);
+      this.logger.info?.('Package description updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({

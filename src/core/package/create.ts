@@ -9,39 +9,79 @@ import { validatePackageBasic, validatePackageFull } from './validation';
 import { checkTransportRequirements } from './transportCheck';
 import { checkPackage } from './check';
 import { CreatePackageParams } from './types';
+import { getSystemInformation } from '../shared/systemInfo';
 
 /**
  * Step 4: Create package
+ * Only allowed parameters: name, description, superPackage, packageType, softwareComponent, transportLayer
+ * masterSystem/responsible are derived via getSystemInformation (cloud) or env fallbacks
  */
 async function createPackageInternal(
   connection: AbapConnection,
   args: CreatePackageParams,
   swcomp: string,
-  transportLayer: string | undefined,
+  transportLayer: string,
   transportRequest?: string
 ): Promise<any> {
   const baseUrl = await connection.getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/packages`;
-  const username = args.responsible || process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
 
-  const softwareComponentName = swcomp;
+  // Escape XML special characters in description
+  const escapeXml = (str: string | undefined): string => {
+    if (!str) return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  };
+
+  const description = escapeXml(args.description || args.package_name);
+  const packageType = args.package_type || 'development';
+
+  // Get master system / responsible from ADT metadata helper (cloud) with env fallback
+  const systemInfo = await getSystemInformation(connection);
+  const masterSystem = systemInfo?.systemID;
+  const responsibleUser =
+    args.responsible ||
+    systemInfo?.userName ||
+    process.env.SAP_USERNAME ||
+    process.env.SAP_USER ||
+    '';
+  
+  // All attributes must be present in XML body, even if empty
+  // Software component - always include, with name attribute if provided
+  const softwareComponentXml = swcomp
+    ? `<pak:softwareComponent pak:name="${escapeXml(swcomp)}"/>`
+    : '<pak:softwareComponent/>';
+  
+  // Transport layer - always include, with name attribute if provided
   const transportLayerXml = transportLayer
-    ? `<pak:transportLayer pak:name="${transportLayer}"/>`
+    ? `<pak:transportLayer pak:name="${escapeXml(transportLayer)}"/>`
     : '<pak:transportLayer/>';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${args.description || args.package_name}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN" adtcore:masterSystem="${process.env.SAP_SYSTEM || 'E19'}" adtcore:responsible="${username}">
+  // Build XML with all required attributes
+  const responsibleAttr = responsibleUser ? ` adtcore:responsible="${escapeXml(responsibleUser)}"` : '';
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${escapeXml(masterSystem)}"` : '';
+  // Application component - always include, with name attribute if provided
+  const applicationComponentXml = args.application_component
+    ? `<pak:applicationComponent pak:name="${escapeXml(args.application_component)}"/>`
+    : '<pak:applicationComponent/>';
+  
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
 
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 
-  <pak:attributes pak:isEncapsulated="false" pak:packageType="${args.package_type || 'development'}" pak:recordChanges="false"/>
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="false"/>
 
   <pak:superPackage adtcore:name="${args.super_package}"/>
 
-  <pak:applicationComponent/>
+  ${applicationComponentXml}
 
   <pak:transport>
 
-    <pak:softwareComponent pak:name="${softwareComponentName}"/>
+    ${softwareComponentXml}
 
     ${transportLayerXml}
 
@@ -92,7 +132,8 @@ export async function createPackage(
     throw new Error('Super package (parent package) is required');
   }
 
-  const swcomp = params.software_component || 'HOME';
+  // software_component and transport_layer can be empty/undefined
+  const swcomp = params.software_component;
   const transportLayer = params.transport_layer;
 
   try {
@@ -111,11 +152,21 @@ export async function createPackage(
       throw new Error('Transport request is required when transport_layer is specified. Please provide transport_request parameter or create a transport first.');
     }
 
-    if (transportLayer) {
+    // Full validation only if both swcomp and transportLayer are provided
+    // Otherwise SAP will complain about missing transport layer
+    if (swcomp && transportLayer) {
       await validatePackageFull(connection, params, swcomp, transportLayer);
     }
 
-    const createResponse = await createPackageInternal(connection, params, swcomp, transportLayer, transportRequest);
+    // In XML body, all attributes must be present (even if empty)
+    // Pass empty strings to createPackageInternal so XML includes all elements
+    const createResponse = await createPackageInternal(
+      connection, 
+      params, 
+      swcomp || '', 
+      transportLayer || '', 
+      transportRequest
+    );
 
     await checkPackage(connection, params.package_name);
 

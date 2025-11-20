@@ -77,3 +77,46 @@ export async function updatePackage(
   return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, xmlBody, headers);
 }
 
+/**
+ * Update only package description (safe update - only modifiable field)
+ * Reads current package data and updates only description attribute
+ */
+export async function updatePackageDescription(
+  connection: AbapConnection,
+  packageName: string,
+  description: string,
+  lockHandle: string,
+  sessionId: string
+): Promise<AxiosResponse> {
+  if (!packageName) {
+    throw new Error('package_name is required');
+  }
+  if (!description) {
+    throw new Error('description is required');
+  }
+
+  // Read current package to get existing XML
+  const { getPackage } = await import('./read');
+  const readResponse = await getPackage(connection, packageName);
+  
+  // Get current XML as string
+  const currentXml = typeof readResponse.data === 'string' 
+    ? readResponse.data 
+    : JSON.stringify(readResponse.data);
+  
+  // Replace description attribute in XML (simple string replacement)
+  // Pattern: adtcore:description="old_value" -> adtcore:description="new_value"
+  const descriptionRegex = /(adtcore:description=")([^"]*)(")/;
+  const updatedXml = currentXml.replace(descriptionRegex, `$1${description.replace(/"/g, '&quot;')}$3`);
+
+  const packageNameEncoded = encodeSapObjectName(packageName);
+  const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${lockHandle}`;
+
+  const headers = {
+    'Content-Type': 'application/vnd.sap.adt.packages.v2+xml',
+    'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml'
+  };
+
+  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, updatedXml, headers);
+}
+

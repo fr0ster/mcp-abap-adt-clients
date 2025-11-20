@@ -19,13 +19,36 @@ export async function unlockInterface(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return makeAdtRequestWithSession(
-    connection,
-    url,
-    'POST',
-    sessionId,
-    '',
-    { 'Content-Type': 'application/x-www-form-urlencoded' }
-  );
+  try {
+    const response = await makeAdtRequestWithSession(
+      connection,
+      url,
+      'POST',
+      sessionId,
+      '',
+      { 'Content-Type': 'application/x-www-form-urlencoded' }
+    );
+    return response;
+  } catch (error: any) {
+    // If response is not returned (e.g., object locked by another user, network error),
+    // provide more context in the error message
+    if (!error.response) {
+      throw new Error(
+        `Failed to unlock interface ${interfaceName}: No response from server. ` +
+        `Lock handle: ${lockHandle.substring(0, 10)}..., Session: ${sessionId.substring(0, 10)}... ` +
+        `The interface may be locked by another user or session may be invalid.`
+      );
+    }
+    // If we have a response, include its status and data in the error
+    const status = error.response?.status;
+    const statusText = status ? `HTTP ${status}` : 'HTTP ?';
+    const errorData = error.response?.data
+      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+      : error.message;
+    
+    throw new Error(
+      `Failed to unlock interface ${interfaceName} (${statusText}): ${errorData}`
+    );
+  }
 }
 

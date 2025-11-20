@@ -127,7 +127,7 @@ packages/adt-clients/
 - `updateProgramSource(name: string, source: string, transportRequest?: string)`
 - `updateInterfaceSource(name: string, source: string, transportRequest?: string)`
 - `updateFunctionModuleSource(group: string, name: string, source: string, transportRequest?: string)`
-- `updateViewSource(name: string, ddlSource: string, transportRequest?: string)`
+- `updateViewSource(name: string, ddlSource: string, transportRequest?: string, options?: { lockHandle?: string; sessionId?: string })`
 - `updateDomain(name: string, params: UpdateDomainParams)`
 - `updateDataElement(name: string, params: UpdateDataElementParams)`
 

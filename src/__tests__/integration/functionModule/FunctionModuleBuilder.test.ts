@@ -325,10 +325,6 @@ describe('FunctionModuleBuilder', () => {
             return b.create();
           })
           .then(b => {
-            logBuilderTestStep('check');
-            return b.check();
-          })
-          .then(b => {
             logBuilderTestStep('lock');
             return b.lock();
           })

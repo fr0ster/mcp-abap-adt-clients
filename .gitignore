@@ -21,3 +21,4 @@ coverage/**
 .locks/*
 !.locks/.keep
 mcp-abap-adt-adt-clients-*.tgz
+sk.json

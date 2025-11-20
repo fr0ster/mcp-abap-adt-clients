@@ -224,7 +224,10 @@ export class ViewBuilder {
       const params: UpdateViewSourceParams = {
         view_name: this.config.viewName,
         ddl_source: this.config.ddlSource,
-        activate: false
+        activate: false,
+        lock_handle: this.lockHandle,
+        session_id: this.sessionId,
+        transport_request: this.config.transportRequest
       };
       const result = await updateViewSource(this.connection, params);
       this.state.updateResult = result;

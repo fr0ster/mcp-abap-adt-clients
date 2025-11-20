@@ -8,6 +8,10 @@ const path = require('path');
 const yaml = require('yaml');
 const dotenv = require('dotenv');
 
+let cachedConfig = null;
+let configLoadedFrom = null;
+let displayedTemplateWarning = false;
+
 /**
  * Load environment variables from .env file (quiet mode - no console output)
  */
@@ -26,16 +30,35 @@ function loadTestEnv() {
  * Load test configuration from YAML
  */
 function loadTestConfig() {
-  const configPath = path.resolve(__dirname, 'test-config.yaml');
-
-  if (!fs.existsSync(configPath)) {
-    console.error('❌ Test configuration file not found: test-config.yaml');
-    console.error('Please create tests/test-config.yaml with test parameters');
-    process.exit(1);
+  if (cachedConfig) {
+    return cachedConfig;
   }
 
-  const configContent = fs.readFileSync(configPath, 'utf8');
-  return yaml.parse(configContent);
+  const configPath = path.resolve(__dirname, 'test-config.yaml');
+  const templatePath = path.resolve(__dirname, 'test-config.yaml.template');
+
+  if (fs.existsSync(configPath)) {
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    cachedConfig = yaml.parse(configContent) || {};
+    configLoadedFrom = 'custom';
+    return cachedConfig;
+  }
+
+  if (fs.existsSync(templatePath)) {
+    if (!displayedTemplateWarning) {
+      console.warn('⚠️ tests/test-config.yaml not found. Using tests/test-config.yaml.template (all integration tests remain disabled).');
+      console.warn('   Copy the template to tests/test-config.yaml and fill in your SAP system details to run integration tests.');
+      displayedTemplateWarning = true;
+    }
+    const templateContent = fs.readFileSync(templatePath, 'utf8');
+    cachedConfig = yaml.parse(templateContent) || {};
+    configLoadedFrom = 'template';
+    return cachedConfig;
+  }
+
+  console.error('❌ Test configuration files not found.');
+  console.error('Please copy tests/test-config.yaml.template to tests/test-config.yaml and configure test parameters.');
+  process.exit(1);
 }
 
 /**

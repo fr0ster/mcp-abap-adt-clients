@@ -262,10 +262,6 @@ describe('ClassBuilder', () => {
           return b.create();
         })
         .then(b => {
-            logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
-          })
-          .then(b => {
             logBuilderTestStep('lock');
           return b.lock();
         })

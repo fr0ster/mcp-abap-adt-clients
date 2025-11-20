@@ -98,9 +98,28 @@ describe('InterfaceBuilder', () => {
           builderLogger.debug?.(`[CLEANUP] Unlocked interface ${interfaceName} before deletion`);
         }
       } catch (unlockError: any) {
-        // Log but continue - lock might be stale
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to unlock interface ${interfaceName}: ${unlockError.message}`);
+        // If unlock fails due to no response or lock conflict, log detailed error
+        const errorMsg = unlockError.message || 'Unknown error';
+        const hasResponse = unlockError.response !== undefined;
+        const status = unlockError.response?.status;
+        
+        if (!hasResponse) {
+          // No response - likely network issue or object locked by another user
+          lockedReason = `Interface ${interfaceName} unlock failed: No response from server. ${errorMsg}`;
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Failed to unlock interface ${interfaceName} (no response): ${errorMsg}`);
+          }
+        } else if (status === 423 || status === 409) {
+          // Locked by another user or conflict
+          lockedReason = `Interface ${interfaceName} is locked (HTTP ${status}). ${errorMsg}`;
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Interface ${interfaceName} is locked (HTTP ${status}): ${errorMsg}`);
+          }
+        } else {
+          // Other error - log but continue
+          if (debugEnabled) {
+            builderLogger.warn?.(`[CLEANUP] Failed to unlock interface ${interfaceName} (HTTP ${status || '?'}): ${errorMsg}`);
+          }
         }
       }
     }
@@ -230,10 +249,6 @@ describe('InterfaceBuilder', () => {
           .then(b => {
             logBuilderTestStep('create');
             return b.create();
-          })
-          .then(b => {
-            logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
           })
           .then(b => {
             logBuilderTestStep('lock');

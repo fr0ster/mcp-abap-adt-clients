@@ -58,7 +58,10 @@ lock_config:
 # Environment configuration
 environment:
   default_package: "ZADT_BLD_PKG01"  # Default package for creating objects (used if not specified in test case)
-  # default_transport: ""  # Default transport request (used if not specified in test case)
+  default_transport: ""  # Default transport request (used if not specified in test case)
+  # Cleanup configuration (applies to all tests)
+  cleanup_before: true   # Clean up objects before test (default: true)
+  cleanup_after: true    # Clean up objects after test (default: true)
 
 # ============================================================================
 # BUILDER TESTS
@@ -68,7 +71,7 @@ environment:
 create_class:
   test_cases:
     - name: "builder_class"
-      enabled: false
+      enabled: true
       description: "Create test class for ClassBuilder tests"
       params:
         class_name: "ZADT_BLD_CLS01"
@@ -100,19 +103,24 @@ create_class:
 create_package:
   test_cases:
     - name: "builder_package"
-      enabled: false
+      enabled: true
       description: "Package reserved for PackageBuilder tests"
       params:
-        package_name: "ZADT_BLD_PKG01"
-        super_package: "ZADT_BLD_SUPER"
+        package_name: "ZADT_BLD_PKG01"          # Parent package (existing)
+        test_package: "ZADT_BLD_INNER_PKG01"    # Package created by the test
+        super_package: "ZADT_BLD_PKG01"
         description: "PackageBuilder workflow package"
-        package_type: "development"
+        updated_description: "PackageBuilder workflow package - updated"  # Description for update operation
+        package_type: "development"             # Optional: development, main, structure, etc.
+        # software_component: "HOME"            # Optional: Software component name (can be empty)
+        # transport_layer: ""                   # Optional: Transport layer (can be empty)
+        # transport_request: ""                 # Optional: Transport request number (used in query param, not in body)
 
 # Create Domain
 create_domain:
   test_cases:
     - name: "builder_domain"
-      enabled: false
+      enabled: true
       description: "Domain used by DomainBuilder workflow tests"
       params:
         domain_name: "ZADT_BLD_DOM01"
@@ -129,7 +137,7 @@ create_domain:
 create_data_element:
   test_cases:
     - name: "builder_data_element"
-      enabled: false
+      enabled: true
       description: "Data element reserved for DataElementBuilder tests"
       params:
         data_element_name: "ZADT_BLD_DTEL01"
@@ -155,7 +163,7 @@ create_data_element:
 create_interface:
   test_cases:
     - name: "builder_interface"
-      enabled: false
+      enabled: true
       description: "Interface reserved for InterfaceBuilder tests"
       params:
         interface_name: "ZADT_BLD_IF01"
@@ -172,7 +180,7 @@ create_interface:
 create_program:
   test_cases:
     - name: "builder_program"
-      enabled: false
+      enabled: true
       description: "Program reserved for ProgramBuilder tests"
       params:
         program_name: "ZADT_BLD_PROG01"
@@ -188,7 +196,7 @@ create_program:
 create_table:
   test_cases:
     - name: "builder_table"
-      enabled: false
+      enabled: true
       description: "Table reserved for TableBuilder tests"
       params:
         table_name: "ZADT_BLD_TAB01"
@@ -215,7 +223,7 @@ create_table:
 create_structure:
   test_cases:
     - name: "builder_structure"
-      enabled: false
+      enabled: true
       description: "Structure reserved for StructureBuilder tests"
       params:
         structure_name: "ZADT_BLD_STRU01"
@@ -234,7 +242,7 @@ create_structure:
 create_view:
   test_cases:
     - name: "builder_view"
-      enabled: false
+      enabled: true
       description: "View reserved for ViewBuilder tests"
       params:
         view_name: "ZADT_BLD_VIEW01"
@@ -258,10 +266,10 @@ create_view:
 create_function_group:
   test_cases:
     - name: "builder_function_group"
-      enabled: false
+      enabled: true
       description: "Function group reserved for FunctionGroupBuilder tests"
       params:
-        function_group_name: "ZADT_BLD_FGR01"
+        function_group_name: "ZADT_BLD_FGR_EMPTY"
         description: "FunctionGroupBuilder workflow FUGR"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
@@ -270,7 +278,7 @@ create_function_group:
 create_function_module:
   test_cases:
     - name: "builder_function_module"
-      enabled: false
+      enabled: true
       description: "Function module reserved for FunctionModuleBuilder tests"
       params:
         function_module_name: "Z_ADT_BLD_FM01"  # Must start with Z_ or Y_ (with underscore)
@@ -291,8 +299,87 @@ create_function_module:
 create_transport:
   test_cases:
     - name: "builder_transport"
-      enabled: false
+      enabled: true
       description: "Transport reserved for TransportBuilder tests"
       params:
         description: "TransportBuilder workflow transport"
         # package_name: "ZADT_BLD_PKG01"
+
+# Standard SAP objects registry for read-only tests
+standard_objects:
+  classes:
+    - name: "CL_ABAP_CHAR_UTILITIES"
+      description: "Character utilities helper (available everywhere)"
+      available_in: ["onprem", "cloud"]
+    - name: "CL_ABAP_CORRESPONDING"
+      description: "Corresponding-move helper for ABAP"
+      available_in: ["onprem", "cloud"]
+
+  interfaces:
+    - name: "IF_BUPA_API_MODIFY"
+      description: "Interface zum BAdI: BUPA_API_MODIFY"
+      available_in: ["onprem", "cloud"]
+
+  domains:
+    - name: "MANDT"
+      description: "Client domain"
+      available_in: ["onprem", "cloud"]
+    - name: "ABAP_BOOL"
+      description: "Boolean domain"
+      available_in: ["onprem", "cloud"]
+
+  data_elements:
+    - name: "MANDT"
+      description: "Client data element"
+      available_in: ["onprem", "cloud"]
+    - name: "ABAP_BOOL"
+      description: "Boolean data element"
+      available_in: ["onprem", "cloud"]
+
+  tables:
+    - name: "T000"
+      description: "Client table (on-premise SAP systems)"
+      available_in: ["onprem"]
+    - name: "T000"
+      description: "Clients"
+      available_in: ["cloud"]
+
+  structures:
+    - name: "SYST"
+      description: "System fields structure"
+      available_in: ["onprem", "cloud"]
+
+  packages:
+    - name: "$TMP"
+      description: "Local package"
+      available_in: ["onprem"]
+    - name: "ZLOCAL"
+      description: "Placeholder for ABAP Cloud package – replace with existing package"
+      available_in: ["cloud"]
+
+  programs:
+    - name: "SAPLSETB"
+      description: "Standard SAP settings program"
+      available_in: ["onprem"]
+
+  views:
+    - name: "H_T000"
+      description: "Client table help view"
+      available_in: ["onprem"]
+    - name: "I_SapPackage"
+      description: "ABAP Cloud: replace with CDS view name existing in tenant"
+      available_in: ["cloud"]
+
+  function_groups:
+    - name: "EDIN"
+      description: "System function group"
+      available_in: ["onprem", "cloud"]
+
+  function_modules:
+    - name: "IDOC_INBOUND_XML_SOAP_HTTP"
+      group: "EDIN"
+      description: "Returns system metadata"
+      available_in: ["onprem", "cloud"]
+
+  standard_criteria:
+    note: "Update the entries above with objects that exist in your SAP system before running read tests."
