@@ -6,8 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [Unreleased]
 
 ### Added
+- **src/core.ts** – internal exports file for Builders, allows importing Builders within workspace as `@mcp-abap-adt/adt-clients/core`
+  - NOTE: This is INTERNAL USE ONLY - public API remains CrudClient and ReadOnlyClient
 
-### Added
 - **CrudClient** – unified client for CRUD operations across all 12 object types
   - Method chaining pattern: all methods return `Promise<this>` for fluent workflows
   - State management: internal state stores results from create, lock, unlock, update, activate operations
