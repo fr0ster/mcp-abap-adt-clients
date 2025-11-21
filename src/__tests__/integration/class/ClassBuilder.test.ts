@@ -250,6 +250,7 @@ describe('ClassBuilder', () => {
         const builder = new ClassBuilder(connection, builderLogger, {
           className: testClassName,
           packageName: testPackageName,
+          description: `Test class ${testClassName}`,
           transportRequest: resolveTransportRequest(testCase.params.transport_request),
       }).setCode(sourceCode);
 
@@ -333,7 +334,8 @@ describe('ClassBuilder', () => {
         builderLogger,
         {
           className: standardClassName,
-          packageName: 'SAP' // Standard package
+          packageName: 'SAP', // Standard package
+          description: '' // Not used for read operations
         }
       );
 
@@ -400,7 +402,8 @@ describe('ClassBuilder', () => {
         builderLogger,
         {
           className: standardClassName,
-          packageName: 'SAP' // Standard package
+          packageName: 'SAP', // Standard package
+          description: '' // Not used for read operations
         }
       );
 

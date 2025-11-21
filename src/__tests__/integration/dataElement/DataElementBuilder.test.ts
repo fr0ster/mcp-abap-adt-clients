@@ -341,7 +341,8 @@ describe('DataElementBuilder', () => {
         builderLogger,
         {
           dataElementName: standardDataElementName,
-          packageName: 'SAP' // Standard package
+          packageName: 'SAP', // Standard package
+          description: '' // Not used for read operations
         }
       );
 

@@ -356,7 +356,8 @@ describe('PackageBuilder', () => {
       const builder = new PackageBuilder(connection, builderLogger, {
         packageName: standardPackageName,
         // superPackage is not used in read mode, fallback to resolved package
-        superPackage: standardObject.superPackage || '$TMP'
+        superPackage: standardObject.superPackage || '$TMP',
+        description: '' // Not used for read operations
       });
 
       try {

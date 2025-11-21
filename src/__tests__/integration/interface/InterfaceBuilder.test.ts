@@ -11,7 +11,7 @@ import { deleteInterface } from '../../../core/interface/delete';
 import { unlockInterface } from '../../../core/interface/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getTestLock, unregisterTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
@@ -97,11 +97,16 @@ describe('InterfaceBuilder', () => {
         if (debugEnabled) {
           builderLogger.debug?.(`[CLEANUP] Unlocked interface ${interfaceName} before deletion`);
         }
+        // Successfully unlocked - remove from lockHelper
+        unregisterTestLock('interface', interfaceName);
       } catch (unlockError: any) {
         // If unlock fails due to no response or lock conflict, log detailed error
         const errorMsg = unlockError.message || 'Unknown error';
         const hasResponse = unlockError.response !== undefined;
         const status = unlockError.response?.status;
+        
+        // Remove stale lock from lockHelper regardless of unlock success
+        unregisterTestLock('interface', interfaceName);
         
         if (!hasResponse) {
           // No response - likely network issue or object locked by another user
@@ -345,7 +350,8 @@ describe('InterfaceBuilder', () => {
 
       const builder = new InterfaceBuilder(connection, builderLogger, {
         interfaceName: standardInterfaceName,
-        packageName: 'SAP' // Standard package
+        packageName: 'SAP', // Standard package
+        description: '' // Not used for read operations
       });
 
       try {

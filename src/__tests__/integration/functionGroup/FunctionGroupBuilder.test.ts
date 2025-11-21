@@ -269,7 +269,8 @@ describe('FunctionGroupBuilder', () => {
 
       const builder = new FunctionGroupBuilder(connection, builderLogger, {
         functionGroupName: standardFunctionGroupName,
-        packageName: 'SAP' // Standard package
+        packageName: 'SAP', // Standard package
+        description: '' // Not used for read operations
       });
 
       try {

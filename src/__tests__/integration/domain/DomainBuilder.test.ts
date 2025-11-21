@@ -278,7 +278,8 @@ describe('DomainBuilder', () => {
         builderLogger,
         {
           domainName: standardDomainName,
-          packageName: 'SAP' // Standard package
+          packageName: 'SAP', // Standard package
+          description: '' // Not used for read operations
         }
       );
 

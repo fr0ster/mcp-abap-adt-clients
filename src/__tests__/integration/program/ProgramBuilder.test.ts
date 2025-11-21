@@ -279,7 +279,8 @@ describe('ProgramBuilder', () => {
 
       const builder = new ProgramBuilder(connection, builderLogger, {
         programName: standardProgramName,
-        packageName: 'SAP' // Standard package
+        packageName: 'SAP', // Standard package
+        description: '' // Not used for read operations
       });
 
       try {

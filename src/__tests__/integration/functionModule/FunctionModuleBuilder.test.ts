@@ -415,6 +415,7 @@ describe('FunctionModuleBuilder', () => {
       const builder = new FunctionModuleBuilder(connection, builderLogger, {
         functionGroupName: standardFunctionGroupName,
         functionModuleName: standardFunctionModuleName,
+        description: '', // Not used for read operations
         sourceCode: '' // Not needed for read
       });
 
