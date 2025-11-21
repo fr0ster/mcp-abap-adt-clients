@@ -11,6 +11,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import * as mgmtOps from '../core/managementOperations';
 import { getObjectUri } from '../core/shared/checkRun';
+import { getInactiveObjects, InactiveObjectsResponse } from '../core/shared/getInactiveObjects';
 
 export class ManagementClient {
   constructor(private connection: AbapConnection) {}
@@ -46,6 +47,13 @@ export class ManagementClient {
    */
   async checkObject(name: string, type: string, version?: string): Promise<AxiosResponse> {
     return mgmtOps.checkObject(this.connection, name, type, version);
+  }
+
+  /**
+   * Get list of inactive objects (not yet activated)
+   */
+  async getInactiveObjects(options?: { includeRawXml?: boolean }): Promise<InactiveObjectsResponse> {
+    return getInactiveObjects(this.connection, options);
   }
 
   // TODO: Add more management methods as needed

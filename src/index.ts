@@ -23,6 +23,9 @@ export { LockClient } from './clients/LockClient';
 export { ValidationClient } from './clients/ValidationClient';
 export { parseActivationResponse } from './core/managementOperations';
 
+// Export shared types
+export type { InactiveObject, InactiveObjectsResponse } from './core/shared/getInactiveObjects';
+
 // Export Builders for high-level operations
 export { ClassBuilder, type ClassBuilderConfig, type ClassBuilderLogger, type ClassBuilderState } from './core/class/ClassBuilder';
 export { DomainBuilder, type DomainBuilderConfig, type DomainBuilderLogger, type DomainBuilderState } from './core/domain/DomainBuilder';
