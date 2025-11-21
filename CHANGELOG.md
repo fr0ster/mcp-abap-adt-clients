@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Changed
+- **ReadOnlyClient refactored to state pattern** – all read methods now return `Promise<this>` for chaining
+  - Added private `state` with `readResult` field
+  - Added `getReadResult()` getter method
+  - All read operations now store result in state instead of returning directly
+  - Enables consistent chaining pattern: `await client.readProgram(name); const result = client.getReadResult();`
+- **CrudClient state renamed** – `state` → `crudState` to avoid conflicts with ReadOnlyClient's private state
+  - Both classes now have separate private state fields
+  - No breaking changes to public API - all getters remain the same
+
 ### Added
 - **CrudClient complete method coverage** – added 55 new methods for 8 object types:
   - **FunctionModule** (7 methods): create, lock, unlock, update, activate, check, validate
