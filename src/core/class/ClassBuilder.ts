@@ -45,6 +45,7 @@ import { updateClass } from './update';
 import { checkClass } from './check';
 import { unlockClass } from './unlock';
 import { activateClass } from './activation';
+import { deleteClass } from './delete';
 
 export interface ClassBuilderConfig {
   className: string;
@@ -81,6 +82,7 @@ export interface ClassBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -410,6 +412,30 @@ export class ClassBuilder {
     }
   }
 
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting class:', this.config.className);
+      const result = await deleteClass(
+        this.connection,
+        {
+          class_name: this.config.className,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Class deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -475,6 +501,10 @@ export class ClassBuilder {
     return this.state.activateResult;
   }
 
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
     return [...this.state.errors];
   }
@@ -497,6 +527,7 @@ export class ClassBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -509,6 +540,7 @@ export class ClassBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

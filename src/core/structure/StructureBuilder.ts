@@ -38,6 +38,7 @@ import { upload } from './update';
 import { checkStructure } from './check';
 import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
+import { deleteStructure } from './delete';
 import { validateStructureName } from './validation';
 import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams } from './types';
 import { ValidationResult } from '../shared/validation';
@@ -73,6 +74,7 @@ export interface StructureBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
@@ -348,6 +350,31 @@ export class StructureBuilder {
     }
   }
 
+
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting structure:', this.config.structureName);
+      const result = await deleteStructure(
+        this.connection,
+        {
+          structure_name: this.config.structureName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Structure deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
     try {
       this.logger.info?.('Reading structure:', this.config.structureName);
@@ -427,6 +454,11 @@ export class StructureBuilder {
     return this.state.activateResult;
   }
 
+
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getReadResult(): AxiosResponse | undefined {
     return this.state.readResult;
   }
@@ -442,6 +474,7 @@ export class StructureBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -452,6 +485,7 @@ export class StructureBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

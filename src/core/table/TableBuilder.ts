@@ -38,6 +38,7 @@ import { updateTable } from './update';
 import { runTableCheckRun } from './check';
 import { unlockTable } from './unlock';
 import { activateTable } from './activation';
+import { deleteTable } from './delete';
 import { validateTableName } from './validation';
 import { CreateTableParams } from './types';
 import { UpdateTableParams } from './update';
@@ -70,6 +71,7 @@ export interface TableBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
@@ -313,6 +315,31 @@ export class TableBuilder {
     }
   }
 
+
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting table:', this.config.tableName);
+      const result = await deleteTable(
+        this.connection,
+        {
+          table_name: this.config.tableName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Table deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
     try {
       this.logger.info?.('Reading table:', this.config.tableName);
@@ -392,6 +419,11 @@ export class TableBuilder {
     return this.state.activateResult;
   }
 
+
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getReadResult(): AxiosResponse | undefined {
     return this.state.readResult;
   }
@@ -407,6 +439,7 @@ export class TableBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -417,6 +450,7 @@ export class TableBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

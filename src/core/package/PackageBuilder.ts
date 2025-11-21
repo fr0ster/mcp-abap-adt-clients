@@ -35,6 +35,7 @@ import { checkPackage } from './check';
 import { getPackage } from './read';
 import { lockPackage } from './lock';
 import { unlockPackage } from './unlock';
+import { deletePackage } from './delete';
 import { updatePackageDescription } from './update';
 import { CreatePackageParams } from './types';
 import { generateSessionId } from '../../utils/sessionUtils';
@@ -71,6 +72,7 @@ export interface PackageBuilderState {
   lockResult?: string; // lock handle
   unlockResult?: AxiosResponse;
   updateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   sessionId?: string;
   lockHandle?: string;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
@@ -384,6 +386,30 @@ export class PackageBuilder {
     }
   }
 
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting package:', this.config.packageName);
+      const result = await deletePackage(
+        this.connection,
+        {
+          package_name: this.config.packageName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Package deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.state.lockHandle) {
       return;
@@ -455,6 +481,10 @@ export class PackageBuilder {
     return this.state.updateResult;
   }
 
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getResults(): {
     validate?: { basic?: void; full?: void };
     create?: AxiosResponse;
@@ -463,6 +493,7 @@ export class PackageBuilder {
     lock?: string;
     unlock?: AxiosResponse;
     update?: AxiosResponse;
+    delete?: AxiosResponse;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
@@ -473,6 +504,7 @@ export class PackageBuilder {
       lock: this.state.lockResult,
       unlock: this.state.unlockResult,
       update: this.state.updateResult,
+      delete: this.state.deleteResult,
       errors: [...this.state.errors]
     };
   }

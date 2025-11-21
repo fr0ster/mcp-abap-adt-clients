@@ -21,6 +21,7 @@ import { ValidationResult } from '../shared/validation';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
+import { deleteFunctionModule } from './delete';
 import { getFunctionSource } from './read';
 
 export interface FunctionModuleBuilderLogger {
@@ -51,6 +52,7 @@ export interface FunctionModuleBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
@@ -303,6 +305,32 @@ export class FunctionModuleBuilder {
     }
   }
 
+
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting functionmodule:', this.config.functionModuleName);
+      const result = await deleteFunctionModule(
+        this.connection,
+        {
+          function_module_name: this.config.functionModuleName,
+          function_group_name: this.config.functionGroupName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('FunctionModule deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
     try {
       this.logger.info?.('Reading function module:', this.config.functionModuleName);
@@ -392,6 +420,11 @@ export class FunctionModuleBuilder {
     return this.state.activateResult;
   }
 
+
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getReadResult(): AxiosResponse | undefined {
     return this.state.readResult;
   }
@@ -408,6 +441,7 @@ export class FunctionModuleBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -418,6 +452,7 @@ export class FunctionModuleBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

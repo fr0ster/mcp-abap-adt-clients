@@ -20,6 +20,7 @@ import { CreateDataElementParams, UpdateDataElementParams } from './types';
 import { checkDataElement } from './check';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
+import { deleteDataElement } from './delete';
 import { validateObjectName, ValidationResult } from '../shared/validation';
 
 export interface DataElementBuilderLogger {
@@ -59,6 +60,7 @@ export interface DataElementBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
 
@@ -485,6 +487,30 @@ export class DataElementBuilder {
     }
   }
 
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting data element:', this.config.dataElementName);
+      const result = await deleteDataElement(
+        this.connection,
+        {
+          data_element_name: this.config.dataElementName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Data element deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle) {
       return;
@@ -546,6 +572,10 @@ export class DataElementBuilder {
     return this.state.activateResult;
   }
 
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
     return [...this.state.errors];
   }
@@ -557,6 +587,7 @@ export class DataElementBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -566,6 +597,7 @@ export class DataElementBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

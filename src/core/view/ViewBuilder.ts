@@ -38,6 +38,7 @@ import { updateViewSource } from './update';
 import { checkView } from './check';
 import { unlockDDLS } from './unlock';
 import { activateDDLS } from './activation';
+import { deleteView } from './delete';
 import { validateViewName } from './validation';
 import { CreateViewParams, UpdateViewSourceParams } from './types';
 import { ValidationResult } from '../shared/validation';
@@ -70,6 +71,7 @@ export interface ViewBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
@@ -317,6 +319,31 @@ export class ViewBuilder {
     }
   }
 
+
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting view:', this.config.viewName);
+      const result = await deleteView(
+        this.connection,
+        {
+          view_name: this.config.viewName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('View deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
     try {
       this.logger.info?.('Reading view:', this.config.viewName);
@@ -396,6 +423,11 @@ export class ViewBuilder {
     return this.state.activateResult;
   }
 
+
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getReadResult(): AxiosResponse | undefined {
     return this.state.readResult;
   }
@@ -411,6 +443,7 @@ export class ViewBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -421,6 +454,7 @@ export class ViewBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

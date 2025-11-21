@@ -41,6 +41,7 @@ import { CreateDomainParams, UpdateDomainParams } from './types';
 import { checkDomainSyntax } from './check';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
+import { deleteDomain } from './delete';
 import { FixedValue } from './types';
 import { validateObjectName, ValidationResult } from '../shared/validation';
 import { getSystemInformation } from '../shared/systemInfo';
@@ -80,6 +81,7 @@ export interface DomainBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   readResult?: AxiosResponse;
   transportResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
@@ -428,6 +430,31 @@ export class DomainBuilder {
     }
   }
 
+
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting domain:', this.config.domainName);
+      const result = await deleteDomain(
+        this.connection,
+        {
+          domain_name: this.config.domainName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Domain deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async read(): Promise<this> {
     try {
       this.logger.info?.('Reading domain:', this.config.domainName);
@@ -521,6 +548,11 @@ export class DomainBuilder {
     return this.state.activateResult;
   }
 
+
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getReadResult(): AxiosResponse | undefined {
     return this.state.readResult;
   }
@@ -540,6 +572,7 @@ export class DomainBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -549,6 +582,7 @@ export class DomainBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

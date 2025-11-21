@@ -19,6 +19,7 @@ import { ValidationResult } from '../shared/validation';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
 import { activateFunctionGroup } from './activation';
+import { deleteFunctionGroup } from './delete';
 import { checkFunctionGroup } from './check';
 import { getFunctionGroup } from './read';
 
@@ -47,6 +48,7 @@ export interface FunctionGroupBuilderState {
   checkResult?: AxiosResponse;
   unlockResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   readResult?: AxiosResponse;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
@@ -251,6 +253,30 @@ export class FunctionGroupBuilder {
     }
   }
 
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting function group:', this.config.functionGroupName);
+      const result = await deleteFunctionGroup(
+        this.connection,
+        {
+          function_group_name: this.config.functionGroupName,
+          transport_request: this.config.transportRequest
+        }
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Function group deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
   async read(): Promise<this> {
     try {
       this.logger.info?.('Reading function group:', this.config.functionGroupName);
@@ -326,6 +352,10 @@ export class FunctionGroupBuilder {
     return this.state.activateResult;
   }
 
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
   getReadResult(): AxiosResponse | undefined {
     return this.state.readResult;
   }
@@ -341,6 +371,7 @@ export class FunctionGroupBuilder {
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
+    delete?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
@@ -350,6 +381,7 @@ export class FunctionGroupBuilder {
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
+      delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

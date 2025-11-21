@@ -27,6 +27,7 @@ interface CrudClientState {
   unlockResult?: AxiosResponse;
   updateResult?: AxiosResponse;
   activateResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   checkResult?: AxiosResponse;
   validationResult?: any;
   // Note: readResult is in ReadOnlyClient's separate private state
@@ -45,6 +46,7 @@ export class CrudClient extends ReadOnlyClient {
   getUnlockResult(): AxiosResponse | undefined { return this.crudState.unlockResult; }
   getUpdateResult(): AxiosResponse | undefined { return this.crudState.updateResult; }
   getActivateResult(): AxiosResponse | undefined { return this.crudState.activateResult; }
+  getDeleteResult(): AxiosResponse | undefined { return this.crudState.deleteResult; }
   getCheckResult(): AxiosResponse | undefined { return this.crudState.checkResult; }
   getValidationResult(): any | undefined { return this.crudState.validationResult; }
 
@@ -105,6 +107,13 @@ export class CrudClient extends ReadOnlyClient {
     const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
     await builder.validate();
     this.crudState.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  async deleteProgram(programName: string, transportRequest?: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
     return this;
   }
 
@@ -169,6 +178,13 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  async deleteClass(className: string, transportRequest?: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
   // ==================== Interface operations ====================
   
   async createInterface(
@@ -228,6 +244,14 @@ export class CrudClient extends ReadOnlyClient {
     this.crudState.validationResult = builder.getState().validationResult;
     return this;
   }
+
+  async deleteInterface(interfaceName: string, transportRequest?: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
 
   // ==================== FunctionModule operations ====================
   
@@ -295,6 +319,13 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  async deleteFunctionModule(functionModuleName: string, functionGroupName: string, transportRequest?: string): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
   // ==================== FunctionGroup operations ====================
   
   async createFunctionGroup(functionGroupName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
@@ -340,6 +371,14 @@ export class CrudClient extends ReadOnlyClient {
     this.crudState.validationResult = builder.getState().validationResult;
     return this;
   }
+
+  async deleteFunctionGroup(functionGroupName: string, transportRequest?: string): Promise<this> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
 
   // ==================== DataElement operations ====================
   
@@ -395,6 +434,14 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  async deleteDataElement(dataElementName: string, transportRequest?: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
+
   // ==================== Domain operations ====================
   
   async createDomain(domainName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
@@ -448,6 +495,14 @@ export class CrudClient extends ReadOnlyClient {
     this.crudState.validationResult = builder.getState().validationResult;
     return this;
   }
+
+  async deleteDomain(domainName: string, transportRequest?: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
 
   // ==================== Structure operations ====================
   
@@ -503,6 +558,14 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  async deleteStructure(structureName: string, transportRequest?: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
+
   // ==================== Table operations ====================
   
   async createTable(tableName: string, packageName: string, transportRequest?: string): Promise<this> {
@@ -556,6 +619,14 @@ export class CrudClient extends ReadOnlyClient {
     this.crudState.validationResult = builder.getState().validationResult;
     return this;
   }
+
+  async deleteTable(tableName: string, transportRequest?: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName, transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
 
   // ==================== View operations ====================
   
@@ -611,6 +682,14 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  async deleteView(viewName: string, transportRequest?: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
+
   // ==================== Package operations ====================
   
   async createPackage(packageName: string, superPackage: string, description: string, transportRequest?: string): Promise<this> {
@@ -626,6 +705,14 @@ export class CrudClient extends ReadOnlyClient {
     this.crudState.validationResult = builder.getState().validationResult;
     return this;
   }
+
+  async deletePackage(packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage: '', description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
 
   async lockPackage(packageName: string, superPackage: string): Promise<this> {
     const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description: '' });

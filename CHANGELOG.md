@@ -16,6 +16,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - No breaking changes to public API - all getters remain the same
 
 ### Added
+- **Delete functionality** – complete delete support across all layers:
+  - **All 11 Builders** now have `delete()` method, `getDeleteResult()` getter, and `deleteResult` in state
+  - **CrudClient** gained 11 new delete methods:
+    - `deleteClass()`, `deleteProgram()`, `deleteInterface()`
+    - `deleteTable()`, `deleteStructure()`, `deleteDataElement()`
+    - `deleteDomain()`, `deleteView()`, `deleteFunctionGroup()`
+    - `deleteFunctionModule()` – requires both `functionModuleName` and `functionGroupName`
+    - `deletePackage()` – requires `superPackage` parameter
+  - Added `deleteResult` to CrudClientState and `getDeleteResult()` getter
+  - Low-level delete functions in `core/*/delete.ts` now properly exposed through Builder pattern
 - **CrudClient complete method coverage** – added 55 new methods for 8 object types:
   - **FunctionModule** (7 methods): create, lock, unlock, update, activate, check, validate
   - **FunctionGroup** (6 methods): create, lock, unlock, activate, check, validate
@@ -27,7 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - **Package** (6 methods): create, validate, lock, unlock, update, check
   - **Transport** (1 method): create
 - All non-read Builder operations now accessible through CrudClient
-- Total 76 CRUD methods across all object types (438 lines of code)
+- Total 87 CRUD methods across all object types (delete + previous methods)
 
 ## [0.1.5] - 2025-11-21
 
