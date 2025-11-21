@@ -54,7 +54,7 @@ export interface StructureBuilderConfig {
   structureName: string;
   packageName?: string;
   transportRequest?: string;
-  description?: string;
+  description: string;
   ddlCode?: string; // DDL SQL source code for structure (required for create operation)
   // Legacy fields (deprecated, use ddlCode instead)
   fields?: StructureField[];

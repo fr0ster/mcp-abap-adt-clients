@@ -54,7 +54,7 @@ export interface ViewBuilderConfig {
   viewName: string;
   packageName?: string;
   transportRequest?: string;
-  description?: string;
+  description: string;
   ddlSource?: string;
   sessionId?: string;
   // Optional callback to register lock in persistent storage

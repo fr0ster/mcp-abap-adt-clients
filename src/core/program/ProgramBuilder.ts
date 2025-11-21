@@ -33,7 +33,7 @@ export interface ProgramBuilderConfig {
   programName: string;
   packageName?: string;
   transportRequest?: string;
-  description?: string;
+  description: string;
   programType?: string;
   application?: string;
   sourceCode?: string;

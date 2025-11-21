@@ -50,7 +50,7 @@ export interface ClassBuilderConfig {
   className: string;
   packageName?: string;
   transportRequest?: string;
-  description?: string;
+  description: string;
   superclass?: string;
   final?: boolean;
   abstract?: boolean;

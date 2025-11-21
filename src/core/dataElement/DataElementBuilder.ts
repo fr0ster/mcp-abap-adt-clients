@@ -33,7 +33,7 @@ export interface DataElementBuilderConfig {
   dataElementName: string;
   packageName?: string;
   transportRequest?: string;
-  description?: string;
+  description: string;
   domainName?: string;
   dataType?: string;
   length?: number;

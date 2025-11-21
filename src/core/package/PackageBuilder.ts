@@ -49,7 +49,7 @@ export interface PackageBuilderLogger {
 export interface PackageBuilderConfig {
   packageName: string;
   superPackage: string;
-  description?: string;
+  description: string;
   updatedDescription?: string; // Description to use for update operation
   packageType?: string;
   softwareComponent?: string;

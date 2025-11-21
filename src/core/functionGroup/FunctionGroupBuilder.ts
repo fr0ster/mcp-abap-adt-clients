@@ -33,7 +33,7 @@ export interface FunctionGroupBuilderConfig {
   functionGroupName: string;
   packageName?: string;
   transportRequest?: string;
-  description?: string;
+  description: string;
   sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId

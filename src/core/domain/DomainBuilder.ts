@@ -57,7 +57,7 @@ export interface DomainBuilderConfig {
   domainName: string;
   packageName?: string;
   transportRequest?: string;
-  description?: string;
+  description: string;
   datatype?: string;
   length?: number;
   decimals?: number;
