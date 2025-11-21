@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.1.0, v1.2.3, etc.
+
+permissions:
+  contents: write  # Required for creating releases
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Create package
+        run: npm pack
+
+      - name: Get package filename
+        id: package
+        run: |
+          PACKAGE_FILE=$(ls mcp-abap-adt-adt-clients-*.tgz)
+          echo "filename=$PACKAGE_FILE" >> $GITHUB_OUTPUT
+          echo "Package created: $PACKAGE_FILE"
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.package.outputs.filename }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          body: |
+            ## Installation
+
+            Download the `.tgz` package and install:
+
+            ```bash
+            npm install -g ./${{ steps.package.outputs.filename }}
+            ```
+
+            ## What's Changed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
