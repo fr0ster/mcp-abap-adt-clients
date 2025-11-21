@@ -1,10 +1,10 @@
 /**
- * View delete operations
+ * View delete operations - Low-level functions
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { deleteObject, DeleteObjectParams } from '../delete';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 
 export interface DeleteViewParams {
   view_name: string;
@@ -12,22 +12,95 @@ export interface DeleteViewParams {
 }
 
 /**
- * Delete ABAP view (DDLS)
+ * Low-level: Check if view can be deleted
+ */
+export async function checkDeletion(
+  connection: AbapConnection,
+  params: DeleteViewParams
+): Promise<AxiosResponse> {
+  const { view_name } = params;
+
+  if (!view_name) {
+    throw new Error('view_name is required');
+  }
+
+  const encodedName = encodeSapObjectName(view_name);
+  const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
+
+  const baseUrl = await connection.getBaseUrl();
+  const checkUrl = `${baseUrl}/sap/bc/adt/deletion/check`;
+
+  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="${objectUri}"/>
+</del:checkRequest>`;
+
+  const headers = {
+    'Accept': 'application/vnd.sap.adt.deletion.check.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml'
+  };
+
+  return await connection.makeAdtRequest({
+    url: checkUrl,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlPayload,
+    headers
+  });
+}
+
+/**
+ * Low-level: Delete view (DDLS)
  */
 export async function deleteView(
   connection: AbapConnection,
   params: DeleteViewParams
 ): Promise<AxiosResponse> {
-  if (!params.view_name) {
+  const { view_name, transport_request } = params;
+
+  if (!view_name) {
     throw new Error('view_name is required');
   }
 
-  const deleteParams: DeleteObjectParams = {
-    object_name: params.view_name,
-    object_type: 'DDLS/DF',
-    transport_request: params.transport_request
+  const encodedName = encodeSapObjectName(view_name);
+  const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
+
+  const baseUrl = await connection.getBaseUrl();
+  const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
+
+  let transportNumberTag = '';
+  if (transport_request && transport_request.trim()) {
+    transportNumberTag = `<del:transportNumber>${transport_request}</del:transportNumber>`;
+  }
+
+  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
+  <del:object adtcore:uri="${objectUri}">
+    ${transportNumberTag}
+  </del:object>
+</del:deletionRequest>`;
+
+  const headers = {
+    'Accept': 'application/vnd.sap.adt.deletion.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml'
   };
 
-  return await deleteObject(connection, deleteParams);
-}
+  const response = await connection.makeAdtRequest({
+    url: deletionUrl,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlPayload,
+    headers
+  });
 
+  return {
+    ...response,
+    data: {
+      success: true,
+      view_name,
+      object_uri: objectUri,
+      transport_request: transport_request || 'local',
+      message: `View ${view_name} deleted successfully`
+    }
+  } as AxiosResponse;
+}

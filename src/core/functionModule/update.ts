@@ -1,27 +1,25 @@
 /**
- * FunctionModule update operations
+ * FunctionModule update operations - low-level functions for FunctionModuleBuilder
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
-import { lockFunctionModuleForUpdate } from './lock';
-import { unlockFunctionModule } from './unlock';
-import { activateFunctionModule } from './activation';
-import { UpdateFunctionModuleSourceParams } from './types';
+import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
- * Upload function module source code (for update)
+ * Upload function module source code (low-level - uses existing lockHandle)
+ * This function does NOT lock/unlock - it assumes the object is already locked
+ * Used internally by FunctionModuleBuilder
  */
-async function uploadFunctionModuleSourceForUpdate(
+export async function update(
   connection: AbapConnection,
   functionGroupName: string,
   functionModuleName: string,
   lockHandle: string,
-  corrNr: string | undefined,
   sourceCode: string,
-  sessionId: string
+  sessionId: string,
+  corrNr?: string
 ): Promise<AxiosResponse> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
@@ -36,33 +34,16 @@ async function uploadFunctionModuleSourceForUpdate(
     'Accept': 'text/plain'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
-}
-
-/**
- * Update function module source code (internal - uses existing lockHandle)
- * This function does NOT lock/unlock - it assumes the object is already locked
- */
-export async function updateFunctionModuleSourceInternal(
-  connection: AbapConnection,
-  functionGroupName: string,
-  functionModuleName: string,
-  lockHandle: string,
-  sourceCode: string,
-  sessionId: string,
-  corrNr?: string
-): Promise<AxiosResponse> {
-  const encodedModuleName = functionModuleName.toUpperCase();
-  await uploadFunctionModuleSourceForUpdate(connection, functionGroupName, encodedModuleName, lockHandle, corrNr, sourceCode, sessionId);
+  await makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
 
   return {
     data: {
       success: true,
-      function_module_name: encodedModuleName,
+      function_module_name: functionModuleName.toUpperCase(),
       function_group_name: functionGroupName,
       type: 'FUGR/FF',
-      message: `Function module ${encodedModuleName} source updated successfully`,
-      uri: `/sap/bc/adt/functions/groups/${encodeSapObjectName(functionGroupName).toLowerCase()}/fmodules/${encodeSapObjectName(encodedModuleName).toLowerCase()}`,
+      message: `Function module ${functionModuleName.toUpperCase()} source updated successfully`,
+      uri: `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}`,
       source_size_bytes: sourceCode.length
     },
     status: 200,
@@ -70,68 +51,5 @@ export async function updateFunctionModuleSourceInternal(
     headers: {},
     config: {} as any
   } as AxiosResponse;
-}
-
-/**
- * Update function module source code
- * Full workflow: lock -> upload source -> unlock -> activate (optional)
- */
-export async function updateFunctionModuleSource(
-  connection: AbapConnection,
-  params: UpdateFunctionModuleSourceParams
-): Promise<AxiosResponse> {
-  const functionModuleName = params.function_module_name.toUpperCase();
-  const sessionId = generateSessionId();
-  let lockHandle: string | null = null;
-
-  try {
-    const lockResult = await lockFunctionModuleForUpdate(connection, params.function_group_name, functionModuleName, sessionId);
-    lockHandle = lockResult.lockHandle;
-    const corrNr = lockResult.corrNr;
-
-    await uploadFunctionModuleSourceForUpdate(connection, params.function_group_name, functionModuleName, lockHandle, corrNr, params.source_code, sessionId);
-
-    await unlockFunctionModule(connection, params.function_group_name, functionModuleName, lockHandle, sessionId);
-    lockHandle = null;
-
-    const shouldActivate = params.activate === true;
-
-    if (shouldActivate) {
-      await activateFunctionModule(connection, params.function_group_name, functionModuleName, sessionId);
-    }
-
-    return {
-      data: {
-        success: true,
-        function_module_name: functionModuleName,
-        function_group_name: params.function_group_name,
-        type: 'FUGR/FF',
-        message: shouldActivate
-          ? `Function module ${functionModuleName} source updated and activated successfully`
-          : `Function module ${functionModuleName} source updated successfully (not activated)`,
-        uri: `/sap/bc/adt/functions/groups/${encodeSapObjectName(params.function_group_name).toLowerCase()}/fmodules/${encodeSapObjectName(functionModuleName).toLowerCase()}`,
-        source_size_bytes: params.source_code.length
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
-
-  } catch (error: any) {
-    if (lockHandle) {
-      try {
-        await unlockFunctionModule(connection, params.function_group_name, functionModuleName, lockHandle, sessionId);
-      } catch (unlockError) {
-        // Ignore unlock errors
-      }
-    }
-
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
-
-    throw new Error(`Failed to update function module ${functionModuleName}: ${errorMessage}`);
-  }
 }
 

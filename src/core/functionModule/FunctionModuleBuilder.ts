@@ -13,10 +13,10 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { validateFunctionModuleName } from './validation';
-import { createFunctionModule } from './create';
+import { create } from './create';
 import { lockFunctionModule } from './lock';
-import { updateFunctionModuleSource, updateFunctionModuleSourceInternal } from './update';
-import { CreateFunctionModuleParams, UpdateFunctionModuleSourceParams } from './types';
+import { update } from './update';
+import { CreateFunctionModuleParams } from './types';
 import { ValidationResult } from '../shared/validation';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
@@ -141,22 +141,18 @@ export class FunctionModuleBuilder {
 
   async create(): Promise<this> {
     try {
-      if (!this.sourceCode) {
-        throw new Error('Source code is required before calling create(). Use setCode().');
-      }
-      this.logger.info?.('Creating function module:', this.config.functionModuleName);
-      const params: CreateFunctionModuleParams = {
-        function_group_name: this.config.functionGroupName,
-        function_module_name: this.config.functionModuleName,
-        source_code: this.sourceCode,
-        package_name: this.config.packageName,
-        description: this.config.description,
-        transport_request: this.config.transportRequest,
-        activate: false // Don't activate in low-level function
-      };
-      const result = await createFunctionModule(this.connection, params);
+      this.logger.info?.('Creating function module metadata:', this.config.functionModuleName);
+      
+      // Call low-level create function (metadata only)
+      const result = await create(
+        this.connection,
+        this.config.functionGroupName,
+        this.config.functionModuleName,
+        this.config.description,
+        this.config.transportRequest
+      );
       this.state.createResult = result;
-      this.logger.info?.('Function module created successfully:', result.status);
+      this.logger.info?.('Function module metadata created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -209,7 +205,7 @@ export class FunctionModuleBuilder {
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
       this.logger.info?.('Updating function module source:', this.config.functionModuleName);
-      const result = await updateFunctionModuleSourceInternal(
+      const result = await update(
         this.connection,
         this.config.functionGroupName,
         this.config.functionModuleName,

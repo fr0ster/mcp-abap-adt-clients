@@ -225,7 +225,9 @@ describe('ViewBuilder', () => {
             logBuilderTestStep('create');
             return b.create();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to finish create operation (includes lock/unlock internally)
+            await new Promise(resolve => setTimeout(resolve, 1000));
             logBuilderTestStep('lock');
             return b.lock();
           })
@@ -263,18 +265,6 @@ describe('ViewBuilder', () => {
         const errorData = error.response?.data || '';
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
-        // Check if object is locked by someone else (currently editing)
-        if (fullErrorText.includes('currently editing') ||
-            fullErrorText.includes('exceptionresourcenoaccess') ||
-            fullErrorText.includes('eu510')) {
-          logBuilderTestSkip(
-            builderLogger,
-            'ViewBuilder - full workflow',
-            `View ${viewName} is locked (currently editing, ${statusText}). Details: ${errorMsg}`
-          );
-          return; // Skip test
-        }
 
         // "Already exists" errors should fail the test (cleanup must work)
         const enhancedError = statusText !== 'HTTP ?'

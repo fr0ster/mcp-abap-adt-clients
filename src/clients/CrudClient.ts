@@ -1,123 +1,214 @@
 /**
  * CrudClient - Full CRUD operations for SAP ADT
  *
- * Extends ReadOnlyClient with Create, Update, and Delete operations.
- * All methods return raw AxiosResponse - no MCP formatting.
- *
- * All implementations are in core/{object}/ modules (e.g., core/program/, core/class/).
- * Read operations are inherited from ReadOnlyClient (which delegates to core/{object}/read.ts).
+ * Extends ReadOnlyClient with Create, Update, Lock, Unlock, Activate, Check, Validate operations.
+ * Methods return `this` for chaining. Results stored in state and accessible via getters.
  */
 
 import { ReadOnlyClient } from './ReadOnlyClient';
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import * as programOps from '../core/program';
-import * as classOps from '../core/class';
-import * as domainOps from '../core/domain';
-import * as dataElementOps from '../core/dataElement';
-import * as interfaceOps from '../core/interface';
-import * as tableOps from '../core/table';
-import * as structureOps from '../core/structure';
-import * as viewOps from '../core/view';
-import * as functionGroupOps from '../core/functionGroup';
-import * as functionModuleOps from '../core/functionModule';
-import * as packageOps from '../core/package';
-import * as transportOps from '../core/transport';
-import * as deleteOps from '../core/delete';
+import { ProgramBuilder } from '../core/program';
+import { ClassBuilder } from '../core/class';
+import { InterfaceBuilder } from '../core/interface';
+import { DataElementBuilder } from '../core/dataElement';
+import { DomainBuilder } from '../core/domain';
+import { StructureBuilder } from '../core/structure';
+import { TableBuilder } from '../core/table';
+import { ViewBuilder } from '../core/view';
+import { FunctionGroupBuilder } from '../core/functionGroup';
+import { FunctionModuleBuilder } from '../core/functionModule';
+import { PackageBuilder } from '../core/package';
+import { TransportBuilder } from '../core/transport';
+
+interface CrudClientState {
+  createResult?: AxiosResponse;
+  lockHandle?: string;
+  unlockResult?: AxiosResponse;
+  updateResult?: AxiosResponse;
+  activateResult?: AxiosResponse;
+  checkResult?: AxiosResponse;
+  validationResult?: any;
+  readResult?: AxiosResponse;
+}
 
 export class CrudClient extends ReadOnlyClient {
+  private state: CrudClientState = {};
+  
   constructor(connection: AbapConnection) {
     super(connection);
   }
 
-  // Program operations
-  async createProgram(params: programOps.CreateProgramParams): Promise<AxiosResponse> {
-    return programOps.createProgram(this.connection, params);
+  // State getters
+  getCreateResult(): AxiosResponse | undefined { return this.state.createResult; }
+  getLockHandle(): string | undefined { return this.state.lockHandle; }
+  getUnlockResult(): AxiosResponse | undefined { return this.state.unlockResult; }
+  getUpdateResult(): AxiosResponse | undefined { return this.state.updateResult; }
+  getActivateResult(): AxiosResponse | undefined { return this.state.activateResult; }
+  getCheckResult(): AxiosResponse | undefined { return this.state.checkResult; }
+  getValidationResult(): any | undefined { return this.state.validationResult; }
+  getReadResult(): AxiosResponse | undefined { return this.state.readResult; }
+
+  // ==================== Program operations ====================
+  
+  async createProgram(programName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
   }
 
-  async updateProgramSource(params: programOps.UpdateProgramSourceParams): Promise<AxiosResponse> {
-    return programOps.updateProgramSource(this.connection, params);
+  async lockProgram(programName: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
   }
 
-  // Class operations
-  async createClass(params: classOps.CreateClassParams): Promise<AxiosResponse> {
-    return classOps.createClass(this.connection, params);
+  async unlockProgram(programName: string, lockHandle?: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
   }
 
-
-  // Domain operations
-  async createDomain(params: domainOps.CreateDomainParams): Promise<AxiosResponse> {
-    return domainOps.createDomain(this.connection, params);
+  async updateProgram(programName: string, sourceCode: string, lockHandle?: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '', sourceCode });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
   }
 
-  async updateDomain(params: domainOps.UpdateDomainParams): Promise<AxiosResponse> {
-    return domainOps.updateDomain(this.connection, params);
+  async activateProgram(programName: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
   }
 
-  // DataElement operations
-  async createDataElement(params: dataElementOps.CreateDataElementParams): Promise<AxiosResponse> {
-    return dataElementOps.createDataElement(this.connection, params);
+  async checkProgram(programName: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
   }
 
-  async updateDataElement(params: dataElementOps.UpdateDataElementParams): Promise<AxiosResponse> {
-    return dataElementOps.updateDataElement(this.connection, params);
+  async validateProgram(programName: string): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
   }
 
-  // Interface operations
-  async createInterface(params: interfaceOps.CreateInterfaceParams): Promise<AxiosResponse> {
-    return interfaceOps.createInterface(this.connection, params);
+  // ==================== Class operations ====================
+  
+  async createClass(className: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
   }
 
-  async updateInterfaceSource(params: interfaceOps.UpdateInterfaceSourceParams): Promise<AxiosResponse> {
-    return interfaceOps.updateInterfaceSource(this.connection, params);
+  async lockClass(className: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
   }
 
-  // Table operations
-  async createTable(params: tableOps.CreateTableParams): Promise<AxiosResponse> {
-    return tableOps.createTable(this.connection, params);
+  async unlockClass(className: string, lockHandle?: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
   }
 
-  // Structure operations
-  async createStructure(params: structureOps.CreateStructureParams): Promise<AxiosResponse> {
-    return structureOps.createStructure(this.connection, params);
+  async updateClass(className: string, sourceCode: string, lockHandle?: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    builder.setCode(sourceCode);
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
   }
 
-  // View operations
-  async createView(params: viewOps.CreateViewParams): Promise<AxiosResponse> {
-    return viewOps.createView(this.connection, params);
+  async activateClass(className: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
   }
 
-  async updateViewSource(params: viewOps.UpdateViewSourceParams): Promise<AxiosResponse> {
-    return viewOps.updateViewSource(this.connection, params);
+  async checkClass(className: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
   }
 
-  // FunctionGroup operations
-  async createFunctionGroup(params: functionGroupOps.CreateFunctionGroupParams): Promise<AxiosResponse> {
-    return functionGroupOps.createFunctionGroup(this.connection, params);
+  async validateClass(className: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
   }
 
-  // FunctionModule operations
-  async createFunctionModule(params: functionModuleOps.CreateFunctionModuleParams): Promise<AxiosResponse> {
-    return functionModuleOps.createFunctionModule(this.connection, params);
+  // ==================== Interface operations ====================
+  
+  async createInterface(interfaceName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
   }
 
-  async updateFunctionModuleSource(params: functionModuleOps.UpdateFunctionModuleSourceParams): Promise<AxiosResponse> {
-    return functionModuleOps.updateFunctionModuleSource(this.connection, params);
+  async lockInterface(interfaceName: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
   }
 
-  // Package operations
-  async createPackage(params: packageOps.CreatePackageParams): Promise<AxiosResponse> {
-    return packageOps.createPackage(this.connection, params);
+  async unlockInterface(interfaceName: string, lockHandle?: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
   }
 
-  // Transport operations
-  async createTransport(params: transportOps.CreateTransportParams): Promise<AxiosResponse> {
-    return transportOps.createTransport(this.connection, params);
+  async updateInterface(interfaceName: string, sourceCode: string, lockHandle?: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '', sourceCode });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
   }
 
-  // Delete operations (common for all object types)
-  async deleteObject(params: deleteOps.DeleteObjectParams): Promise<AxiosResponse> {
-    return deleteOps.deleteObject(this.connection, params);
+  async activateInterface(interfaceName: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkInterface(interfaceName: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateInterface(interfaceName: string): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
   }
 }
-

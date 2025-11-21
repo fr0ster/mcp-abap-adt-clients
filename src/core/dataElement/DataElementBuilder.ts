@@ -12,7 +12,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
-import { createDataElement } from './create';
+import { create } from './create';
 import { getDataElement } from './read';
 import { lockDataElement } from './lock';
 import { updateDataElementInternal, getDomainInfo } from './update';
@@ -268,7 +268,7 @@ export class DataElementBuilder {
         long_label: this.config.longLabel,
         heading_label: this.config.headingLabel
       };
-      const result = await createDataElement(this.connection, params);
+      const result = await create(this.connection, params, this.sessionId);
       this.state.createResult = result;
       this.logger.info?.('Data element created successfully:', result.status);
       return this;

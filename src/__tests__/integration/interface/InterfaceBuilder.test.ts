@@ -8,18 +8,16 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { InterfaceBuilder, InterfaceBuilderLogger } from '../../../core/interface';
 import { deleteInterface } from '../../../core/interface/delete';
-import { unlockInterface } from '../../../core/interface/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, unregisterTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getConfig } from '../../helpers/sessionConfig';
+import { createOnLockCallback } from '../../helpers/lockHelper';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep,
-  getHttpStatusText
+  logBuilderTestStep
 } from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -42,18 +40,18 @@ if (fs.existsSync(envPath)) {
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
+  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => { },
+  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => { },
+  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => { },
+  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => { },
+  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => { },
 };
 
 const builderLogger: InterfaceBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
+  debug: debugEnabled ? console.log : () => { },
+  info: debugEnabled ? console.log : () => { },
+  warn: debugEnabled ? console.warn : () => { },
+  error: debugEnabled ? console.error : () => { },
 };
 
 describe('InterfaceBuilder', () => {
@@ -83,73 +81,27 @@ describe('InterfaceBuilder', () => {
 
   async function ensureInterfaceReady(interfaceName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    let lockedReason: string | null = null;
-
-    // Step 1: Check for locks and unlock if needed
-    const lock = getTestLock('interface', interfaceName);
-    if (lock) {
-      try {
-        const sessionId = lock.sessionId || generateSessionId('cleanup');
-        await unlockInterface(connection, interfaceName, lock.lockHandle, sessionId);
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Unlocked interface ${interfaceName} before deletion`);
-        }
-        // Successfully unlocked - remove from lockHelper
-        unregisterTestLock('interface', interfaceName);
-      } catch (unlockError: any) {
-        // If unlock fails due to no response or lock conflict, log detailed error
-        const errorMsg = unlockError.message || 'Unknown error';
-        const hasResponse = unlockError.response !== undefined;
-        const status = unlockError.response?.status;
-        
-        // Remove stale lock from lockHelper regardless of unlock success
-        unregisterTestLock('interface', interfaceName);
-        
-        if (!hasResponse) {
-          // No response - likely network issue or object locked by another user
-          lockedReason = `Interface ${interfaceName} unlock failed: No response from server. ${errorMsg}`;
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Failed to unlock interface ${interfaceName} (no response): ${errorMsg}`);
-          }
-        } else if (status === 423 || status === 409) {
-          // Locked by another user or conflict
-          lockedReason = `Interface ${interfaceName} is locked (HTTP ${status}). ${errorMsg}`;
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Interface ${interfaceName} is locked (HTTP ${status}): ${errorMsg}`);
-          }
-        } else {
-          // Other error - log but continue
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Failed to unlock interface ${interfaceName} (HTTP ${status || '?'}): ${errorMsg}`);
-          }
-        }
-      }
-    }
-
-    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
     try {
       await deleteInterface(connection, { interface_name: interfaceName });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted interface ${interfaceName}`);
-      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { success: true };
     } catch (error: any) {
       const status = error.response?.status;
-      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-      const errorMsg = error.message || '';
-      const errorData = error.response?.data || '';
-      console.warn(`[CLEANUP][Interface] Failed to delete ${interfaceName} (${statusText}): ${errorMsg} ${errorData}`);
-      if (status === 423) {
-        lockedReason = `Interface ${interfaceName} is locked by another user (HTTP 423 Locked)`;
-      }
-    }
 
-    if (lockedReason) {
-      return { success: false, reason: lockedReason };
+      // 429 = locked by another user - skip test
+      if (status === 429) {
+        return {
+          success: false,
+          reason: `Interface ${interfaceName} is locked (HTTP 429)`
+        };
+      }
+
+      // All other errors (404, etc.) - ignore and proceed
+      return { success: true };
     }
-    return { success: true };
   }
 
   function getBuilderTestDefinition() {
@@ -249,71 +201,43 @@ describe('InterfaceBuilder', () => {
 
       try {
         logBuilderTestStep('validate');
-      await builder
-        .validate()
-          .then(b => {
-            logBuilderTestStep('create');
-            return b.create();
-          })
-          .then(b => {
-            logBuilderTestStep('lock');
-            return b.lock();
-          })
-          .then(b => {
-            logBuilderTestStep('update');
-            return b.update();
-          })
-          .then(b => {
-            logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
-          })
-          .then(b => {
-            logBuilderTestStep('unlock');
-            return b.unlock();
-          })
-          .then(b => {
-            logBuilderTestStep('activate');
-            return b.activate();
-          })
-          .then(b => {
-            logBuilderTestStep('check(active)');
-            return b.check('active');
-        });
+        await builder.validate();
 
-      const state = builder.getState();
-      expect(state.createResult).toBeDefined();
-      expect(state.activateResult).toBeDefined();
-      expect(state.errors.length).toBe(0);
+        logBuilderTestStep('create');
+        await builder.create();
+        
+        // Wait for SAP to finish create operation (includes lock/unlock/activate internally)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        logBuilderTestStep('lock');
+        await builder.lock();
+
+        logBuilderTestStep('update');
+        await builder.update();
+
+        logBuilderTestStep('check(inactive)');
+        await builder.check('inactive');
+
+        logBuilderTestStep('unlock');
+        await builder.unlock();
+
+        logBuilderTestStep('activate');
+        await builder.activate();
+
+        logBuilderTestStep('check(active)');
+        await builder.check('active');
+
+        const state = builder.getState();
+        expect(state.createResult).toBeDefined();
+        expect(state.activateResult).toBeDefined();
+        expect(state.errors.length).toBe(0);
 
         logBuilderTestSuccess(builderLogger, 'InterfaceBuilder - full workflow');
-      } catch (error: any) {
-        const statusText = getHttpStatusText(error);
-        // Extract error message from error object (may be in message or response.data)
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
-        const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
-        // Check if object is locked by someone else (currently editing)
-        if (fullErrorText.includes('currently editing') ||
-            fullErrorText.includes('exceptionresourcenoaccess') ||
-            fullErrorText.includes('eu510')) {
-          logBuilderTestSkip(
-            builderLogger,
-            'InterfaceBuilder - full workflow',
-            `Interface ${interfaceName} is locked (currently editing, ${statusText}). Details: ${errorMsg}`
-          );
-          return; // Skip test
-        }
-
-        // "Already exists" errors should fail the test (cleanup must work)
-        const enhancedError = statusText !== 'HTTP ?'
-          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-          : error;
-        logBuilderTestError(builderLogger, 'InterfaceBuilder - full workflow', enhancedError);
-        throw enhancedError;
+      } catch (error) {
+        logBuilderTestError(builderLogger, 'InterfaceBuilder - full workflow', error);
+        throw error;
       } finally {
-        await builder.forceUnlock().catch(() => {});
+        await builder.forceUnlock().catch(() => { });
         logBuilderTestEnd(builderLogger, 'InterfaceBuilder - full workflow');
       }
     }, getTimeout('test'));

@@ -202,7 +202,9 @@ describe('ProgramBuilder', () => {
             logBuilderTestStep('create');
             return b.create();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to finish create operation (includes lock/unlock internally)
+            await new Promise(resolve => setTimeout(resolve, 1000));
             logBuilderTestStep('lock');
             return b.lock();
           })

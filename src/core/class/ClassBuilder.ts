@@ -38,7 +38,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { validateClassName, ValidationResult } from './validation';
-import { createClass, CreateClassParams } from './create';
+import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
 import { lockClass } from './lock';
 import { updateClass } from './update';
@@ -189,7 +189,7 @@ export class ClassBuilder {
         throw new Error('Package name is required');
       }
       this.logger.info?.('Creating class:', this.config.className);
-      const result = await createClass(this.connection, {
+      const result = await createClassObject(this.connection, {
         class_name: this.config.className,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -200,7 +200,7 @@ export class ClassBuilder {
         create_protected: this.config.createProtected,
         master_system: this.config.masterSystem,
         responsible: this.config.responsible,
-      });
+      }, this.sessionId);
       this.state.createResult = result;
       this.logger.info?.('Class created successfully:', result.status);
       return this;

@@ -1,11 +1,10 @@
 /**
- * Class create operations
+ * Class create operations - Low-level functions
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -29,9 +28,10 @@ export interface CreateClassParams {
 
 
 /**
- * Create class object with metadata
+ * Low-level: Create class object with metadata (POST)
+ * Does NOT lock/upload/activate - just creates the object
  */
-async function createClassObject(
+export async function create(
   connection: AbapConnection,
   args: CreateClassParams,
   sessionId: string
@@ -113,48 +113,3 @@ async function createClassObject(
     throw error;
   }
 }
-
-/**
- * Create ABAP class object (metadata only)
- * Low-level function - only creates the class object with metadata
- *
- * To complete class creation workflow:
- * 1. createClass() - create object
- * 2. lockClass() - lock for modification
- * 3. updateClass() - upload source code
- * 4. unlockClass() - unlock
- * 5. activateClass() - activate (optional)
- */
-export async function createClass(
-  connection: AbapConnection,
-  params: CreateClassParams
-): Promise<AxiosResponse> {
-  if (!params.class_name) {
-    throw new Error('Class name is required');
-  }
-
-  if (params.class_name.length > 30) {
-    throw new Error('Class name must not exceed 30 characters');
-  }
-
-  if (!params.package_name) {
-    throw new Error('package_name is required');
-  }
-
-  const className = params.class_name.toUpperCase();
-  const sessionId = generateSessionId();
-
-  // Create class object with metadata
-  const createResponse = await createClassObject(connection, params, sessionId);
-
-  if (createResponse.status < 200 || createResponse.status >= 300) {
-    const errorMessage = createResponse.data
-      ? (typeof createResponse.data === 'string' ? createResponse.data : JSON.stringify(createResponse.data))
-      : createResponse.statusText;
-    throw new Error(`Failed to create class ${className}: ${errorMessage}`);
-  }
-
-  // Return response from SAP
-  return createResponse;
-}
-

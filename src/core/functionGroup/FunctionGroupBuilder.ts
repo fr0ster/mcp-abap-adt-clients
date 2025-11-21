@@ -13,7 +13,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { validateFunctionGroupName } from './validation';
-import { createFunctionGroup } from './create';
+import { create } from './create';
 import { CreateFunctionGroupParams } from './types';
 import { ValidationResult } from '../shared/validation';
 import { lockFunctionGroup } from './lock';
@@ -126,14 +126,15 @@ export class FunctionGroupBuilder {
         throw new Error('Package name is required');
       }
       this.logger.info?.('Creating function group:', this.config.functionGroupName);
-      const params: CreateFunctionGroupParams = {
-        function_group_name: this.config.functionGroupName,
-        package_name: this.config.packageName,
-        transport_request: this.config.transportRequest,
-        description: this.config.description,
-        activate: false // Don't activate in low-level function
-      };
-      const result = await createFunctionGroup(this.connection, params);
+      
+      // Call low-level create function
+      const result = await create(
+        this.connection,
+        this.config.functionGroupName,
+        this.config.description,
+        this.config.packageName,
+        this.config.transportRequest
+      );
       this.state.createResult = result;
       this.logger.info?.('Function group created successfully:', result.status);
       return this;

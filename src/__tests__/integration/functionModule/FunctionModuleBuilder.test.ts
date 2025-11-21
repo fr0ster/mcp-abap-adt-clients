@@ -7,13 +7,11 @@
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { FunctionModuleBuilder, FunctionModuleBuilderLogger } from '../../../core/functionModule';
+import { FunctionGroupBuilder } from '../../../core/functionGroup';
 import { deleteFunctionModule } from '../../../core/functionModule/delete';
-import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
-import { createFunctionGroup } from '../../../core/functionGroup/create';
 import { unlockFunctionModule } from '../../../core/functionModule/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { LockStateManager } from '../../../utils/lockStateManager';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
 import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -155,13 +153,13 @@ describe('FunctionModuleBuilder', () => {
 
     // Try to create (ignore "already exists" errors)
     try {
-      await createFunctionGroup(connection, {
-        function_group_name: functionGroupName,
-        package_name: packageName,
-        transport_request: transportRequest,
-        description: `Test function group for ${functionGroupName}`,
-        activate: false
+      const builder = new FunctionGroupBuilder(connection, {}, {
+        functionGroupName: functionGroupName,
+        packageName: packageName,
+        transportRequest: transportRequest,
+        description: `Test function group for ${functionGroupName}`
       });
+      await builder.create();
       return { success: true };
     } catch (error: any) {
       // 409 = already exists, that's fine
@@ -324,7 +322,9 @@ describe('FunctionModuleBuilder', () => {
             logBuilderTestStep('create');
             return b.create();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to finish create operation (includes lock/unlock internally)
+            await new Promise(resolve => setTimeout(resolve, 1000));
             logBuilderTestStep('lock');
             return b.lock();
           })
@@ -357,14 +357,6 @@ describe('FunctionModuleBuilder', () => {
         const errorData = error.response?.data || '';
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
-        // Check if object is locked by someone else (currently editing)
-        if (fullErrorText.includes('currently editing') ||
-            fullErrorText.includes('exceptionresourcenoaccess') ||
-            fullErrorText.includes('eu510')) {
-          logBuilderTestSkip(builderLogger, 'FunctionModuleBuilder - full workflow', `Function module ${functionModuleName} is locked (currently editing)`);
-          return; // Skip test
-        }
 
         // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(builderLogger, 'FunctionModuleBuilder - full workflow', error);

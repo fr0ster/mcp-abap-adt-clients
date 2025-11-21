@@ -12,10 +12,3 @@ export interface CreateFunctionModuleParams {
   activate?: boolean;
 }
 
-export interface UpdateFunctionModuleSourceParams {
-  function_group_name: string;
-  function_module_name: string;
-  source_code: string;
-  activate?: boolean;
-}
-

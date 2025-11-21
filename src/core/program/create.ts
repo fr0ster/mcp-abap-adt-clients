@@ -1,5 +1,5 @@
 /**
- * Program create operations
+ * Program create operations - Low-level functions
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
@@ -80,9 +80,10 @@ START-OF-SELECTION.
 }
 
 /**
- * Create program object with metadata
+ * Low-level: Create program object with metadata (POST)
+ * Does NOT lock/upload/activate - just creates the object
  */
-async function createProgramObject(
+export async function create(
   connection: AbapConnection,
   args: CreateProgramParams,
   sessionId: string
@@ -144,69 +145,3 @@ async function uploadProgramSource(
 
   return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
 }
-
-/**
- * Create ABAP program
- * Full workflow: create object -> lock -> upload source -> unlock -> activate
- */
-export async function createProgram(
-  connection: AbapConnection,
-  params: CreateProgramParams
-): Promise<AxiosResponse> {
-  const programName = params.program_name.toUpperCase();
-  const sessionId = generateSessionId();
-  let lockHandle: string | null = null;
-
-  try {
-    // Step 1: Create program object with metadata
-    const createResponse = await createProgramObject(connection, params, sessionId);
-    if (createResponse.status < 200 || createResponse.status >= 300) {
-      throw new Error(`Failed to create program object: ${createResponse.status} ${createResponse.statusText}`);
-    }
-
-    // Extract lock handle from response headers
-    lockHandle = createResponse.headers['sap-adt-lockhandle'] ||
-                 createResponse.headers['lockhandle'] ||
-                 createResponse.headers['x-sap-adt-lockhandle'];
-
-    if (!lockHandle) {
-      // Fallback: do explicit LOCK
-      lockHandle = await lockProgram(connection, programName, sessionId);
-    }
-
-    // Step 2: Upload source code
-    const programType = convertProgramType(params.program_type);
-    const sourceCode = params.source_code || generateProgramTemplate(programName, programType, params.description || programName);
-    const uploadResponse = await uploadProgramSource(connection, programName, sourceCode, lockHandle, sessionId, params.transport_request);
-    if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
-      throw new Error(`Failed to upload source: ${uploadResponse.status} ${uploadResponse.statusText}`);
-    }
-
-    // Step 3: Unlock the program
-    await unlockProgram(connection, programName, lockHandle, sessionId);
-    lockHandle = null;
-
-    // Step 4: Activate the program (optional)
-    const shouldActivate = params.activate !== false;
-    if (shouldActivate) {
-      await activateProgram(connection, programName, sessionId);
-    }
-
-    // Return the real response from SAP (from initial POST)
-    return createResponse;
-
-  } catch (error: any) {
-    // Attempt to unlock if we have a lock handle
-    if (lockHandle) {
-      try {
-        await unlockProgram(connection, programName, lockHandle, sessionId);
-      } catch (unlockError: any) {
-        // Ignore unlock errors
-      }
-    }
-
-    const errorMessage = error.response?.data || error.message || 'Unknown error';
-    throw new Error(`Failed to create program ${programName}: ${errorMessage}`);
-  }
-}
-

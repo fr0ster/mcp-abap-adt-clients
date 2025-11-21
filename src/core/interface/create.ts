@@ -1,22 +1,17 @@
 /**
- * Interface create operations
+ * Interface create operations - Low-level functions (1 function = 1 HTTP request)
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
-import { lockInterface } from './lock';
-import { unlockInterface } from './unlock';
-import { activateInterface } from './activation';
+import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
-import { CreateInterfaceParams } from './types';
 
 /**
  * Generate minimal interface source code if not provided
  */
-function generateInterfaceTemplate(interfaceName: string, description: string): string {
+export function generateInterfaceTemplate(interfaceName: string, description: string): string {
   return `INTERFACE ${interfaceName}
   PUBLIC.
 
@@ -29,9 +24,10 @@ ENDINTERFACE.`;
 }
 
 /**
- * Create interface object with metadata
+ * Low-level: Create interface object with metadata (POST)
+ * Does NOT lock/upload/activate - just creates the object
  */
-async function createInterfaceObject(
+export async function create(
   connection: AbapConnection,
   interfaceName: string,
   description: string,
@@ -87,9 +83,10 @@ async function createInterfaceObject(
 }
 
 /**
- * Upload interface source code
+ * Low-level: Upload interface source code (PUT)
+ * Requires lock handle - does NOT lock/unlock
  */
-async function uploadInterfaceSource(
+export async function upload(
   connection: AbapConnection,
   interfaceName: string,
   sourceCode: string,
@@ -111,81 +108,3 @@ async function uploadInterfaceSource(
     { 'Content-Type': 'text/plain; charset=utf-8' }
   );
 }
-
-/**
- * Create ABAP interface
- * Full workflow: create object -> lock -> upload source -> unlock -> activate
- */
-export async function createInterface(
-  connection: AbapConnection,
-  params: CreateInterfaceParams
-): Promise<AxiosResponse> {
-  if (!params.interface_name || !params.package_name) {
-    throw new Error('interface_name and package_name are required');
-  }
-
-  const finalDescription = params.description || params.interface_name;
-  const finalSourceCode = params.source_code || generateInterfaceTemplate(params.interface_name, finalDescription);
-
-  const sessionId = generateSessionId();
-  let lockHandle: string | undefined;
-
-  try {
-    // Step 1: Create interface object with metadata
-    const createResponse = await createInterfaceObject(
-      connection,
-      params.interface_name,
-      finalDescription,
-      params.package_name,
-      params.transport_request,
-      sessionId,
-      params.master_system,
-      params.responsible
-    );
-
-    // Step 2: Lock interface
-    const lockData = await lockInterface(connection, params.interface_name, sessionId);
-    lockHandle = lockData.lockHandle;
-    const corrNr = lockData.corrNr;
-
-    // Step 3: Upload source code
-    await uploadInterfaceSource(
-      connection,
-      params.interface_name,
-      finalSourceCode,
-      lockHandle,
-      corrNr,
-      sessionId
-    );
-
-    // Step 4: Unlock interface
-    await unlockInterface(connection, params.interface_name, lockHandle, sessionId);
-    lockHandle = undefined;
-
-    // Step 5: Activate interface (optional)
-    const shouldActivate = params.activate !== false;
-    if (shouldActivate) {
-      await activateInterface(connection, params.interface_name, sessionId);
-    }
-
-    // Return the real response from SAP (from initial POST)
-    return createResponse;
-
-  } catch (error: any) {
-    // Attempt to unlock if we have a lock handle
-    if (lockHandle) {
-      try {
-        await unlockInterface(connection, params.interface_name, lockHandle, sessionId);
-      } catch (unlockError) {
-        // Ignore unlock errors
-      }
-    }
-
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
-
-    throw new Error(`Failed to create interface ${params.interface_name}: ${errorMessage}`);
-  }
-}
-

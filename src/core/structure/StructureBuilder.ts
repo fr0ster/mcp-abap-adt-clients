@@ -32,9 +32,9 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
-import { createStructure } from './create';
+import { create } from './create';
 import { lockStructure } from './lock';
-import { updateStructure } from './update';
+import { upload } from './update';
 import { checkStructure } from './check';
 import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
@@ -188,20 +188,19 @@ export class StructureBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      if (!this.config.ddlCode) {
-        throw new Error('DDL code is required');
-      }
-      this.logger.info?.('Creating structure:', this.config.structureName);
-      const params: CreateStructureParams = {
-        structure_name: this.config.structureName,
-        package_name: this.config.packageName,
-        transport_request: this.config.transportRequest,
-        description: this.config.description,
-        ddl_code: this.config.ddlCode
-      };
-      const result = await createStructure(this.connection, params);
+      this.logger.info?.('Creating structure metadata:', this.config.structureName);
+      
+      // Call low-level create function (metadata only)
+      const result = await create(
+        this.connection,
+        this.config.structureName,
+        this.config.description,
+        this.config.packageName,
+        this.config.transportRequest,
+        this.sessionId
+      );
       this.state.createResult = result;
-      this.logger.info?.('Structure created successfully:', result.status);
+      this.logger.info?.('Structure metadata created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -252,17 +251,15 @@ export class StructureBuilder {
       if (!code) {
         throw new Error('DDL code is required. Use setDdlCode() or pass as parameter.');
       }
-      this.logger.info?.('Updating structure:', this.config.structureName);
-      const params: UpdateStructureParams = {
-        structure_name: this.config.structureName,
-        ddl_code: code,
-        transport_request: this.config.transportRequest
-      };
-      const result = await updateStructure(
+      this.logger.info?.('Updating structure DDL:', this.config.structureName);
+      
+      const result = await upload(
         this.connection,
-        params,
+        this.config.structureName,
+        code,
         this.lockHandle,
-        this.sessionId
+        this.sessionId,
+        this.config.transportRequest
       );
       this.state.updateResult = result;
       this.logger.info?.('Structure updated successfully:', result.status);

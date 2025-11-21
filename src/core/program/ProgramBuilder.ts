@@ -13,9 +13,8 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { validateProgramName } from './validation';
-import { createProgram, CreateProgramParams } from './create';
+import { create, CreateProgramParams } from './create';
 import { lockProgram } from './lock';
-import { updateProgramSource, UpdateProgramSourceParams } from './update';
 import { ValidationResult } from '../shared/validation';
 import { checkProgram } from './check';
 import { unlockProgram } from './unlock';
@@ -158,7 +157,7 @@ export class ProgramBuilder {
         source_code: this.sourceCode,
         activate: false // Don't activate in low-level function
       };
-      const result = await createProgram(this.connection, params);
+      const result = await create(this.connection, params, this.sessionId);
       this.state.createResult = result;
       this.logger.info?.('Program created successfully:', result.status);
       return this;
@@ -212,12 +211,22 @@ export class ProgramBuilder {
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
       this.logger.info?.('Updating program source:', this.config.programName);
-      const params: UpdateProgramSourceParams = {
-        program_name: this.config.programName,
-        source_code: code,
-        activate: false // Don't activate in low-level function
+
+      // Direct PUT with existing lockHandle (don't call updateProgramSource which does its own lock/unlock)
+      const encodedName = this.config.programName.toLowerCase();
+      let url = `/sap/bc/adt/programs/programs/${encodedName}/source/main?lockHandle=${this.lockHandle}`;
+      if (this.config.transportRequest) {
+        url += `&corrNr=${this.config.transportRequest}`;
+      }
+
+      const headers = {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Accept': 'text/plain'
       };
-      const result = await updateProgramSource(this.connection, params);
+
+      const { makeAdtRequestWithSession } = await import('../../utils/sessionUtils');
+      const result = await makeAdtRequestWithSession(this.connection, url, 'PUT', this.sessionId, code, headers);
+
       this.state.updateResult = result;
       this.logger.info?.('Program updated successfully:', result.status);
       return this;

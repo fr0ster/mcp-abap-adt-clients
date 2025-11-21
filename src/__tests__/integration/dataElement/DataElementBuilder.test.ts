@@ -292,14 +292,6 @@ describe('DataElementBuilder', () => {
         const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
-        // Check if object is locked by someone else (currently editing)
-        if (fullErrorText.includes('currently editing') ||
-            fullErrorText.includes('exceptionresourcenoaccess') ||
-            fullErrorText.includes('eu510')) {
-          logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', `Data element ${dataElementName} is locked (currently editing)`);
-          return; // Skip test
-        }
-
         // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(builderLogger, 'DataElementBuilder - full workflow', error);
         throw error;

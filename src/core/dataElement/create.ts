@@ -1,14 +1,12 @@
 /**
- * DataElement create operations
+ * DataElement create operations - Low-level functions
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { generateSessionId } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
-import { activateDataElement } from './activation';
 import { getDomainInfo } from './update';
 import { CreateDataElementParams } from './types';
 import * as crypto from 'crypto';
@@ -21,7 +19,7 @@ function generateRequestId(): string {
 }
 
 /**
- * Make ADT request stateless
+ * Low-level: Make ADT request stateless
  */
 async function makeAdtRequestStateless(
   connection: AbapConnection,
@@ -52,17 +50,21 @@ async function makeAdtRequestStateless(
 }
 
 /**
- * Create data element internal
+ * Low-level: Create data element (POST)
+ * Does NOT activate - just creates the object
  */
-async function createDataElementInternal(
+export async function create(
   connection: AbapConnection,
   args: CreateDataElementParams,
-  sessionId: string,
-  username: string,
-  masterSystem?: string
+  sessionId: string
 ): Promise<AxiosResponse> {
   const baseUrl = await connection.getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
+
+  // Get system information for cloud systems
+  const systemInfo = await getSystemInformation(connection);
+  const username = systemInfo?.userName || '';
+  const masterSystem = systemInfo?.systemID || '';
 
   const description = args.description || args.data_element_name;
   if (!args.type_kind) {
@@ -182,92 +184,5 @@ async function createDataElementInternal(
   };
 
   return makeAdtRequestStateless(connection, url, 'POST', sessionId, xmlBody, headers);
-}
-
-/**
- * Get data element to verify creation
- */
-async function getDataElementForVerification(
-  connection: AbapConnection,
-  dataElementName: string,
-  sessionId: string
-): Promise<any> {
-  const baseUrl = await connection.getBaseUrl();
-  const dataElementNameEncoded = encodeSapObjectName(dataElementName.toLowerCase());
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}`;
-
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
-  };
-
-  const response = await makeAdtRequestStateless(connection, url, 'GET', sessionId, null, headers);
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  const result = parser.parse(response.data);
-  return result['blue:wbobj'];
-}
-
-/**
- * Create ABAP data element
- * Full workflow: create -> activate -> verify
- */
-export async function createDataElement(
-  connection: AbapConnection,
-  params: CreateDataElementParams
-): Promise<AxiosResponse> {
-  if (!params.data_element_name) {
-    throw new Error('Data element name is required');
-  }
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
-  if (!params.type_kind) {
-    throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
-  }
-  const typeKind = params.type_kind;
-  if (typeKind === 'domain' && !params.domain_name) {
-    throw new Error('Domain name is required when type_kind is domain');
-  }
-
-  const sessionId = generateSessionId();
-
-  // Get masterSystem and responsible (only for cloud systems)
-  // On cloud, getSystemInformation returns systemID and userName
-  // On on-premise, it returns null, so we don't add these attributes
-  const systemInfo = await getSystemInformation(connection);
-  const masterSystem = systemInfo?.systemID;
-  const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
-
-  try {
-    // Step 1: Create data element with POST
-    const createResponse = await createDataElementInternal(
-      connection,
-      {
-        ...params,
-        type_kind: typeKind
-      },
-      sessionId,
-      username,
-      masterSystem
-    );
-
-    // Step 2: Activate data element
-    await activateDataElement(connection, params.data_element_name, sessionId);
-
-    // Return the real response from SAP (from initial POST)
-    return createResponse;
-
-  } catch (error: any) {
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
-
-    throw new Error(`Failed to create data element ${params.data_element_name}: ${errorMessage}`);
-  }
 }
 

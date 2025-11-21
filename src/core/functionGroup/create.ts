@@ -12,8 +12,9 @@ import { CreateFunctionGroupParams } from './types';
 
 /**
  * Create function group metadata via POST
+ * Low-level function - creates function group without workflow logic
  */
-async function createFunctionGroupObject(
+export async function create(
   connection: AbapConnection,
   functionGroupName: string,
   description: string,
@@ -51,68 +52,3 @@ async function createFunctionGroupObject(
     headers
   });
 }
-
-/**
- * Create ABAP function group
- * Full workflow: create -> activate (optional)
- */
-export async function createFunctionGroup(
-  connection: AbapConnection,
-  params: CreateFunctionGroupParams
-): Promise<AxiosResponse> {
-  if (!params.function_group_name || !params.package_name) {
-    throw new Error('function_group_name and package_name are required');
-  }
-
-  if (params.function_group_name.length > 26) {
-    throw new Error('Function group name must not exceed 26 characters');
-  }
-
-  if (!/^[ZY]/i.test(params.function_group_name)) {
-    throw new Error('Function group name must start with Z or Y (customer namespace)');
-  }
-
-  try {
-    const createResponse = await createFunctionGroupObject(
-      connection,
-      params.function_group_name,
-      params.description || params.function_group_name,
-      params.package_name,
-      params.transport_request
-    );
-
-    const shouldActivate = params.activate !== false;
-    if (shouldActivate) {
-      await activateFunctionGroup(connection, params.function_group_name);
-    }
-
-    // Return the real response from SAP (from initial POST)
-    return createResponse;
-
-  } catch (error: any) {
-    let errorMessage = `Failed to create function group: ${error}`;
-
-    if (error.response?.status === 400) {
-      errorMessage = `Bad request. Check if function group name is valid and package exists.`;
-    } else if (error.response?.status === 409) {
-      errorMessage = `Function group ${params.function_group_name} already exists.`;
-    } else if (error.response?.data && typeof error.response.data === 'string') {
-      try {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_'
-        });
-        const errorData = parser.parse(error.response.data);
-        const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
-        if (errorMsg) {
-          errorMessage = `SAP Error: ${errorMsg}`;
-        }
-      } catch (parseError) {
-        // Ignore parse errors, use default message
-      }
-    }
-
-    throw new Error(errorMessage);
-  }
-}
-

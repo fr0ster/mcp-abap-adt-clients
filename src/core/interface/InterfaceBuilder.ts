@@ -11,12 +11,10 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
+import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { validateInterfaceName } from './validation';
-import { createInterface } from './create';
+import { create as createInterfaceObject, generateInterfaceTemplate } from './create';
 import { lockInterface } from './lock';
-import { updateInterfaceSource } from './update';
-import { CreateInterfaceParams, UpdateInterfaceSourceParams } from './types';
 import { ValidationResult } from '../shared/validation';
 import { checkInterface } from './check';
 import { unlockInterface } from './unlock';
@@ -136,18 +134,22 @@ export class InterfaceBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating interface:', this.config.interfaceName);
-      const params: CreateInterfaceParams = {
-        interface_name: this.config.interfaceName,
-        package_name: this.config.packageName,
-        transport_request: this.config.transportRequest,
-        description: this.config.description,
-        source_code: this.sourceCode,
-        activate: false // Don't activate in low-level function
-      };
-      const result = await createInterface(this.connection, params);
+      this.logger.info?.('Creating interface object:', this.config.interfaceName);
+      
+      const finalDescription = this.config.description || this.config.interfaceName;
+      
+      // Call low-level function
+      const result = await createInterfaceObject(
+        this.connection,
+        this.config.interfaceName,
+        finalDescription,
+        this.config.packageName,
+        this.config.transportRequest,
+        this.sessionId
+      );
+      
       this.state.createResult = result;
-      this.logger.info?.('Interface created successfully:', result.status);
+      this.logger.info?.('Interface object created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -156,7 +158,7 @@ export class InterfaceBuilder {
         timestamp: new Date()
       });
       this.logger.error?.('Create failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -199,12 +201,20 @@ export class InterfaceBuilder {
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
       this.logger.info?.('Updating interface source:', this.config.interfaceName);
-      const params: UpdateInterfaceSourceParams = {
-        interface_name: this.config.interfaceName,
-        source_code: code,
-        activate: false // Don't activate in low-level function
+      
+      const encodedName = this.config.interfaceName.toLowerCase();
+      let url = `/sap/bc/adt/oo/interfaces/${encodedName}/source/main?lockHandle=${this.lockHandle}`;
+      if (this.config.transportRequest) {
+        url += `&corrNr=${this.config.transportRequest}`;
+      }
+
+      const headers = {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Accept': 'text/plain'
       };
-      const result = await updateInterfaceSource(this.connection, params);
+
+      const result = await makeAdtRequestWithSession(this.connection, url, 'PUT', this.sessionId, code, headers);
+      
       this.state.updateResult = result;
       this.logger.info?.('Interface updated successfully:', result.status);
       return this;
@@ -215,7 +225,7 @@ export class InterfaceBuilder {
         timestamp: new Date()
       });
       this.logger.error?.('Update failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 

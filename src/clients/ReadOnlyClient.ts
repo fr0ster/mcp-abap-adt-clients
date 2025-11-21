@@ -1,125 +1,113 @@
 /**
  * ReadOnlyClient - Read-only operations for SAP ADT
  *
- * Provides methods for retrieving ABAP objects and data without modification.
+ * Exposes only read() methods from Builders.
  * All methods return raw AxiosResponse - no MCP formatting.
- *
- * All implementations are in core/{object}/read.ts modules.
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import * as programRead from '../core/program/read';
-import * as classRead from '../core/class/read';
-import * as domainRead from '../core/domain/read';
-import * as dataElementRead from '../core/dataElement/read';
-import * as interfaceRead from '../core/interface/read';
-import * as tableRead from '../core/table/read';
-import * as structureRead from '../core/structure/read';
-import * as viewRead from '../core/view/read';
-import * as functionGroupRead from '../core/functionGroup/read';
-import * as functionModuleRead from '../core/functionModule/read';
-import * as packageRead from '../core/package/read';
-import * as readOps from '../core/readOperations'; // For remaining operations (fetchNodeStructure, getSystemInformation)
+import { ProgramBuilder } from '../core/program';
+import { ClassBuilder } from '../core/class';
+import { InterfaceBuilder } from '../core/interface';
+import { DataElementBuilder } from '../core/dataElement';
+import { DomainBuilder } from '../core/domain';
+import { StructureBuilder } from '../core/structure';
+import { TableBuilder } from '../core/table';
+import { ViewBuilder } from '../core/view';
+import { FunctionGroupBuilder } from '../core/functionGroup';
+import { FunctionModuleBuilder } from '../core/functionModule';
+import { PackageBuilder } from '../core/package';
+import { TransportBuilder } from '../core/transport';
 
 export class ReadOnlyClient {
-  constructor(protected connection: AbapConnection) {}
+  protected connection: AbapConnection;
 
-  /**
-   * Get ABAP program source code
-   */
-  async getProgram(programName: string): Promise<AxiosResponse> {
-    return programRead.getProgram(this.connection, programName);
+  constructor(connection: AbapConnection) {
+    this.connection = connection;
   }
 
-  /**
-   * Get ABAP class source code
-   */
-  async getClass(className: string): Promise<AxiosResponse> {
-    return classRead.getClass(this.connection, className);
+  // Program operations
+  async readProgram(programName: string): Promise<AxiosResponse> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP table structure
-   */
-  async getTable(tableName: string): Promise<AxiosResponse> {
-    return tableRead.getTable(this.connection, tableName);
+  // Class operations
+  async readClass(className: string): Promise<AxiosResponse> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP structure
-   */
-  async getStructure(structureName: string): Promise<AxiosResponse> {
-    return structureRead.getStructure(this.connection, structureName);
+  // Interface operations
+  async readInterface(interfaceName: string): Promise<AxiosResponse> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP domain
-   */
-  async getDomain(domainName: string): Promise<AxiosResponse> {
-    return domainRead.getDomain(this.connection, domainName);
+  // DataElement operations
+  async readDataElement(dataElementName: string): Promise<AxiosResponse> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP data element
-   */
-  async getDataElement(dataElementName: string): Promise<AxiosResponse> {
-    return dataElementRead.getDataElement(this.connection, dataElementName);
+  // Domain operations
+  async readDomain(domainName: string): Promise<AxiosResponse> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP interface
-   */
-  async getInterface(interfaceName: string): Promise<AxiosResponse> {
-    return interfaceRead.getInterface(this.connection, interfaceName);
+  // Structure operations
+  async readStructure(structureName: string): Promise<AxiosResponse> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP function group
-   */
-  async getFunctionGroup(functionGroupName: string): Promise<AxiosResponse> {
-    return functionGroupRead.getFunctionGroup(this.connection, functionGroupName);
+  // Table operations
+  async readTable(tableName: string): Promise<AxiosResponse> {
+    const builder = new TableBuilder(this.connection, {}, { tableName });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP function module
-   */
-  async getFunction(functionName: string, functionGroup: string): Promise<AxiosResponse> {
-    return functionModuleRead.getFunction(this.connection, functionName, functionGroup);
+  // View operations
+  async readView(viewName: string): Promise<AxiosResponse> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP package
-   */
-  async getPackage(packageName: string): Promise<AxiosResponse> {
-    return packageRead.getPackage(this.connection, packageName);
+  // FunctionGroup operations
+  async readFunctionGroup(functionGroupName: string): Promise<AxiosResponse> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get ABAP view (CDS or Classic)
-   */
-  async getView(viewName: string): Promise<AxiosResponse> {
-    return viewRead.getView(this.connection, viewName);
+  // FunctionModule operations
+  async readFunctionModule(functionModuleName: string, functionGroupName: string): Promise<AxiosResponse> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Fetch node structure from SAP ADT repository
-   */
-  async fetchNodeStructure(
-    parentName: string,
-    parentTechName: string,
-    parentType: string,
-    nodeKey: string,
-    withShortDescriptions: boolean = true
-  ): Promise<AxiosResponse> {
-    return readOps.fetchNodeStructure(this.connection, parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
+  // Package operations
+  async readPackage(packageName: string): Promise<AxiosResponse> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, description: '', superPackage: '' });
+    await builder.read();
+    return builder.getState().readResult!;
   }
 
-  /**
-   * Get system information from SAP ADT (for cloud systems)
-   */
-  async getSystemInformation(): Promise<{ systemID?: string; userName?: string } | null> {
-    return readOps.getSystemInformation(this.connection);
+  // Transport operations
+  async readTransport(transportRequest: string): Promise<AxiosResponse> {
+    const builder = new TransportBuilder(this.connection, {}, { description: '' });
+    await builder.read(transportRequest);
+    return builder.getState().readResult!;
   }
 }
-

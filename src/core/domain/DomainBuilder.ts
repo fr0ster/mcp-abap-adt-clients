@@ -34,7 +34,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
-import { createEmptyDomain, lockAndCreateDomain } from './create';
+import { create, upload } from './create';
 import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
 import { CreateDomainParams, UpdateDomainParams } from './types';
@@ -227,7 +227,7 @@ export class DomainBuilder {
       };
 
       // Create empty domain only (initial POST to register the name)
-      const result = await createEmptyDomain(
+      const result = await create(
         this.connection,
         params,
         this.sessionId,
@@ -295,7 +295,7 @@ export class DomainBuilder {
       const isCreateWorkflow = !!this.state.createResult;
 
       if (isCreateWorkflow) {
-        // For CREATE workflow: use lockAndCreateDomain to fill empty domain with data
+        // For CREATE workflow: use upload to fill empty domain with data
         this.logger.info?.('Filling domain with data (CREATE workflow):', this.config.domainName);
         const createParams: CreateDomainParams = {
           domain_name: this.config.domainName,
@@ -311,7 +311,7 @@ export class DomainBuilder {
           value_table: this.config.value_table,
           fixed_values: this.config.fixed_values
         };
-        const result = await lockAndCreateDomain(
+        const result = await upload(
           this.connection,
           createParams,
           this.lockHandle,

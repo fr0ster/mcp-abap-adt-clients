@@ -3,13 +3,4 @@
  */
 
 export * from './types';
-export * from './create';
-export * from './update';
-export * from './read';
-export * from './lock';
-export * from './unlock';
-export * from './activation';
-export * from './check';
-export * from './delete';
 export { DomainBuilder, type DomainBuilderConfig, type DomainBuilderLogger, type DomainBuilderState } from './DomainBuilder';
-

@@ -5,14 +5,13 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/ClassBuilder.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig, ILogger } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ClassBuilder, ClassBuilderLogger } from '../../../core/class';
-import { deleteObject } from '../../../core/delete';
+import { deleteClass } from '../../../core/class/delete';
 import { unlockClass } from '../../../core/class/unlock';
-import { validateClassName } from '../../../core/class/validation';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { setupTestEnvironment, cleanupTestEnvironment, getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getTestLock } from '../../helpers/lockHelper';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -146,9 +145,8 @@ describe('ClassBuilder', () => {
 
     // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
     try {
-      await deleteObject(connection, {
-        object_name: className,
-        object_type: 'CLAS/OC',
+      await deleteClass(connection, {
+        class_name: className,
       });
       if (debugEnabled) {
         builderLogger.debug?.(`[CLEANUP] Successfully deleted class ${className}`);

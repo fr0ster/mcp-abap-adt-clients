@@ -1,44 +1,44 @@
 /**
  * ADT Clients Package - Main exports
  *
- * High-level API:
- * - ReadOnlyClient: Read-only operations
- * - CrudClient: Full CRUD operations (extends ReadOnlyClient)
- * - ManagementClient: Activation and syntax checking
- * - Builders: Fluent API for object operations with Promise chaining
+ * Client APIs (Public API):
+ * - ReadOnlyClient: Read-only operations (read* methods)
+ * - CrudClient: Full CRUD operations (read* + create*, lock*, unlock*, update*, activate*, check*, validate*)
+ *
+ * Use Builders directly from core for fine-grained control and method chaining.
+ * Builders are exported from './core' entry point.
  *
  * @example
  * ```typescript
- * import { ClassBuilder, DataElementBuilder } from '@mcp-abap-adt/adt-clients';
+ * import { ReadOnlyClient, CrudClient } from '@mcp-abap-adt/adt-clients';
+ * import { InterfaceBuilder } from '@mcp-abap-adt/adt-clients/core';
  *
- * const builder = new ClassBuilder(connection, logger, config);
- * await builder.validate().then(b => b.create()).then(b => b.activate());
+ * // Using ReadOnlyClient for read operations
+ * const readClient = new ReadOnlyClient(connection);
+ * await readClient.readProgram('ZTEST');
+ *
+ * // Using CrudClient for CRUD operations
+ * const crudClient = new CrudClient(connection);
+ * await crudClient.createProgram('ZTEST', 'Test program', 'ZPACKAGE');
+ * const lockHandle = await crudClient.lockProgram('ZTEST');
+ * await crudClient.updateProgram('ZTEST', 'WRITE: / "Hello".', lockHandle);
+ * await crudClient.unlockProgram('ZTEST', lockHandle);
+ * await crudClient.activateProgram('ZTEST');
+ *
+ * // Using Builder for complex workflows with chaining
+ * const builder = new InterfaceBuilder(connection, {}, { interfaceName: 'ZIF_TEST', description: 'Test' });
+ * await builder.create().lock().setCode('INTERFACE zif_test. ENDINTERFACE.').update().unlock().activate();
  * ```
  */
 
+// Client APIs (Public API)
 export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
-export { ManagementClient } from './clients/ManagementClient';
-export { LockClient } from './clients/LockClient';
-export { ValidationClient } from './clients/ValidationClient';
-export { parseActivationResponse } from './core/managementOperations';
 
 // Export shared types
 export type { InactiveObject, InactiveObjectsResponse } from './core/shared/getInactiveObjects';
 
-// Export Builders for high-level operations
-export { ClassBuilder, type ClassBuilderConfig, type ClassBuilderLogger, type ClassBuilderState } from './core/class/ClassBuilder';
-export { DomainBuilder, type DomainBuilderConfig, type DomainBuilderLogger, type DomainBuilderState } from './core/domain/DomainBuilder';
-export { DataElementBuilder, type DataElementBuilderConfig, type DataElementBuilderLogger, type DataElementBuilderState } from './core/dataElement/DataElementBuilder';
-export { ProgramBuilder, type ProgramBuilderConfig, type ProgramBuilderLogger, type ProgramBuilderState } from './core/program/ProgramBuilder';
-export { InterfaceBuilder, type InterfaceBuilderConfig, type InterfaceBuilderLogger, type InterfaceBuilderState } from './core/interface/InterfaceBuilder';
-export { FunctionGroupBuilder, type FunctionGroupBuilderConfig, type FunctionGroupBuilderLogger, type FunctionGroupBuilderState } from './core/functionGroup/FunctionGroupBuilder';
-export { FunctionModuleBuilder, type FunctionModuleBuilderConfig, type FunctionModuleBuilderLogger, type FunctionModuleBuilderState } from './core/functionModule/FunctionModuleBuilder';
-export { StructureBuilder, type StructureBuilderConfig, type StructureBuilderLogger, type StructureBuilderState } from './core/structure/StructureBuilder';
-export { TableBuilder, type TableBuilderConfig, type TableBuilderLogger, type TableBuilderState } from './core/table/TableBuilder';
-export { ViewBuilder, type ViewBuilderConfig, type ViewBuilderLogger, type ViewBuilderState } from './core/view/ViewBuilder';
-export { TransportBuilder, type TransportBuilderConfig, type TransportBuilderLogger, type TransportBuilderState } from './core/transport/TransportBuilder';
-export { PackageBuilder, type PackageBuilderConfig, type PackageBuilderLogger, type PackageBuilderState } from './core/package/PackageBuilder';
+
 
 // Re-export types from connection package for convenience
 export type { AbapConnection, AbapRequestOptions } from '@mcp-abap-adt/connection';

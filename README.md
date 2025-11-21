@@ -1,15 +1,16 @@
 # @mcp-abap-adt/adt-clients
 
-ADT (ABAP Development Tools) clients for SAP ABAP systems with a **Builder-first API**.  
-Low-level helpers stay internal; consumers interact via Builders and high-level clients (Management, Lock, Validation).
+TypeScript clients for SAP ABAP Development Tools (ADT) with a **Builder and Client API architecture**.
 
 ## Features
 
-- ✅ **Builder-first workflow** – every supported object type exposes a fluent Builder (`ClassBuilder`, `TableBuilder`, …) that wraps validate/create/lock/update/activate in one chain.
-- ✅ **High-level clients** – `ManagementClient`, `LockClient`, `ValidationClient` cover cross-object tasks (activation, ad-hoc locking, name validation) without touching internal modules.
-- ✅ **Stateful session propagation** – builders and clients keep the same `sap-adt-connection-id` across lock/update/unlock; session state can be exported/imported via the connection package.
-- ✅ **Lock registry + CLI** – persistent `.locks/active-locks.json` plus `adt-manage-locks` / `adt-unlock-objects` scripts to recover from crashes.
-- ✅ **Test-friendly logging** – `DEBUG_TESTS=true` for per-step output, `LOG_LOCKS=false` to silence `[LOCK] ...` lines.
+- ✅ **Builder API** – fluent interface for complex workflows with method chaining (`ClassBuilder`, `ProgramBuilder`, etc.)
+- ✅ **Client API** – simplified interface for common operations:
+  - `ReadOnlyClient` – read operations for all object types
+  - `CrudClient` – full CRUD operations with method chaining and state management
+- ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
+- ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
+- ✅ **TypeScript-first** – full type safety with comprehensive interfaces
 
 ## Installation
 
@@ -35,26 +36,51 @@ After global installation, you get 5 CLI commands:
 
 See [CLI Tools documentation](./bin/README.md) for details.
 
+## Architecture
+
+### Three-Layer API
+
+1. **Builders** (Low-level, flexible)
+   - Direct access to all ADT operations
+   - Method chaining with Promise support
+   - Fine-grained control over workflow
+   - Example: `ProgramBuilder`, `ClassBuilder`, `InterfaceBuilder`
+
+2. **Clients** (High-level, convenient)
+   - **ReadOnlyClient** – simple read operations
+   - **CrudClient** – unified CRUD operations with chaining
+   - State management with getters
+   - Example: `client.createProgram(...).lockProgram(...).updateProgram(...)`
+
+3. **Specialized Clients**
+   - `ManagementClient` – activation, syntax checking
+   - `LockClient` – lock/unlock with registry
+   - `ValidationClient` – object name validation
+
 ## Supported Object Types
 
-- **Classes** (CLAS/OC) - Full CRUD + run (if_oo_adt_classrun)
-- **Interfaces** (INTF/OI) - Full CRUD
-- **Programs** (PROG/P) - Full CRUD
-- **Function Groups** (FUGR/F) - Full CRUD
-- **Function Modules** (FUGR/FF) - Full CRUD
-- **Domains** (DOMA/DD) - Full CRUD
-- **Data Elements** (DTEL/DE) - Full CRUD
-- **CDS Views** (DDLS/DL) - Full CRUD
-- **Tables** (TABL/DT) - Read operations
-- **Structures** (TABL/DS) - Read operations
-- **Packages** (DEVC/K) - Create, read
-- **Transports** (TRNS/R3TR) - Create
+| Object Type | Builder | CrudClient | ReadOnlyClient |
+|------------|---------|------------|----------------|
+| Classes (CLAS) | ✅ | ✅ | ✅ |
+| Interfaces (INTF) | ✅ | ✅ | ✅ |
+| Programs (PROG) | ✅ | ✅ | ✅ |
+| Function Groups (FUGR) | ✅ | ✅ | ✅ |
+| Function Modules (FUGR/FF) | ✅ | ✅ | ✅ |
+| Domains (DOMA) | ✅ | ✅ | ✅ |
+| Data Elements (DTEL) | ✅ | ✅ | ✅ |
+| Structures (TABL/DS) | ✅ | ✅ | ✅ |
+| Tables (TABL/DT) | ✅ | ✅ | ✅ |
+| Views (DDLS) | ✅ | ✅ | ✅ |
+| Packages (DEVC) | ✅ | ✅ | ✅ |
+| Transports (TRNS) | ✅ | ✅ | ✅ |
 
 ## Quick Start
 
+### Using CrudClient (Recommended for most cases)
+
 ```typescript
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { ClassBuilder, LockClient, ManagementClient } from '@mcp-abap-adt/adt-clients';
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
 const connection = createAbapConnection({
   url: 'https://your-sap-system.example.com',
@@ -64,7 +90,40 @@ const connection = createAbapConnection({
   password: process.env.SAP_PASSWORD!
 }, console);
 
-// Full builder workflow
+const client = new CrudClient(connection);
+
+// Method chaining with state management
+await client
+  .createInterface('ZIF_TEST', 'Test Interface', 'ZPACKAGE', 'TREQ123')
+  .lockInterface('ZIF_TEST')
+  .updateInterface('ZIF_TEST', sourceCode)
+  .unlockInterface('ZIF_TEST')
+  .activateInterface('ZIF_TEST');
+
+// Access results via getters
+const createResult = client.getCreateResult();
+const lockHandle = client.getLockHandle();
+const activateResult = client.getActivateResult();
+```
+
+### Using ReadOnlyClient
+
+```typescript
+import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new ReadOnlyClient(connection);
+
+// Simple read operations
+const programSource = await client.readProgram('ZTEST_PROGRAM');
+const classDefinition = await client.readClass('ZCL_TEST_CLASS');
+const interfaceCode = await client.readInterface('ZIF_TEST_INTERFACE');
+```
+
+### Using Builders (Advanced workflows)
+
+```typescript
+import { ClassBuilder } from '@mcp-abap-adt/adt-clients/core';
+
 const builder = new ClassBuilder(connection, console, {
   className: 'ZCL_MY_CLASS',
   packageName: 'ZADT_BLD_PKG01',
@@ -85,37 +144,11 @@ CLASS zcl_my_class IMPLEMENTATION.
 ENDCLASS.`)
   .validate()
   .then(b => b.create())
-  .then(b => b.check('inactive'))
   .then(b => b.lock())
-  .then(b => {
-    b.setCode(b.getState().sourceCode!.replace('builder', 'builder v2'));
-    return b.update();
-  })
-  .then(b => b.check('inactive'))
+  .then(b => b.update())
   .then(b => b.unlock())
-  .then(b => b.activate())
-  .then(b => b.check('active'));
-
-// Ad-hoc management helpers
-const lockClient = new LockClient(connection);
-const mgmtClient = new ManagementClient(connection);
-
-const { lockHandle, sessionId } = await lockClient.lock({
-  objectType: 'class',
-  objectName: 'ZCL_MY_CLASS'
-});
-
-await mgmtClient.activateObjectsGroup([{ name: 'ZCL_MY_CLASS', uri: '/sap/bc/adt/oo/classes/zcl_my_class' }]);
-
-await lockClient.unlock({
-  objectType: 'class',
-  objectName: 'ZCL_MY_CLASS',
-  lockHandle,
-  sessionId
-});
+  .then(b => b.activate());
 ```
-
-> ℹ️ Need to persist the `sessionId` / cookies between processes? See [doc/architecture/STATEFUL_SESSION_GUIDE.md](../../doc/architecture/STATEFUL_SESSION_GUIDE.md) and the `@mcp-abap-adt/connection` README for details.
 
 ## CLI Tools
 
@@ -149,15 +182,96 @@ adt-manage-sessions cleanup
 
 See [bin/README.md](bin/README.md) for details.
 
-## Builders & Clients
+## API Reference
 
-- **Builders**: classes, interfaces, programs, domains, data elements, tables, structures, views, packages, transports, function groups, function modules.  
-  Each builder exposes `.validate()`, `.create()`, `.lock()`, `.update()`, `.activate()`, `.check()`, `.read()`, `.forceUnlock()`.
-- **ManagementClient**: batch activation + check operations.
-- **LockClient**: explicit lock/unlock helpers that integrate with the `.locks` registry (used by tests and CLI tools).
-- **ValidationClient**: name validation helper mirroring ADT validation endpoint.
+### CrudClient Methods
+
+**Create Operations:**
+- `createProgram(name, description, package, transport?)` → `Promise<this>`
+- `createClass(name, description, package, transport?)` → `Promise<this>`
+- `createInterface(name, description, package, transport?)` → `Promise<this>`
+- And more for all object types...
+
+**Lock Operations:**
+- `lockProgram(name)` → `Promise<this>` (stores lockHandle in state)
+- `unlockProgram(name, lockHandle?)` → `Promise<this>`
+- Similar for all object types...
+
+**Update Operations:**
+- `updateProgram(name, sourceCode, lockHandle?)` → `Promise<this>`
+- `updateClass(name, sourceCode, lockHandle?)` → `Promise<this>`
+- And more...
+
+**Activation:**
+- `activateProgram(name)` → `Promise<this>`
+- `activateClass(name)` → `Promise<this>`
+- And more...
+
+**State Getters:**
+- `getCreateResult()` → `AxiosResponse | undefined`
+- `getLockHandle()` → `string | undefined`
+- `getUnlockResult()` → `AxiosResponse | undefined`
+- `getUpdateResult()` → `AxiosResponse | undefined`
+- `getActivateResult()` → `AxiosResponse | undefined`
+- `getCheckResult()` → `AxiosResponse | undefined`
+- `getValidationResult()` → `any | undefined`
+
+### ReadOnlyClient Methods
+
+- `readProgram(name)` → `Promise<AxiosResponse>`
+- `readClass(name)` → `Promise<AxiosResponse>`
+- `readInterface(name)` → `Promise<AxiosResponse>`
+- `readDataElement(name)` → `Promise<AxiosResponse>`
+- `readDomain(name)` → `Promise<AxiosResponse>`
+- `readStructure(name)` → `Promise<AxiosResponse>`
+- `readTable(name)` → `Promise<AxiosResponse>`
+- `readView(name)` → `Promise<AxiosResponse>`
+- `readFunctionGroup(name)` → `Promise<AxiosResponse>`
+- `readFunctionModule(name, functionGroup)` → `Promise<AxiosResponse>`
+- `readPackage(name)` → `Promise<AxiosResponse>`
+- `readTransport(transportRequest)` → `Promise<AxiosResponse>`
+
+### Specialized Clients
+
+- **ManagementClient**: batch activation + check operations
+- **LockClient**: explicit lock/unlock with `.locks` registry integration
+- **ValidationClient**: name validation mirroring ADT validation endpoint
 
 Refer to the TypeScript typings (`src/index.ts`) for the full API surface.
+
+## Migration Guide
+
+### From v0.1.0 to v0.2.0
+
+**Breaking Changes:**
+
+1. **Low-level functions removed from exports**
+   ```typescript
+   // ❌ Before
+   import { createProgram } from '@mcp-abap-adt/adt-clients/core/program';
+   
+   // ✅ After - Use Builder
+   import { ProgramBuilder } from '@mcp-abap-adt/adt-clients/core';
+   
+   // ✅ Or use CrudClient
+   import { CrudClient } from '@mcp-abap-adt/adt-clients';
+   const client = new CrudClient(connection);
+   await client.createProgram(...);
+   ```
+
+2. **Client classes removed**
+   ```typescript
+   // ❌ Before
+   import { InterfaceClient } from '@mcp-abap-adt/adt-clients';
+   
+   // ✅ After
+   import { CrudClient } from '@mcp-abap-adt/adt-clients';
+   const client = new CrudClient(connection);
+   ```
+
+**Non-breaking:**
+- Builders continue to work as before
+- Specialized clients (ManagementClient, LockClient, ValidationClient) unchanged
 
 ## Documentation
 

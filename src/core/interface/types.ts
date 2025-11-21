@@ -13,9 +13,3 @@ export interface CreateInterfaceParams {
   activate?: boolean;
 }
 
-export interface UpdateInterfaceSourceParams {
-  interface_name: string;
-  source_code: string;
-  activate?: boolean;
-}
-

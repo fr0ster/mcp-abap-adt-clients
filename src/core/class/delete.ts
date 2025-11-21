@@ -1,31 +1,31 @@
 /**
- * FunctionGroup delete operations - Low-level functions
+ * Class delete operations - Low-level functions
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
-export interface DeleteFunctionGroupParams {
-  function_group_name: string;
+export interface DeleteClassParams {
+  class_name: string;
   transport_request?: string;
 }
 
 /**
- * Low-level: Check if function group can be deleted
+ * Low-level: Check if class can be deleted (deletion check)
  */
 export async function checkDeletion(
   connection: AbapConnection,
-  params: DeleteFunctionGroupParams
+  params: DeleteClassParams
 ): Promise<AxiosResponse> {
-  const { function_group_name } = params;
+  const { class_name } = params;
 
-  if (!function_group_name) {
-    throw new Error('function_group_name is required');
+  if (!class_name) {
+    throw new Error('class_name is required');
   }
 
-  const encodedName = encodeSapObjectName(function_group_name);
-  const objectUri = `/sap/bc/adt/functions/groups/${encodedName}`;
+  const encodedName = encodeSapObjectName(class_name);
+  const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;
 
   const baseUrl = await connection.getBaseUrl();
   const checkUrl = `${baseUrl}/sap/bc/adt/deletion/check`;
@@ -50,27 +50,30 @@ export async function checkDeletion(
 }
 
 /**
- * Low-level: Delete function group
+ * Low-level: Delete class using ADT deletion API
  */
-export async function deleteFunctionGroup(
+export async function deleteClass(
   connection: AbapConnection,
-  params: DeleteFunctionGroupParams
+  params: DeleteClassParams
 ): Promise<AxiosResponse> {
-  const { function_group_name, transport_request } = params;
+  const { class_name, transport_request } = params;
 
-  if (!function_group_name) {
-    throw new Error('function_group_name is required');
+  if (!class_name) {
+    throw new Error('class_name is required');
   }
 
-  const encodedName = encodeSapObjectName(function_group_name);
-  const objectUri = `/sap/bc/adt/functions/groups/${encodedName}`;
+  const encodedName = encodeSapObjectName(class_name);
+  const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;
 
   const baseUrl = await connection.getBaseUrl();
   const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
 
+  // Classes require empty transportNumber tag if no transport request
   let transportNumberTag = '';
   if (transport_request && transport_request.trim()) {
     transportNumberTag = `<del:transportNumber>${transport_request}</del:transportNumber>`;
+  } else {
+    transportNumberTag = '<del:transportNumber/>';
   }
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -97,10 +100,10 @@ export async function deleteFunctionGroup(
     ...response,
     data: {
       success: true,
-      function_group_name,
+      class_name,
       object_uri: objectUri,
       transport_request: transport_request || 'local',
-      message: `Function group ${function_group_name} deleted successfully`
+      message: `Class ${class_name} deleted successfully`
     }
   } as AxiosResponse;
 }

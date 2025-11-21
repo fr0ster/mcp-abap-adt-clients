@@ -16,8 +16,9 @@ import { CreateDomainParams } from './types';
 
 /**
  * Create empty domain (initial POST to register the name)
+ * Low-level function - creates domain without locking
  */
-export async function createEmptyDomain(
+export async function create(
   connection: AbapConnection,
   args: CreateDomainParams,
   sessionId: string,
@@ -49,10 +50,10 @@ export async function createEmptyDomain(
 }
 
 /**
- * Create domain with lock handle
- * Build XML from scratch using parameters
+ * Upload domain content with lock handle
+ * Low-level function - requires existing lock
  */
-export async function lockAndCreateDomain(
+export async function upload(
   connection: AbapConnection,
   args: CreateDomainParams,
   lockHandle: string,
@@ -117,107 +118,3 @@ ${fixValuesXml}
 
   return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, xmlBody, headers);
 }
-
-/**
- * Get domain to verify creation
- */
-async function getDomainForVerification(
-  connection: AbapConnection,
-  domainName: string,
-  sessionId: string
-): Promise<any> {
-  const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
-  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?version=workingArea`;
-
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml'
-  };
-
-  const response = await makeAdtRequestWithSession(connection, url, 'GET', sessionId, undefined, headers);
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  const result = parser.parse(response.data);
-  return result['doma:domain'];
-}
-
-/**
- * Create ABAP domain
- * Full workflow: create empty -> lock -> create with data -> check -> unlock -> activate
- */
-export async function createDomain(
-  connection: AbapConnection,
-  params: CreateDomainParams
-): Promise<AxiosResponse> {
-  if (!params.domain_name) {
-    throw new Error('Domain name is required');
-  }
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
-  if (params.domain_name.length > 30) {
-    throw new Error('Domain name must not exceed 30 characters');
-  }
-
-  const sessionId = generateSessionId();
-
-  // Get masterSystem and responsible (only for cloud systems)
-  // On cloud, getSystemInformation returns systemID and userName
-  // On on-premise, it returns null, so we don't add these attributes
-  const systemInfo = await getSystemInformation(connection);
-  const masterSystem = systemInfo?.systemID;
-  const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
-
-  let lockHandle = '';
-  let createResponse: AxiosResponse | null = null;
-
-  try {
-    // Step 1: Create empty domain
-    createResponse = await createEmptyDomain(connection, params, sessionId, username, masterSystem);
-
-    // Step 2: Acquire lock
-    lockHandle = await acquireLockHandle(connection, params, sessionId);
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Step 3: Create domain with full data
-    await lockAndCreateDomain(connection, params, lockHandle, sessionId, username, masterSystem);
-
-    // Step 4: Check domain validity (inactive version after creation)
-    await checkDomainSyntax(connection, params.domain_name, 'inactive', sessionId);
-
-    // Step 5: Unlock domain
-    await unlockDomain(connection, params.domain_name, lockHandle, sessionId);
-
-    // Step 6: Activate domain (optional, default true)
-    const shouldActivate = params.activate !== false;
-    if (shouldActivate) {
-      await activateDomain(connection, params.domain_name, sessionId);
-    }
-
-    // Return the real response from SAP (from initial POST)
-    return createResponse;
-
-  } catch (error: any) {
-    // Try to unlock if we have a lock handle
-    if (lockHandle) {
-      try {
-        await unlockDomain(connection, params.domain_name, lockHandle, sessionId);
-      } catch (unlockError) {
-        // Ignore unlock errors
-      }
-    }
-
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
-
-    throw new Error(`Failed to create domain ${params.domain_name}: ${errorMessage}`);
-  }
-}
-
