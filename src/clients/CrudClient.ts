@@ -51,8 +51,14 @@ export class CrudClient extends ReadOnlyClient {
 
   // ==================== Program operations ====================
   
-  async createProgram(programName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
-    const builder = new ProgramBuilder(this.connection, {}, { programName, description, packageName, transportRequest });
+  async createProgram(
+    programName: string, 
+    description: string, 
+    packageName: string, 
+    transportRequest?: string,
+    options?: { masterSystem?: string; responsible?: string; programType?: string; application?: string }
+  ): Promise<this> {
+    const builder = new ProgramBuilder(this.connection, {}, { programName, description, packageName, transportRequest, ...options });
     await builder.create();
     this.state.createResult = builder.getState().createResult;
     return this;
@@ -105,8 +111,14 @@ export class CrudClient extends ReadOnlyClient {
 
   // ==================== Class operations ====================
   
-  async createClass(className: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
-    const builder = new ClassBuilder(this.connection, {}, { className, description, packageName, transportRequest });
+  async createClass(
+    className: string, 
+    description: string, 
+    packageName: string, 
+    transportRequest?: string,
+    options?: { superclass?: string; final?: boolean; abstract?: boolean; createProtected?: boolean; masterSystem?: string; responsible?: string }
+  ): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description, packageName, transportRequest, ...options });
     await builder.create();
     this.state.createResult = builder.getState().createResult;
     return this;
@@ -160,8 +172,14 @@ export class CrudClient extends ReadOnlyClient {
 
   // ==================== Interface operations ====================
   
-  async createInterface(interfaceName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
-    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description, packageName, transportRequest });
+  async createInterface(
+    interfaceName: string, 
+    description: string, 
+    packageName: string, 
+    transportRequest?: string,
+    options?: { masterSystem?: string; responsible?: string }
+  ): Promise<this> {
+    const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description, packageName, transportRequest, ...options });
     await builder.create();
     this.state.createResult = builder.getState().createResult;
     return this;
