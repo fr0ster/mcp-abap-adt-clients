@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+- **CrudClient complete method coverage** – added 55 new methods for 8 object types:
+  - **FunctionModule** (7 methods): create, lock, unlock, update, activate, check, validate
+  - **FunctionGroup** (6 methods): create, lock, unlock, activate, check, validate
+  - **DataElement** (7 methods): create, lock, unlock, update, activate, check, validate
+  - **Domain** (7 methods): create, lock, unlock, update, activate, check, validate
+  - **Structure** (7 methods): create, lock, unlock, update, activate, check, validate
+  - **Table** (7 methods): create, lock, unlock, update, activate, check, validate
+  - **View** (7 methods): create, lock, unlock, update, activate, check, validate
+  - **Package** (6 methods): create, validate, lock, unlock, update, check
+  - **Transport** (1 method): create
+- All non-read Builder operations now accessible through CrudClient
+- Total 76 CRUD methods across all object types (438 lines of code)
+
 ## [0.1.5] - 2025-11-21
 
 ### Changed

@@ -230,6 +230,444 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  // ==================== FunctionModule operations ====================
+  
+  async createFunctionModule(
+    functionModuleName: string,
+    functionGroupName: string,
+    description: string,
+    packageName: string,
+    transportRequest?: string
+  ): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { 
+      functionModuleName, 
+      functionGroupName, 
+      description, 
+      packageName, 
+      transportRequest 
+    });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockFunctionModule(functionModuleName: string, functionGroupName: string): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockFunctionModule(functionModuleName: string, functionGroupName: string, lockHandle?: string): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async updateFunctionModule(functionModuleName: string, functionGroupName: string, sourceCode: string, lockHandle?: string): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '', sourceCode });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateFunctionModule(functionModuleName: string, functionGroupName: string): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkFunctionModule(functionModuleName: string, functionGroupName: string): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateFunctionModule(functionModuleName: string, functionGroupName: string): Promise<this> {
+    const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  // ==================== FunctionGroup operations ====================
+  
+  async createFunctionGroup(functionGroupName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockFunctionGroup(functionGroupName: string): Promise<this> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockFunctionGroup(functionGroupName: string, lockHandle?: string): Promise<this> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async activateFunctionGroup(functionGroupName: string): Promise<this> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkFunctionGroup(functionGroupName: string): Promise<this> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateFunctionGroup(functionGroupName: string): Promise<this> {
+    const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  // ==================== DataElement operations ====================
+  
+  async createDataElement(dataElementName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockDataElement(dataElementName: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockDataElement(dataElementName: string, lockHandle?: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async updateDataElement(dataElementName: string, properties: any, lockHandle?: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '', ...properties });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateDataElement(dataElementName: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkDataElement(dataElementName: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateDataElement(dataElementName: string): Promise<this> {
+    const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  // ==================== Domain operations ====================
+  
+  async createDomain(domainName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockDomain(domainName: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockDomain(domainName: string, lockHandle?: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async updateDomain(domainName: string, properties: any, lockHandle?: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '', ...properties });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateDomain(domainName: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkDomain(domainName: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateDomain(domainName: string): Promise<this> {
+    const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  // ==================== Structure operations ====================
+  
+  async createStructure(structureName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockStructure(structureName: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockStructure(structureName: string, lockHandle?: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async updateStructure(structureName: string, ddlCode: string, lockHandle?: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '', ddlCode });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateStructure(structureName: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkStructure(structureName: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateStructure(structureName: string): Promise<this> {
+    const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  // ==================== Table operations ====================
+  
+  async createTable(tableName: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockTable(tableName: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockTable(tableName: string, lockHandle?: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async updateTable(tableName: string, ddlCode: string, lockHandle?: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName, ddlCode });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateTable(tableName: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkTable(tableName: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateTable(tableName: string): Promise<this> {
+    const builder = new TableBuilder(this.connection, {}, { tableName });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  // ==================== View operations ====================
+  
+  async createView(viewName: string, description: string, packageName: string, transportRequest?: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description, packageName, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockView(viewName: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockView(viewName: string, lockHandle?: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async updateView(viewName: string, ddlSource: string, lockHandle?: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '', ddlSource });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateView(viewName: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
+    await builder.activate();
+    this.state.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkView(viewName: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
+    await builder.check();
+    this.state.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateView(viewName: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  // ==================== Package operations ====================
+  
+  async createPackage(packageName: string, superPackage: string, description: string, transportRequest?: string): Promise<this> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description, transportRequest });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async validatePackage(packageName: string, superPackage: string): Promise<this> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description: '' });
+    await builder.validate();
+    this.state.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  async lockPackage(packageName: string, superPackage: string): Promise<this> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description: '' });
+    await builder.lock();
+    this.state.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockPackage(packageName: string, superPackage: string, lockHandle?: string): Promise<this> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description: '' });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.unlock();
+    this.state.unlockResult = builder.getState().unlockResult;
+    this.state.lockHandle = undefined;
+    return this;
+  }
+
+  async updatePackage(packageName: string, superPackage: string, updatedDescription: string, lockHandle?: string): Promise<this> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description: '', updatedDescription });
+    (builder as any).lockHandle = lockHandle || this.state.lockHandle;
+    await builder.update();
+    this.state.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async checkPackage(packageName: string, superPackage: string): Promise<this> {
+    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description: '' });
+    await builder.check();
+    // checkResult is void for Package
+    return this;
+  }
+
+  // ==================== Transport operations ====================
+  
+  async createTransport(description: string, transportType?: 'workbench' | 'customizing'): Promise<this> {
+    const builder = new TransportBuilder(this.connection, {}, { description, transportType });
+    await builder.create();
+    this.state.createResult = builder.getState().createResult;
+    return this;
+  }
+
   // ==================== Batch operations ====================
   
   /**
