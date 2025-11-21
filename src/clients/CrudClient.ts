@@ -229,4 +229,33 @@ export class CrudClient extends ReadOnlyClient {
     this.state.validationResult = builder.getState().validationResult;
     return this;
   }
+
+  // ==================== Batch operations ====================
+  
+  /**
+   * Activate multiple ABAP objects in batch
+   * Uses ADT activation/runs endpoint for batch activation
+   */
+  async activateObjectsGroup(
+    objects: Array<{ uri: string; name: string }>,
+    preaudit: boolean = true
+  ): Promise<AxiosResponse> {
+    const { activateObjectsGroup } = await import('../core/managementOperations');
+    const result = await activateObjectsGroup(this.connection, objects, preaudit);
+    this.state.activateResult = result;
+    return result;
+  }
+
+  /**
+   * Parse activation response to extract status and messages
+   */
+  parseActivationResponse(responseData: string | any): {
+    activated: boolean;
+    checked: boolean;
+    generated: boolean;
+    messages: Array<{ type: string; text: string; line?: number; column?: number }>;
+  } {
+    const { parseActivationResponse } = require('../core/managementOperations');
+    return parseActivationResponse(responseData);
+  }
 }

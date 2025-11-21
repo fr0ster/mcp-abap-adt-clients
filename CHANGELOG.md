@@ -5,10 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-### Added
-- **src/core.ts** – internal exports file for Builders, allows importing Builders within workspace as `@mcp-abap-adt/adt-clients/core`
-  - NOTE: This is INTERNAL USE ONLY - public API remains CrudClient and ReadOnlyClient
+## [0.1.5] - 2025-11-21
 
+### Changed
+- **Public API simplified** – removed `/core` exports completely
+  - Only CrudClient and ReadOnlyClient are now exposed as public API
+  - All functionality accessible through these two client classes only
+
+### Added
+- **CrudClient.activateObjectsGroup()** – batch activation of multiple objects
+- **CrudClient.parseActivationResponse()** – parse activation results and extract messages
+
+### Removed
+- **src/core.ts** – removed internal exports file
+- **package.json /core export** – no more internal API exposure
+
+## [0.1.4] - 2025-11-21
+
+### Added
 - **CrudClient** – unified client for CRUD operations across all 12 object types
   - Method chaining pattern: all methods return `Promise<this>` for fluent workflows
   - State management: internal state stores results from create, lock, unlock, update, activate operations
