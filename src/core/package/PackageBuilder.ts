@@ -272,10 +272,10 @@ export class PackageBuilder {
     }
   }
 
-  async check(): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'active'): Promise<this> {
     try {
-      this.logger.info?.('Checking package:', this.config.packageName);
-      await checkPackage(this.connection, this.config.packageName);
+      this.logger.info?.('Checking package:', this.config.packageName, 'version:', version);
+      await checkPackage(this.connection, this.config.packageName, version);
       this.state.checkResult = undefined;
       this.logger.info?.('Package check successful');
       return this;
