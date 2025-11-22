@@ -7,9 +7,6 @@ import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getSystemInformation } from '../shared/systemInfo';
-import { lockDDLS } from './lock';
-import { unlockDDLS } from './unlock';
-import { activateDDLS } from './activation';
 import { CreateViewParams } from './types';
 
 /**
@@ -48,75 +45,18 @@ async function createDDLSObject(
 }
 
 /**
- * Upload DDL source code
- */
-async function uploadDDLSource(
-  connection: AbapConnection,
-  viewName: string,
-  ddlSource: string,
-  lockHandle: string,
-  transportRequest?: string
-): Promise<AxiosResponse> {
-  const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}/source/main?${queryParams}`;
-
-  const headers = {
-    'Content-Type': 'text/plain; charset=utf-8'
-  };
-
-  return connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: ddlSource, headers});
-}
-
-/**
- * Create ABAP view (CDS or Classic)
- * Full workflow: create object -> lock -> upload source -> unlock -> activate
+ * Create ABAP view (CDS DDLS object)
+ * Low-level: Only creates the DDLS object metadata, does NOT lock/upload/activate
+ * For complete workflow, use ViewBuilder
  */
 export async function createView(
   connection: AbapConnection,
   params: CreateViewParams
 ): Promise<AxiosResponse> {
-  if (!params.view_name || !params.ddl_source || !params.package_name) {
-    throw new Error('Missing required parameters: view_name, ddl_source, and package_name');
+  if (!params.view_name || !params.package_name) {
+    throw new Error('Missing required parameters: view_name and package_name');
   }
 
-  const viewName = params.view_name.toUpperCase();
-  let lockHandle: string | null = null;
-
-  try {
-    const createResponse = await createDDLSObject(connection, params);
-    if (createResponse.status < 200 || createResponse.status >= 300) {
-      throw new Error(`Failed to create DDLS: ${createResponse.status} ${createResponse.statusText}`);
-    }
-
-    lockHandle = await lockDDLS(connection, viewName);
-
-    const uploadResponse = await uploadDDLSource(connection, viewName, params.ddl_source, lockHandle, params.transport_request);
-    if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
-      throw new Error(`Failed to upload DDL: ${uploadResponse.status} ${uploadResponse.statusText}`);
-    }
-
-    await unlockDDLS(connection, viewName, lockHandle);
-    lockHandle = null;
-
-    await activateDDLS(connection, viewName);
-
-    // Return the real response from SAP (from initial POST)
-    return createResponse;
-
-  } catch (error: any) {
-    if (lockHandle) {
-      try {
-        await unlockDDLS(connection, viewName, lockHandle);
-      } catch (unlockError) {
-        // Ignore unlock errors
-      }
-    }
-
-    const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
-      : error.message;
-
-    throw new Error(`Failed to create view ${viewName}: ${errorMessage}`);
-  }
+  return createDDLSObject(connection, params);
 }
 

@@ -166,17 +166,8 @@ describe('FunctionModuleBuilder', () => {
       return { success: true }; // No connection = nothing to clean
     }
 
-    // Try to delete Function Module (ignore errors)
-    try {
-      await deleteFunctionModule(connection, {
-        function_group_name: functionGroupName,
-        function_module_name: functionModuleName
-      });
-    } catch (error) {
-      // Ignore all errors (404, locked, etc.)
-    }
-
-    // Try to delete Function Group (ignore errors)
+    // Delete Function Group (which automatically deletes all Function Modules inside)
+    // Note: FM is already deleted in test chain if test succeeded
     try {
       await deleteFunctionGroup(connection, {
         function_group_name: functionGroupName,
@@ -346,10 +337,13 @@ describe('FunctionModuleBuilder', () => {
         logBuilderTestError(builderLogger, 'FunctionModuleBuilder - full workflow', error);
         throw error;
       } finally {
-        // Cleanup: force unlock in case of failure
+        // Cleanup: force unlock and delete Function Group (which also deletes all FMs inside)
         if (builder) {
           await builder.forceUnlock().catch(() => {});
         }
+        await cleanupFunctionModuleAndGroup(functionGroupName!, functionModuleName!).catch(() => {
+          logBuilderTestError(builderLogger, 'FunctionModuleBuilder - full workflow', new Error('Cleanup failed'));
+        });
         logBuilderTestEnd(builderLogger, 'FunctionModuleBuilder - full workflow');
       }
     }, getTimeout('test'));

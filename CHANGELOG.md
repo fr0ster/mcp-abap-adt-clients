@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Fixed
+- **Deletion XML format** – all delete operations now send proper empty `<del:transportNumber/>` tag when no transport request specified:
+  - Affected modules: Structure, Domain, DataElement, Table, View, FunctionGroup, FunctionModule
+  - Previously sent empty string which caused malformed XML
+  - Now consistent with Class, Interface, Program, Package, BehaviorDefinition
+- **Test cleanup pattern** – removed duplicate `delete()` calls in integration tests:
+  - `delete()` remains in Promise chain as part of test workflow verification
+  - `finally` blocks now only contain `forceUnlock()` for cleanup on test failure
+  - Prevents double deletion attempts which could cause test failures
+  - Affected tests: ClassBuilder, ProgramBuilder, FunctionGroupBuilder, DomainBuilder, FunctionModuleBuilder, StructureBuilder, DataElementBuilder, InterfaceBuilder
+
 ### Changed
 - **Cloud-aware attributes** – `masterSystem` and `responsible` now only sent for cloud systems
   - Affects: Structure, Table, Package, View, Interface, DataElement create/update operations

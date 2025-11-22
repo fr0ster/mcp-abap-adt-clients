@@ -32,8 +32,8 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { createView } from './create';
+import { updateView } from './update';
 import { lockDDLS } from './lock';
-import { updateViewSource } from './update';
 import { checkView } from './check';
 import { unlockDDLS } from './unlock';
 import { activateDDLS } from './activation';
@@ -156,19 +156,18 @@ export class ViewBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      if (!this.config.ddlSource) {
-        throw new Error('DDL source is required');
-      }
+      
       this.logger.info?.('Creating view:', this.config.viewName);
+      
       const params: CreateViewParams = {
         view_name: this.config.viewName,
-        ddl_source: this.config.ddlSource,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
         description: this.config.description
       };
       const result = await createView(this.connection, params);
       this.state.createResult = result;
+      
       this.logger.info?.('View created successfully:', result.status);
       return this;
     } catch (error: any) {
@@ -185,6 +184,10 @@ export class ViewBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking view:', this.config.viewName);
+      
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
+
       const lockHandle = await lockDDLS(
         this.connection,
         this.config.viewName,
@@ -218,15 +221,18 @@ export class ViewBuilder {
       if (!this.config.ddlSource) {
         throw new Error('DDL source is required');
       }
+      
       this.logger.info?.('Updating view:', this.config.viewName);
-      const params: UpdateViewSourceParams = {
-        view_name: this.config.viewName,
-        ddl_source: this.config.ddlSource,
-        activate: false,
-        lock_handle: this.lockHandle,
-        transport_request: this.config.transportRequest
-      };
-      const result = await updateViewSource(this.connection, params);
+      
+      // Upload DDL source with existing lock handle
+      const result = await updateView(
+        this.connection,
+        this.config.viewName,
+        this.config.ddlSource,
+        this.lockHandle,
+        this.config.transportRequest
+      );
+      
       this.state.updateResult = result;
       this.logger.info?.('View updated successfully:', result.status);
       return this;
@@ -278,6 +284,10 @@ export class ViewBuilder {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.logger.info?.('View unlocked successfully');
+      
+      // Enable stateless session mode
+      this.connection.setSessionType("stateless");
+      
       return this;
     } catch (error: any) {
       this.state.errors.push({

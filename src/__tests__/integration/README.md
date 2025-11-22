@@ -64,6 +64,11 @@ npm test -- testClass.integration.test.ts
 DEBUG_TESTS=true npm test -- testClass.integration.test.ts
 ```
 
+### With ADT operation debug logs (shows test steps and ADT operations):
+```bash
+DEBUG_ADT_TESTS=true npm test -- integration/view
+```
+
 ### Clean output (only test results):
 ```bash
 npm test -- testClass.integration.test.ts 2>&1 | grep -E "(✓|✅|🧹|PASS|FAIL|Tests:)"
@@ -71,17 +76,32 @@ npm test -- testClass.integration.test.ts 2>&1 | grep -E "(✓|✅|🧹|PASS|FAI
 
 ## Debug Logging
 
-Debug logs are controlled by `DEBUG_TESTS` environment variable:
+Debug logs are controlled by environment variables:
 
-- `DEBUG_TESTS=true` - shows all debug/info logs from connection layer
+- `DEBUG_TESTS=true` - shows all debug/info logs from connection layer (HTTP requests, CSRF tokens, cookies)
+- `DEBUG_ADT_TESTS=true` - shows test workflow steps and ADT operation details (create, lock, update, activate, delete)
 - Default (unset) - shows only test progress (✅) and errors (❌)
 
-Example debug output:
+Example debug output with `DEBUG_TESTS=true`:
 ```
 [DEBUG] BaseAbapConnection - Fetching NEW CSRF token
 [DEBUG] BaseAbapConnection - Updated cookies from response
 [DEBUG] BaseAbapConnection - Reusing existing CSRF token
 ✅ Created class: ZCL_TEST_BASIC
+```
+
+Example debug output with `DEBUG_ADT_TESTS=true`:
+```
+[1/3] ▶ ViewBuilder - full workflow :: builder_view
+  Params: {"view_name":"ZADT_BLD_VIEW02","description":"ViewBuilder workflow view",...}
+  → validate
+  → create
+  → lock
+  → update
+  → unlock
+  → activate
+  → delete (cleanup)
+[1/3] ✓ PASS ViewBuilder - full workflow (12.3s)
 ```
 
 ## Test Configuration

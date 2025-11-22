@@ -166,6 +166,10 @@ export class FunctionModuleBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking function module:', this.config.functionModuleName);
+      
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
+
       const lockHandle = await lockFunctionModule(
         this.connection,
         this.config.functionGroupName,
@@ -263,6 +267,10 @@ export class FunctionModuleBuilder {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.logger.info?.('Function module unlocked successfully');
+      
+      // Enable stateless session mode
+      this.connection.setSessionType("stateless");
+
       return this;
     } catch (error: any) {
       this.state.errors.push({

@@ -165,6 +165,10 @@ export class InterfaceBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking interface:', this.config.interfaceName);
+      
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
+
       const lockData = await lockInterface(
         this.connection,
         this.config.interfaceName
@@ -265,6 +269,10 @@ export class InterfaceBuilder {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.logger.info?.('Interface unlocked successfully');
+      
+      // Enable stateless session mode
+      this.connection.setSessionType("stateless");
+
       return this;
     } catch (error: any) {
       this.state.errors.push({

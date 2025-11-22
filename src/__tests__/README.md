@@ -105,6 +105,21 @@ This ensures:
 npm test
 ```
 
+### Run specific integration test
+```bash
+npm test -- integration/class
+npm test -- integration/view
+```
+
+### Run with debug logging
+```bash
+# Connection layer debug (HTTP, CSRF, cookies)
+DEBUG_TESTS=true npm test -- integration/class
+
+# ADT operations debug (test steps, create/lock/update/activate)
+DEBUG_ADT_TESTS=true npm test -- integration/view
+```
+
 ### Run specific unit test
 ```bash
 npm test -- functionGroup/create.test
@@ -124,6 +139,18 @@ npm test -- functionModule
 ### Run all Function Group unit tests
 ```bash
 npm test -- functionGroup
+```
+
+## Debug Logging
+
+Tests support two levels of debug logging:
+
+- **`DEBUG_TESTS=true`** - Connection layer debug (shows HTTP requests, CSRF tokens, cookies, session management)
+- **`DEBUG_ADT_TESTS=true`** - ADT operations debug (shows test workflow steps like validate → create → lock → update → activate → delete)
+
+Both can be used together for maximum verbosity:
+```bash
+DEBUG_TESTS=true DEBUG_ADT_TESTS=true npm test -- integration/view
 ```
 
 ## Test Dependencies

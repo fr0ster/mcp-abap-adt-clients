@@ -4,7 +4,7 @@ export interface BuilderTestLogger {
   error?: (...args: any[]) => void;
 }
 
-const debugLogsEnabled = process.env.DEBUG_TESTS === 'true';
+const debugLogsEnabled = process.env.DEBUG_ADT_TESTS === 'true';
 const lockLogsSetting = (process.env.LOG_LOCKS || 'true').toLowerCase();
 const lockLogsEnabled = lockLogsSetting !== 'false' && lockLogsSetting !== '0' && lockLogsSetting !== 'off';
 

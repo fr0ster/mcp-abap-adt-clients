@@ -4,7 +4,7 @@
 
 export interface CreateViewParams {
   view_name: string;
-  ddl_source: string;
+  ddl_source?: string; // Optional - only metadata creation in low-level function
   package_name: string;
   transport_request?: string;
   description?: string;
