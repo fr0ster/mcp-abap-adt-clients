@@ -79,19 +79,31 @@ describe('DomainBuilder', () => {
     }
   });
 
+  /**
+   * Pre-check: Verify test domain doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureDomainReady(domainName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    // Try to delete (ignore all errors)
+    // Check if domain exists
     try {
-      await deleteDomain(connection, {
-        domain_name: domainName,
-        transport_request: resolveTransportRequest(undefined) || undefined
-      });
-    } catch (error) {
-      // Ignore all errors (404, locked, etc.)
+      await getDomain(connection, domainName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Domain ${domainName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
+    } catch (error: any) {
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
+        return {
+          success: false,
+          reason: `Cannot verify domain existence: ${error.message}`
+        };
+      }
     }
 
     return { success: true };
@@ -170,18 +182,6 @@ describe('DomainBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (domainName && connection) {
-        // Cleanup after test
-        const cleanup = await ensureDomainReady(domainName);
-        if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'DomainBuilder - full workflow', definition);
@@ -231,6 +231,10 @@ describe('DomainBuilder', () => {
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('active');
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
           });
 
         const state = builder.getState();

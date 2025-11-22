@@ -7,8 +7,8 @@
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { FunctionGroupBuilder, FunctionGroupBuilderLogger } from '../../../core/functionGroup';
-import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
+import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -86,19 +86,31 @@ describe('FunctionGroupBuilder', () => {
     }
   });
 
+  /**
+   * Pre-check: Verify test function group doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureFunctionGroupReady(functionGroupName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    // Try to delete (ignore all errors)
+    // Check if function group exists
     try {
-      await deleteFunctionGroup(connection, {
-        function_group_name: functionGroupName,
-        transport_request: resolveTransportRequest(undefined) || undefined
-      });
-    } catch (error) {
-      // Ignore all errors (404, locked, etc.)
+      await getFunctionGroup(connection, functionGroupName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Function Group ${functionGroupName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
+    } catch (error: any) {
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
+        return {
+          success: false,
+          reason: `Cannot verify function group existence: ${error.message}`
+        };
+      }
     }
 
     return { success: true };
@@ -169,18 +181,6 @@ describe('FunctionGroupBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (functionGroupName && connection) {
-        // Cleanup after test
-        const cleanup = await ensureFunctionGroupReady(functionGroupName);
-        if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - full workflow', definition);
@@ -220,7 +220,11 @@ describe('FunctionGroupBuilder', () => {
           .then(b => {
             logBuilderTestStep('check');
             return b.check();
-        });
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
+          });
 
       const state = builder.getState();
       expect(state.createResult).toBeDefined();

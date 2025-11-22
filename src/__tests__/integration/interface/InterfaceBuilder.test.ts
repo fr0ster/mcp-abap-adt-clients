@@ -7,6 +7,7 @@
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { InterfaceBuilder, InterfaceBuilderLogger } from '../../../core/interface';
+import { getInterface } from '../../../core/interface/read';
 import { deleteInterface } from '../../../core/interface/delete';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -79,29 +80,34 @@ describe('InterfaceBuilder', () => {
     }
   });
 
+  /**
+   * Pre-check: Verify test interface doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureInterfaceReady(interfaceName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
       return { success: true };
     }
 
+    // Check if interface exists
     try {
-      await deleteInterface(connection, { interface_name: interfaceName });
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return { success: true };
+      await getInterface(connection, interfaceName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Interface ${interfaceName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
     } catch (error: any) {
-      const status = error.response?.status;
-
-      // 429 = locked by another user - skip test
-      if (status === 429) {
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
         return {
           success: false,
-          reason: `Interface ${interfaceName} is locked (HTTP 429)`
+          reason: `Cannot verify interface existence: ${error.message}`
         };
       }
-
-      // All other errors (404, etc.) - ignore and proceed
-      return { success: true };
     }
+
+    return { success: true };
   }
 
   function getBuilderTestDefinition() {
@@ -170,16 +176,6 @@ describe('InterfaceBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (interfaceName && connection) {
-        // Cleanup after test
-        const cleanup = await ensureInterfaceReady(interfaceName);
-        if (!cleanup.success && cleanup.reason) {
-          console.warn(`[CLEANUP][Interface] ${cleanup.reason}`);
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'InterfaceBuilder - full workflow', definition);
@@ -226,6 +222,9 @@ describe('InterfaceBuilder', () => {
 
         logBuilderTestStep('check(active)');
         await builder.check('active');
+
+        logBuilderTestStep('delete (cleanup)');
+        await builder.delete();
 
         const state = builder.getState();
         expect(state.createResult).toBeDefined();

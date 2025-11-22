@@ -7,6 +7,7 @@
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { TableBuilder, TableBuilderLogger } from '../../../core/table';
+import { getTable } from '../../../core/table/read';
 import { deleteTable } from '../../../core/table/delete';
 import { unlockTable } from '../../../core/table/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
@@ -81,50 +82,33 @@ describe('TableBuilder', () => {
     }
   });
 
+  /**
+   * Pre-check: Verify test table doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureTableReady(tableName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    let lockedReason: string | null = null;
-
-    // Step 1: Check for locks and unlock if needed
-    const lock = getTestLock('table', tableName);
-    if (lock) {
-      try {
-        const sessionId = lock.sessionId || generateSessionId('cleanup');
-        await unlockTable(connection, tableName, lock.lockHandle, sessionId);
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Unlocked table ${tableName} before deletion`);
-        }
-      } catch (unlockError: any) {
-        // Log but continue - lock might be stale
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to unlock table ${tableName}: ${unlockError.message}`);
-        }
-      }
-    }
-
-    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
+    // Check if table exists
     try {
-      await deleteTable(connection, { table_name: tableName });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted table ${tableName}`);
-      }
+      await getTable(connection, tableName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Table ${tableName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
     } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-      const errorMsg = error.message || '';
-      const errorData = error.response?.data || '';
-      console.warn(`[CLEANUP][Table] Failed to delete ${tableName} (${statusText}): ${errorMsg} ${errorData}`);
-      if (status === 423) {
-        lockedReason = `Table ${tableName} is locked by another user (HTTP 423 Locked)`;
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
+        return {
+          success: false,
+          reason: `Cannot verify table existence: ${error.message}`
+        };
       }
     }
 
-    if (lockedReason) {
-      return { success: false, reason: lockedReason };
-    }
     return { success: true };
   }
 
@@ -194,16 +178,6 @@ describe('TableBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (tableName && connection) {
-        // Cleanup after test
-        const cleanup = await ensureTableReady(tableName);
-        if (!cleanup.success && cleanup.reason) {
-          console.warn(`[CLEANUP][Table] ${cleanup.reason}`);
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'TableBuilder - full workflow', definition);
@@ -260,6 +234,10 @@ describe('TableBuilder', () => {
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('abapCheckRun');
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
           });
 
         const state = builder.getState();

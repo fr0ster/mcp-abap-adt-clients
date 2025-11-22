@@ -79,16 +79,31 @@ describe('ProgramBuilder', () => {
     }
   });
 
+  /**
+   * Pre-check: Verify test program doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureProgramReady(programName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    // Try to delete (ignore all errors)
+    // Check if program exists
     try {
-      await deleteProgram(connection, { program_name: programName });
-    } catch (error) {
-      // Ignore all errors (404, locked, etc.)
+      await getProgramSource(connection, programName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Program ${programName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
+    } catch (error: any) {
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
+        return {
+          success: false,
+          reason: `Cannot verify program existence: ${error.message}`
+        };
+      }
     }
 
     return { success: true };
@@ -166,18 +181,6 @@ describe('ProgramBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (programName && connection) {
-        // Cleanup after test
-        const cleanup = await ensureProgramReady(programName);
-        if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'ProgramBuilder - full workflow', definition);
@@ -233,7 +236,11 @@ describe('ProgramBuilder', () => {
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('active');
-        });
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
+          });
 
       const state = builder.getState();
       expect(state.createResult).toBeDefined();

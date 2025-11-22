@@ -7,6 +7,7 @@
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { StructureBuilder, StructureBuilderLogger } from '../../../core/structure';
+import { getStructure } from '../../../core/structure/read';
 import { deleteStructure } from '../../../core/structure/delete';
 import { unlockStructure } from '../../../core/structure/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
@@ -80,50 +81,33 @@ describe('StructureBuilder', () => {
     }
   });
 
+  /**
+   * Pre-check: Verify test structure doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureStructureReady(structureName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    let lockedReason: string | null = null;
-
-    // Step 1: Check for locks and unlock if needed
-    const lock = getTestLock('structure', structureName);
-    if (lock) {
-      try {
-        const sessionId = lock.sessionId || generateSessionId('cleanup');
-        await unlockStructure(connection, structureName, lock.lockHandle, sessionId);
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Unlocked structure ${structureName} before deletion`);
-        }
-      } catch (unlockError: any) {
-        // Log but continue - lock might be stale
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to unlock structure ${structureName}: ${unlockError.message}`);
-        }
-      }
-    }
-
-    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
+    // Check if structure exists
     try {
-      await deleteStructure(connection, { structure_name: structureName });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted structure ${structureName}`);
-      }
+      await getStructure(connection, structureName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Structure ${structureName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
     } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-      const errorMsg = error.message || '';
-      const errorData = error.response?.data || '';
-      console.warn(`[CLEANUP][Structure] Failed to delete ${structureName} (${statusText}): ${errorMsg} ${errorData}`);
-      if (status === 423) {
-        lockedReason = `Structure ${structureName} is locked by another user (HTTP 423 Locked)`;
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
+        return {
+          success: false,
+          reason: `Cannot verify structure existence: ${error.message}`
+        };
       }
     }
 
-    if (lockedReason) {
-      return { success: false, reason: lockedReason };
-    }
     return { success: true };
   }
 
@@ -193,16 +177,6 @@ describe('StructureBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (structureName && connection) {
-        // Cleanup after test
-        const cleanup = await ensureStructureReady(structureName);
-        if (!cleanup.success && cleanup.reason) {
-          console.warn(`[CLEANUP][Structure] ${cleanup.reason}`);
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'StructureBuilder - full workflow', definition);
@@ -252,6 +226,10 @@ describe('StructureBuilder', () => {
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('active');
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
           });
 
         const state = builder.getState();

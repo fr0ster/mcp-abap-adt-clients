@@ -79,65 +79,43 @@ describe('PackageBuilder', () => {
   });
 
   /**
-   * Cleanup before test: Try to delete package, ignore all errors except 429 (Too Many Requests)
-   * After successful deletion, wait for system to process the deletion
+   * Pre-check: Verify test package doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
    */
-  async function cleanupPackageBefore(packageName: string): Promise<void> {
+  async function ensurePackageReady(packageName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return;
+      return { success: true };
     }
 
+    // Check if package exists
     try {
-      await deletePackage(connection, { package_name: packageName });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted package ${packageName} before test`);
-      }
-      
-      // Wait for system to process the deletion (SAP may need time to actually delete the object)
-      await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
-      
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Waited for system to process deletion of ${packageName}`);
-      }
+      await getPackage(connection, packageName);
+      // Package exists - skip test for safety
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Package ${packageName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
     } catch (error: any) {
       const status = error.response?.status;
       
-      // Don't ignore 429 (Too Many Requests) - this is a rate limit error
-      if (status === 429) {
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Rate limit (429) when deleting package ${packageName} before test`);
-        }
-        throw error; // Re-throw 429 to handle it properly
+      // 404 is expected - object doesn't exist, we can proceed
+      if (status === 404) {
+        return { success: true };
       }
       
-      // Ignore all other errors (404, 403, 423, etc.)
+      // Any other error (including locked state) means package might exist
+      // Better to skip test for safety
+      const errorMsg = error.message || 'Unknown error';
       if (debugEnabled) {
-        const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-        builderLogger.debug?.(`[CLEANUP] Ignored error when deleting package ${packageName} before test (${statusText}): ${error.message || ''}`);
+        builderLogger.warn?.(`[PRE-CHECK] Package ${packageName} check failed with status ${status}: ${errorMsg}`);
       }
-    }
-  }
-
-  /**
-   * Cleanup after test: Try to delete package, ignore all errors
-   */
-  async function cleanupPackageAfter(packageName: string): Promise<void> {
-    if (!connection) {
-      return;
-    }
-
-    try {
-      await deletePackage(connection, { package_name: packageName });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted package ${packageName} after test`);
-      }
-    } catch (error: any) {
-      // Ignore all errors after test
-      if (debugEnabled) {
-        const status = error.response?.status;
-        const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-        builderLogger.debug?.(`[CLEANUP] Ignored error when deleting package ${packageName} after test (${statusText}): ${error.message || ''}`);
-      }
+      
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status}). ` +
+                `May be locked or inaccessible. Delete/unlock manually to proceed.`
+      };
     }
   }
 
@@ -216,35 +194,14 @@ describe('PackageBuilder', () => {
       testCase = tc;
       packageName = tc.params.test_package || tc.params.package_name;
 
-      // Get global cleanup settings from environment config
-      const envConfig = getEnvironmentConfig();
-      const cleanupBefore = envConfig.cleanup_before !== false; // Default to true if not specified
-
-      if (packageName && cleanupBefore) {
-        try {
-          await cleanupPackageBefore(packageName);
-        } catch (error: any) {
-          // Only 429 (rate limit) is re-thrown - skip test in this case
-          if (error.response?.status === 429) {
-            skipReason = `Rate limit (429) when cleaning up package ${packageName} before test`;
-            testCase = null;
-            packageName = null;
-          }
-          // All other errors are ignored - test can proceed
+      // Pre-check: Verify package doesn't exist before test
+      if (packageName) {
+        const readyCheck = await ensurePackageReady(packageName);
+        if (!readyCheck.success) {
+          skipReason = readyCheck.reason || 'Package pre-check failed';
+          testCase = null;
+          packageName = null;
         }
-      }
-    });
-
-    afterEach(async () => {
-      // Get global cleanup settings from environment config
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfter = envConfig.cleanup_after !== false; // Default to true if not specified
-
-      // Cleanup after test - ignore all errors
-      if (packageName && cleanupAfter) {
-        await cleanupPackageAfter(packageName);
-      } else if (packageName && !cleanupAfter && debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Cleanup after test is disabled for package ${packageName}`);
       }
     });
 
@@ -272,6 +229,12 @@ describe('PackageBuilder', () => {
             logBuilderTestStep('create');
             return b.create();
           })
+          .then(async b => {
+            // Wait for system to process package creation before reading
+            logBuilderTestStep('wait (system processing)');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return b;
+          })
           .then(b => {
             logBuilderTestStep('read');
             return b.read();
@@ -280,19 +243,51 @@ describe('PackageBuilder', () => {
             logBuilderTestStep('lock');
             return b.lock();
           })
-          // .then(b => {
-          //   logBuilderTestStep('update');
-          //   return b.update();
-          // })
+          .then(b => {
+            logBuilderTestStep('update');
+            return b.update();
+          })
           .then(b => {
             logBuilderTestStep('unlock');
             return b.unlock();
+          })
+          .then(async b => {
+            // Wait for system to process package update
+            logBuilderTestStep('wait (after update)');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return b;
+          })
+          .then(b => {
+            logBuilderTestStep('read (verify update)');
+            return b.read();
+          })
+          .then(b => {
+            logBuilderTestStep('check(active)');
+            return b.check();
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
           });
 
         const state = builder.getState();
         expect(state.createResult).toBeDefined();
         expect(state.readResult).toBeDefined();
+        expect(state.updateResult).toBeDefined();
         expect(state.errors.length).toBe(0);
+        
+        // Verify that description was updated
+        if (state.readResult?.data) {
+          const readData = typeof state.readResult.data === 'string' 
+            ? state.readResult.data 
+            : JSON.stringify(state.readResult.data);
+          const updatedDesc = testCase?.params?.updated_description || testCase?.params?.description;
+          if (updatedDesc && !readData.includes(updatedDesc)) {
+            builderLogger.warn?.(`⚠️ Updated description "${updatedDesc}" not found in package after read`);
+          } else if (updatedDesc) {
+            builderLogger.info?.(`✓ Verified updated description: "${updatedDesc}"`);
+          }
+        }
 
         logBuilderTestSuccess(builderLogger, 'PackageBuilder - full workflow');
       } catch (error: any) {

@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [Unreleased]
 
 ### Changed
+- **Cloud-aware attributes** – `masterSystem` and `responsible` now only sent for cloud systems
+  - Affects: Structure, Table, Package, View, Interface, DataElement create/update operations
+  - Uses `getSystemInformation()` to detect cloud environment instead of `process.env`
+- **Builder test pattern improved** – all 10 Builder tests now follow consistent pattern:
+  - Pre-check: verify object doesn't exist (safety, non-destructive)
+  - Test flow: includes cleanup via `.delete()` method after activation
+  - No `afterEach` cleanup blocks (cleanup in test flow only)
+- **PackageBuilder test enhanced** – full workflow with update verification:
+  - Adds wait periods after create and update operations
+  - Verifies description update with second read operation
+  - Complete workflow: validate → create → read → lock → update → unlock → read → verify → delete
 - **ReadOnlyClient refactored to state pattern** – all read methods now return `Promise<this>` for chaining
   - Added private `state` with `readResult` field
   - Added `getReadResult()` getter method

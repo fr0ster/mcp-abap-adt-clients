@@ -7,11 +7,9 @@
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ClassBuilder, ClassBuilderLogger } from '../../../core/class';
-import { deleteClass } from '../../../core/class/delete';
-import { unlockClass } from '../../../core/class/unlock';
+import { getClass } from '../../../core/class/read';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock } from '../../helpers/lockHelper';
+import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -121,42 +119,30 @@ describe('ClassBuilder', () => {
    * Ensure class is ready for test (delete if exists)
    * Uses validateClassName to check existence
    */
+  /**
+   * Pre-check: Verify test class doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureClassReady(className: string, packageName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    // Step 1: Check for locks and unlock if needed
-    const lock = getTestLock('class', className);
-    if (lock) {
-      try {
-        const sessionId = lock.sessionId || generateSessionId('cleanup');
-        await unlockClass(connection, className, lock.lockHandle, sessionId);
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Unlocked class ${className} before deletion`);
-        }
-      } catch (unlockError: any) {
-        // Log but continue - lock might be stale
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to unlock class ${className}: ${unlockError.message}`);
-        }
-      }
-    }
-
-    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
+    // Check if class exists
     try {
-      await deleteClass(connection, {
-        class_name: className,
-      });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted class ${className}`);
-      }
+      await getClass(connection, className);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Class ${className} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
     } catch (error: any) {
-      // Ignore all errors (404, locked, etc.), but log details if DEBUG_TESTS=true
-      if (debugEnabled) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        builderLogger.warn?.(`[CLEANUP] Failed to delete class ${className}: ${errorMsg} ${errorData}`);
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
+        return {
+          success: false,
+          reason: `Cannot verify class existence: ${error.message}`
+        };
       }
     }
 
@@ -207,19 +193,6 @@ describe('ClassBuilder', () => {
           skipReason = cleanup.reason || 'Failed to cleanup class before test';
           testCase = null;
           testClassName = null;
-        }
-      }
-    });
-
-    afterEach(async () => {
-      if (testClassName && connection && testCase?.params) {
-        // Cleanup after test
-        const packageName = resolvePackageName(testCase.params.package_name);
-        const cleanup = await ensureClassReady(testClassName, packageName);
-        if (!cleanup.success && cleanup.reason) {
-          if (debugEnabled) {
-            builderLogger.warn?.(`[CLEANUP] Cleanup failed: ${cleanup.reason}`);
-          }
         }
       }
     });
@@ -287,6 +260,10 @@ describe('ClassBuilder', () => {
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('active');
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
           });
 
         const state = builder.getState();

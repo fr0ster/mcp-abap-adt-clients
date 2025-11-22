@@ -7,6 +7,7 @@
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ViewBuilder, ViewBuilderLogger } from '../../../core/view';
+import { getView } from '../../../core/view/read';
 import { deleteView } from '../../../core/view/delete';
 import { unlockDDLS } from '../../../core/view/unlock';
 import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
@@ -76,49 +77,33 @@ describe('ViewBuilder', () => {
     }
   });
 
+  /**
+   * Pre-check: Verify test view doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   */
   async function ensureViewReady(viewName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
-    }
-    let lockedReason: string | null = null;
-
-    // Step 1: Check for locks and unlock if needed
-    const lock = getTestLock('view', viewName);
-    if (lock) {
-      try {
-        const sessionId = lock.sessionId || generateSessionId('cleanup');
-        await unlockDDLS(connection, viewName, lock.lockHandle, sessionId);
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Unlocked view ${viewName} before deletion`);
-        }
-      } catch (unlockError: any) {
-        // Log but continue - lock might be stale
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to unlock view ${viewName}: ${unlockError.message}`);
-        }
-      }
+      return { success: true };
     }
 
-    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
+    // Check if view exists
     try {
-      await deleteView(connection, { view_name: viewName });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted view ${viewName}`);
-      }
+      await getView(connection, viewName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: View ${viewName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
     } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-      const errorMsg = error.message || '';
-      const errorData = error.response?.data || '';
-      console.warn(`[CLEANUP][View] Failed to delete ${viewName} (${statusText}): ${errorMsg} ${errorData}`);
-      if (status === 423) {
-        lockedReason = `View ${viewName} is locked by another user (HTTP 423 Locked)`;
+      // 404 is expected - object doesn't exist, we can proceed
+      if (error.response?.status !== 404) {
+        return {
+          success: false,
+          reason: `Cannot verify view existence: ${error.message}`
+        };
       }
     }
 
-    if (lockedReason) {
-      return { success: false, reason: lockedReason };
-    }
     return { success: true };
   }
 
@@ -188,16 +173,6 @@ describe('ViewBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (viewName && connection) {
-        // Cleanup after test
-        const cleanup = await ensureViewReady(viewName);
-        if (!cleanup.success && cleanup.reason) {
-          console.warn(`[CLEANUP][View] ${cleanup.reason}`);
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'ViewBuilder - full workflow', definition);
@@ -250,6 +225,10 @@ describe('ViewBuilder', () => {
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('active');
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup)');
+            return b.delete();
           });
 
         const state = builder.getState();

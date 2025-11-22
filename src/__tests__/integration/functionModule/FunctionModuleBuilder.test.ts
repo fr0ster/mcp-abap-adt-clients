@@ -8,12 +8,12 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { FunctionModuleBuilder, FunctionModuleBuilderLogger } from '../../../core/functionModule';
 import { FunctionGroupBuilder } from '../../../core/functionGroup';
+import { getFunction } from '../../../core/functionModule/read';
 import { deleteFunctionModule } from '../../../core/functionModule/delete';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
-import { unlockFunctionModule } from '../../../core/functionModule/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getConfig } from '../../helpers/sessionConfig';
+import { createOnLockCallback } from '../../helpers/lockHelper';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
@@ -85,56 +85,39 @@ describe('FunctionModuleBuilder', () => {
   /**
    * Ensure Function Module is deleted (cleanup before test)
    */
+  /**
+   * Pre-check: Verify test function module doesn't exist
+   * Safety: Skip test if object exists to avoid accidental deletion
+   * Note: Can only check FM if FUGR exists. If FUGR doesn't exist, FM can't exist either.
+   */
   async function ensureFunctionModuleReady(
     functionGroupName: string,
     functionModuleName: string
   ): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
-      return { success: true }; // No connection = nothing to clean
+      return { success: true };
     }
 
-    let lockedReason: string | null = null;
-
-    // Step 1: Check for locks and unlock if needed
-    const lock = getTestLock('fm', functionModuleName, functionGroupName);
-    if (lock) {
-      try {
-        const sessionId = lock.sessionId || generateSessionId('cleanup');
-        await unlockFunctionModule(connection, functionGroupName, functionModuleName, lock.lockHandle, sessionId);
-        if (debugEnabled) {
-          builderLogger.debug?.(`[CLEANUP] Unlocked function module ${functionGroupName}/${functionModuleName} before deletion`);
-        }
-      } catch (unlockError: any) {
-        // Log but continue - lock might be stale
-        if (debugEnabled) {
-          builderLogger.warn?.(`[CLEANUP] Failed to unlock function module ${functionGroupName}/${functionModuleName}: ${unlockError.message}`);
-        }
-      }
-    }
-
-    // Step 2: Try to delete (ignore all errors, but log if DEBUG_TESTS=true)
+    // Check if function module exists
+    // Note: If FUGR doesn't exist, this will return 500 - that's OK, FM can't exist without FUGR
     try {
-      await deleteFunctionModule(connection, {
-        function_group_name: functionGroupName,
-        function_module_name: functionModuleName
-      });
-      if (debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Successfully deleted function module ${functionGroupName}/${functionModuleName}`);
-      }
+      await getFunction(connection, functionGroupName, functionModuleName);
+      return {
+        success: false,
+        reason: `⚠️ SAFETY: Function Module ${functionGroupName}/${functionModuleName} already exists! ` +
+                `Delete manually or use different test name to avoid accidental deletion.`
+      };
     } catch (error: any) {
+      // 404 or 500 are expected - object doesn't exist (or parent doesn't exist), we can proceed
       const status = error.response?.status;
-      const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-      const errorMsg = error.message || '';
-      const errorData = error.response?.data || '';
-      console.warn(`[CLEANUP][FunctionModule] Failed to delete ${functionGroupName}/${functionModuleName} (${statusText}): ${errorMsg} ${errorData}`);
-      if (status === 423) {
-        lockedReason = `Function module ${functionModuleName} is locked by another user (HTTP 423 Locked)`;
+      if (status !== 404 && status !== 500) {
+        return {
+          success: false,
+          reason: `Cannot verify function module existence: ${error.message}`
+        };
       }
     }
 
-    if (lockedReason) {
-      return { success: false, reason: lockedReason };
-    }
     return { success: true };
   }
 
@@ -275,16 +258,6 @@ describe('FunctionModuleBuilder', () => {
       }
     });
 
-    afterEach(async () => {
-      if (functionGroupName && functionModuleName && connection) {
-        // Cleanup after test: delete Function Module and Function Group
-        const cleanup = await cleanupFunctionModuleAndGroup(functionGroupName, functionModuleName);
-        if (!cleanup.success && cleanup.reason) {
-          console.warn(`[CLEANUP][FunctionModule] ${cleanup.reason}`);
-        }
-      }
-    });
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(builderLogger, 'FunctionModuleBuilder - full workflow', definition);
@@ -350,7 +323,11 @@ describe('FunctionModuleBuilder', () => {
           .then(b => {
             logBuilderTestStep('activate');
             return b.activate();
-        });
+          })
+          .then(b => {
+            logBuilderTestStep('delete (cleanup FM)');
+            return b.delete();
+          });
 
       const state = builder.getState();
       expect(state.createResult).toBeDefined();

@@ -10,14 +10,15 @@ import { AxiosResponse } from 'axios';
  */
 export async function checkPackage(
   connection: AbapConnection,
-  packageName: string
+  packageName: string,
+  version: 'active' | 'inactive' = 'active'
 ): Promise<void> {
   const baseUrl = await connection.getBaseUrl();
   const url = `${baseUrl}/sap/bc/adt/checkruns`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
 
-  <chkrun:checkObject adtcore:uri="/sap/bc/adt/packages/${packageName.toLowerCase()}" chkrun:version="active"/>
+  <chkrun:checkObject adtcore:uri="/sap/bc/adt/packages/${packageName.toLowerCase()}" chkrun:version="${version}"/>
 
 </chkrun:checkObjectList>`;
 
