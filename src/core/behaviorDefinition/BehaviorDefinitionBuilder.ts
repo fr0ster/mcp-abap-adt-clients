@@ -268,23 +268,28 @@ export class BehaviorDefinitionBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
     try {
       this.logger.info?.('Checking behavior definition:', this.config.name, 'version:', version);
+      
+      // Use provided source code or stored source code
+      const codeToCheck = sourceCode || this.sourceCode;
       
       // Run both implementation check and ABAP check
       const implResult = await checkImplementation(
         this.connection,
         this.config.name,
+        this.sessionId,
         version,
-        this.sessionId
+        codeToCheck
       );
       
       const abapResult = await checkAbap(
         this.connection,
         this.config.name,
+        this.sessionId,
         version,
-        this.sessionId
+        codeToCheck
       );
       
       this.state.checkResults = [implResult, abapResult];

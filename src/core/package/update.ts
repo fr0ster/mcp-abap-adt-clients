@@ -10,15 +10,29 @@ import { CreatePackageParams } from './types';
 
 /**
  * Build XML for package update (similar to create)
+ * Note: masterSystem and responsible should only be included for cloud systems
  */
-function buildUpdatePackageXml(args: CreatePackageParams): string {
-  const username = args.responsible || process.env.SAP_USERNAME || process.env.SAP_USER || 'DEVELOPER';
+async function buildUpdatePackageXml(connection: AbapConnection, args: CreatePackageParams): Promise<string> {
+  const { getSystemInformation } = await import('../shared/systemInfo');
+  
+  // Get system information - only for cloud systems
+  const systemInfo = await getSystemInformation(connection);
+  const username = systemInfo?.userName || '';
+  const systemId = systemInfo?.systemID || '';
+
+  // Only add masterSystem and responsible for cloud systems
+  const masterSystem = systemInfo ? systemId : '';
+  const responsible = systemInfo ? (args.responsible || username) : '';
+
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
+
   const softwareComponentName = args.software_component || 'HOME';
   const transportLayerXml = args.transport_layer
     ? `<pak:transportLayer pak:name="${args.transport_layer}"/>`
     : '<pak:transportLayer/>';
 
-  return `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${args.description || args.package_name}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN" adtcore:masterSystem="${process.env.SAP_SYSTEM || 'E19'}" adtcore:responsible="${username}">
+  return `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${args.description || args.package_name}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
 
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 
@@ -67,7 +81,7 @@ export async function updatePackage(
   const packageNameEncoded = encodeSapObjectName(params.package_name);
   const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${lockHandle}`;
 
-  const xmlBody = buildUpdatePackageXml(params);
+  const xmlBody = await buildUpdatePackageXml(connection, params);
 
   const headers = {
     'Content-Type': 'application/vnd.sap.adt.packages.v2+xml',

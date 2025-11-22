@@ -13,9 +13,10 @@ export async function checkInterface(
   connection: AbapConnection,
   interfaceName: string,
   version: string = 'active',
-  sessionId?: string
+  sessionId?: string,
+  sourceCode?: string
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'interface', interfaceName, version, 'abapCheckRun', sessionId);
+  const response = await runCheckRun(connection, 'interface', interfaceName, version, 'abapCheckRun', sessionId, sourceCode);
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {

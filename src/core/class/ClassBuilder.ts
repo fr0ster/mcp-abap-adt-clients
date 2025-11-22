@@ -339,14 +339,18 @@ export class ClassBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
     try {
       this.logger.info?.('Checking class:', this.config.className, 'version:', version);
+      
+      // Use provided source code or stored source code
+      const codeToCheck = sourceCode || this.sourceCode;
+      
       const result = await checkClass(
         this.connection,
         this.config.className,
         version,
-        this.sourceCode,
+        codeToCheck,
         this.sessionId
       );
       this.state.checkResult = result;

@@ -265,6 +265,10 @@ describe('ClassBuilder', () => {
           return b.lock();
         })
           .then(b => {
+            logBuilderTestStep('check with source code (before update)');
+            return b.check('inactive', sourceCode);
+        })
+          .then(b => {
             logBuilderTestStep('update');
           return b.update();
         })

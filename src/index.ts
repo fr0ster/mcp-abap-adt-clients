@@ -37,6 +37,7 @@ export { CrudClient } from './clients/CrudClient';
 
 // Export shared types
 export type { InactiveObject, InactiveObjectsResponse } from './core/shared/getInactiveObjects';
+export type { ObjectReference } from './core/shared/groupActivation';
 
 
 

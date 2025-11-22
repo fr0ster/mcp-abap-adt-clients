@@ -230,7 +230,7 @@ export class FunctionModuleBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
     try {
       this.logger.info?.('Checking function module:', this.config.functionModuleName, 'version:', version);
       const result = await checkFunctionModule(
@@ -238,7 +238,8 @@ export class FunctionModuleBuilder {
         this.config.functionGroupName,
         this.config.functionModuleName,
         version,
-        this.sessionId
+        this.sessionId,
+        sourceCode
       );
       this.state.checkResult = result;
       this.logger.info?.('Function module check successful:', result.status);

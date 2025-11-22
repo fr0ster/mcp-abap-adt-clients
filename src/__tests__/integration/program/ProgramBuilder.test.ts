@@ -193,6 +193,8 @@ describe('ProgramBuilder', () => {
       }
 
       const builder = new ProgramBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+      
+      const sourceCode = testCase.params.source_code;
 
       try {
         logBuilderTestStep('validate');
@@ -207,6 +209,10 @@ describe('ProgramBuilder', () => {
             await new Promise(resolve => setTimeout(resolve, 1000));
             logBuilderTestStep('lock');
             return b.lock();
+          })
+          .then(b => {
+            logBuilderTestStep('check with source code (before update)');
+            return b.check('inactive', sourceCode);
           })
           .then(b => {
             logBuilderTestStep('update');

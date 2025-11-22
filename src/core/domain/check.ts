@@ -13,15 +13,17 @@ import { runCheckRun, parseCheckRunResponse } from '../shared/checkRun';
  * @param domainName - Domain name
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @param sessionId - Session ID (required for domain operations)
+ * @param sourceCode - Optional source code to validate
  * @returns Check result with errors/warnings
  */
 export async function checkDomainSyntax(
   connection: AbapConnection,
   domainName: string,
   version: 'active' | 'inactive',
-  sessionId: string
+  sessionId: string,
+  sourceCode?: string
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'domain', domainName, version, 'abapCheckRun', sessionId);
+  const response = await runCheckRun(connection, 'domain', domainName, version, 'abapCheckRun', sessionId, sourceCode);
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {

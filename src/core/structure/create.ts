@@ -11,6 +11,7 @@ import { lockStructure } from './lock';
 import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
 import { CreateStructureParams } from './types';
+import { getSystemInformation } from '../shared/systemInfo';
 
 /**
  * Create empty structure metadata via POST
@@ -26,7 +27,19 @@ export async function create(
 ): Promise<AxiosResponse> {
   const createUrl = `/sap/bc/adt/ddic/structures${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
 
-  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${structureName.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN" adtcore:masterSystem="${process.env.SAP_SYSTEM || process.env.SAP_SYSTEM_ID || 'DEV'}" adtcore:responsible="${process.env.SAP_USER || process.env.SAP_USERNAME || 'DEVELOPER'}">
+  // Get system information - only for cloud systems
+  const systemInfo = await getSystemInformation(connection);
+  const username = systemInfo?.userName || '';
+  const systemId = systemInfo?.systemID || '';
+
+  // Only add masterSystem and responsible for cloud systems (when systemInfo is available)
+  const masterSystem = systemInfo ? systemId : '';
+  const responsible = systemInfo ? username : '';
+
+  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
+
+  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${structureName.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${packageName.toUpperCase()}"/>
 </blue:blueSource>`;
 

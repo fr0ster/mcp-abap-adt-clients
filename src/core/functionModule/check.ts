@@ -10,10 +10,29 @@ import { parseCheckRunResponse } from '../shared/checkRun';
 /**
  * Build check run XML payload for function module
  */
-function buildCheckRunXml(functionGroupName: string, functionModuleName: string, version: string): string {
+function buildCheckRunXml(
+  functionGroupName: string, 
+  functionModuleName: string, 
+  version: string, 
+  sourceCode?: string
+): string {
   const encodedGroup = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModule = encodeSapObjectName(functionModuleName).toLowerCase();
   const objectUri = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedModule}`;
+
+  if (sourceCode) {
+    const base64Source = Buffer.from(sourceCode, 'utf-8').toString('base64');
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
+  <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
+    <chkrun:artifacts>
+      <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="${objectUri}/source/main">
+        <chkrun:content>${base64Source}</chkrun:content>
+      </chkrun:artifact>
+    </chkrun:artifacts>
+  </chkrun:checkObject>
+</chkrun:checkObjectList>`;
+  }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
@@ -35,6 +54,7 @@ function buildCheckRunXml(functionGroupName: string, functionModuleName: string,
  * @param functionModuleName - Function module name
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @param sessionId - Optional session ID
+ * @param sourceCode - Optional source code to validate
  * @returns Check result with errors/warnings
  */
 export async function checkFunctionModule(
@@ -42,9 +62,10 @@ export async function checkFunctionModule(
   functionGroupName: string,
   functionModuleName: string,
   version: 'active' | 'inactive',
-  sessionId?: string
+  sessionId?: string,
+  sourceCode?: string
 ): Promise<AxiosResponse> {
-  const xmlBody = buildCheckRunXml(functionGroupName, functionModuleName, version);
+  const xmlBody = buildCheckRunXml(functionGroupName, functionModuleName, version, sourceCode);
   const headers = {
     'Accept': 'application/vnd.sap.adt.checkmessages+xml',
     'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'

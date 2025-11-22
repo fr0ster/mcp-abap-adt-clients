@@ -230,10 +230,13 @@ export async function runCheckRun(
   objectName: string,
   version: string = 'active',
   reporter: string = 'abapCheckRun',
-  sessionId?: string
+  sessionId?: string,
+  sourceCode?: string
 ): Promise<AxiosResponse> {
   const objectUri = getObjectUri(objectType, objectName);
-  const xmlBody = buildCheckRunXml(objectUri, version);
+  const xmlBody = sourceCode 
+    ? buildCheckRunXmlWithSource(objectUri, sourceCode, version)
+    : buildCheckRunXml(objectUri, version);
 
   const headers = {
     'Accept': 'application/vnd.sap.adt.checkmessages+xml',

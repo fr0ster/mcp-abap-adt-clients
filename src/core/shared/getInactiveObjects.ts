@@ -1,3 +1,7 @@
+/**
+ * Get Inactive Objects - retrieve list of objects not yet activated
+ */
+
 import { AbapConnection, getTimeout } from "@mcp-abap-adt/connection";
 import { XMLParser } from "fast-xml-parser";
 
@@ -31,6 +35,8 @@ export interface InactiveObjectsResponse {
 
 /**
  * Get list of inactive objects (objects that are not yet activated)
+ * 
+ * Endpoint: GET /sap/bc/adt/activation/inactiveobjects
  * 
  * @param connection - ABAP connection instance
  * @param options - Optional parameters

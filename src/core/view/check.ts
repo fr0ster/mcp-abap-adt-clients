@@ -25,12 +25,13 @@ export async function checkView(
   connection: AbapConnection,
   viewName: string,
   version: string = 'active',
-  sessionId?: string
+  sessionId?: string,
+  sourceCode?: string
 ): Promise<AxiosResponse> {
   let attempt = 0;
   // Allow one retry when system did not materialize inactive version yet
   while (attempt < 2) {
-    const response = await runCheckRun(connection, 'view', viewName, version, 'abapCheckRun', sessionId);
+    const response = await runCheckRun(connection, 'view', viewName, version, 'abapCheckRun', sessionId, sourceCode);
     const checkResult = parseCheckRunResponse(response);
 
     if (!checkResult.success && checkResult.has_errors) {

@@ -20,6 +20,8 @@ import { FunctionGroupBuilder } from '../core/functionGroup';
 import { FunctionModuleBuilder } from '../core/functionModule';
 import { PackageBuilder } from '../core/package';
 import { TransportBuilder } from '../core/transport';
+import { BehaviorDefinitionBuilder } from '../core/behaviorDefinition';
+import { MetadataExtensionBuilder } from '../core/metadataExtension';
 
 interface CrudClientState {
   createResult?: AxiosResponse;
@@ -754,20 +756,183 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  // ==================== BehaviorDefinition operations ====================
+  
+  async createBehaviorDefinition(
+    name: string,
+    description: string,
+    packageName: string,
+    transportRequest: string,
+    rootEntity: string,
+    implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection',
+    options?: { masterSystem?: string; responsible?: string }
+  ): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(
+      this.connection, 
+      {}, 
+      { name, description, packageName, transportRequest, rootEntity, implementationType, ...options }
+    );
+    await builder.create();
+    this.crudState.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockBehaviorDefinition(name: string): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name, description: '', rootEntity: '' });
+    await builder.lock();
+    this.crudState.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockBehaviorDefinition(name: string, lockHandle?: string): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name, description: '', rootEntity: '' });
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.unlock();
+    this.crudState.unlockResult = builder.getState().unlockResult;
+    this.crudState.lockHandle = undefined;
+    return this;
+  }
+
+  async updateBehaviorDefinition(name: string, sourceCode: string, lockHandle?: string): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name, description: '', rootEntity: '', sourceCode });
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.update();
+    this.crudState.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateBehaviorDefinition(name: string): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name, description: '', rootEntity: '' });
+    await builder.activate();
+    this.crudState.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkBehaviorDefinition(name: string, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name, description: '', rootEntity: '' });
+    await builder.check(version);
+    this.crudState.checkResult = builder.getState().checkResults?.[0];
+    return this;
+  }
+
+  async validateBehaviorDefinition(rootEntity: string, implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name: '', description: '', rootEntity, implementationType });
+    await builder.validate();
+    this.crudState.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  async deleteBehaviorDefinition(name: string, transportRequest?: string): Promise<this> {
+    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name, description: '', rootEntity: '', transportRequest });
+    await builder.checkDeletion();
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
+  // ==================== MetadataExtension operations ====================
+  
+  async createMetadataExtension(
+    name: string,
+    description: string,
+    packageName: string,
+    transportRequest?: string,
+    options?: { masterLanguage?: string; masterSystem?: string; responsible?: string }
+  ): Promise<this> {
+    const builder = new MetadataExtensionBuilder(
+      this.connection,
+      {},
+      { name, description, packageName, transportRequest, ...options }
+    );
+    await builder.create();
+    this.crudState.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockMetadataExtension(name: string): Promise<this> {
+    const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description: '' });
+    await builder.lock();
+    this.crudState.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockMetadataExtension(name: string, lockHandle?: string): Promise<this> {
+    const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description: '' });
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.unlock();
+    this.crudState.unlockResult = builder.getState().unlockResult;
+    this.crudState.lockHandle = undefined;
+    return this;
+  }
+
+  async updateMetadataExtension(name: string, sourceCode: string, lockHandle?: string): Promise<this> {
+    const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description: '', sourceCode });
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.update();
+    this.crudState.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateMetadataExtension(name: string): Promise<this> {
+    const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description: '' });
+    await builder.activate();
+    this.crudState.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkMetadataExtension(name: string, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+    const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description: '' });
+    await builder.check(version);
+    this.crudState.checkResult = builder.getState().checkResult;
+    return this;
+  }
+
+  async validateMetadataExtension(name: string, description: string, packageName: string): Promise<this> {
+    const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description, packageName });
+    await builder.validate();
+    this.crudState.validationResult = builder.getState().validationResult;
+    return this;
+  }
+
+  async deleteMetadataExtension(name: string, transportRequest?: string): Promise<this> {
+    const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description: '', transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
   // ==================== Batch operations ====================
   
   /**
    * Activate multiple ABAP objects in batch
-   * Uses ADT activation/runs endpoint for batch activation
+   * Uses ADT activation/runs endpoint for batch activation with session support
    */
   async activateObjectsGroup(
-    objects: Array<{ uri: string; name: string }>,
-    preaudit: boolean = true
+    objects: Array<{ uri: string; type?: string; name: string }>,
+    sessionId: string,
+    preaudit: boolean = false
   ): Promise<AxiosResponse> {
-    const { activateObjectsGroup } = await import('../core/managementOperations');
-    const result = await activateObjectsGroup(this.connection, objects, preaudit);
+    const { activateObjectsGroup } = await import('../core/shared/groupActivation');
+    const result = await activateObjectsGroup(this.connection, objects, sessionId, preaudit);
     this.crudState.activateResult = result;
     return result;
+  }
+
+  /**
+   * Get list of inactive objects (objects not yet activated)
+   * Returns objects with user, deleted flag, URI, type, name, and transport
+   */
+  async getInactiveObjects(options?: { includeRawXml?: boolean }): Promise<{
+    objects: Array<{
+      user: string;
+      deleted: boolean;
+      ref: { uri: string; type: string; name: string };
+      transport?: string;
+    }>;
+    rawXml?: string;
+  }> {
+    const { getInactiveObjects } = await import('../core/shared/getInactiveObjects');
+    return await getInactiveObjects(this.connection, options);
   }
 
   /**

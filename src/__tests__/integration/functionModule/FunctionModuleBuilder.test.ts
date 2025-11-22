@@ -315,6 +315,9 @@ describe('FunctionModuleBuilder', () => {
           description: testCase.params.description,
           onLock: createOnLockCallback('fm', functionModuleName, functionGroupName, __filename)
         });
+        
+        const sourceCode = testCase.params.source_code;
+        
         logBuilderTestStep('validate');
       await builder
         .validate()
@@ -327,6 +330,10 @@ describe('FunctionModuleBuilder', () => {
             await new Promise(resolve => setTimeout(resolve, 1000));
             logBuilderTestStep('lock');
             return b.lock();
+          })
+          .then(b => {
+            logBuilderTestStep('check with source code (before update)');
+            return b.check('inactive', sourceCode);
           })
           .then(b => {
             logBuilderTestStep('update');

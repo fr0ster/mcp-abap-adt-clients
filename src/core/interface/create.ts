@@ -37,21 +37,21 @@ export async function create(
   masterSystem?: string,
   responsible?: string
 ): Promise<AxiosResponse> {
-  // Get masterSystem and responsible (only for cloud systems)
-  // On cloud, getSystemInformation returns systemID and userName
-  // On on-premise, it returns null, so we don't add these attributes
+  // Get system information - only for cloud systems
+  const systemInfo = await getSystemInformation(connection);
+  
   let finalMasterSystem = masterSystem;
   let finalResponsible = responsible;
 
-  const systemInfo = await getSystemInformation(connection);
   if (systemInfo) {
+    // Only for cloud systems - use systemInfo or provided values
     finalMasterSystem = finalMasterSystem || systemInfo.systemID;
     finalResponsible = finalResponsible || systemInfo.userName;
+  } else {
+    // For non-cloud systems - don't add these attributes
+    finalMasterSystem = '';
+    finalResponsible = '';
   }
-
-  // Only use masterSystem from getSystemInformation (cloud), not from env
-  // username can fallback to env if not provided
-  finalResponsible = finalResponsible || process.env.SAP_USERNAME || process.env.SAP_USER || '';
 
   const masterSystemAttr = finalMasterSystem ? ` adtcore:masterSystem="${finalMasterSystem}"` : '';
   const responsibleAttr = finalResponsible ? ` adtcore:responsible="${finalResponsible}"` : '';

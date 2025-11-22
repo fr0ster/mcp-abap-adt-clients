@@ -17,15 +17,16 @@ import { CheckReporter } from './types';
  * @param reporter - Check reporter type
  * @param sessionId - Session ID for request tracking
  * @param version - Version to check (default: inactive)
+ * @param sourceCode - Optional source code to check (will be base64 encoded)
  * @returns Axios response with check results (XML)
  * 
  * @example
  * ```typescript
- * // Check implementation
+ * // Check saved version
  * const implResult = await check(connection, 'Z_MY_BDEF', 'bdefImplementationCheck', sessionId);
  * 
- * // Check ABAP syntax
- * const syntaxResult = await check(connection, 'Z_MY_BDEF', 'abapCheckRun', sessionId);
+ * // Check unsaved source code
+ * const syntaxResult = await check(connection, 'Z_MY_BDEF', 'abapCheckRun', sessionId, 'inactive', sourceCode);
  * ```
  */
 export async function check(
@@ -33,11 +34,29 @@ export async function check(
     name: string,
     reporter: CheckReporter,
     sessionId: string,
-    version: string = 'inactive'
+    version: string = 'inactive',
+    sourceCode?: string
 ): Promise<AxiosResponse> {
-    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
+    let xmlBody: string;
+    
+    if (sourceCode) {
+        // Check with source code content (for unsaved changes)
+        const base64Content = Buffer.from(sourceCode, 'utf-8').toString('base64');
+        xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
+    <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}" chkrun:version="${version}">
+        <chkrun:artifacts>
+            <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main">
+                <chkrun:content>${base64Content}</chkrun:content>
+            </chkrun:artifact>
+        </chkrun:artifacts>
+    </chkrun:checkObject>
+</chkrun:checkObjectList>`;
+    } else {
+        // Check saved version
+        xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
     <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}" chkrun:version="${version}"/>
 </chkrun:checkObjectList>`;
+    }
 
     const headers = {
         'Accept': 'application/vnd.sap.adt.checkmessages+xml',
@@ -65,20 +84,26 @@ export async function check(
  * @param name - Behavior definition name
  * @param sessionId - Session ID for request tracking
  * @param version - Version to check (default: inactive)
+ * @param sourceCode - Optional source code to check
  * @returns Axios response with check results
  * 
  * @example
  * ```typescript
+ * // Check saved version
  * const result = await checkImplementation(connection, 'Z_MY_BDEF', sessionId);
+ * 
+ * // Check unsaved changes
+ * const result = await checkImplementation(connection, 'Z_MY_BDEF', sessionId, 'inactive', sourceCode);
  * ```
  */
 export async function checkImplementation(
     connection: AbapConnection,
     name: string,
     sessionId: string,
-    version: string = 'inactive'
+    version: string = 'inactive',
+    sourceCode?: string
 ): Promise<AxiosResponse> {
-    return check(connection, name, 'bdefImplementationCheck', sessionId, version);
+    return check(connection, name, 'bdefImplementationCheck', sessionId, version, sourceCode);
 }
 
 /**
@@ -90,18 +115,24 @@ export async function checkImplementation(
  * @param name - Behavior definition name
  * @param sessionId - Session ID for request tracking
  * @param version - Version to check (default: inactive)
+ * @param sourceCode - Optional source code to check
  * @returns Axios response with check results
  * 
  * @example
  * ```typescript
+ * // Check saved version
  * const result = await checkAbap(connection, 'Z_MY_BDEF', sessionId);
+ * 
+ * // Check unsaved changes
+ * const result = await checkAbap(connection, 'Z_MY_BDEF', sessionId, 'inactive', sourceCode);
  * ```
  */
 export async function checkAbap(
     connection: AbapConnection,
     name: string,
     sessionId: string,
-    version: string = 'inactive'
+    version: string = 'inactive',
+    sourceCode?: string
 ): Promise<AxiosResponse> {
-    return check(connection, name, 'abapCheckRun', sessionId, version);
+    return check(connection, name, 'abapCheckRun', sessionId, version, sourceCode);
 }

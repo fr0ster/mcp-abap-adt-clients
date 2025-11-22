@@ -11,6 +11,7 @@ import { lockDataElement } from './lock';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { UpdateDataElementParams } from './types';
+import { getSystemInformation } from '../shared/systemInfo';
 
 /**
  * Get domain info to extract dataType, length, decimals
@@ -159,6 +160,8 @@ export async function updateDataElementInternal(
   const leftToRightDirection = args.left_to_right_direction !== undefined ? args.left_to_right_direction : false;
   const deactivateBIDIFiltering = args.deactivate_bidi_filtering !== undefined ? args.deactivate_bidi_filtering : false;
 
+  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel"
             xmlns:adtcore="http://www.sap.com/adt/core"
@@ -168,8 +171,7 @@ export async function updateDataElementInternal(
             adtcore:language="EN"
             adtcore:name="${args.data_element_name.toUpperCase()}"
             adtcore:type="DTEL/DE"
-            adtcore:masterLanguage="EN"
-            adtcore:responsible="${username}">
+            adtcore:masterLanguage="EN"${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
   <dtel:dataElement>
     <dtel:typeKind>${typeKind}</dtel:typeKind>
@@ -246,7 +248,12 @@ export async function updateDataElement(
   }
 
   const sessionId = generateSessionId();
-  const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+  
+  // Get system information - only for cloud systems
+  const systemInfo = await getSystemInformation(connection);
+  const username = systemInfo?.userName || '';
+  const responsible = systemInfo ? username : '';
+  
   let lockHandle = '';
 
   try {
