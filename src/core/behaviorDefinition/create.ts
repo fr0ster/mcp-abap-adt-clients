@@ -1,0 +1,87 @@
+/**
+ * Behavior Definition create operations - Low-level functions
+ */
+
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getSystemInformation } from '../shared/systemInfo';
+import { BehaviorDefinitionCreateParams } from './types';
+
+/**
+ * Create a new behavior definition
+ * 
+ * Endpoint: POST /sap/bc/adt/bo/behaviordefinitions
+ * 
+ * @param connection - ABAP connection instance
+ * @param params - Creation parameters
+ * @param sessionId - Session ID for request tracking
+ * @returns Axios response with created object metadata
+ * 
+ * @example
+ * ```typescript
+ * const response = await create(connection, {
+ *   name: 'Z_MY_BDEF',
+ *   description: 'My Behavior Definition',
+ *   package: 'Z_PACKAGE',
+ *   implementationType: 'Managed'
+ * }, sessionId);
+ * 
+ * // Extract source URI
+ * const sourceUri = response.data.match(/abapsource:sourceUri="([^"]+)"/)?.[1];
+ * ```
+ */
+export async function create(
+    connection: AbapConnection,
+    params: BehaviorDefinitionCreateParams,
+    sessionId: string
+): Promise<AxiosResponse> {
+    try {
+        const language = params.language || 'EN';
+        
+        // Get system information (for cloud systems)
+        let masterSystem = 'TRL';
+        let responsible = params.responsible;
+        
+        const systemInfo = await getSystemInformation(connection);
+        if (systemInfo) {
+            masterSystem = systemInfo.systemID || masterSystem;
+            responsible = responsible || systemInfo.userName;
+        }
+        
+        // Fallback to env username if not provided
+        responsible = responsible || process.env.SAP_USERNAME || process.env.SAP_USER || '';
+
+        const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+        const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
+
+        const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${params.description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="BDEF/BDO" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
+    <adtcore:adtTemplate>
+        <adtcore:adtProperty adtcore:key="implementation_type">${params.implementationType}</adtcore:adtProperty>
+    </adtcore:adtTemplate>
+    <adtcore:packageRef adtcore:name="${params.package}"/>
+</blue:blueSource>`;
+
+        const headers = {
+            'Accept': 'application/vnd.sap.adt.blues.v1+xml',
+            'Content-Type': 'application/vnd.sap.adt.blues.v1+xml'
+        };
+
+        const url = '/sap/bc/adt/bo/behaviordefinitions';
+
+        const response = await makeAdtRequestWithSession(
+            connection,
+            sessionId,
+            'POST',
+            url,
+            xmlBody,
+            headers
+        );
+
+        return response;
+    } catch (error: any) {
+        throw new Error(
+            `Failed to create behavior definition ${params.name}: ${error.message}`
+        );
+    }
+}

@@ -1,0 +1,522 @@
+/**
+ * BehaviorDefinitionBuilder - Fluent API for behavior definition operations with Promise chaining
+ *
+ * Supports:
+ * - Method chaining: builder.validate().then(b => b.create()).then(b => b.lock())...
+ * - Error handling: .catch() for error callbacks
+ * - Cleanup: .finally() for guaranteed execution
+ * - Result storage: all results stored in logger/state
+ * - Chain interruption: chain stops on first error (standard Promise behavior)
+ */
+
+import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { generateSessionId } from '../../utils/sessionUtils';
+import { validate } from './validation';
+import { create } from './create';
+import { lock } from './lock';
+import { unlock } from './unlock';
+import { read, readSource } from './read';
+import { update } from './update';
+import { checkImplementation, checkAbap } from './check';
+import { activate } from './activation';
+import { checkDeletion, deleteBehaviorDefinition } from './delete';
+import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams } from './types';
+
+export interface BehaviorDefinitionBuilderLogger {
+  debug?: (message: string, ...args: any[]) => void;
+  info?: (message: string, ...args: any[]) => void;
+  warn?: (message: string, ...args: any[]) => void;
+  error?: (message: string, ...args: any[]) => void;
+}
+
+export interface BehaviorDefinitionBuilderConfig {
+  name: string;
+  packageName?: string;
+  transportRequest?: string;
+  description: string;
+  implementationType?: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
+  rootEntity?: string;
+  sourceCode?: string;
+  sessionId?: string;
+  onLock?: (lockHandle: string, sessionId: string) => void;
+}
+
+export interface BehaviorDefinitionBuilderState {
+  validationResult?: AxiosResponse;
+  createResult?: AxiosResponse;
+  lockHandle?: string;
+  readResult?: AxiosResponse;
+  updateResult?: AxiosResponse;
+  checkResults?: AxiosResponse[];
+  unlockResult?: AxiosResponse;
+  activateResult?: AxiosResponse;
+  deleteCheckResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
+  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+}
+
+export class BehaviorDefinitionBuilder {
+  private connection: AbapConnection;
+  private logger: BehaviorDefinitionBuilderLogger;
+  private config: BehaviorDefinitionBuilderConfig;
+  private sourceCode?: string;
+  private lockHandle?: string;
+  private sessionId: string;
+  private state: BehaviorDefinitionBuilderState;
+
+  constructor(
+    connection: AbapConnection,
+    logger: BehaviorDefinitionBuilderLogger,
+    config: BehaviorDefinitionBuilderConfig
+  ) {
+    this.connection = connection;
+    this.logger = logger;
+    this.config = { ...config };
+    this.sourceCode = config.sourceCode;
+    this.sessionId = config.sessionId || generateSessionId();
+    this.state = {
+      errors: [],
+      checkResults: []
+    };
+  }
+
+  // Builder methods - return this for chaining
+  setPackage(packageName: string): this {
+    this.config.packageName = packageName;
+    this.logger.debug?.('Package set:', packageName);
+    return this;
+  }
+
+  setRequest(transportRequest: string): this {
+    this.config.transportRequest = transportRequest;
+    this.logger.debug?.('Transport request set:', transportRequest);
+    return this;
+  }
+
+  setName(name: string): this {
+    this.config.name = name;
+    this.logger.debug?.('Behavior definition name set:', name);
+    return this;
+  }
+
+  setCode(sourceCode: string): this {
+    this.sourceCode = sourceCode;
+    this.logger.debug?.('Source code set, length:', sourceCode.length);
+    return this;
+  }
+
+  setDescription(description: string): this {
+    this.config.description = description;
+    return this;
+  }
+
+  setImplementationType(implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'): this {
+    this.config.implementationType = implementationType;
+    return this;
+  }
+
+  setRootEntity(rootEntity: string): this {
+    this.config.rootEntity = rootEntity;
+    return this;
+  }
+
+  // Operation methods - return Promise<this> for Promise chaining
+  async validate(): Promise<this> {
+    try {
+      if (!this.config.rootEntity) {
+        throw new Error('Root entity is required for validation');
+      }
+      if (!this.config.packageName) {
+        throw new Error('Package name is required for validation');
+      }
+      
+      this.logger.info?.('Validating behavior definition:', this.config.name);
+      
+      const params: BehaviorDefinitionValidationParams = {
+        objname: this.config.name,
+        rootEntity: this.config.rootEntity,
+        description: this.config.description,
+        package: this.config.packageName,
+        implementationType: this.config.implementationType || 'Managed'
+      };
+      
+      const result = await validate(this.connection, params, this.sessionId);
+      
+      this.state.validationResult = result;
+      this.logger.info?.('Validation successful');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'validate',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Validation failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async create(): Promise<this> {
+    try {
+      if (!this.config.packageName) {
+        throw new Error('Package name is required');
+      }
+      
+      this.logger.info?.('Creating behavior definition:', this.config.name);
+      
+      const params: BehaviorDefinitionCreateParams = {
+        name: this.config.name,
+        package: this.config.packageName,
+        description: this.config.description,
+        implementationType: this.config.implementationType || 'Managed',
+      };
+      
+      const result = await create(this.connection, params, this.sessionId);
+      this.state.createResult = result;
+      this.logger.info?.('Behavior definition created successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'create',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Create failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async lock(): Promise<this> {
+    try {
+      this.logger.info?.('Locking behavior definition:', this.config.name);
+      const lockHandle = await lock(
+        this.connection,
+        this.config.name,
+        this.sessionId
+      );
+      this.lockHandle = lockHandle;
+      this.state.lockHandle = lockHandle;
+
+      // Register lock in persistent storage if callback provided
+      if (this.config.onLock) {
+        this.config.onLock(lockHandle, this.sessionId);
+      }
+
+      this.logger.info?.('Behavior definition locked, handle:', lockHandle.substring(0, 10) + '...');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'lock',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Lock failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async readSource(): Promise<this> {
+    try {
+      this.logger.info?.('Reading behavior definition source:', this.config.name);
+      const response = await readSource(this.connection, this.config.name, this.sessionId);
+      this.sourceCode = response.data;
+      this.logger.info?.('Source code read, length:', response.data?.length || 0);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'readSource',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read source failed:', error);
+      throw error;
+    }
+  }
+
+  async update(sourceCode?: string): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Behavior definition must be locked before update. Call lock() first.');
+      }
+      const code = sourceCode || this.sourceCode;
+      if (!code) {
+        throw new Error('Source code is required. Use setCode() or pass as parameter.');
+      }
+      this.logger.info?.('Updating behavior definition source:', this.config.name);
+
+      const result = await update(
+        this.connection,
+        this.config.name,
+        code,
+        this.lockHandle,
+        this.sessionId,
+        this.config.transportRequest
+      );
+
+      this.state.updateResult = result;
+      this.logger.info?.('Behavior definition updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'update',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+    try {
+      this.logger.info?.('Checking behavior definition:', this.config.name, 'version:', version);
+      
+      // Run both implementation check and ABAP check
+      const implResult = await checkImplementation(
+        this.connection,
+        this.config.name,
+        version,
+        this.sessionId
+      );
+      
+      const abapResult = await checkAbap(
+        this.connection,
+        this.config.name,
+        version,
+        this.sessionId
+      );
+      
+      this.state.checkResults = [implResult, abapResult];
+      this.logger.info?.('Behavior definition check successful');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'check',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Check failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async unlock(): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Behavior definition is not locked. Call lock() first.');
+      }
+      this.logger.info?.('Unlocking behavior definition:', this.config.name);
+      const result = await unlock(
+        this.connection,
+        this.config.name,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.state.unlockResult = result;
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+      this.logger.info?.('Behavior definition unlocked successfully');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'unlock',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Unlock failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async activate(preauditRequested: boolean = false): Promise<this> {
+    try {
+      this.logger.info?.('Activating behavior definition:', this.config.name);
+      const result = await activate(
+        this.connection,
+        this.config.name,
+        this.sessionId,
+        preauditRequested
+      );
+      this.state.activateResult = result;
+      this.logger.info?.('Behavior definition activated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'activate',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Activate failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async checkDeletion(): Promise<this> {
+    try {
+      this.logger.info?.('Checking deletion for behavior definition:', this.config.name);
+      const result = await checkDeletion(
+        this.connection,
+        this.config.name,
+        this.sessionId
+      );
+      this.state.deleteCheckResult = result;
+      this.logger.info?.('Deletion check successful:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'checkDeletion',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Deletion check failed:', error);
+      throw error;
+    }
+  }
+
+  async delete(): Promise<this> {
+    try {
+      this.logger.info?.('Deleting behavior definition:', this.config.name);
+      const result = await deleteBehaviorDefinition(
+        this.connection,
+        this.config.name,
+        this.sessionId,
+        this.config.transportRequest
+      );
+      this.state.deleteResult = result;
+      this.logger.info?.('Behavior definition deleted successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'delete',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Delete failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async read(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+    try {
+      this.logger.info?.('Reading behavior definition metadata:', this.config.name);
+      const result = await read(this.connection, this.config.name, this.sessionId, version);
+      this.state.readResult = result;
+      this.logger.info?.('Behavior definition read successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'read',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Read failed:', error);
+      throw error; // Interrupts chain
+    }
+  }
+
+  async forceUnlock(): Promise<void> {
+    if (!this.lockHandle) {
+      return;
+    }
+    try {
+      await unlock(
+        this.connection,
+        this.config.name,
+        this.lockHandle,
+        this.sessionId
+      );
+      this.logger.info?.('Force unlock successful for', this.config.name);
+    } catch (error: any) {
+      this.logger.warn?.('Force unlock failed:', error);
+    } finally {
+      this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+    }
+  }
+
+  // Getters for accessing results
+  getState(): Readonly<BehaviorDefinitionBuilderState> {
+    return { ...this.state };
+  }
+
+  getName(): string {
+    return this.config.name;
+  }
+
+  getLockHandle(): string | undefined {
+    return this.lockHandle;
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  getValidationResult(): AxiosResponse | undefined {
+    return this.state.validationResult;
+  }
+
+  getCreateResult(): AxiosResponse | undefined {
+    return this.state.createResult;
+  }
+
+  getUpdateResult(): AxiosResponse | undefined {
+    return this.state.updateResult;
+  }
+
+  getCheckResults(): AxiosResponse[] | undefined {
+    return this.state.checkResults;
+  }
+
+  getUnlockResult(): AxiosResponse | undefined {
+    return this.state.unlockResult;
+  }
+
+  getActivateResult(): AxiosResponse | undefined {
+    return this.state.activateResult;
+  }
+
+  getDeleteCheckResult(): AxiosResponse | undefined {
+    return this.state.deleteCheckResult;
+  }
+
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
+  }
+
+  getReadResult(): AxiosResponse | undefined {
+    return this.state.readResult;
+  }
+
+  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+    return [...this.state.errors];
+  }
+
+  // Helper method to get all results
+  getResults(): {
+    validation?: AxiosResponse;
+    create?: AxiosResponse;
+    update?: AxiosResponse;
+    check?: AxiosResponse[];
+    unlock?: AxiosResponse;
+    activate?: AxiosResponse;
+    deleteCheck?: AxiosResponse;
+    delete?: AxiosResponse;
+    lockHandle?: string;
+    errors: Array<{ method: string; error: Error; timestamp: Date }>;
+  } {
+    return {
+      validation: this.state.validationResult,
+      create: this.state.createResult,
+      update: this.state.updateResult,
+      check: this.state.checkResults,
+      unlock: this.state.unlockResult,
+      activate: this.state.activateResult,
+      deleteCheck: this.state.deleteCheckResult,
+      delete: this.state.deleteResult,
+      lockHandle: this.lockHandle,
+      errors: [...this.state.errors]
+    };
+  }
+}
+
