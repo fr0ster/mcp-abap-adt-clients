@@ -5,27 +5,24 @@
  * Source: GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Read metadata extension metadata
  * 
  * @param connection - ABAP connection instance
  * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
- * @param sessionId - Session ID for request tracking
  * @returns Axios response with metadata extension metadata
  * 
  * @example
  * ```typescript
- * const metadata = await readMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sessionId);
+ * const metadata = await readMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001');
  * ```
  */
 export async function readMetadataExtension(
   connection: AbapConnection,
-  name: string,
-  sessionId: string
+  name: string
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
@@ -34,14 +31,12 @@ export async function readMetadataExtension(
     'Accept': 'application/vnd.sap.adt.ddic.ddlx.v1+xml'
   };
 
-  return makeAdtRequestWithSession(
-    connection,
-    sessionId,
-    'GET',
+  return connection.makeAdtRequest({
     url,
-    undefined,
+    method: 'GET',
+    timeout: getTimeout('default'),
     headers
-  );
+  });
 }
 
 /**
@@ -49,20 +44,18 @@ export async function readMetadataExtension(
  * 
  * @param connection - ABAP connection instance
  * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
- * @param sessionId - Session ID for request tracking
  * @param version - Version to read ('active' or 'inactive', default 'active')
  * @returns Axios response with source code as string
  * 
  * @example
  * ```typescript
- * const response = await readMetadataExtensionSource(connection, 'ZOK_C_CDS_TEST_0001', sessionId);
+ * const response = await readMetadataExtensionSource(connection, 'ZOK_C_CDS_TEST_0001');
  * const sourceCode = response.data;
  * ```
  */
 export async function readMetadataExtensionSource(
   connection: AbapConnection,
   name: string,
-  sessionId: string,
   version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
@@ -72,12 +65,10 @@ export async function readMetadataExtensionSource(
     'Accept': 'text/plain'
   };
 
-  return makeAdtRequestWithSession(
-    connection,
-    sessionId,
-    'GET',
+  return connection.makeAdtRequest({
     url,
-    undefined,
+    method: 'GET',
+    timeout: getTimeout('default'),
     headers
-  );
+  });
 }

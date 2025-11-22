@@ -27,7 +27,6 @@ import { activateObjectInSession } from '../../utils/activationUtils';
 export async function activate(
     connection: AbapConnection,
     name: string,
-    sessionId: string,
     preauditRequested: boolean = true
 ): Promise<AxiosResponse> {
     const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}`;
@@ -35,7 +34,6 @@ export async function activate(
         connection,
         objectUri,
         name.toUpperCase(),
-        sessionId,
         preauditRequested
     );
 }

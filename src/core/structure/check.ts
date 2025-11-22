@@ -15,10 +15,9 @@ export async function checkStructure(
   connection: AbapConnection,
   structureName: string,
   version: string = 'active',
-  sessionId?: string,
   sourceCode?: string
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'structure', structureName, version, 'abapCheckRun', sessionId, sourceCode);
+  const response = await runCheckRun(connection, 'structure', structureName, version, 'abapCheckRun', sourceCode);
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {

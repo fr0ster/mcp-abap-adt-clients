@@ -34,17 +34,14 @@ async function makeAdtRequest(
 /**
  * Get base URL from connection
  */
-async function getBaseUrl(connection: AbapConnection): Promise<string> {
-  return connection.getBaseUrl();
-}
 
 /**
  * Get ABAP program source code
  */
 export async function getProgram(connection: AbapConnection, programName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(programName);
-  const url = `${baseUrl}/sap/bc/adt/programs/programs/${encodedName}/source/main`;
+  const url = `/sap/bc/adt/programs/programs/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -52,9 +49,9 @@ export async function getProgram(connection: AbapConnection, programName: string
  * Get ABAP class source code
  */
 export async function getClass(connection: AbapConnection, className: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(className);
-  const url = `${baseUrl}/sap/bc/adt/oo/classes/${encodedName}/source/main`;
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -62,9 +59,9 @@ export async function getClass(connection: AbapConnection, className: string): P
  * Get ABAP table structure
  */
 export async function getTable(connection: AbapConnection, tableName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(tableName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
+  const url = `/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -72,9 +69,9 @@ export async function getTable(connection: AbapConnection, tableName: string): P
  * Get ABAP structure
  */
 export async function getStructure(connection: AbapConnection, structureName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(structureName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/structures/${encodedName}/source/main`;
+  const url = `/sap/bc/adt/ddic/structures/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -82,9 +79,9 @@ export async function getStructure(connection: AbapConnection, structureName: st
  * Get ABAP domain
  */
 export async function getDomain(connection: AbapConnection, domainName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(domainName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/domains/${encodedName}`;
+  const url = `/sap/bc/adt/ddic/domains/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -92,9 +89,9 @@ export async function getDomain(connection: AbapConnection, domainName: string):
  * Get ABAP data element
  */
 export async function getDataElement(connection: AbapConnection, dataElementName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(dataElementName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements/${encodedName}`;
+  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -102,9 +99,9 @@ export async function getDataElement(connection: AbapConnection, dataElementName
  * Get ABAP interface
  */
 export async function getInterface(connection: AbapConnection, interfaceName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(interfaceName);
-  const url = `${baseUrl}/sap/bc/adt/oo/interfaces/${encodedName}/source/main`;
+  const url = `/sap/bc/adt/oo/interfaces/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -112,9 +109,9 @@ export async function getInterface(connection: AbapConnection, interfaceName: st
  * Get ABAP function group
  */
 export async function getFunctionGroup(connection: AbapConnection, functionGroupName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(functionGroupName);
-  const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedName}`;
+  const url = `/sap/bc/adt/functions/groups/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -126,10 +123,10 @@ export async function getFunction(
   functionName: string,
   functionGroup: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
-  const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
+  const url = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -137,9 +134,9 @@ export async function getFunction(
  * Get ABAP package
  */
 export async function getPackage(connection: AbapConnection, packageName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(packageName);
-  const url = `${baseUrl}/sap/bc/adt/packages/${encodedName}`;
+  const url = `/sap/bc/adt/packages/${encodedName}`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -147,9 +144,9 @@ export async function getPackage(connection: AbapConnection, packageName: string
  * Get ABAP view (CDS or Classic)
  */
 export async function getView(connection: AbapConnection, viewName: string): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
+  
   const encodedName = encodeSapObjectName(viewName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }
 
@@ -164,8 +161,8 @@ export async function fetchNodeStructure(
   nodeKey: string,
   withShortDescriptions: boolean = true
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
-  const url = `${baseUrl}/sap/bc/adt/repository/nodestructure`;
+  
+  const url = `/sap/bc/adt/repository/nodestructure`;
 
   const params = {
     parent_name: parentName,
@@ -193,8 +190,8 @@ export async function getSystemInformation(
   connection: AbapConnection
 ): Promise<{ systemID?: string; userName?: string } | null> {
   try {
-    const baseUrl = await getBaseUrl(connection);
-    const url = `${baseUrl}/sap/bc/adt/core/http/systeminformation`;
+    
+    const url = `/sap/bc/adt/core/http/systeminformation`;
 
     const headers = {
       'Accept': 'application/json'

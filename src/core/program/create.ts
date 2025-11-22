@@ -2,10 +2,9 @@
  * Program create operations - Low-level functions
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { lockProgram } from './lock';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
@@ -85,8 +84,7 @@ START-OF-SELECTION.
  */
 export async function create(
   connection: AbapConnection,
-  args: CreateProgramParams,
-  sessionId: string
+  args: CreateProgramParams
 ): Promise<AxiosResponse> {
   const description = args.description || args.program_name;
   const programType = convertProgramType(args.program_type);
@@ -121,7 +119,7 @@ export async function create(
     'Content-Type': 'application/vnd.sap.adt.programs.programs.v2+xml'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, metadataXml, headers);
+  return connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: metadataXml, headers});
 }
 
 /**
@@ -143,5 +141,5 @@ async function uploadProgramSource(
     'Content-Type': 'text/plain; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
+  return connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: sourceCode, headers});
 }

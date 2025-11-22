@@ -1,11 +1,11 @@
 /**
  * Structure unlock operations
+ * NOTE: Builder should call connection.setSessionType("stateless") after unlocking
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock structure
@@ -15,10 +15,14 @@ export async function unlockStructure(
   connection: AbapConnection,
   structureName: string,
   lockHandle: string,
-  sessionId: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null
+  });
 }
 

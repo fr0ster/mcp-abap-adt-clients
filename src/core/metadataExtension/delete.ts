@@ -4,9 +4,8 @@
  * Endpoint: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Delete a metadata extension
@@ -25,8 +24,7 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 export async function deleteMetadataExtension(
   connection: AbapConnection,
   name: string,
-  transportRequest: string | undefined,
-  sessionId: string
+  transportRequest: string | undefined
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
@@ -35,12 +33,11 @@ export async function deleteMetadataExtension(
     'Accept': 'application/xml'
   };
 
-  return makeAdtRequestWithSession(
-    connection,
-    sessionId,
-    'DELETE',
+  return connection.makeAdtRequest({  
+    method: 'DELETE',
     url,
-    undefined,
+    timeout: getTimeout('default'),
+    data: undefined,
     headers
-  );
+  });
 }

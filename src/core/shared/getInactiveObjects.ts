@@ -57,11 +57,10 @@ export async function getInactiveObjects(
     includeRawXml?: boolean;
   }
 ): Promise<InactiveObjectsResponse> {
-  const baseUrl = await connection.getBaseUrl();
 
   const response = await connection.makeAdtRequest({
     method: "GET",
-    url: `${baseUrl}/sap/bc/adt/activation/inactiveobjects`,
+    url: `/sap/bc/adt/activation/inactiveobjects`,
     timeout: getTimeout('default'),
     headers: {
       Accept: "application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8",

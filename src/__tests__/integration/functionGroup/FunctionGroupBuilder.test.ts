@@ -236,6 +236,7 @@ describe('FunctionGroupBuilder', () => {
         logBuilderTestError(builderLogger, 'FunctionGroupBuilder - full workflow', error);
         throw error;
       } finally {
+        // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'FunctionGroupBuilder - full workflow');
       }

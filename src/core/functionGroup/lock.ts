@@ -3,8 +3,8 @@
  */
 
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { XMLParser } from 'fast-xml-parser';
 
 /**
@@ -26,7 +26,12 @@ export async function lockFunctionGroup(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers
+  });
 
   // Extract lock handle from response header
   const lockHandle = response.headers['sap-adt-lm-handle'];
@@ -62,5 +67,9 @@ export async function unlockFunctionGroup(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default')
+  });
 }

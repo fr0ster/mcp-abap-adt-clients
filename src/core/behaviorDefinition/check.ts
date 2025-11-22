@@ -2,9 +2,8 @@
  * Behavior Definition check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { CheckReporter } from './types';
 
 /**
@@ -65,14 +64,13 @@ export async function check(
 
     const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
 
-    return makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'POST',
+    return connection.makeAdtRequest({
         url,
-        xmlBody,
+        method: 'POST',
+        timeout: getTimeout('default'),
+        data: xmlBody,
         headers
-    );
+      });
 }
 
 /**

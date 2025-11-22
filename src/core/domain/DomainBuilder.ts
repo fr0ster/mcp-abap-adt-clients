@@ -33,7 +33,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { create, upload } from './create';
 import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
@@ -67,10 +66,6 @@ export interface DomainBuilderConfig {
   sign_exists?: boolean;
   value_table?: string;
   fixed_values?: FixedValue[];
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface DomainBuilderState {
@@ -92,7 +87,6 @@ export class DomainBuilder {
   private logger: DomainBuilderLogger;
   private config: DomainBuilderConfig;
   private lockHandle?: string;
-  private sessionId: string;
   private state: DomainBuilderState;
 
   constructor(
@@ -103,7 +97,6 @@ export class DomainBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -213,6 +206,9 @@ export class DomainBuilder {
       const masterSystem = systemInfo?.systemID;
       const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
+
       const params: CreateDomainParams = {
         domain_name: this.config.domainName,
         package_name: this.config.packageName,
@@ -232,7 +228,6 @@ export class DomainBuilder {
       const result = await create(
         this.connection,
         params,
-        this.sessionId,
         username,
         masterSystem
       );
@@ -253,18 +248,16 @@ export class DomainBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking domain:', this.config.domainName);
+      
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
+      
       const lockHandle = await lockDomain(
         this.connection,
-        this.config.domainName,
-        this.sessionId
+        this.config.domainName
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
-
-      // Register lock in persistent storage if callback provided
-      if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
-      }
 
       this.logger.info?.('Domain locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
@@ -317,7 +310,6 @@ export class DomainBuilder {
           this.connection,
           createParams,
           this.lockHandle,
-          this.sessionId,
           username,
           masterSystem
         );
@@ -363,8 +355,7 @@ export class DomainBuilder {
       const result = await checkDomainSyntax(
         this.connection,
         this.config.domainName,
-        version,
-        this.sessionId
+        version
       );
       this.state.checkResult = result;
       this.logger.info?.('Domain check successful:', result.status);
@@ -389,12 +380,12 @@ export class DomainBuilder {
       const result = await unlockDomain(
         this.connection,
         this.config.domainName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
+      this.connection.setSessionType("stateless");
       this.logger.info?.('Domain unlocked successfully');
       return this;
     } catch (error: any) {
@@ -413,8 +404,7 @@ export class DomainBuilder {
       this.logger.info?.('Activating domain:', this.config.domainName);
       const result = await activateDomain(
         this.connection,
-        this.config.domainName,
-        this.sessionId
+        this.config.domainName
       );
       this.state.activateResult = result;
       this.logger.info?.('Domain activated successfully:', result.status);
@@ -499,8 +489,7 @@ export class DomainBuilder {
       await unlockDomain(
         this.connection,
         this.config.domainName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.logger.info?.('Force unlock successful for', this.config.domainName);
     } catch (error: any) {
@@ -508,6 +497,7 @@ export class DomainBuilder {
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
+      this.connection.setSessionType("stateless");
     }
   }
 
@@ -524,8 +514,8 @@ export class DomainBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getCreateResult(): AxiosResponse | undefined {

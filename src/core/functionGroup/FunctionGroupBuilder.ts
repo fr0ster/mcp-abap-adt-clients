@@ -11,7 +11,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
 import { CreateFunctionGroupParams } from './types';
@@ -37,8 +36,8 @@ export interface FunctionGroupBuilderConfig {
   description: string;
   sessionId?: string;
   // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  // Called after successful lock() with: lockHandle
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface FunctionGroupBuilderState {
@@ -58,7 +57,6 @@ export class FunctionGroupBuilder {
   private logger: FunctionGroupBuilderLogger;
   private config: FunctionGroupBuilderConfig;
   private lockHandle?: string;
-  private sessionId: string;
   private state: FunctionGroupBuilderState;
 
   constructor(
@@ -69,7 +67,6 @@ export class FunctionGroupBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -157,14 +154,13 @@ export class FunctionGroupBuilder {
       const lockHandle = await lockFunctionGroup(
         this.connection,
         this.config.functionGroupName,
-        this.sessionId
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
+        this.config.onLock(lockHandle);
       }
 
       this.logger.info?.('Function group locked, handle:', lockHandle.substring(0, 10) + '...');
@@ -188,7 +184,6 @@ export class FunctionGroupBuilder {
         this.config.functionGroupName,
         version,
         sourceCode,
-        this.sessionId
       );
       this.state.checkResult = result;
       this.logger.info?.('Function group check successful:', result.status);
@@ -213,8 +208,7 @@ export class FunctionGroupBuilder {
       const result = await unlockFunctionGroup(
         this.connection,
         this.config.functionGroupName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
@@ -303,8 +297,7 @@ export class FunctionGroupBuilder {
       await unlockFunctionGroup(
         this.connection,
         this.config.functionGroupName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.logger.info?.('Force unlock successful for', this.config.functionGroupName);
     } catch (error: any) {
@@ -328,8 +321,8 @@ export class FunctionGroupBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getValidationResult(): ValidationResult | undefined {

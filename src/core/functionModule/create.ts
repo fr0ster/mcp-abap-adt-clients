@@ -6,7 +6,6 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 import { lockFunctionModule } from './lock';
 import { unlockFunctionModule } from './unlock';
@@ -29,10 +28,9 @@ export async function create(
   description: string,
   corrNr: string | undefined
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
 
-  let url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules${corrNr ? `?corrNr=${corrNr}` : ''}`;
+  let url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules${corrNr ? `?corrNr=${corrNr}` : ''}`;
 
   // Get masterSystem and responsible (only for cloud systems)
   // On cloud, getSystemInformation returns systemID and userName

@@ -30,12 +30,11 @@ export async function getTableContents(
     throw new Error('Table name is required');
   }
 
-  const baseUrl = await connection.getBaseUrl();
   const maxRows = params.max_rows || 100;
   const encodedName = encodeSapObjectName(params.table_name);
 
   // First, get table structure to know all fields
-  const structureUrl = `${baseUrl}/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
+  const structureUrl = `/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
 
   // Get table structure
   const structureResponse = await connection.makeAdtRequest({
@@ -91,7 +90,7 @@ export async function getTableContents(
   const sqlQuery = `SELECT ${fields.join(', ')} FROM ${params.table_name}`;
 
   // Execute SQL query via Data Preview API
-  const url = `${baseUrl}/sap/bc/adt/datapreview/freestyle?rowNumber=${maxRows}`;
+  const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${maxRows}`;
 
   return connection.makeAdtRequest({
     url,

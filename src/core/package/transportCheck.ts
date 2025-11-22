@@ -14,8 +14,7 @@ export async function checkTransportRequirements(
   args: CreatePackageParams,
   transportLayer: string
 ): Promise<string[]> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/cts/transportchecks`;
+  const url = `/sap/bc/adt/cts/transportchecks`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>

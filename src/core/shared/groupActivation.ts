@@ -2,9 +2,8 @@
  * Group Activation operations - activate multiple objects with session support
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Object reference for group activation
@@ -71,12 +70,11 @@ ${objectReferences}
         'Content-Type': 'application/xml'
     };
 
-    return makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'POST',
+    return connection.makeAdtRequest({
         url,
-        xmlBody,
+        method: 'POST',
+        timeout: getTimeout('default'),
+        data: xmlBody,
         headers
-    );
+    });
 }

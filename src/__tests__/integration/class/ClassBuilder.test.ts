@@ -9,7 +9,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { ClassBuilder, ClassBuilderLogger } from '../../../core/class';
 import { getClass } from '../../../core/class/read';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../../helpers/sessionConfig';
+import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -59,9 +59,6 @@ describe('ClassBuilder', () => {
   let connection: AbapConnection;
   let hasConfig = false;
   let isCloudSystem = false;
-  let sessionId: string | null = null;
-  let testConfig: any = null;
-  let lockTracking: { enabled: boolean; locksDir: string; autoCleanup: boolean } | null = null;
 
   beforeAll(async () => {
     // Count total tests for progress tracking
@@ -70,26 +67,6 @@ describe('ClassBuilder', () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
-
-      // Setup session and lock tracking based on test-config.yaml
-      // This will enable stateful session if persist_session: true in YAML
-      const env = await setupTestEnvironment(connection, 'class_builder', __filename);
-      sessionId = env.sessionId;
-      testConfig = env.testConfig;
-      lockTracking = env.lockTracking;
-
-      if (sessionId) {
-        builderLogger.debug?.(`✓ Session persistence enabled: ${sessionId}`);
-        builderLogger.debug?.(`  Session storage: ${testConfig?.session_config?.sessions_dir || '.sessions'}`);
-      } else {
-        builderLogger.debug?.('⚠️ Session persistence disabled (persist_session: false in test-config.yaml)');
-      }
-
-      if (lockTracking?.enabled) {
-        builderLogger.debug?.(`✓ Lock tracking enabled: ${lockTracking.locksDir}`);
-      } else {
-        builderLogger.debug?.('⚠️ Lock tracking disabled (persist_locks: false in test-config.yaml)');
-      }
 
       // Connect to SAP system to initialize session (get CSRF token and cookies)
       await (connection as any).connect();
@@ -106,7 +83,6 @@ describe('ClassBuilder', () => {
   afterAll(async () => {
     resetTestCounter();
     if (connection) {
-      await cleanupTestEnvironment(connection, sessionId, testConfig);
       connection.reset();
     }
   });
@@ -276,6 +252,7 @@ describe('ClassBuilder', () => {
         logBuilderTestError(builderLogger, 'ClassBuilder - full workflow', error);
         throw error;
       } finally {
+        // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'ClassBuilder - full workflow');
       }

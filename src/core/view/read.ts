@@ -49,9 +49,8 @@ export async function getViewTransport(
   connection: AbapConnection,
   viewName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(viewName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/ddl/sources/${encodedName}/transport`;
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

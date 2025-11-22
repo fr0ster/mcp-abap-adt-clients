@@ -35,10 +35,9 @@ import { checkPackage } from './check';
 import { getPackage } from './read';
 import { lockPackage } from './lock';
 import { unlockPackage } from './unlock';
-import { deletePackage } from './delete';
+import { deletePackage, checkPackageDeletion, parsePackageDeletionCheck } from './delete';
 import { updatePackageDescription } from './update';
 import { CreatePackageParams } from './types';
-import { generateSessionId } from '../../utils/sessionUtils';
 
 export interface PackageBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -58,10 +57,9 @@ export interface PackageBuilderConfig {
   transportRequest?: string;
   applicationComponent?: string;
   responsible?: string;
-  sessionId?: string;
   // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  // Called after successful lock() with: lockHandle
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface PackageBuilderState {
@@ -73,7 +71,6 @@ export interface PackageBuilderState {
   unlockResult?: AxiosResponse;
   updateResult?: AxiosResponse;
   deleteResult?: AxiosResponse;
-  sessionId?: string;
   lockHandle?: string;
   errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }
@@ -93,8 +90,7 @@ export class PackageBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.state = {
-      errors: [],
-      sessionId: config.sessionId || generateSessionId()
+      errors: []
     };
   }
 
@@ -254,10 +250,10 @@ export class PackageBuilder {
     }
   }
 
-  async read(): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
     try {
-      this.logger.info?.('Reading package:', this.config.packageName);
-      const result = await getPackage(this.connection, this.config.packageName);
+      this.logger.info?.('Reading package:', this.config.packageName, 'version:', version);
+      const result = await getPackage(this.connection, this.config.packageName, version);
       this.state.readResult = result;
       this.logger.info?.('Package read successfully:', result.status);
       return this;
@@ -292,21 +288,20 @@ export class PackageBuilder {
 
   async lock(): Promise<this> {
     try {
-      if (!this.state.sessionId) {
-        this.state.sessionId = generateSessionId();
-      }
+      // Enable stateful session mode for lock/update/unlock sequence
+      this.connection.setSessionType("stateful");
+      
       this.logger.info?.('Locking package:', this.config.packageName);
       const lockHandle = await lockPackage(
         this.connection,
-        this.config.packageName,
-        this.state.sessionId
+        this.config.packageName
       );
       this.state.lockHandle = lockHandle;
       this.state.lockResult = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.state.sessionId);
+        this.config.onLock(lockHandle);
       }
 
       this.logger.info?.('Package locked successfully, lock handle:', lockHandle);
@@ -324,9 +319,6 @@ export class PackageBuilder {
 
   async unlock(): Promise<this> {
     try {
-      if (!this.state.sessionId) {
-        this.state.sessionId = generateSessionId();
-      }
       if (!this.state.lockHandle) {
         throw new Error('Package must be locked before unlocking. Call lock() first.');
       }
@@ -334,11 +326,14 @@ export class PackageBuilder {
       const result = await unlockPackage(
         this.connection,
         this.config.packageName,
-        this.state.lockHandle,
-        this.state.sessionId
+        this.state.lockHandle
       );
       this.state.unlockResult = result;
       this.state.lockHandle = undefined;
+      
+      // Switch back to stateless mode after unlock
+      this.connection.setSessionType("stateless");
+      
       this.logger.info?.('Package unlocked successfully');
       return this;
     } catch (error: any) {
@@ -354,9 +349,6 @@ export class PackageBuilder {
 
   async update(): Promise<this> {
     try {
-      if (!this.state.sessionId) {
-        this.state.sessionId = generateSessionId();
-      }
       if (!this.state.lockHandle) {
         throw new Error('Package must be locked before updating. Call lock() first.');
       }
@@ -369,8 +361,7 @@ export class PackageBuilder {
         this.connection,
         this.config.packageName,
         descriptionToUpdate,
-        this.state.lockHandle,
-        this.state.sessionId
+        this.state.lockHandle
       );
       this.state.updateResult = result;
       this.logger.info?.('Package description updated successfully:', result.status);
@@ -389,6 +380,23 @@ export class PackageBuilder {
   async delete(): Promise<this> {
     try {
       this.logger.info?.('Deleting package:', this.config.packageName);
+      
+      // Check if package can be deleted first (same as Eclipse ADT does)
+      this.logger.debug?.('Checking if package can be deleted...');
+      const checkResponse = await checkPackageDeletion(
+        this.connection,
+        {
+          package_name: this.config.packageName
+        }
+      );
+      
+      const checkResult = parsePackageDeletionCheck(checkResponse);
+      if (!checkResult.isDeletable) {
+        throw new Error(`Package cannot be deleted: ${checkResult.message || 'Unknown reason'}`);
+      }
+      this.logger.debug?.('Package deletion check passed');
+      
+      // Proceed with deletion
       const result = await deletePackage(
         this.connection,
         {
@@ -414,16 +422,14 @@ export class PackageBuilder {
     if (!this.state.lockHandle) {
       return;
     }
-    if (!this.state.sessionId) {
-      this.state.sessionId = generateSessionId();
-    }
     try {
       await unlockPackage(
         this.connection,
         this.config.packageName,
-        this.state.lockHandle,
-        this.state.sessionId
+        this.state.lockHandle
       );
+      // Switch back to stateless after force unlock
+      this.connection.setSessionType("stateless");
       this.logger.info?.('Force unlock successful for', this.config.packageName);
     } catch (error: any) {
       this.logger.warn?.('Force unlock failed:', error);
@@ -461,8 +467,8 @@ export class PackageBuilder {
     return [...this.state.errors];
   }
 
-  getSessionId(): string | undefined {
-    return this.state.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getLockHandle(): string | undefined {

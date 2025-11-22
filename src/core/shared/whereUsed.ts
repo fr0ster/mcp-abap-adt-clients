@@ -83,9 +83,8 @@ export async function getWhereUsed(
     throw new Error('Object type is required');
   }
 
-  const baseUrl = await connection.getBaseUrl();
   const objectUri = buildObjectUri(params.object_name, params.object_type);
-  const url = `${baseUrl}/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
+  const url = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
 
   const requestBody = '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>';
 

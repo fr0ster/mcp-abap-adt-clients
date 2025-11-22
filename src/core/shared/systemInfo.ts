@@ -13,8 +13,7 @@ export async function getSystemInformation(
   connection: AbapConnection
 ): Promise<{ systemID?: string; userName?: string; client?: string; language?: string; userFullName?: string } | null> {
   try {
-    const baseUrl = await connection.getBaseUrl();
-    const url = `${baseUrl}/sap/bc/adt/core/http/systeminformation`;
+    const url = `/sap/bc/adt/core/http/systeminformation`;
 
     const headers = {
       'Accept': 'application/vnd.sap.adt.core.http.systeminformation.v1+json'

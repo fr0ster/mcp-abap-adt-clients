@@ -5,7 +5,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getTimeout } from '@mcp-abap-adt/connection';
 
 /**
  * Unlock interface
@@ -14,20 +14,18 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 export async function unlockInterface(
   connection: AbapConnection,
   interfaceName: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
   try {
-    const response = await makeAdtRequestWithSession(
-      connection,
+    const response = await connection.makeAdtRequest({
       url,
-      'POST',
-      sessionId,
-      '',
-      { 'Content-Type': 'application/x-www-form-urlencoded' }
-    );
+      method: 'POST',
+      timeout: getTimeout(),
+      data: '',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
     return response;
   } catch (error: any) {
     // If response is not returned (e.g., object locked by another user, network error),
@@ -35,7 +33,7 @@ export async function unlockInterface(
     if (!error.response) {
       throw new Error(
         `Failed to unlock interface ${interfaceName}: No response from server. ` +
-        `Lock handle: ${lockHandle.substring(0, 10)}..., Session: ${sessionId.substring(0, 10)}... ` +
+        `Lock handle: ${lockHandle.substring(0, 10)}... ` +
         `The interface may be locked by another user or session may be invalid.`
       );
     }
@@ -45,7 +43,7 @@ export async function unlockInterface(
     const errorData = error.response?.data
       ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
       : error.message;
-    
+
     throw new Error(
       `Failed to unlock interface ${interfaceName} (${statusText}): ${errorData}`
     );

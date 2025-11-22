@@ -2,11 +2,10 @@
  * Domain create operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { acquireLockHandle } from './lock';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
@@ -17,11 +16,12 @@ import { CreateDomainParams } from './types';
 /**
  * Create empty domain (initial POST to register the name)
  * Low-level function - creates domain without locking
+ * 
+ * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function create(
   connection: AbapConnection,
   args: CreateDomainParams,
-  sessionId: string,
   username: string,
   masterSystem?: string
 ): Promise<AxiosResponse> {
@@ -46,18 +46,25 @@ export async function create(
     'Content-Type': 'application/vnd.sap.adt.domains.v2+xml'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, xmlBody, headers);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }
 
 /**
  * Upload domain content with lock handle
  * Low-level function - requires existing lock
+ * 
+ * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function upload(
   connection: AbapConnection,
   args: CreateDomainParams,
   lockHandle: string,
-  sessionId: string,
   username: string,
   masterSystem?: string
 ): Promise<AxiosResponse> {
@@ -116,5 +123,11 @@ ${fixValuesXml}
     'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, xmlBody, headers);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }

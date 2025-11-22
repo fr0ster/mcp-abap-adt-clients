@@ -93,8 +93,7 @@ export async function createTransport(
     throw new Error('Cannot create transport request: username not found. Please provide owner in params, set SAP_USERNAME in config, or ensure system information endpoint is available.');
   }
 
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/cts/transportrequests`;
+  const url = `/sap/bc/adt/cts/transportrequests`;
 
   const xmlBody = buildCreateTransportXml(params, username);
   const headers = {

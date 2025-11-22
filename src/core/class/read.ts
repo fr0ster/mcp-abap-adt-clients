@@ -59,9 +59,8 @@ export async function getClassTransport(
   connection: AbapConnection,
   className: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(className);
-  const url = `${baseUrl}/sap/bc/adt/oo/classes/${encodedName}/transport`;
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

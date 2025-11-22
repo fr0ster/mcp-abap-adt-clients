@@ -236,6 +236,7 @@ describe('InterfaceBuilder', () => {
         logBuilderTestError(builderLogger, 'InterfaceBuilder - full workflow', error);
         throw error;
       } finally {
+        // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => { });
         logBuilderTestEnd(builderLogger, 'InterfaceBuilder - full workflow');
       }

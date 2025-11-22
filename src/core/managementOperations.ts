@@ -33,9 +33,6 @@ async function makeAdtRequest(
 /**
  * Get base URL from connection
  */
-async function getBaseUrl(connection: AbapConnection): Promise<string> {
-  return connection.getBaseUrl();
-}
 
 /**
  * Activate multiple ABAP objects in batch
@@ -46,8 +43,8 @@ export async function activateObjectsGroup(
   objects: Array<{ uri: string; name: string }>,
   preaudit: boolean = true
 ): Promise<AxiosResponse> {
-  const baseUrl = await getBaseUrl(connection);
-  const url = `${baseUrl}/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`;
+  
+  const url = `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`;
 
   const objectReferences = objects.map(obj =>
     `  <adtcore:objectReference adtcore:uri="${obj.uri}" adtcore:name="${obj.name}"/>`

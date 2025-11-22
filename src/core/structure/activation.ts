@@ -12,10 +12,9 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateStructure(
   connection: AbapConnection,
-  structureName: string,
-  sessionId: string
+  structureName: string
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}`;
-  return await activateObjectInSession(connection, objectUri, structureName, sessionId, true);
+  return await activateObjectInSession(connection, objectUri, structureName, true);
 }
 

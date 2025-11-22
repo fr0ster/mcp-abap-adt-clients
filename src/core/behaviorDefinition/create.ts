@@ -4,7 +4,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getTimeout } from '@mcp-abap-adt/connection';
 import { getSystemInformation } from '../shared/systemInfo';
 import { BehaviorDefinitionCreateParams } from './types';
 
@@ -34,7 +34,6 @@ import { BehaviorDefinitionCreateParams } from './types';
 export async function create(
     connection: AbapConnection,
     params: BehaviorDefinitionCreateParams,
-    sessionId: string
 ): Promise<AxiosResponse> {
     try {
         const language = params.language || 'EN';
@@ -69,14 +68,13 @@ export async function create(
 
         const url = '/sap/bc/adt/bo/behaviordefinitions';
 
-        const response = await makeAdtRequestWithSession(
-            connection,
-            sessionId,
-            'POST',
+        const response = await connection.makeAdtRequest({
             url,
-            xmlBody,
+            method: 'POST',
+            timeout: getTimeout('default'),
+            data: xmlBody,
             headers
-        );
+        });
 
         return response;
     } catch (error: any) {

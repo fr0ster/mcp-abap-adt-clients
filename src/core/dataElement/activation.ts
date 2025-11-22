@@ -6,14 +6,6 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import * as crypto from 'crypto';
-
-/**
- * Generate unique request ID
- */
-function generateRequestId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
 
 /**
  * Build activation XML payload
@@ -55,47 +47,14 @@ function parseActivationResponse(response: AxiosResponse): { success: boolean; m
 }
 
 /**
- * Make ADT request stateless
- */
-async function makeAdtRequestStateless(
-  connection: AbapConnection,
-  url: string,
-  method: string,
-  sessionId: string,
-  data?: any,
-  additionalHeaders?: Record<string, string>
-): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-
-  const requestId = generateRequestId();
-  const headers: Record<string, string> = {
-    'sap-adt-connection-id': sessionId,
-    'sap-adt-request-id': requestId,
-    'X-sap-adt-profiling': 'server-time',
-    ...additionalHeaders
-  };
-
-  return connection.makeAdtRequest({
-    url: fullUrl,
-    method,
-    timeout: getTimeout('default'),
-    data,
-    headers
-  });
-}
-
-/**
  * Activate data element
  * Makes data element active and usable in SAP system
  */
 export async function activateDataElement(
   connection: AbapConnection,
-  dataElementName: string,
-  sessionId: string
+  dataElementName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/activation?method=activate&preauditRequested=true`;
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
   const xmlBody = buildActivationXml(dataElementName);
 
   const headers = {
@@ -103,7 +62,13 @@ export async function activateDataElement(
     'Content-Type': 'application/xml'
   };
 
-  const response = await makeAdtRequestStateless(connection, url, 'POST', sessionId, xmlBody, headers);
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 
   const activationResult = parseActivationResponse(response);
   if (!activationResult.success) {
@@ -112,4 +77,3 @@ export async function activateDataElement(
 
   return response;
 }
-

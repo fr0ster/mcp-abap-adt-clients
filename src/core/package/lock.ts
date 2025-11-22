@@ -2,19 +2,20 @@
  * Package lock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Lock package for modification
  * Returns lock handle that must be used in subsequent requests
+ * 
+ * NOTE: Caller must enable stateful session mode via connection.setSessionType("stateful") 
+ * before calling this function
  */
 export async function lockPackage(
   connection: AbapConnection,
-  packageName: string,
-  sessionId: string
+  packageName: string
 ): Promise<string> {
   const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName)}?_action=LOCK&accessMode=MODIFY`;
 
@@ -22,7 +23,13 @@ export async function lockPackage(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null,
+    headers
+  });
 
   // Parse lock handle from XML response
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
@@ -35,4 +42,3 @@ export async function lockPackage(
 
   return lockHandle;
 }
-

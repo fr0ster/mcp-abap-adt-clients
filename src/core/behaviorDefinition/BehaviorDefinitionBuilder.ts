@@ -11,7 +11,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { validate } from './validation';
 import { create } from './create';
 import { lock } from './lock';
@@ -38,8 +37,7 @@ export interface BehaviorDefinitionBuilderConfig {
   implementationType?: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
   rootEntity?: string;
   sourceCode?: string;
-  sessionId?: string;
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface BehaviorDefinitionBuilderState {
@@ -62,7 +60,6 @@ export class BehaviorDefinitionBuilder {
   private config: BehaviorDefinitionBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private sessionId: string;
   private state: BehaviorDefinitionBuilderState;
 
   constructor(
@@ -74,7 +71,6 @@ export class BehaviorDefinitionBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: [],
       checkResults: []
@@ -141,7 +137,7 @@ export class BehaviorDefinitionBuilder {
         implementationType: this.config.implementationType || 'Managed'
       };
       
-      const result = await validate(this.connection, params, this.sessionId);
+      const result = await validate(this.connection, params);
       
       this.state.validationResult = result;
       this.logger.info?.('Validation successful');
@@ -172,7 +168,7 @@ export class BehaviorDefinitionBuilder {
         implementationType: this.config.implementationType || 'Managed',
       };
       
-      const result = await create(this.connection, params, this.sessionId);
+      const result = await create(this.connection, params);
       this.state.createResult = result;
       this.logger.info?.('Behavior definition created successfully:', result.status);
       return this;
@@ -192,15 +188,14 @@ export class BehaviorDefinitionBuilder {
       this.logger.info?.('Locking behavior definition:', this.config.name);
       const lockHandle = await lock(
         this.connection,
-        this.config.name,
-        this.sessionId
+        this.config.name
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
+        this.config.onLock(lockHandle);
       }
 
       this.logger.info?.('Behavior definition locked, handle:', lockHandle.substring(0, 10) + '...');
@@ -219,7 +214,7 @@ export class BehaviorDefinitionBuilder {
   async readSource(): Promise<this> {
     try {
       this.logger.info?.('Reading behavior definition source:', this.config.name);
-      const response = await readSource(this.connection, this.config.name, this.sessionId);
+      const response = await readSource(this.connection, this.config.name);
       this.sourceCode = response.data;
       this.logger.info?.('Source code read, length:', response.data?.length || 0);
       return this;
@@ -250,7 +245,6 @@ export class BehaviorDefinitionBuilder {
         this.config.name,
         code,
         this.lockHandle,
-        this.sessionId,
         this.config.transportRequest
       );
 
@@ -279,7 +273,6 @@ export class BehaviorDefinitionBuilder {
       const implResult = await checkImplementation(
         this.connection,
         this.config.name,
-        this.sessionId,
         version,
         codeToCheck
       );
@@ -287,7 +280,6 @@ export class BehaviorDefinitionBuilder {
       const abapResult = await checkAbap(
         this.connection,
         this.config.name,
-        this.sessionId,
         version,
         codeToCheck
       );
@@ -316,7 +308,6 @@ export class BehaviorDefinitionBuilder {
         this.connection,
         this.config.name,
         this.lockHandle,
-        this.sessionId
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
@@ -340,7 +331,6 @@ export class BehaviorDefinitionBuilder {
       const result = await activate(
         this.connection,
         this.config.name,
-        this.sessionId,
         preauditRequested
       );
       this.state.activateResult = result;
@@ -363,7 +353,6 @@ export class BehaviorDefinitionBuilder {
       const result = await checkDeletion(
         this.connection,
         this.config.name,
-        this.sessionId
       );
       this.state.deleteCheckResult = result;
       this.logger.info?.('Deletion check successful:', result.status);
@@ -385,7 +374,6 @@ export class BehaviorDefinitionBuilder {
       const result = await deleteBehaviorDefinition(
         this.connection,
         this.config.name,
-        this.sessionId,
         this.config.transportRequest
       );
       this.state.deleteResult = result;
@@ -405,7 +393,7 @@ export class BehaviorDefinitionBuilder {
   async read(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
     try {
       this.logger.info?.('Reading behavior definition metadata:', this.config.name);
-      const result = await read(this.connection, this.config.name, this.sessionId, version);
+      const result = await read(this.connection, this.config.name, version);
       this.state.readResult = result;
       this.logger.info?.('Behavior definition read successfully:', result.status);
       return this;
@@ -429,7 +417,6 @@ export class BehaviorDefinitionBuilder {
         this.connection,
         this.config.name,
         this.lockHandle,
-        this.sessionId
       );
       this.logger.info?.('Force unlock successful for', this.config.name);
     } catch (error: any) {
@@ -453,8 +440,8 @@ export class BehaviorDefinitionBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getValidationResult(): AxiosResponse | undefined {

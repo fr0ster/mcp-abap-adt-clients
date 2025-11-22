@@ -2,11 +2,10 @@
  * Program lock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Lock program for modification
@@ -14,8 +13,7 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
  */
 export async function lockProgram(
   connection: AbapConnection,
-  programName: string,
-  sessionId: string
+  programName: string
 ): Promise<string> {
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
 
@@ -23,7 +21,7 @@ export async function lockProgram(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  const response = await connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: null, headers} );
 
   // Parse lock handle from XML response
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
@@ -52,7 +50,7 @@ export async function lockProgramForUpdate(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  const response = await connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: null, headers} );
 
   // Parse lock handle and transport number from XML response
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });

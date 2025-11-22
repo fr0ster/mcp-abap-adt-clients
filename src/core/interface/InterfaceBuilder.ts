@@ -11,7 +11,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getTimeout } from '@mcp-abap-adt/connection';
 import { validateInterfaceName } from './validation';
 import { create as createInterfaceObject, generateInterfaceTemplate } from './create';
 import { lockInterface } from './lock';
@@ -21,6 +21,7 @@ import { unlockInterface } from './unlock';
 import { activateInterface } from './activation';
 import { deleteInterface } from './delete';
 import { getInterfaceSource } from './read';
+import { get } from 'http';
 
 export interface InterfaceBuilderLogger {
   debug?: (message: string, ...args: any[]) => void;
@@ -37,8 +38,8 @@ export interface InterfaceBuilderConfig {
   sourceCode?: string;
   sessionId?: string;
   // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  // Called after successful lock() with: lockHandle
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface InterfaceBuilderState {
@@ -60,7 +61,6 @@ export class InterfaceBuilder {
   private config: InterfaceBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private sessionId: string;
   private state: InterfaceBuilderState;
 
   constructor(
@@ -72,7 +72,6 @@ export class InterfaceBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -146,8 +145,7 @@ export class InterfaceBuilder {
         this.config.interfaceName,
         finalDescription,
         this.config.packageName,
-        this.config.transportRequest,
-        this.sessionId
+        this.config.transportRequest
       );
       
       this.state.createResult = result;
@@ -169,15 +167,14 @@ export class InterfaceBuilder {
       this.logger.info?.('Locking interface:', this.config.interfaceName);
       const lockData = await lockInterface(
         this.connection,
-        this.config.interfaceName,
-        this.sessionId
+        this.config.interfaceName
       );
       this.lockHandle = lockData.lockHandle;
       this.state.lockHandle = lockData.lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockData.lockHandle, this.sessionId);
+        this.config.onLock(lockData.lockHandle);
       }
 
       this.logger.info?.('Interface locked, handle:', lockData.lockHandle.substring(0, 10) + '...');
@@ -215,7 +212,7 @@ export class InterfaceBuilder {
         'Accept': 'text/plain'
       };
 
-      const result = await makeAdtRequestWithSession(this.connection, url, 'PUT', this.sessionId, code, headers);
+      const result = await this.connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout(), data: code, headers});
       
       this.state.updateResult = result;
       this.logger.info?.('Interface updated successfully:', result.status);
@@ -237,8 +234,7 @@ export class InterfaceBuilder {
       const result = await checkInterface(
         this.connection,
         this.config.interfaceName,
-        version,
-        this.sessionId
+        version
       );
       this.state.checkResult = result;
       this.logger.info?.('Interface check successful:', result.status);
@@ -263,8 +259,7 @@ export class InterfaceBuilder {
       const result = await unlockInterface(
         this.connection,
         this.config.interfaceName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
@@ -287,8 +282,7 @@ export class InterfaceBuilder {
       this.logger.info?.('Activating interface:', this.config.interfaceName);
       const result = await activateInterface(
         this.connection,
-        this.config.interfaceName,
-        this.sessionId
+        this.config.interfaceName
       );
       this.state.activateResult = result;
       this.logger.info?.('Interface activated successfully:', result.status);
@@ -355,8 +349,7 @@ export class InterfaceBuilder {
       await unlockInterface(
         this.connection,
         this.config.interfaceName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.logger.info?.('Force unlock successful for', this.config.interfaceName);
     } catch (error: any) {
@@ -380,8 +373,8 @@ export class InterfaceBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getValidationResult(): ValidationResult | undefined {

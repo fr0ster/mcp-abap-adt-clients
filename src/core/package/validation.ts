@@ -13,8 +13,7 @@ export async function validatePackageBasic(
   connection: AbapConnection,
   args: CreatePackageParams
 ): Promise<void> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/packages/validation`;
+  const url = `/sap/bc/adt/packages/validation`;
   const params = {
     objname: args.package_name,
     packagename: args.super_package,
@@ -52,8 +51,7 @@ export async function validatePackageFull(
   swcomp: string,
   transportLayer: string
 ): Promise<void> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/packages/validation`;
+  const url = `/sap/bc/adt/packages/validation`;
   const params = {
     objname: args.package_name,
     packagename: args.super_package,

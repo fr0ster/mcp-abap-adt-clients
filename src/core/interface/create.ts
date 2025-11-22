@@ -1,11 +1,12 @@
 /**
  * Interface create operations - Low-level functions (1 function = 1 HTTP request)
+ * 
+ * NOTE: Builder should call connection.setSessionType("stateful") before creating
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 
 /**
@@ -33,7 +34,6 @@ export async function create(
   description: string,
   packageName: string,
   transportRequest: string | undefined,
-  sessionId: string,
   masterSystem?: string,
   responsible?: string
 ): Promise<AxiosResponse> {
@@ -66,20 +66,18 @@ export async function create(
 
 </intf:abapInterface>`;
 
-  const url = `/sap/bc/adt/oo/interfaces`;
-  const params = transportRequest ? `?corrNr=${transportRequest}` : '';
+  const url = `/sap/bc/adt/oo/interfaces${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
 
-  return makeAdtRequestWithSession(
-    connection,
-    url + params,
-    'POST',
-    sessionId,
-    payload,
-    {
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: payload,
+    headers: {
       'Content-Type': 'application/vnd.sap.adt.oo.interfaces.v5+xml',
       'Accept': 'application/vnd.sap.adt.oo.interfaces.v5+xml'
     }
-  );
+  });
 }
 
 /**
@@ -91,20 +89,18 @@ export async function upload(
   interfaceName: string,
   sourceCode: string,
   lockHandle: string,
-  corrNr: string | undefined,
-  sessionId: string
+  corrNr: string | undefined
 ): Promise<void> {
   let url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}/source/main?lockHandle=${lockHandle}`;
   if (corrNr) {
     url += `&corrNr=${corrNr}`;
   }
 
-  await makeAdtRequestWithSession(
-    connection,
+  await connection.makeAdtRequest({
     url,
-    'PUT',
-    sessionId,
-    sourceCode,
-    { 'Content-Type': 'text/plain; charset=utf-8' }
-  );
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: sourceCode,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  });
 }

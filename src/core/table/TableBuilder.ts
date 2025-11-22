@@ -31,7 +31,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { createTable } from './create';
 import { acquireTableLockHandle } from './lock';
 import { updateTable } from './update';
@@ -57,10 +56,6 @@ export interface TableBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   ddlCode?: string;
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface TableBuilderState {
@@ -81,7 +76,6 @@ export class TableBuilder {
   private logger: TableBuilderLogger;
   private config: TableBuilderConfig;
   private lockHandle?: string;
-  private sessionId: string;
   private state: TableBuilderState;
 
   constructor(
@@ -92,7 +86,6 @@ export class TableBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -157,6 +150,7 @@ export class TableBuilder {
         throw new Error('DDL code is required');
       }
       this.logger.info?.('Creating table:', this.config.tableName);
+      this.connection.setSessionType("stateful");
       const params: CreateTableParams = {
         table_name: this.config.tableName,
         ddl_code: this.config.ddlCode,
@@ -181,18 +175,13 @@ export class TableBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking table:', this.config.tableName);
+      this.connection.setSessionType("stateful");
       const lockHandle = await acquireTableLockHandle(
         this.connection,
-        this.config.tableName,
-        this.sessionId
+        this.config.tableName
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
-
-      // Register lock in persistent storage if callback provided
-      if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
-      }
 
       this.logger.info?.('Table locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
@@ -225,8 +214,7 @@ export class TableBuilder {
       const result = await updateTable(
         this.connection,
         params,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.updateResult = result;
       this.logger.info?.('Table updated successfully:', result.status);
@@ -248,8 +236,7 @@ export class TableBuilder {
       const result = await runTableCheckRun(
         this.connection,
         reporter,
-        this.config.tableName,
-        this.sessionId
+        this.config.tableName
       );
       this.state.checkResult = result;
       this.logger.info?.('Table check successful:', result.status);
@@ -275,11 +262,11 @@ export class TableBuilder {
         this.connection,
         this.config.tableName,
         this.lockHandle,
-        this.sessionId
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
+      this.connection.setSessionType("stateless");
       this.logger.info?.('Table unlocked successfully');
       return this;
     } catch (error: any) {
@@ -298,8 +285,7 @@ export class TableBuilder {
       this.logger.info?.('Activating table:', this.config.tableName);
       const result = await activateTable(
         this.connection,
-        this.config.tableName,
-        this.sessionId
+        this.config.tableName
       );
       this.state.activateResult = result;
       this.logger.info?.('Table activated successfully:', result.status);
@@ -366,8 +352,7 @@ export class TableBuilder {
       await unlockTable(
         this.connection,
         this.config.tableName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.logger.info?.('Force unlock successful for', this.config.tableName);
     } catch (error: any) {
@@ -375,6 +360,7 @@ export class TableBuilder {
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
+      this.connection.setSessionType("stateless");
     }
   }
 
@@ -391,8 +377,8 @@ export class TableBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getValidationResult(): ValidationResult | undefined {

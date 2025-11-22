@@ -72,20 +72,13 @@ export async function checkFunctionModule(
   };
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
 
-  let response: AxiosResponse;
-  if (sessionId) {
-    const { makeAdtRequestWithSession } = await import('../../utils/sessionUtils');
-    response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, xmlBody, headers);
-  } else {
-    const baseUrl = await connection.getBaseUrl();
-    response = await connection.makeAdtRequest({
-      url: `${baseUrl}${url}`,
-      method: 'POST',
-      timeout: getTimeout('default'),
-      data: xmlBody,
-      headers
-    });
-  }
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 
   const checkResult = parseCheckRunResponse(response);
 

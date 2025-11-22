@@ -11,7 +11,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { create } from './create';
 import { getDataElement } from './read';
 import { lockDataElement } from './lock';
@@ -45,10 +44,6 @@ export interface DataElementBuilderConfig {
   headingLabel?: string;
   typeKind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
   typeName?: string;
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface DataElementBuilderState {
@@ -69,7 +64,6 @@ export class DataElementBuilder {
   private logger: DataElementBuilderLogger;
   private config: DataElementBuilderConfig;
   private lockHandle?: string;
-  private sessionId: string;
   private state: DataElementBuilderState;
 
   constructor(
@@ -80,7 +74,6 @@ export class DataElementBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -270,7 +263,8 @@ export class DataElementBuilder {
         long_label: this.config.longLabel,
         heading_label: this.config.headingLabel
       };
-      const result = await create(this.connection, params, this.sessionId);
+      this.connection.setSessionType("stateful");
+      const result = await create(this.connection, params);
       this.state.createResult = result;
       this.logger.info?.('Data element created successfully:', result.status);
       return this;
@@ -288,18 +282,13 @@ export class DataElementBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking data element:', this.config.dataElementName);
+      this.connection.setSessionType("stateful");
       const lockHandle = await lockDataElement(
         this.connection,
-        this.config.dataElementName,
-        this.sessionId
+        this.config.dataElementName
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
-
-      // Register lock in persistent storage if callback provided
-      if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
-      }
 
       this.logger.info?.('Data element locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
@@ -364,26 +353,11 @@ export class DataElementBuilder {
         this.connection,
         params,
         this.lockHandle,
-        this.sessionId,
         username,
         domainInfo
       );
 
-      this.state.updateResult = {
-        data: {
-          success: true,
-          data_element_name: params.data_element_name,
-          package: params.package_name,
-          transport_request: params.transport_request,
-          status: 'inactive',
-          session_id: this.sessionId,
-          message: `Data element ${params.data_element_name} updated successfully`
-        },
-        status: result.status,
-        statusText: result.statusText,
-        headers: result.headers,
-        config: result.config
-      } as AxiosResponse;
+      this.state.updateResult = result;
 
       this.logger.info?.('Data element updated successfully:', result.status);
       return this;
@@ -404,8 +378,7 @@ export class DataElementBuilder {
       const result = await checkDataElement(
         this.connection,
         this.config.dataElementName,
-        version,
-        this.sessionId
+        version
       );
       this.state.checkResult = result;
       this.logger.info?.('Data element check successful:', result.status);
@@ -446,12 +419,12 @@ export class DataElementBuilder {
       const result = await unlockDataElement(
         this.connection,
         this.config.dataElementName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
+      this.connection.setSessionType("stateless");
       this.logger.info?.('Data element unlocked successfully');
       return this;
     } catch (error: any) {
@@ -470,8 +443,7 @@ export class DataElementBuilder {
       this.logger.info?.('Activating data element:', this.config.dataElementName);
       const result = await activateDataElement(
         this.connection,
-        this.config.dataElementName,
-        this.sessionId
+        this.config.dataElementName
       );
       this.state.activateResult = result;
       this.logger.info?.('Data element activated successfully:', result.status);
@@ -519,8 +491,7 @@ export class DataElementBuilder {
       await unlockDataElement(
         this.connection,
         this.config.dataElementName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.logger.info?.('Force unlock successful for', this.config.dataElementName);
     } catch (error: any) {
@@ -528,6 +499,7 @@ export class DataElementBuilder {
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
+      this.connection.setSessionType("stateless");
     }
   }
 
@@ -544,8 +516,8 @@ export class DataElementBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getReadResult(): AxiosResponse | undefined {

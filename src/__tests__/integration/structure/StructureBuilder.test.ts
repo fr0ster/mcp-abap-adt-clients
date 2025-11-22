@@ -8,11 +8,8 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { StructureBuilder, StructureBuilderLogger } from '../../../core/structure';
 import { getStructure } from '../../../core/structure/read';
-import { deleteStructure } from '../../../core/structure/delete';
-import { unlockStructure } from '../../../core/structure/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -249,6 +246,7 @@ describe('StructureBuilder', () => {
         logBuilderTestError(builderLogger, 'StructureBuilder - full workflow', error);
         throw error;
       } finally {
+        // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'StructureBuilder - full workflow');
       }

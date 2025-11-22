@@ -49,9 +49,8 @@ export async function getInterfaceTransport(
   connection: AbapConnection,
   interfaceName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(interfaceName);
-  const url = `${baseUrl}/sap/bc/adt/oo/interfaces/${encodedName}/transport`;
+  const url = `/sap/bc/adt/oo/interfaces/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

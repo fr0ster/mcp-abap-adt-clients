@@ -21,8 +21,7 @@ export async function activateFunctionGroup(
   <adtcore:objectReference adtcore:uri="${objectUri}" adtcore:name="${functionGroupName}"/>
 </adtcore:objectReferences>`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/activation?method=activate&preauditRequested=true`;
+  const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;
 
   return connection.makeAdtRequest({
     url,

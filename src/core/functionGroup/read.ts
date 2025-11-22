@@ -10,9 +10,8 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Get ABAP function group
  */
 export async function getFunctionGroup(connection: AbapConnection, functionGroupName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(functionGroupName);
-  const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedName}`;
+  const url = `/sap/bc/adt/functions/groups/${encodedName}`;
 
   return connection.makeAdtRequest({
     url,
@@ -32,9 +31,8 @@ export async function getFunctionGroupTransport(
   connection: AbapConnection,
   functionGroupName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(functionGroupName);
-  const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedName}/transport`;
+  const url = `/sap/bc/adt/functions/groups/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

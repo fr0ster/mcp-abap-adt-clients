@@ -25,7 +25,6 @@ import { activateObjectInSession } from '../../utils/activationUtils';
 export async function activateMetadataExtension(
   connection: AbapConnection,
   name: string,
-  sessionId: string,
   preaudit: boolean = true
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
@@ -35,7 +34,6 @@ export async function activateMetadataExtension(
     connection,
     objectUri,
     name.toUpperCase(),
-    sessionId,
     preaudit
   );
 }

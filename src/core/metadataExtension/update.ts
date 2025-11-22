@@ -4,9 +4,8 @@
  * Endpoint: PUT /sap/bc/adt/ddic/ddlx/sources/{name}/source/main?lockHandle={lockHandle}
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Update metadata extension source code
@@ -15,7 +14,6 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
  * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
  * @param sourceCode - Metadata extension annotation source code
  * @param lockHandle - Lock handle from lockMetadataExtension
- * @param sessionId - Session ID for request tracking
  * @returns Axios response
  * 
  * @example
@@ -29,15 +27,14 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
  *     Fld1;
  * }`;
  * 
- * await updateMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sourceCode, lockHandle, sessionId);
+ * await updateMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sourceCode, lockHandle);
  * ```
  */
 export async function updateMetadataExtension(
   connection: AbapConnection,
   name: string,
   sourceCode: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main?lockHandle=${lockHandle}`;
@@ -47,12 +44,11 @@ export async function updateMetadataExtension(
     'Content-Type': 'text/plain; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(
-    connection,
-    sessionId,
-    'PUT',
+  return connection.makeAdtRequest({
     url,
-    sourceCode,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: sourceCode,
     headers
-  );
+  });
 }

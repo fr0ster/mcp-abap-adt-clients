@@ -8,7 +8,6 @@
 
 import { AxiosResponse } from 'axios';
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { makeAdtRequestWithSession } from './sessionUtils';
 import { getTimeout } from '@mcp-abap-adt/connection';
 import { encodeSapObjectName } from './internalUtils';
 
@@ -98,7 +97,6 @@ export async function activateObjectInSession(
   connection: AbapConnection,
   objectUri: string,
   objectName: string,
-  sessionId: string,
   preaudit: boolean = true
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preaudit}`;
@@ -113,6 +111,11 @@ export async function activateObjectInSession(
     'Accept': 'application/xml'
   };
 
-  return await makeAdtRequestWithSession(connection, url, 'POST', sessionId, activationXml, headers);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: activationXml,
+    headers
+  });
 }
-

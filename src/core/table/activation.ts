@@ -12,10 +12,9 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateTable(
   connection: AbapConnection,
-  tableName: string,
-  sessionId: string
+  tableName: string
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}`;
-  return await activateObjectInSession(connection, objectUri, tableName, sessionId, true);
+  return await activateObjectInSession(connection, objectUri, tableName, true);
 }
 

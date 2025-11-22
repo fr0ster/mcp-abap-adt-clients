@@ -2,10 +2,9 @@
  * Structure update operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { UpdateStructureParams } from './types';
 
 /**
@@ -18,7 +17,6 @@ export async function upload(
   structureName: string,
   ddlCode: string,
   lockHandle: string,
-  sessionId: string,
   transportRequest?: string
 ): Promise<AxiosResponse> {
   const structureNameEncoded = encodeSapObjectName(structureName);
@@ -29,7 +27,13 @@ export async function upload(
     'Content-Type': 'text/plain; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, ddlCode, headers);
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: ddlCode,
+    headers
+  });
 }
 
 /**
@@ -38,8 +42,7 @@ export async function upload(
 export async function updateStructure(
   connection: AbapConnection,
   params: UpdateStructureParams,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   if (!params.structure_name) {
     throw new Error('structure_name is required');
@@ -56,6 +59,11 @@ export async function updateStructure(
     'Content-Type': 'text/plain; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, params.ddl_code, headers);
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: params.ddl_code,
+    headers
+  });
 }
-

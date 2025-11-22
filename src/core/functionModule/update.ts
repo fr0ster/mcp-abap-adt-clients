@@ -2,10 +2,9 @@
  * FunctionModule update operations - low-level functions for FunctionModuleBuilder
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Upload function module source code (low-level - uses existing lockHandle)
@@ -18,7 +17,6 @@ export async function update(
   functionModuleName: string,
   lockHandle: string,
   sourceCode: string,
-  sessionId: string,
   corrNr?: string
 ): Promise<AxiosResponse> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
@@ -34,7 +32,13 @@ export async function update(
     'Accept': 'text/plain'
   };
 
-  await makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
+  await connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: sourceCode,
+    headers
+  });
 
   return {
     data: {

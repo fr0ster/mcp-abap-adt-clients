@@ -11,7 +11,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { validateProgramName } from './validation';
 import { create, CreateProgramParams } from './create';
 import { lockProgram } from './lock';
@@ -40,7 +39,7 @@ export interface ProgramBuilderConfig {
   sessionId?: string;
   // Optional callback to register lock in persistent storage
   // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface ProgramBuilderState {
@@ -62,7 +61,6 @@ export class ProgramBuilder {
   private config: ProgramBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private sessionId: string;
   private state: ProgramBuilderState;
 
   constructor(
@@ -74,7 +72,6 @@ export class ProgramBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -159,7 +156,7 @@ export class ProgramBuilder {
         source_code: this.sourceCode,
         activate: false // Don't activate in low-level function
       };
-      const result = await create(this.connection, params, this.sessionId);
+      const result = await create(this.connection, params);
       this.state.createResult = result;
       this.logger.info?.('Program created successfully:', result.status);
       return this;
@@ -180,14 +177,13 @@ export class ProgramBuilder {
       const lockHandle = await lockProgram(
         this.connection,
         this.config.programName,
-        this.sessionId
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
+        this.config.onLock(lockHandle);
       }
 
       this.logger.info?.('Program locked, handle:', lockHandle.substring(0, 10) + '...');
@@ -226,8 +222,14 @@ export class ProgramBuilder {
         'Accept': 'text/plain'
       };
 
-      const { makeAdtRequestWithSession } = await import('../../utils/sessionUtils');
-      const result = await makeAdtRequestWithSession(this.connection, url, 'PUT', this.sessionId, code, headers);
+      const { getTimeout } = await import('@mcp-abap-adt/connection');
+      const result = await this.connection.makeAdtRequest({
+        url,
+        method: 'PUT',
+        timeout: getTimeout('default'),
+        data: code,
+        headers
+      });
 
       this.state.updateResult = result;
       this.logger.info?.('Program updated successfully:', result.status);
@@ -250,7 +252,6 @@ export class ProgramBuilder {
         this.connection,
         this.config.programName,
         version,
-        this.sessionId,
         sourceCode
       );
       this.state.checkResult = result;
@@ -276,8 +277,7 @@ export class ProgramBuilder {
       const result = await unlockProgram(
         this.connection,
         this.config.programName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
@@ -300,8 +300,7 @@ export class ProgramBuilder {
       this.logger.info?.('Activating program:', this.config.programName);
       const result = await activateProgram(
         this.connection,
-        this.config.programName,
-        this.sessionId
+        this.config.programName
       );
       this.state.activateResult = result;
       this.logger.info?.('Program activated successfully:', result.status);
@@ -368,7 +367,6 @@ export class ProgramBuilder {
         this.connection,
         this.config.programName,
         this.lockHandle,
-        this.sessionId
       );
       this.logger.info?.('Force unlock successful for', this.config.programName);
     } catch (error: any) {
@@ -392,8 +390,8 @@ export class ProgramBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getValidationResult(): ValidationResult | undefined {

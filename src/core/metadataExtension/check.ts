@@ -26,7 +26,6 @@ import { runCheckRun } from '../shared/checkRun';
 export async function checkMetadataExtension(
   connection: AbapConnection,
   name: string,
-  sessionId: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string
 ): Promise<AxiosResponse> {
@@ -40,7 +39,6 @@ export async function checkMetadataExtension(
     objectName,
     version,
     'abapCheckRun',
-    sessionId,
     sourceCode
   );
 }

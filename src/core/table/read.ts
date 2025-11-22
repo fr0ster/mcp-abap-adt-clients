@@ -49,9 +49,8 @@ export async function getTableTransport(
   connection: AbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(tableName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/tables/${encodedName}/transport`;
+  const url = `/sap/bc/adt/ddic/tables/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

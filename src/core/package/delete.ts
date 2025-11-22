@@ -15,6 +15,8 @@ export interface DeletePackageParams {
 /**
  * Check if package can be deleted (deletion check)
  * Returns response with isDeletable flag
+ * 
+ * NOTE: Uses stateful session headers automatically if connection has stateful mode enabled
  */
 export async function checkPackageDeletion(
   connection: AbapConnection,
@@ -27,8 +29,7 @@ export async function checkPackageDeletion(
   const encodedName = encodeSapObjectName(params.package_name);
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const checkUrl = `${baseUrl}/sap/bc/adt/deletion/check`;
+  const checkUrl = `/sap/bc/adt/deletion/check`;
 
   // Build XML check request (no transportNumber in check request)
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
@@ -91,8 +92,7 @@ export async function deletePackage(
   const encodedName = encodeSapObjectName(params.package_name);
   const objectUri = `/sap/bc/adt/packages/${encodedName}`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
+  const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
   // Build XML deletion request
   // For packages, empty transportNumber tag may be required if no transport_request provided

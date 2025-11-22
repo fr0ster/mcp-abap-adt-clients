@@ -13,9 +13,8 @@ import { activateObjectInSession } from '../../utils/activationUtils';
 export async function activateDDLS(
   connection: AbapConnection,
   viewName: string,
-  sessionId: string
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`;
-  return await activateObjectInSession(connection, objectUri, viewName, sessionId, true);
+  return await activateObjectInSession(connection, objectUri, viewName, true);
 }
 

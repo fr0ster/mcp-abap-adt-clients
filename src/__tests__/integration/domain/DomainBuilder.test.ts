@@ -247,6 +247,7 @@ describe('DomainBuilder', () => {
         logBuilderTestError(builderLogger, 'DomainBuilder - full workflow', error);
         throw error;
       } finally {
+        // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'DomainBuilder - full workflow');
       }

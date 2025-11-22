@@ -27,8 +27,7 @@ export async function checkDeletion(
   const encodedName = encodeSapObjectName(view_name);
   const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const checkUrl = `${baseUrl}/sap/bc/adt/deletion/check`;
+  const checkUrl = `/sap/bc/adt/deletion/check`;
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
@@ -65,12 +64,14 @@ export async function deleteView(
   const encodedName = encodeSapObjectName(view_name);
   const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
+  const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
+  // Views require empty transportNumber tag if no transport request
   let transportNumberTag = '';
   if (transport_request && transport_request.trim()) {
     transportNumberTag = `<del:transportNumber>${transport_request}</del:transportNumber>`;
+  } else {
+    transportNumberTag = '<del:transportNumber/>';
   }
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>

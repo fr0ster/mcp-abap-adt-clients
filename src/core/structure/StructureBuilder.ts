@@ -31,7 +31,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { create } from './create';
 import { lockStructure } from './lock';
 import { upload } from './update';
@@ -60,10 +59,9 @@ export interface StructureBuilderConfig {
   // Legacy fields (deprecated, use ddlCode instead)
   fields?: StructureField[];
   includes?: StructureInclude[];
-  sessionId?: string;
   // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  // Called after successful lock() with: lockHandle
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface StructureBuilderState {
@@ -84,7 +82,6 @@ export class StructureBuilder {
   private logger: StructureBuilderLogger;
   private config: StructureBuilderConfig;
   private lockHandle?: string;
-  private sessionId: string;
   private state: StructureBuilderState;
 
   constructor(
@@ -95,7 +92,6 @@ export class StructureBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -198,8 +194,7 @@ export class StructureBuilder {
         this.config.structureName,
         this.config.description,
         this.config.packageName,
-        this.config.transportRequest,
-        this.sessionId
+        this.config.transportRequest
       );
       this.state.createResult = result;
       this.logger.info?.('Structure metadata created successfully:', result.status);
@@ -218,17 +213,20 @@ export class StructureBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking structure:', this.config.structureName);
+      
+      // Enable stateful mode for lock operation
+      this.connection.setSessionType('stateful');
+      
       const lockHandle = await lockStructure(
         this.connection,
-        this.config.structureName,
-        this.sessionId
+        this.config.structureName
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
+        this.config.onLock(lockHandle);
       }
 
       this.logger.info?.('Structure locked, handle:', lockHandle.substring(0, 10) + '...');
@@ -260,7 +258,6 @@ export class StructureBuilder {
         this.config.structureName,
         code,
         this.lockHandle,
-        this.sessionId,
         this.config.transportRequest
       );
       this.state.updateResult = result;
@@ -283,8 +280,7 @@ export class StructureBuilder {
       const result = await checkStructure(
         this.connection,
         this.config.structureName,
-        version,
-        this.sessionId
+        version
       );
       this.state.checkResult = result;
       this.logger.info?.('Structure check successful:', result.status);
@@ -310,11 +306,14 @@ export class StructureBuilder {
         this.connection,
         this.config.structureName,
         this.lockHandle,
-        this.sessionId
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
+      
+      // Disable stateful mode after unlock
+      this.connection.setSessionType('stateless');
+      
       this.logger.info?.('Structure unlocked successfully');
       return this;
     } catch (error: any) {
@@ -333,8 +332,7 @@ export class StructureBuilder {
       this.logger.info?.('Activating structure:', this.config.structureName);
       const result = await activateStructure(
         this.connection,
-        this.config.structureName,
-        this.sessionId
+        this.config.structureName
       );
       this.state.activateResult = result;
       this.logger.info?.('Structure activated successfully:', result.status);
@@ -402,7 +400,6 @@ export class StructureBuilder {
         this.connection,
         this.config.structureName,
         this.lockHandle,
-        this.sessionId
       );
       this.logger.info?.('Force unlock successful for', this.config.structureName);
     } catch (error: any) {
@@ -424,10 +421,6 @@ export class StructureBuilder {
 
   getLockHandle(): string | undefined {
     return this.lockHandle;
-  }
-
-  getSessionId(): string {
-    return this.sessionId;
   }
 
   getValidationResult(): ValidationResult | undefined {

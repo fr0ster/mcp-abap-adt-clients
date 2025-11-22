@@ -10,9 +10,8 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Get ABAP domain
  */
 export async function getDomain(connection: AbapConnection, domainName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(domainName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/domains/${encodedName}`;
+  const url = `/sap/bc/adt/ddic/domains/${encodedName}`;
 
   return connection.makeAdtRequest({
     url,
@@ -32,9 +31,8 @@ export async function getDomainTransport(
   connection: AbapConnection,
   domainName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(domainName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/domains/${encodedName}/transport`;
+  const url = `/sap/bc/adt/ddic/domains/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

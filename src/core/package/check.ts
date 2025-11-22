@@ -13,8 +13,7 @@ export async function checkPackage(
   packageName: string,
   version: 'active' | 'inactive' = 'active'
 ): Promise<void> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/checkruns`;
+  const url = `/sap/bc/adt/checkruns`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
 

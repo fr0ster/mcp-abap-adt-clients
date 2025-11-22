@@ -10,9 +10,8 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Get ABAP data element
  */
 export async function getDataElement(connection: AbapConnection, dataElementName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(dataElementName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements/${encodedName}`;
+  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
 
   return connection.makeAdtRequest({
     url,
@@ -32,9 +31,8 @@ export async function getDataElementTransport(
   connection: AbapConnection,
   dataElementName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(dataElementName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements/${encodedName}/transport`;
+  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

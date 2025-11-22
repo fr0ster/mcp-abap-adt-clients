@@ -1,53 +1,14 @@
 /**
  * DataElement create operations - Low-level functions
+ * NOTE: Builder should call connection.setSessionType("stateful") before creating
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 import { getDomainInfo } from './update';
 import { CreateDataElementParams } from './types';
-import * as crypto from 'crypto';
-
-/**
- * Generate unique request ID
- */
-function generateRequestId(): string {
-  return crypto.randomUUID().replace(/-/g, '');
-}
-
-/**
- * Low-level: Make ADT request stateless
- */
-async function makeAdtRequestStateless(
-  connection: AbapConnection,
-  url: string,
-  method: string,
-  sessionId: string,
-  data?: any,
-  additionalHeaders?: Record<string, string>
-): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-
-  const requestId = generateRequestId();
-  const headers: Record<string, string> = {
-    'sap-adt-connection-id': sessionId,
-    'sap-adt-request-id': requestId,
-    'X-sap-adt-profiling': 'server-time',
-    ...additionalHeaders
-  };
-
-  return connection.makeAdtRequest({
-    url: fullUrl,
-    method,
-    timeout: getTimeout('default'),
-    data,
-    headers
-  });
-}
 
 /**
  * Low-level: Create data element (POST)
@@ -55,11 +16,9 @@ async function makeAdtRequestStateless(
  */
 export async function create(
   connection: AbapConnection,
-  args: CreateDataElementParams,
-  sessionId: string
+  args: CreateDataElementParams
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
+  const url = `/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   // Get system information for cloud systems
   const systemInfo = await getSystemInformation(connection);
@@ -183,6 +142,11 @@ export async function create(
     'Content-Type': 'application/vnd.sap.adt.dataelements.v2+xml'
   };
 
-  return makeAdtRequestStateless(connection, url, 'POST', sessionId, xmlBody, headers);
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }
-

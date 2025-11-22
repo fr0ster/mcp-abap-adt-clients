@@ -13,13 +13,12 @@ import { activateObjectInSession } from '../../utils/activationUtils';
 export async function activateFunctionModule(
   connection: AbapConnection,
   functionGroupName: string,
-  functionModuleName: string,
-  sessionId: string
+  functionModuleName: string
 ): Promise<AxiosResponse> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
   const objectUri = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}`;
 
-  return await activateObjectInSession(connection, objectUri, functionModuleName, sessionId, true);
+  return await activateObjectInSession(connection, objectUri, functionModuleName, true);
 }
 

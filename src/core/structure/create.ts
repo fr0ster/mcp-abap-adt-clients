@@ -1,16 +1,10 @@
 /**
  * Structure create operations
+ * NOTE: Builder should call connection.setSessionType("stateful") before creating
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
-import { lockStructure } from './lock';
-import { unlockStructure } from './unlock';
-import { activateStructure } from './activation';
-import { CreateStructureParams } from './types';
 import { getSystemInformation } from '../shared/systemInfo';
 
 /**
@@ -22,9 +16,7 @@ export async function create(
   structureName: string,
   description: string,
   packageName: string,
-  transportRequest: string | undefined,
-  sessionId: string
-): Promise<AxiosResponse> {
+  transportRequest: string | undefined): Promise<AxiosResponse> {
   const createUrl = `/sap/bc/adt/ddic/structures${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
 
   // Get system information - only for cloud systems
@@ -48,5 +40,11 @@ export async function create(
     'Content-Type': 'application/vnd.sap.adt.structures.v2+xml'
   };
 
-  return makeAdtRequestWithSession(connection, createUrl, 'POST', sessionId, structureXml, headers);
+  return connection.makeAdtRequest({
+    url: createUrl,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: structureXml,
+    headers
+  });
 }

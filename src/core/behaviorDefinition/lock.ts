@@ -2,10 +2,9 @@
  * Behavior Definition lock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Lock behavior definition for modification
@@ -27,7 +26,6 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 export async function lock(
     connection: AbapConnection,
     name: string,
-    sessionId: string,
     accessMode: string = 'MODIFY'
 ): Promise<string> {
     const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
@@ -51,14 +49,13 @@ export async function lock(
         'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
     };
 
-    const response = await makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'POST',
+    const response = await connection.makeAdtRequest({
         url,
-        xmlBody,
+        method: 'POST',
+        timeout: getTimeout('default'),
+        data: xmlBody,
         headers
-    );
+    });
 
     // Parse lock handle from XML response
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
@@ -115,14 +112,13 @@ export async function lockForUpdate(
         'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
     };
 
-    const response = await makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'POST',
+    const response = await connection.makeAdtRequest({
         url,
-        xmlBody,
+        method: 'POST',
+        timeout: getTimeout('default'),
+        data: xmlBody,
         headers
-    );
+    });
 
     // Parse lock handle and transport number from XML response
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });

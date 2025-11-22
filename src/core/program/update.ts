@@ -3,7 +3,7 @@
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getTimeout } from '@mcp-abap-adt/connection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 export interface UpdateProgramSourceParams {
@@ -35,6 +35,6 @@ export async function uploadProgramSource(
     'Accept': 'text/plain'
   };
 
-  return await makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
+  return await connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: sourceCode, headers});
 }
 

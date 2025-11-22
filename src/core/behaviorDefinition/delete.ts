@@ -4,7 +4,6 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Check if behavior definition can be deleted
@@ -26,7 +25,6 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 export async function checkDeletion(
     connection: AbapConnection,
     name: string,
-    sessionId: string
 ): Promise<AxiosResponse> {
     const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}`;
 
@@ -39,8 +37,7 @@ export async function checkDeletion(
         'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml'
     };
 
-    const baseUrl = await connection.getBaseUrl();
-    const checkUrl = `${baseUrl}/sap/bc/adt/deletion/check`;
+    const checkUrl = `/sap/bc/adt/deletion/check`;
 
     return await connection.makeAdtRequest({
         url: checkUrl,
@@ -74,7 +71,6 @@ export async function checkDeletion(
 export async function deleteBehaviorDefinition(
     connection: AbapConnection,
     name: string,
-    sessionId: string,
     transportRequest?: string
 ): Promise<AxiosResponse> {
     const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}`;
@@ -94,8 +90,7 @@ export async function deleteBehaviorDefinition(
         'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml'
     };
 
-    const baseUrl = await connection.getBaseUrl();
-    const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
+    const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
     return await connection.makeAdtRequest({
         url: deletionUrl,

@@ -9,10 +9,13 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 /**
  * Get ABAP package
  */
-export async function getPackage(connection: AbapConnection, packageName: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
+export async function getPackage(
+  connection: AbapConnection,
+  packageName: string,
+  version: 'active' | 'inactive' = 'active'
+): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(packageName);
-  const url = `${baseUrl}/sap/bc/adt/packages/${encodedName}`;
+  const url = `/sap/bc/adt/packages/${encodedName}?version=${version}`;
 
   return connection.makeAdtRequest({
     url,
@@ -32,9 +35,8 @@ export async function getPackageTransport(
   connection: AbapConnection,
   packageName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(packageName);
-  const url = `${baseUrl}/sap/bc/adt/packages/${encodedName}/transport`;
+  const url = `/sap/bc/adt/packages/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

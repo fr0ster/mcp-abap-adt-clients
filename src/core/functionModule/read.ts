@@ -60,10 +60,9 @@ export async function getFunctionModuleTransport(
   functionName: string,
   functionGroup: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
-  const url = `${baseUrl}/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/transport`;
+  const url = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

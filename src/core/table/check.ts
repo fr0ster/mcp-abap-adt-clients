@@ -2,11 +2,10 @@
  * Table check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Build check run XML payload
@@ -25,8 +24,7 @@ function buildCheckRunPayload(tableName: string): string {
 export async function runTableCheckRun(
   connection: AbapConnection,
   reporter: 'tableStatusCheck' | 'abapCheckRun',
-  tableName: string,
-  sessionId: string
+  tableName: string
 ): Promise<AxiosResponse> {
   const payload = buildCheckRunPayload(tableName);
   const headers = {
@@ -34,6 +32,6 @@ export async function runTableCheckRun(
     'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
   };
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, payload, headers);
+  return connection.makeAdtRequest({ url, method: 'POST', timeout: getTimeout('default'), data: payload, headers });
 }
 

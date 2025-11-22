@@ -2,10 +2,9 @@
  * View unlock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock DDLS
@@ -13,11 +12,10 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 export async function unlockDDLS(
   connection: AbapConnection,
   viewName: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
+  return connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: null});
 }
 

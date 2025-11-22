@@ -2,24 +2,30 @@
  * Domain unlock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock domain
  * Must use same session and lock handle from lock operation
+ * 
+ * NOTE: Caller should disable stateful session mode via connection.setSessionType("stateless")
+ * after calling this function
  */
 export async function unlockDomain(
   connection: AbapConnection,
   domainName: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null
+  });
 }
 

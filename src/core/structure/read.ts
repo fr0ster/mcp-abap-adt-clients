@@ -49,9 +49,8 @@ export async function getStructureTransport(
   connection: AbapConnection,
   structureName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(structureName);
-  const url = `${baseUrl}/sap/bc/adt/ddic/structures/${encodedName}/transport`;
+  const url = `/sap/bc/adt/ddic/structures/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

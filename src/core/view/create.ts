@@ -2,11 +2,10 @@
  * View create operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 import { lockDDLS } from './lock';
 import { unlockDDLS } from './unlock';
@@ -18,8 +17,7 @@ import { CreateViewParams } from './types';
  */
 async function createDDLSObject(
   connection: AbapConnection,
-  args: CreateViewParams,
-  sessionId: string
+  args: CreateViewParams
 ): Promise<AxiosResponse> {
   const description = args.description || args.view_name;
   const url = `/sap/bc/adt/ddic/ddl/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
@@ -45,7 +43,8 @@ async function createDDLSObject(
     'Content-Type': 'application/vnd.sap.adt.ddlSource+xml'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, metadataXml, headers);
+  return connection.makeAdtRequest(
+    {url, method: 'POST', timeout: getTimeout('default'), data: metadataXml, headers});
 }
 
 /**
@@ -56,7 +55,6 @@ async function uploadDDLSource(
   viewName: string,
   ddlSource: string,
   lockHandle: string,
-  sessionId: string,
   transportRequest?: string
 ): Promise<AxiosResponse> {
   const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
@@ -66,7 +64,7 @@ async function uploadDDLSource(
     'Content-Type': 'text/plain; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, ddlSource, headers);
+  return connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: ddlSource, headers});
 }
 
 /**
@@ -82,26 +80,25 @@ export async function createView(
   }
 
   const viewName = params.view_name.toUpperCase();
-  const sessionId = generateSessionId();
   let lockHandle: string | null = null;
 
   try {
-    const createResponse = await createDDLSObject(connection, params, sessionId);
+    const createResponse = await createDDLSObject(connection, params);
     if (createResponse.status < 200 || createResponse.status >= 300) {
       throw new Error(`Failed to create DDLS: ${createResponse.status} ${createResponse.statusText}`);
     }
 
-    lockHandle = await lockDDLS(connection, viewName, sessionId);
+    lockHandle = await lockDDLS(connection, viewName);
 
-    const uploadResponse = await uploadDDLSource(connection, viewName, params.ddl_source, lockHandle, sessionId, params.transport_request);
+    const uploadResponse = await uploadDDLSource(connection, viewName, params.ddl_source, lockHandle, params.transport_request);
     if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
       throw new Error(`Failed to upload DDL: ${uploadResponse.status} ${uploadResponse.statusText}`);
     }
 
-    await unlockDDLS(connection, viewName, lockHandle, sessionId);
+    await unlockDDLS(connection, viewName, lockHandle);
     lockHandle = null;
 
-    await activateDDLS(connection, viewName, sessionId);
+    await activateDDLS(connection, viewName);
 
     // Return the real response from SAP (from initial POST)
     return createResponse;
@@ -109,7 +106,7 @@ export async function createView(
   } catch (error: any) {
     if (lockHandle) {
       try {
-        await unlockDDLS(connection, viewName, lockHandle, sessionId);
+        await unlockDDLS(connection, viewName, lockHandle);
       } catch (unlockError) {
         // Ignore unlock errors
       }

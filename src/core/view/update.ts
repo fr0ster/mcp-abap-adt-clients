@@ -5,7 +5,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
+import { getTimeout } from '@mcp-abap-adt/connection';
 import { lockDDLSForUpdate } from './lock';
 import { unlockDDLS } from './unlock';
 import { activateDDLS } from './activation';
@@ -19,7 +19,6 @@ async function uploadDDLSourceForUpdate(
   viewName: string,
   ddlSource: string,
   lockHandle: string,
-  sessionId: string,
   transportRequest?: string
 ): Promise<AxiosResponse> {
   const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
@@ -29,7 +28,7 @@ async function uploadDDLSourceForUpdate(
     'Content-Type': 'text/plain; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, ddlSource, headers);
+  return connection.makeAdtRequest({ url, method: 'PUT', timeout: getTimeout(), data: ddlSource, headers });
 }
 
 /**
@@ -42,13 +41,12 @@ export async function updateViewSource(
 ): Promise<AxiosResponse> {
   const viewName = params.view_name.toUpperCase();
   const reuseLock = Boolean(params.lock_handle);
-  const sessionId = params.session_id || generateSessionId();
   let lockHandle: string | null = params.lock_handle || null;
   let corrNr: string | undefined = params.transport_request;
 
   try {
     if (!reuseLock) {
-      const lockResult = await lockDDLSForUpdate(connection, viewName, sessionId);
+      const lockResult = await lockDDLSForUpdate(connection, viewName);
       lockHandle = lockResult.lockHandle;
       corrNr = lockResult.corrNr ?? corrNr;
     }
@@ -57,17 +55,17 @@ export async function updateViewSource(
       throw new Error('lock_handle is required for updateViewSource');
     }
 
-    await uploadDDLSourceForUpdate(connection, viewName, params.ddl_source, lockHandle, sessionId, corrNr);
+    await uploadDDLSourceForUpdate(connection, viewName, params.ddl_source, lockHandle, corrNr);
 
     if (!reuseLock) {
-      await unlockDDLS(connection, viewName, lockHandle, sessionId);
+      await unlockDDLS(connection, viewName, lockHandle);
       lockHandle = null;
     }
 
     const shouldActivate = params.activate === true;
 
     if (shouldActivate) {
-      await activateDDLS(connection, viewName, sessionId);
+      await activateDDLS(connection, viewName);
     }
 
     return {
@@ -90,7 +88,7 @@ export async function updateViewSource(
   } catch (error: any) {
     if (!reuseLock && lockHandle) {
       try {
-        await unlockDDLS(connection, viewName, lockHandle, sessionId);
+        await unlockDDLS(connection, viewName, lockHandle);
       } catch {
         // Ignore unlock errors for auto-managed locks
       }

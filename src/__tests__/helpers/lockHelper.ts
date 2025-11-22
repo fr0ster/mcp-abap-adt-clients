@@ -85,9 +85,10 @@ export function createOnLockCallback(
   objectName: string,
   functionGroupName?: string,
   testFile?: string
-): (lockHandle: string, sessionId: string) => void {
-  return (lockHandle: string, sessionId: string) => {
+): (lockHandle: string) => void {
+  return (lockHandle: string) => {
     const targetName = functionGroupName ? `${functionGroupName}/${objectName}` : objectName;
+    const sessionId = ''; // sessionId is internal to connection now
     logBuilderLockEvent(objectType, targetName, sessionId, lockHandle);
     registerTestLock(objectType, objectName, sessionId, lockHandle, functionGroupName, testFile);
   };

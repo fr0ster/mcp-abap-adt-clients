@@ -65,16 +65,10 @@ export async function runClass(
     'Accept': 'text/plain'
   };
 
-  if (sessionId) {
-    const { makeAdtRequestWithSession } = await import('../../utils/sessionUtils');
-    return makeAdtRequestWithSession(connection, url, 'POST', sessionId, '', headers);
-  } else {
-    const baseUrl = await connection.getBaseUrl();
-    return connection.makeAdtRequest({
-      url: `${baseUrl}${url}`,
-      method: 'POST',
-      timeout: (await import('@mcp-abap-adt/connection')).getTimeout('default'),
-      headers
-    });
-  }
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: (await import('@mcp-abap-adt/connection')).getTimeout('default'),
+    headers
+  });
 }

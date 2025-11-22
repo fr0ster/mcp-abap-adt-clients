@@ -2,23 +2,29 @@
  * Package unlock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock package
- * Must use same session and lock handle from lock operation
+ * Must use same lock handle from lock operation
+ * 
+ * NOTE: Caller should disable stateful session mode via connection.setSessionType("stateless")
+ * after calling this function
  */
 export async function unlockPackage(
   connection: AbapConnection,
   packageName: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null
+  });
 }
 

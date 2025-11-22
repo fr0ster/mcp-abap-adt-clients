@@ -1,6 +1,5 @@
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { BehaviorDefinitionValidationParams } from './types';
 
 /**
@@ -32,8 +31,7 @@ import { BehaviorDefinitionValidationParams } from './types';
  */
 export async function validate(
     connection: AbapConnection,
-    params: BehaviorDefinitionValidationParams,
-    sessionId: string
+    params: BehaviorDefinitionValidationParams
 ): Promise<AxiosResponse> {
     try {
         const queryParams = new URLSearchParams({
@@ -46,16 +44,14 @@ export async function validate(
 
         const url = `/sap/bc/adt/bo/behaviordefinitions/validation?${queryParams.toString()}`;
 
-        const response = await makeAdtRequestWithSession(
-            connection,
-            sessionId,
-            'POST',
+        const response = await connection.makeAdtRequest({
             url,
-            undefined,
-            {
+            method: 'POST',
+            timeout: getTimeout('default'),
+            headers: {
                 'Accept': 'application/vnd.sap.as+xml'
             }
-        );
+        });
 
         return response;
     } catch (error: any) {

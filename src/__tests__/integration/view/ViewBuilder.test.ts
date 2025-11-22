@@ -5,13 +5,11 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- integration/view/ViewBuilder
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ViewBuilder, ViewBuilderLogger } from '../../../core/view';
 import { getView } from '../../../core/view/read';
-import { deleteView } from '../../../core/view/delete';
-import { unlockDDLS } from '../../../core/view/unlock';
-import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getConfig } from '../../helpers/sessionConfig';
+import { createOnLockCallback } from '../../helpers/lockHelper';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -32,7 +30,6 @@ const {
   resolveTransportRequest,
   ensurePackageConfig
 } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -273,7 +270,7 @@ describe('ViewBuilder', () => {
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'ViewBuilder - full workflow');
       }
-    }, getTimeout('test'));
+    }, getTimeout('default'));
   });
 
 });

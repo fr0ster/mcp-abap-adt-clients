@@ -21,8 +21,7 @@ export async function create(
   packageName: string,
   transportRequest?: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/functions/groups${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
+  const url = `/sap/bc/adt/functions/groups${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
 
   // Get masterSystem and responsible (only for cloud systems)
   // On cloud, getSystemInformation returns systemID and userName

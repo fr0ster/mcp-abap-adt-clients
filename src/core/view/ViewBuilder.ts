@@ -31,7 +31,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { createView } from './create';
 import { lockDDLS } from './lock';
 import { updateViewSource } from './update';
@@ -59,8 +58,8 @@ export interface ViewBuilderConfig {
   ddlSource?: string;
   sessionId?: string;
   // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  // Called after successful lock() with: lockHandle
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface ViewBuilderState {
@@ -81,7 +80,6 @@ export class ViewBuilder {
   private logger: ViewBuilderLogger;
   private config: ViewBuilderConfig;
   private lockHandle?: string;
-  private sessionId: string;
   private state: ViewBuilderState;
 
   constructor(
@@ -92,7 +90,6 @@ export class ViewBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -191,14 +188,13 @@ export class ViewBuilder {
       const lockHandle = await lockDDLS(
         this.connection,
         this.config.viewName,
-        this.sessionId
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
+        this.config.onLock(lockHandle);
       }
 
       this.logger.info?.('View locked, handle:', lockHandle.substring(0, 10) + '...');
@@ -228,7 +224,6 @@ export class ViewBuilder {
         ddl_source: this.config.ddlSource,
         activate: false,
         lock_handle: this.lockHandle,
-        session_id: this.sessionId,
         transport_request: this.config.transportRequest
       };
       const result = await updateViewSource(this.connection, params);
@@ -252,8 +247,7 @@ export class ViewBuilder {
       const result = await checkView(
         this.connection,
         this.config.viewName,
-        version,
-        this.sessionId
+        version
       );
       this.state.checkResult = result;
       this.logger.info?.('View check successful:', result.status);
@@ -278,8 +272,7 @@ export class ViewBuilder {
       const result = await unlockDDLS(
         this.connection,
         this.config.viewName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
@@ -302,8 +295,7 @@ export class ViewBuilder {
       this.logger.info?.('Activating view:', this.config.viewName);
       const result = await activateDDLS(
         this.connection,
-        this.config.viewName,
-        this.sessionId
+        this.config.viewName
       );
       this.state.activateResult = result;
       this.logger.info?.('View activated successfully:', result.status);
@@ -370,8 +362,7 @@ export class ViewBuilder {
       await unlockDDLS(
         this.connection,
         this.config.viewName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.logger.info?.('Force unlock successful for', this.config.viewName);
     } catch (error: any) {
@@ -395,8 +386,8 @@ export class ViewBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getValidationResult(): ValidationResult | undefined {

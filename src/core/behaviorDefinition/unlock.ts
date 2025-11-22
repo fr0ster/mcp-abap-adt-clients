@@ -2,9 +2,8 @@
  * Behavior Definition unlock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock behavior definition
@@ -30,15 +29,12 @@ export async function unlock(
     connection: AbapConnection,
     name: string,
     lockHandle: string,
-    sessionId: string
 ): Promise<AxiosResponse> {
     const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-    return makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'POST',
+    return connection.makeAdtRequest({
         url,
-        undefined
-    );
+        method: 'POST',
+        timeout: getTimeout('default')
+    });
 }

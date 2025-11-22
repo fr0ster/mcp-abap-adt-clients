@@ -4,7 +4,6 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { XMLParser } from 'fast-xml-parser';
 import { validatePackageBasic, validatePackageFull } from './validation';
 import { checkTransportRequirements } from './transportCheck';
 import { checkPackage } from './check';
@@ -22,9 +21,8 @@ async function createPackageInternal(
   swcomp: string,
   transportLayer: string,
   transportRequest?: string
-): Promise<any> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/packages`;
+): Promise<AxiosResponse> {
+  const url = `/sap/bc/adt/packages`;
 
   // Escape XML special characters in description
   const escapeXml = (str: string | undefined): string => {
@@ -111,10 +109,7 @@ async function createPackageInternal(
     }
   });
 
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
-  const result = parser.parse(response.data);
-
-  return result['pak:package'];
+  return response;
 }
 
 /**

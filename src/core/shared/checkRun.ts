@@ -2,7 +2,7 @@
  * Shared check run utilities
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -234,7 +234,7 @@ export async function runCheckRun(
   sourceCode?: string
 ): Promise<AxiosResponse> {
   const objectUri = getObjectUri(objectType, objectName);
-  const xmlBody = sourceCode 
+  const xmlBody = sourceCode
     ? buildCheckRunXmlWithSource(objectUri, sourceCode, version)
     : buildCheckRunXml(objectUri, version);
 
@@ -245,19 +245,13 @@ export async function runCheckRun(
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
 
-  if (sessionId) {
-    const { makeAdtRequestWithSession } = await import('../../utils/sessionUtils');
-    return makeAdtRequestWithSession(connection, url, 'POST', sessionId, xmlBody, headers);
-  } else {
-    const baseUrl = await connection.getBaseUrl();
-    return connection.makeAdtRequest({
-      url: `${baseUrl}${url}`,
-      method: 'POST',
-      timeout: (await import('@mcp-abap-adt/connection')).getTimeout('default'),
-      data: xmlBody,
-      headers
-    });
-  }
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }
 
 /**
@@ -293,18 +287,12 @@ export async function runCheckRunWithSource(
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
 
-  if (sessionId) {
-    const { makeAdtRequestWithSession } = await import('../../utils/sessionUtils');
-    return makeAdtRequestWithSession(connection, url, 'POST', sessionId, xmlBody, headers);
-  } else {
-    const baseUrl = await connection.getBaseUrl();
-    return connection.makeAdtRequest({
-      url: `${baseUrl}${url}`,
-      method: 'POST',
-      timeout: (await import('@mcp-abap-adt/connection')).getTimeout('default'),
-      data: xmlBody,
-      headers
-    });
-  }
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }
 

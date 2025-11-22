@@ -346,7 +346,7 @@ describe('FunctionModuleBuilder', () => {
         logBuilderTestError(builderLogger, 'FunctionModuleBuilder - full workflow', error);
         throw error;
       } finally {
-        // Guaranteed unlock: always try to unlock if builder was created and has lockHandle
+        // Cleanup: force unlock in case of failure
         if (builder) {
           await builder.forceUnlock().catch(() => {});
         }

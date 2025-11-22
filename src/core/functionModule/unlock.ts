@@ -2,10 +2,9 @@
  * FunctionModule unlock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock function module
@@ -14,8 +13,7 @@ export async function unlockFunctionModule(
   connection: AbapConnection,
   functionGroupName: string,
   functionModuleName: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
@@ -25,6 +23,11 @@ export async function unlockFunctionModule(
     'Accept': 'application/xml'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers
+  });
 }
 

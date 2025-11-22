@@ -29,7 +29,6 @@ export async function validateClassName(
   description?: string,
   superClass?: string
 ): Promise<ValidationResult> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(className);
 
   // Build query parameters for class validation
@@ -50,7 +49,7 @@ export async function validateClassName(
     params.append('superClass', superClass);
   }
 
-  const url = `${baseUrl}/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
+  const url = `/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
   const headers = {
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check'
   };

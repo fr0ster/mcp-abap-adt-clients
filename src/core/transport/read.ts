@@ -10,9 +10,8 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Get ABAP transport request
  */
 export async function getTransport(connection: AbapConnection, transportNumber: string): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(transportNumber);
-  const url = `${baseUrl}/sap/bc/adt/cts/transportrequests/${encodedName}`;
+  const url = `/sap/bc/adt/cts/transportrequests/${encodedName}`;
 
   return connection.makeAdtRequest({
     url,

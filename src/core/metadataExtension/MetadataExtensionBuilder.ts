@@ -6,7 +6,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { validateMetadataExtension } from './validation';
 import { createMetadataExtension } from './create';
 import { lockMetadataExtension } from './lock';
@@ -55,7 +54,6 @@ export class MetadataExtensionBuilder {
   private logger: MetadataExtensionBuilderLogger;
   private config: MetadataExtensionBuilderConfig;
   private lockHandle?: string;
-  private sessionId: string;
   private state: MetadataExtensionBuilderState;
 
   constructor(
@@ -66,7 +64,6 @@ export class MetadataExtensionBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -162,8 +159,7 @@ export class MetadataExtensionBuilder {
           masterLanguage: this.config.masterLanguage,
           masterSystem: this.config.masterSystem,
           responsible: this.config.responsible
-        },
-        this.sessionId
+        }
       );
       
       this.state.createResult = result;
@@ -185,8 +181,7 @@ export class MetadataExtensionBuilder {
       this.logger.info?.('Locking metadata extension:', this.config.name);
       const lockHandle = await lockMetadataExtension(
         this.connection,
-        this.config.name,
-        this.sessionId
+        this.config.name
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
@@ -208,8 +203,7 @@ export class MetadataExtensionBuilder {
       this.logger.info?.('Reading metadata extension metadata:', this.config.name);
       const result = await readMetadataExtension(
         this.connection,
-        this.config.name,
-        this.sessionId
+        this.config.name
       );
       this.state.readResult = result;
       this.logger.info?.('Metadata extension metadata read successfully');
@@ -231,7 +225,6 @@ export class MetadataExtensionBuilder {
       const result = await readMetadataExtensionSource(
         this.connection,
         this.config.name,
-        this.sessionId,
         version
       );
       this.state.sourceCode = result.data;
@@ -263,8 +256,7 @@ export class MetadataExtensionBuilder {
         this.connection,
         this.config.name,
         this.config.sourceCode,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       
       this.state.updateResult = result;
@@ -287,7 +279,6 @@ export class MetadataExtensionBuilder {
       const result = await checkMetadataExtension(
         this.connection,
         this.config.name,
-        this.sessionId,
         version,
         sourceCode || this.config.sourceCode
       );
@@ -315,8 +306,7 @@ export class MetadataExtensionBuilder {
       const result = await unlockMetadataExtension(
         this.connection,
         this.config.name,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       
       this.state.unlockResult = result;
@@ -340,8 +330,7 @@ export class MetadataExtensionBuilder {
       this.logger.info?.('Activating metadata extension:', this.config.name);
       const result = await activateMetadataExtension(
         this.connection,
-        this.config.name,
-        this.sessionId
+        this.config.name
       );
       this.state.activateResult = result;
       this.logger.info?.('Metadata extension activated successfully');
@@ -363,8 +352,7 @@ export class MetadataExtensionBuilder {
       const result = await deleteMetadataExtension(
         this.connection,
         this.config.name,
-        this.config.transportRequest,
-        this.sessionId
+        this.config.transportRequest
       );
       this.state.deleteResult = result;
       this.logger.info?.('Metadata extension deleted successfully');
@@ -397,7 +385,7 @@ export class MetadataExtensionBuilder {
     return this.state.errors;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 }

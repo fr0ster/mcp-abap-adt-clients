@@ -11,7 +11,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { validateFunctionModuleName } from './validation';
 import { create } from './create';
 import { lockFunctionModule } from './lock';
@@ -38,10 +37,9 @@ export interface FunctionModuleBuilderConfig {
   transportRequest?: string;
   description: string;
   sourceCode?: string;
-  sessionId?: string;
   // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
+  // Called after successful lock() with: lockHandle
+  onLock?: (lockHandle: string) => void;
 }
 
 export interface FunctionModuleBuilderState {
@@ -63,7 +61,6 @@ export class FunctionModuleBuilder {
   private config: FunctionModuleBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private sessionId: string;
   private state: FunctionModuleBuilderState;
 
   constructor(
@@ -75,7 +72,6 @@ export class FunctionModuleBuilder {
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -173,15 +169,14 @@ export class FunctionModuleBuilder {
       const lockHandle = await lockFunctionModule(
         this.connection,
         this.config.functionGroupName,
-        this.config.functionModuleName,
-        this.sessionId
+        this.config.functionModuleName
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
+        this.config.onLock(lockHandle);
       }
 
       this.logger.info?.('Function module locked, handle:', lockHandle.substring(0, 10) + '...');
@@ -213,7 +208,6 @@ export class FunctionModuleBuilder {
         this.config.functionModuleName,
         this.lockHandle,
         code,
-        this.sessionId,
         this.config.transportRequest
       );
       this.state.updateResult = result;
@@ -238,7 +232,6 @@ export class FunctionModuleBuilder {
         this.config.functionGroupName,
         this.config.functionModuleName,
         version,
-        this.sessionId,
         sourceCode
       );
       this.state.checkResult = result;
@@ -265,8 +258,7 @@ export class FunctionModuleBuilder {
         this.connection,
         this.config.functionGroupName,
         this.config.functionModuleName,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
@@ -289,8 +281,7 @@ export class FunctionModuleBuilder {
       const result = await activateFunctionModule(
         this.connection,
         this.config.functionGroupName,
-        this.config.functionModuleName,
-        this.sessionId
+        this.config.functionModuleName
       );
       this.state.activateResult = result;
       this.logger.info?.('Function module activated successfully:', result.status);
@@ -365,7 +356,6 @@ export class FunctionModuleBuilder {
         this.config.functionGroupName,
         this.config.functionModuleName,
         this.lockHandle,
-        this.sessionId
       );
       this.logger.info?.('Force unlock successful for', this.config.functionModuleName);
     } catch (error: any) {
@@ -393,8 +383,8 @@ export class FunctionModuleBuilder {
     return this.lockHandle;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   getValidationResult(): ValidationResult | undefined {

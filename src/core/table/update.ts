@@ -2,10 +2,9 @@
  * Table update operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 export interface UpdateTableParams {
   table_name: string;
@@ -20,8 +19,7 @@ export interface UpdateTableParams {
 export async function updateTable(
   connection: AbapConnection,
   params: UpdateTableParams,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   if (!params.table_name) {
     throw new Error('table_name is required');
@@ -32,9 +30,6 @@ export async function updateTable(
   if (!lockHandle) {
     throw new Error('lockHandle is required');
   }
-  if (!sessionId) {
-    throw new Error('sessionId is required');
-  }
 
   const tableName = params.table_name.toUpperCase();
   const queryParams = `lockHandle=${lockHandle}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
@@ -44,6 +39,6 @@ export async function updateTable(
     'Content-Type': 'text/plain; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, params.ddl_code, headers);
+  return connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: params.ddl_code, headers});
 }
 

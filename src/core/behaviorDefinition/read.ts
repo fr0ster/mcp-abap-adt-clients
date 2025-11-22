@@ -2,9 +2,8 @@
  * Behavior Definition read operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Read behavior definition metadata
@@ -35,14 +34,12 @@ export async function read(
         'Accept': 'application/vnd.sap.adt.blues.v1+xml'
     };
 
-    return makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'GET',
+    return connection.makeAdtRequest({
         url,
-        undefined,
+        method: 'GET',
+        timeout: getTimeout('default'),
         headers
-    );
+    });
 }
 
 /**
@@ -65,7 +62,6 @@ export async function read(
 export async function readSource(
     connection: AbapConnection,
     name: string,
-    sessionId: string,
     version: string = 'inactive'
 ): Promise<AxiosResponse> {
     const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main?version=${version}`;
@@ -74,12 +70,10 @@ export async function readSource(
         'Accept': 'text/plain'
     };
 
-    return makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'GET',
+    return connection.makeAdtRequest({
         url,
-        undefined,
+        method: 'GET',
+        timeout: getTimeout('default'),
         headers
-    );
+    });
 }

@@ -28,7 +28,6 @@ export async function validateObjectName(
   objectName: string,
   additionalParams?: Record<string, string>
 ): Promise<ValidationResult> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(objectName);
 
   // Build query parameters
@@ -38,7 +37,7 @@ export async function validateObjectName(
     ...additionalParams
   });
 
-  const url = `${baseUrl}/sap/bc/adt/functions/validation?${params.toString()}`;
+  const url = `/sap/bc/adt/functions/validation?${params.toString()}`;
 
   try {
     const response = await connection.makeAdtRequest({

@@ -2,9 +2,8 @@
  * Class create operations - Low-level functions
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -30,11 +29,12 @@ export interface CreateClassParams {
 /**
  * Low-level: Create class object with metadata (POST)
  * Does NOT lock/upload/activate - just creates the object
+ * 
+ * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function create(
   connection: AbapConnection,
-  args: CreateClassParams,
-  sessionId: string
+  args: CreateClassParams
 ): Promise<AxiosResponse> {
   const description = args.description || args.class_name || '';
   const url = `/sap/bc/adt/oo/classes${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
@@ -89,15 +89,19 @@ export async function create(
   };
 
   // Log request details for debugging authorization issues
-  const baseUrl = await connection.getBaseUrl();
-  const fullUrl = `${baseUrl}${url}`;
-  logger.debug(`[DEBUG] Creating class - URL: ${fullUrl}`);
+  logger.debug(`[DEBUG] Creating class - URL: ${url}`);
   logger.debug(`[DEBUG] Creating class - Method: POST`);
   logger.debug(`[DEBUG] Creating class - Headers:`, JSON.stringify(headers, null, 2));
   logger.debug(`[DEBUG] Creating class - Body (first 500 chars):`, metadataXml.substring(0, 500));
 
   try {
-    const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, metadataXml, headers);
+    const response = await connection.makeAdtRequest({
+      url,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      data: metadataXml,
+      headers
+    });
     return response;
   } catch (error: any) {
     // Log error details for debugging

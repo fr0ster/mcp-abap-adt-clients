@@ -15,7 +15,6 @@ export interface UpdateViewSourceParams {
   ddl_source: string;
   activate?: boolean;
   lock_handle?: string;
-  session_id?: string;
   transport_request?: string;
 }
 

@@ -4,10 +4,9 @@
  * Endpoint: POST /sap/bc/adt/ddic/ddlx/sources/{name}?_action=LOCK&accessMode=MODIFY
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Lock a metadata extension for modification
@@ -24,8 +23,7 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
  */
 export async function lockMetadataExtension(
   connection: AbapConnection,
-  name: string,
-  sessionId: string
+  name: string
 ): Promise<string> {
   const lowerName = name.toLowerCase();
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}?_action=LOCK&accessMode=MODIFY`;
@@ -34,14 +32,13 @@ export async function lockMetadataExtension(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await makeAdtRequestWithSession(
-    connection,
-    sessionId,
-    'POST',
+  const response = await connection.makeAdtRequest({
+    method: 'POST',
     url,
-    undefined,
+    timeout: getTimeout('default'),
+    data: undefined,
     headers
-  );
+  });
 
   // Parse lock handle from XML response
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });

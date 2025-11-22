@@ -27,8 +27,7 @@ export async function checkDeletion(
   const encodedName = encodeSapObjectName(interface_name);
   const objectUri = `/sap/bc/adt/oo/interfaces/${encodedName}`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const checkUrl = `${baseUrl}/sap/bc/adt/deletion/check`;
+  const checkUrl = `/sap/bc/adt/deletion/check`;
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
@@ -65,8 +64,7 @@ export async function deleteInterface(
   const encodedName = encodeSapObjectName(interface_name);
   const objectUri = `/sap/bc/adt/oo/interfaces/${encodedName}`;
 
-  const baseUrl = await connection.getBaseUrl();
-  const deletionUrl = `${baseUrl}/sap/bc/adt/deletion/delete`;
+  const deletionUrl = `/sap/bc/adt/deletion/delete`;
 
   // Interfaces require empty transportNumber tag
   let transportNumberTag = '';

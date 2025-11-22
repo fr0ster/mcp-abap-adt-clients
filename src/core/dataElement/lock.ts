@@ -1,12 +1,11 @@
 /**
  * DataElement lock operations
+ * NOTE: Builder should call connection.setSessionType("stateful") before locking
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Lock data element for modification
@@ -14,8 +13,7 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
  */
 export async function lockDataElement(
   connection: AbapConnection,
-  dataElementName: string,
-  sessionId: string
+  dataElementName: string
 ): Promise<string> {
   const dataElementNameEncoded = encodeSapObjectName(dataElementName.toLowerCase());
   const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?_action=LOCK&accessMode=MODIFY`;
@@ -24,11 +22,16 @@ export async function lockDataElement(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  const response = await connection.makeAdtRequest({
+    method: 'POST',
+    url,
+    headers,
+    timeout: getTimeout('default')
+  });
 
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: ''
+    attributeNamePrefix: '',
   });
 
   const result = parser.parse(response.data);
@@ -40,4 +43,3 @@ export async function lockDataElement(
 
   return lockHandle;
 }
-

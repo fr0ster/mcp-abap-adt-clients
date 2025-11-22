@@ -6,7 +6,6 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 
 export interface MetadataExtensionCreateParams {
@@ -39,8 +38,7 @@ export interface MetadataExtensionCreateParams {
  */
 export async function createMetadataExtension(
   connection: AbapConnection,
-  params: MetadataExtensionCreateParams,
-  sessionId: string
+  params: MetadataExtensionCreateParams
 ): Promise<AxiosResponse> {
   const url = '/sap/bc/adt/ddic/ddlx/sources';
 
@@ -76,12 +74,11 @@ export async function createMetadataExtension(
     'Content-Type': 'application/vnd.sap.adt.ddic.ddlx.v1+xml'
   };
 
-  return makeAdtRequestWithSession(
-    connection,
-    sessionId,
-    'POST',
+  return connection.makeAdtRequest({
     url,
-    xmlBody,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: xmlBody,
     headers
-  );
+  });
 }

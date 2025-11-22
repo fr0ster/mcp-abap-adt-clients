@@ -252,6 +252,7 @@ describe('ProgramBuilder', () => {
         logBuilderTestError(builderLogger, 'ProgramBuilder - full workflow', error);
         throw error;
       } finally {
+        // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'ProgramBuilder - full workflow');
       }

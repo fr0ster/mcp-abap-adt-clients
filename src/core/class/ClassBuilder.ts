@@ -36,7 +36,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { generateSessionId } from '../../utils/sessionUtils';
 import { validateClassName, ValidationResult } from './validation';
 import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
@@ -58,10 +57,6 @@ export interface ClassBuilderConfig {
   createProtected?: boolean;
   masterSystem?: string;
   responsible?: string;
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string, sessionId: string) => void;
 }
 
 export interface ClassBuilderLogger {
@@ -92,7 +87,6 @@ export class ClassBuilder {
   private config: ClassBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private sessionId: string;
   private state: ClassBuilderState;
 
   constructor(
@@ -103,7 +97,6 @@ export class ClassBuilder {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
-    this.sessionId = config.sessionId || generateSessionId();
     this.state = {
       errors: []
     };
@@ -191,6 +184,8 @@ export class ClassBuilder {
         throw new Error('Package name is required');
       }
       this.logger.info?.('Creating class:', this.config.className);
+
+      
       const result = await createClassObject(this.connection, {
         class_name: this.config.className,
         package_name: this.config.packageName,
@@ -202,7 +197,7 @@ export class ClassBuilder {
         create_protected: this.config.createProtected,
         master_system: this.config.masterSystem,
         responsible: this.config.responsible,
-      }, this.sessionId);
+      });
       this.state.createResult = result;
       this.logger.info?.('Class created successfully:', result.status);
       return this;
@@ -281,18 +276,16 @@ export class ClassBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking class:', this.config.className);
+      
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
+      
       const lockHandle = await lockClass(
         this.connection,
-        this.config.className,
-        this.sessionId
+        this.config.className
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
-
-      // Register lock in persistent storage if callback provided
-      if (this.config.onLock) {
-        this.config.onLock(lockHandle, this.sessionId);
-      }
 
       this.logger.info?.('Class locked, handle:', lockHandle.substring(0, 10) + '...');
       return this;
@@ -322,7 +315,6 @@ export class ClassBuilder {
         this.config.className,
         code,
         this.lockHandle,
-        this.sessionId,
         this.config.transportRequest
       );
       this.state.updateResult = result;
@@ -350,8 +342,7 @@ export class ClassBuilder {
         this.connection,
         this.config.className,
         version,
-        codeToCheck,
-        this.sessionId
+        codeToCheck
       );
       this.state.checkResult = result;
       this.logger.info?.('Class check successful:', result.status);
@@ -376,11 +367,15 @@ export class ClassBuilder {
       const result = await unlockClass(
         this.connection,
         this.config.className,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
+      this.state.lockHandle = undefined;
+      
+      // Disable stateful session mode after unlock
+      this.connection.setSessionType("stateless");
+      
       this.logger.info?.('Class unlocked successfully:', result.status);
       return this;
     } catch (error: any) {
@@ -399,8 +394,7 @@ export class ClassBuilder {
       this.logger.info?.('Activating class:', this.config.className);
       const result = await activateClass(
         this.connection,
-        this.config.className,
-        this.sessionId
+        this.config.className
       );
       this.state.activateResult = result;
       this.logger.info?.('Class activated successfully:', result.status);
@@ -448,9 +442,9 @@ export class ClassBuilder {
       await unlockClass(
         this.connection,
         this.config.className,
-        this.lockHandle,
-        this.sessionId
+        this.lockHandle
       );
+      this.connection.setSessionType("stateless");
       this.logger.info?.('Force unlock successful for', this.config.className);
     } catch (error: any) {
       this.logger.warn?.('Force unlock failed:', error);
@@ -517,8 +511,8 @@ export class ClassBuilder {
     return this.config.className;
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
   }
 
   // Helper method to get all results

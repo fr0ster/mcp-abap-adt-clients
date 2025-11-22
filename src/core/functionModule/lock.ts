@@ -2,11 +2,10 @@
  * FunctionModule lock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Lock function module for editing
@@ -15,7 +14,6 @@ export async function lockFunctionModule(
   connection: AbapConnection,
   functionGroupName: string,
   functionModuleName: string,
-  sessionId: string
 ): Promise<string> {
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(functionModuleName).toLowerCase();
@@ -25,7 +23,12 @@ export async function lockFunctionModule(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers
+  });
 
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -59,7 +62,12 @@ export async function lockFunctionModuleForUpdate(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'POST', sessionId, null, headers);
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers
+  });
 
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
   const result = parser.parse(response.data);

@@ -11,8 +11,8 @@ import { getDataElement } from '../../../core/dataElement/read';
 import { deleteDataElement } from '../../../core/dataElement/delete';
 import { unlockDataElement } from '../../../core/dataElement/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getConfig } from '../../helpers/sessionConfig';
+import { getTestLock } from '../../helpers/lockHelper';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -212,8 +212,7 @@ describe('DataElementBuilder', () => {
         connection,
         builderLogger,
         {
-          ...buildBuilderConfig(testCase),
-          onLock: createOnLockCallback('dataElement', dataElementName, undefined, __filename)
+          ...buildBuilderConfig(testCase)
         }
       );
 
@@ -272,6 +271,7 @@ describe('DataElementBuilder', () => {
         logBuilderTestError(builderLogger, 'DataElementBuilder - full workflow', error);
         throw error;
       } finally {
+        // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(builderLogger, 'DataElementBuilder - full workflow');
       }

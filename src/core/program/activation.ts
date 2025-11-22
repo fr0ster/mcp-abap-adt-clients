@@ -13,10 +13,9 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateProgram(
   connection: AbapConnection,
-  programName: string,
-  sessionId: string
+  programName: string
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`;
-  return await activateObjectInSession(connection, objectUri, programName, sessionId, true);
+  return await activateObjectInSession(connection, objectUri, programName, true);
 }
 

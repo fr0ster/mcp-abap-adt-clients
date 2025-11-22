@@ -5,7 +5,6 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Unlock the table after DDL content is added
@@ -14,12 +13,17 @@ import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 export async function unlockTable(
   connection: AbapConnection,
   tableName: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return makeAdtRequestWithSession(connection, url, 'POST', sessionId, null);
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null,
+    headers: {}
+  });
 }
 
 /**
@@ -29,8 +33,7 @@ export async function deleteTableLock(
   connection: AbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeSapObjectName(tableName)}`;
+  const url = `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeSapObjectName(tableName)}`;
 
   return connection.makeAdtRequest({
     url,

@@ -82,12 +82,10 @@ export async function readObjectSource(
     throw new Error(`Object type ${objectType} does not support source code reading`);
   }
 
-  const baseUrl = await connection.getBaseUrl();
   const uri = getObjectSourceUri(objectType, objectName, functionGroup, version);
-  const url = `${baseUrl}${uri}`;
 
   return connection.makeAdtRequest({
-    url,
+    url: uri,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {

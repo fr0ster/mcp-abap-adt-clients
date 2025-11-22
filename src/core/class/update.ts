@@ -2,21 +2,21 @@
  * Class update operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Update class source code (low-level function)
  * Requires class to be locked first
+ * 
+ * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateClass(
   connection: AbapConnection,
   className: string,
   sourceCode: string,
   lockHandle: string,
-  sessionId: string,
   transportRequest?: string
 ): Promise<AxiosResponse> {
   if (!sourceCode) {
@@ -38,7 +38,13 @@ export async function updateClass(
     'Accept': 'text/plain'
   };
 
-  return await makeAdtRequestWithSession(connection, url, 'PUT', sessionId, sourceCode, headers);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: sourceCode,
+    headers
+  });
 }
 
 

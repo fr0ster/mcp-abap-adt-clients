@@ -6,10 +6,6 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
-import { lockDataElement } from './lock';
-import { unlockDataElement } from './unlock';
-import { activateDataElement } from './activation';
 import { UpdateDataElementParams } from './types';
 import { getSystemInformation } from '../shared/systemInfo';
 
@@ -20,9 +16,8 @@ export async function getDomainInfo(
   connection: AbapConnection,
   domainName: string
 ): Promise<{ dataType: string; length: number; decimals: number }> {
-  const baseUrl = await connection.getBaseUrl();
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
-  const url = `${baseUrl}/sap/bc/adt/ddic/domains/${domainNameEncoded}`;
+  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}`;
 
   const headers = {
     'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml'
@@ -55,12 +50,10 @@ export async function getDomainInfo(
  */
 async function getDataElementForVerification(
   connection: AbapConnection,
-  dataElementName: string,
-  sessionId: string
+  dataElementName: string
 ): Promise<any> {
-  const baseUrl = await connection.getBaseUrl();
   const dataElementNameEncoded = encodeSapObjectName(dataElementName.toLowerCase());
-  const url = `${baseUrl}/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}`;
+  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}`;
 
   const headers = {
     'Accept': 'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
@@ -90,7 +83,6 @@ export async function updateDataElementInternal(
   connection: AbapConnection,
   args: UpdateDataElementParams,
   lockHandle: string,
-  sessionId: string,
   username: string,
   domainInfo: { dataType: string; length: number; decimals: number }
 ): Promise<AxiosResponse> {
@@ -229,16 +221,24 @@ export async function updateDataElementInternal(
     }
   }
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, xmlBody, headers);
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }
 
 /**
- * Update ABAP data element
- * Full workflow: get domain info -> lock -> update -> unlock -> activate
+ * Update data element - atomic PUT operation
+ * NOTE: Requires object to be locked first via lockDataElement()
+ * NOTE: Builder should call connection.setSessionType("stateful") before locking
  */
 export async function updateDataElement(
   connection: AbapConnection,
-  params: UpdateDataElementParams
+  params: UpdateDataElementParams,
+  lockHandle: string
 ): Promise<AxiosResponse> {
   if (!params.data_element_name) {
     throw new Error('Data element name is required');
@@ -246,76 +246,27 @@ export async function updateDataElement(
   if (!params.package_name) {
     throw new Error('Package name is required');
   }
+  if (!params.type_kind) {
+    throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
+  }
 
-  const sessionId = generateSessionId();
-  
-  // Get system information - only for cloud systems
+  // Get system information for username
   const systemInfo = await getSystemInformation(connection);
   const username = systemInfo?.userName || '';
-  const responsible = systemInfo ? username : '';
-  
-  let lockHandle = '';
 
-  try {
-    if (!params.type_kind) {
-      throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
-    }
-    const typeKind = params.type_kind;
-    let domainInfo = { dataType: 'CHAR', length: 100, decimals: 0 };
-
-    if (typeKind === 'domain') {
-      const domainName = params.type_name || params.domain_name || 'CHAR100';
-      domainInfo = await getDomainInfo(connection, domainName);
-    } else if (typeKind === 'predefinedAbapType') {
-      domainInfo = {
-        dataType: params.data_type || 'CHAR',
-        length: params.length || 100,
-        decimals: params.decimals || 0
-      };
-    }
-
-    lockHandle = await lockDataElement(connection, params.data_element_name, sessionId);
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    await updateDataElementInternal(connection, params, lockHandle, sessionId, username, domainInfo);
-
-    await unlockDataElement(connection, params.data_element_name, lockHandle, sessionId);
-
-    const shouldActivate = params.activate !== false;
-    if (shouldActivate) {
-      await activateDataElement(connection, params.data_element_name, sessionId);
-    }
-
-    const updatedDataElement = await getDataElementForVerification(connection, params.data_element_name, sessionId);
-
-    return {
-      data: {
-        success: true,
-        data_element_name: params.data_element_name,
-        package: params.package_name,
-        transport_request: params.transport_request,
-        domain_name: params.domain_name,
-        status: shouldActivate ? 'active' : 'inactive',
-        session_id: sessionId,
-        message: `Data element ${params.data_element_name} updated${shouldActivate ? ' and activated' : ''} successfully`,
-        data_element_details: updatedDataElement
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
-
-  } catch (error: any) {
-    if (lockHandle) {
-      try {
-        await unlockDataElement(connection, params.data_element_name, lockHandle, sessionId);
-      } catch (unlockError) {
-        // Ignore unlock errors
-      }
-    }
-    throw error;
+  // Get domain info if needed
+  let domainInfo = { dataType: 'CHAR', length: 100, decimals: 0 };
+  if (params.type_kind === 'domain') {
+    const domainName = params.type_name || params.domain_name || 'CHAR100';
+    domainInfo = await getDomainInfo(connection, domainName);
+  } else if (params.type_kind === 'predefinedAbapType') {
+    domainInfo = {
+      dataType: params.data_type || 'CHAR',
+      length: params.length || 100,
+      decimals: params.decimals || 0
+    };
   }
+
+  return updateDataElementInternal(connection, params, lockHandle, username, domainInfo);
 }
 

@@ -2,11 +2,10 @@
  * Domain update operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { getSystemInformation } from '../shared/systemInfo';
 import { lockDomain } from './lock';
 import { unlockDomain } from './unlock';
@@ -16,12 +15,13 @@ import { UpdateDomainParams } from './types';
 
 /**
  * Update domain with new data
+ * 
+ * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 async function updateDomainInternal(
   connection: AbapConnection,
   args: UpdateDomainParams,
   lockHandle: string,
-  sessionId: string,
   username: string,
   masterSystem?: string
 ): Promise<AxiosResponse> {
@@ -80,7 +80,13 @@ ${fixValuesXml}
     'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, xmlBody, headers);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }
 
 /**
@@ -88,8 +94,7 @@ ${fixValuesXml}
  */
 async function getDomainForVerification(
   connection: AbapConnection,
-  domainName: string,
-  sessionId: string
+  domainName: string
 ): Promise<any> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?version=workingArea`;
@@ -98,7 +103,12 @@ async function getDomainForVerification(
     'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml'
   };
 
-  const response = await makeAdtRequestWithSession(connection, url, 'GET', sessionId, undefined, headers);
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers
+  });
 
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -124,7 +134,8 @@ export async function updateDomain(
     throw new Error('Package name is required');
   }
 
-  const sessionId = generateSessionId();
+  // Enable stateful session mode
+  connection.setSessionType("stateful");
 
   // Get masterSystem and responsible (only for cloud systems)
   // On cloud, getSystemInformation returns systemID and userName
@@ -136,22 +147,25 @@ export async function updateDomain(
   let lockHandle = '';
 
   try {
-    lockHandle = await lockDomain(connection, params.domain_name, sessionId);
+    lockHandle = await lockDomain(connection, params.domain_name);
 
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    await updateDomainInternal(connection, params, lockHandle, sessionId, username, masterSystem);
+    await updateDomainInternal(connection, params, lockHandle, username, masterSystem);
 
-    await checkDomainSyntax(connection, params.domain_name, 'inactive', sessionId);
+    await checkDomainSyntax(connection, params.domain_name, 'inactive');
 
-    await unlockDomain(connection, params.domain_name, lockHandle, sessionId);
+    await unlockDomain(connection, params.domain_name, lockHandle);
 
     const shouldActivate = params.activate !== false;
     if (shouldActivate) {
-      await activateDomain(connection, params.domain_name, sessionId);
+      await activateDomain(connection, params.domain_name);
     }
 
-    const updatedDomain = await getDomainForVerification(connection, params.domain_name, sessionId);
+    const updatedDomain = await getDomainForVerification(connection, params.domain_name);
+
+    // Disable stateful session mode
+    connection.setSessionType("stateless");
 
     return {
       data: {
@@ -160,7 +174,6 @@ export async function updateDomain(
         package: params.package_name,
         transport_request: params.transport_request,
         status: shouldActivate ? 'active' : 'inactive',
-        session_id: sessionId,
         message: `Domain ${params.domain_name} updated${shouldActivate ? ' and activated' : ''} successfully`,
         domain_details: updatedDomain
       },
@@ -173,9 +186,11 @@ export async function updateDomain(
   } catch (error: any) {
     if (lockHandle) {
       try {
-        await unlockDomain(connection, params.domain_name, lockHandle, sessionId);
+        await unlockDomain(connection, params.domain_name, lockHandle);
       } catch (unlockError) {
         // Ignore unlock errors
+      } finally {
+        connection.setSessionType("stateless");
       }
     }
     throw error;

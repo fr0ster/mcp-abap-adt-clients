@@ -6,7 +6,6 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { generateSessionId, makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { acquireTableLockHandle } from './lock';
 import { unlockTable, deleteTableLock } from './unlock';
 import { activateTable } from './activation';
@@ -64,8 +63,7 @@ async function verifyTableCreation(
   connection: AbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
-  const url = `${baseUrl}/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}/source/main`;
+  const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}/source/main`;
 
   return connection.makeAdtRequest({
     url,
@@ -93,10 +91,10 @@ export async function createTable(
     throw new Error('Package name is required');
   }
 
-  const sessionId = generateSessionId();
   let lockHandle: string | null = null;
 
   try {
+    
     // Get system information - only for cloud systems
     const systemInfo = await getSystemInformation(connection);
     const username = systemInfo?.userName || '';
@@ -123,17 +121,23 @@ export async function createTable(
       'Content-Type': 'application/vnd.sap.adt.tables.v2+xml'
     };
 
-    const createResponse = await makeAdtRequestWithSession(connection, createUrl, 'POST', sessionId, tableXml, headers);
+    const createResponse = await connection.makeAdtRequest({
+      url: createUrl,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      data: tableXml,
+      headers
+    });
 
     // Step 1.1: Run table status check before locking (optional, continue on error)
     try {
-      await runTableCheckRun(connection, 'tableStatusCheck', params.table_name, sessionId);
+      await runTableCheckRun(connection, 'tableStatusCheck', params.table_name);
     } catch (statusError) {
       // Continue even if status check fails
     }
 
     // Step 1.2: Get lockHandle for the created table
-    lockHandle = await acquireTableLockHandle(connection, params.table_name, sessionId);
+    lockHandle = await acquireTableLockHandle(connection, params.table_name);
 
     // Step 1.3: Add DDL content to the table with lockHandle
     const ddlUrl = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(params.table_name)}/source/main?lockHandle=${lockHandle}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
@@ -143,20 +147,26 @@ export async function createTable(
       'Content-Type': 'text/plain; charset=utf-8'
     };
 
-    const ddlResponse = await makeAdtRequestWithSession(connection, ddlUrl, 'PUT', sessionId, params.ddl_code, ddlHeaders);
+    const ddlResponse = await connection.makeAdtRequest({
+      url: ddlUrl,
+      method: 'PUT',
+      timeout: getTimeout('default'),
+      data: params.ddl_code,
+      headers: ddlHeaders
+    });
 
     parseTableCreationResponse(ddlResponse.data);
 
     // Step 1.3.1: Run ABAP check before unlock (optional, continue on error)
     try {
-      await runTableCheckRun(connection, 'abapCheckRun', params.table_name, sessionId);
+      await runTableCheckRun(connection, 'abapCheckRun', params.table_name);
     } catch (checkError) {
       // Continue even if check fails
     }
 
     // Step 1.4: Unlock the table after DDL content is added
     try {
-      await unlockTable(connection, params.table_name, lockHandle, sessionId);
+      await unlockTable(connection, params.table_name, lockHandle);
       lockHandle = null;
     } catch (unlockError) {
       try {
@@ -174,12 +184,12 @@ export async function createTable(
       activationAttempt++;
 
       try {
-        await activateTable(connection, params.table_name, sessionId);
+        await activateTable(connection, params.table_name);
         break;
       } catch (attemptError: any) {
         if (attemptError.response?.data?.includes('No active nametab')) {
           try {
-            await runTableCheckRun(connection, 'abapCheckRun', params.table_name, sessionId);
+            await runTableCheckRun(connection, 'abapCheckRun', params.table_name);
           } catch (retryCheckError) {
             // Ignore
           }
@@ -203,7 +213,7 @@ export async function createTable(
     // Try to unlock if we have a lock handle
     if (lockHandle) {
       try {
-        await unlockTable(connection, params.table_name, lockHandle, sessionId);
+        await unlockTable(connection, params.table_name, lockHandle);
       } catch (unlockError) {
         try {
           await deleteTableLock(connection, params.table_name);

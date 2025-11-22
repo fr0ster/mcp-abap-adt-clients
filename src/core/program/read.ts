@@ -49,9 +49,8 @@ export async function getProgramTransport(
   connection: AbapConnection,
   programName: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedName = encodeSapObjectName(programName);
-  const url = `${baseUrl}/sap/bc/adt/programs/programs/${encodedName}/transport`;
+  const url = `/sap/bc/adt/programs/programs/${encodedName}/transport`;
 
   return connection.makeAdtRequest({
     url,

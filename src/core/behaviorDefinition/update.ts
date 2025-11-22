@@ -2,9 +2,8 @@
  * Behavior Definition update operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 
 /**
  * Update behavior definition source code
@@ -46,7 +45,6 @@ export async function update(
     name: string,
     source: string,
     lockHandle: string,
-    sessionId: string,
     transportRequest?: string
 ): Promise<AxiosResponse> {
     if (!source) {
@@ -67,12 +65,11 @@ export async function update(
         'Accept': 'text/plain'
     };
 
-    return await makeAdtRequestWithSession(
-        connection,
-        sessionId,
-        'PUT',
+    return await connection.makeAdtRequest({
         url,
-        source,
+        method: 'PUT',
+        timeout: getTimeout('default'),
+        data: source,
         headers
-    );
+    });
 }

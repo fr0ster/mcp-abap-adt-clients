@@ -2,10 +2,9 @@
  * Package update operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { makeAdtRequestWithSession } from '../../utils/sessionUtils';
 import { CreatePackageParams } from './types';
 
 /**
@@ -67,12 +66,13 @@ export interface UpdatePackageParams extends CreatePackageParams {
 
 /**
  * Update package with new data
+ * 
+ * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updatePackage(
   connection: AbapConnection,
   params: UpdatePackageParams,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('package_name is required');
@@ -88,19 +88,26 @@ export async function updatePackage(
     'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, xmlBody, headers);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: xmlBody,
+    headers
+  });
 }
 
 /**
  * Update only package description (safe update - only modifiable field)
  * Reads current package data and updates only description attribute
+ * 
+ * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updatePackageDescription(
   connection: AbapConnection,
   packageName: string,
   description: string,
-  lockHandle: string,
-  sessionId: string
+  lockHandle: string
 ): Promise<AxiosResponse> {
   if (!packageName) {
     throw new Error('package_name is required');
@@ -131,6 +138,12 @@ export async function updatePackageDescription(
     'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml'
   };
 
-  return makeAdtRequestWithSession(connection, url, 'PUT', sessionId, updatedXml, headers);
+  return await connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: updatedXml,
+    headers
+  });
 }
 

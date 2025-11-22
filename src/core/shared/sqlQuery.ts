@@ -29,9 +29,8 @@ export async function getSqlQuery(
     throw new Error('SQL query is required');
   }
 
-  const baseUrl = await connection.getBaseUrl();
   const rowNumber = params.row_number || 100;
-  const url = `${baseUrl}/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
+  const url = `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`;
 
   return connection.makeAdtRequest({
     url,

@@ -8,11 +8,8 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { TableBuilder, TableBuilderLogger } from '../../../core/table';
 import { getTable } from '../../../core/table/read';
-import { deleteTable } from '../../../core/table/delete';
-import { unlockTable } from '../../../core/table/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
-import { getConfig, generateSessionId } from '../../helpers/sessionConfig';
-import { getTestLock, createOnLockCallback } from '../../helpers/lockHelper';
+import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -197,8 +194,7 @@ describe('TableBuilder', () => {
       }
 
       const builder = new TableBuilder(connection, builderLogger, {
-        ...buildBuilderConfig(testCase),
-        onLock: createOnLockCallback('table', tableName, undefined, __filename)
+        ...buildBuilderConfig(testCase)
       });
 
       try {

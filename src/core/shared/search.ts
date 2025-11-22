@@ -31,11 +31,10 @@ export async function searchObjects(
   connection: AbapConnection,
   params: SearchObjectsParams
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const encodedQuery = encodeSapObjectName(params.query);
   const maxResults = params.maxResults || 100;
 
-  let url = `${baseUrl}/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodedQuery}&maxResults=${maxResults}`;
+  let url = `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodedQuery}&maxResults=${maxResults}`;
 
   if (params.objectType) {
     url += `&objectType=${encodeSapObjectName(params.objectType)}`;

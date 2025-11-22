@@ -66,12 +66,10 @@ export async function readObjectMetadata(
   objectName: string,
   functionGroup?: string
 ): Promise<AxiosResponse> {
-  const baseUrl = await connection.getBaseUrl();
   const uri = getObjectMetadataUri(objectType, objectName, functionGroup);
-  const url = `${baseUrl}${uri}`;
 
   return connection.makeAdtRequest({
-    url,
+    url: uri,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
