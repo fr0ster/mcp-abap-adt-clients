@@ -23,6 +23,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `src/core/shared/` remains for operations exposed through SharedBuilder (getInactiveObjects, activateObjectsGroup, search, whereUsed, etc.)
   - Clarified separation: `src/utils/` for internal utilities, `src/core/shared/` for public shared operations
 
+### Added
+- **Documentation index** – created `docs/README.md` as central documentation hub:
+  - Organized documentation by categories: Architecture, Usage Guides, Development
+  - Added quick navigation to all documentation files
+  - Included visual directory structure
+  - Added key concepts overview (Client classes, Builder pattern, Type system, Session management)
+  - Provided links to main package documentation and support resources
+
 ## [0.1.11] - TBD
 
 ### Changed
