@@ -16,6 +16,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Updated all imports to reference `types.ts` instead of individual files
   - Simplified module exports: `export * from './types'` provides all type definitions
   - Improved type consistency and maintainability across the codebase
+- **Reorganized internal Client utilities** – moved Client implementation utilities from `src/core/` to `src/utils/`:
+  - Moved `managementOperations.ts` – internal implementations for activation and check operations used by CrudClient
+  - Moved `readOperations.ts` – internal implementations for read operations used by ReadOnlyClient
+  - These are internal utilities used only by Client classes and not exported through public API
+  - `src/core/shared/` remains for operations exposed through SharedBuilder (getInactiveObjects, activateObjectsGroup, search, whereUsed, etc.)
+  - Clarified separation: `src/utils/` for internal utilities, `src/core/shared/` for public shared operations
 
 ## [0.1.11] - TBD
 

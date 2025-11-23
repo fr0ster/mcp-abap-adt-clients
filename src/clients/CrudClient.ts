@@ -938,7 +938,7 @@ export class CrudClient extends ReadOnlyClient {
     generated: boolean;
     messages: Array<{ type: string; text: string; line?: number; column?: number }>;
   } {
-    const { parseActivationResponse } = require('../core/managementOperations');
+    const { parseActivationResponse } = require('../utils/managementOperations');
     return parseActivationResponse(responseData);
   }
 }
