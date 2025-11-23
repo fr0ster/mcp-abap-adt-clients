@@ -5,6 +5,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.10] - TBD
+
+### Changed
+- **Unified logger architecture** – all Builder tests now use three separate loggers:
+  - **`connectionLogger`** (type: `ILogger`) – for connection package logs, created by `createConnectionLogger()`, controlled by `DEBUG_CONNECTORS`
+  - **`builderLogger`** (type: `IAdtLogger`) – for Builder library code logs, created by `createBuilderLogger()`, controlled by `DEBUG_ADT_LIBS`
+  - **`testsLogger`** (type: `IAdtLogger`) – for test execution logs, created by `createTestsLogger()`, controlled by `DEBUG_ADT_TESTS`
+  - Removed manual logger implementations and debug flag variables (`debugE2EEnabled`, `debugConnectionEnabled`, `debugLibsEnabled`)
+  - Updated all 12 Builder integration tests to use helper functions
+  - Fixed logger usage: `testsLogger` for `logBuilderTest*()` functions, `builderLogger` for Builder constructors
+- **IAdtLogger interface unified** – all Builders now use shared `IAdtLogger` interface instead of custom logger types:
+  - Created `IAdtLogger` in `src/utils/logger.ts` with optional methods (debug, info, warn, error)
+  - Updated all 14 Builders (Class, Interface, Program, View, Table, etc.) to use `IAdtLogger`
+  - Removed custom `XxxBuilderLogger` type definitions
+  - Exported `IAdtLogger` and `emptyLogger` from main index
+- **Lock handle output improved** – all lock operations now log full handle instead of truncated:
+  - Changed from `lockHandle.substring(0, 10) + '...'` to full `lockHandle`
+  - Affects all 13 Builders with lock() method
+  - Updated `unlock.ts` error messages to show full handle
+  - Improves debugging and lock tracking
+- **Debug flags granular system** – 5-tier debug flag architecture:
+  - `DEBUG_CONNECTORS` – connection package logs (renamed from `DEBUG_TESTS`)
+  - `DEBUG_ADT_LIBS` – Builder library and core function logs
+  - `DEBUG_ADT_TESTS` – Builder test execution logs
+  - `DEBUG_ADT_E2E_TESTS` – E2E integration test logs
+  - `DEBUG_ADT_HELPER_TESTS` – test helper function logs
+  - `DEBUG_ADT_TESTS=true` enables all ADT scopes for backward compatibility
+- **Operation delays now configurable** – test delays moved from hardcoded to YAML configuration:
+  - **Default delays increased**: Changed from 2 seconds to **3 seconds** for better reliability
+  - **Global configuration**: Set delays for all tests in `test_settings.operation_delays` section
+  - **Test-specific overrides**: Each test case can override delays via `params.operation_delays`
+  - **Configurable operations**: `lock`, `unlock`, `update`, `create`, and `default`
+  - Added `getOperationDelay(operation, testCase)` helper in `tests/test-helper.js`
+  - Updated all 7 Builder integration tests to use configurable delays
+  - Improved test reliability when running test suites (multiple tests together)
+- **Sequential test execution enforced** – added `maxConcurrency: 1` to `jest.config.js`:
+  - Ensures only 1 test suite runs at a time (previously only limited workers)
+  - Prevents SAP object conflicts between concurrent tests
+  - Combined with existing `maxWorkers: 1` for complete sequential execution
+
+### Added
+- **Logger helper functions** in `src/__tests__/helpers/testLogger.ts`:
+  - `createConnectionLogger()` – creates logger for connection package
+  - `createBuilderLogger()` – creates logger for Builder library code
+  - `createTestsLogger()` – creates logger for Builder test execution
+  - `createE2ETestsLogger()` – creates logger for E2E tests
+  - All helpers respect corresponding DEBUG flags
+- **Operation delays documentation** – comprehensive guide in `docs/usage/OPERATION_DELAYS.md`:
+  - Configuration examples (global and test-specific)
+  - Usage patterns for all operation types
+  - Troubleshooting guide for common timing issues
+  - Performance tuning recommendations
+  - Complete API reference for `getOperationDelay()`
+- **Debug logging documentation** – updated `docs/usage/DEBUG.md`:
+  - Granular debug flag system explanation
+  - Usage examples for each debug scope
+  - Logger helper function documentation
+  - Backward compatibility notes
+
+### Documentation
+- **Reorganized documentation structure** – moved files into categorical subfolders:
+  - **`docs/architecture/`** – system design and architecture (ARCHITECTURE.md)
+  - **`docs/usage/`** – user guides (DEBUG.md, OPERATION_DELAYS.md, OPERATION_DELAYS_SUMMARY.md, STATEFUL_SESSION_GUIDE.md)
+  - **`docs/development/`** – developer guides (BUILDER_TEST_PATTERN.md, TEST_CONFIG_SCHEMA.md)
+  - Removed old `docs/reference/` folder
+- **Cleaned up obsolete scripts** – removed deprecated development scripts:
+  - `fix-builder-tests.sh`
+  - `scripts/add-delete-methods.js`
+  - `scripts/add-delete-to-builders.sh`
+
 ### Fixed
 - **Deletion XML format** – all delete operations now send proper empty `<del:transportNumber/>` tag when no transport request specified:
   - Affected modules: Structure, Domain, DataElement, Table, View, FunctionGroup, FunctionModule

@@ -29,6 +29,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { createPackage } from './create';
 import { validatePackageBasic, validatePackageFull } from './validation';
 import { checkPackage } from './check';
@@ -38,13 +39,6 @@ import { unlockPackage } from './unlock';
 import { deletePackage, checkPackageDeletion, parsePackageDeletionCheck } from './delete';
 import { updatePackageDescription } from './update';
 import { CreatePackageParams } from './types';
-
-export interface PackageBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface PackageBuilderConfig {
   packageName: string;
@@ -77,13 +71,13 @@ export interface PackageBuilderState {
 
 export class PackageBuilder {
   private connection: AbapConnection;
-  private logger: PackageBuilderLogger;
+  private logger: IAdtLogger;
   private config: PackageBuilderConfig;
   private state: PackageBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: PackageBuilderLogger,
+    logger: IAdtLogger,
     config: PackageBuilderConfig
   ) {
     this.connection = connection;

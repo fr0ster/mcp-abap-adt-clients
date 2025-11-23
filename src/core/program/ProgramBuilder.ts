@@ -11,6 +11,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { validateProgramName } from './validation';
 import { create, CreateProgramParams } from './create';
 import { lockProgram } from './lock';
@@ -20,13 +21,6 @@ import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
 import { getProgramSource } from './read';
 import { deleteProgram } from './delete';
-
-export interface ProgramBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface ProgramBuilderConfig {
   programName: string;
@@ -57,7 +51,7 @@ export interface ProgramBuilderState {
 
 export class ProgramBuilder {
   private connection: AbapConnection;
-  private logger: ProgramBuilderLogger;
+  private logger: IAdtLogger;
   private config: ProgramBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -65,7 +59,7 @@ export class ProgramBuilder {
 
   constructor(
     connection: AbapConnection,
-    logger: ProgramBuilderLogger,
+    logger: IAdtLogger,
     config: ProgramBuilderConfig
   ) {
     this.connection = connection;
@@ -186,7 +180,7 @@ export class ProgramBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Program locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Program locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

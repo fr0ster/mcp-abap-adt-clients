@@ -36,6 +36,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { validateClassName, ValidationResult } from './validation';
 import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
@@ -59,13 +60,6 @@ export interface ClassBuilderConfig {
   responsible?: string;
 }
 
-export interface ClassBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
-
 export interface ClassBuilderState {
   validationResult?: ValidationResult;
   createResult?: AxiosResponse;
@@ -83,7 +77,7 @@ export interface ClassBuilderState {
 
 export class ClassBuilder {
   private connection: AbapConnection;
-  private logger: ClassBuilderLogger;
+  private logger: IAdtLogger;
   private config: ClassBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -91,7 +85,7 @@ export class ClassBuilder {
 
   constructor(
     connection: AbapConnection,
-    logger: ClassBuilderLogger,
+    logger: IAdtLogger,
     config: ClassBuilderConfig
   ) {
     this.connection = connection;
@@ -287,7 +281,7 @@ export class ClassBuilder {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Class locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Class locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

@@ -2,12 +2,17 @@
  * Unit test for TransportBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- integration/transport/TransportBuilder
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - TransportBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=transport/TransportBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { TransportBuilder, TransportBuilderLogger } from '../../../core/transport';
-import { getTransport } from '../../../core/transport/read';
+import { TransportBuilder } from '../../../core/transport/TransportBuilder';
+import { IAdtLogger } from '../../../utils/logger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
@@ -17,6 +22,7 @@ import {
   logBuilderTestEnd,
   logBuilderTestStep
 } from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -32,21 +38,14 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
 
-const builderLogger: TransportBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Library code uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('TransportBuilder', () => {
   let connection: AbapConnection;
@@ -59,7 +58,7 @@ describe('TransportBuilder', () => {
       await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -116,22 +115,20 @@ describe('TransportBuilder', () => {
     afterEach(async () => {
       // Transports cannot be deleted, so no cleanup needed
       // Just log if needed
-      if (testCase && debugEnabled) {
-        builderLogger.debug?.(`[CLEANUP] Transport was created (cannot be deleted)`);
-      }
+        testsLogger.debug?.('[BUILDER TESTS] Transport was created (cannot be deleted)');
     });
 
     it('should execute full workflow: create and read transport', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'TransportBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'TransportBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'TransportBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'TransportBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase) {
-        logBuilderTestSkip(builderLogger, 'TransportBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'TransportBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -149,7 +146,7 @@ describe('TransportBuilder', () => {
 
         transportNumber = state.transportNumber || null;
 
-        logBuilderTestSuccess(builderLogger, 'TransportBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'TransportBuilder - full workflow');
       } catch (error: any) {
         // If username not found or user doesn't exist, skip test instead of failing
         const errorMsg = error.message || '';
@@ -160,10 +157,10 @@ describe('TransportBuilder', () => {
         if (fullErrorText.includes('username not found') ||
             fullErrorText.includes('does not exist in the system') ||
             fullErrorText.includes('user') && fullErrorText.includes('does not exist')) {
-          logBuilderTestSkip(builderLogger, 'TransportBuilder - full workflow', 'Username not found or user does not exist in system');
+          logBuilderTestSkip(testsLogger, 'TransportBuilder - full workflow', 'Username not found or user does not exist in system');
           return; // Skip test
         }
-        logBuilderTestError(builderLogger, 'TransportBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'TransportBuilder - full workflow', error);
         throw error;
       } finally {
         // Read the created transport before cleanup (using transportNumber from state)
@@ -177,15 +174,13 @@ describe('TransportBuilder', () => {
             expect(readResult).toBeDefined();
             expect(readResult?.status).toBe(200);
             expect(readResult?.data).toBeDefined();
-          } catch (readError) {
-            if (debugEnabled) {
-              builderLogger.warn?.(`Failed to read transport ${transportNumber}:`, readError);
-            }
+          } catch (readError: any) {
+              testsLogger.warn?.(`Failed to read transport ${transportNumber}:`, readError);
             // Don't fail the test if read fails
           }
         }
 
-        logBuilderTestEnd(builderLogger, 'TransportBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'TransportBuilder - full workflow');
       }
     }, getTimeout('test'));
   });

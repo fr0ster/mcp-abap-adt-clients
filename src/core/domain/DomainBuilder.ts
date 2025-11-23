@@ -33,6 +33,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { create, upload } from './create';
 import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
@@ -45,13 +46,6 @@ import { FixedValue } from './types';
 import { validateObjectName, ValidationResult } from '../shared/validation';
 import { getSystemInformation } from '../shared/systemInfo';
 import { getDomain, getDomainTransport } from './read';
-
-export interface DomainBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface DomainBuilderConfig {
   domainName: string;
@@ -84,14 +78,14 @@ export interface DomainBuilderState {
 
 export class DomainBuilder {
   private connection: AbapConnection;
-  private logger: DomainBuilderLogger;
+  private logger: IAdtLogger;
   private config: DomainBuilderConfig;
   private lockHandle?: string;
   private state: DomainBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: DomainBuilderLogger,
+    logger: IAdtLogger,
     config: DomainBuilderConfig
   ) {
     this.connection = connection;
@@ -259,7 +253,7 @@ export class DomainBuilder {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Domain locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Domain locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

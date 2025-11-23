@@ -1,3 +1,5 @@
+import { IAdtLogger } from "../../utils/logger";
+
 export interface BuilderTestLogger {
   info?: (...args: any[]) => void;
   warn?: (...args: any[]) => void;
@@ -86,7 +88,7 @@ function logImmediate(message: string): void {
   process.stdout.write(message + '\n');
 }
 
-export function logBuilderTestStart(logger: BuilderTestLogger | undefined, testName: string, testCase: any): void {
+export function logBuilderTestStart(logger: IAdtLogger | undefined, testName: string, testCase: any): void {
   if (!testCase) {
     return;
   }

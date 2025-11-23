@@ -46,3 +46,4 @@ export type { AbapConnection, AbapRequestOptions } from '@mcp-abap-adt/connectio
 
 // Export utilities
 export { encodeSapObjectName } from './utils/internalUtils';
+export { type IAdtLogger, emptyLogger } from './utils/logger';

@@ -3,12 +3,12 @@
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
  * Enable debug logs:
- * - DEBUG_ADT=true npm test -- integration/package    (ADT-clients logs)
- * - DEBUG_TESTS=true npm test -- integration/package  (Connection logs)
+ * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=package    (ADT-clients logs)
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { PackageBuilder, PackageBuilderLogger } from '../../../core/package';
+import { PackageBuilder } from '../../../core/package';
+import { IAdtLogger } from '../../../utils/logger';
 import { getPackage } from '../../../core/package/read';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -20,6 +20,7 @@ import {
   logBuilderTestEnd,
   logBuilderTestStep
 } from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -39,22 +40,16 @@ if (fs.existsSync(envPath)) {
 }
 
 const debugEnabled = process.env.DEBUG_ADT_TESTS === 'true' || process.env.DEBUG_ADT === 'true';
-const debugConnection = process.env.DEBUG_TESTS === 'true'; // Connection uses DEBUG_TESTS
+const debugConnection = process.env.DEBUG_CONNECTORS === 'true'; // Connection uses DEBUG_CONNECTORS
 
-const connectionLogger: ILogger = {
-  debug: debugConnection ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugConnection ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugConnection ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugConnection ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugConnection ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
 
-const builderLogger: PackageBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Library code uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('PackageBuilder', () => {
   let connection: AbapConnection;
@@ -70,7 +65,7 @@ describe('PackageBuilder', () => {
       // Check if this is a cloud system (for environment-specific standard packages)
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -210,15 +205,15 @@ describe('PackageBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'PackageBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'PackageBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'PackageBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'PackageBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !packageName) {
-        logBuilderTestSkip(builderLogger, 'PackageBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'PackageBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -232,34 +227,34 @@ describe('PackageBuilder', () => {
             logBuilderTestStep('create');
             return b.create();
           })
-          // .then(b => {
-          //   logBuilderTestStep('check(active)');
-          //   return b.check();
-          // })
-          // .then(async b => {
-          //   // Wait for system to process package creation before reading
-          //   logBuilderTestStep('wait (system processing)');
-          //   await new Promise(resolve => setTimeout(resolve, 2000));
-          //   return b;
-          // })
-          // .then(b => {
-          //   logBuilderTestStep('read');
-          //   return b.read();
-          // })
+          .then(b => {
+            logBuilderTestStep('check(active)');
+            return b.check();
+          })
+          .then(async b => {
+            // Wait for system to process package creation before reading
+            logBuilderTestStep('wait (system processing)');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return b;
+          })
+          .then(b => {
+            logBuilderTestStep('read');
+            return b.read();
+          })
           .then(b => {
             logBuilderTestStep('lock');
             return b.lock();
           })
-          // .then(b => {
-          //   logBuilderTestStep('update');
-          //   return b.update();
-          // })
-          // .then(async b => {
-          //   // Wait for system to process package update
-          //   logBuilderTestStep('wait (after update)');
-          //   await new Promise(resolve => setTimeout(resolve, 2000));
-          //   return b;
-          // })
+          .then(b => {
+            logBuilderTestStep('update');
+            return b.update();
+          })
+          .then(async b => {
+            // Wait for system to process package update
+            logBuilderTestStep('wait (after update)');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return b;
+          })
           .then(b => {
             logBuilderTestStep('unlock');
             return b.unlock();
@@ -303,7 +298,7 @@ describe('PackageBuilder', () => {
           }
         }
 
-        logBuilderTestSuccess(builderLogger, 'PackageBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'PackageBuilder - full workflow');
       } catch (error: any) {
         const errorMsg = error.message || '';
         const errorData = error.response?.data || '';
@@ -324,11 +319,11 @@ describe('PackageBuilder', () => {
           return;
         }
 
-        logBuilderTestError(builderLogger, 'PackageBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'PackageBuilder - full workflow', error);
         throw error;
       } finally {
         await builder.forceUnlock().catch(() => {});
-        logBuilderTestEnd(builderLogger, 'PackageBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'PackageBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -339,7 +334,7 @@ describe('PackageBuilder', () => {
       const standardObject = resolveStandardObject('package', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'PackageBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'PackageBuilder - read standard object', {
           name: 'read_standard',
           params: {}
         });
@@ -352,13 +347,13 @@ describe('PackageBuilder', () => {
       }
 
       const standardPackageName = standardObject.name;
-      logBuilderTestStart(builderLogger, 'PackageBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'PackageBuilder - read standard object', {
         name: 'read_standard',
         params: { package_name: standardPackageName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'PackageBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'PackageBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
@@ -378,12 +373,12 @@ describe('PackageBuilder', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'PackageBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'PackageBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'PackageBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'PackageBuilder - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'PackageBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'PackageBuilder - read standard object');
       }
     }, getTimeout('test'));
   });

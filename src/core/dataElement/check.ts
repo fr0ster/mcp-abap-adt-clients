@@ -28,7 +28,7 @@ export async function checkDataElement(
         errorMessage.toLowerCase().includes('database')) {
       // This is expected behavior for DDIC objects - check may not be fully supported
       // Return response without throwing - test chain can continue
-      if (process.env.DEBUG_TESTS === 'true') {
+      if (process.env.DEBUG_ADT_LIBS === 'true') {
         console.warn(`Check warning for data element ${dataElementName}: ${errorMessage} (check may not be fully supported for DDIC objects)`);
       }
       return response; // Return response anyway

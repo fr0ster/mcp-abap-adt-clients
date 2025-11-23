@@ -21,13 +21,7 @@ import { checkImplementation, checkAbap } from './check';
 import { activate } from './activation';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
 import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams } from './types';
-
-export interface BehaviorDefinitionBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
+import { IAdtLogger } from '../../utils/logger';
 
 export interface BehaviorDefinitionBuilderConfig {
   name: string;
@@ -56,7 +50,7 @@ export interface BehaviorDefinitionBuilderState {
 
 export class BehaviorDefinitionBuilder {
   private connection: AbapConnection;
-  private logger: BehaviorDefinitionBuilderLogger;
+  private logger: IAdtLogger;
   private config: BehaviorDefinitionBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -64,7 +58,7 @@ export class BehaviorDefinitionBuilder {
 
   constructor(
     connection: AbapConnection,
-    logger: BehaviorDefinitionBuilderLogger,
+    logger:     IAdtLogger,
     config: BehaviorDefinitionBuilderConfig
   ) {
     this.connection = connection;
@@ -198,7 +192,7 @@ export class BehaviorDefinitionBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Behavior definition locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Behavior definition locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

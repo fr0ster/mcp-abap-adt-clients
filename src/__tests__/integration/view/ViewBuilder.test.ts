@@ -2,11 +2,17 @@
  * Unit test for ViewBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- integration/view/ViewBuilder
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - ViewBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=view/ViewBuilder
  */
 
 import { AbapConnection, getTimeout, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { ViewBuilder, ViewBuilderLogger } from '../../../core/view';
+import { ViewBuilder } from '../../../core/view';
+import { IAdtLogger } from '../../../utils/logger';
 import { getView } from '../../../core/view/read';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
@@ -19,16 +25,18 @@ import {
   logBuilderTestStep,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
+getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  ensurePackageConfig
+  ensurePackageConfig,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -36,21 +44,14 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
 
-const builderLogger: ViewBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Library code (ViewBuilder) uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('ViewBuilder', () => {
   let connection: AbapConnection;
@@ -63,7 +64,7 @@ describe('ViewBuilder', () => {
       await (connection as any).connect();
       hasConfig = true;
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -172,15 +173,15 @@ describe('ViewBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'ViewBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'ViewBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'ViewBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !viewName) {
-        logBuilderTestSkip(builderLogger, 'ViewBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -199,15 +200,19 @@ describe('ViewBuilder', () => {
           })
           .then(async b => {
             // Wait for SAP to finish create operation (includes lock/unlock internally)
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock');
             return b.lock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit lock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
             logBuilderTestStep('update');
             return b.update();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit update operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
             logBuilderTestStep('check(inactive)');
             return b.check('inactive');
           })
@@ -215,7 +220,9 @@ describe('ViewBuilder', () => {
             logBuilderTestStep('unlock');
             return b.unlock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit unlock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate');
             return b.activate();
           })
@@ -233,7 +240,7 @@ describe('ViewBuilder', () => {
         expect(state.activateResult).toBeDefined();
         expect(state.errors.length).toBe(0);
 
-        logBuilderTestSuccess(builderLogger, 'ViewBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'ViewBuilder - full workflow');
       } catch (error: any) {
         const statusText = getHttpStatusText(error);
         // Extract error message from error object (may be in message or response.data)
@@ -246,7 +253,7 @@ describe('ViewBuilder', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(builderLogger, 'ViewBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'ViewBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
         // Read the created view before cleanup
@@ -260,15 +267,13 @@ describe('ViewBuilder', () => {
             expect(readResult?.status).toBe(200);
             expect(readResult?.data).toBeDefined();
           } catch (readError) {
-            if (debugEnabled) {
-              builderLogger.warn?.(`Failed to read view ${viewName}:`, readError);
-            }
-            // Don't fail the test if read fails
+            // Log warning but don't fail the test if read fails
+            builderLogger.warn?.(`Failed to read view ${viewName}:`, readError);
           }
         }
 
         await builder.forceUnlock().catch(() => {});
-        logBuilderTestEnd(builderLogger, 'ViewBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'ViewBuilder - full workflow');
       }
     }, getTimeout('default'));
   });

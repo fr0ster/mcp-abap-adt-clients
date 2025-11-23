@@ -3,4 +3,4 @@
  */
 
 export * from './types';
-export { TransportBuilder, type TransportBuilderConfig, type TransportBuilderLogger, type TransportBuilderState } from './TransportBuilder';
+export { TransportBuilder, type TransportBuilderConfig, type TransportBuilderState } from './TransportBuilder';

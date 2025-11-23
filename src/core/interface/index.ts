@@ -3,4 +3,4 @@
  */
 
 export * from './types';
-export { InterfaceBuilder, type InterfaceBuilderConfig, type InterfaceBuilderLogger, type InterfaceBuilderState } from './InterfaceBuilder';
+export { InterfaceBuilder, type InterfaceBuilderConfig, type InterfaceBuilderState } from './InterfaceBuilder';

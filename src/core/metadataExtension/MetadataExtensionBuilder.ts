@@ -6,6 +6,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { validateMetadataExtension } from './validation';
 import { createMetadataExtension } from './create';
 import { lockMetadataExtension } from './lock';
@@ -15,13 +16,6 @@ import { updateMetadataExtension } from './update';
 import { checkMetadataExtension } from './check';
 import { activateMetadataExtension } from './activate';
 import { deleteMetadataExtension } from './delete';
-
-export interface MetadataExtensionBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface MetadataExtensionBuilderConfig {
   name: string;
@@ -51,14 +45,14 @@ export interface MetadataExtensionBuilderState {
 
 export class MetadataExtensionBuilder {
   private connection: AbapConnection;
-  private logger: MetadataExtensionBuilderLogger;
+  private logger: IAdtLogger;
   private config: MetadataExtensionBuilderConfig;
   private lockHandle?: string;
   private state: MetadataExtensionBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: MetadataExtensionBuilderLogger,
+    logger: IAdtLogger,
     config: MetadataExtensionBuilderConfig
   ) {
     this.connection = connection;

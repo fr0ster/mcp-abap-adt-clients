@@ -2,13 +2,18 @@
  * Unit test for FunctionGroupBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- integration/functionGroup/FunctionGroupBuilder
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - FunctionGroupBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=functionGroup/FunctionGroupBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { FunctionGroupBuilder, FunctionGroupBuilderLogger } from '../../../core/functionGroup';
+import { FunctionGroupBuilder } from '../../../core/functionGroup';
+import { IAdtLogger } from '../../../utils/logger';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
-import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -21,6 +26,7 @@ import {
   setTotalTests,
   resetTestCounter
 } from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -31,7 +37,8 @@ const {
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  resolveStandardObject
+  resolveStandardObject,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -40,21 +47,15 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
 
-const builderLogger: FunctionGroupBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('FunctionGroupBuilder', () => {
   let connection: AbapConnection;
@@ -74,7 +75,7 @@ describe('FunctionGroupBuilder', () => {
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -183,15 +184,15 @@ describe('FunctionGroupBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'FunctionGroupBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'FunctionGroupBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !functionGroupName) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'FunctionGroupBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -205,15 +206,21 @@ describe('FunctionGroupBuilder', () => {
             logBuilderTestStep('create');
             return b.create();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit create operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock');
             return b.lock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit lock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
             logBuilderTestStep('unlock');
             return b.unlock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit unlock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate');
             return b.activate();
         })
@@ -231,14 +238,14 @@ describe('FunctionGroupBuilder', () => {
       expect(state.activateResult).toBeDefined();
       expect(state.errors.length).toBe(0);
 
-        logBuilderTestSuccess(builderLogger, 'FunctionGroupBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'FunctionGroupBuilder - full workflow');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'FunctionGroupBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'FunctionGroupBuilder - full workflow', error);
         throw error;
       } finally {
         // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
-        logBuilderTestEnd(builderLogger, 'FunctionGroupBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'FunctionGroupBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -249,7 +256,7 @@ describe('FunctionGroupBuilder', () => {
       const standardObject = resolveStandardObject('function_group', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'FunctionGroupBuilder - read standard object', {
           name: 'read_standard',
           params: {}
         });
@@ -262,13 +269,13 @@ describe('FunctionGroupBuilder', () => {
       }
 
       const standardFunctionGroupName = standardObject.name;
-      logBuilderTestStart(builderLogger, 'FunctionGroupBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'FunctionGroupBuilder - read standard object', {
         name: 'read_standard',
         params: { function_group_name: standardFunctionGroupName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'FunctionGroupBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'FunctionGroupBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
@@ -287,12 +294,12 @@ describe('FunctionGroupBuilder', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'FunctionGroupBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'FunctionGroupBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'FunctionGroupBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'FunctionGroupBuilder - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'FunctionGroupBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'FunctionGroupBuilder - read standard object');
       }
     }, getTimeout('test'));
   });

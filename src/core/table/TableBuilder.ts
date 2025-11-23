@@ -31,6 +31,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { createTable } from './create';
 import { acquireTableLockHandle } from './lock';
 import { updateTable } from './update';
@@ -43,13 +44,6 @@ import { CreateTableParams } from './types';
 import { UpdateTableParams } from './update';
 import { ValidationResult } from '../shared/validation';
 import { getTableSource } from './read';
-
-export interface TableBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface TableBuilderConfig {
   tableName: string;
@@ -73,14 +67,14 @@ export interface TableBuilderState {
 
 export class TableBuilder {
   private connection: AbapConnection;
-  private logger: TableBuilderLogger;
+  private logger: IAdtLogger;
   private config: TableBuilderConfig;
   private lockHandle?: string;
   private state: TableBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: TableBuilderLogger,
+    logger: IAdtLogger,
     config: TableBuilderConfig
   ) {
     this.connection = connection;
@@ -183,7 +177,7 @@ export class TableBuilder {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Table locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Table locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

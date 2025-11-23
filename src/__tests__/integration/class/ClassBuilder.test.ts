@@ -2,11 +2,17 @@
  * Unit test for ClassBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/ClassBuilder.test
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - ClassBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=class/ClassBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { ClassBuilder, ClassBuilderLogger } from '../../../core/class';
+import { ClassBuilder } from '../../../core/class';
+import { IAdtLogger } from '../../../utils/logger';
 import { getClass } from '../../../core/class/read';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -20,6 +26,7 @@ import {
   setTotalTests,
   resetTestCounter
 } from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -30,7 +37,8 @@ const {
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  resolveStandardObject
+  resolveStandardObject,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -39,21 +47,14 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
 
-const builderLogger: ClassBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Library code (ClassBuilder) uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('ClassBuilder', () => {
   let connection: AbapConnection;
@@ -75,7 +76,7 @@ describe('ClassBuilder', () => {
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -175,21 +176,21 @@ describe('ClassBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'ClassBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'ClassBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !testClassName) {
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
       const testPackageName = resolvePackageName(testCase.params.package_name);
       if (!testPackageName) {
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - full workflow', 'package_name not configured');
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - full workflow', 'package_name not configured');
         return;
       }
       const sourceCode = testCase.params.source_code || `CLASS ${testClassName} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
@@ -213,7 +214,9 @@ describe('ClassBuilder', () => {
             logBuilderTestStep('lock');
           return b.lock();
         })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit lock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
             logBuilderTestStep('check with source code (before update)');
             return b.check('inactive', sourceCode);
         })
@@ -221,7 +224,9 @@ describe('ClassBuilder', () => {
             logBuilderTestStep('update');
           return b.update();
         })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit update operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
             logBuilderTestStep('check(inactive)');
             return b.check('inactive');
         })
@@ -229,7 +234,9 @@ describe('ClassBuilder', () => {
             logBuilderTestStep('unlock');
           return b.unlock();
         })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit unlock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate');
             return b.activate();
           })
@@ -247,14 +254,14 @@ describe('ClassBuilder', () => {
         expect(state.activateResult).toBeDefined();
         expect(state.errors.length).toBe(0);
 
-        logBuilderTestSuccess(builderLogger, 'ClassBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'ClassBuilder - full workflow');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'ClassBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'ClassBuilder - full workflow', error);
         throw error;
       } finally {
         // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
-        logBuilderTestEnd(builderLogger, 'ClassBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'ClassBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -265,23 +272,23 @@ describe('ClassBuilder', () => {
       const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'ClassBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'ClassBuilder - read standard object', {
           name: 'read_standard',
           params: {}
         });
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - read standard object',
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - read standard object',
           `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
         return;
       }
 
       const standardClassName = standardObject.name;
-      logBuilderTestStart(builderLogger, 'ClassBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'ClassBuilder - read standard object', {
         name: 'read_standard',
         params: { class_name: standardClassName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
@@ -304,12 +311,12 @@ describe('ClassBuilder', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'ClassBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'ClassBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'ClassBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'ClassBuilder - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'ClassBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'ClassBuilder - read standard object');
       }
     }, getTimeout('test'));
   });
@@ -320,11 +327,11 @@ describe('ClassBuilder', () => {
       const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'ClassBuilder - read transport request', {
+        logBuilderTestStart(testsLogger, 'ClassBuilder - read transport request', {
           name: 'read_transport',
           params: {}
         });
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - read transport request',
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - read transport request',
           `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
         return;
       }
@@ -334,22 +341,22 @@ describe('ClassBuilder', () => {
       // Check if transport_request is configured in YAML
       const transportRequest = resolveTransportRequest(testCase?.params?.transport_request);
       if (!transportRequest) {
-        logBuilderTestStart(builderLogger, 'ClassBuilder - read transport request', {
+        logBuilderTestStart(testsLogger, 'ClassBuilder - read transport request', {
           name: 'read_transport',
           params: { class_name: standardClassName }
         });
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - read transport request',
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - read transport request',
           'transport_request not configured in test-config.yaml (required for transport read test)');
         return;
       }
 
-      logBuilderTestStart(builderLogger, 'ClassBuilder - read transport request', {
+      logBuilderTestStart(testsLogger, 'ClassBuilder - read transport request', {
         name: 'read_transport',
         params: { class_name: standardClassName, transport_request: transportRequest }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'ClassBuilder - read transport request', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'ClassBuilder - read transport request', 'No SAP configuration');
         return;
       }
 
@@ -372,12 +379,12 @@ describe('ClassBuilder', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'ClassBuilder - read transport request');
+        logBuilderTestSuccess(testsLogger, 'ClassBuilder - read transport request');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'ClassBuilder - read transport request', error);
+        logBuilderTestError(testsLogger, 'ClassBuilder - read transport request', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'ClassBuilder - read transport request');
+        logBuilderTestEnd(testsLogger, 'ClassBuilder - read transport request');
       }
     }, getTimeout('test'));
   });

@@ -34,6 +34,14 @@ test_settings:
     default: 60000
     create: 60000
     delay: 3000  # Delay after delete/create operations
+  # Operation delays (milliseconds) - time to wait for SAP to commit operations
+  # These delays ensure SAP has time to persist state changes between operations
+  operation_delays:
+    lock: 3000      # Delay after lock operation (default: 3 seconds)
+    unlock: 3000    # Delay after unlock operation (default: 3 seconds)
+    update: 3000    # Delay after update operation (default: 3 seconds)
+    create: 3000    # Delay after create operation (default: 3 seconds)
+    default: 3000   # Default delay for any operation (default: 3 seconds)
 
 # Session persistence configuration
 session_config:
@@ -80,6 +88,12 @@ create_class:
         # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
         final: true
+        # Optional: Override operation delays for this specific test (in milliseconds)
+        # operation_delays:
+        #   lock: 5000      # Custom delay after lock (overrides global setting)
+        #   unlock: 5000    # Custom delay after unlock
+        #   update: 5000    # Custom delay after update
+        #   create: 4000    # Custom delay after create
         source_code: |
           CLASS ZADT_BLD_CLS01 DEFINITION
             PUBLIC

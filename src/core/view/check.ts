@@ -40,14 +40,14 @@ export async function checkView(
         checkResult.errors.some((err: any) => (err.text || '').toLowerCase().includes('has been checked'));
 
       if (hasCheckedMessage) {
-        if (process.env.DEBUG_TESTS === 'true') {
+        if (process.env.DEBUG_ADT_LIBS === 'true') {
           console.warn(`Check warning for view ${viewName}: ${errorMessage} (view was already checked)`);
         }
         return response;
       }
 
       if (attempt === 0 && shouldRetryMissingVersion(checkResult)) {
-        if (process.env.DEBUG_TESTS === 'true') {
+        if (process.env.DEBUG_ADT_LIBS === 'true') {
           console.warn(`Check retry for view ${viewName}: ${errorMessage} (waiting for inactive version)`);
         }
         attempt += 1;
@@ -56,7 +56,7 @@ export async function checkView(
       }
 
       if (shouldRetryMissingVersion(checkResult)) {
-        if (process.env.DEBUG_TESTS === 'true') {
+        if (process.env.DEBUG_ADT_LIBS === 'true') {
           console.warn(`Check warning for view ${viewName}: ${errorMessage} (version not available, continue)`);
         }
         return response;

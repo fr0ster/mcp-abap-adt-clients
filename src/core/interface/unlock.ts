@@ -33,7 +33,7 @@ export async function unlockInterface(
     if (!error.response) {
       throw new Error(
         `Failed to unlock interface ${interfaceName}: No response from server. ` +
-        `Lock handle: ${lockHandle.substring(0, 10)}... ` +
+        `Lock handle: ${lockHandle} ` +
         `The interface may be locked by another user or session may be invalid.`
       );
     }

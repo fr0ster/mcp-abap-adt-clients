@@ -5,10 +5,13 @@
  *   LOG_LEVEL=error  - Only errors
  *   LOG_LEVEL=warn   - Errors + warnings + skip reasons
  *   LOG_LEVEL=info   - Errors + warnings + info (default)
- *   LOG_LEVEL=debug  - All logs (same as DEBUG_TESTS=true)
+ *   LOG_LEVEL=debug  - All logs
  *
- * Backward compatibility:
- *   DEBUG_TESTS=true - Same as LOG_LEVEL=debug
+ * Debug flags (granular control):
+ *   DEBUG_ADT_LIBS=true           - Library code (Builders, core clients)
+ *   DEBUG_ADT_HELPER_TESTS=true   - Test helpers (test-helper.js, builderTestLogger, etc.)
+ *   DEBUG_ADT_E2E_TESTS=true      - E2E/integration tests
+ *   DEBUG_ADT_TESTS=true          - All of the above (backward compatibility)
  *
  * Test Pattern with Skip Reporting:
  *
@@ -64,6 +67,11 @@
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
+/**
+ * Debug scope for granular control over logging
+ */
+export type DebugScope = 'connectors' | 'libs' | 'helpers' | 'e2e' | 'tests' | 'none';
+
 const LOG_LEVELS: Record<LogLevel, number> = {
   error: 0,
   warn: 1,
@@ -71,9 +79,34 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 3,
 };
 
+/**
+ * Check if debug is enabled for a specific scope
+ */
+export function isDebugEnabled(scope: DebugScope): boolean {
+  // // DEBUG_ADT_TESTS=true enables all scopes (backward compatibility)
+  // if (process.env.DEBUG_ADT_TESTS === 'true') {
+  //   return true;
+  // }
+
+  switch (scope) {
+    case 'connectors':
+      return process.env.DEBUG_CONNECTORS === 'true';
+    case 'libs':
+      return process.env.DEBUG_ADT_LIBS === 'true';
+    case 'helpers':
+      return process.env.DEBUG_ADT_HELPER_TESTS === 'true';
+    case 'e2e':
+      return process.env.DEBUG_ADT_E2E_TESTS === 'true';
+    case 'tests':
+      return process.env.DEBUG_ADT_TESTS === 'true';
+    case 'none':
+      return false;
+  }
+}
+
 function getLogLevel(): LogLevel {
-  // Backward compatibility: DEBUG_TESTS=true → debug level
-  if (process.env.DEBUG_TESTS === 'true') {
+  // Backward compatibility: DEBUG_ADT_TESTS=true → debug level
+  if (process.env.DEBUG_ADT_TESTS === 'true') {
     return 'debug';
   }
 
@@ -99,9 +132,12 @@ export interface TestLogger {
 
 /**
  * Create a test logger with configured log level
+ * @param prefix - Optional prefix for log messages
+ * @param scope - Debug scope (libs, helpers, e2e, all) - controls debug logging
  */
-export function createTestLogger(prefix?: string): TestLogger {
+export function createTestLogger(prefix?: string, scope: DebugScope = 'none'): TestLogger {
   const p = prefix ? `[${prefix}] ` : '';
+  const debugEnabled = isDebugEnabled(scope);
 
   // Helper to get caller location from stack trace
   function getCallerLocation(): string {
@@ -123,7 +159,7 @@ export function createTestLogger(prefix?: string): TestLogger {
   }
 
   return {
-    debug: shouldLog('debug')
+    debug: shouldLog('debug') && debugEnabled
       ? function(msg, ...args) {
           const location = getCallerLocation();
           console.log(`${p}${msg}`, ...args);
@@ -133,7 +169,7 @@ export function createTestLogger(prefix?: string): TestLogger {
     info: shouldLog('info')
       ? function(msg, ...args) {
           console.log(`${p}${msg}`, ...args);
-          if (shouldLog('debug')) {
+          if (debugEnabled) {
             const location = getCallerLocation();
             if (location) console.log(`      at ${location}`);
           }
@@ -142,7 +178,7 @@ export function createTestLogger(prefix?: string): TestLogger {
     warn: shouldLog('warn')
       ? function(msg, ...args) {
           console.warn(`${p}⚠️  ${msg}`, ...args);
-          if (shouldLog('debug')) {
+          if (debugEnabled) {
             const location = getCallerLocation();
             if (location) console.warn(`      at ${location}`);
           }
@@ -151,7 +187,7 @@ export function createTestLogger(prefix?: string): TestLogger {
     error: shouldLog('error')
       ? function(msg, ...args) {
           console.error(`${p}❌ ${msg}`, ...args);
-          if (shouldLog('debug')) {
+          if (debugEnabled) {
             const location = getCallerLocation();
             if (location) console.error(`      at ${location}`);
           }
@@ -160,7 +196,7 @@ export function createTestLogger(prefix?: string): TestLogger {
     skip: shouldLog('warn')
       ? (msg, reason) => process.stdout.write(`${p}⏭️  SKIPPED: ${msg}\n   Reason: ${reason}\n`)
       : () => {},
-    csrfToken: shouldLog('debug')
+    csrfToken: shouldLog('debug') && debugEnabled
       ? function(action, token) {
           const location = getCallerLocation();
           console.log(`${p}CSRF ${action}:`, token);
@@ -175,4 +211,61 @@ export function createTestLogger(prefix?: string): TestLogger {
  */
 export function getCurrentLogLevel(): LogLevel {
   return currentLevel;
+}
+
+/**
+ * Create a connection logger for @mcp-abap-adt/connection package
+ * Uses DEBUG_CONNECTORS flag
+ */
+export function createConnectionLogger() {
+  const enabled = isDebugEnabled('connectors');
+  return {
+    debug: enabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
+    info: enabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
+    warn: enabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
+    error: enabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
+    csrfToken: enabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
+  };
+}
+
+/**
+ * Create a builder logger for Builder library code
+ * Uses DEBUG_ADT_LIBS flag
+ */
+export function createBuilderLogger() {
+  const enabled = isDebugEnabled('libs');
+  return {
+    debug: enabled ? console.log : () => {},
+    info: enabled ? console.log : () => {},
+    warn: enabled ? console.warn : () => {},
+    error: enabled ? console.error : () => {},
+  };
+}
+
+/**
+ * Create a test logger for Builder integration tests
+ * Uses DEBUG_ADT_TESTS flag
+ */
+export function createTestsLogger() {
+  const enabled = isDebugEnabled('tests');
+  return {
+    debug: enabled ? console.log : () => {},
+    info: enabled ? console.log : () => {},
+    warn: enabled ? console.warn : () => {},
+    error: enabled ? console.error : () => {},
+  };
+}
+
+/**
+ * Create a test logger for E2E integration tests
+ * Uses DEBUG_ADT_E2E_TESTS flag
+ */
+export function createE2ETestsLogger() {
+  const enabled = isDebugEnabled('e2e');
+  return {
+    debug: enabled ? console.log : () => {},
+    info: enabled ? console.log : () => {},
+    warn: enabled ? console.warn : () => {},
+    error: enabled ? console.error : () => {},
+  };
 }

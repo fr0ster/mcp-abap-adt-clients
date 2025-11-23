@@ -31,6 +31,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { create } from './create';
 import { lockStructure } from './lock';
 import { upload } from './update';
@@ -42,13 +43,6 @@ import { validateStructureName } from './validation';
 import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams } from './types';
 import { ValidationResult } from '../shared/validation';
 import { getStructureSource } from './read';
-
-export interface StructureBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface StructureBuilderConfig {
   structureName: string;
@@ -79,14 +73,14 @@ export interface StructureBuilderState {
 
 export class StructureBuilder {
   private connection: AbapConnection;
-  private logger: StructureBuilderLogger;
+  private logger: IAdtLogger;
   private config: StructureBuilderConfig;
   private lockHandle?: string;
   private state: StructureBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: StructureBuilderLogger,
+    logger: IAdtLogger,
     config: StructureBuilderConfig
   ) {
     this.connection = connection;
@@ -229,7 +223,7 @@ export class StructureBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Structure locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Structure locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

@@ -11,6 +11,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
 import { CreateFunctionGroupParams } from './types';
@@ -21,13 +22,6 @@ import { activateFunctionGroup } from './activation';
 import { deleteFunctionGroup } from './delete';
 import { checkFunctionGroup } from './check';
 import { getFunctionGroup } from './read';
-
-export interface FunctionGroupBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface FunctionGroupBuilderConfig {
   functionGroupName: string;
@@ -54,14 +48,14 @@ export interface FunctionGroupBuilderState {
 
 export class FunctionGroupBuilder {
   private connection: AbapConnection;
-  private logger: FunctionGroupBuilderLogger;
+  private logger: IAdtLogger;
   private config: FunctionGroupBuilderConfig;
   private lockHandle?: string;
   private state: FunctionGroupBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: FunctionGroupBuilderLogger,
+    logger: IAdtLogger,
     config: FunctionGroupBuilderConfig
   ) {
     this.connection = connection;
@@ -163,7 +157,7 @@ export class FunctionGroupBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Function group locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Function group locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

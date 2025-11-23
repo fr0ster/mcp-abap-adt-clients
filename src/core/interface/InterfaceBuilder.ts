@@ -12,6 +12,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getTimeout } from '@mcp-abap-adt/connection';
+import { IAdtLogger } from '../../utils/logger';
 import { validateInterfaceName } from './validation';
 import { create as createInterfaceObject, generateInterfaceTemplate } from './create';
 import { lockInterface } from './lock';
@@ -22,13 +23,6 @@ import { activateInterface } from './activation';
 import { deleteInterface } from './delete';
 import { getInterfaceSource } from './read';
 import { get } from 'http';
-
-export interface InterfaceBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface InterfaceBuilderConfig {
   interfaceName: string;
@@ -57,7 +51,7 @@ export interface InterfaceBuilderState {
 
 export class InterfaceBuilder {
   private connection: AbapConnection;
-  private logger: InterfaceBuilderLogger;
+  private logger: IAdtLogger;
   private config: InterfaceBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -65,7 +59,7 @@ export class InterfaceBuilder {
 
   constructor(
     connection: AbapConnection,
-    logger: InterfaceBuilderLogger,
+    logger: IAdtLogger,
     config: InterfaceBuilderConfig
   ) {
     this.connection = connection;
@@ -181,7 +175,7 @@ export class InterfaceBuilder {
         this.config.onLock(lockData.lockHandle);
       }
 
-      this.logger.info?.('Interface locked, handle:', lockData.lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Interface locked, handle:', lockData.lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

@@ -341,13 +341,70 @@ class CustomAbapClient {
 
 ## Interfaces
 
+### Logger Interface
+
+All Builders use a unified `IAdtLogger` interface for logging:
+
+```typescript
+// src/utils/logger.ts
+export interface IAdtLogger {
+  debug?(message: string, ...args: unknown[]): void;
+  info?(message: string, ...args: unknown[]): void;
+  warn?(message: string, ...args: unknown[]): void;
+  error?(message: string, ...args: unknown[]): void;
+}
+
+// Empty logger for silent operation
+export const emptyLogger: IAdtLogger = {};
+```
+
+**Features:**
+- All methods are optional (using `?`)
+- Enables silent operation when logging is disabled
+- Unified interface across all Builders
+- Compatible with console, winston, pino, and other loggers
+
+**Usage in Builders:**
+
+```typescript
+import { IAdtLogger, emptyLogger } from '../../utils/logger';
+
+export class ClassBuilder {
+  private logger: IAdtLogger;
+
+  constructor(
+    connection: AbapConnection,
+    config: ClassBuilderConfig,
+    logger?: IAdtLogger
+  ) {
+    this.connection = connection;
+    this.config = config;
+    this.logger = logger || emptyLogger;
+  }
+
+  async lock(name: string): Promise<string> {
+    const lockHandle = await lockObject(/* ... */);
+    this.logger.info?.('Class locked, handle:', lockHandle);
+    return lockHandle;
+  }
+}
+```
+
+**Note:** Lock handles are always logged in **full** (not truncated), making debugging easier.
+
+### Connection Interface
+
 ```typescript
 interface AbapConnection {
   makeAdtRequest(options: AbapRequestOptions): Promise<AxiosResponse>;
   getBaseUrl(): Promise<string>;
   getAuthHeaders(): Promise<Record<string, string>>;
 }
+```
 
+### Builder Configuration Interfaces
+
+```typescript
 interface CreateClassParams {
   name: string;
   packageName: string;
@@ -366,6 +423,20 @@ interface UpdateDomainParams {
   // ... other parameters
 }
 ```
+
+---
+
+## Debug Flags
+
+The library uses a **5-tier granular debug flag system**:
+
+1. **`DEBUG_CONNECTORS`** - `@mcp-abap-adt/connection` package logs
+2. **`DEBUG_ADT_LIBS`** - Builder implementation and core library functions
+3. **`DEBUG_ADT_TESTS`** - Builder test execution logs
+4. **`DEBUG_ADT_E2E_TESTS`** - E2E integration test logs
+5. **`DEBUG_ADT_HELPER_TESTS`** - Test helper function logs
+
+See [DEBUG.md](../DEBUG.md) for detailed usage.
 
 ---
 

@@ -12,7 +12,7 @@ import { runCheckRunWithSource, parseCheckRunResponse } from '../shared/checkRun
 // Re-export ValidationResult for convenience
 export type { ValidationResult } from '../shared/validation';
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
+const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   error: debugEnabled ? console.error : () => {},

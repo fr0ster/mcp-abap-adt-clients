@@ -2,17 +2,20 @@
  * Unit test for DataElementBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/dataElement/DataElementBuilder.test
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - DataElementBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=dataElement/DataElementBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { DataElementBuilder, DataElementBuilderLogger } from '../../../core/dataElement';
+import { DataElementBuilder } from '../../../core/dataElement';
+import { IAdtLogger } from '../../../utils/logger';
 import { getDataElement } from '../../../core/dataElement/read';
-import { deleteDataElement } from '../../../core/dataElement/delete';
-import { unlockDataElement } from '../../../core/dataElement/unlock';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
-import { getTestLock } from '../../helpers/lockHelper';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -23,6 +26,7 @@ import {
   setTotalTests,
   resetTestCounter
 } from '../../helpers/builderTestLogger';
+import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -42,21 +46,18 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
+// E2E tests use DEBUG_ADT_E2E_TESTS for test code
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+// Library code (DataElementBuilder) uses DEBUG_ADT_LIBS
 
-const builderLogger: DataElementBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('DataElementBuilder', () => {
   let connection: AbapConnection;
@@ -76,7 +77,7 @@ describe('DataElementBuilder', () => {
       isCloudSystem = await isCloudEnvironment(connection);
       hasConfig = true;
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -196,15 +197,15 @@ describe('DataElementBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'DataElementBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'DataElementBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'DataElementBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !dataElementName) {
-        logBuilderTestSkip(builderLogger, 'DataElementBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'DataElementBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -259,7 +260,7 @@ describe('DataElementBuilder', () => {
       expect(state.errors.length).toBe(0);
 
         // Log success BEFORE finally block to ensure it's displayed
-        logBuilderTestSuccess(builderLogger, 'DataElementBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'DataElementBuilder - full workflow');
       } catch (error: any) {
         // Extract error message from error object (may be in message or response.data)
         const errorMsg = error.message || '';
@@ -268,12 +269,12 @@ describe('DataElementBuilder', () => {
         const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
         // "Already exists" errors should fail the test (cleanup must work)
-        logBuilderTestError(builderLogger, 'DataElementBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'DataElementBuilder - full workflow', error);
         throw error;
       } finally {
         // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
-        logBuilderTestEnd(builderLogger, 'DataElementBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'DataElementBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -284,23 +285,23 @@ describe('DataElementBuilder', () => {
       const standardObject = resolveStandardObject('dataElement', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'DataElementBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'DataElementBuilder - read standard object', {
           name: 'read_standard',
           params: {}
         });
-        logBuilderTestSkip(builderLogger, 'DataElementBuilder - read standard object',
+        logBuilderTestSkip(testsLogger, 'DataElementBuilder - read standard object',
           `Standard data element not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
         return;
       }
 
       const standardDataElementName = standardObject.name;
-      logBuilderTestStart(builderLogger, 'DataElementBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'DataElementBuilder - read standard object', {
         name: 'read_standard',
         params: { data_element_name: standardDataElementName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'DataElementBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'DataElementBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
@@ -322,12 +323,12 @@ describe('DataElementBuilder', () => {
         expect(result).toBeDefined();
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'DataElementBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'DataElementBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'DataElementBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'DataElementBuilder - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'DataElementBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'DataElementBuilder - read standard object');
       }
     }, getTimeout('test'));
   });

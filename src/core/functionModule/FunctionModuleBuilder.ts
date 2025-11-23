@@ -11,6 +11,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { validateFunctionModuleName } from './validation';
 import { create } from './create';
 import { lockFunctionModule } from './lock';
@@ -22,13 +23,6 @@ import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
 import { deleteFunctionModule } from './delete';
 import { getFunctionSource } from './read';
-
-export interface FunctionModuleBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface FunctionModuleBuilderConfig {
   functionGroupName: string;
@@ -57,7 +51,7 @@ export interface FunctionModuleBuilderState {
 
 export class FunctionModuleBuilder {
   private connection: AbapConnection;
-  private logger: FunctionModuleBuilderLogger;
+  private logger: IAdtLogger;
   private config: FunctionModuleBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -65,7 +59,7 @@ export class FunctionModuleBuilder {
 
   constructor(
     connection: AbapConnection,
-    logger: FunctionModuleBuilderLogger,
+    logger: IAdtLogger,
     config: FunctionModuleBuilderConfig
   ) {
     this.connection = connection;
@@ -183,7 +177,7 @@ export class FunctionModuleBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Function module locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Function module locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

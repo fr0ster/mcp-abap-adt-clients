@@ -33,7 +33,7 @@ export async function checkDomainSyntax(
 
     if (hasCheckedMessage) {
       // This is expected behavior - domain was already checked, return response anyway
-      if (process.env.DEBUG_TESTS === 'true') {
+      if (process.env.DEBUG_ADT_LIBS === 'true') {
         console.warn(`Check warning for domain ${domainName}: ${errorMessage} (domain was already checked)`);
       }
       return response; // Return response anyway

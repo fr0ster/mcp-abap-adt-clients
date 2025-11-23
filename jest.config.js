@@ -27,8 +27,9 @@ module.exports = {
     '/dist/',
     '/e2e/', // E2E tests should be run separately
   ],
-  // Force sequential execution for integration tests (--runInBand in package.json)
-  // Integration tests must run sequentially to avoid conflicts with shared SAP objects
+  // Force sequential execution for all tests (single worker, no parallelism)
+  // Integration tests MUST run sequentially to avoid conflicts with shared SAP objects
   maxWorkers: 1,
+  maxConcurrency: 1, // Only run 1 test suite at a time
 };
 

@@ -199,8 +199,8 @@ export async function updateDataElementInternal(
     'Content-Type': 'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8'
   };
 
-  // Debug: log XML when DEBUG_TESTS is enabled (formatted for readability)
-  if (process.env.DEBUG_TESTS === 'true') {
+  // Debug: log XML when DEBUG_ADT_LIBS is enabled (formatted for readability)
+  if (process.env.DEBUG_ADT_LIBS === 'true') {
     console.log('[UPDATE XML]');
     // Format XML with indentation for readability
     try {

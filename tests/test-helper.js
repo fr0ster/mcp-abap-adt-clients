@@ -389,6 +389,35 @@ function resolveStandardObject(objectType, isCloud, testCase = null) {
   return null;
 }
 
+/**
+ * Get operation delay in milliseconds
+ * @param {string} operation - Operation type ('lock', 'unlock', 'update', 'create', or 'default')
+ * @param {object} [testCase] - Optional test case to check for override
+ * @returns {number} Delay in milliseconds
+ */
+function getOperationDelay(operation = 'default', testCase = null) {
+  const config = loadTestConfig();
+  const defaultDelay = 3000; // Default 3 seconds
+  
+  // Check for test case specific override first
+  if (testCase?.params?.operation_delays?.[operation]) {
+    return testCase.params.operation_delays[operation];
+  }
+  
+  // Check for global operation delays in test_settings
+  const globalDelays = config.test_settings?.operation_delays;
+  if (globalDelays?.[operation]) {
+    return globalDelays[operation];
+  }
+  
+  // Fall back to legacy delay setting or default
+  if (config.test_settings?.timeouts?.delay) {
+    return config.test_settings.timeouts.delay;
+  }
+  
+  return defaultDelay;
+}
+
 module.exports = {
   loadTestConfig,
   getEnabledTestCase,
@@ -409,5 +438,6 @@ module.exports = {
   getTimeout,  // Add getTimeout from root helper
   getTestTimeout,  // Add getTestTimeout from root helper
   resolveStandardObject,  // Add resolveStandardObject helper
+  getOperationDelay,  // Get delay for SAP operations
 };
 

@@ -3,7 +3,7 @@
  */
 
 export * from './types';
-export { PackageBuilder, type PackageBuilderConfig, type PackageBuilderLogger, type PackageBuilderState } from './PackageBuilder';
+export { PackageBuilder, type PackageBuilderConfig, type PackageBuilderState } from './PackageBuilder';
 export { checkPackageDeletion, parsePackageDeletionCheck, deletePackage, type DeletePackageParams } from './delete';
 export { getPackage } from './read';
 export { checkPackage } from './check';

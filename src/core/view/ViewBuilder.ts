@@ -31,6 +31,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { createView } from './create';
 import { updateView } from './update';
 import { lockDDLS } from './lock';
@@ -42,13 +43,6 @@ import { validateViewName } from './validation';
 import { CreateViewParams, UpdateViewSourceParams } from './types';
 import { ValidationResult } from '../shared/validation';
 import { getViewSource } from './read';
-
-export interface ViewBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface ViewBuilderConfig {
   viewName: string;
@@ -77,14 +71,14 @@ export interface ViewBuilderState {
 
 export class ViewBuilder {
   private connection: AbapConnection;
-  private logger: ViewBuilderLogger;
+  private logger: IAdtLogger;
   private config: ViewBuilderConfig;
   private lockHandle?: string;
   private state: ViewBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: ViewBuilderLogger,
+    logger: IAdtLogger,
     config: ViewBuilderConfig
   ) {
     this.connection = connection;
@@ -159,6 +153,9 @@ export class ViewBuilder {
       
       this.logger.info?.('Creating view:', this.config.viewName);
       
+      // Enable stateful session mode for create operation
+      this.connection.setSessionType("stateful");
+      
       const params: CreateViewParams = {
         view_name: this.config.viewName,
         package_name: this.config.packageName,
@@ -200,7 +197,7 @@ export class ViewBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('View locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('View locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

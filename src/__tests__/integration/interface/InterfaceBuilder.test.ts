@@ -2,13 +2,18 @@
  * Unit test for InterfaceBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/interface/InterfaceBuilder.test
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - InterfaceBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=interface/InterfaceBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { InterfaceBuilder, InterfaceBuilderLogger } from '../../../core/interface';
+import { InterfaceBuilder } from '../../../core/interface';
+import { IAdtLogger } from '../../../utils/logger';
 import { getInterface } from '../../../core/interface/read';
-import { deleteInterface } from '../../../core/interface/delete';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
@@ -20,17 +25,19 @@ import {
   logBuilderTestEnd,
   logBuilderTestStep
 } from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
+getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  resolveStandardObject
+  resolveStandardObject,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -39,21 +46,14 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => { },
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => { },
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => { },
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => { },
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => { },
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
 
-const builderLogger: InterfaceBuilderLogger = {
-  debug: debugEnabled ? console.log : () => { },
-  info: debugEnabled ? console.log : () => { },
-  warn: debugEnabled ? console.warn : () => { },
-  error: debugEnabled ? console.error : () => { },
-};
+// Library code (InterfaceBuilder) uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('InterfaceBuilder', () => {
   let connection: AbapConnection;
@@ -69,7 +69,7 @@ describe('InterfaceBuilder', () => {
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -178,15 +178,15 @@ describe('InterfaceBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'InterfaceBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'InterfaceBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'InterfaceBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'InterfaceBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !interfaceName) {
-        logBuilderTestSkip(builderLogger, 'InterfaceBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'InterfaceBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -202,20 +202,29 @@ describe('InterfaceBuilder', () => {
         logBuilderTestStep('create');
         await builder.create();
         
-        // Wait for SAP to finish create operation (includes lock/unlock/activate internally)
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Wait for SAP to commit the object creation (metadata only)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
 
         logBuilderTestStep('lock');
         await builder.lock();
+        
+        // Wait for SAP to commit lock operation
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
 
         logBuilderTestStep('update');
         await builder.update();
+        
+        // Wait for SAP to commit update operation
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
 
         logBuilderTestStep('check(inactive)');
         await builder.check('inactive');
 
         logBuilderTestStep('unlock');
         await builder.unlock();
+        
+        // Wait for SAP to commit unlock operation
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
 
         logBuilderTestStep('activate');
         await builder.activate();
@@ -231,14 +240,14 @@ describe('InterfaceBuilder', () => {
         expect(state.activateResult).toBeDefined();
         expect(state.errors.length).toBe(0);
 
-        logBuilderTestSuccess(builderLogger, 'InterfaceBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'InterfaceBuilder - full workflow');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'InterfaceBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'InterfaceBuilder - full workflow', error);
         throw error;
       } finally {
         // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => { });
-        logBuilderTestEnd(builderLogger, 'InterfaceBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'InterfaceBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -249,7 +258,7 @@ describe('InterfaceBuilder', () => {
       const standardObject = resolveStandardObject('interface', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'InterfaceBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'InterfaceBuilder - read standard object', {
           name: 'read_standard',
           params: {}
         });
@@ -262,13 +271,13 @@ describe('InterfaceBuilder', () => {
       }
 
       const standardInterfaceName = standardObject.name;
-      logBuilderTestStart(builderLogger, 'InterfaceBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'InterfaceBuilder - read standard object', {
         name: 'read_standard',
         params: { interface_name: standardInterfaceName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'InterfaceBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'InterfaceBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
@@ -287,12 +296,12 @@ describe('InterfaceBuilder', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'InterfaceBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'InterfaceBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'InterfaceBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'InterfaceBuilder - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'InterfaceBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'InterfaceBuilder - read standard object');
       }
     }, getTimeout('test'));
   });

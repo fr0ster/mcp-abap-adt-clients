@@ -6,7 +6,7 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../shared/systemInfo';
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
+const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   error: debugEnabled ? console.error : () => {},

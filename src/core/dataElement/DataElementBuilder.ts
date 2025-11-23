@@ -11,6 +11,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { create } from './create';
 import { getDataElement } from './read';
 import { lockDataElement } from './lock';
@@ -21,13 +22,6 @@ import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { deleteDataElement } from './delete';
 import { validateObjectName, ValidationResult } from '../shared/validation';
-
-export interface DataElementBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface DataElementBuilderConfig {
   dataElementName: string;
@@ -61,14 +55,14 @@ export interface DataElementBuilderState {
 
 export class DataElementBuilder {
   private connection: AbapConnection;
-  private logger: DataElementBuilderLogger;
+  private logger: IAdtLogger;
   private config: DataElementBuilderConfig;
   private lockHandle?: string;
   private state: DataElementBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: DataElementBuilderLogger,
+    logger: IAdtLogger,
     config: DataElementBuilderConfig
   ) {
     this.connection = connection;
@@ -290,7 +284,7 @@ export class DataElementBuilder {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Data element locked, handle:', lockHandle.substring(0, 10) + '...');
+      this.logger.info?.('Data element locked, handle:', lockHandle);
       return this;
     } catch (error: any) {
       this.state.errors.push({

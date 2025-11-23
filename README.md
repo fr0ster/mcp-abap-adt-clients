@@ -276,14 +276,62 @@ Refer to the TypeScript typings (`src/index.ts`) for the full API surface.
 ## Documentation
 
 - **[Stateful Session Guide](docs/STATEFUL_SESSION_GUIDE.md)** – how Builders and clients manage `sessionId`, `lockHandle`, and the lock registry
+- **[Operation Delays](docs/OPERATION_DELAYS.md)** – configurable delays for SAP operations in tests (sequential execution, timing issues)
 - **[Architecture](docs/reference/ARCHITECTURE.md)** – package structure and design decisions
 - **[Builder Test Pattern](docs/BUILDER_TEST_PATTERN.md)** – test structure and patterns for contributors
 - **[Test Configuration Schema](docs/TEST_CONFIG_SCHEMA.md)** – YAML test configuration reference
 
-## Logging
+## Logging and Debugging
 
-- `DEBUG_TESTS=true` – verbose step-by-step logging for tests
-- `LOG_LOCKS=false` – disable `[LOCK] ...` lines (enabled by default)
+The library uses a **5-tier granular debug flag system** for different code layers:
+
+### Debug Environment Variables
+
+```bash
+# Connection package logs (HTTP, sessions, CSRF tokens)
+DEBUG_CONNECTORS=true npm test
+
+# Builder implementation and core library logs
+DEBUG_ADT_LIBS=true npm test
+
+# Builder test execution logs
+DEBUG_ADT_TESTS=true npm test
+
+# E2E integration test logs
+DEBUG_ADT_E2E_TESTS=true npm test
+
+# Test helper function logs
+DEBUG_ADT_HELPER_TESTS=true npm test
+
+# Enable ALL ADT scopes at once
+DEBUG_ADT_TESTS=true npm test
+```
+
+### Logger Interface
+
+All Builders use a unified `IAdtLogger` interface:
+
+```typescript
+import { IAdtLogger, emptyLogger } from '@mcp-abap-adt/adt-clients';
+
+// Custom logger example
+const logger: IAdtLogger = {
+  debug: (msg, ...args) => console.debug(msg, ...args),
+  info: (msg, ...args) => console.info(msg, ...args),
+  warn: (msg, ...args) => console.warn(msg, ...args),
+  error: (msg, ...args) => console.error(msg, ...args),
+};
+
+// Use with Builders
+const builder = new ClassBuilder(connection, config, logger);
+
+// Or use emptyLogger for silent operation
+const silentBuilder = new ClassBuilder(connection, config, emptyLogger);
+```
+
+**Note:** All logger methods are optional. Lock handles are always logged in full (not truncated).
+
+See [docs/DEBUG.md](docs/DEBUG.md) for detailed debugging guide.
 
 ## Changelog
 

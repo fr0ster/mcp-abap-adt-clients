@@ -2,11 +2,17 @@
  * Unit test for TableBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- integration/table/TableBuilder
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - TableBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=table/TableBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { TableBuilder, TableBuilderLogger } from '../../../core/table';
+import { TableBuilder } from '../../../core/table';
+import { IAdtLogger } from '../../../utils/logger';
 import { getTable } from '../../../core/table/read';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -19,17 +25,19 @@ import {
   logBuilderTestStep,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
+getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  resolveStandardObject
+  resolveStandardObject,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -38,21 +46,15 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
 
-const builderLogger: TableBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('TableBuilder', () => {
   let connection: AbapConnection;
@@ -68,7 +70,7 @@ describe('TableBuilder', () => {
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -177,10 +179,10 @@ describe('TableBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'TableBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'TableBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'TableBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'TableBuilder - full workflow', skipReason);
         return;
       }
 
@@ -207,15 +209,19 @@ describe('TableBuilder', () => {
           })
           .then(async b => {
             // Wait for SAP to finish create operation (includes lock/unlock internally)
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock');
             return b.lock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit lock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
             logBuilderTestStep('update');
             return b.update();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit update operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
             logBuilderTestStep('check(inactive)');
             return b.check('abapCheckRun');
           })
@@ -223,7 +229,9 @@ describe('TableBuilder', () => {
             logBuilderTestStep('unlock');
             return b.unlock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit unlock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate');
             return b.activate();
           })
@@ -241,7 +249,7 @@ describe('TableBuilder', () => {
         expect(state.activateResult).toBeDefined();
         expect(state.errors.length).toBe(0);
 
-        logBuilderTestSuccess(builderLogger, 'TableBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'TableBuilder - full workflow');
       } catch (error: any) {
         const statusText = getHttpStatusText(error);
         // Extract error message from error object
@@ -254,11 +262,11 @@ describe('TableBuilder', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(builderLogger, 'TableBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'TableBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
         await builder.forceUnlock().catch(() => {});
-        logBuilderTestEnd(builderLogger, 'TableBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'TableBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -269,23 +277,23 @@ describe('TableBuilder', () => {
       const standardObject = resolveStandardObject('table', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'TableBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'TableBuilder - read standard object', {
           name: 'read_standard',
           params: {}
         });
-        logBuilderTestSkip(builderLogger, 'TableBuilder - read standard object',
+        logBuilderTestSkip(testsLogger, 'TableBuilder - read standard object',
           `Standard table not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
         return;
       }
 
       const standardTableName = standardObject.name;
-      logBuilderTestStart(builderLogger, 'TableBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'TableBuilder - read standard object', {
         name: 'read_standard',
         params: { table_name: standardTableName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'TableBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'TableBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
@@ -307,12 +315,12 @@ describe('TableBuilder', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'TableBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'TableBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'TableBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'TableBuilder - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'TableBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'TableBuilder - read standard object');
       }
     }, getTimeout('test'));
   });

@@ -26,16 +26,10 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
+import { IAdtLogger } from '../../utils/logger';
 import { createTransport } from './create';
 import { getTransport } from './read';
 import { CreateTransportParams } from './types';
-
-export interface TransportBuilderLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
 
 export interface TransportBuilderConfig {
   description: string;
@@ -54,13 +48,13 @@ export interface TransportBuilderState {
 
 export class TransportBuilder {
   private connection: AbapConnection;
-  private logger: TransportBuilderLogger;
+  private logger: IAdtLogger;
   private config: TransportBuilderConfig;
   private state: TransportBuilderState;
 
   constructor(
     connection: AbapConnection,
-    logger: TransportBuilderLogger,
+    logger: IAdtLogger,
     config: TransportBuilderConfig
   ) {
     this.connection = connection;

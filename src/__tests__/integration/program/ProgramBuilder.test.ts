@@ -2,12 +2,17 @@
  * Unit test for ProgramBuilder
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/program/ProgramBuilder.test
+ * Enable debug logs:
+ *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_LIBS=true        - ProgramBuilder library logs
+ *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
+ *
+ * Run: npm test -- --testPathPattern=program/ProgramBuilder
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { ProgramBuilder, ProgramBuilderLogger } from '../../../core/program';
-import { deleteProgram } from '../../../core/program/delete';
+import { ProgramBuilder } from '../../../core/program';
+import { IAdtLogger } from '../../../utils/logger';
 import { getProgramSource } from '../../../core/program/read';
 import { getConfig } from '../../helpers/sessionConfig';
 import { isCloudEnvironment } from '../../../core/shared/systemInfo';
@@ -19,17 +24,19 @@ import {
   logBuilderTestEnd,
   logBuilderTestStep
 } from '../../helpers/builderTestLogger';
+import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
+getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  resolveStandardObject
+  resolveStandardObject,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -38,21 +45,14 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const connectionLogger: ILogger = {
-  debug: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  info: debugEnabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-  warn: debugEnabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-  error: debugEnabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-  csrfToken: debugEnabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-};
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
 
-const builderLogger: ProgramBuilderLogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+// Library code (ClassBuilder) uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('ProgramBuilder', () => {
   let connection: AbapConnection;
@@ -68,7 +68,7 @@ describe('ProgramBuilder', () => {
       // Check if this is a cloud system (programs are not supported in cloud)
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      builderLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -183,15 +183,15 @@ describe('ProgramBuilder', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(builderLogger, 'ProgramBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'ProgramBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(builderLogger, 'ProgramBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'ProgramBuilder - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !programName) {
-        logBuilderTestSkip(builderLogger, 'ProgramBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'ProgramBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -209,11 +209,13 @@ describe('ProgramBuilder', () => {
           })
           .then(async b => {
             // Wait for SAP to finish create operation (includes lock/unlock internally)
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock');
             return b.lock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit lock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
             logBuilderTestStep('check with source code (before update)');
             return b.check('inactive', sourceCode);
           })
@@ -221,7 +223,9 @@ describe('ProgramBuilder', () => {
             logBuilderTestStep('update');
             return b.update();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit update operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
             logBuilderTestStep('check(inactive)');
             return b.check('inactive');
           })
@@ -229,7 +233,9 @@ describe('ProgramBuilder', () => {
             logBuilderTestStep('unlock');
             return b.unlock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit unlock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate');
             return b.activate();
           })
@@ -247,14 +253,14 @@ describe('ProgramBuilder', () => {
       expect(state.activateResult).toBeDefined();
       expect(state.errors.length).toBe(0);
 
-        logBuilderTestSuccess(builderLogger, 'ProgramBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'ProgramBuilder - full workflow');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'ProgramBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'ProgramBuilder - full workflow', error);
         throw error;
       } finally {
         // Cleanup: force unlock in case of failure
         await builder.forceUnlock().catch(() => {});
-        logBuilderTestEnd(builderLogger, 'ProgramBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'ProgramBuilder - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -262,12 +268,12 @@ describe('ProgramBuilder', () => {
   describe('Read standard object', () => {
     it('should read standard SAP program', async () => {
       if (!hasConfig) {
-        logBuilderTestSkip(builderLogger, 'ProgramBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'ProgramBuilder - read standard object', 'No SAP configuration');
         return;
       }
 
       if (isCloudSystem) {
-        logBuilderTestSkip(builderLogger, 'ProgramBuilder - read standard object', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
+        logBuilderTestSkip(testsLogger, 'ProgramBuilder - read standard object', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
         return;
       }
 
@@ -275,12 +281,12 @@ describe('ProgramBuilder', () => {
       const standardObject = resolveStandardObject('program', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(builderLogger, 'ProgramBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'ProgramBuilder - read standard object', {
           name: 'read_standard',
           params: {}
         });
         logBuilderTestSkip(
-          builderLogger,
+          testsLogger,
           'ProgramBuilder - read standard object',
           'Standard program not configured for on-premise environment'
         );
@@ -288,7 +294,7 @@ describe('ProgramBuilder', () => {
       }
 
       const standardProgramName = standardObject.name;
-      logBuilderTestStart(builderLogger, 'ProgramBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'ProgramBuilder - read standard object', {
         name: 'read_standard',
         params: { program_name: standardProgramName }
       });
@@ -308,12 +314,12 @@ describe('ProgramBuilder', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
 
-        logBuilderTestSuccess(builderLogger, 'ProgramBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'ProgramBuilder - read standard object');
       } catch (error) {
-        logBuilderTestError(builderLogger, 'ProgramBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'ProgramBuilder - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(builderLogger, 'ProgramBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'ProgramBuilder - read standard object');
       }
     }, getTimeout('test'));
   });
