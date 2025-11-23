@@ -6,7 +6,7 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 import { lockDomain } from './lock';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';

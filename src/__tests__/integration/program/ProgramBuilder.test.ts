@@ -15,7 +15,7 @@ import { ProgramBuilder } from '../../../core/program';
 import { IAdtLogger } from '../../../utils/logger';
 import { getProgramSource } from '../../../core/program/read';
 import { getConfig } from '../../helpers/sessionConfig';
-import { isCloudEnvironment } from '../../../core/shared/systemInfo';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   logBuilderTestError,
   logBuilderTestSkip,

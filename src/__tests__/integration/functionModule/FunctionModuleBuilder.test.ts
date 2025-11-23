@@ -16,7 +16,7 @@ import { IAdtLogger } from '../../../utils/logger';
 import { FunctionGroupBuilder } from '../../../core/functionGroup';
 import { getFunction } from '../../../core/functionModule/read';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
-import { isCloudEnvironment } from '../../../core/shared/systemInfo';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
 import {

@@ -78,7 +78,7 @@ export async function createTransport(
   // If username not found in config, try to get from system information
   if (!username) {
     try {
-      const { getSystemInformation } = await import('../shared/systemInfo');
+      const { getSystemInformation } = await import('../../utils/systemInfo');
       const systemInfo = await getSystemInformation(connection);
       if (systemInfo?.userName) {
         username = systemInfo.userName;

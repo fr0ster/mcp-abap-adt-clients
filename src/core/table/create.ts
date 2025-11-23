@@ -11,7 +11,7 @@ import { unlockTable, deleteTableLock } from './unlock';
 import { activateTable } from './activation';
 import { runTableCheckRun } from './check';
 import { CreateTableParams } from './types';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
  * Parse XML response to extract table creation information

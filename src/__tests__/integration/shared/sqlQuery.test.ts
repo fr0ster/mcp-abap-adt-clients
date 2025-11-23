@@ -9,7 +9,7 @@
 
 import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { getSqlQuery } from '../../../core/shared/sqlQuery';
-import { isCloudEnvironment } from '../../../core/shared/systemInfo';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {

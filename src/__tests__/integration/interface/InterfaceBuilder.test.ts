@@ -14,7 +14,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { InterfaceBuilder } from '../../../core/interface';
 import { IAdtLogger } from '../../../utils/logger';
 import { getInterface } from '../../../core/interface/read';
-import { isCloudEnvironment } from '../../../core/shared/systemInfo';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
 import {

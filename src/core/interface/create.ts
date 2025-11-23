@@ -7,7 +7,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
  * Generate minimal interface source code if not provided

@@ -4,7 +4,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } from '../shared/checkRun';
+import { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } from '../../utils/checkRun';
 
 /**
  * Check function group code (syntax, compilation, rules)
@@ -30,7 +30,7 @@ export async function checkFunctionGroup(
   sourceCode?: string,
   sessionId?: string
 ): Promise<AxiosResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../shared/checkRun');
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
 
   let response: AxiosResponse;
 

@@ -41,7 +41,7 @@ import { activateDDLS } from './activation';
 import { deleteView } from './delete';
 import { validateViewName } from './validation';
 import { CreateViewParams, UpdateViewSourceParams } from './types';
-import { ValidationResult } from '../shared/validation';
+import { ValidationResult } from '../../utils/validation';
 import { getViewSource } from './read';
 
 export interface ViewBuilderConfig {

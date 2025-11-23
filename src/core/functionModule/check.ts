@@ -5,7 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { parseCheckRunResponse } from '../shared/checkRun';
+import { parseCheckRunResponse } from '../../utils/checkRun';
 
 /**
  * Build check run XML payload for function module

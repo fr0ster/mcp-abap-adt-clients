@@ -12,7 +12,7 @@ import { CreatePackageParams } from './types';
  * Note: masterSystem and responsible should only be included for cloud systems
  */
 async function buildUpdatePackageXml(connection: AbapConnection, args: CreatePackageParams): Promise<string> {
-  const { getSystemInformation } = await import('../shared/systemInfo');
+  const { getSystemInformation } = await import('../../utils/systemInfo');
   
   // Get system information - only for cloud systems
   const systemInfo = await getSystemInformation(connection);

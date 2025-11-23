@@ -15,7 +15,7 @@ import { IAdtLogger } from '../../utils/logger';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
 import { CreateFunctionGroupParams } from './types';
-import { ValidationResult } from '../shared/validation';
+import { ValidationResult } from '../../utils/validation';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
 import { activateFunctionGroup } from './activation';

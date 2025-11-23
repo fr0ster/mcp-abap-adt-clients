@@ -6,11 +6,11 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { ValidationResult } from '../shared/validation';
-import { runCheckRunWithSource, parseCheckRunResponse } from '../shared/checkRun';
+import { ValidationResult } from '../../utils/validation';
+import { runCheckRunWithSource, parseCheckRunResponse } from '../../utils/checkRun';
 
 // Re-export ValidationResult for convenience
-export type { ValidationResult } from '../shared/validation';
+export type { ValidationResult } from '../../utils/validation';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 const logger = {
@@ -252,7 +252,7 @@ export async function validateClassSource(
   version: 'inactive' | 'active' = 'active',
   sessionId?: string
 ): Promise<AxiosResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../shared/checkRun');
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
 
   let response: AxiosResponse;
 

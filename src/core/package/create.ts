@@ -8,7 +8,7 @@ import { validatePackageBasic, validatePackageFull } from './validation';
 import { checkTransportRequirements } from './transportCheck';
 import { checkPackage } from './check';
 import { CreatePackageParams } from './types';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
  * Step 4: Create package

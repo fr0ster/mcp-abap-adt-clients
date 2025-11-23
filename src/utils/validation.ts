@@ -4,7 +4,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName } from './internalUtils';
 
 export interface ValidationResult {
   valid: boolean;

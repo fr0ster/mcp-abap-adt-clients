@@ -21,7 +21,7 @@ import { checkDataElement } from './check';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { deleteDataElement } from './delete';
-import { validateObjectName, ValidationResult } from '../shared/validation';
+import { validateObjectName, ValidationResult } from '../../utils/validation';
 
 export interface DataElementBuilderConfig {
   dataElementName: string;

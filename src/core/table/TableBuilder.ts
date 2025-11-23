@@ -42,7 +42,7 @@ import { deleteTable } from './delete';
 import { validateTableName } from './validation';
 import { CreateTableParams } from './types';
 import { UpdateTableParams } from './update';
-import { ValidationResult } from '../shared/validation';
+import { ValidationResult } from '../../utils/validation';
 import { getTableSource } from './read';
 
 export interface TableBuilderConfig {

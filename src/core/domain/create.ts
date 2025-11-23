@@ -10,7 +10,7 @@ import { acquireLockHandle } from './lock';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 import { CreateDomainParams } from './types';
 
 /**

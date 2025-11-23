@@ -10,7 +10,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { PackageBuilder } from '../../../core/package';
 import { IAdtLogger } from '../../../utils/logger';
 import { getPackage } from '../../../core/package/read';
-import { isCloudEnvironment } from '../../../core/shared/systemInfo';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,

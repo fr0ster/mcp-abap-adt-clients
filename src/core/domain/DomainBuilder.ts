@@ -43,8 +43,8 @@ import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { deleteDomain } from './delete';
 import { FixedValue } from './types';
-import { validateObjectName, ValidationResult } from '../shared/validation';
-import { getSystemInformation } from '../shared/systemInfo';
+import { validateObjectName, ValidationResult } from '../../utils/validation';
+import { getSystemInformation } from '../../utils/systemInfo';
 import { getDomain, getDomainTransport } from './read';
 
 export interface DomainBuilderConfig {

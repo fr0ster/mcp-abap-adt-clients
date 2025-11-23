@@ -15,7 +15,7 @@ import { IAdtLogger } from '../../utils/logger';
 import { validateProgramName } from './validation';
 import { create, CreateProgramParams } from './create';
 import { lockProgram } from './lock';
-import { ValidationResult } from '../shared/validation';
+import { ValidationResult } from '../../utils/validation';
 import { checkProgram } from './check';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';

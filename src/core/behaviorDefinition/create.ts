@@ -5,7 +5,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getTimeout } from '@mcp-abap-adt/connection';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 import { BehaviorDefinitionCreateParams } from './types';
 
 /**

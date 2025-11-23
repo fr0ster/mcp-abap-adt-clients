@@ -4,7 +4,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { runCheckRun, parseCheckRunResponse } from '../shared/checkRun';
+import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
 /**
  * Check class code (syntax, compilation, rules)
@@ -30,7 +30,7 @@ export async function checkClass(
   sourceCode?: string,
   sessionId?: string
 ): Promise<AxiosResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../shared/checkRun');
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
 
   let response: AxiosResponse;
 

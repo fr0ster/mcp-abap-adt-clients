@@ -16,7 +16,7 @@ import { IAdtLogger } from '../../utils/logger';
 import { validateInterfaceName } from './validation';
 import { create as createInterfaceObject, generateInterfaceTemplate } from './create';
 import { lockInterface } from './lock';
-import { ValidationResult } from '../shared/validation';
+import { ValidationResult } from '../../utils/validation';
 import { checkInterface } from './check';
 import { unlockInterface } from './unlock';
 import { activateInterface } from './activation';

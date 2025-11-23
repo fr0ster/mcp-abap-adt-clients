@@ -3,7 +3,7 @@
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
-import { validateObjectName, ValidationResult } from '../shared/validation';
+import { validateObjectName, ValidationResult } from '../../utils/validation';
 
 /**
  * Validate structure name

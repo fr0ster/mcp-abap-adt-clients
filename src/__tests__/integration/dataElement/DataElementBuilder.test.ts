@@ -14,7 +14,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { DataElementBuilder } from '../../../core/dataElement';
 import { IAdtLogger } from '../../../utils/logger';
 import { getDataElement } from '../../../core/dataElement/read';
-import { isCloudEnvironment } from '../../../core/shared/systemInfo';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,

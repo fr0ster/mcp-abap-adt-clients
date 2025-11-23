@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.11] - TBD
+
+### Changed
+- **Reorganized internal utilities** – moved internal helper modules from `src/core/shared/` to `src/utils/`:
+  - Moved `systemInfo.ts` – system information and cloud environment detection (used internally by Builders)
+  - Moved `validation.ts` – object name validation utilities (used internally by Builders)
+  - Moved `checkRun.ts` – syntax and consistency check utilities (used internally by Builders)
+  - These utilities are internal implementation details and not exported through public API
+  - `src/core/shared/` now contains only operations exposed through CrudClient/ReadOnlyClient
+  - Updated all imports in Builders, tests, and core modules
+
 ## [0.1.10] - TBD
 
 ### Changed

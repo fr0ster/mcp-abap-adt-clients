@@ -14,7 +14,7 @@ import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/con
 import { FunctionGroupBuilder } from '../../../core/functionGroup';
 import { IAdtLogger } from '../../../utils/logger';
 import { getFunctionGroup } from '../../../core/functionGroup/read';
-import { isCloudEnvironment } from '../../../core/shared/systemInfo';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,

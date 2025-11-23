@@ -6,7 +6,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { runCheckRun } from '../shared/checkRun';
+import { runCheckRun } from '../../utils/checkRun';
 
 /**
  * Check metadata extension syntax

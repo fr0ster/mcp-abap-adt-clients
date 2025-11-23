@@ -8,7 +8,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { lockProgram } from './lock';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 
 export interface CreateProgramParams {
   program_name: string;

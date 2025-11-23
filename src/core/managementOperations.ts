@@ -131,7 +131,7 @@ export async function checkObject(
   type: string,
   version?: string
 ): Promise<AxiosResponse> {
-  const { runCheckRun } = await import('./shared/checkRun');
+  const { runCheckRun } = await import('../utils/checkRun');
   return runCheckRun(connection, type, name, version || 'active', 'abapCheckRun');
 }
 

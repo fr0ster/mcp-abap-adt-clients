@@ -41,7 +41,7 @@ import { activateStructure } from './activation';
 import { deleteStructure } from './delete';
 import { validateStructureName } from './validation';
 import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams } from './types';
-import { ValidationResult } from '../shared/validation';
+import { ValidationResult } from '../../utils/validation';
 import { getStructureSource } from './read';
 
 export interface StructureBuilderConfig {

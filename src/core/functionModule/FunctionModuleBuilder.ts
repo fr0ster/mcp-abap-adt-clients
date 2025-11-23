@@ -17,7 +17,7 @@ import { create } from './create';
 import { lockFunctionModule } from './lock';
 import { update } from './update';
 import { CreateFunctionModuleParams } from './types';
-import { ValidationResult } from '../shared/validation';
+import { ValidationResult } from '../../utils/validation';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';

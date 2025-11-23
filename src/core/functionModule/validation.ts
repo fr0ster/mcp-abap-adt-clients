@@ -5,7 +5,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { validateObjectName, ValidationResult } from '../shared/validation';
+import { validateObjectName, ValidationResult } from '../../utils/validation';
 
 /**
  * Validate function module name
@@ -50,7 +50,7 @@ export async function validateFunctionModuleSource(
   version: 'inactive' | 'active' = 'active',
   sessionId?: string
 ): Promise<AxiosResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../shared/checkRun');
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
 
   // Build object type path for function module
   const objectType = 'function_module';

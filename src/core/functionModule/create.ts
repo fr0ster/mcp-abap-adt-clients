@@ -6,7 +6,7 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 import { lockFunctionModule } from './lock';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
@@ -15,7 +15,7 @@ import { getFunctionGroup } from '../functionGroup/read';
 import { create as createFunctionGroupLowLevel } from '../functionGroup/create';
 import { activateFunctionGroup } from '../functionGroup/activation';
 import { validateFunctionModuleName } from './validation';
-import { validateAndThrow } from '../shared/validation';
+import { validateAndThrow } from '../../utils/validation';
 
 /**
  * Create function module metadata

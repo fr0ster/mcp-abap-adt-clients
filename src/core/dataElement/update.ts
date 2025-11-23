@@ -7,7 +7,7 @@ import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { UpdateDataElementParams } from './types';
-import { getSystemInformation } from '../shared/systemInfo';
+import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
  * Get domain info to extract dataType, length, decimals
