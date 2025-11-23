@@ -7,16 +7,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
-
-export interface MetadataExtensionCreateParams {
-  name: string;
-  description: string;
-  packageName: string;
-  transportRequest?: string;
-  masterLanguage?: string;
-  masterSystem?: string;
-  responsible?: string;
-}
+import { MetadataExtensionCreateParams } from './types';
 
 /**
  * Create a new metadata extension (DDLX)

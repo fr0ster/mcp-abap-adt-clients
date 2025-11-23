@@ -5,12 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface GetWhereUsedParams {
-  object_name: string;
-  object_type: string;
-  detailed?: boolean;
-}
+import { GetWhereUsedParams } from './types';
 
 /**
  * Build object URI based on type and name

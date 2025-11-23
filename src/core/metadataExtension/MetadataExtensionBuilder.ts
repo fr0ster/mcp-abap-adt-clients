@@ -16,32 +16,7 @@ import { updateMetadataExtension } from './update';
 import { checkMetadataExtension } from './check';
 import { activateMetadataExtension } from './activate';
 import { deleteMetadataExtension } from './delete';
-
-export interface MetadataExtensionBuilderConfig {
-  name: string;
-  description: string;
-  packageName?: string;
-  transportRequest?: string;
-  sourceCode?: string;
-  masterLanguage?: string;
-  masterSystem?: string;
-  responsible?: string;
-  sessionId?: string;
-}
-
-export interface MetadataExtensionBuilderState {
-  validationResult?: { valid: boolean; errors?: string[] };
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  readResult?: AxiosResponse;
-  sourceCode?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
+import { MetadataExtensionBuilderConfig, MetadataExtensionBuilderState } from './types';
 
 export class MetadataExtensionBuilder {
   private connection: AbapConnection;

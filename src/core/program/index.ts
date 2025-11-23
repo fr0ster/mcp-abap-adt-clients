@@ -2,4 +2,5 @@
  * Program operations - exports
  */
 
-export { ProgramBuilder, type ProgramBuilderConfig, type ProgramBuilderState } from './ProgramBuilder';
+export * from './types';
+export { ProgramBuilder } from './ProgramBuilder';

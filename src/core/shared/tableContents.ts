@@ -9,11 +9,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface GetTableContentsParams {
-  table_name: string;
-  max_rows?: number;
-}
+import { GetTableContentsParams } from './types';
 
 /**
  * Get table contents via ADT Data Preview API

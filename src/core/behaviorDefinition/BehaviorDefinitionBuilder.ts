@@ -20,33 +20,8 @@ import { update } from './update';
 import { checkImplementation, checkAbap } from './check';
 import { activate } from './activation';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
-import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams } from './types';
+import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams, BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState } from './types';
 import { IAdtLogger } from '../../utils/logger';
-
-export interface BehaviorDefinitionBuilderConfig {
-  name: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  implementationType?: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
-  rootEntity?: string;
-  sourceCode?: string;
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface BehaviorDefinitionBuilderState {
-  validationResult?: AxiosResponse;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  readResult?: AxiosResponse;
-  updateResult?: AxiosResponse;
-  checkResults?: AxiosResponse[];
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteCheckResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
 
 export class BehaviorDefinitionBuilder {
   private connection: AbapConnection;

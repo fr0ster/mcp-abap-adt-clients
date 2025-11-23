@@ -3,4 +3,4 @@
  */
 
 export * from './types';
-export { DataElementBuilder, type DataElementBuilderConfig, type DataElementBuilderState } from './DataElementBuilder';
+export { DataElementBuilder } from './DataElementBuilder';

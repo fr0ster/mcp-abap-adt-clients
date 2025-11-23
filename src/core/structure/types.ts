@@ -1,5 +1,5 @@
 /**
- * Structure types
+ * Structure module type definitions
  */
 
 export interface StructureField {
@@ -19,6 +19,7 @@ export interface StructureInclude {
   suffix?: string;
 }
 
+// Low-level function parameters (snake_case)
 export interface CreateStructureParams {
   structure_name: string;
   description?: string;
@@ -36,3 +37,33 @@ export interface UpdateStructureParams {
   transport_request?: string;
 }
 
+export interface DeleteStructureParams {
+  structure_name: string;
+  transport_request?: string;
+}
+
+// Builder configuration (camelCase)
+export interface StructureBuilderConfig {
+  structureName: string;
+  packageName?: string;
+  transportRequest?: string;
+  description: string;
+  ddlCode?: string; // DDL SQL source code for structure (required for create operation)
+  // Legacy fields (deprecated, use ddlCode instead)
+  fields?: StructureField[];
+  includes?: StructureInclude[];
+  onLock?: (lockHandle: string) => void;
+}
+
+export interface StructureBuilderState {
+  validationResult?: any;
+  createResult?: any;
+  lockHandle?: string;
+  updateResult?: any;
+  checkResult?: any;
+  unlockResult?: any;
+  activateResult?: any;
+  deleteResult?: any;
+  readResult?: any;
+  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+}

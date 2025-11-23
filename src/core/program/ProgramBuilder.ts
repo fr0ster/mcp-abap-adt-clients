@@ -13,7 +13,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger } from '../../utils/logger';
 import { validateProgramName } from './validation';
-import { create, CreateProgramParams } from './create';
+import { create } from './create';
 import { lockProgram } from './lock';
 import { ValidationResult } from '../../utils/validation';
 import { checkProgram } from './check';
@@ -21,33 +21,7 @@ import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
 import { getProgramSource } from './read';
 import { deleteProgram } from './delete';
-
-export interface ProgramBuilderConfig {
-  programName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  programType?: string;
-  application?: string;
-  sourceCode?: string;
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle, sessionId
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface ProgramBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
+import { ProgramBuilderConfig, ProgramBuilderState, CreateProgramParams } from './types';
 
 export class ProgramBuilder {
   private connection: AbapConnection;
@@ -141,13 +115,13 @@ export class ProgramBuilder {
       }
       this.logger.info?.('Creating program:', this.config.programName);
       const params: CreateProgramParams = {
-        program_name: this.config.programName,
-        package_name: this.config.packageName,
-        transport_request: this.config.transportRequest,
+        programName: this.config.programName,
+        packageName: this.config.packageName,
+        transportRequest: this.config.transportRequest,
         description: this.config.description,
-        program_type: this.config.programType,
+        programType: this.config.programType,
         application: this.config.application,
-        source_code: this.sourceCode,
+        sourceCode: this.sourceCode,
         activate: false // Don't activate in low-level function
       };
       const result = await create(this.connection, params);
@@ -316,8 +290,8 @@ export class ProgramBuilder {
       const result = await deleteProgram(
         this.connection,
         {
-          program_name: this.config.programName,
-          transport_request: this.config.transportRequest
+          programName: this.config.programName,
+          transportRequest: this.config.transportRequest
         }
       );
       this.state.deleteResult = result;

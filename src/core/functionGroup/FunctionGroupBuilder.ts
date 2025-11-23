@@ -14,7 +14,7 @@ import { AxiosResponse } from 'axios';
 import { IAdtLogger } from '../../utils/logger';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
-import { CreateFunctionGroupParams } from './types';
+import { CreateFunctionGroupParams, FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './types';
 import { ValidationResult } from '../../utils/validation';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
@@ -22,29 +22,6 @@ import { activateFunctionGroup } from './activation';
 import { deleteFunctionGroup } from './delete';
 import { checkFunctionGroup } from './check';
 import { getFunctionGroup } from './read';
-
-export interface FunctionGroupBuilderConfig {
-  functionGroupName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface FunctionGroupBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
 
 export class FunctionGroupBuilder {
   private connection: AbapConnection;

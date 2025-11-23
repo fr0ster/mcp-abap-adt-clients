@@ -3,4 +3,4 @@
  */
 
 export * from './types';
-export { DomainBuilder, type DomainBuilderConfig, type DomainBuilderState } from './DomainBuilder';
+export { DomainBuilder } from './DomainBuilder';

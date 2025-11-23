@@ -5,20 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface SearchObjectsParams {
-  query: string;
-  objectType?: string;
-  maxResults?: number;
-}
-
-export interface SearchResult {
-  name: string;
-  type: string;
-  description: string;
-  packageName?: string;
-  uri?: string;
-}
+import { SearchObjectsParams } from './types';
 
 /**
  * Search for ABAP objects by name pattern

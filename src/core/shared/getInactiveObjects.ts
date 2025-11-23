@@ -4,34 +4,13 @@
 
 import { AbapConnection, getTimeout } from "@mcp-abap-adt/connection";
 import { XMLParser } from "fast-xml-parser";
+import { ObjectReference, InactiveObjectsResponse } from "./types";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   parseAttributeValue: false,
 });
-
-/**
- * Inactive object entry from ADT API
- */
-export interface InactiveObject {
-  user: string;
-  deleted: boolean;
-  ref: {
-    uri: string;
-    type: string;
-    name: string;
-  };
-  transport?: string;
-}
-
-/**
- * Response from getInactiveObjects
- */
-export interface InactiveObjectsResponse {
-  objects: InactiveObject[];
-  rawXml?: string;
-}
 
 /**
  * Get list of inactive objects (objects that are not yet activated)
@@ -46,9 +25,9 @@ export interface InactiveObjectsResponse {
  * ```typescript
  * const result = await getInactiveObjects(connection);
  * console.log(`Found ${result.objects.length} inactive objects`);
- * result.objects.forEach(obj => {
- *   console.log(`${obj.ref.name} (${obj.ref.type}) - user: ${obj.user}`);
- * });
+ * 
+ * // Objects can be directly passed to activateObjectsGroup
+ * await activateObjectsGroup(connection, result.objects);
  * ```
  */
 export async function getInactiveObjects(
@@ -70,12 +49,12 @@ export async function getInactiveObjects(
   const xml = response.data;
   const parsed = xmlParser.parse(xml);
 
-  const objects: InactiveObject[] = [];
+  const objects: ObjectReference[] = [];
 
   // Parse XML response
   const root = parsed["ioc:inactiveObjects"];
   if (!root) {
-    return { objects, rawXml: options?.includeRawXml ? xml : undefined };
+    return { objects, xmlStr: options?.includeRawXml ? xml : undefined };
   }
 
   const entries = Array.isArray(root["ioc:entry"]) 
@@ -92,19 +71,13 @@ export async function getInactiveObjects(
     if (!ref) continue;
 
     objects.push({
-      user: objectData["@_ioc:user"] || "",
-      deleted: objectData["@_ioc:deleted"] === "true",
-      ref: {
-        uri: ref["@_adtcore:uri"] || "",
-        type: ref["@_adtcore:type"] || "",
-        name: ref["@_adtcore:name"] || "",
-      },
-      transport: entry["ioc:transport"]?.["@_adtcore:name"] || undefined,
+      type: ref["@_adtcore:type"] || "",
+      name: ref["@_adtcore:name"] || "",
     });
   }
 
   return {
     objects,
-    rawXml: options?.includeRawXml ? xml : undefined,
+    xmlStr: options?.includeRawXml ? xml : undefined,
   };
 }

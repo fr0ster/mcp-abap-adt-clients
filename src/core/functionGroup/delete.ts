@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteFunctionGroupParams {
-  function_group_name: string;
-  transport_request?: string;
-}
+import { DeleteFunctionGroupParams } from './types';
 
 /**
  * Low-level: Check if function group can be deleted

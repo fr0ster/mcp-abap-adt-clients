@@ -5,25 +5,13 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { CreateClassParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 const logger = {
   debug: debugEnabled ? console.log : () => {},
   error: debugEnabled ? console.error : () => {},
 };
-
-export interface CreateClassParams {
-  class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_system?: string;
-  responsible?: string;
-  superclass?: string;
-  final?: boolean;
-  abstract?: boolean;
-  create_protected?: boolean;
-}
 
 
 /**

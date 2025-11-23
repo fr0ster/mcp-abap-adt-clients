@@ -3,4 +3,4 @@
  */
 
 export * from './types';
-export { StructureBuilder, type StructureBuilderConfig, type StructureBuilderState } from './StructureBuilder';
+export { StructureBuilder } from './StructureBuilder';

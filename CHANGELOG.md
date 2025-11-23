@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.12] - TBD
+
+### Changed
+- **Type definitions consolidated** – all type definitions moved to centralized `types.ts` files per module:
+  - Created `types.ts` in each core module (class, program, interface, domain, dataElement, structure, table, view, functionGroup, functionModule, package, transport, behaviorDefinition, metadataExtension, shared)
+  - **Low-level function parameters** use `snake_case` naming (e.g., `class_name`, `package_name`, `transport_request`)
+  - **Builder configuration** uses `camelCase` naming (e.g., `className`, `packageName`, `transportRequest`)
+  - Moved all interface definitions from individual files (create.ts, delete.ts, update.ts, Builder.ts) to centralized `types.ts`
+  - Updated all imports to reference `types.ts` instead of individual files
+  - Simplified module exports: `export * from './types'` provides all type definitions
+  - Improved type consistency and maintainability across the codebase
+
 ## [0.1.11] - TBD
 
 ### Changed

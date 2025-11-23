@@ -426,6 +426,95 @@ interface UpdateDomainParams {
 
 ---
 
+## Type System Organization
+
+### Type Definition Structure
+
+Each core module (class, program, interface, domain, dataElement, structure, table, view, functionGroup, functionModule, package, transport, behaviorDefinition, metadataExtension, shared) maintains its own `types.ts` file with centralized type definitions.
+
+### Naming Conventions
+
+The package uses **dual naming conventions** to distinguish between low-level operations and high-level Builder API:
+
+#### Low-Level Function Parameters (snake_case)
+
+Used by internal ADT API functions that directly interact with SAP backend:
+
+```typescript
+// Low-level function parameters use snake_case
+export interface CreateClassParams {
+  class_name: string;
+  description?: string;
+  package_name: string;
+  transport_request?: string;
+  master_system?: string;
+  responsible?: string;
+  superclass?: string;
+  final?: boolean;
+  abstract?: boolean;
+  create_protected?: boolean;
+}
+```
+
+#### Builder Configuration (camelCase)
+
+Used by Builder classes that provide fluent API:
+
+```typescript
+// Builder configuration uses camelCase
+export interface ClassBuilderConfig {
+  className: string;
+  description: string;
+  packageName?: string;
+  transportRequest?: string;
+  sourceCode?: string;
+  superclass?: string;
+  final?: boolean;
+  abstract?: boolean;
+  createProtected?: boolean;
+  masterSystem?: string;
+  responsible?: string;
+}
+```
+
+### Type Organization Pattern
+
+Each module's `types.ts` file follows this structure:
+
+```typescript
+// 1. Low-level function parameters (snake_case)
+export interface CreateXxxParams { ... }
+export interface UpdateXxxParams { ... }
+export interface DeleteXxxParams { ... }
+
+// 2. Builder configuration (camelCase)
+export interface XxxBuilderConfig { ... }
+export interface XxxBuilderState { ... }
+```
+
+### Module Exports
+
+Type definitions are exported through module index files:
+
+```typescript
+// src/core/class/index.ts
+export * from './types';           // All type definitions
+export { ClassBuilder } from './ClassBuilder';  // Builder class
+```
+
+This allows consumers to import types directly:
+
+```typescript
+import { 
+  CreateClassParams,      // Low-level parameters
+  ClassBuilderConfig,     // Builder configuration
+  ClassBuilderState,      // Builder state
+  ClassBuilder            // Builder class
+} from '@mcp-abap-adt/adt-clients';
+```
+
+---
+
 ## Debug Flags
 
 The library uses a **5-tier granular debug flag system**:

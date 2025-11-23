@@ -37,44 +37,14 @@ import { IAdtLogger } from '../../utils/logger';
 import { create, upload } from './create';
 import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
-import { CreateDomainParams, UpdateDomainParams } from './types';
+import { CreateDomainParams, UpdateDomainParams, FixedValue, DomainBuilderConfig, DomainBuilderState } from './types';
 import { checkDomainSyntax } from './check';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { deleteDomain } from './delete';
-import { FixedValue } from './types';
 import { validateObjectName, ValidationResult } from '../../utils/validation';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getDomain, getDomainTransport } from './read';
-
-export interface DomainBuilderConfig {
-  domainName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  datatype?: string;
-  length?: number;
-  decimals?: number;
-  conversion_exit?: string;
-  lowercase?: boolean;
-  sign_exists?: boolean;
-  value_table?: string;
-  fixed_values?: FixedValue[];
-}
-
-export interface DomainBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  transportResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
 
 export class DomainBuilder {
   private connection: AbapConnection;

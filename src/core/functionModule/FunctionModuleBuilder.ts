@@ -16,38 +16,13 @@ import { validateFunctionModuleName } from './validation';
 import { create } from './create';
 import { lockFunctionModule } from './lock';
 import { update } from './update';
-import { CreateFunctionModuleParams } from './types';
+import { CreateFunctionModuleParams, FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './types';
 import { ValidationResult } from '../../utils/validation';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
 import { deleteFunctionModule } from './delete';
 import { getFunctionSource } from './read';
-
-export interface FunctionModuleBuilderConfig {
-  functionGroupName: string;
-  functionModuleName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  sourceCode?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface FunctionModuleBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
 
 export class FunctionModuleBuilder {
   private connection: AbapConnection;

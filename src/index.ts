@@ -35,9 +35,18 @@
 export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
 
+// Export SharedBuilder
+export { SharedBuilder } from './core/shared';
+
 // Export shared types
-export type { InactiveObject, InactiveObjectsResponse } from './core/shared/getInactiveObjects';
-export type { ObjectReference } from './core/shared/groupActivation';
+export type { 
+  InactiveObjectsResponse,
+  ObjectReference,
+  SearchObjectsParams,
+  GetSqlQueryParams,
+  GetTableContentsParams,
+  GetWhereUsedParams
+} from './core/shared';
 
 
 

@@ -38,36 +38,7 @@ import { lockPackage } from './lock';
 import { unlockPackage } from './unlock';
 import { deletePackage, checkPackageDeletion, parsePackageDeletionCheck } from './delete';
 import { updatePackageDescription } from './update';
-import { CreatePackageParams } from './types';
-
-export interface PackageBuilderConfig {
-  packageName: string;
-  superPackage: string;
-  description: string;
-  updatedDescription?: string; // Description to use for update operation
-  packageType?: string;
-  softwareComponent?: string;
-  transportLayer?: string;
-  transportRequest?: string;
-  applicationComponent?: string;
-  responsible?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface PackageBuilderState {
-  validationResult?: { basic?: void; full?: void };
-  createResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  checkResult?: void;
-  lockResult?: string; // lock handle
-  unlockResult?: AxiosResponse;
-  updateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  lockHandle?: string;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
+import { CreatePackageParams, PackageBuilderConfig, PackageBuilderState } from './types';
 
 export class PackageBuilder {
   private connection: AbapConnection;

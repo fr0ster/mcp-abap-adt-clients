@@ -40,30 +40,9 @@ import { unlockTable } from './unlock';
 import { activateTable } from './activation';
 import { deleteTable } from './delete';
 import { validateTableName } from './validation';
-import { CreateTableParams } from './types';
-import { UpdateTableParams } from './update';
+import { CreateTableParams, UpdateTableParams, TableBuilderConfig, TableBuilderState } from './types';
 import { ValidationResult } from '../../utils/validation';
 import { getTableSource } from './read';
-
-export interface TableBuilderConfig {
-  tableName: string;
-  packageName?: string;
-  transportRequest?: string;
-  ddlCode?: string;
-}
-
-export interface TableBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
 
 export class TableBuilder {
   private connection: AbapConnection;

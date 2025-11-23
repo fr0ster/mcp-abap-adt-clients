@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteDomainParams {
-  domain_name: string;
-  transport_request?: string;
-}
+import { DeleteDomainParams } from './types';
 
 /**
  * Low-level: Check if domain can be deleted

@@ -5,13 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface UpdateTableParams {
-  table_name: string;
-  ddl_code: string;
-  transport_request?: string;
-  activate?: boolean;
-}
+import { UpdateTableParams } from './types';
 
 /**
  * Update table using existing lock/session (Builder workflow)

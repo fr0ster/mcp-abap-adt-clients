@@ -40,34 +40,9 @@ import { unlockDDLS } from './unlock';
 import { activateDDLS } from './activation';
 import { deleteView } from './delete';
 import { validateViewName } from './validation';
-import { CreateViewParams, UpdateViewSourceParams } from './types';
+import { CreateViewParams, UpdateViewSourceParams, ViewBuilderConfig, ViewBuilderState } from './types';
 import { ValidationResult } from '../../utils/validation';
 import { getViewSource } from './read';
-
-export interface ViewBuilderConfig {
-  viewName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  ddlSource?: string;
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface ViewBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
 
 export class ViewBuilder {
   private connection: AbapConnection;

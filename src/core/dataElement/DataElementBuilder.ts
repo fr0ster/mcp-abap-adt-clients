@@ -22,36 +22,7 @@ import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { deleteDataElement } from './delete';
 import { validateObjectName, ValidationResult } from '../../utils/validation';
-
-export interface DataElementBuilderConfig {
-  dataElementName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  domainName?: string;
-  dataType?: string;
-  length?: number;
-  decimals?: number;
-  shortLabel?: string;
-  mediumLabel?: string;
-  longLabel?: string;
-  headingLabel?: string;
-  typeKind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
-  typeName?: string;
-}
-
-export interface DataElementBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
+import { DataElementBuilderConfig, DataElementBuilderState } from './types';
 
 export class DataElementBuilder {
   private connection: AbapConnection;

@@ -1,5 +1,5 @@
 /**
- * DataElement types
+ * DataElement module type definitions
  */
 
 /**
@@ -13,6 +13,8 @@
  * When type_kind is 'domain', domain_name (or type_name) must be provided.
  * For the reference/predefined variants, use type_kind + data_type/length/refs accordingly.
  */
+
+// Low-level function parameters (snake_case)
 export interface CreateDataElementParams {
   data_element_name: string;
   description?: string;
@@ -64,3 +66,38 @@ export interface UpdateDataElementParams {
   activate?: boolean;
 }
 
+export interface DeleteDataElementParams {
+  data_element_name: string;
+  transport_request?: string;
+}
+
+// Builder configuration (camelCase)
+export interface DataElementBuilderConfig {
+  dataElementName: string;
+  packageName?: string;
+  transportRequest?: string;
+  description: string;
+  domainName?: string;
+  dataType?: string;
+  length?: number;
+  decimals?: number;
+  shortLabel?: string;
+  mediumLabel?: string;
+  longLabel?: string;
+  headingLabel?: string;
+  typeKind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
+  typeName?: string;
+}
+
+export interface DataElementBuilderState {
+  validationResult?: any;
+  createResult?: any;
+  readResult?: any;
+  lockHandle?: string;
+  updateResult?: any;
+  checkResult?: any;
+  unlockResult?: any;
+  activateResult?: any;
+  deleteResult?: any;
+  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+}

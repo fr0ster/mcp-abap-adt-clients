@@ -9,19 +9,7 @@ import { lockProgram } from './lock';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
 import { getSystemInformation } from '../../utils/systemInfo';
-
-export interface CreateProgramParams {
-  program_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_system?: string;
-  responsible?: string;
-  program_type?: string;
-  application?: string;
-  source_code?: string;
-  activate?: boolean;
-}
+import { CreateProgramParams } from './types';
 
 /**
  * Convert readable program type to SAP internal code
@@ -86,15 +74,15 @@ export async function create(
   connection: AbapConnection,
   args: CreateProgramParams
 ): Promise<AxiosResponse> {
-  const description = args.description || args.program_name;
-  const programType = convertProgramType(args.program_type);
+  const description = args.description || args.programName;
+  const programType = convertProgramType(args.programType);
   const application = args.application || '*';
-  const url = `/sap/bc/adt/programs/programs${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
+  const url = `/sap/bc/adt/programs/programs${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
   // Get masterSystem and responsible (only for cloud systems)
   // On cloud, getSystemInformation returns systemID and userName
   // On on-premise, it returns null, so we don't add these attributes
-  let masterSystem = args.master_system;
+  let masterSystem = args.masterSystem;
   let username = args.responsible;
 
   const systemInfo = await getSystemInformation(connection);
@@ -110,8 +98,8 @@ export async function create(
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.program_name}" adtcore:type="PROG/P" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
-  <adtcore:packageRef adtcore:name="${args.package_name}"/>
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.programName}" adtcore:type="PROG/P" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
+  <adtcore:packageRef adtcore:name="${args.packageName}"/>
 </program:abapProgram>`;
 
   const headers = {

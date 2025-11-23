@@ -8,11 +8,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-
-export interface GetSqlQueryParams {
-  sql_query: string;
-  row_number?: number;
-}
+import { GetSqlQueryParams } from './types';
 
 /**
  * Execute freestyle SQL query via SAP ADT Data Preview API

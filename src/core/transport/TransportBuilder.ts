@@ -29,22 +29,7 @@ import { AxiosResponse } from 'axios';
 import { IAdtLogger } from '../../utils/logger';
 import { createTransport } from './create';
 import { getTransport } from './read';
-import { CreateTransportParams } from './types';
-
-export interface TransportBuilderConfig {
-  description: string;
-  transportType?: 'workbench' | 'customizing';
-  targetSystem?: string;
-  owner?: string;
-}
-
-export interface TransportBuilderState {
-  createResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  transportNumber?: string;
-  taskNumber?: string;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
+import { CreateTransportParams, TransportBuilderConfig, TransportBuilderState } from './types';
 
 export class TransportBuilder {
   private connection: AbapConnection;

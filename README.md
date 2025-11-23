@@ -239,6 +239,61 @@ See [bin/README.md](bin/README.md) for details.
 
 Refer to the TypeScript typings (`src/index.ts`) for the full API surface.
 
+## Type System
+
+### Centralized Type Definitions
+
+All type definitions are centralized in module-specific `types.ts` files:
+
+```typescript
+// Import types from module exports
+import { 
+  CreateClassParams,      // Low-level function parameters
+  ClassBuilderConfig,     // Builder configuration
+  ClassBuilderState,      // Builder state
+  ClassBuilder            // Builder class
+} from '@mcp-abap-adt/adt-clients';
+```
+
+### Naming Conventions
+
+The package uses **dual naming conventions** to distinguish API layers:
+
+#### Low-Level Parameters (snake_case)
+
+Used by internal ADT API functions:
+
+```typescript
+interface CreateClassParams {
+  class_name: string;
+  package_name: string;
+  transport_request?: string;
+  description?: string;
+}
+```
+
+#### Builder Configuration (camelCase)
+
+Used by Builder classes providing fluent API:
+
+```typescript
+interface ClassBuilderConfig {
+  className: string;
+  packageName?: string;
+  transportRequest?: string;
+  description: string;
+  sourceCode?: string;
+}
+```
+
+This dual convention:
+- Makes low-level/high-level distinction clear
+- Matches SAP ADT XML parameter naming (`class_name` in ADT requests)
+- Provides familiar camelCase for JavaScript/TypeScript consumers
+- Enables proper type checking at each layer
+
+See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-organization) for details.
+
 ## Migration Guide
 
 ### From v0.1.0 to v0.2.0

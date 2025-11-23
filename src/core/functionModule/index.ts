@@ -3,4 +3,4 @@
  */
 
 export * from './types';
-export { FunctionModuleBuilder, type FunctionModuleBuilderConfig, type FunctionModuleBuilderState } from './FunctionModuleBuilder';
+export { FunctionModuleBuilder } from './FunctionModuleBuilder';

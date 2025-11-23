@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteTableParams {
-  table_name: string;
-  transport_request?: string;
-}
+import { DeleteTableParams } from './types';
 
 /**
  * Low-level: Check if table can be deleted

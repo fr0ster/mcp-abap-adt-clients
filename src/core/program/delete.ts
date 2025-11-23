@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteProgramParams {
-  program_name: string;
-  transport_request?: string;
-}
+import { DeleteProgramParams } from './types';
 
 /**
  * Low-level: Check if program can be deleted
@@ -18,7 +14,7 @@ export async function checkDeletion(
   connection: AbapConnection,
   params: DeleteProgramParams
 ): Promise<AxiosResponse> {
-  const { program_name } = params;
+  const { programName: program_name } = params;
 
   if (!program_name) {
     throw new Error('program_name is required');
@@ -55,7 +51,7 @@ export async function deleteProgram(
   connection: AbapConnection,
   params: DeleteProgramParams
 ): Promise<AxiosResponse> {
-  const { program_name, transport_request } = params;
+  const { programName: program_name, transportRequest: transport_request } = params;
 
   if (!program_name) {
     throw new Error('program_name is required');

@@ -4,7 +4,6 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
 /**
  * Check class code (syntax, compilation, rules)

@@ -5,12 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteFunctionModuleParams {
-  function_module_name: string;
-  function_group_name: string;
-  transport_request?: string;
-}
+import { DeleteFunctionModuleParams } from './types';
 
 /**
  * Low-level: Check if function module can be deleted

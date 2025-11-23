@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteClassParams {
-  class_name: string;
-  transport_request?: string;
-}
+import { DeleteClassParams } from './types';
 
 /**
  * Low-level: Check if class can be deleted (deletion check)

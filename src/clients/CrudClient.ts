@@ -908,28 +908,22 @@ export class CrudClient extends ReadOnlyClient {
    * Uses ADT activation/runs endpoint for batch activation with session support
    */
   async activateObjectsGroup(
-    objects: Array<{ uri: string; type?: string; name: string }>,
-    sessionId: string,
+    objects: Array<{ type: string; name: string }>,
     preaudit: boolean = false
   ): Promise<AxiosResponse> {
     const { activateObjectsGroup } = await import('../core/shared/groupActivation');
-    const result = await activateObjectsGroup(this.connection, objects, sessionId, preaudit);
+    const result = await activateObjectsGroup(this.connection, objects, preaudit);
     this.crudState.activateResult = result;
     return result;
   }
 
   /**
    * Get list of inactive objects (objects not yet activated)
-   * Returns objects with user, deleted flag, URI, type, name, and transport
+   * Returns array of ObjectReference (type + name) with optional xmlStr for debugging
    */
   async getInactiveObjects(options?: { includeRawXml?: boolean }): Promise<{
-    objects: Array<{
-      user: string;
-      deleted: boolean;
-      ref: { uri: string; type: string; name: string };
-      transport?: string;
-    }>;
-    rawXml?: string;
+    objects: Array<{ type: string; name: string }>;
+    xmlStr?: string;
   }> {
     const { getInactiveObjects } = await import('../core/shared/getInactiveObjects');
     return await getInactiveObjects(this.connection, options);

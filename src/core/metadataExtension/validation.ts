@@ -5,12 +5,7 @@
  */
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
-
-export interface MetadataExtensionValidationParams {
-  name: string;
-  description: string;
-  packageName: string;
-}
+import { MetadataExtensionValidationParams } from './types';
 
 /**
  * Validate metadata extension parameters

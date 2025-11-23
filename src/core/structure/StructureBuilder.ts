@@ -40,36 +40,9 @@ import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
 import { deleteStructure } from './delete';
 import { validateStructureName } from './validation';
-import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams } from './types';
+import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams, StructureBuilderConfig, StructureBuilderState } from './types';
 import { ValidationResult } from '../../utils/validation';
 import { getStructureSource } from './read';
-
-export interface StructureBuilderConfig {
-  structureName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  ddlCode?: string; // DDL SQL source code for structure (required for create operation)
-  // Legacy fields (deprecated, use ddlCode instead)
-  fields?: StructureField[];
-  includes?: StructureInclude[];
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface StructureBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
 
 export class StructureBuilder {
   private connection: AbapConnection;

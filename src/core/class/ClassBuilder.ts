@@ -46,34 +46,7 @@ import { checkClass } from './check';
 import { unlockClass } from './unlock';
 import { activateClass } from './activation';
 import { deleteClass } from './delete';
-
-export interface ClassBuilderConfig {
-  className: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  superclass?: string;
-  final?: boolean;
-  abstract?: boolean;
-  createProtected?: boolean;
-  masterSystem?: string;
-  responsible?: string;
-}
-
-export interface ClassBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  metadataResult?: AxiosResponse;
-  transportResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
+import { ClassBuilderConfig, ClassBuilderState } from './types';
 
 export class ClassBuilder {
   private connection: AbapConnection;

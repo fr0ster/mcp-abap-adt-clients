@@ -12,13 +12,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getFunctionGroup } from './read';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
-
-export interface UpdateFunctionGroupParams {
-  function_group_name: string;
-  description?: string;
-  transport_request?: string;
-  lock_handle?: string;
-}
+import { UpdateFunctionGroupParams } from './types';
 
 /**
  * Update function group metadata via PUT

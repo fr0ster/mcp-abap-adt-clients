@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteInterfaceParams {
-  interface_name: string;
-  transport_request?: string;
-}
+import { DeleteInterfaceParams } from './types';
 
 /**
  * Low-level: Check if interface can be deleted

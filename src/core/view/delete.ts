@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteViewParams {
-  view_name: string;
-  transport_request?: string;
-}
+import { DeleteViewParams } from './types';
 
 /**
  * Low-level: Check if view can be deleted

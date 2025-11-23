@@ -4,11 +4,9 @@
  * Low-level functions for working with SAP metadata extensions
  */
 
+export * from './types';
 export { validateMetadataExtension } from './validation';
-export type { MetadataExtensionValidationParams } from './validation';
-
 export { createMetadataExtension } from './create';
-export type { MetadataExtensionCreateParams } from './create';
 
 export { lockMetadataExtension } from './lock';
 export { unlockMetadataExtension } from './unlock';

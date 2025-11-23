@@ -5,12 +5,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { getTimeout } from '@mcp-abap-adt/connection';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface UpdateProgramSourceParams {
-  program_name: string;
-  source_code: string;
-  activate?: boolean;
-}
+import { UpdateProgramSourceParams } from './types';
 
 /**
  * Upload program source code (low-level - uses existing lockHandle)

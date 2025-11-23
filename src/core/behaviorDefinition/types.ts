@@ -86,6 +86,18 @@ export interface CheckRunResult {
     messages?: CheckMessage[];
 }
 
+// Builder configuration (camelCase)
+export interface BehaviorDefinitionBuilderConfig {
+  name: string;
+  packageName?: string;
+  transportRequest?: string;
+  description: string;
+  implementationType?: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
+  rootEntity?: string;
+  sourceCode?: string;
+  onLock?: (lockHandle: string) => void;
+}
+
 /**
  * State maintained by the Behavior Definition Builder
  */
@@ -103,9 +115,18 @@ export interface BehaviorDefinitionBuilderState {
     /** Read result (GET behavior definition) */
     readResult?: AxiosResponse<any>;
     /** Update source result */
+    updateResult?: AxiosResponse<any>;
     updateSourceResult?: AxiosResponse<any>;
     /** Check results */
     checkResults?: AxiosResponse<any>[];
+    /** Unlock result */
+    unlockResult?: AxiosResponse<any>;
+    /** Activate result */
+    activateResult?: AxiosResponse<any>;
+    /** Delete check result */
+    deleteCheckResult?: AxiosResponse<any>;
     /** Delete result */
     deleteResult?: AxiosResponse<any>;
+    /** Errors array */
+    errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }

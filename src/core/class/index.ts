@@ -2,4 +2,5 @@
  * Class operations - exports
  */
 
-export { ClassBuilder, type ClassBuilderConfig, type ClassBuilderState } from './ClassBuilder';
+export * from './types';
+export { ClassBuilder } from './ClassBuilder';

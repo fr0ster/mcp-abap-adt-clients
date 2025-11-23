@@ -5,11 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-
-export interface DeleteDataElementParams {
-  data_element_name: string;
-  transport_request?: string;
-}
+import { DeleteDataElementParams } from './types';
 
 /**
  * Low-level: Check if data element can be deleted

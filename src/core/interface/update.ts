@@ -3,9 +3,5 @@
  * Use InterfaceBuilder.update() instead
  */
 
-export interface UpdateInterfaceSourceParams {
-  interface_name: string;
-  source_code: string;
-  activate?: boolean;
-}
+import { UpdateInterfaceSourceParams } from './types';
 

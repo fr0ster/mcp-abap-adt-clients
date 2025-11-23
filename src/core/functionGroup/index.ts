@@ -3,4 +3,4 @@
  */
 
 export * from './types';
-export { FunctionGroupBuilder, type FunctionGroupBuilderConfig, type FunctionGroupBuilderState } from './FunctionGroupBuilder';
+export { FunctionGroupBuilder } from './FunctionGroupBuilder';

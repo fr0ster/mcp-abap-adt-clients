@@ -23,31 +23,7 @@ import { activateInterface } from './activation';
 import { deleteInterface } from './delete';
 import { getInterfaceSource } from './read';
 import { get } from 'http';
-
-export interface InterfaceBuilderConfig {
-  interfaceName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  sourceCode?: string;
-  sessionId?: string;
-  // Optional callback to register lock in persistent storage
-  // Called after successful lock() with: lockHandle
-  onLock?: (lockHandle: string) => void;
-}
-
-export interface InterfaceBuilderState {
-  validationResult?: ValidationResult;
-  createResult?: AxiosResponse;
-  lockHandle?: string;
-  updateResult?: AxiosResponse;
-  checkResult?: AxiosResponse;
-  unlockResult?: AxiosResponse;
-  activateResult?: AxiosResponse;
-  deleteResult?: AxiosResponse;
-  readResult?: AxiosResponse;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
-}
+import { InterfaceBuilderConfig, InterfaceBuilderState } from './types';
 
 export class InterfaceBuilder {
   private connection: AbapConnection;

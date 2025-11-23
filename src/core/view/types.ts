@@ -1,7 +1,8 @@
 /**
- * View types
+ * View module type definitions
  */
 
+// Low-level function parameters (snake_case)
 export interface CreateViewParams {
   view_name: string;
   ddl_source?: string; // Optional - only metadata creation in low-level function
@@ -18,3 +19,31 @@ export interface UpdateViewSourceParams {
   transport_request?: string;
 }
 
+export interface DeleteViewParams {
+  view_name: string;
+  transport_request?: string;
+}
+
+// Builder configuration (camelCase)
+export interface ViewBuilderConfig {
+  viewName: string;
+  packageName?: string;
+  transportRequest?: string;
+  description: string;
+  ddlSource?: string;
+  sessionId?: string;
+  onLock?: (lockHandle: string) => void;
+}
+
+export interface ViewBuilderState {
+  validationResult?: any;
+  createResult?: any;
+  lockHandle?: string;
+  updateResult?: any;
+  checkResult?: any;
+  unlockResult?: any;
+  activateResult?: any;
+  deleteResult?: any;
+  readResult?: any;
+  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+}
