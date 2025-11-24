@@ -15,6 +15,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Added ABAP Unit orchestration helpers (`startClassUnitTestRun`, `getClassUnitTestStatus`, `getClassUnitTestResult`) and corresponding CrudClient methods (`runClassUnitTests`, `getClassUnitTestRunStatus`, `getClassUnitTestRunResult`) with getters for run/status/result responses.
   - ClassBuilder integration test now supports optional test-class configuration from `tests/test-config.yaml` (auto uploads test class include and executes ABAP Unit run when configured).
   - `tests/test-config.yaml.template` updated with richer example class (parent/child data builders) and optional `test_class` block.
+- **Dedicated test-class lifecycle methods**:
+  - Added low-level helpers (`lockClassTestClasses`, `unlockClassTestClasses`) and ClassBuilder methods (`lockTestClasses`, `updateTestClasses`, `unlockTestClasses`, `activateTestClasses`) so test includes can be managed explicitly.
+  - CrudClient now proxies these methods 1:1, exposing `lockTestClasses()`, `updateClassTestIncludes()`, `unlockTestClasses()`, `activateTestClasses()` plus getters for lock/activation results.
 
 ## [0.1.12] - TBD
 

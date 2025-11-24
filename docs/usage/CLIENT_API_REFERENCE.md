@@ -299,6 +299,7 @@ Locks are automatically stored in `CrudClient` state and accessible via `getLock
 ```typescript
 lockProgram(name: string): Promise<this>
 lockClass(name: string): Promise<this>
+lockTestClasses(name: string): Promise<this>
 lockInterface(name: string): Promise<this>
 lockDataElement(name: string): Promise<this>
 lockDomain(name: string): Promise<this>
@@ -331,6 +332,7 @@ If `lockHandle` is not provided, uses the handle from state (set by previous `lo
 ```typescript
 unlockProgram(name: string, lockHandle?: string): Promise<this>
 unlockClass(name: string, lockHandle?: string): Promise<this>
+unlockTestClasses(name: string, lockHandle?: string): Promise<this>
 unlockInterface(name: string, lockHandle?: string): Promise<this>
 unlockDataElement(name: string, lockHandle?: string): Promise<this>
 unlockDomain(name: string, lockHandle?: string): Promise<this>
@@ -425,8 +427,13 @@ getClassUnitTestRunResult(
 ```typescript
 await client
   .lockClass('ZCL_ZOK_CDS_TEST_DATA')
-  .updateClassTestIncludes('ZCL_ZOK_CDS_TEST_DATA', TEST_CLASS_SOURCE)
+  .updateClass('ZCL_ZOK_CDS_TEST_DATA', CLASS_SOURCE)
   .unlockClass('ZCL_ZOK_CDS_TEST_DATA')
+  .activateClass('ZCL_ZOK_CDS_TEST_DATA')
+  .lockTestClasses('ZCL_ZOK_CDS_TEST_DATA')
+  .updateClassTestIncludes('ZCL_ZOK_CDS_TEST_DATA', TEST_CLASS_SOURCE)
+  .unlockTestClasses('ZCL_ZOK_CDS_TEST_DATA')
+  .activateTestClasses('ZCL_ZOK_CDS_TEST_DATA')
   .runClassUnitTests([
     { containerClass: 'ZCL_ZOK_CDS_TEST_DATA', testClass: 'LTCL_ZOK_CDS_TEST_DATA' }
   ]);
@@ -452,6 +459,7 @@ activate<ObjectType>(name: string): Promise<this>
 ```typescript
 activateProgram(name: string): Promise<this>
 activateClass(name: string): Promise<this>
+activateTestClasses(name: string): Promise<this>
 activateInterface(name: string): Promise<this>
 activateDataElement(name: string): Promise<this>
 activateDomain(name: string): Promise<this>
@@ -544,6 +552,8 @@ getLockHandle(): string | undefined
 getUnlockResult(): AxiosResponse | undefined
 getUpdateResult(): AxiosResponse | undefined
 getTestClassUpdateResult(): AxiosResponse | undefined
+getTestClassLockHandle(): string | undefined
+getTestClassActivateResult(): AxiosResponse | undefined
 getAbapUnitRunResponse(): AxiosResponse | undefined
 getAbapUnitRunId(): string | undefined
 getAbapUnitStatusResponse(): AxiosResponse | undefined
