@@ -17,14 +17,14 @@ import { create } from './create';
 import { lockFunctionModule } from './lock';
 import { update } from './update';
 import { CreateFunctionModuleParams, FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './types';
-import { ValidationResult } from '../../utils/validation';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
 import { deleteFunctionModule } from './delete';
 import { getFunctionSource } from './read';
+import { IBuilder } from '../shared/IBuilder';
 
-export class FunctionModuleBuilder {
+export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderState> {
   private connection: AbapConnection;
   private logger: IAdtLogger;
   private config: FunctionModuleBuilderConfig;
@@ -92,8 +92,9 @@ export class FunctionModuleBuilder {
         this.config.functionModuleName,
         this.config.description
       );
-      this.state.validationResult = result;
-      this.logger.info?.('Validation successful:', result.valid);
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = result;
+      this.logger.info?.('Validation successful');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -364,8 +365,8 @@ export class FunctionModuleBuilder {
     return this.connection.getSessionId();
   }
 
-  getValidationResult(): ValidationResult | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -403,24 +404,26 @@ export class FunctionModuleBuilder {
 
   // Helper method to get all results
   getResults(): {
-    validation?: ValidationResult;
+    validation?: AxiosResponse;
     create?: AxiosResponse;
     update?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
     delete?: AxiosResponse;
+    read?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validation: this.state.validationResult,
+      validation: this.state.validationResponse,
       create: this.state.createResult,
       update: this.state.updateResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
+      read: this.state.readResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

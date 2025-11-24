@@ -37,7 +37,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger } from '../../utils/logger';
-import { validateClassName, ValidationResult } from './validation';
+import { validateClassName } from './validation';
 import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
 import { lockClass } from './lock';
@@ -112,6 +112,12 @@ export class ClassBuilder {
     return this;
   }
 
+  setClassTemplate(templateXml: string): this {
+    this.config.classTemplate = templateXml;
+    this.logger.debug?.('Class template set, length:', templateXml.length);
+    return this;
+  }
+
   setDescription(description: string): this {
     this.config.description = description;
     return this;
@@ -149,8 +155,9 @@ export class ClassBuilder {
         this.config.description,
         this.config.superclass
       );
-      this.state.validationResult = result;
-      this.logger.info?.('Validation successful:', result.valid);
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = result;
+      this.logger.info?.('Validation successful');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -182,6 +189,7 @@ export class ClassBuilder {
         create_protected: this.config.createProtected,
         master_system: this.config.masterSystem,
         responsible: this.config.responsible,
+        template_xml: this.config.classTemplate
       });
       this.state.createResult = result;
       this.logger.info?.('Class created successfully:', result.status);
@@ -518,6 +526,43 @@ export class ClassBuilder {
     }
   }
 
+  async clearTestClasses(): Promise<this> {
+    try {
+      this.logger.info?.('Clearing test classes for:', this.config.className);
+      this.connection.setSessionType('stateful');
+      
+      const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
+      this.testLockHandle = lockHandle;
+      this.state.testLockHandle = lockHandle;
+
+      const emptyTestSource = '';
+      const result = await updateClassTestInclude(
+        this.connection,
+        this.config.className,
+        emptyTestSource,
+        lockHandle,
+        this.config.transportRequest
+      );
+      this.state.testClassesResult = result;
+
+      await unlockClassTestClasses(this.connection, this.config.className, lockHandle);
+      this.testLockHandle = undefined;
+      this.state.testLockHandle = undefined;
+
+      this.connection.setSessionType("stateless");
+      this.logger.info?.('Test classes cleared successfully');
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'clearTestClasses',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Clear test classes failed:', error);
+      throw error;
+    }
+  }
+
   async forceUnlock(): Promise<void> {
     if (!this.lockHandle && !this.testLockHandle) {
       return;
@@ -555,8 +600,8 @@ export class ClassBuilder {
     return { ...this.state };
   }
 
-  getValidationResult(): ValidationResult | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -625,7 +670,7 @@ export class ClassBuilder {
 
   // Helper method to get all results
   getResults(): {
-    validation?: ValidationResult;
+    validation?: AxiosResponse;
     create?: AxiosResponse;
     read?: AxiosResponse;
     metadata?: AxiosResponse;
@@ -640,7 +685,7 @@ export class ClassBuilder {
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validation: this.state.validationResult,
+      validation: this.state.validationResponse,
       create: this.state.createResult,
       read: this.state.readResult,
       metadata: this.state.metadataResult,

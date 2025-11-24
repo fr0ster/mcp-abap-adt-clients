@@ -106,9 +106,10 @@ export class BehaviorDefinitionBuilder {
         implementationType: this.config.implementationType || 'Managed'
       };
       
-      const result = await validate(this.connection, params);
+      const response = await validate(this.connection, params);
       
-      this.state.validationResult = result;
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = response;
       this.logger.info?.('Validation successful');
       return this;
     } catch (error: any) {
@@ -413,8 +414,8 @@ export class BehaviorDefinitionBuilder {
     return this.connection.getSessionId();
   }
 
-  getValidationResult(): AxiosResponse | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -461,20 +462,20 @@ export class BehaviorDefinitionBuilder {
     check?: AxiosResponse[];
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
-    deleteCheck?: AxiosResponse;
     delete?: AxiosResponse;
+    read?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validation: this.state.validationResult,
+      validation: this.state.validationResponse,
       create: this.state.createResult,
       update: this.state.updateResult,
       check: this.state.checkResults,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
-      deleteCheck: this.state.deleteCheckResult,
       delete: this.state.deleteResult,
+      read: this.state.readResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

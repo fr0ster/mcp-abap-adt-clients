@@ -1,6 +1,6 @@
 /**
- * View validation
- * Uses ADT validation endpoint: /sap/bc/adt/ddic/ddl/validation
+ * Data Element validation
+ * Uses ADT validation endpoint: /sap/bc/adt/ddic/dataelements/validation
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
@@ -8,26 +8,26 @@ import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
- * Validate view name
+ * Validate data element name
  * Returns raw response from ADT - consumer decides how to interpret it
  * 
- * Endpoint: POST /sap/bc/adt/ddic/ddl/validation
+ * Endpoint: POST /sap/bc/adt/ddic/dataelements/validation
  * 
  * Response format:
- * - Success: <CHECK_RESULT>X</CHECK_RESULT>
- * - Error: <exc:exception> with message about existing object or validation failure
+ * - Success: <SEVERITY>OK</SEVERITY>
+ * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message
  */
-export async function validateViewName(
+export async function validateDataElementName(
   connection: AbapConnection,
-  viewName: string,
+  dataElementName: string,
   packageName?: string,
   description?: string
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/ddic/ddl/validation`;
-  const encodedName = encodeSapObjectName(viewName);
+  const url = `/sap/bc/adt/ddic/dataelements/validation`;
+  const encodedName = encodeSapObjectName(dataElementName);
   
   const queryParams = new URLSearchParams({
-    objtype: 'ddls',
+    objtype: 'dtel',
     objname: encodedName
   });
 
@@ -35,7 +35,7 @@ export async function validateViewName(
     queryParams.append('packagename', encodeSapObjectName(packageName));
   }
 
-  // Description is required for view validation
+  // Description is required for data element validation
   queryParams.append('description', description || '');
 
   return connection.makeAdtRequest({

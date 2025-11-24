@@ -2,6 +2,9 @@
  * Class module type definitions
  */
 
+import { AxiosResponse } from 'axios';
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Low-level function parameters (snake_case)
 export interface CreateClassParams {
   class_name: string;
@@ -14,6 +17,7 @@ export interface CreateClassParams {
   final?: boolean;
   abstract?: boolean;
   create_protected?: boolean;
+  template_xml?: string;
 }
 
 export interface DeleteClassParams {
@@ -36,22 +40,14 @@ export interface ClassBuilderConfig {
   createProtected?: boolean;
   masterSystem?: string;
   responsible?: string;
+  classTemplate?: string;
 }
 
-export interface ClassBuilderState {
-  validationResult?: any;
-  readResult?: any;
-  createResult?: any;
-  metadataResult?: any;
-  transportResult?: any;
-  lockHandle?: string;
-  unlockResult?: any;
-  updateResult?: any;
-  testClassesResult?: any;
-  testActivateResult?: any;
-  testLockHandle?: string;
-  activateResult?: any;
-  checkResult?: any;
-  deleteResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface ClassBuilderState extends BaseBuilderState {
+  metadataResult?: any; // Class-specific: metadata read result
+  transportResult?: any; // Class-specific: transport read result
+  testClassesResult?: any; // Class-specific: test classes update result
+  testActivateResult?: any; // Class-specific: test classes activation result
+  testLockHandle?: string; // Class-specific: test classes lock handle
+  // Other fields inherited from BaseBuilderState
 }

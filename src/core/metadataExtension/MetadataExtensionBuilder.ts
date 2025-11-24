@@ -88,18 +88,22 @@ export class MetadataExtensionBuilder {
   async validate(): Promise<this> {
     try {
       this.logger.info?.('Validating metadata extension parameters');
-      const result = await validateMetadataExtension(this.connection, {
+      const response = await validateMetadataExtension(this.connection, {
         name: this.config.name,
         description: this.config.description,
         packageName: this.config.packageName || ''
       });
-      this.state.validationResult = result;
-      if (!result.valid) {
-        throw new Error(`Validation failed: ${result.errors?.join(', ')}`);
-      }
+      
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = response;
       this.logger.info?.('Validation successful');
       return this;
     } catch (error: any) {
+      // Store error response if available
+      if (error.response) {
+        this.state.validationResponse = error.response;
+      }
+      
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),

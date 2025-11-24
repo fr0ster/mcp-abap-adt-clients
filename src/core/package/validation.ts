@@ -3,16 +3,17 @@
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
-import { XMLParser } from 'fast-xml-parser';
+import { AxiosResponse } from 'axios';
 import { CreatePackageParams } from './types';
 
 /**
  * Step 1: Validate package parameters (basic check)
+ * Returns raw response from ADT - consumer decides how to interpret it
  */
 export async function validatePackageBasic(
   connection: AbapConnection,
   args: CreatePackageParams
-): Promise<void> {
+): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/packages/validation`;
   const params = {
     objname: args.package_name,
@@ -22,7 +23,7 @@ export async function validatePackageBasic(
     checkmode: 'basic'
   };
 
-  const response = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
@@ -31,26 +32,18 @@ export async function validatePackageBasic(
       'Accept': 'application/vnd.sap.as+xml'
     }
   });
-
-  const parser = new XMLParser({ ignoreAttributes: false });
-  const result = parser.parse(response.data);
-  const severity = result['asx:abap']?.['asx:values']?.DATA?.SEVERITY;
-
-  if (severity !== 'OK') {
-    const shortText = result['asx:abap']?.['asx:values']?.DATA?.SHORT_TEXT || 'Validation failed';
-    throw new Error(`Package validation failed: ${shortText}`);
-  }
 }
 
 /**
  * Step 3: Full validation with transport layer
+ * Returns raw response from ADT - consumer decides how to interpret it
  */
 export async function validatePackageFull(
   connection: AbapConnection,
   args: CreatePackageParams,
   swcomp: string,
   transportLayer: string
-): Promise<void> {
+): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/packages/validation`;
   const params = {
     objname: args.package_name,
@@ -63,7 +56,7 @@ export async function validatePackageFull(
     checkmode: 'full'
   };
 
-  const response = await connection.makeAdtRequest({
+  return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
@@ -72,14 +65,5 @@ export async function validatePackageFull(
       'Accept': 'application/vnd.sap.as+xml'
     }
   });
-
-  const parser = new XMLParser({ ignoreAttributes: false });
-  const result = parser.parse(response.data);
-  const severity = result['asx:abap']?.['asx:values']?.DATA?.SEVERITY;
-
-  if (severity !== 'OK') {
-    const shortText = result['asx:abap']?.['asx:values']?.DATA?.SHORT_TEXT || 'Full validation failed';
-    throw new Error(`Package full validation failed: ${shortText}`);
-  }
 }
 

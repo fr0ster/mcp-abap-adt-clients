@@ -126,26 +126,35 @@ export class PackageBuilder {
 
       // Basic validation
       try {
-        await validatePackageBasic(this.connection, params);
-        this.state.validationResult = { basic: undefined };
+        const response = await validatePackageBasic(this.connection, params);
+        // Store raw response - consumer decides how to interpret it
+        this.state.validationResponse = response;
         this.logger.info?.('Package basic validation successful');
       } catch (validationError: any) {
-        // If package already exists, log warning but continue (cleanup may have failed)
-        const errorMsg = validationError.message || '';
-        if (errorMsg.includes('already exists') || errorMsg.includes('PAK042')) {
-          this.logger.warn?.(`Package ${this.config.packageName} already exists. Validation skipped.`);
-          this.state.validationResult = { basic: undefined }; // Mark as successful to continue
-        } else {
-          throw validationError; // Re-throw other validation errors
+        // Store error response if available
+        if (validationError.response) {
+          this.state.validationResponse = validationError.response;
         }
+        
+        // Re-throw validation errors - consumer decides how to handle them
+        throw validationError;
       }
 
       // Full validation only if both transport layer and software component are explicitly provided
       // SAP requires transport layer for full validation, so we skip it if not provided
       if (this.config.transportLayer && this.config.softwareComponent) {
-        await validatePackageFull(this.connection, params, this.config.softwareComponent, this.config.transportLayer);
-        this.state.validationResult.full = undefined;
-        this.logger.info?.('Package full validation successful');
+        try {
+          const fullResponse = await validatePackageFull(this.connection, params, this.config.softwareComponent, this.config.transportLayer);
+          // Store full validation response (overwrites basic if both are done)
+          this.state.validationResponse = fullResponse;
+          this.logger.info?.('Package full validation successful');
+        } catch (fullValidationError: any) {
+          // Store error response if available
+          if (fullValidationError.response) {
+            this.state.validationResponse = fullValidationError.response;
+          }
+          throw fullValidationError;
+        }
       } else {
         this.logger.info?.('Skipping full validation (transport layer or software component not provided)');
       }
@@ -412,8 +421,8 @@ export class PackageBuilder {
     return this.config.packageName;
   }
 
-  getValidationResult(): { basic?: void; full?: void } | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -424,7 +433,7 @@ export class PackageBuilder {
     return this.state.readResult;
   }
 
-  getCheckResult(): void | undefined {
+  getCheckResult(): AxiosResponse | undefined {
     return this.state.checkResult;
   }
 
@@ -457,25 +466,25 @@ export class PackageBuilder {
   }
 
   getResults(): {
-    validate?: { basic?: void; full?: void };
+    validation?: AxiosResponse;
     create?: AxiosResponse;
     read?: AxiosResponse;
-    check?: void;
-    lock?: string;
+    check?: AxiosResponse;
     unlock?: AxiosResponse;
-    update?: AxiosResponse;
+    activate?: AxiosResponse;
     delete?: AxiosResponse;
+    lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validate: this.state.validationResult,
+      validation: this.state.validationResponse,
       create: this.state.createResult,
       read: this.state.readResult,
       check: this.state.checkResult,
-      lock: this.state.lockResult,
       unlock: this.state.unlockResult,
-      update: this.state.updateResult,
+      activate: this.state.activateResult,
       delete: this.state.deleteResult,
+      lockHandle: this.state.lockHandle,
       errors: [...this.state.errors]
     };
   }

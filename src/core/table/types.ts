@@ -2,12 +2,15 @@
  * Table module type definitions
  */
 
+import { AxiosResponse } from 'axios';
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Low-level function parameters (snake_case)
 export interface CreateTableParams {
   table_name: string;
-  ddl_code: string;
   package_name: string;
   transport_request?: string;
+  ddl_code?: string; // Optional - can be added via update() later
 }
 
 export interface UpdateTableParams {
@@ -28,17 +31,9 @@ export interface TableBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   ddlCode?: string;
+  description?: string;
 }
 
-export interface TableBuilderState {
-  validationResult?: any;
-  createResult?: any;
-  lockHandle?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  readResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface TableBuilderState extends BaseBuilderState {
+  // Table-specific state can be added here if needed
 }

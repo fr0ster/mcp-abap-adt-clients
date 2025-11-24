@@ -15,15 +15,15 @@ import { IAdtLogger } from '../../utils/logger';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
 import { CreateFunctionGroupParams, FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './types';
-import { ValidationResult } from '../../utils/validation';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
 import { activateFunctionGroup } from './activation';
 import { deleteFunctionGroup } from './delete';
 import { checkFunctionGroup } from './check';
 import { getFunctionGroup } from './read';
+import { IBuilder } from '../shared/IBuilder';
 
-export class FunctionGroupBuilder {
+export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState> {
   private connection: AbapConnection;
   private logger: IAdtLogger;
   private config: FunctionGroupBuilderConfig;
@@ -76,8 +76,9 @@ export class FunctionGroupBuilder {
         this.config.functionGroupName,
         this.config.description
       );
-      this.state.validationResult = result;
-      this.logger.info?.('Validation successful:', result.valid);
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = result;
+      this.logger.info?.('Validation successful');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -168,6 +169,13 @@ export class FunctionGroupBuilder {
       this.logger.error?.('Check failed:', error);
       throw error; // Interrupts chain
     }
+  }
+
+  async update(): Promise<this> {
+    // Function groups don't have a direct update endpoint
+    // Updates are done through function modules within the group
+    this.logger.warn?.('Update not supported for function groups. Use function module builders instead.');
+    return this;
   }
 
   async unlock(): Promise<this> {
@@ -296,8 +304,8 @@ export class FunctionGroupBuilder {
     return this.connection.getSessionId();
   }
 
-  getValidationResult(): ValidationResult | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -330,22 +338,24 @@ export class FunctionGroupBuilder {
 
   // Helper method to get all results
   getResults(): {
-    validation?: ValidationResult;
+    validation?: AxiosResponse;
     create?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
     delete?: AxiosResponse;
+    read?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validation: this.state.validationResult,
+      validation: this.state.validationResponse,
       create: this.state.createResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
+      read: this.state.readResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

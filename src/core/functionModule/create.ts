@@ -15,7 +15,6 @@ import { getFunctionGroup } from '../functionGroup/read';
 import { create as createFunctionGroupLowLevel } from '../functionGroup/create';
 import { activateFunctionGroup } from '../functionGroup/activation';
 import { validateFunctionModuleName } from './validation';
-import { validateAndThrow } from '../../utils/validation';
 
 /**
  * Create function module metadata

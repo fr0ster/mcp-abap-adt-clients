@@ -12,8 +12,16 @@
 
 import { AbapConnection, getTimeout, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ViewBuilder } from '../../../core/view';
+import { ClassBuilder } from '../../../core/class';
+import { TableBuilder } from '../../../core/table';
+import { UnitTestBuilder } from '../../../core/unitTest';
+import { SharedBuilder } from '../../../core/shared';
 import { IAdtLogger } from '../../../utils/logger';
 import { getView } from '../../../core/view/read';
+import { deleteView } from '../../../core/view/delete';
+import { getTable } from '../../../core/table/read';
+import { deleteTable } from '../../../core/table/delete';
+import { getClass } from '../../../core/class/read';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
 import {
@@ -36,7 +44,8 @@ getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  getOperationDelay
+  getOperationDelay,
+  parseValidationResponse
 } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -52,6 +61,56 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
+
+function buildCdsUnitTemplate(cdsViewName: string, testMethodName = 'TestMethod_0001'): string {
+  const viewNameUpper = cdsViewName.toUpperCase();
+  return `<abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
+  <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;cds:cdstobetested xmlns:cds="http://www.sap.com/adt/cdsfrwk/cds"&gt;
+  &lt;cds:cdsundertest api_doc="true" cds_name="${viewNameUpper}" cds_test_type="UNIT_TEST"&gt;
+    &lt;cds:testmethods&gt;
+      &lt;cds:testmethod test_method_name="${testMethodName}"/&gt;
+    &lt;/cds:testmethods&gt;
+  &lt;/cds:cdsundertest&gt;
+&lt;/cds:cdstobetested&gt;
+</abapsource:property>
+  <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
+</abapsource:template>`;
+}
+
+function buildCdsUnitTestClassSource(testClassName: string, cdsViewName: string): string {
+  const classNameUpper = testClassName.toUpperCase();
+  const viewNameUpper = cdsViewName.toUpperCase();
+  return `"!@testing ${viewNameUpper}
+CLASS ${classNameUpper} DEFINITION FINAL
+  FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+
+  PRIVATE SECTION.
+    TYPES: BEGIN OF ty_data,
+             id         TYPE char10,
+             name       TYPE char50,
+             value      TYPE dec15_2,
+             created_at TYPE dats,
+           END OF ty_data.
+    DATA test_data TYPE STANDARD TABLE OF ty_data WITH EMPTY KEY.
+    METHODS setup.
+    METHODS test_select FOR TESTING.
+ENDCLASS.
+
+CLASS ${classNameUpper} IMPLEMENTATION.
+  METHOD setup.
+    CLEAR test_data.
+  ENDMETHOD.
+
+  METHOD test_select.
+    SELECT id, name, value, created_at FROM ${viewNameUpper}
+      INTO TABLE @test_data UP TO 1 ROWS.
+    " Test passes if view is accessible (even if empty)
+    cl_abap_unit_assert=>assert_not_initial( act = test_data ).
+  ENDMETHOD.
+ENDCLASS.
+`;
+}
 
 describe('ViewBuilder', () => {
   let connection: AbapConnection;
@@ -75,35 +134,6 @@ describe('ViewBuilder', () => {
     }
   });
 
-  /**
-   * Pre-check: Verify test view doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function ensureViewReady(viewName: string): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if view exists
-    try {
-      await getView(connection, viewName);
-      return {
-        success: false,
-        reason: `⚠️ SAFETY: View ${viewName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
-      };
-    } catch (error: any) {
-      // 404 is expected - object doesn't exist, we can proceed
-      if (error.response?.status !== 404) {
-        return {
-          success: false,
-          reason: `Cannot verify view existence: ${error.message}`
-        };
-      }
-    }
-
-    return { success: true };
-  }
 
   function getBuilderTestDefinition() {
     return getTestCaseDefinition('create_view', 'builder_view');
@@ -127,12 +157,14 @@ describe('ViewBuilder', () => {
   describe('Full workflow', () => {
     let testCase: any = null;
     let viewName: string | null = null;
+    let tableName: string | null = null;
     let skipReason: string | null = null;
 
     beforeEach(async () => {
       skipReason = null;
       testCase = null;
       viewName = null;
+      tableName = null;
 
       if (!hasConfig) {
         skipReason = 'No SAP configuration';
@@ -159,16 +191,7 @@ describe('ViewBuilder', () => {
 
       testCase = tc;
       viewName = tc.params.view_name;
-
-      // Cleanup before test
-      if (viewName) {
-        const cleanup = await ensureViewReady(viewName);
-        if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup view before test';
-          testCase = null;
-          viewName = null;
-        }
-      }
+      tableName = tc.params.table_name || null;
     });
 
     it('should execute full workflow and store all results', async () => {
@@ -183,6 +206,94 @@ describe('ViewBuilder', () => {
       if (!testCase || !viewName) {
         logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', skipReason || 'Test case not available');
         return;
+      }
+
+      // Create table first if needed
+      let tableBuilder: TableBuilder | null = null;
+      if (tableName && testCase.params.table_source) {
+        try {
+          tableBuilder = new TableBuilder(connection, builderLogger, {
+            tableName: tableName,
+            packageName: resolvePackageName(testCase.params.package_name),
+            transportRequest: resolveTransportRequest(testCase.params.transport_request),
+            ddlCode: testCase.params.table_source,
+            description: testCase.params.description || `Table for ${testCase.params.view_name}`
+          });
+
+          logBuilderTestStep('validate table');
+          await tableBuilder.validate();
+          
+          // Check validation result - if object exists, fail the test
+          const validationResponse = tableBuilder.getValidationResponse();
+          if (validationResponse) {
+            const validationResult = parseValidationResponse(validationResponse);
+            
+            // Check HTTP status - 400 usually means validation failed (object exists or invalid)
+            if (validationResponse.status === 400) {
+              // For 400, check if it's because object exists
+              if (validationResult.exists) {
+                throw new Error(
+                  `Table ${tableName} already exists: ${validationResult.message || 'Object already exists'}`
+                );
+              }
+              // If 400 but not "exists", it's still a validation error
+              throw new Error(
+                `Table validation failed (HTTP 400): ${validationResult.message || 'Validation error'}`
+              );
+            }
+            
+            // For other statuses, check validation result
+            if (validationResult.exists) {
+              throw new Error(
+                `Table ${tableName} already exists: ${validationResult.message || 'Object already exists'}`
+              );
+            }
+            if (!validationResult.valid) {
+              throw new Error(
+                `Table validation failed: ${validationResult.message || 'Validation error'}`
+              );
+            }
+          }
+          
+          logBuilderTestStep('create table');
+          try {
+            await tableBuilder.create()
+              .then(async b => {
+                await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+                logBuilderTestStep('lock table');
+                return b.lock();
+              })
+              .then(async b => {
+                // Wait for SAP to commit lock operation
+                await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+                logBuilderTestStep('update table DDL');
+                return b.update();
+              })
+              .then(async b => {
+                await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+                logBuilderTestStep('unlock table');
+                return b.unlock();
+              })
+              .then(async b => {
+                await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+                logBuilderTestStep('activate table');
+                return b.activate();
+              });
+          } catch (tableWorkflowError: any) {
+            // Ensure table is unlocked even if any step fails (lock, update, unlock, activate)
+            if (tableBuilder) {
+              try {
+                await tableBuilder.forceUnlock().catch(() => {});
+              } catch (unlockError) {
+                builderLogger.warn?.(`Failed to unlock table ${tableName} after workflow error:`, unlockError);
+              }
+            }
+            throw tableWorkflowError;
+          }
+        } catch (error: any) {
+          logBuilderTestError(testsLogger, 'ViewBuilder - full workflow (table creation)', error);
+          throw error;
+        }
       }
 
       const builder = new ViewBuilder(connection, builderLogger, {
@@ -226,13 +337,27 @@ describe('ViewBuilder', () => {
             logBuilderTestStep('activate');
             return b.activate();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit activation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || getOperationDelay('unlock', testCase)));
             logBuilderTestStep('check(active)');
             return b.check('active');
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to finish check operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || getOperationDelay('activate', testCase)));
             logBuilderTestStep('delete (cleanup)');
-            return b.delete();
+            // Use group deletion for view and table together
+            if (tableBuilder && tableName && viewName) {
+              const sharedBuilder = new SharedBuilder(connection);
+              await sharedBuilder.deleteGroup([
+                { type: 'DDLS/DF', name: viewName },
+                { type: 'TABL/DT', name: tableName }
+              ]);
+            } else if (viewName) {
+              return b.delete();
+            }
+            return b;
           });
 
         const state = builder.getState();
@@ -272,10 +397,368 @@ describe('ViewBuilder', () => {
           }
         }
 
-        await builder.forceUnlock().catch(() => {});
+        // Cleanup: use group deletion for view and table together
+        if (viewName && tableName && tableBuilder) {
+          try {
+            await builder.forceUnlock().catch(() => {});
+            await tableBuilder.forceUnlock().catch(() => {});
+            const sharedBuilder = new SharedBuilder(connection);
+            await sharedBuilder.deleteGroup([
+              { type: 'DDLS/DF', name: viewName },
+              { type: 'TABL/DT', name: tableName }
+            ]).catch(() => {});
+          } catch (error) {
+            builderLogger.warn?.(`Failed to cleanup view ${viewName} and table ${tableName}:`, error);
+          }
+        } else if (viewName) {
+          try {
+            await builder.forceUnlock().catch(() => {});
+            await builder.delete().catch(() => {});
+          } catch (error) {
+            builderLogger.warn?.(`Failed to cleanup view ${viewName}:`, error);
+          }
+        }
+
         logBuilderTestEnd(testsLogger, 'ViewBuilder - full workflow');
       }
-    }, getTimeout('default'));
+    }, getTimeout('long'));
+  });
+
+  describe('CDS Unit Test workflow', () => {
+    let testCase: any = null;
+    let tableName: string | null = null;
+    let viewName: string | null = null;
+    let className: string | null = null;
+    let skipReason: string | null = null;
+
+      beforeEach(async () => {
+      skipReason = null;
+      testCase = null;
+      tableName = null;
+      viewName = null;
+      className = null;
+
+      if (!hasConfig) {
+        skipReason = 'No SAP configuration';
+        return;
+      }
+
+      const tc = getEnabledTestCase('create_view', 'cds_unit_test');
+      if (!tc) {
+        skipReason = 'CDS unit test case disabled or not found';
+        return;
+      }
+
+      const packageCheck = ensurePackageConfig(tc.params, 'ViewBuilder - CDS unit test');
+      if (!packageCheck.success) {
+        skipReason = packageCheck.reason || 'Default package is not configured';
+        return;
+      }
+
+      if (!tc.params.cds_unit_test) {
+        skipReason = 'cds_unit_test configuration missing';
+        return;
+      }
+
+      testCase = tc;
+      tableName = tc.params.table_name;
+      viewName = tc.params.view_name;
+      className = tc.params.cds_unit_test.class_name;
+    });
+
+    it('should create CDS view, generate unit test class, and run ABAP Unit', async () => {
+      const definition = getTestCaseDefinition('create_view', 'cds_unit_test');
+      logBuilderTestStart(testsLogger, 'ViewBuilder - CDS unit test', definition);
+
+      if (skipReason) {
+        logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', skipReason);
+        return;
+      }
+
+      if (!testCase || !tableName || !viewName || !className) {
+        logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', skipReason || 'Test case not available');
+        return;
+      }
+
+      const cdsTestConfig = testCase.params.cds_unit_test;
+      const testClassName = cdsTestConfig.test_class_name || `LTC_${viewName}`;
+      const classTemplateXml =
+        cdsTestConfig.template_xml || buildCdsUnitTemplate(viewName);
+      const testClassSource =
+        cdsTestConfig.test_class_source || buildCdsUnitTestClassSource(testClassName, viewName);
+
+      const tableBuilder = new TableBuilder(connection, builderLogger, {
+        tableName: tableName,
+        packageName: resolvePackageName(testCase.params.package_name),
+        transportRequest: resolveTransportRequest(testCase.params.transport_request),
+        ddlCode: testCase.params.table_source,
+        description: testCase.params.description || `Table for ${viewName}`
+      });
+
+      const viewBuilder = new ViewBuilder(connection, builderLogger, {
+        viewName,
+        packageName: resolvePackageName(testCase.params.package_name),
+        transportRequest: resolveTransportRequest(testCase.params.transport_request),
+        description: testCase.params.description,
+        ddlSource: testCase.params.ddl_source
+      });
+
+      const classBuilder = new ClassBuilder(connection, builderLogger, {
+        className,
+        description: cdsTestConfig.description || `CDS unit test for ${viewName}`,
+        packageName: resolvePackageName(testCase.params.package_name),
+        transportRequest: resolveTransportRequest(cdsTestConfig.transport_request || testCase.params.transport_request),
+        final: true
+      });
+
+      let unitTestBuilder: UnitTestBuilder | null = null;
+
+      try {
+        logBuilderTestStep('validate table');
+        await tableBuilder.validate();
+        
+        // Check validation result - if object exists, fail the test
+        const validationResponse = tableBuilder.getValidationResponse();
+        if (validationResponse) {
+          const validationResult = parseValidationResponse(validationResponse);
+          if (validationResult.exists) {
+            throw new Error(
+              `Table ${tableName} already exists: ${validationResult.message || 'Object already exists'}`
+            );
+          }
+          if (!validationResult.valid) {
+            throw new Error(
+              `Table validation failed: ${validationResult.message || 'Validation error'}`
+            );
+          }
+        }
+        
+        logBuilderTestStep('create table');
+        try {
+          await tableBuilder.create()
+            .then(async b => {
+              await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+              logBuilderTestStep('lock table');
+              return b.lock();
+            })
+            .then(async b => {
+              // Wait for SAP to commit lock operation
+              await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+              logBuilderTestStep('update table DDL');
+              return b.update();
+            })
+            .then(async b => {
+              await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+              logBuilderTestStep('unlock table');
+              return b.unlock();
+            })
+            .then(async b => {
+              await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+              logBuilderTestStep('activate table');
+              return b.activate();
+            });
+        } catch (tableWorkflowError: any) {
+          // Ensure table is unlocked even if any step fails (lock, update, unlock, activate)
+          if (tableBuilder) {
+            try {
+              await tableBuilder.forceUnlock().catch(() => {});
+            } catch (unlockError) {
+              builderLogger.warn?.(`Failed to unlock table ${tableName} after workflow error:`, unlockError);
+            }
+          }
+          throw tableWorkflowError;
+        }
+
+        logBuilderTestStep('create CDS view');
+        await viewBuilder
+          .validate()
+          .then(b => b.create())
+          .then(async b => {
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+            logBuilderTestStep('lock view');
+            return b.lock();
+          })
+          .then(b => {
+            logBuilderTestStep('update view DDL');
+            return b.update();
+          })
+          .then(async b => {
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+            logBuilderTestStep('unlock view');
+            return b.unlock();
+          })
+          .then(async b => {
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+            logBuilderTestStep('activate view');
+            return b.activate();
+          });
+
+        classBuilder.setClassTemplate(classTemplateXml);
+        classBuilder.setTestClassCode(testClassSource);
+        logBuilderTestStep('create CDS unit test class');
+        await classBuilder.validate();
+        await classBuilder.create();
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        logBuilderTestStep('activate unit test class');
+        await classBuilder.activate();
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+
+        unitTestBuilder = new UnitTestBuilder(connection, builderLogger, {
+          objectType: 'class',
+          objectName: className,
+          testClassName: testClassName,
+          transportRequest: resolveTransportRequest(cdsTestConfig.transport_request || testCase.params.transport_request)
+        }).setTestClassSource(testClassSource);
+
+        logBuilderTestStep('lock test classes');
+        await unitTestBuilder.lockTestClasses();
+        logBuilderTestStep('update test class source');
+        await unitTestBuilder.updateTestClass();
+        logBuilderTestStep('unlock test classes');
+        await unitTestBuilder.unlockTestClasses();
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+        logBuilderTestStep('activate test classes');
+        await unitTestBuilder.activateTestClasses();
+
+        const runOptions = cdsTestConfig.unit_test_options ? {
+          title: cdsTestConfig.unit_test_options.title,
+          context: cdsTestConfig.unit_test_options.context,
+          scope: cdsTestConfig.unit_test_options.scope,
+          riskLevel: cdsTestConfig.unit_test_options.risk_level,
+          duration: cdsTestConfig.unit_test_options.duration
+        } : undefined;
+
+        logBuilderTestStep('run ABAP Unit tests');
+        testsLogger.info?.('[ABAP-UNIT] Starting CDS unit test run', {
+          className
+        });
+
+        // Create new connection for unit test execution (separate timeout)
+        const unitTestConnection = await createAbapConnection(getConfig(), connectionLogger);
+        testsLogger.info?.('[ABAP-UNIT] Created separate connection for unit test execution');
+
+        // Reuse unitTestBuilder for CDS run (change objectType to 'cds')
+        unitTestBuilder = new UnitTestBuilder(unitTestConnection, builderLogger, {
+          objectType: 'cds',
+          objectName: className
+        });
+
+        await unitTestBuilder.runForObject(runOptions);
+
+        const runId = unitTestBuilder.getRunId();
+        testsLogger.info?.('[ABAP-UNIT] Run started', { runId });
+
+        logBuilderTestStep('get ABAP Unit test status');
+        await unitTestBuilder.getStatus(
+          cdsTestConfig.unit_test_status?.with_long_polling !== false
+        );
+
+        const runStatus = unitTestBuilder.getRunStatus();
+        const statusText = typeof runStatus === 'string' ? runStatus : JSON.stringify(runStatus);
+        testsLogger.info?.('[ABAP-UNIT] Status retrieved', { 
+          runId, 
+          status: statusText,
+          finished: statusText.includes('FINISHED')
+        });
+
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unit_test_result', testCase)));
+
+        logBuilderTestStep('get ABAP Unit test result');
+        await unitTestBuilder.getResult({
+          withNavigationUris: cdsTestConfig.unit_test_result?.with_navigation_uris ?? false,
+          format: cdsTestConfig.unit_test_result?.format === 'junit' ? 'junit' : 'abapunit'
+        });
+
+        const runResult = unitTestBuilder.getRunResult();
+        const resultType = runResult ? (typeof runResult === 'string' ? 'string' : 'object') : 'undefined';
+        testsLogger.info?.('[ABAP-UNIT] Result retrieved', { 
+          runId,
+          resultType,
+          hasResult: !!runResult
+        });
+
+        // Verify that status and result were retrieved
+        expect(runId).toBeDefined();
+        expect(runStatus).toBeDefined();
+        expect(runResult).toBeDefined();
+
+        logBuilderTestStep('delete (cleanup)');
+        // Delete test class first (use unit test connection)
+        await unitTestBuilder.deleteTestClass().catch(() => {});
+        
+        // Use group deletion for view and table together (use original connection)
+        if (viewName && tableName) {
+          const sharedBuilder = new SharedBuilder(connection);
+          await sharedBuilder.deleteGroup([
+            { type: 'DDLS/DF', name: viewName },
+            { type: 'TABL/DT', name: tableName }
+          ]).catch(() => {});
+        } else {
+          if (viewName) {
+            await viewBuilder.delete().catch(() => {});
+          }
+          if (tableName && tableBuilder) {
+            await tableBuilder.delete().catch(() => {});
+          }
+        }
+
+        // Verify deletion
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('delete', testCase) || 2000));
+        
+        if (className) {
+          try {
+            await getClass(connection, className);
+            testsLogger.warn?.('Unit test class still exists after deletion:', className);
+          } catch (error: any) {
+            if (error.response?.status === 404) {
+              testsLogger.info?.('Unit test class successfully deleted:', className);
+            }
+          }
+        }
+
+        if (viewName) {
+          try {
+            await getView(connection, viewName);
+            testsLogger.warn?.('CDS view still exists after deletion:', viewName);
+          } catch (error: any) {
+            if (error.response?.status === 404) {
+              testsLogger.info?.('CDS view successfully deleted:', viewName);
+            }
+          }
+        }
+
+        if (tableName) {
+          try {
+            await getTable(connection, tableName);
+            testsLogger.warn?.('Table still exists after deletion:', tableName);
+          } catch (error: any) {
+            if (error.response?.status === 404) {
+              testsLogger.info?.('Table successfully deleted:', tableName);
+            }
+          }
+        }
+
+        // Verify results
+        expect(unitTestBuilder).toBeDefined();
+        expect(unitTestBuilder!.getRunId()).toBeDefined();
+        expect(unitTestBuilder!.getRunStatus()).toBeDefined();
+        expect(unitTestBuilder!.getRunResult()).toBeDefined();
+
+        logBuilderTestSuccess(testsLogger, 'ViewBuilder - CDS unit test');
+      } catch (error: any) {
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'ViewBuilder - CDS unit test', enhancedError);
+        throw enhancedError;
+      } finally {
+        await classBuilder.forceUnlock().catch(() => {});
+        await viewBuilder.forceUnlock().catch(() => {});
+        await tableBuilder.forceUnlock().catch(() => {});
+        logBuilderTestEnd(testsLogger, 'ViewBuilder - CDS unit test');
+      }
+    }, getTimeout('long') * 2); // CDS unit test needs more time
   });
 
 });

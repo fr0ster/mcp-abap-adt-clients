@@ -42,11 +42,12 @@ import { checkDomainSyntax } from './check';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { deleteDomain } from './delete';
-import { validateObjectName, ValidationResult } from '../../utils/validation';
+import { validateDomainName } from './validation';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getDomain, getDomainTransport } from './read';
+import { IBuilder } from '../shared/IBuilder';
 
-export class DomainBuilder {
+export class DomainBuilder implements IBuilder<DomainBuilderState> {
   private connection: AbapConnection;
   private logger: IAdtLogger;
   private config: DomainBuilderConfig;
@@ -135,16 +136,14 @@ export class DomainBuilder {
   async validate(): Promise<this> {
     try {
       this.logger.info?.('Validating domain name:', this.config.domainName);
-      const result = await validateObjectName(
+      const result = await validateDomainName(
         this.connection,
-        'DOMA/DD',
         this.config.domainName,
-        this.config.packageName ? { packagename: this.config.packageName } : undefined
+        this.config.packageName,
+        this.config.description
       );
-      this.state.validationResult = result;
-      if (!result.valid) {
-        throw new Error(`Domain name validation failed: ${result.message || 'Invalid domain name'}`);
-      }
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = result;
       this.logger.info?.('Domain name validation successful');
       return this;
     } catch (error: any) {

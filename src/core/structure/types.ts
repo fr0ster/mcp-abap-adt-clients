@@ -2,6 +2,8 @@
  * Structure module type definitions
  */
 
+import { BaseBuilderState } from '../shared/IBuilder';
+
 export interface StructureField {
   name: string;
   data_type?: string;
@@ -55,15 +57,6 @@ export interface StructureBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface StructureBuilderState {
-  validationResult?: any;
-  createResult?: any;
-  lockHandle?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  readResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface StructureBuilderState extends BaseBuilderState {
+  // Structure-specific state can be added here if needed
 }

@@ -52,12 +52,18 @@ export async function create(
 
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
+  const abapSourceNamespace = args.template_xml ? ' xmlns:abapsource="http://www.sap.com/adt/abapsource"' : '';
+  const templateSection = args.template_xml ? `\n\n  ${args.template_xml}\n\n` : '\n\n';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><class:abapClass xmlns:class="http://www.sap.com/adt/oo/classes" xmlns:adtcore="http://www.sap.com/adt/core"${abapSourceNamespace} adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.class_name}" adtcore:type="CLAS/OC" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} class:final="${finalAttr}" class:visibility="${visibilityAttr}">
 
 
 
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
+
+
+
+  ${templateSection}
 
 
 

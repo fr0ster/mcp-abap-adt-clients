@@ -2,6 +2,9 @@
  * View module type definitions
  */
 
+import { AxiosResponse } from 'axios';
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Low-level function parameters (snake_case)
 export interface CreateViewParams {
   view_name: string;
@@ -35,15 +38,6 @@ export interface ViewBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface ViewBuilderState {
-  validationResult?: any;
-  createResult?: any;
-  lockHandle?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  readResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface ViewBuilderState extends BaseBuilderState {
+  // View-specific state can be added here if needed
 }

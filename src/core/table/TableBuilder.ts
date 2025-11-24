@@ -41,10 +41,10 @@ import { activateTable } from './activation';
 import { deleteTable } from './delete';
 import { validateTableName } from './validation';
 import { CreateTableParams, UpdateTableParams, TableBuilderConfig, TableBuilderState } from './types';
-import { ValidationResult } from '../../utils/validation';
 import { getTableSource } from './read';
+import { IBuilder } from '../shared/IBuilder';
 
-export class TableBuilder {
+export class TableBuilder implements IBuilder<TableBuilderState> {
   private connection: AbapConnection;
   private logger: IAdtLogger;
   private config: TableBuilderConfig;
@@ -89,21 +89,38 @@ export class TableBuilder {
     return this;
   }
 
+  setDescription(description: string): this {
+    this.config.description = description;
+    this.logger.debug?.('Description set:', description);
+    return this;
+  }
+
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<this> {
     try {
       this.logger.info?.('Validating table name:', this.config.tableName);
-      const result = await validateTableName(
+      const response = await validateTableName(
         this.connection,
-        this.config.tableName
+        this.config.tableName,
+        this.config.description
       );
-      this.state.validationResult = result;
-      if (!result.valid) {
-        throw new Error(`Table name validation failed: ${result.message}`);
-      }
+      
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = response;
       this.logger.info?.('Table name validation successful');
       return this;
     } catch (error: any) {
+      // For validation, HTTP 400 might indicate object exists - store response for analysis
+      if (error.response && error.response.status === 400) {
+        this.state.validationResponse = error.response;
+        this.logger.info?.('Table validation returned 400 - object may already exist');
+        return this;
+      }
+      // Store error response if available
+      if (error.response) {
+        this.state.validationResponse = error.response;
+      }
+      
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
@@ -119,16 +136,13 @@ export class TableBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      if (!this.config.ddlCode) {
-        throw new Error('DDL code is required');
-      }
       this.logger.info?.('Creating table:', this.config.tableName);
       this.connection.setSessionType("stateful");
       const params: CreateTableParams = {
         table_name: this.config.tableName,
-        ddl_code: this.config.ddlCode,
         package_name: this.config.packageName,
-        transport_request: this.config.transportRequest
+        transport_request: this.config.transportRequest,
+        ddl_code: this.config.ddlCode // Optional - can be added via update() later
       };
       const result = await createTable(this.connection, params);
       this.state.createResult = result;
@@ -318,9 +332,13 @@ export class TableBuilder {
   }
 
   async forceUnlock(): Promise<void> {
+    // Try to unlock if we have a lockHandle
     if (!this.lockHandle) {
+      this.logger.warn?.('No lockHandle available for force unlock:', this.config.tableName);
+      this.connection.setSessionType("stateless");
       return;
     }
+    
     try {
       await unlockTable(
         this.connection,
@@ -354,8 +372,8 @@ export class TableBuilder {
     return this.connection.getSessionId();
   }
 
-  getValidationResult(): ValidationResult | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -392,7 +410,7 @@ export class TableBuilder {
   }
 
   getResults(): {
-    validate?: ValidationResult;
+    validate?: AxiosResponse;
     create?: AxiosResponse;
     update?: AxiosResponse;
     check?: AxiosResponse;
@@ -403,7 +421,7 @@ export class TableBuilder {
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validate: this.state.validationResult,
+      validate: this.state.validationResponse,
       create: this.state.createResult,
       update: this.state.updateResult,
       check: this.state.checkResult,

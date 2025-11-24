@@ -2,6 +2,8 @@
  * DataElement module type definitions
  */
 
+import { BaseBuilderState } from '../shared/IBuilder';
+
 /**
  * SAP ADT supports the following type kinds for data elements:
  *  - domain
@@ -89,15 +91,6 @@ export interface DataElementBuilderConfig {
   typeName?: string;
 }
 
-export interface DataElementBuilderState {
-  validationResult?: any;
-  createResult?: any;
-  readResult?: any;
-  lockHandle?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface DataElementBuilderState extends BaseBuilderState {
+  // DataElement-specific state can be added here if needed
 }

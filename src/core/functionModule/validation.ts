@@ -1,30 +1,56 @@
 /**
  * Function Module validation
+ * Uses ADT validation endpoint: /sap/bc/adt/functions/validation
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { validateObjectName, ValidationResult } from '../../utils/validation';
 
 /**
  * Validate function module name
+ * Returns raw response from ADT - consumer decides how to interpret it
+ * 
+ * Endpoint: POST /sap/bc/adt/functions/validation
+ * 
+ * Query parameters:
+ * - objtype: FUGR/FF
+ * - objname: function module name
+ * - fugrname: function group name
+ * - description: optional description
+ * 
+ * Response format:
+ * - Success: <SEVERITY>OK</SEVERITY>
+ * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message (e.g., "Function module ... already exists")
  */
 export async function validateFunctionModuleName(
   connection: AbapConnection,
   functionGroupName: string,
   functionModuleName: string,
   description?: string
-): Promise<ValidationResult> {
-  const params: Record<string, string> = {
-    fugrname: encodeSapObjectName(functionGroupName)
-  };
+): Promise<AxiosResponse> {
+  const url = `/sap/bc/adt/functions/validation`;
+  const encodedFugr = encodeSapObjectName(functionGroupName);
+  const encodedFm = encodeSapObjectName(functionModuleName);
+  
+  const queryParams = new URLSearchParams({
+    objtype: 'FUGR/FF',
+    objname: encodedFm,
+    fugrname: encodedFugr
+  });
 
   if (description) {
-    params.description = description;
+    queryParams.append('description', description);
   }
 
-  return validateObjectName(connection, 'FUGR/FF', functionModuleName, params);
+  return connection.makeAdtRequest({
+    url: `${url}?${queryParams.toString()}`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage'
+    }
+  });
 }
 
 /**

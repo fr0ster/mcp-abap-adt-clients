@@ -11,14 +11,12 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { ClassBuilder } from '../../../core/class';
 import {
-  ClassBuilder,
+  UnitTestBuilder,
   ClassUnitTestDefinition,
-  ClassUnitTestRunOptions,
-  startClassUnitTestRun,
-  getClassUnitTestStatus,
-  getClassUnitTestResult
-} from '../../../core/class';
+  ClassUnitTestRunOptions
+} from '../../../core/unitTest';
 import { IAdtLogger } from '../../../utils/logger';
 import { getClass } from '../../../core/class/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -338,6 +336,8 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         builder = builder.setTestClassName(testClassConfig.name);
       }
 
+      let unitTestBuilder: UnitTestBuilder | null = null;
+
       try {
         logBuilderTestStep('validate');
       await builder
@@ -391,34 +391,39 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             if (!shouldUpdateTestClass) {
               return b;
             }
+
+            unitTestBuilder = new UnitTestBuilder(connection, builderLogger, {
+              objectType: 'class',
+              objectName: testClassName!,
+              testClassName: testClassConfig.name,
+              transportRequest: resolveTransportRequest(testCase.params.transport_request)
+            }).setTestClassSource(testClassConfig.source_code);
+
             logBuilderTestStep('lock test classes');
-            return b.lockTestClasses();
-          })
-          .then(b => {
-            if (!shouldUpdateTestClass) {
-              return b;
-            }
+            await unitTestBuilder.lockTestClasses();
+
             logBuilderTestStep('update test classes');
-            return b.updateTestClasses();
-          })
-          .then(b => {
-            if (!shouldUpdateTestClass) {
-              return b;
-            }
+            await unitTestBuilder.updateTestClass();
+
             logBuilderTestStep('unlock test classes');
-            return b.unlockTestClasses();
-          })
-          .then(async b => {
-            if (!shouldUpdateTestClass) {
-              return b;
-            }
+            await unitTestBuilder.unlockTestClasses();
+
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate test classes');
-            return b.activateTestClasses();
+            await unitTestBuilder.activateTestClasses();
+
+            return b;
           })
           .then(async b => {
             if (!shouldRunUnitTests || testDefinitions.length === 0) {
               return b;
+            }
+
+            if (!unitTestBuilder) {
+              unitTestBuilder = new UnitTestBuilder(connection, builderLogger, {
+                objectType: 'class',
+                objectName: testClassName!
+              });
             }
 
             logBuilderTestStep('run ABAP Unit tests');
@@ -426,43 +431,38 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
               tests: testDefinitions.map(test => `${test.containerClass}/${test.testClass}`).join(', ')
             });
             const runOptions = normalizeUnitTestOptions(testClassConfig.unit_test_options);
-            const runResponse = await startClassUnitTestRun(connection, testDefinitions, runOptions);
-            expect(runResponse.status).toBeGreaterThanOrEqual(200);
-            expect(runResponse.status).toBeLessThan(400);
+            await unitTestBuilder.runForClass(testDefinitions, runOptions);
 
-            const runId = extractRunIdFromResponse(runResponse);
-            expect(runId).toBeTruthy();
+            const runId = unitTestBuilder.getRunId();
             testsLogger.info?.('[ABAP-UNIT] Run started', { runId });
 
-            const statusResponse = await getClassUnitTestStatus(
-              connection,
-              runId as string,
+            logBuilderTestStep('get ABAP Unit test status');
+            await unitTestBuilder.getStatus(
               testClassConfig.unit_test_status?.with_long_polling !== false
             );
-            expect(statusResponse.status).toBe(200);
-            expect(String(statusResponse.data)).toContain('FINISHED');
-            testsLogger.info?.('[ABAP-UNIT] Status response received', {
-              runId,
-              statusXmlSnippet: String(statusResponse.data).substring(0, 200)
+
+            const runStatus = unitTestBuilder.getRunStatus();
+            const statusText = typeof runStatus === 'string' ? runStatus : JSON.stringify(runStatus);
+            testsLogger.info?.('[ABAP-UNIT] Status retrieved', { 
+              runId, 
+              status: statusText,
+              finished: statusText.includes('FINISHED')
             });
 
-            const resultResponse = await getClassUnitTestResult(
-              connection,
-              runId as string,
-              {
-                withNavigationUris: testClassConfig.unit_test_result?.with_navigation_uris ?? false,
-                format: testClassConfig.unit_test_result?.format === 'junit' ? 'junit' : 'abapunit'
-              }
-            );
-            expect(resultResponse.status).toBe(200);
-            expect(String(resultResponse.data).toUpperCase()).toContain(
-              (testDefinitions[0].testClass || '').toUpperCase()
-            );
-            const resultPreview = String(resultResponse.data).substring(0, 400);
-            testsLogger.info?.('[ABAP-UNIT] Result response received', {
-              runId,
-              format: testClassConfig.unit_test_result?.format || 'abapunit',
-              preview: resultPreview
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unit_test_result', testCase)));
+
+            logBuilderTestStep('get ABAP Unit test result');
+            await unitTestBuilder.getResult({
+              withNavigationUris: testClassConfig.unit_test_result?.with_navigation_uris ?? false,
+              format: testClassConfig.unit_test_result?.format === 'junit' ? 'junit' : 'abapunit'
+            });
+
+            const runResult = unitTestBuilder.getRunResult();
+            const hasResult = runResult !== undefined && runResult !== null;
+            testsLogger.info?.('[ABAP-UNIT] Result retrieved', { 
+              runId, 
+              hasResult,
+              resultType: hasResult ? typeof runResult : 'undefined'
             });
 
             return b;
@@ -475,9 +475,20 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         const state = builder.getState();
         expect(state.createResult).toBeDefined();
         expect(state.activateResult).toBeDefined();
+        
         if (shouldUpdateTestClass) {
-          expect(state.testClassesResult).toBeDefined();
+          expect(unitTestBuilder).toBeDefined();
+          const unitTestState = unitTestBuilder!.getState();
+          expect(unitTestState.testLockHandle).toBeUndefined(); // Should be unlocked after operations
         }
+        
+        if (shouldRunUnitTests) {
+          expect(unitTestBuilder).toBeDefined();
+          expect(unitTestBuilder!.getRunId()).toBeDefined();
+          expect(unitTestBuilder!.getRunStatus()).toBeDefined();
+          expect(unitTestBuilder!.getRunResult()).toBeDefined();
+        }
+        
         expect(state.errors.length).toBe(0);
 
         logBuilderTestSuccess(testsLogger, 'ClassBuilder - full workflow');

@@ -41,10 +41,10 @@ import { activateStructure } from './activation';
 import { deleteStructure } from './delete';
 import { validateStructureName } from './validation';
 import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams, StructureBuilderConfig, StructureBuilderState } from './types';
-import { ValidationResult } from '../../utils/validation';
 import { getStructureSource } from './read';
+import { IBuilder } from '../shared/IBuilder';
 
-export class StructureBuilder {
+export class StructureBuilder implements IBuilder<StructureBuilderState> {
   private connection: AbapConnection;
   private logger: IAdtLogger;
   private config: StructureBuilderConfig;
@@ -126,15 +126,14 @@ export class StructureBuilder {
   async validate(): Promise<this> {
     try {
       this.logger.info?.('Validating structure name:', this.config.structureName);
-      const result = await validateStructureName(
+      const response = await validateStructureName(
         this.connection,
         this.config.structureName,
         this.config.description
       );
-      this.state.validationResult = result;
-      if (!result.valid) {
-        throw new Error(`Structure name validation failed: ${result.message}`);
-      }
+      
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = response;
       this.logger.info?.('Structure name validation successful');
       return this;
     } catch (error: any) {
@@ -390,8 +389,8 @@ export class StructureBuilder {
     return this.lockHandle;
   }
 
-  getValidationResult(): ValidationResult | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -428,24 +427,26 @@ export class StructureBuilder {
   }
 
   getResults(): {
-    validate?: ValidationResult;
+    validate?: AxiosResponse;
     create?: AxiosResponse;
     update?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
     delete?: AxiosResponse;
+    read?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validate: this.state.validationResult,
+      validate: this.state.validationResponse,
       create: this.state.createResult,
       update: this.state.updateResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
+      read: this.state.readResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

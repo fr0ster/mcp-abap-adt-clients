@@ -2,6 +2,8 @@
  * Package module type definitions
  */
 
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Low-level function parameters (snake_case)
 export interface CreatePackageParams {
   package_name: string;
@@ -30,15 +32,7 @@ export interface PackageBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface PackageBuilderState {
-  validationResult?: { basic?: void; full?: void };
-  createResult?: any;
-  readResult?: any;
-  checkResult?: void;
-  lockResult?: string; // lock handle
-  unlockResult?: any;
-  updateResult?: any;
-  deleteResult?: any;
-  lockHandle?: string;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface PackageBuilderState extends BaseBuilderState {
+  lockResult?: string; // Package-specific: lock handle from lock operation
+  // Other fields inherited from BaseBuilderState
 }

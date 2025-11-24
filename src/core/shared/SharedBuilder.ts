@@ -6,6 +6,7 @@
  * - Where-used analysis
  * - Inactive objects management
  * - Group activation
+ * - Group deletion (check and delete)
  * - Object metadata and source code reading
  * - SQL queries and table contents
  */
@@ -14,6 +15,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
+import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
 import { readObjectMetadata } from './readMetadata';
 import { readObjectSource, supportsSourceCode } from './readSource';
 import { searchObjects } from './search';
@@ -33,6 +35,8 @@ interface SharedBuilderState {
   searchResult?: AxiosResponse;
   inactiveObjects?: InactiveObjectsResponse;
   activateResult?: AxiosResponse;
+  checkDeletionResult?: AxiosResponse;
+  deleteResult?: AxiosResponse;
   metadataResult?: AxiosResponse;
   sourceResult?: AxiosResponse;
   whereUsedResult?: AxiosResponse;
@@ -66,6 +70,14 @@ export class SharedBuilder {
 
   getActivateResult(): AxiosResponse | undefined {
     return this.state.activateResult;
+  }
+
+  getCheckDeletionResult(): AxiosResponse | undefined {
+    return this.state.checkDeletionResult;
+  }
+
+  getDeleteResult(): AxiosResponse | undefined {
+    return this.state.deleteResult;
   }
 
   getMetadataResult(): AxiosResponse | undefined {
@@ -109,6 +121,22 @@ export class SharedBuilder {
    */
   async activateGroup(objects: ObjectReference[], preauditRequested: boolean = false): Promise<this> {
     this.state.activateResult = await activateObjectsGroup(this.connection, objects, preauditRequested);
+    return this;
+  }
+
+  /**
+   * Check if multiple objects can be deleted (group deletion check)
+   */
+  async checkDeletionGroup(objects: ObjectReference[]): Promise<this> {
+    this.state.checkDeletionResult = await checkDeletionGroup(this.connection, objects);
+    return this;
+  }
+
+  /**
+   * Delete multiple objects in a group
+   */
+  async deleteGroup(objects: ObjectReference[], transportRequest?: string): Promise<this> {
+    this.state.deleteResult = await deleteObjectsGroup(this.connection, objects, transportRequest);
     return this;
   }
 

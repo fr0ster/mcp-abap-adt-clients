@@ -7,6 +7,7 @@ export { ClassBuilder } from './ClassBuilder';
 export {
   runClass,
   startClassUnitTestRun,
+  startClassUnitTestRunByObject,
   getClassUnitTestStatus,
   getClassUnitTestResult,
   ClassUnitTestDefinition,

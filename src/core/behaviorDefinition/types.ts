@@ -101,32 +101,24 @@ export interface BehaviorDefinitionBuilderConfig {
 /**
  * State maintained by the Behavior Definition Builder
  */
-export interface BehaviorDefinitionBuilderState {
+
+import { BaseBuilderState } from '../shared/IBuilder';
+
+/**
+ * State maintained by the Behavior Definition Builder
+ */
+export interface BehaviorDefinitionBuilderState extends BaseBuilderState {
     /** Name of the behavior definition */
     name?: string;
-    /** Validation result */
-    validationResult?: AxiosResponse<any>;
-    /** Create result */
-    createResult?: AxiosResponse<any>;
     /** Lock result */
     lockResult?: AxiosResponse<any>;
-    /** Current lock handle */
-    lockHandle?: string;
-    /** Read result (GET behavior definition) */
-    readResult?: AxiosResponse<any>;
-    /** Update source result */
-    updateResult?: AxiosResponse<any>;
+    /** Update source result (separate from updateResult) */
     updateSourceResult?: AxiosResponse<any>;
-    /** Check results */
+    /** Check results (array for multiple checks) */
     checkResults?: AxiosResponse<any>[];
-    /** Unlock result */
-    unlockResult?: AxiosResponse<any>;
-    /** Activate result */
-    activateResult?: AxiosResponse<any>;
     /** Delete check result */
     deleteCheckResult?: AxiosResponse<any>;
-    /** Delete result */
-    deleteResult?: AxiosResponse<any>;
-    /** Errors array */
-    errors: Array<{ method: string; error: Error; timestamp: Date }>;
+    /** Validation result */
+    validationResult?: AxiosResponse<any>;
+    // Other fields inherited from BaseBuilderState
 }

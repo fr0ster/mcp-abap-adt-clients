@@ -2,6 +2,8 @@
  * Domain module type definitions
  */
 
+import { BaseBuilderState } from '../shared/IBuilder';
+
 export interface FixedValue {
   low: string;
   text: string;
@@ -61,16 +63,7 @@ export interface DomainBuilderConfig {
   fixed_values?: FixedValue[];
 }
 
-export interface DomainBuilderState {
-  validationResult?: any;
-  createResult?: any;
-  lockHandle?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  readResult?: any;
-  transportResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface DomainBuilderState extends BaseBuilderState {
+  transportResult?: any; // Domain-specific: transport read result
+  // Other fields inherited from BaseBuilderState
 }

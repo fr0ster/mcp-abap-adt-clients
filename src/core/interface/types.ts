@@ -2,6 +2,8 @@
  * Interface module type definitions
  */
 
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Low-level function parameters (snake_case)
 export interface CreateInterfaceParams {
   interface_name: string;
@@ -36,15 +38,6 @@ export interface InterfaceBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface InterfaceBuilderState {
-  validationResult?: any;
-  createResult?: any;
-  lockHandle?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  readResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface InterfaceBuilderState extends BaseBuilderState {
+  // Interface-specific state can be added here if needed
 }

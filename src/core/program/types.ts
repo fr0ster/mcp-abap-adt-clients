@@ -2,6 +2,8 @@
  * Program module type definitions
  */
 
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Low-level function parameters (snake_case)
 export interface CreateProgramParams {
   programName: string;
@@ -40,16 +42,7 @@ export interface ProgramBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface ProgramBuilderState {
-  validationResult?: any;
-  readResult?: any;
-  createResult?: any;
-  lockHandle?: string;
-  unlockResult?: any;
-  updateResult?: any;
-  activateResult?: any;
-  checkResult?: any;
-  deleteResult?: any;
-  runResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface ProgramBuilderState extends BaseBuilderState {
+  runResult?: any; // Program-specific: result of program execution
+  // Other fields inherited from BaseBuilderState
 }

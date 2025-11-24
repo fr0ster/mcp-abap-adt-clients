@@ -45,7 +45,7 @@ interface CrudClientState {
   activateResult?: AxiosResponse;
   deleteResult?: AxiosResponse;
   checkResult?: AxiosResponse;
-  validationResult?: any;
+  validationResponse?: AxiosResponse;
   // Note: readResult is in ReadOnlyClient's separate private state
 }
 
@@ -71,7 +71,7 @@ export class CrudClient extends ReadOnlyClient {
   getActivateResult(): AxiosResponse | undefined { return this.crudState.activateResult; }
   getDeleteResult(): AxiosResponse | undefined { return this.crudState.deleteResult; }
   getCheckResult(): AxiosResponse | undefined { return this.crudState.checkResult; }
-  getValidationResult(): any | undefined { return this.crudState.validationResult; }
+  getValidationResponse(): AxiosResponse | undefined { return this.crudState.validationResponse; }
 
   // ==================== Program operations ====================
   
@@ -129,7 +129,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateProgram(programName: string): Promise<this> {
     const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -233,7 +233,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateClass(className: string): Promise<this> {
     const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -334,7 +334,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateInterface(interfaceName: string): Promise<this> {
     const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -408,7 +408,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateFunctionModule(functionModuleName: string, functionGroupName: string): Promise<this> {
     const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -461,7 +461,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateFunctionGroup(functionGroupName: string): Promise<this> {
     const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -523,7 +523,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateDataElement(dataElementName: string): Promise<this> {
     const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -585,7 +585,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateDomain(domainName: string): Promise<this> {
     const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -647,7 +647,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateStructure(structureName: string): Promise<this> {
     const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -709,7 +709,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateTable(tableName: string): Promise<this> {
     const builder = new TableBuilder(this.connection, {}, { tableName });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -768,10 +768,10 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async validateView(viewName: string): Promise<this> {
-    const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
+  async validateView(viewName: string, packageName?: string): Promise<this> {
+    const builder = new ViewBuilder(this.connection, {}, { viewName, packageName, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -824,7 +824,7 @@ export class CrudClient extends ReadOnlyClient {
   async validatePackage(packageName: string, superPackage: string): Promise<this> {
     const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description: '' });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -938,7 +938,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateBehaviorDefinition(rootEntity: string, implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'): Promise<this> {
     const builder = new BehaviorDefinitionBuilder(this.connection, {}, { name: '', description: '', rootEntity, implementationType });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -1010,7 +1010,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateMetadataExtension(name: string, description: string, packageName: string): Promise<this> {
     const builder = new MetadataExtensionBuilder(this.connection, {}, { name, description, packageName });
     await builder.validate();
-    this.crudState.validationResult = builder.getState().validationResult;
+    this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
@@ -1034,6 +1034,33 @@ export class CrudClient extends ReadOnlyClient {
     const { activateObjectsGroup } = await import('../core/shared/groupActivation');
     const result = await activateObjectsGroup(this.connection, objects, preaudit);
     this.crudState.activateResult = result;
+    return result;
+  }
+
+  /**
+   * Check if multiple ABAP objects can be deleted (group deletion check)
+   * Uses ADT deletion/check endpoint for batch deletion check
+   */
+  async checkDeletionGroup(
+    objects: Array<{ type: string; name: string }>
+  ): Promise<AxiosResponse> {
+    const { checkDeletionGroup } = await import('../core/shared/groupDeletion');
+    const result = await checkDeletionGroup(this.connection, objects);
+    this.crudState.checkResult = result;
+    return result;
+  }
+
+  /**
+   * Delete multiple ABAP objects in batch
+   * Uses ADT deletion/delete endpoint for batch deletion
+   */
+  async deleteObjectsGroup(
+    objects: Array<{ type: string; name: string }>,
+    transportRequest?: string
+  ): Promise<AxiosResponse> {
+    const { deleteObjectsGroup } = await import('../core/shared/groupDeletion');
+    const result = await deleteObjectsGroup(this.connection, objects, transportRequest);
+    this.crudState.deleteResult = result;
     return result;
   }
 

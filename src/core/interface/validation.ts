@@ -1,23 +1,45 @@
 /**
  * Interface validation
+ * Uses ADT validation endpoint: /sap/bc/adt/oo/interfaces/validation
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { validateObjectName, ValidationResult } from '../../utils/validation';
+import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Validate interface name
+ * Returns raw response from ADT - consumer decides how to interpret it
+ * 
+ * Endpoint: POST /sap/bc/adt/oo/interfaces/validation
+ * 
+ * Response format:
+ * - Success: <CHECK_RESULT>X</CHECK_RESULT>
+ * - Error: <exc:exception> with message about existing object or validation failure
  */
 export async function validateInterfaceName(
   connection: AbapConnection,
   interfaceName: string,
   description?: string
-): Promise<ValidationResult> {
-  const params: Record<string, string> = {};
+): Promise<AxiosResponse> {
+  const url = `/sap/bc/adt/oo/interfaces/validation`;
+  const encodedName = encodeSapObjectName(interfaceName);
+  
+  const queryParams = new URLSearchParams({
+    objtype: 'intf',
+    objname: encodedName
+  });
 
   if (description) {
-    params.description = description;
+    queryParams.append('description', description);
   }
 
-  return validateObjectName(connection, 'INTF/OI', interfaceName, params);
+  return connection.makeAdtRequest({
+    url: `${url}?${queryParams.toString()}`,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.as+xml'
+    }
+  });
 }

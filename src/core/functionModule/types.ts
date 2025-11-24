@@ -2,6 +2,8 @@
  * FunctionModule module type definitions
  */
 
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Low-level function parameters (snake_case)
 export interface CreateFunctionModuleParams {
   function_group_name: string;
@@ -30,15 +32,6 @@ export interface FunctionModuleBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface FunctionModuleBuilderState {
-  validationResult?: any;
-  createResult?: any;
-  lockHandle?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  readResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface FunctionModuleBuilderState extends BaseBuilderState {
+  // FunctionModule-specific state can be added here if needed
 }

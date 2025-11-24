@@ -21,10 +21,11 @@ import { checkDataElement } from './check';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { deleteDataElement } from './delete';
-import { validateObjectName, ValidationResult } from '../../utils/validation';
+import { validateDataElementName } from './validation';
 import { DataElementBuilderConfig, DataElementBuilderState } from './types';
+import { IBuilder } from '../shared/IBuilder';
 
-export class DataElementBuilder {
+export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
   private connection: AbapConnection;
   private logger: IAdtLogger;
   private config: DataElementBuilderConfig;
@@ -122,25 +123,14 @@ export class DataElementBuilder {
   async validate(): Promise<this> {
     try {
       this.logger.info?.('Validating data element name:', this.config.dataElementName);
-      const result = await validateObjectName(
+      const result = await validateDataElementName(
         this.connection,
-        'DTEL/DE',
         this.config.dataElementName,
-        this.config.packageName ? { packagename: this.config.packageName } : undefined
+        this.config.packageName,
+        this.config.description
       );
-      this.state.validationResult = result;
-      if (!result.valid) {
-        // Check if error is about object already existing (common in tests)
-        const errorMsg = result.message || '';
-        if (errorMsg.toLowerCase().includes('already exists') ||
-            errorMsg.toLowerCase().includes('does already exist') ||
-            errorMsg.toLowerCase().includes('resource') && errorMsg.toLowerCase().includes('exist')) {
-          // Object exists - this is OK for tests, just log warning
-          this.logger.warn?.('Data element already exists, validation skipped:', this.config.dataElementName);
-          return this;
-        }
-        throw new Error(`Data element name validation failed: ${errorMsg || 'Invalid data element name'}`);
-      }
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = result;
       this.logger.info?.('Data element name validation successful');
       return this;
     } catch (error: any) {
@@ -172,11 +162,12 @@ export class DataElementBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
-      // If validation result exists, use its message
-      if (this.state.validationResult && !this.state.validationResult.valid) {
-        throw new Error(`Data element name validation failed: ${this.state.validationResult.message || 'Invalid data element name'}`);
+      // Store error response if available
+      if (error.response) {
+        this.state.validationResponse = error.response;
       }
+      
+      this.logger.error?.('Validation failed:', error);
       throw error; // Interrupts chain
     }
   }

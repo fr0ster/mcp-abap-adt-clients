@@ -16,7 +16,6 @@ import { IAdtLogger } from '../../utils/logger';
 import { validateInterfaceName } from './validation';
 import { create as createInterfaceObject, generateInterfaceTemplate } from './create';
 import { lockInterface } from './lock';
-import { ValidationResult } from '../../utils/validation';
 import { checkInterface } from './check';
 import { unlockInterface } from './unlock';
 import { activateInterface } from './activation';
@@ -24,8 +23,9 @@ import { deleteInterface } from './delete';
 import { getInterfaceSource } from './read';
 import { get } from 'http';
 import { InterfaceBuilderConfig, InterfaceBuilderState } from './types';
+import { IBuilder } from '../shared/IBuilder';
 
-export class InterfaceBuilder {
+export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
   private connection: AbapConnection;
   private logger: IAdtLogger;
   private config: InterfaceBuilderConfig;
@@ -81,13 +81,15 @@ export class InterfaceBuilder {
   async validate(): Promise<this> {
     try {
       this.logger.info?.('Validating interface:', this.config.interfaceName);
-      const result = await validateInterfaceName(
+      const response = await validateInterfaceName(
         this.connection,
         this.config.interfaceName,
         this.config.description
       );
-      this.state.validationResult = result;
-      this.logger.info?.('Validation successful:', result.valid);
+      
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = response;
+      this.logger.info?.('Validation successful');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -355,8 +357,8 @@ export class InterfaceBuilder {
     return this.connection.getSessionId();
   }
 
-  getValidationResult(): ValidationResult | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -394,24 +396,26 @@ export class InterfaceBuilder {
 
   // Helper method to get all results
   getResults(): {
-    validation?: ValidationResult;
+    validation?: AxiosResponse;
     create?: AxiosResponse;
     update?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
     delete?: AxiosResponse;
+    read?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validation: this.state.validationResult,
+      validation: this.state.validationResponse,
       create: this.state.createResult,
       update: this.state.updateResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
+      read: this.state.readResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

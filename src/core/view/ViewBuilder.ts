@@ -41,7 +41,6 @@ import { activateDDLS } from './activation';
 import { deleteView } from './delete';
 import { validateViewName } from './validation';
 import { CreateViewParams, UpdateViewSourceParams, ViewBuilderConfig, ViewBuilderState } from './types';
-import { ValidationResult } from '../../utils/validation';
 import { getViewSource } from './read';
 
 export class ViewBuilder {
@@ -98,18 +97,29 @@ export class ViewBuilder {
   async validate(): Promise<this> {
     try {
       this.logger.info?.('Validating view name:', this.config.viewName);
-      const result = await validateViewName(
+      const response = await validateViewName(
         this.connection,
         this.config.viewName,
+        this.config.packageName,
         this.config.description
       );
-      this.state.validationResult = result;
-      if (!result.valid) {
-        throw new Error(`View name validation failed: ${result.message}`);
-      }
+      
+      // Store raw response - consumer decides how to interpret it
+      this.state.validationResponse = response;
       this.logger.info?.('View name validation successful');
       return this;
     } catch (error: any) {
+      // For validation, HTTP 400 might indicate object exists - store response for analysis
+      if (error.response && error.response.status === 400) {
+        this.state.validationResponse = error.response;
+        this.logger.info?.('View validation returned 400 - object may already exist');
+        return this;
+      }
+      // Store error response if available
+      if (error.response) {
+        this.state.validationResponse = error.response;
+      }
+      
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
@@ -372,8 +382,8 @@ export class ViewBuilder {
     return this.connection.getSessionId();
   }
 
-  getValidationResult(): ValidationResult | undefined {
-    return this.state.validationResult;
+  getValidationResponse(): AxiosResponse | undefined {
+    return this.state.validationResponse;
   }
 
   getCreateResult(): AxiosResponse | undefined {
@@ -410,24 +420,26 @@ export class ViewBuilder {
   }
 
   getResults(): {
-    validate?: ValidationResult;
+    validate?: AxiosResponse;
     create?: AxiosResponse;
     update?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
     delete?: AxiosResponse;
+    read?: AxiosResponse;
     lockHandle?: string;
     errors: Array<{ method: string; error: Error; timestamp: Date }>;
   } {
     return {
-      validate: this.state.validationResult,
+      validate: this.state.validationResponse,
       create: this.state.createResult,
       update: this.state.updateResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
+      read: this.state.readResult,
       lockHandle: this.lockHandle,
       errors: [...this.state.errors]
     };

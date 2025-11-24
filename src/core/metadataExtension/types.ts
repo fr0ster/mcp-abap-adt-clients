@@ -2,6 +2,9 @@
  * MetadataExtension module type definitions
  */
 
+import { AxiosResponse } from 'axios';
+import { BaseBuilderState } from '../shared/IBuilder';
+
 // Validation parameters
 export interface MetadataExtensionValidationParams {
   name: string;
@@ -33,16 +36,7 @@ export interface MetadataExtensionBuilderConfig {
   sessionId?: string;
 }
 
-export interface MetadataExtensionBuilderState {
-  validationResult?: { valid: boolean; errors?: string[] };
-  createResult?: any;
-  lockHandle?: string;
-  readResult?: any;
-  sourceCode?: string;
-  updateResult?: any;
-  checkResult?: any;
-  unlockResult?: any;
-  activateResult?: any;
-  deleteResult?: any;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
+export interface MetadataExtensionBuilderState extends BaseBuilderState {
+  sourceCode?: string; // MetadataExtension-specific: stored source code
+  // Other fields inherited from BaseBuilderState
 }

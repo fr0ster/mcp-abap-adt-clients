@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('yaml');
 const dotenv = require('dotenv');
+const { XMLParser } = require('fast-xml-parser');
 
 let cachedConfig = null;
 let configLoadedFrom = null;
@@ -418,6 +419,84 @@ function getOperationDelay(operation = 'default', testCase = null) {
   return defaultDelay;
 }
 
+/**
+ * Parse validation response from ADT
+ * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
+ * @param {Object} response - AxiosResponse from validation endpoint
+ * @returns {Object} Parsed validation result with valid, severity, message, exists fields
+ */
+function parseValidationResponse(response) {
+  try {
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '@_'
+    });
+    const result = parser.parse(response.data);
+
+    // Check for exception format (<exc:exception>)
+    const exception = result['exc:exception'];
+    if (exception) {
+      const message = exception['message'] || '';
+      const localizedMessage = exception['localizedMessage'] || message;
+      const msgText = localizedMessage || message;
+      const msgLower = msgText.toLowerCase();
+      
+      // Check exception type - ExceptionResourceAlreadyExists means object exists
+      const exceptionType = exception['type'] || '';
+      const isResourceAlreadyExists = exceptionType === 'ExceptionResourceAlreadyExists' ||
+                                      exceptionType.includes('ResourceAlreadyExists') ||
+                                      exceptionType.includes('AlreadyExists');
+      
+      // Check if message indicates object already exists
+      const exists = isResourceAlreadyExists ||
+                     msgLower.includes('already exists') ||
+                     msgLower.includes('does already exist') ||
+                     (msgLower.includes('exist') && (msgLower.includes('table') || msgLower.includes('database') || msgLower.includes('resource')));
+      
+      return {
+        valid: false,
+        severity: 'ERROR',
+        message: msgText,
+        exists: exists || undefined
+      };
+    }
+
+    // Check for standard format (<asx:abap><asx:values><DATA>)
+    const data = result['asx:abap']?.['asx:values']?.['DATA'];
+    if (!data) {
+      // No data means validation passed
+      return { valid: true };
+    }
+
+    // Check for CHECK_RESULT=X (success)
+    if (data['CHECK_RESULT'] === 'X') {
+      return { valid: true };
+    }
+
+    // Check for SEVERITY (error/warning)
+    const severity = data['SEVERITY'];
+    const shortText = data['SHORT_TEXT'] || '';
+    const longText = data['LONG_TEXT'] || '';
+
+    // Check if message indicates object already exists
+    const msgLower = shortText.toLowerCase();
+    const exists = msgLower.includes('already exists') ||
+                   msgLower.includes('does already exist') ||
+                   (msgLower.includes('exist') && (msgLower.includes('resource') || msgLower.includes('definition') || msgLower.includes('object')));
+
+    return {
+      valid: severity !== 'ERROR',
+      severity: severity,
+      message: shortText,
+      longText: longText,
+      exists: exists || undefined
+    };
+  } catch (error) {
+    // If parsing fails, assume validation passed (fallback)
+    return { valid: true };
+  }
+}
+
 module.exports = {
   loadTestConfig,
   getEnabledTestCase,
@@ -439,5 +518,6 @@ module.exports = {
   getTestTimeout,  // Add getTestTimeout from root helper
   resolveStandardObject,  // Add resolveStandardObject helper
   getOperationDelay,  // Get delay for SAP operations
+  parseValidationResponse,  // Parse validation response from ADT
 };
 
