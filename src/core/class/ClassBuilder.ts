@@ -42,7 +42,11 @@ import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
 import { lockClass } from './lock';
 import { updateClass } from './update';
-import { updateClassTestInclude } from './testclasses';
+import {
+  updateClassTestInclude,
+  lockClassTestClasses,
+  unlockClassTestClasses
+} from './testclasses';
 import { checkClass } from './check';
 import { unlockClass } from './unlock';
 import { activateClass } from './activation';
@@ -55,6 +59,7 @@ export class ClassBuilder {
   private config: ClassBuilderConfig;
   private sourceCode?: string;
   private lockHandle?: string;
+  private testLockHandle?: string;
   private state: ClassBuilderState;
 
   constructor(
@@ -98,6 +103,12 @@ export class ClassBuilder {
   setTestClassCode(sourceCode: string): this {
     this.config.testClassCode = sourceCode;
     this.logger.debug?.('Test class code set, length:', sourceCode.length);
+    return this;
+  }
+
+  setTestClassName(testClassName: string): this {
+    this.config.testClassName = testClassName;
+    this.logger.debug?.('Test class name set:', testClassName);
     return this;
   }
 
@@ -274,6 +285,26 @@ export class ClassBuilder {
     }
   }
 
+  async lockTestClasses(): Promise<this> {
+    try {
+      this.logger.info?.('Locking test classes for:', this.config.className);
+      this.connection.setSessionType('stateful');
+      const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
+      this.testLockHandle = lockHandle;
+      this.state.testLockHandle = lockHandle;
+      this.logger.info?.('Test classes locked, handle:', lockHandle);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'lockTestClasses',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Lock test classes failed:', error);
+      throw error;
+    }
+  }
+
   async update(sourceCode?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
@@ -307,8 +338,8 @@ export class ClassBuilder {
 
   async updateTestClasses(testClassSource?: string): Promise<this> {
     try {
-      if (!this.lockHandle) {
-        throw new Error('Class must be locked before updating test classes. Call lock() first.');
+      if (!this.testLockHandle) {
+        throw new Error('Test classes must be locked before update. Call lockTestClasses() first.');
       }
       const code = testClassSource || this.config.testClassCode;
       if (!code) {
@@ -319,7 +350,7 @@ export class ClassBuilder {
         this.connection,
         this.config.className,
         code,
-        this.lockHandle,
+        this.testLockHandle,
         this.config.transportRequest
       );
       this.state.testClassesResult = result;
@@ -394,6 +425,33 @@ export class ClassBuilder {
     }
   }
 
+  async unlockTestClasses(): Promise<this> {
+    try {
+      if (!this.testLockHandle) {
+        this.logger.warn?.('Test classes are not locked.');
+        return this;
+      }
+      this.logger.info?.('Unlocking test classes:', this.config.className);
+      const result = await unlockClassTestClasses(
+        this.connection,
+        this.config.className,
+        this.testLockHandle
+      );
+      this.state.testLockHandle = undefined;
+      this.testLockHandle = undefined;
+      this.logger.info?.('Test classes unlocked successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'unlockTestClasses',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Unlock test classes failed:', error);
+      throw error;
+    }
+  }
+
   async activate(): Promise<this> {
     try {
       this.logger.info?.('Activating class:', this.config.className);
@@ -412,6 +470,27 @@ export class ClassBuilder {
       });
       this.logger.error?.('Activate failed:', error);
       throw error; // Interrupts chain
+    }
+  }
+
+  async activateTestClasses(): Promise<this> {
+    try {
+      this.logger.info?.('Activating test classes via class activation:', this.config.className);
+      const result = await activateClass(
+        this.connection,
+        this.config.className
+      );
+      this.state.testActivateResult = result;
+      this.logger.info?.('Test classes activated within class activation:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'activateTestClasses',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Activate test classes failed:', error);
+      throw error;
     }
   }
 
@@ -440,22 +519,34 @@ export class ClassBuilder {
   }
 
   async forceUnlock(): Promise<void> {
-    if (!this.lockHandle) {
+    if (!this.lockHandle && !this.testLockHandle) {
       return;
     }
     try {
-      await unlockClass(
-        this.connection,
-        this.config.className,
-        this.lockHandle
-      );
+      if (this.lockHandle) {
+        await unlockClass(
+          this.connection,
+          this.config.className,
+          this.lockHandle
+        );
+        this.lockHandle = undefined;
+        this.state.lockHandle = undefined;
+      }
+
+      if (this.testLockHandle) {
+        await unlockClassTestClasses(
+          this.connection,
+          this.config.className,
+          this.testLockHandle
+        );
+        this.testLockHandle = undefined;
+        this.state.testLockHandle = undefined;
+      }
+
       this.connection.setSessionType("stateless");
       this.logger.info?.('Force unlock successful for', this.config.className);
     } catch (error: any) {
       this.logger.warn?.('Force unlock failed:', error);
-    } finally {
-      this.lockHandle = undefined;
-      this.state.lockHandle = undefined;
     }
   }
 
@@ -500,6 +591,14 @@ export class ClassBuilder {
     return this.state.testClassesResult;
   }
 
+  getTestClassesLockHandle(): string | undefined {
+    return this.state.testLockHandle;
+  }
+
+  getTestClassesActivateResult(): AxiosResponse | undefined {
+    return this.state.testActivateResult;
+  }
+
   getUnlockResult(): AxiosResponse | undefined {
     return this.state.unlockResult;
   }
@@ -532,6 +631,7 @@ export class ClassBuilder {
     metadata?: AxiosResponse;
     update?: AxiosResponse;
     testClasses?: AxiosResponse;
+    testClassesActivation?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
@@ -546,6 +646,7 @@ export class ClassBuilder {
       metadata: this.state.metadataResult,
       update: this.state.updateResult,
       testClasses: this.state.testClassesResult,
+      testClassesActivation: this.state.testActivateResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,

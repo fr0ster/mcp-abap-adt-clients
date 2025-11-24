@@ -36,6 +36,8 @@ interface CrudClientState {
   unlockResult?: AxiosResponse;
   updateResult?: AxiosResponse;
   testClassUpdateResult?: AxiosResponse;
+  testClassLockHandle?: string;
+  testClassActivateResult?: AxiosResponse;
   abapUnitRunResponse?: AxiosResponse;
   abapUnitRunStatus?: AxiosResponse;
   abapUnitRunResult?: AxiosResponse;
@@ -60,6 +62,8 @@ export class CrudClient extends ReadOnlyClient {
   getUnlockResult(): AxiosResponse | undefined { return this.crudState.unlockResult; }
   getUpdateResult(): AxiosResponse | undefined { return this.crudState.updateResult; }
   getTestClassUpdateResult(): AxiosResponse | undefined { return this.crudState.testClassUpdateResult; }
+  getTestClassLockHandle(): string | undefined { return this.crudState.testClassLockHandle; }
+  getTestClassActivateResult(): AxiosResponse | undefined { return this.crudState.testClassActivateResult; }
   getAbapUnitRunResponse(): AxiosResponse | undefined { return this.crudState.abapUnitRunResponse; }
   getAbapUnitRunId(): string | undefined { return this.crudState.abapUnitRunId; }
   getAbapUnitStatusResponse(): AxiosResponse | undefined { return this.crudState.abapUnitRunStatus; }
@@ -178,10 +182,37 @@ export class CrudClient extends ReadOnlyClient {
 
   async updateClassTestIncludes(className: string, testClassSource: string, lockHandle?: string): Promise<this> {
     const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
-    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
     builder.setTestClassCode(testClassSource);
+    if (lockHandle || this.crudState.testClassLockHandle) {
+      (builder as any).testLockHandle = lockHandle || this.crudState.testClassLockHandle;
+    } else {
+      await builder.lockTestClasses();
+      this.crudState.testClassLockHandle = builder.getState().testLockHandle;
+    }
     await builder.updateTestClasses();
     this.crudState.testClassUpdateResult = builder.getState().testClassesResult;
+    return this;
+  }
+
+  async lockTestClasses(className: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    await builder.lockTestClasses();
+    this.crudState.testClassLockHandle = builder.getState().testLockHandle;
+    return this;
+  }
+
+  async unlockTestClasses(className: string, lockHandle?: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    (builder as any).testLockHandle = lockHandle || this.crudState.testClassLockHandle;
+    await builder.unlockTestClasses();
+    this.crudState.testClassLockHandle = undefined;
+    return this;
+  }
+
+  async activateTestClasses(className: string, testClassName: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '', testClassName });
+    await builder.activateTestClasses();
+    this.crudState.testClassActivateResult = builder.getState().testActivateResult;
     return this;
   }
 

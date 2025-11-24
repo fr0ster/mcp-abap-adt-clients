@@ -107,7 +107,7 @@ describe('ClassBuilder', () => {
    * Pre-check: Verify test class doesn't exist
    * Safety: Skip test if object exists to avoid accidental deletion
    */
-  async function ensureClassReady(className: string, packageName: string): Promise<{ success: boolean; reason?: string }> {
+async function ensureClassReady(className: string, packageName: string): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
       return { success: true };
     }
@@ -115,11 +115,21 @@ describe('ClassBuilder', () => {
     // Check if class exists
     try {
       await getClass(connection, className);
+    try {
+      const cleanupBuilder = new ClassBuilder(connection, builderLogger, {
+        className,
+        packageName,
+        description: `Cleanup ${className}`
+      });
+      await cleanupBuilder.delete();
+      // Give backend time to finalize deletion
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    } catch (cleanupError: any) {
       return {
         success: false,
-        reason: `⚠️ SAFETY: Class ${className} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
+        reason: `Failed to delete existing class ${className}: ${cleanupError.message || cleanupError}`
       };
+    }
     } catch (error: any) {
       // 404 is expected - object doesn't exist, we can proceed
       if (error.response?.status !== 404) {
@@ -132,6 +142,27 @@ describe('ClassBuilder', () => {
 
     return { success: true };
   }
+
+async function waitForClassCreation(className: string, maxAttempts = 5, delayMs = 2000): Promise<void> {
+  if (!connection) {
+    return;
+  }
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await getClass(connection, className);
+      return;
+    } catch (error: any) {
+      if (error.response?.status !== 404) {
+        throw error;
+      }
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
 
 function buildUnitTestDefinitions(config: any, fallbackClassName: string): ClassUnitTestDefinition[] {
   if (!config) {
@@ -294,12 +325,18 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         ? buildUnitTestDefinitions(testClassConfig, testClassName)
         : [];
 
-        const builder = new ClassBuilder(connection, builderLogger, {
+        let builder = new ClassBuilder(connection, builderLogger, {
           className: testClassName,
           packageName: testPackageName,
           description: `Test class ${testClassName}`,
           transportRequest: resolveTransportRequest(testCase.params.transport_request),
       }).setCode(sourceCode);
+      if (testClassConfig?.source_code) {
+        builder = builder.setTestClassCode(testClassConfig.source_code);
+      }
+      if (testClassConfig?.name) {
+        builder = builder.setTestClassName(testClassConfig.name);
+      }
 
       try {
         logBuilderTestStep('validate');
@@ -309,8 +346,15 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             logBuilderTestStep('create');
           return b.create();
         })
-        .then(b => {
-            logBuilderTestStep('lock');
+        .then(async b => {
+          const createDelay = getOperationDelay('create', testCase);
+          await new Promise(resolve => setTimeout(resolve, createDelay));
+          const classNameToCreate = testClassName;
+          if (!classNameToCreate) {
+            throw new Error('class_name is not defined');
+          }
+          await waitForClassCreation(classNameToCreate);
+          logBuilderTestStep('lock');
           return b.lock();
         })
           .then(async b => {
@@ -319,17 +363,9 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             logBuilderTestStep('check with source code (before update)');
             return b.check('inactive', sourceCode);
         })
-          .then(b => {
+        .then(b => {
             logBuilderTestStep('update');
           return b.update();
-        })
-        .then(b => {
-          if (!shouldUpdateTestClass) {
-            return b;
-          }
-          logBuilderTestStep('update test classes');
-          b.setTestClassCode(testClassConfig.source_code);
-          return b.updateTestClasses();
         })
           .then(async b => {
             // Wait for SAP to commit update operation
@@ -337,10 +373,10 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             logBuilderTestStep('check(inactive)');
             return b.check('inactive');
         })
-        .then(b => {
+          .then(b => {
             logBuilderTestStep('unlock');
-          return b.unlock();
-        })
+            return b.unlock();
+          })
           .then(async b => {
             // Wait for SAP to commit unlock operation
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
@@ -350,6 +386,35 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
           .then(b => {
             logBuilderTestStep('check(active)');
             return b.check('active');
+          })
+          .then(async b => {
+            if (!shouldUpdateTestClass) {
+              return b;
+            }
+            logBuilderTestStep('lock test classes');
+            return b.lockTestClasses();
+          })
+          .then(b => {
+            if (!shouldUpdateTestClass) {
+              return b;
+            }
+            logBuilderTestStep('update test classes');
+            return b.updateTestClasses();
+          })
+          .then(b => {
+            if (!shouldUpdateTestClass) {
+              return b;
+            }
+            logBuilderTestStep('unlock test classes');
+            return b.unlockTestClasses();
+          })
+          .then(async b => {
+            if (!shouldUpdateTestClass) {
+              return b;
+            }
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+            logBuilderTestStep('activate test classes');
+            return b.activateTestClasses();
           })
           .then(async b => {
             if (!shouldRunUnitTests || testDefinitions.length === 0) {
@@ -393,9 +458,11 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             expect(String(resultResponse.data).toUpperCase()).toContain(
               (testDefinitions[0].testClass || '').toUpperCase()
             );
+            const resultPreview = String(resultResponse.data).substring(0, 400);
             testsLogger.info?.('[ABAP-UNIT] Result response received', {
               runId,
-              format: testClassConfig.unit_test_result?.format || 'abapunit'
+              format: testClassConfig.unit_test_result?.format || 'abapunit',
+              preview: resultPreview
             });
 
             return b;
