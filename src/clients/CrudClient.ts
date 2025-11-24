@@ -785,8 +785,37 @@ export class CrudClient extends ReadOnlyClient {
 
   // ==================== Package operations ====================
   
-  async createPackage(packageName: string, superPackage: string, description: string, transportRequest?: string): Promise<this> {
-    const builder = new PackageBuilder(this.connection, {}, { packageName, superPackage, description, transportRequest });
+  async createPackage(
+    packageName: string,
+    superPackage: string,
+    description: string,
+    transportOrOptions?:
+      | string
+      | {
+          packageType?: string;
+          softwareComponent?: string;
+          transportLayer?: string;
+          transportRequest?: string;
+          applicationComponent?: string;
+          responsible?: string;
+        }
+  ): Promise<this> {
+    const options =
+      typeof transportOrOptions === 'string' || transportOrOptions === undefined
+        ? { transportRequest: transportOrOptions }
+        : transportOrOptions;
+
+    const builder = new PackageBuilder(this.connection, {}, {
+      packageName,
+      superPackage,
+      description,
+      packageType: options?.packageType,
+      softwareComponent: options?.softwareComponent,
+      transportLayer: options?.transportLayer,
+      transportRequest: options?.transportRequest,
+      applicationComponent: options?.applicationComponent,
+      responsible: options?.responsible
+    });
     await builder.create();
     this.crudState.createResult = builder.getState().createResult;
     return this;

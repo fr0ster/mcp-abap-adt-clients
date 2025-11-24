@@ -30,7 +30,8 @@ const {
   getTestCaseDefinition,
   resolvePackageName,
   resolveStandardObject,
-  getEnvironmentConfig
+  getEnvironmentConfig,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -53,12 +54,14 @@ const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('PackageBuilder', () => {
   let connection: AbapConnection;
+  let connectionConfig: any = null;
   let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       const config = getConfig();
+      connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
@@ -155,6 +158,72 @@ describe('PackageBuilder', () => {
     };
   }
 
+  function isPackageLockedError(error: any): boolean {
+    if (!error) {
+      return false;
+    }
+    const message = String(error.message || '').toLowerCase();
+    const responseData = error.response?.data;
+    const responseText =
+      typeof responseData === 'string'
+        ? responseData.toLowerCase()
+        : JSON.stringify(responseData || '').toLowerCase();
+    return (
+      message.includes('already locked') ||
+      message.includes('is locked') ||
+      responseText.includes('already locked')
+    );
+  }
+
+  async function performDeleteWithRetry(builder: PackageBuilder, testCase: any): Promise<void> {
+    const deleteDelay = getOperationDelay('delete', testCase);
+    if (deleteDelay > 0) {
+      logBuilderTestStep(`wait (before delete ${deleteDelay}ms)`);
+      await new Promise(resolve => setTimeout(resolve, deleteDelay));
+    }
+
+    const attemptDelete = async () => {
+      logBuilderTestStep('delete (cleanup)');
+      await deleteWithFreshConnection(builder);
+    };
+
+    try {
+      await attemptDelete();
+    } catch (error: any) {
+      if (!isPackageLockedError(error)) {
+        throw error;
+      }
+      const retryDelay = getOperationDelay('delete_retry', testCase) || deleteDelay || 10000;
+      if (retryDelay > 0) {
+        logBuilderTestStep(`delete locked, retry after ${retryDelay}ms`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+      await attemptDelete();
+    }
+  }
+
+  async function deleteWithFreshConnection(builder: PackageBuilder): Promise<void> {
+    if (!connectionConfig) {
+      throw new Error('Connection configuration is unavailable for delete operation');
+    }
+
+    const dedicatedConnection = createAbapConnection(connectionConfig, connectionLogger);
+    await (dedicatedConnection as any).connect();
+    dedicatedConnection.setSessionType('stateless');
+
+    const builderInternal = builder as any;
+    const originalConnection = builderInternal.connection;
+
+    try {
+      builderInternal.connection = dedicatedConnection;
+      await builder.delete();
+    } finally {
+      builderInternal.connection = originalConnection;
+      dedicatedConnection.reset();
+    }
+  }
+
+
   describe('Full workflow', () => {
     let testCase: any = null;
     let packageName: string | null = null;
@@ -232,9 +301,11 @@ describe('PackageBuilder', () => {
             return b.check();
           })
           .then(async b => {
-            // Wait for system to process package creation before reading
-            logBuilderTestStep('wait (system processing)');
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            const createDelay = getOperationDelay('create', testCase);
+            if (createDelay > 0) {
+              logBuilderTestStep(`wait (after create ${createDelay}ms)`);
+              await new Promise(resolve => setTimeout(resolve, createDelay));
+            }
             return b;
           })
           .then(b => {
@@ -250,39 +321,40 @@ describe('PackageBuilder', () => {
             return b.update();
           })
           .then(async b => {
-            // Wait for system to process package update
-            logBuilderTestStep('wait (after update)');
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            const updateDelay = getOperationDelay('update', testCase);
+            if (updateDelay > 0) {
+              logBuilderTestStep(`wait (after update ${updateDelay}ms)`);
+              await new Promise(resolve => setTimeout(resolve, updateDelay));
+            }
             return b;
           })
           .then(b => {
             logBuilderTestStep('unlock');
             return b.unlock();
           })
-          // .then(async b => {
-          //   // Wait for system to process package update
-          //   logBuilderTestStep('wait (after update)');
-          //   await new Promise(resolve => setTimeout(resolve, 20000));
-          //   return b;
-          // })
+          .then(async b => {
+            const unlockDelay = getOperationDelay('unlock', testCase);
+            if (unlockDelay > 0) {
+              logBuilderTestStep(`wait (after unlock ${unlockDelay}ms)`);
+              await new Promise(resolve => setTimeout(resolve, unlockDelay));
+            }
+            return b;
+          })
           // .then(b => {
           //   logBuilderTestStep('read (verify update)');
           //   return b.read();
           // })
-          // .then(b => {
-          //   logBuilderTestStep('check(active)');
-          //   return b.check();
-          // })
           .then(b => {
-            logBuilderTestStep('delete (cleanup)');
-            return b.delete();
-            // return deletePackage(connection, packageName);
-          });
+            logBuilderTestStep('check(active)');
+            return b.check();
+          })
+
+        await performDeleteWithRetry(builder, testCase);
 
         const state = builder.getState();
         expect(state.createResult).toBeDefined();
         // expect(state.readResult).toBeDefined();
-        // expect(state.updateResult).toBeDefined();
+        expect(state.updateResult).toBeDefined();
         expect(state.errors.length).toBe(0);
         
         // Verify that description was updated

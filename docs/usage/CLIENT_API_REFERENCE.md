@@ -252,13 +252,15 @@ createFunctionModule(
 // Package
 createPackage(
   name: string,
-  description: string,
   superPackage: string,
-  transportRequest?: string,
-  options?: {
+  description: string,
+  transportOrOptions?: string | {
     packageType?: string;
     softwareComponent?: string;
     transportLayer?: string;
+    transportRequest?: string;
+    applicationComponent?: string;
+    responsible?: string;
   }
 ): Promise<this>
 
