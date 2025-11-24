@@ -3,7 +3,7 @@
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
  * Enable debug logs:
- *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_TESTS=true       - Integration test execution logs
  *   DEBUG_ADT_LIBS=true        - StructureBuilder library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *

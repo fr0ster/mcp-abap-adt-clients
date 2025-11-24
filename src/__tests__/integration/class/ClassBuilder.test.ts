@@ -3,7 +3,7 @@
  * Tests fluent API with Promise chaining, error handling, and result storage
  *
  * Enable debug logs:
- *   DEBUG_ADT_E2E_TESTS=true   - E2E test execution logs
+ *   DEBUG_ADT_TESTS=true       - Integration test execution logs
  *   DEBUG_ADT_LIBS=true        - ClassBuilder library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
@@ -357,6 +357,9 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             }
 
             logBuilderTestStep('run ABAP Unit tests');
+            testsLogger.info?.('[ABAP-UNIT] Starting run', {
+              tests: testDefinitions.map(test => `${test.containerClass}/${test.testClass}`).join(', ')
+            });
             const runOptions = normalizeUnitTestOptions(testClassConfig.unit_test_options);
             const runResponse = await startClassUnitTestRun(connection, testDefinitions, runOptions);
             expect(runResponse.status).toBeGreaterThanOrEqual(200);
@@ -364,6 +367,7 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
 
             const runId = extractRunIdFromResponse(runResponse);
             expect(runId).toBeTruthy();
+            testsLogger.info?.('[ABAP-UNIT] Run started', { runId });
 
             const statusResponse = await getClassUnitTestStatus(
               connection,
@@ -372,6 +376,10 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             );
             expect(statusResponse.status).toBe(200);
             expect(String(statusResponse.data)).toContain('FINISHED');
+            testsLogger.info?.('[ABAP-UNIT] Status response received', {
+              runId,
+              statusXmlSnippet: String(statusResponse.data).substring(0, 200)
+            });
 
             const resultResponse = await getClassUnitTestResult(
               connection,
@@ -385,6 +393,10 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             expect(String(resultResponse.data).toUpperCase()).toContain(
               (testDefinitions[0].testClass || '').toUpperCase()
             );
+            testsLogger.info?.('[ABAP-UNIT] Result response received', {
+              runId,
+              format: testClassConfig.unit_test_result?.format || 'abapunit'
+            });
 
             return b;
           })
