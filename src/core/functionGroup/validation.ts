@@ -34,11 +34,18 @@ export async function validateFunctionGroupName(
     queryParams.append('description', description);
   }
 
+  // XML body required for validation
+  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description || encodedName}" adtcore:language="EN" adtcore:name="${encodedName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN">
+</group:abapFunctionGroup>`;
+
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
     timeout: getTimeout('default'),
+    data: xmlPayload,
     headers: {
+      'Content-Type': 'application/vnd.sap.adt.functions.groups.v2+xml',
       'Accept': 'application/vnd.sap.as+xml'
     }
   });

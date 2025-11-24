@@ -137,6 +137,16 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
       this.logger.info?.('Structure name validation successful');
       return this;
     } catch (error: any) {
+      // For validation, HTTP 400 might indicate object exists - store response for analysis
+      if (error.response && error.response.status === 400) {
+        this.state.validationResponse = error.response;
+        this.logger.info?.('Structure validation returned 400 - object may already exist');
+        return this;
+      }
+      // Store error response if available
+      if (error.response) {
+        this.state.validationResponse = error.response;
+      }
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),

@@ -13,7 +13,6 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { FunctionGroupBuilder } from '../../../core/functionGroup';
 import { IAdtLogger } from '../../../utils/logger';
-import { getFunctionGroup } from '../../../core/functionGroup/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -38,7 +37,8 @@ const {
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getOperationDelay,
+  parseValidationResponse
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -87,35 +87,6 @@ describe('FunctionGroupBuilder', () => {
     }
   });
 
-  /**
-   * Pre-check: Verify test function group doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function ensureFunctionGroupReady(functionGroupName: string): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if function group exists
-    try {
-      await getFunctionGroup(connection, functionGroupName);
-      return {
-        success: false,
-        reason: `⚠️ SAFETY: Function Group ${functionGroupName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
-      };
-    } catch (error: any) {
-      // 404 is expected - object doesn't exist, we can proceed
-      if (error.response?.status !== 404) {
-        return {
-          success: false,
-          reason: `Cannot verify function group existence: ${error.message}`
-        };
-      }
-    }
-
-    return { success: true };
-  }
 
   function getBuilderTestDefinition() {
     return getTestCaseDefinition('create_function_group', 'builder_function_group');
@@ -170,16 +141,6 @@ describe('FunctionGroupBuilder', () => {
 
       testCase = tc;
       functionGroupName = tc.params.function_group_name;
-
-      // Cleanup before test
-      if (functionGroupName) {
-        const cleanup = await ensureFunctionGroupReady(functionGroupName);
-        if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup function group before test';
-        testCase = null;
-        functionGroupName = null;
-      }
-      }
     });
 
     it('should execute full workflow and store all results', async () => {
@@ -200,12 +161,27 @@ describe('FunctionGroupBuilder', () => {
 
       try {
         logBuilderTestStep('validate');
-      await builder
-        .validate()
-          .then(b => {
-            logBuilderTestStep('create');
-            return b.create();
-          })
+        await builder.validate();
+        
+        // Check validation result - if object exists, fail the test
+        const validationResponse = builder.getValidationResponse();
+        if (validationResponse) {
+          const validationResult = parseValidationResponse(validationResponse);
+          if (validationResult.exists) {
+            throw new Error(
+              `Function Group ${functionGroupName} already exists: ${validationResult.message || 'Object already exists'}`
+            );
+          }
+          if (!validationResult.valid) {
+            throw new Error(
+              `Function Group validation failed: ${validationResult.message || 'Validation error'}`
+            );
+          }
+        }
+        
+        logBuilderTestStep('create');
+        await builder
+          .create()
           .then(async b => {
             // Wait for SAP to commit create operation
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));

@@ -302,6 +302,11 @@ create_interface:
         source_code: |
           INTERFACE ZADT_BLD_IF01
             PUBLIC .
+      operation_delays:
+        create: 5000  # Increased delay for interface creation
+        lock: 3000
+        update: 3000
+        unlock: 3000
             METHODS: test_method.
           ENDINTERFACE.
 

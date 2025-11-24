@@ -34,11 +34,18 @@ export async function validateInterfaceName(
     queryParams.append('description', description);
   }
 
+  // XML body required for validation
+  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
+<intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description || encodedName}" adtcore:language="EN" adtcore:name="${encodedName}" adtcore:type="INTF/OI" adtcore:masterLanguage="EN">
+</intf:abapInterface>`;
+
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
     timeout: getTimeout('default'),
+    data: xmlPayload,
     headers: {
+      'Content-Type': 'application/vnd.sap.adt.oo.interfaces.v5+xml',
       'Accept': 'application/vnd.sap.as+xml'
     }
   });

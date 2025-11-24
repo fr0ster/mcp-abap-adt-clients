@@ -13,7 +13,6 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { InterfaceBuilder } from '../../../core/interface';
 import { IAdtLogger } from '../../../utils/logger';
-import { getInterface } from '../../../core/interface/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
@@ -37,7 +36,8 @@ getEnabledTestCase,
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getOperationDelay,
+  parseValidationResponse
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -80,35 +80,6 @@ describe('InterfaceBuilder', () => {
     }
   });
 
-  /**
-   * Pre-check: Verify test interface doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function ensureInterfaceReady(interfaceName: string): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if interface exists
-    try {
-      await getInterface(connection, interfaceName);
-      return {
-        success: false,
-        reason: `⚠️ SAFETY: Interface ${interfaceName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
-      };
-    } catch (error: any) {
-      // 404 is expected - object doesn't exist, we can proceed
-      if (error.response?.status !== 404) {
-        return {
-          success: false,
-          reason: `Cannot verify interface existence: ${error.message}`
-        };
-      }
-    }
-
-    return { success: true };
-  }
 
   function getBuilderTestDefinition() {
     return getTestCaseDefinition('create_interface', 'builder_interface');
@@ -164,16 +135,6 @@ describe('InterfaceBuilder', () => {
 
       testCase = tc;
       interfaceName = tc.params.interface_name;
-
-      // Cleanup before test
-      if (interfaceName) {
-        const cleanup = await ensureInterfaceReady(interfaceName);
-        if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup interface before test';
-          testCase = null;
-          interfaceName = null;
-        }
-      }
     });
 
     it('should execute full workflow and store all results', async () => {
@@ -198,6 +159,22 @@ describe('InterfaceBuilder', () => {
       try {
         logBuilderTestStep('validate');
         await builder.validate();
+        
+        // Check validation result - if object exists, fail the test
+        const validationResponse = builder.getValidationResponse();
+        if (validationResponse) {
+          const validationResult = parseValidationResponse(validationResponse);
+          if (validationResult.exists) {
+            throw new Error(
+              `Interface ${interfaceName} already exists: ${validationResult.message || 'Object already exists'}`
+            );
+          }
+          if (!validationResult.valid) {
+            throw new Error(
+              `Interface validation failed: ${validationResult.message || 'Validation error'}`
+            );
+          }
+        }
 
         logBuilderTestStep('create');
         await builder.create();

@@ -13,7 +13,6 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { StructureBuilder } from '../../../core/structure';
 import { IAdtLogger } from '../../../utils/logger';
-import { getStructure } from '../../../core/structure/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -36,7 +35,8 @@ getEnabledTestCase,
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getOperationDelay,
+  parseValidationResponse
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -80,35 +80,6 @@ describe('StructureBuilder', () => {
     }
   });
 
-  /**
-   * Pre-check: Verify test structure doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function ensureStructureReady(structureName: string): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if structure exists
-    try {
-      await getStructure(connection, structureName);
-      return {
-        success: false,
-        reason: `⚠️ SAFETY: Structure ${structureName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
-      };
-    } catch (error: any) {
-      // 404 is expected - object doesn't exist, we can proceed
-      if (error.response?.status !== 404) {
-        return {
-          success: false,
-          reason: `Cannot verify structure existence: ${error.message}`
-        };
-      }
-    }
-
-    return { success: true };
-  }
 
   function getBuilderTestDefinition() {
     return getTestCaseDefinition('create_structure', 'builder_structure');
@@ -164,16 +135,6 @@ describe('StructureBuilder', () => {
 
       testCase = tc;
       structureName = tc.params.structure_name;
-
-      // Cleanup before test
-      if (structureName) {
-        const cleanup = await ensureStructureReady(structureName);
-        if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup structure before test';
-          testCase = null;
-          structureName = null;
-        }
-      }
     });
 
     it('should execute full workflow and store all results', async () => {
@@ -194,12 +155,27 @@ describe('StructureBuilder', () => {
 
       try {
         logBuilderTestStep('validate');
-      await builder
-        .validate()
-          .then(b => {
-            logBuilderTestStep('create');
-            return b.create();
-          })
+        await builder.validate();
+        
+        // Check validation result - if object exists, fail the test
+        const validationResponse = builder.getValidationResponse();
+        if (validationResponse) {
+          const validationResult = parseValidationResponse(validationResponse);
+          if (validationResult.exists) {
+            throw new Error(
+              `Structure ${structureName} already exists: ${validationResult.message || 'Object already exists'}`
+            );
+          }
+          if (!validationResult.valid) {
+            throw new Error(
+              `Structure validation failed: ${validationResult.message || 'Validation error'}`
+            );
+          }
+        }
+        
+        logBuilderTestStep('create');
+        await builder
+          .create()
           .then(async b => {
             // Wait for SAP to finish create operation (includes lock/unlock internally)
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
