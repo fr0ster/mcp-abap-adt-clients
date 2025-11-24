@@ -364,6 +364,7 @@ update<ObjectType>(name: string, sourceCode: string, lockHandle?: string): Promi
 ```typescript
 updateProgram(name: string, sourceCode: string, lockHandle?: string): Promise<this>
 updateClass(name: string, sourceCode: string, lockHandle?: string): Promise<this>
+updateClassTestIncludes(name: string, testClassCode: string, lockHandle?: string): Promise<this>
 updateInterface(name: string, sourceCode: string, lockHandle?: string): Promise<this>
 updateDataElement(name: string, metadata: object, lockHandle?: string): Promise<this>
 updateDomain(name: string, metadata: object, lockHandle?: string): Promise<this>
@@ -373,6 +374,9 @@ updateView(name: string, ddlSource: string, lockHandle?: string): Promise<this>
 updateFunctionModule(name: string, functionGroup: string, sourceCode: string, lockHandle?: string): Promise<this>
 updatePackage(name: string, description: string, lockHandle?: string): Promise<this>
 ```
+
+`updateClassTestIncludes` uploads ABAP Unit test classes (the `CLAS/OC` *testclasses* include).  
+It requires the class to be locked, the LockHandle provided (or stored via `lockClass()`), and accepts raw ABAP test class source code.
 
 **Example:**
 ```typescript
@@ -391,6 +395,49 @@ await client
   .lockClass('ZCL_TEST')
   .updateClass('ZCL_TEST', sourceCode)
   .unlockClass('ZCL_TEST');
+```
+
+### ABAP Unit Operations
+
+Run and monitor ABAP Unit tests for class-based test implementations.
+
+```typescript
+runClassUnitTests(
+  tests: Array<{ containerClass: string; testClass: string }>,
+  options?: {
+    title?: string;
+    context?: string;
+    scope?: { ownTests?: boolean; foreignTests?: boolean; addForeignTestsAsPreview?: boolean };
+    riskLevel?: { harmless?: boolean; dangerous?: boolean; critical?: boolean };
+    duration?: { short?: boolean; medium?: boolean; long?: boolean };
+  }
+): Promise<this>
+
+getClassUnitTestRunStatus(runId: string, withLongPolling?: boolean): Promise<this>
+
+getClassUnitTestRunResult(
+  runId: string,
+  options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' }
+): Promise<this>
+```
+
+**Example:**
+```typescript
+await client
+  .lockClass('ZCL_ZOK_CDS_TEST_DATA')
+  .updateClassTestIncludes('ZCL_ZOK_CDS_TEST_DATA', TEST_CLASS_SOURCE)
+  .unlockClass('ZCL_ZOK_CDS_TEST_DATA')
+  .runClassUnitTests([
+    { containerClass: 'ZCL_ZOK_CDS_TEST_DATA', testClass: 'LTCL_ZOK_CDS_TEST_DATA' }
+  ]);
+
+const runId = client.getAbapUnitRunId(); // extracted from Location header
+await client.getClassUnitTestRunStatus(runId);
+await client.getClassUnitTestRunResult(runId, { withNavigationUris: false });
+
+console.log(client.getAbapUnitRunResponse()?.status);   // POST response
+console.log(client.getAbapUnitStatusResponse()?.data);  // Run status XML
+console.log(client.getAbapUnitResultResponse()?.data);  // Run result XML
 ```
 
 ### Activate Operations
@@ -496,6 +543,11 @@ getCreateResult(): AxiosResponse | undefined
 getLockHandle(): string | undefined
 getUnlockResult(): AxiosResponse | undefined
 getUpdateResult(): AxiosResponse | undefined
+getTestClassUpdateResult(): AxiosResponse | undefined
+getAbapUnitRunResponse(): AxiosResponse | undefined
+getAbapUnitRunId(): string | undefined
+getAbapUnitStatusResponse(): AxiosResponse | undefined
+getAbapUnitResultResponse(): AxiosResponse | undefined
 getActivateResult(): AxiosResponse | undefined
 getDeleteResult(): AxiosResponse | undefined
 getCheckResult(): AxiosResponse | undefined

@@ -101,17 +101,131 @@ create_class:
             CREATE PUBLIC .
 
             PUBLIC SECTION.
+              TYPES:
+                BEGIN OF ty_parent,
+                  fld1 TYPE char10,
+                  fld2 TYPE string,
+                  fld3 TYPE char8,
+                END OF ty_parent,
+                ty_parent_tab TYPE STANDARD TABLE OF ty_parent WITH DEFAULT KEY,
+                BEGIN OF ty_child,
+                  parent_id TYPE char10,
+                  chld_id   TYPE char10,
+                END OF ty_child,
+                ty_child_tab TYPE STANDARD TABLE OF ty_child WITH DEFAULT KEY.
+
               METHODS:
                 get_text RETURNING VALUE(rv_text) TYPE string.
+              CLASS-METHODS:
+                build_parent_data RETURNING VALUE(rt_parent) TYPE ty_parent_tab,
+                build_child_data  RETURNING VALUE(rt_child)  TYPE ty_child_tab.
             PROTECTED SECTION.
             PRIVATE SECTION.
           ENDCLASS.
 
           CLASS ZADT_BLD_CLS01 IMPLEMENTATION.
             METHOD get_text.
-              rv_text = 'Builder Test'.
+              rv_text = |Parents: { lines( build_parent_data( ) ) }|.
+            ENDMETHOD.
+
+            METHOD build_parent_data.
+              rt_parent = VALUE #(
+                ( fld1 = '0000000001' fld2 = 'Parent 1' fld3 = '20250101' )
+                ( fld1 = '0000000002' fld2 = 'Parent 2' fld3 = '20250105' )
+              ).
+            ENDMETHOD.
+
+            METHOD build_child_data.
+              rt_child = VALUE #(
+                ( parent_id = '0000000001' chld_id = 'C01' )
+                ( parent_id = '0000000001' chld_id = 'C02' )
+                ( parent_id = '0000000002' chld_id = 'C03' )
+              ).
             ENDMETHOD.
           ENDCLASS.
+
+        # Optional ABAP Unit test configuration.
+        # Remove the entire block below if you don't want to generate test classes or run ABAP Unit tests.
+        test_class:
+          enabled: true
+          run_unit_test: true
+          name: "LTCL_ZADT_BLD_CLS01"
+          container_class: "ZADT_BLD_CLS01"
+          source_code: |
+            CLASS ltcl_zadt_bld_cls01 DEFINITION
+              FOR TESTING
+              DURATION SHORT
+              RISK LEVEL HARMLESS
+              FINAL.
+
+              PRIVATE SECTION.
+                METHODS parent_data_two_rows FOR TESTING.
+                METHODS child_data_relations FOR TESTING.
+            ENDCLASS.
+
+            CLASS ltcl_zadt_bld_cls01 IMPLEMENTATION.
+              METHOD parent_data_two_rows.
+                DATA lt_parent TYPE zadt_bld_cls01=>ty_parent_tab.
+                lt_parent = zadt_bld_cls01=>build_parent_data( ).
+
+                cl_abap_unit_assert=>assert_equals(
+                  act = lines( lt_parent )
+                  exp = 2
+                  msg = 'Expected 2 parent rows'
+                ).
+
+                DATA(ls_first) = lt_parent[ 1 ].
+                cl_abap_unit_assert=>assert_equals(
+                  act = ls_first-fld1
+                  exp = '0000000001'
+                  msg = 'Incorrect key for first parent'
+                ).
+              ENDMETHOD.
+
+              METHOD child_data_relations.
+                DATA lt_parent TYPE zadt_bld_cls01=>ty_parent_tab.
+                DATA lt_child  TYPE zadt_bld_cls01=>ty_child_tab.
+
+                lt_parent = zadt_bld_cls01=>build_parent_data( ).
+                lt_child  = zadt_bld_cls01=>build_child_data( ).
+
+                cl_abap_unit_assert=>assert_equals(
+                  act = lines( lt_child )
+                  exp = 3
+                  msg = 'Expected 3 child rows'
+                ).
+
+                LOOP AT lt_child ASSIGNING FIELD-SYMBOL(<ls_child>).
+                  READ TABLE lt_parent WITH KEY fld1 = <ls_child>-parent_id TRANSPORTING NO FIELDS.
+                  cl_abap_unit_assert=>assert_equals(
+                    act = sy-subrc
+                    exp = 0
+                    msg = |Invalid parent reference { <ls_child>-parent_id }|
+                  ).
+                ENDLOOP.
+              ENDMETHOD.
+            ENDCLASS.
+
+          unit_test_options:
+            title: "LTCL_ZADT_BLD_CLS01"
+            context: "Builder Class ABAP Unit"
+            scope:
+              own_tests: true
+              foreign_tests: false
+              add_foreign_tests_as_preview: true
+            risk_level:
+              harmless: true
+              dangerous: true
+              critical: true
+            duration:
+              short: true
+              medium: true
+              long: true
+          unit_test_status:
+            with_long_polling: true
+          unit_test_result:
+            with_navigation_uris: false
+            format: "abapunit"   # or "junit"
 
 # Create Package
 create_package:

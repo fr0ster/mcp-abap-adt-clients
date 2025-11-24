@@ -11,7 +11,14 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { ClassBuilder } from '../../../core/class';
+import {
+  ClassBuilder,
+  ClassUnitTestDefinition,
+  ClassUnitTestRunOptions,
+  startClassUnitTestRun,
+  getClassUnitTestStatus,
+  getClassUnitTestResult
+} from '../../../core/class';
 import { IAdtLogger } from '../../../utils/logger';
 import { getClass } from '../../../core/class/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -126,6 +133,85 @@ describe('ClassBuilder', () => {
     return { success: true };
   }
 
+function buildUnitTestDefinitions(config: any, fallbackClassName: string): ClassUnitTestDefinition[] {
+  if (!config) {
+    return [];
+  }
+
+  const entries = Array.isArray(config.tests) && config.tests.length
+    ? config.tests
+    : [{
+        container_class: config.container_class || fallbackClassName,
+        test_class: config.name || config.test_class
+      }];
+
+  return entries
+    .map((entry: any) => ({
+      containerClass: entry.container_class || entry.containerClass || fallbackClassName,
+      testClass: entry.test_class || entry.testClass || entry.name || config.name || 'LTCL_TEST_CLASS'
+    }))
+    .filter((item: ClassUnitTestDefinition) => Boolean(item.containerClass) && Boolean(item.testClass));
+}
+
+function normalizeUnitTestOptions(raw?: any): ClassUnitTestRunOptions | undefined {
+  if (!raw) {
+    return undefined;
+  }
+
+  const options: ClassUnitTestRunOptions = {};
+  if (raw.title) {
+    options.title = raw.title;
+  }
+  if (raw.context) {
+    options.context = raw.context;
+  }
+
+  if (raw.scope) {
+    options.scope = {
+      ownTests: raw.scope.own_tests ?? raw.scope.ownTests,
+      foreignTests: raw.scope.foreign_tests ?? raw.scope.foreignTests,
+      addForeignTestsAsPreview: raw.scope.add_foreign_tests_as_preview ?? raw.scope.addForeignTestsAsPreview
+    };
+  }
+
+  const riskSource = raw.risk_level || raw.riskLevel;
+  if (riskSource) {
+    options.riskLevel = {
+      harmless: riskSource.harmless,
+      dangerous: riskSource.dangerous,
+      critical: riskSource.critical
+    };
+  }
+
+  if (raw.duration) {
+    options.duration = {
+      short: raw.duration.short,
+      medium: raw.duration.medium,
+      long: raw.duration.long
+    };
+  }
+
+  return options;
+}
+
+function extractRunIdFromResponse(response: { headers?: Record<string, any> }): string | null {
+  if (!response?.headers) {
+    return null;
+  }
+
+  const headerNames = ['location', 'content-location', 'sap-adt-location'];
+  for (const header of headerNames) {
+    const value = response.headers[header] || response.headers[header.toUpperCase()];
+    if (typeof value === 'string' && value.length > 0) {
+      const runId = value.split('/').pop();
+      if (runId) {
+        return runId;
+      }
+    }
+  }
+  return null;
+}
+
   describe('Full workflow', () => {
     let testCase: any = null;
     let testClassName: string | null = null;
@@ -194,6 +280,19 @@ describe('ClassBuilder', () => {
         return;
       }
       const sourceCode = testCase.params.source_code || `CLASS ${testClassName} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
+      const testClassConfig = testCase.params.test_class;
+      const shouldUpdateTestClass = Boolean(
+        testClassConfig &&
+        testClassConfig.enabled !== false &&
+        testClassConfig.source_code
+      );
+      const shouldRunUnitTests = Boolean(
+        shouldUpdateTestClass &&
+        (testClassConfig.run_unit_test === undefined || testClassConfig.run_unit_test === true)
+      );
+      const testDefinitions = shouldRunUnitTests
+        ? buildUnitTestDefinitions(testClassConfig, testClassName)
+        : [];
 
         const builder = new ClassBuilder(connection, builderLogger, {
           className: testClassName,
@@ -224,6 +323,14 @@ describe('ClassBuilder', () => {
             logBuilderTestStep('update');
           return b.update();
         })
+        .then(b => {
+          if (!shouldUpdateTestClass) {
+            return b;
+          }
+          logBuilderTestStep('update test classes');
+          b.setTestClassCode(testClassConfig.source_code);
+          return b.updateTestClasses();
+        })
           .then(async b => {
             // Wait for SAP to commit update operation
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
@@ -244,6 +351,43 @@ describe('ClassBuilder', () => {
             logBuilderTestStep('check(active)');
             return b.check('active');
           })
+          .then(async b => {
+            if (!shouldRunUnitTests || testDefinitions.length === 0) {
+              return b;
+            }
+
+            logBuilderTestStep('run ABAP Unit tests');
+            const runOptions = normalizeUnitTestOptions(testClassConfig.unit_test_options);
+            const runResponse = await startClassUnitTestRun(connection, testDefinitions, runOptions);
+            expect(runResponse.status).toBeGreaterThanOrEqual(200);
+            expect(runResponse.status).toBeLessThan(400);
+
+            const runId = extractRunIdFromResponse(runResponse);
+            expect(runId).toBeTruthy();
+
+            const statusResponse = await getClassUnitTestStatus(
+              connection,
+              runId as string,
+              testClassConfig.unit_test_status?.with_long_polling !== false
+            );
+            expect(statusResponse.status).toBe(200);
+            expect(String(statusResponse.data)).toContain('FINISHED');
+
+            const resultResponse = await getClassUnitTestResult(
+              connection,
+              runId as string,
+              {
+                withNavigationUris: testClassConfig.unit_test_result?.with_navigation_uris ?? false,
+                format: testClassConfig.unit_test_result?.format === 'junit' ? 'junit' : 'abapunit'
+              }
+            );
+            expect(resultResponse.status).toBe(200);
+            expect(String(resultResponse.data).toUpperCase()).toContain(
+              (testDefinitions[0].testClass || '').toUpperCase()
+            );
+
+            return b;
+          })
           .then(b => {
             logBuilderTestStep('delete (cleanup)');
             return b.delete();
@@ -252,6 +396,9 @@ describe('ClassBuilder', () => {
         const state = builder.getState();
         expect(state.createResult).toBeDefined();
         expect(state.activateResult).toBeDefined();
+        if (shouldUpdateTestClass) {
+          expect(state.testClassesResult).toBeDefined();
+        }
         expect(state.errors.length).toBe(0);
 
         logBuilderTestSuccess(testsLogger, 'ClassBuilder - full workflow');

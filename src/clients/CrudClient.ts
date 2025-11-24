@@ -9,7 +9,14 @@ import { ReadOnlyClient } from './ReadOnlyClient';
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { ProgramBuilder } from '../core/program';
-import { ClassBuilder } from '../core/class';
+import {
+  ClassBuilder,
+  startClassUnitTestRun,
+  getClassUnitTestStatus,
+  getClassUnitTestResult,
+  ClassUnitTestDefinition,
+  ClassUnitTestRunOptions
+} from '../core/class';
 import { InterfaceBuilder } from '../core/interface';
 import { DataElementBuilder } from '../core/dataElement';
 import { DomainBuilder } from '../core/domain';
@@ -28,6 +35,11 @@ interface CrudClientState {
   lockHandle?: string;
   unlockResult?: AxiosResponse;
   updateResult?: AxiosResponse;
+  testClassUpdateResult?: AxiosResponse;
+  abapUnitRunResponse?: AxiosResponse;
+  abapUnitRunStatus?: AxiosResponse;
+  abapUnitRunResult?: AxiosResponse;
+  abapUnitRunId?: string;
   activateResult?: AxiosResponse;
   deleteResult?: AxiosResponse;
   checkResult?: AxiosResponse;
@@ -47,6 +59,11 @@ export class CrudClient extends ReadOnlyClient {
   getLockHandle(): string | undefined { return this.crudState.lockHandle; }
   getUnlockResult(): AxiosResponse | undefined { return this.crudState.unlockResult; }
   getUpdateResult(): AxiosResponse | undefined { return this.crudState.updateResult; }
+  getTestClassUpdateResult(): AxiosResponse | undefined { return this.crudState.testClassUpdateResult; }
+  getAbapUnitRunResponse(): AxiosResponse | undefined { return this.crudState.abapUnitRunResponse; }
+  getAbapUnitRunId(): string | undefined { return this.crudState.abapUnitRunId; }
+  getAbapUnitStatusResponse(): AxiosResponse | undefined { return this.crudState.abapUnitRunStatus; }
+  getAbapUnitResultResponse(): AxiosResponse | undefined { return this.crudState.abapUnitRunResult; }
   getActivateResult(): AxiosResponse | undefined { return this.crudState.activateResult; }
   getDeleteResult(): AxiosResponse | undefined { return this.crudState.deleteResult; }
   getCheckResult(): AxiosResponse | undefined { return this.crudState.checkResult; }
@@ -159,6 +176,15 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  async updateClassTestIncludes(className: string, testClassSource: string, lockHandle?: string): Promise<this> {
+    const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    builder.setTestClassCode(testClassSource);
+    await builder.updateTestClasses();
+    this.crudState.testClassUpdateResult = builder.getState().testClassesResult;
+    return this;
+  }
+
   async activateClass(className: string): Promise<this> {
     const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
     await builder.activate();
@@ -184,6 +210,40 @@ export class CrudClient extends ReadOnlyClient {
     const builder = new ClassBuilder(this.connection, {}, { className, description: '', transportRequest });
     await builder.delete();
     this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
+  async runClassUnitTests(
+    tests: ClassUnitTestDefinition[],
+    options?: ClassUnitTestRunOptions
+  ): Promise<this> {
+    const response = await startClassUnitTestRun(this.connection, tests, options);
+    this.crudState.abapUnitRunResponse = response;
+    const location =
+      response.headers?.['location'] ||
+      response.headers?.['content-location'] ||
+      response.headers?.['sap-adt-location'];
+    if (location) {
+      const runId = location.split('/').pop();
+      if (runId) {
+        this.crudState.abapUnitRunId = runId;
+      }
+    }
+    return this;
+  }
+
+  async getClassUnitTestRunStatus(runId: string, withLongPolling: boolean = true): Promise<this> {
+    const response = await getClassUnitTestStatus(this.connection, runId, withLongPolling);
+    this.crudState.abapUnitRunStatus = response;
+    return this;
+  }
+
+  async getClassUnitTestRunResult(
+    runId: string,
+    options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' }
+  ): Promise<this> {
+    const response = await getClassUnitTestResult(this.connection, runId, options);
+    this.crudState.abapUnitRunResult = response;
     return this;
   }
 

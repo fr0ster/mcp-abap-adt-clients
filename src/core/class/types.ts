@@ -28,6 +28,7 @@ export interface ClassBuilderConfig {
   packageName?: string;
   transportRequest?: string;
   sourceCode?: string;
+  testClassCode?: string;
   superclass?: string;
   final?: boolean;
   abstract?: boolean;
@@ -45,6 +46,7 @@ export interface ClassBuilderState {
   lockHandle?: string;
   unlockResult?: any;
   updateResult?: any;
+  testClassesResult?: any;
   activateResult?: any;
   checkResult?: any;
   deleteResult?: any;

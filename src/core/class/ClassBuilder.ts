@@ -42,6 +42,7 @@ import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
 import { lockClass } from './lock';
 import { updateClass } from './update';
+import { updateClassTestInclude } from './testclasses';
 import { checkClass } from './check';
 import { unlockClass } from './unlock';
 import { activateClass } from './activation';
@@ -91,6 +92,12 @@ export class ClassBuilder {
   setCode(sourceCode: string): this {
     this.sourceCode = sourceCode;
     this.logger.debug?.('Source code set, length:', sourceCode.length);
+    return this;
+  }
+
+  setTestClassCode(sourceCode: string): this {
+    this.config.testClassCode = sourceCode;
+    this.logger.debug?.('Test class code set, length:', sourceCode.length);
     return this;
   }
 
@@ -298,6 +305,37 @@ export class ClassBuilder {
     }
   }
 
+  async updateTestClasses(testClassSource?: string): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Class must be locked before updating test classes. Call lock() first.');
+      }
+      const code = testClassSource || this.config.testClassCode;
+      if (!code) {
+        throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
+      }
+      this.logger.info?.('Updating class test include:', this.config.className);
+      const result = await updateClassTestInclude(
+        this.connection,
+        this.config.className,
+        code,
+        this.lockHandle,
+        this.config.transportRequest
+      );
+      this.state.testClassesResult = result;
+      this.logger.info?.('Class test include updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'updateTestClasses',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update test classes failed:', error);
+      throw error;
+    }
+  }
+
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
     try {
       this.logger.info?.('Checking class:', this.config.className, 'version:', version);
@@ -458,6 +496,10 @@ export class ClassBuilder {
     return this.state.checkResult;
   }
 
+  getTestClassesResult(): AxiosResponse | undefined {
+    return this.state.testClassesResult;
+  }
+
   getUnlockResult(): AxiosResponse | undefined {
     return this.state.unlockResult;
   }
@@ -489,6 +531,7 @@ export class ClassBuilder {
     read?: AxiosResponse;
     metadata?: AxiosResponse;
     update?: AxiosResponse;
+    testClasses?: AxiosResponse;
     check?: AxiosResponse;
     unlock?: AxiosResponse;
     activate?: AxiosResponse;
@@ -502,6 +545,7 @@ export class ClassBuilder {
       read: this.state.readResult,
       metadata: this.state.metadataResult,
       update: this.state.updateResult,
+      testClasses: this.state.testClassesResult,
       check: this.state.checkResult,
       unlock: this.state.unlockResult,
       activate: this.state.activateResult,
