@@ -58,7 +58,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/connection": "^0.1.8",
+    "@mcp-abap-adt/connection": "^0.1.11",
     "fast-xml-parser": "^5.2.5",
     "yaml": "^2.3.4"
   },
