@@ -26,7 +26,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
+import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createTransport } from './create';
 import { getTransport } from './read';
 import { CreateTransportParams, TransportBuilderConfig, TransportBuilderState } from './types';
@@ -105,7 +105,7 @@ export class TransportBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Create failed:', error);
+      logErrorSafely(this.logger, 'Create', error);
       throw error;
     }
   }

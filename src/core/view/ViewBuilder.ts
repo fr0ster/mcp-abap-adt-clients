@@ -31,7 +31,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
+import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createView } from './create';
 import { updateView } from './update';
 import { lockDDLS } from './lock';
@@ -158,7 +158,7 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Create failed:', error);
+      logErrorSafely(this.logger, 'Create', error);
       throw error;
     }
   }

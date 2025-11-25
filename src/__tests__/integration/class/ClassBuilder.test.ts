@@ -340,29 +340,36 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
 
       try {
         logBuilderTestStep('validate');
-      await builder
-        .validate()
-        .then(b => {
+        await builder.validate();
+        const validationResponse = builder.getValidationResponse();
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        }
+        expect(validationResponse?.status).toBe(200);
+        
+        await builder
+          .create()
+          .then(async b => {
             logBuilderTestStep('create');
-          return b.create();
-        })
-        .then(async b => {
-          const createDelay = getOperationDelay('create', testCase);
-          await new Promise(resolve => setTimeout(resolve, createDelay));
-          const classNameToCreate = testClassName;
-          if (!classNameToCreate) {
-            throw new Error('class_name is not defined');
-          }
-          await waitForClassCreation(classNameToCreate);
-          logBuilderTestStep('lock');
-          return b.lock();
-        })
+            const createDelay = getOperationDelay('create', testCase);
+            await new Promise(resolve => setTimeout(resolve, createDelay));
+            const classNameToCreate = testClassName;
+            if (!classNameToCreate) {
+              throw new Error('class_name is not defined');
+            }
+            await waitForClassCreation(classNameToCreate);
+            logBuilderTestStep('lock');
+            return b.lock();
+          })
           .then(async b => {
             // Wait for SAP to commit lock operation
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
             logBuilderTestStep('check with source code (before update)');
             return b.check('inactive', sourceCode);
-        })
+          })
         .then(b => {
             logBuilderTestStep('update');
           return b.update();

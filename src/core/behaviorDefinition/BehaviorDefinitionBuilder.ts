@@ -21,7 +21,7 @@ import { checkImplementation, checkAbap } from './check';
 import { activate } from './activation';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
 import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams, BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState } from './types';
-import { IAdtLogger } from '../../utils/logger';
+import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 
 export class BehaviorDefinitionBuilder {
   private connection: AbapConnection;
@@ -148,7 +148,7 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Create failed:', error);
+      logErrorSafely(this.logger, 'Create', error);
       throw error; // Interrupts chain
     }
   }

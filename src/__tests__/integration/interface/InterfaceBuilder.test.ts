@@ -13,6 +13,7 @@
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { InterfaceBuilder } from '../../../core/interface';
 import { IAdtLogger } from '../../../utils/logger';
+import { getInterface } from '../../../core/interface/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
@@ -36,8 +37,7 @@ getEnabledTestCase,
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay,
-  parseValidationResponse
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -100,6 +100,33 @@ describe('InterfaceBuilder', () => {
     };
   }
 
+  async function waitForInterfaceCreation(interfaceName: string, maxAttempts = 5, delayMs = 2000): Promise<void> {
+    if (!connection) {
+      return;
+    }
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await getInterface(connection, interfaceName);
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          console.log(`[waitForInterfaceCreation] Interface ${interfaceName} found on attempt ${attempt}`);
+        }
+        return;
+      } catch (error: any) {
+        if (error.response?.status !== 404) {
+          throw error;
+        }
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          console.log(`[waitForInterfaceCreation] Interface ${interfaceName} not found yet (attempt ${attempt}/${maxAttempts})`);
+        }
+        if (attempt === maxAttempts) {
+          throw new Error(`Interface ${interfaceName} was not created after ${maxAttempts} attempts (${maxAttempts * delayMs}ms total wait time)`);
+        }
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
   describe('Full workflow', () => {
     let testCase: any = null;
     let interfaceName: string | null = null;
@@ -159,28 +186,40 @@ describe('InterfaceBuilder', () => {
       try {
         logBuilderTestStep('validate');
         await builder.validate();
-        
-        // Check validation result - if object exists, fail the test
         const validationResponse = builder.getValidationResponse();
-        if (validationResponse) {
-          const validationResult = parseValidationResponse(validationResponse);
-          if (validationResult.exists) {
-            throw new Error(
-              `Interface ${interfaceName} already exists: ${validationResult.message || 'Object already exists'}`
-            );
-          }
-          if (!validationResult.valid) {
-            throw new Error(
-              `Interface validation failed: ${validationResult.message || 'Validation error'}`
-            );
-          }
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
         }
+        expect(validationResponse?.status).toBe(200);
 
         logBuilderTestStep('create');
         await builder.create();
         
+        // Verify create was successful (201 Created or 200 OK)
+        const createResult = builder.getState().createResult;
+        if (!createResult) {
+          throw new Error('Interface creation did not return a result');
+        }
+        if (createResult.status !== 201 && createResult.status !== 200) {
+          const errorData = typeof createResult.data === 'string' 
+            ? createResult.data 
+            : JSON.stringify(createResult.data);
+          console.error(`Create failed (HTTP ${createResult.status}): ${errorData}`);
+          throw new Error(`Interface creation failed with status ${createResult.status}`);
+        }
+        
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          console.log(`[InterfaceBuilder test] Create successful - Status: ${createResult.status}`);
+        }
+        
         // Wait for SAP to commit the object creation (metadata only)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        
+        // Wait for interface to be available for lock
+        await waitForInterfaceCreation(interfaceName);
 
         logBuilderTestStep('lock');
         await builder.lock();

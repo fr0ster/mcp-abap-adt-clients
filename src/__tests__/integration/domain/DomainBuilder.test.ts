@@ -204,13 +204,20 @@ describe('DomainBuilder', () => {
 
       try {
         logBuilderTestStep('validate');
+        await builder.validate();
+        const validationResponse = builder.getState().validationResponse;
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        }
+        expect(validationResponse?.status).toBe(200);
+        
         await builder
-          .validate()
-          .then(b => {
-            logBuilderTestStep('create');
-            return b.create();
-          })
+          .create()
           .then(async b => {
+            logBuilderTestStep('create');
             // Wait for SAP to finish create operation (includes lock/unlock internally)
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock');

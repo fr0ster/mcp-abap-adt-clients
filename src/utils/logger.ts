@@ -23,3 +23,24 @@ export const emptyLogger: IAdtLogger = {
   warn: () => {},
   error: () => {},
 };
+
+/**
+ * Safely log error without exposing credentials from AxiosError.config/request
+ * Only logs status, statusText, and response data (limited to 500 chars)
+ */
+export function logErrorSafely(
+  logger: IAdtLogger | undefined,
+  operation: string,
+  error: any
+): void {
+  if (error?.response) {
+    const status = error.response.status;
+    const statusText = error.response.statusText;
+    const data = typeof error.response.data === 'string' 
+      ? error.response.data.substring(0, 500)
+      : JSON.stringify(error.response.data).substring(0, 500);
+    logger?.error?.(`${operation} failed: HTTP ${status} ${statusText}`, { status, statusText, data });
+  } else {
+    logger?.error?.(`${operation} failed:`, error instanceof Error ? error.message : String(error));
+  }
+}

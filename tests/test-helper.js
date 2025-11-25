@@ -447,17 +447,22 @@ function parseValidationResponse(response) {
                                       exceptionType.includes('ResourceAlreadyExists') ||
                                       exceptionType.includes('AlreadyExists');
       
+      // InvalidClifName with "already exists" message also means object exists
+      // Also check if exception type is InvalidClifName - this usually means object exists for OO objects
+      const isInvalidClifName = exceptionType === 'InvalidClifName';
+      
       // Check if message indicates object already exists
       const exists = isResourceAlreadyExists ||
+                     (isInvalidClifName && msgLower.includes('already exists')) ||
                      msgLower.includes('already exists') ||
                      msgLower.includes('does already exist') ||
-                     (msgLower.includes('exist') && (msgLower.includes('table') || msgLower.includes('database') || msgLower.includes('resource')));
+                     (msgLower.includes('exist') && (msgLower.includes('table') || msgLower.includes('database') || msgLower.includes('resource') || msgLower.includes('interface') || msgLower.includes('class')));
       
       return {
         valid: false,
         severity: 'ERROR',
         message: msgText,
-        exists: exists || undefined
+        exists: exists ? true : undefined
       };
     }
 
@@ -497,6 +502,36 @@ function parseValidationResponse(response) {
   }
 }
 
+/**
+ * Check validation result and throw error if validation failed
+ * Simple check: if status is not 200, throw error with raw message
+ * @param {Object} validationResponse - AxiosResponse from validation
+ * @param {string} objectName - Name of the object being validated
+ * @param {string} objectType - Type of object (e.g., 'Interface', 'Class', 'Table')
+ * @throws {Error} If validation failed (status !== 200)
+ */
+function checkValidationResult(validationResponse, objectName, objectType) {
+  if (!validationResponse) {
+    return; // No validation response, assume OK
+  }
+
+  const status = validationResponse.status;
+
+  // If status is 200, validation passed
+  if (status === 200) {
+    return;
+  }
+
+  // If status is not 200, get raw error message and throw
+  const rawData = typeof validationResponse.data === 'string' 
+    ? validationResponse.data 
+    : JSON.stringify(validationResponse.data);
+
+  throw new Error(
+    `${objectType} validation failed (HTTP ${status}): ${rawData}`
+  );
+}
+
 module.exports = {
   loadTestConfig,
   getEnabledTestCase,
@@ -519,5 +554,6 @@ module.exports = {
   resolveStandardObject,  // Add resolveStandardObject helper
   getOperationDelay,  // Get delay for SAP operations
   parseValidationResponse,  // Parse validation response from ADT
+  checkValidationResult,  // Check validation result and throw if failed
 };
 

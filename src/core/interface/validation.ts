@@ -1,6 +1,7 @@
 /**
  * Interface validation
- * Uses ADT validation endpoint: /sap/bc/adt/oo/interfaces/validation
+ * Uses ADT validation endpoint: /sap/bc/adt/oo/validation/objectname
+ * Same endpoint as class validation, but with objtype=INTF/OI
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
@@ -11,7 +12,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Validate interface name
  * Returns raw response from ADT - consumer decides how to interpret it
  * 
- * Endpoint: POST /sap/bc/adt/oo/interfaces/validation
+ * Endpoint: POST /sap/bc/adt/oo/validation/objectname
  * 
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
@@ -20,33 +21,34 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function validateInterfaceName(
   connection: AbapConnection,
   interfaceName: string,
+  packageName?: string,
   description?: string
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/oo/interfaces/validation`;
   const encodedName = encodeSapObjectName(interfaceName);
-  
-  const queryParams = new URLSearchParams({
-    objtype: 'intf',
-    objname: encodedName
+
+  // Build query parameters for interface validation (same format as class validation)
+  const params = new URLSearchParams({
+    objname: encodedName,
+    objtype: 'INTF/OI'
   });
 
-  if (description) {
-    queryParams.append('description', description);
+  if (packageName) {
+    params.append('packagename', packageName);
   }
 
-  // XML body required for validation
-  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description || encodedName}" adtcore:language="EN" adtcore:name="${encodedName}" adtcore:type="INTF/OI" adtcore:masterLanguage="EN">
-</intf:abapInterface>`;
+  if (description) {
+    params.append('description', description);
+  }
+
+  const url = `/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
+  const headers = {
+    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check'
+  };
 
   return connection.makeAdtRequest({
-    url: `${url}?${queryParams.toString()}`,
+    url,
     method: 'POST',
     timeout: getTimeout('default'),
-    data: xmlPayload,
-    headers: {
-      'Content-Type': 'application/vnd.sap.adt.oo.interfaces.v5+xml',
-      'Accept': 'application/vnd.sap.as+xml'
-    }
+    headers
   });
 }

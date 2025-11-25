@@ -11,7 +11,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
+import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
 import { CreateFunctionGroupParams, FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './types';
@@ -74,6 +74,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
       const result = await validateFunctionGroupName(
         this.connection,
         this.config.functionGroupName,
+        this.config.packageName,
         this.config.description
       );
       // Store raw response - consumer decides how to interpret it
@@ -126,7 +127,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Create failed:', error);
+      logErrorSafely(this.logger, 'Create', error);
       throw error; // Interrupts chain
     }
   }

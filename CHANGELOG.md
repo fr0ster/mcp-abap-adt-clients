@@ -9,6 +9,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 - **Configurable package creation**: `CrudClient.createPackage()` now accepts either the legacy transport-request string or a richer options object (`packageType`, `softwareComponent`, `transportLayer`, `transportRequest`, `applicationComponent`, `responsible`). This enables Cloud-specific inputs such as `software_component: "ZLOCAL"` with an empty transport layer. Both `PackageBuilder` and the MCP handlers pass the options through automatically.
+- **UnitTestBuilder** – new Builder class for ABAP Unit test operations:
+  - Supports both class unit tests (test includes) and CDS view unit tests (full class lifecycle)
+  - Methods: `lockTestClasses()`, `updateTestClass()`, `unlockTestClasses()`, `activateTestClasses()`, `runForClass()`, `runForObject()`, `getStatus()`, `getResult()`, `deleteTestClass()`
+  - Low-level functions separated into `unitTest/classTest.ts` and `unitTest/run.ts` modules
+  - Integration test for CDS unit tests in `ViewBuilder.test.ts` demonstrates complete workflow: table creation → CDS view creation → unit test class creation → test execution → result retrieval
+
+### Changed
+- **Standardized validation error handling** – all Builders now handle HTTP 400 validation responses consistently:
+  - `StructureBuilder.validate()` now stores HTTP 400 responses in `validationResponse` instead of throwing errors, allowing consumers to parse and interpret validation results
+  - `InterfaceBuilder.validate()` now stores HTTP 400 responses in `validationResponse` instead of throwing errors, allowing consumers to parse and interpret validation results
+  - `FunctionGroupBuilder.validate()` now stores HTTP 400 responses in `validationResponse` instead of throwing errors, allowing consumers to parse and interpret validation results
+  - This aligns validation behavior with `TableBuilder` and `ViewBuilder`, ensuring consistent error handling across all Builders
+  - Integration tests now properly handle validation responses by parsing them and throwing appropriate errors when objects already exist
+- **Validation test assertions simplified** – all integration tests now use Jest `expect` for validation checks:
+  - Replaced `checkValidationResult()` helper with direct `expect(validationResponse?.status).toBe(200)` assertions
+  - Added error output before assertion: when validation fails (non-200 status), the actual SAP error message is logged via `console.error` before Jest assertion error
+  - This provides better visibility into validation failures by showing the actual SAP response data (HTTP status and error details) before the Jest assertion error
+  - Removed `checkValidationResult` helper function and all imports from test files
+- **Test timeout configuration** – timeouts now configured via third parameter of `it()` instead of `jest.setTimeout()`:
+  - Full workflow tests use `getTimeout('test')` (120 seconds)
+  - CDS unit test uses `getTimeout('long')` (200 seconds)
+  - Timeouts are read from `test-config.yaml` via `getTimeout()` helper function
+
+### Fixed
+- **Interface creation timing** – increased default delay after interface creation from 3000ms to 5000ms in test configuration to prevent 404 errors when locking interfaces immediately after creation
+  - Updated `tests/test-config.yaml` and `tests/test-config.yaml.template` with `operation_delays.create: 5000` for `builder_interface` test case
+- **FunctionGroup Kerberos error handling** – FunctionGroup creation now ignores "Kerberos library not loaded" errors (HTTP 400) when the error message contains this text
+  - SAP sometimes returns HTTP 400 with "Kerberos library not loaded" but still creates the FunctionGroup object
+  - The create operation now returns a mock successful response (status 201) when this specific error occurs, allowing workflows to continue
+  - Added detailed system information logging for FunctionGroup creation when `DEBUG_ADT_TESTS=true` or `NODE_ENV=test`
+- **Interface validation endpoint** – fixed Interface validation to use correct ADT endpoint `/sap/bc/adt/oo/validation/objectname` with `objtype=INTF/OI` and `packageName` query parameter
+  - Aligns with Eclipse ADT's validation behavior
+  - Previously used incorrect endpoint which caused "wrong input data for processing" errors
+- **FunctionGroup validation** – added `packageName` parameter to FunctionGroup validation request
+  - `packageName` is now included in both query parameters and XML payload when provided
+  - Ensures validation works correctly for FunctionGroups with package context
+- **Interface create status verification** – added explicit status code verification in `create.ts` to ensure only HTTP 201/200 responses are accepted
+  - Throws descriptive error if create returns unexpected status code
+  - Improves error visibility when interface creation fails silently
+- **Test workflow fixes** – removed duplicate `lock()` calls from integration tests
+  - Fixed tests in `ClassBuilder`, `DataElementBuilder`, `DomainBuilder`, `FunctionModuleBuilder`, `FunctionGroupBuilder`
+  - Two consecutive locks are invalid in ADT and caused test failures
+- **Safe error logging** – implemented `logErrorSafely()` utility function to prevent credential leakage in error logs
+  - All Builder `create()` methods now use `logErrorSafely()` instead of directly logging AxiosError objects
+  - Limits response data to 500 characters and excludes sensitive headers
+  - Applied to all 14 Builders: Class, Interface, Program, View, Table, Structure, DataElement, Domain, FunctionGroup, FunctionModule, Package, Transport, BehaviorDefinition, MetadataExtension
+- **Interface test improvements** – added operation delays after create, lock, update, and unlock operations in InterfaceBuilder test
+  - Ensures SAP has time to commit operations before proceeding
+  - Added `waitForInterfaceCreation()` helper with retry logic and detailed logging
+  - Improved error messages when interface is not found after creation
+
+### Changed
+- **Error logging security** – all Builder error logging now uses `logErrorSafely()` to prevent exposing credentials in logs
+  - Replaced direct `logger.error()` calls with `logErrorSafely()` in all Builder `create()` methods
+  - Error details are logged without sensitive information (credentials, full response data)
+  - Response data is limited to first 500 characters for readability
 
 ### Documentation
 - Updated `docs/usage/CLIENT_API_REFERENCE.md` to describe the new `createPackage(name, superPackage, description, transportOrOptions?)` signature and the available option fields.

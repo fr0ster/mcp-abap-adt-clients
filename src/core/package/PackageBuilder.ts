@@ -29,7 +29,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
+import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createPackage } from './create';
 import { validatePackageBasic, validatePackageFull } from './validation';
 import { checkPackage } from './check';
@@ -209,7 +209,7 @@ export class PackageBuilder {
             error: error instanceof Error ? error : new Error(String(error)),
             timestamp: new Date()
           });
-          this.logger.error?.('Create failed and read also failed:', error);
+          logErrorSafely(this.logger, 'Create and read', error);
           throw error;
         }
       }
@@ -219,7 +219,7 @@ export class PackageBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Create failed:', error);
+      logErrorSafely(this.logger, 'Create', error);
       throw error;
     }
   }

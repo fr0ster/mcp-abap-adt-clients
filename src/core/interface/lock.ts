@@ -22,7 +22,7 @@ export async function lockInterface(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout(), data: null, headers});
+  const response = await connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: null, headers});
 
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -55,7 +55,7 @@ export async function lockInterfaceForUpdate(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
   };
 
-  const response = await connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout(), data: null, headers});
+  const response = await connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: null, headers});
 
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
   const result = parser.parse(response.data);

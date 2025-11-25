@@ -37,8 +37,7 @@ const {
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay,
-  parseValidationResponse
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -162,22 +161,14 @@ describe('FunctionGroupBuilder', () => {
       try {
         logBuilderTestStep('validate');
         await builder.validate();
-        
-        // Check validation result - if object exists, fail the test
         const validationResponse = builder.getValidationResponse();
-        if (validationResponse) {
-          const validationResult = parseValidationResponse(validationResponse);
-          if (validationResult.exists) {
-            throw new Error(
-              `Function Group ${functionGroupName} already exists: ${validationResult.message || 'Object already exists'}`
-            );
-          }
-          if (!validationResult.valid) {
-            throw new Error(
-              `Function Group validation failed: ${validationResult.message || 'Validation error'}`
-            );
-          }
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
         }
+        expect(validationResponse?.status).toBe(200);
         
         logBuilderTestStep('create');
         await builder

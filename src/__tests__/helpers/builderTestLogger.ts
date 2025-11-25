@@ -1,4 +1,4 @@
-import { IAdtLogger } from "../../utils/logger";
+import { IAdtLogger, logErrorSafely } from "../../utils/logger";
 
 export interface BuilderTestLogger {
   info?: (...args: any[]) => void;
@@ -14,6 +14,7 @@ const lockLogsEnabled = lockLogsSetting !== 'false' && lockLogsSetting !== '0' &
 let testCounter = 0;
 let totalTests = 0;
 const testStartTimes = new Map<string, number>();
+const testResults = new Map<string, 'PASS' | 'FAIL' | 'SKIP'>();
 
 function extractErrorMessage(error: unknown): string {
   if (!error) {
@@ -124,6 +125,7 @@ export function resetTestCounter(): void {
   testCounter = 0;
   totalTests = 0;
   testStartTimes.clear();
+  testResults.clear();
 }
 
 export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testName: string, reason: string): void {
@@ -132,25 +134,37 @@ export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testNa
   const message = `${progress} ⏭ SKIP ${testName} – ${reason}`;
   logImmediate(message);
   logger?.warn?.(message);
+  testResults.set(testName, 'SKIP');
 }
 
 export function logBuilderTestSuccess(logger: BuilderTestLogger | undefined, testName: string): void {
-  const startTime = testStartTimes.get(testName);
-  const duration = startTime ? ` (${((Date.now() - startTime) / 1000).toFixed(1)}s)` : '';
-  const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
-  const message = `${progress} ✓ PASS ${testName}${duration}`;
-  // Ensure immediate output
-  logImmediate(message);
-  logger?.info?.(message);
-  testStartTimes.delete(testName);
+  try {
+    const startTime = testStartTimes.get(testName);
+    const duration = startTime ? ` (${((Date.now() - startTime) / 1000).toFixed(1)}s)` : '';
+    const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
+    const message = `${progress} ✓ PASS ${testName}${duration}`;
+    // Ensure immediate output
+    logImmediate(message);
+    logger?.info?.(message);
+    testStartTimes.delete(testName);
+    testResults.set(testName, 'PASS');
+  } catch (error) {
+    // Ignore logging errors if test already completed
+    // This can happen when tests are run in parallel and Jest considers test done
+  }
 }
 
 export function logBuilderTestEnd(logger: BuilderTestLogger | undefined, testName: string): void {
-  // End is logged implicitly in success/fail, only log in debug mode
-  if (debugLogsEnabled) {
-    const message = `  END ${testName}`;
-    logImmediate(message);
-    logger?.info?.(message);
+  try {
+    // End is logged implicitly in success/fail, only log in debug mode
+    if (debugLogsEnabled) {
+      const message = `  END ${testName}`;
+      logImmediate(message);
+      logger?.info?.(message);
+    }
+  } catch (error) {
+    // Ignore logging errors if test already completed
+    // This can happen when tests are run in parallel and Jest considers test done
   }
 }
 
@@ -180,13 +194,41 @@ export function logBuilderTestError(
     }
   }
 
-  logger?.error?.(message, error);
+  // Use safe error logging to avoid exposing credentials
+  if (logger) {
+    logErrorSafely(logger, testName, error);
+  }
   testStartTimes.delete(testName);
+  testResults.set(testName, 'FAIL');
 }
 
 export function logBuilderTestStep(step: string): void {
   if (debugLogsEnabled) {
     logImmediate(`  → ${step}`);
+  }
+}
+
+/**
+ * Log systemInfo for debugging (used in FunctionGroup create and other operations)
+ */
+export function logBuilderSystemInfo(systemInfo: any, finalValues: {
+  masterSystem?: string;
+  responsible?: string;
+  willIncludeMasterSystem?: boolean;
+  willIncludeResponsible?: boolean;
+  masterSystemAttr?: string;
+  responsibleAttr?: string;
+}): void {
+  if (debugLogsEnabled) {
+    logImmediate(`  [SystemInfo] hasSystemInfo: ${!!systemInfo}`);
+    logImmediate(`  [SystemInfo] systemID: ${systemInfo?.systemID || '(none)'}`);
+    logImmediate(`  [SystemInfo] userName: ${systemInfo?.userName || '(none)'}`);
+    logImmediate(`  [SystemInfo] finalMasterSystem: ${finalValues.masterSystem || '(none)'}`);
+    logImmediate(`  [SystemInfo] finalResponsible: ${finalValues.responsible || '(none)'}`);
+    logImmediate(`  [SystemInfo] willIncludeMasterSystem: ${finalValues.willIncludeMasterSystem || false}`);
+    logImmediate(`  [SystemInfo] willIncludeResponsible: ${finalValues.willIncludeResponsible || false}`);
+    logImmediate(`  [SystemInfo] masterSystemAttr: ${finalValues.masterSystemAttr || '(not included)'}`);
+    logImmediate(`  [SystemInfo] responsibleAttr: ${finalValues.responsibleAttr || '(not included)'}`);
   }
 }
 

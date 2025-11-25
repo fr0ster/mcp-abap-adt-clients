@@ -4,10 +4,11 @@ TypeScript clients for SAP ABAP Development Tools (ADT) with a **Builder and Cli
 
 ## Features
 
-- ✅ **Builder API** – fluent interface for complex workflows with method chaining (`ClassBuilder`, `ProgramBuilder`, etc.)
+- ✅ **Builder API** – fluent interface for complex workflows with method chaining (`ClassBuilder`, `ProgramBuilder`, `UnitTestBuilder`, etc.)
 - ✅ **Client API** – simplified interface for common operations:
   - `ReadOnlyClient` – read operations for all object types
   - `CrudClient` – full CRUD operations with method chaining and state management
+- ✅ **ABAP Unit test support** – `UnitTestBuilder` for running and managing ABAP Unit tests (class and CDS view tests)
 - ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
 - ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
 - ✅ **TypeScript-first** – full type safety with comprehensive interfaces

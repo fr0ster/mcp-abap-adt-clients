@@ -20,6 +20,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function validateFunctionGroupName(
   connection: AbapConnection,
   functionGroupName: string,
+  packageName?: string,
   description?: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups/validation`;
@@ -30,13 +31,21 @@ export async function validateFunctionGroupName(
     objname: encodedName
   });
 
+  if (packageName) {
+    queryParams.append('packagename', encodeSapObjectName(packageName));
+  }
+
   if (description) {
     queryParams.append('description', description);
   }
 
   // XML body required for validation
+  const packageRef = packageName 
+    ? `  <adtcore:packageRef adtcore:name="${encodeSapObjectName(packageName)}"/>`
+    : '';
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description || encodedName}" adtcore:language="EN" adtcore:name="${encodedName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN">
+${packageRef}
 </group:abapFunctionGroup>`;
 
   return connection.makeAdtRequest({

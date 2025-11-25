@@ -36,7 +36,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
+import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { validateClassName } from './validation';
 import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
@@ -160,6 +160,17 @@ export class ClassBuilder {
       this.logger.info?.('Validation successful');
       return this;
     } catch (error: any) {
+      // For validation, HTTP 400 might indicate object exists or validation error - store response for analysis
+      if (error.response && error.response.status === 400) {
+        this.state.validationResponse = error.response;
+        this.logger.info?.('Class validation returned 400 - object may already exist or validation error');
+        return this;
+      }
+      // Store error response if available
+      if (error.response) {
+        this.state.validationResponse = error.response;
+      }
+      
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
@@ -200,7 +211,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Create failed:', error);
+      logErrorSafely(this.logger, 'Create', error);
       throw error; // Interrupts chain
     }
   }

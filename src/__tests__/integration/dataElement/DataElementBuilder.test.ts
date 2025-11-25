@@ -37,7 +37,8 @@ const {
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  resolveStandardObject
+  resolveStandardObject,
+  getOperationDelay
 } = require('../../../../tests/test-helper');
 const { getTimeout } = require('../../../../tests/test-helper');
 
@@ -219,17 +220,28 @@ describe('DataElementBuilder', () => {
 
       try {
         logBuilderTestStep('validate');
-      await builder
-          .validate()
-          .then(b => {
+        await builder.validate();
+        const validationResponse = builder.getState().validationResponse;
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        }
+        expect(validationResponse?.status).toBe(200);
+        
+        await builder
+          .create()
+          .then(async b => {
             logBuilderTestStep('create');
-            return b.create();
-          })
-          .then(b => {
+            // Wait for SAP to finish create operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock');
             return b.lock();
           })
-          .then(b => {
+          .then(async b => {
+            // Wait for SAP to commit lock operation
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
             logBuilderTestStep('update');
             return b.update();
           })

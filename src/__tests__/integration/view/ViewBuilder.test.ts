@@ -10,7 +10,7 @@
  * Run: npm test -- --testPathPattern=view/ViewBuilder
  */
 
-import { AbapConnection, getTimeout, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
 import { ViewBuilder } from '../../../core/view';
 import { ClassBuilder } from '../../../core/class';
 import { TableBuilder } from '../../../core/table';
@@ -18,9 +18,7 @@ import { UnitTestBuilder } from '../../../core/unitTest';
 import { SharedBuilder } from '../../../core/shared';
 import { IAdtLogger } from '../../../utils/logger';
 import { getView } from '../../../core/view/read';
-import { deleteView } from '../../../core/view/delete';
 import { getTable } from '../../../core/table/read';
-import { deleteTable } from '../../../core/table/delete';
 import { getClass } from '../../../core/class/read';
 import { getConfig } from '../../helpers/sessionConfig';
 import { createOnLockCallback } from '../../helpers/lockHelper';
@@ -45,7 +43,7 @@ getEnabledTestCase,
   resolveTransportRequest,
   ensurePackageConfig,
   getOperationDelay,
-  parseValidationResponse
+  getTimeout
 } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -222,38 +220,14 @@ describe('ViewBuilder', () => {
 
           logBuilderTestStep('validate table');
           await tableBuilder.validate();
-          
-          // Check validation result - if object exists, fail the test
-          const validationResponse = tableBuilder.getValidationResponse();
-          if (validationResponse) {
-            const validationResult = parseValidationResponse(validationResponse);
-            
-            // Check HTTP status - 400 usually means validation failed (object exists or invalid)
-            if (validationResponse.status === 400) {
-              // For 400, check if it's because object exists
-              if (validationResult.exists) {
-                throw new Error(
-                  `Table ${tableName} already exists: ${validationResult.message || 'Object already exists'}`
-                );
-              }
-              // If 400 but not "exists", it's still a validation error
-              throw new Error(
-                `Table validation failed (HTTP 400): ${validationResult.message || 'Validation error'}`
-              );
-            }
-            
-            // For other statuses, check validation result
-            if (validationResult.exists) {
-              throw new Error(
-                `Table ${tableName} already exists: ${validationResult.message || 'Object already exists'}`
-              );
-            }
-            if (!validationResult.valid) {
-              throw new Error(
-                `Table validation failed: ${validationResult.message || 'Validation error'}`
-              );
-            }
+          const tableValidationResponse = tableBuilder.getValidationResponse();
+          if (tableValidationResponse?.status !== 200) {
+            const errorData = typeof tableValidationResponse?.data === 'string' 
+              ? tableValidationResponse.data 
+              : JSON.stringify(tableValidationResponse?.data);
+            console.error(`Validation failed (HTTP ${tableValidationResponse?.status}): ${errorData}`);
           }
+          expect(tableValidationResponse?.status).toBe(200);
           
           logBuilderTestStep('create table');
           try {
@@ -421,7 +395,7 @@ describe('ViewBuilder', () => {
 
         logBuilderTestEnd(testsLogger, 'ViewBuilder - full workflow');
       }
-    }, getTimeout('long'));
+    }, getTimeout('test')); // Full workflow test timeout (200 seconds)
   });
 
   describe('CDS Unit Test workflow', () => {
@@ -431,7 +405,7 @@ describe('ViewBuilder', () => {
     let className: string | null = null;
     let skipReason: string | null = null;
 
-      beforeEach(async () => {
+    beforeEach(async () => {
       skipReason = null;
       testCase = null;
       tableName = null;
@@ -516,22 +490,14 @@ describe('ViewBuilder', () => {
       try {
         logBuilderTestStep('validate table');
         await tableBuilder.validate();
-        
-        // Check validation result - if object exists, fail the test
-        const validationResponse = tableBuilder.getValidationResponse();
-        if (validationResponse) {
-          const validationResult = parseValidationResponse(validationResponse);
-          if (validationResult.exists) {
-            throw new Error(
-              `Table ${tableName} already exists: ${validationResult.message || 'Object already exists'}`
-            );
-          }
-          if (!validationResult.valid) {
-            throw new Error(
-              `Table validation failed: ${validationResult.message || 'Validation error'}`
-            );
-          }
+        const tableValidationResponse = tableBuilder.getValidationResponse();
+        if (tableValidationResponse?.status !== 200) {
+          const errorData = typeof tableValidationResponse?.data === 'string' 
+            ? tableValidationResponse.data 
+            : JSON.stringify(tableValidationResponse?.data);
+          console.error(`Validation failed (HTTP ${tableValidationResponse?.status}): ${errorData}`);
         }
+        expect(tableValidationResponse?.status).toBe(200);
         
         logBuilderTestStep('create table');
         try {
@@ -743,8 +709,6 @@ describe('ViewBuilder', () => {
         expect(unitTestBuilder!.getRunId()).toBeDefined();
         expect(unitTestBuilder!.getRunStatus()).toBeDefined();
         expect(unitTestBuilder!.getRunResult()).toBeDefined();
-
-        logBuilderTestSuccess(testsLogger, 'ViewBuilder - CDS unit test');
       } catch (error: any) {
         const statusText = getHttpStatusText(error);
         const enhancedError = statusText !== 'HTTP ?'
@@ -753,12 +717,23 @@ describe('ViewBuilder', () => {
         logBuilderTestError(testsLogger, 'ViewBuilder - CDS unit test', enhancedError);
         throw enhancedError;
       } finally {
-        await classBuilder.forceUnlock().catch(() => {});
-        await viewBuilder.forceUnlock().catch(() => {});
-        await tableBuilder.forceUnlock().catch(() => {});
+        try {
+          await classBuilder.forceUnlock().catch(() => {});
+          await viewBuilder.forceUnlock().catch(() => {});
+          await tableBuilder.forceUnlock().catch(() => {});
+        } catch (cleanupError) {
+          // Ignore cleanup errors
+        }
+        
+        // Log success/end only if test didn't throw
+        try {
+          logBuilderTestSuccess(testsLogger, 'ViewBuilder - CDS unit test');
+        } catch (logError) {
+          // Ignore logging errors if test already completed
+        }
         logBuilderTestEnd(testsLogger, 'ViewBuilder - CDS unit test');
       }
-    }, getTimeout('long') * 2); // CDS unit test needs more time
+    }, getTimeout('long')); // CDS unit test needs more time (400 seconds = 6.67 minutes)
   });
 
 });

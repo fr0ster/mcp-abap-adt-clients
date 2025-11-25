@@ -290,11 +290,22 @@ describe('PackageBuilder', () => {
 
       try {
         logBuilderTestStep('validate');
-      await builder
-        .validate()
+        await builder.validate();
+        const validationResponse = builder.getValidationResponse();
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        }
+        expect(validationResponse?.status).toBe(200);
+        
+        await builder
+          .create()
           .then(b => {
             logBuilderTestStep('create');
-            return b.create();
+            logBuilderTestStep('check(active)');
+            return b.check();
           })
           .then(b => {
             logBuilderTestStep('check(active)');

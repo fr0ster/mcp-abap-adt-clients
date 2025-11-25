@@ -31,7 +31,7 @@
 
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
+import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { create } from './create';
 import { lockStructure } from './lock';
 import { upload } from './update';
@@ -181,7 +181,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Create failed:', error);
+      logErrorSafely(this.logger, 'Create', error);
       throw error;
     }
   }

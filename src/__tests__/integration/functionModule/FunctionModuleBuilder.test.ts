@@ -284,13 +284,20 @@ describe('FunctionModuleBuilder', () => {
         const sourceCode = testCase.params.source_code;
         
         logBuilderTestStep('validate');
-      await builder
-        .validate()
-          .then(b => {
-            logBuilderTestStep('create');
-            return b.create();
-          })
+        await builder.validate();
+        const validationResponse = builder.getValidationResponse();
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        }
+        expect(validationResponse?.status).toBe(200);
+        
+        await builder
+          .create()
           .then(async b => {
+            logBuilderTestStep('create');
             // Wait for SAP to commit create operation
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock');
