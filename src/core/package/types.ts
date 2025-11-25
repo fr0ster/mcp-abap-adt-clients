@@ -18,15 +18,17 @@ export interface CreatePackageParams {
 }
 
 // Builder configuration (camelCase)
+// Note: superPackage is required for create operations (validated in builder methods)
+// description is required for create/validate operations
 export interface PackageBuilderConfig {
-  packageName: string;
-  superPackage: string;
-  description: string;
+  packageName: string; // Required
+  superPackage?: string; // Required for create operations, optional for others
+  description?: string; // Required for create/validate operations, optional for others
   updatedDescription?: string; // Description to use for update operation
   packageType?: string;
   softwareComponent?: string;
   transportLayer?: string;
-  transportRequest?: string;
+  transportRequest?: string; // Only optional parameter
   applicationComponent?: string;
   responsible?: string;
   onLock?: (lockHandle: string) => void;

@@ -48,11 +48,13 @@ export interface DeleteDomainParams {
 }
 
 // Builder configuration (camelCase)
+// Note: packageName is required for create/update operations (validated in builder methods)
+// description is required for create/update/validate operations
 export interface DomainBuilderConfig {
   domainName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
+  packageName?: string; // Required for create/update operations, optional for others
+  transportRequest?: string; // Only optional parameter
+  description?: string; // Required for create/update/validate operations, optional for others
   datatype?: string;
   length?: number;
   decimals?: number;

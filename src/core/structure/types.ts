@@ -45,12 +45,14 @@ export interface DeleteStructureParams {
 }
 
 // Builder configuration (camelCase)
+// Note: packageName and ddlCode are required for create operations (validated in builder methods)
+// description is required for create/validate operations
 export interface StructureBuilderConfig {
   structureName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  ddlCode?: string; // DDL SQL source code for structure (required for create operation)
+  packageName?: string; // Required for create operations, optional for others
+  transportRequest?: string; // Only optional parameter
+  description?: string; // Required for create/validate operations, optional for others
+  ddlCode?: string; // Required for create operation - DDL SQL source code for structure
   // Legacy fields (deprecated, use ddlCode instead)
   fields?: StructureField[];
   includes?: StructureInclude[];

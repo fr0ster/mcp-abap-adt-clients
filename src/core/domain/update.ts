@@ -4,13 +4,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
-import { lockDomain } from './lock';
-import { unlockDomain } from './unlock';
-import { activateDomain } from './activation';
-import { checkDomainSyntax } from './check';
 import { UpdateDomainParams } from './types';
 
 /**
@@ -18,7 +12,7 @@ import { UpdateDomainParams } from './types';
  * 
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
-async function updateDomainInternal(
+export async function updateDomain(
   connection: AbapConnection,
   args: UpdateDomainParams,
   lockHandle: string,
@@ -87,113 +81,5 @@ ${fixValuesXml}
     data: xmlBody,
     headers
   });
-}
-
-/**
- * Get domain to verify update
- */
-async function getDomainForVerification(
-  connection: AbapConnection,
-  domainName: string
-): Promise<any> {
-  const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
-  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?version=workingArea`;
-
-  const headers = {
-    'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml'
-  };
-
-  const response = await connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers
-  });
-
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-
-  const result = parser.parse(response.data);
-  return result['doma:domain'];
-}
-
-/**
- * Update ABAP domain
- * Full workflow: lock -> update -> check -> unlock -> activate
- */
-export async function updateDomain(
-  connection: AbapConnection,
-  params: UpdateDomainParams
-): Promise<AxiosResponse> {
-  if (!params.domain_name) {
-    throw new Error('Domain name is required');
-  }
-  if (!params.package_name) {
-    throw new Error('Package name is required');
-  }
-
-  // Enable stateful session mode
-  connection.setSessionType("stateful");
-
-  // Get masterSystem and responsible (only for cloud systems)
-  // On cloud, getSystemInformation returns systemID and userName
-  // On on-premise, it returns null, so we don't add these attributes
-  const systemInfo = await getSystemInformation(connection);
-  const masterSystem = systemInfo?.systemID;
-  const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
-
-  let lockHandle = '';
-
-  try {
-    lockHandle = await lockDomain(connection, params.domain_name);
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    await updateDomainInternal(connection, params, lockHandle, username, masterSystem);
-
-    await checkDomainSyntax(connection, params.domain_name, 'inactive');
-
-    await unlockDomain(connection, params.domain_name, lockHandle);
-
-    const shouldActivate = params.activate !== false;
-    if (shouldActivate) {
-      await activateDomain(connection, params.domain_name);
-    }
-
-    const updatedDomain = await getDomainForVerification(connection, params.domain_name);
-
-    // Disable stateful session mode
-    connection.setSessionType("stateless");
-
-    return {
-      data: {
-        success: true,
-        domain_name: params.domain_name,
-        package: params.package_name,
-        transport_request: params.transport_request,
-        status: shouldActivate ? 'active' : 'inactive',
-        message: `Domain ${params.domain_name} updated${shouldActivate ? ' and activated' : ''} successfully`,
-        domain_details: updatedDomain
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    } as AxiosResponse;
-
-  } catch (error: any) {
-    if (lockHandle) {
-      try {
-        await unlockDomain(connection, params.domain_name, lockHandle);
-      } catch (unlockError) {
-        // Ignore unlock errors
-      } finally {
-        connection.setSessionType("stateless");
-      }
-    }
-    throw error;
-  }
 }
 

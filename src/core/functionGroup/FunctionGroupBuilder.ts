@@ -22,6 +22,7 @@ import { deleteFunctionGroup } from './delete';
 import { checkFunctionGroup } from './check';
 import { getFunctionGroup } from './read';
 import { IBuilder } from '../shared/IBuilder';
+import { XMLParser } from 'fast-xml-parser';
 
 export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState> {
   private connection: AbapConnection;
@@ -68,7 +69,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating function group:', this.config.functionGroupName);
       const result = await validateFunctionGroupName(
@@ -77,16 +78,16 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
         this.config.packageName,
         this.config.description
       );
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = result;
       this.logger.info?.('Validation successful');
-      return this;
+      return result;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists or validation error - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
         this.logger.info?.('Function group validation returned 400 - object may already exist or validation error');
-        return this;
+        return error.response;
       }
       // Store error response if available
       if (error.response) {
@@ -99,7 +100,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
         timestamp: new Date()
       });
       this.logger.error?.('Validation failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -114,7 +115,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
       const result = await create(
         this.connection,
         this.config.functionGroupName,
-        this.config.description,
+        this.config.description || '',
         this.config.packageName,
         this.config.transportRequest
       );
@@ -160,7 +161,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking function group:', this.config.functionGroupName, 'version:', version);
       const result = await checkFunctionGroup(
@@ -169,9 +170,10 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
         version,
         sourceCode,
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Function group check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -179,7 +181,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
         timestamp: new Date()
       });
       this.logger.error?.('Check failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -262,13 +264,20 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
     }
   }
 
-  async read(): Promise<this> {
+  async read(): Promise<FunctionGroupBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading function group:', this.config.functionGroupName);
       const result = await getFunctionGroup(this.connection, this.config.functionGroupName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Function group read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const xmlData = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return this.parseFunctionGroupXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -276,7 +285,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
         timestamp: new Date()
       });
       this.logger.error?.('Read failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -340,8 +349,47 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  /**
+   * Parse XML response to FunctionGroupBuilderConfig
+   */
+  private parseFunctionGroupXml(xmlData: string): FunctionGroupBuilderConfig | undefined {
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+      });
+
+      const result = parser.parse(xmlData);
+      // Try both possible XML structures
+      const functionGroup = result['fu:functionGroup'] || result['group:abapFunctionGroup'];
+
+      if (!functionGroup) {
+        return undefined;
+      }
+
+      const packageRef = functionGroup['adtcore:packageRef'] || functionGroup['packageRef'];
+
+      return {
+        functionGroupName: functionGroup['adtcore:name'] || this.config.functionGroupName,
+        packageName: packageRef?.['adtcore:name'] || packageRef?.['name'],
+        description: functionGroup['adtcore:description'] || ''
+      };
+    } catch (error) {
+      this.logger.error?.('Failed to parse function group XML:', error);
+      return undefined;
+    }
+  }
+
+  getReadResult(): FunctionGroupBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    const xmlData = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return this.parseFunctionGroupXml(xmlData);
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

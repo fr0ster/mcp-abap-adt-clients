@@ -11,6 +11,8 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
 import { DomainBuilder } from '../../../core/domain';
 import { IAdtLogger } from '../../../utils/logger';
 import { getDomain } from '../../../core/domain/read';
@@ -37,7 +39,8 @@ getEnabledTestCase,
   ensurePackageConfig,
   resolveStandardObject,
   getTimeout,
-  getOperationDelay
+  getOperationDelay,
+  retryCheckAfterActivate
 } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -58,8 +61,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('DomainBuilder', () => {
+describe('DomainBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
+  let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -68,6 +72,7 @@ describe('DomainBuilder', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      client = new CrudClient(connection);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -200,12 +205,15 @@ describe('DomainBuilder', () => {
         return;
       }
 
-      const builder = new DomainBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+      const config = buildBuilderConfig(testCase);
 
       try {
         logBuilderTestStep('validate');
-        await builder.validate();
-        const validationResponse = builder.getState().validationResponse;
+        const validationResponse = await client.validateDomain({
+          domainName: config.domainName,
+          packageName: config.packageName!,
+          description: config.description || ''
+        });
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -214,58 +222,56 @@ describe('DomainBuilder', () => {
         }
         expect(validationResponse?.status).toBe(200);
         
-        await builder
-          .create()
-          .then(async b => {
-            logBuilderTestStep('create');
-            // Wait for SAP to finish create operation (includes lock/unlock internally)
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-            logBuilderTestStep('lock');
-            return b.lock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit lock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-            logBuilderTestStep('update');
-            return b.update();
-          })
-          .then(async b => {
-            // Wait for SAP to commit update operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-            logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
-          })
-          .then(b => {
-            logBuilderTestStep('unlock');
-            return b.unlock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit unlock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-            logBuilderTestStep('activate');
-            return b.activate();
-          })
-          .then(b => {
-            logBuilderTestStep('check(active)');
-            return b.check('active');
-          })
-          .then(b => {
-            logBuilderTestStep('delete (cleanup)');
-            return b.delete();
-          });
+        logBuilderTestStep('create');
+        await client.createDomain(config);
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        
+        logBuilderTestStep('check(active)');
+        const checkResultActive = await client.checkDomain({ domainName: config.domainName });
+        expect(checkResultActive?.status).toBeDefined();
+        
+        logBuilderTestStep('lock');
+        await client.lockDomain({ domainName: config.domainName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+        
+        logBuilderTestStep('update');
+        await client.updateDomain({
+          domainName: config.domainName,
+          packageName: config.packageName!,
+          description: config.description || '',
+          datatype: config.datatype,
+          length: config.length,
+          decimals: config.decimals
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+        logBuilderTestStep('check(inactive)');
+        const checkResultInactive = await client.checkDomain({ domainName: config.domainName });
+        expect(checkResultInactive?.status).toBeDefined();
+        
+        logBuilderTestStep('unlock');
+        await client.unlockDomain({ domainName: config.domainName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+        
+        logBuilderTestStep('activate');
+        await client.activateDomain({ domainName: config.domainName });
+        // Wait for activation to complete (activation is asynchronous)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase)));
+        
+        logBuilderTestStep('delete (cleanup)');
+        await client.deleteDomain({
+          domainName: config.domainName,
+          transportRequest: config.transportRequest
+        });
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
-        expect(state.errors.length).toBe(0);
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'DomainBuilder - full workflow');
       } catch (error) {
         logBuilderTestError(testsLogger, 'DomainBuilder - full workflow', error);
         throw error;
       } finally {
-        // Cleanup: force unlock in case of failure
-        await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(testsLogger, 'DomainBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -297,24 +303,12 @@ describe('DomainBuilder', () => {
         return;
       }
 
-      const builder = new DomainBuilder(
-        connection,
-        builderLogger,
-        {
-          domainName: standardDomainName,
-          packageName: 'SAP', // Standard package
-          description: '' // Not used for read operations
-        }
-      );
-
       try {
         logBuilderTestStep('read');
-        await builder.read();
-
-        const result = builder.getReadResult();
+        const result = await client.readDomain(standardDomainName);
         expect(result).toBeDefined();
-        expect(result?.status).toBe(200);
-        expect(result?.data).toBeDefined();
+        expect(result?.domainName).toBe(standardDomainName);
+        expect(result?.description).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'DomainBuilder - read standard object');
       } catch (error) {

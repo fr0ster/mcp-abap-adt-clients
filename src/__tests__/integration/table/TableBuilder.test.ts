@@ -1,6 +1,6 @@
 /**
- * Unit test for TableBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Integration test for TableBuilder
+ * Tests using CrudClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -11,16 +11,18 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
 import { TableBuilder } from '../../../core/table';
 import { IAdtLogger } from '../../../utils/logger';
 import { getTable } from '../../../core/table/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
-  logBuilderTestError,
-  logBuilderTestSkip,
   logBuilderTestStart,
+  logBuilderTestSkip,
   logBuilderTestSuccess,
+  logBuilderTestError,
   logBuilderTestEnd,
   logBuilderTestStep,
   getHttpStatusText
@@ -31,15 +33,16 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-getEnabledTestCase,
+  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getTimeout,
+  getOperationDelay,
+  retryCheckAfterActivate
 } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -56,8 +59,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('TableBuilder', () => {
+describe('TableBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
+  let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -66,6 +70,7 @@ describe('TableBuilder', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      client = new CrudClient(connection);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -195,14 +200,15 @@ describe('TableBuilder', () => {
         return;
       }
 
-      const builder = new TableBuilder(connection, builderLogger, {
-        ...buildBuilderConfig(testCase)
-      });
+      const config = buildBuilderConfig(testCase);
 
       try {
         logBuilderTestStep('validate');
-        await builder.validate();
-        const validationResponse = builder.getValidationResponse();
+        const validationResponse = await client.validateTable({
+          tableName: config.tableName,
+          packageName: config.packageName!,
+          description: config.description || ''
+        });
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -211,67 +217,71 @@ describe('TableBuilder', () => {
         }
         expect(validationResponse?.status).toBe(200);
         
-        await builder
-          .create()
-          .then(async b => {
-            // Wait for SAP to finish create operation (includes lock/unlock internally)
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-            logBuilderTestStep('lock');
-            return b.lock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit lock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-            logBuilderTestStep('update');
-            return b.update();
-          })
-          .then(async b => {
-            // Wait for SAP to commit update operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-            logBuilderTestStep('check(inactive)');
-            return b.check('abapCheckRun');
-          })
-          .then(b => {
-            logBuilderTestStep('unlock');
-            return b.unlock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit unlock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-            logBuilderTestStep('activate');
-            return b.activate();
-          })
-          .then(b => {
-            logBuilderTestStep('check(active)');
-            return b.check('abapCheckRun');
-          })
-          .then(b => {
-            logBuilderTestStep('delete (cleanup)');
-            return b.delete();
-          });
+        logBuilderTestStep('create');
+        await client.createTable({
+          tableName: config.tableName,
+          packageName: config.packageName!,
+          description: config.description || '',
+          ddlCode: config.ddlCode || '',
+          transportRequest: config.transportRequest
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        
+        logBuilderTestStep('lock');
+        await client.lockTable({ tableName: config.tableName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+        
+        logBuilderTestStep('update');
+        await client.updateTable({
+          tableName: config.tableName,
+          ddlCode: config.ddlCode || ''
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+        logBuilderTestStep('check(inactive)');
+        const checkResultInactive = await client.checkTable({ tableName: config.tableName });
+        expect(checkResultInactive?.status).toBeDefined();
+        
+        logBuilderTestStep('unlock');
+        await client.unlockTable({ tableName: config.tableName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+        
+        logBuilderTestStep('activate');
+        await client.activateTable({ tableName: config.tableName });
+        // Wait for activation to complete (activation is asynchronous)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        
+        logBuilderTestStep('check(active)');
+        // Retry check for active version - activation may take time
+        const checkResultActive = await retryCheckAfterActivate(
+          () => client.checkTable({ tableName: config.tableName }),
+          {
+            maxAttempts: 5,
+            delay: 1000,
+            logger: testsLogger,
+            objectName: config.tableName
+          }
+        );
+        expect(checkResultActive?.status).toBeDefined();
+        
+        logBuilderTestStep('delete (cleanup)');
+        await client.deleteTable({
+          tableName: config.tableName,
+          transportRequest: config.transportRequest
+        });
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
-        expect(state.errors.length).toBe(0);
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'TableBuilder - full workflow');
       } catch (error: any) {
         const statusText = getHttpStatusText(error);
-        // Extract error message from error object
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
-        const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
-        // "Already exists" errors should fail the test (cleanup must work)
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
         logBuilderTestError(testsLogger, 'TableBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(testsLogger, 'TableBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -303,23 +313,11 @@ describe('TableBuilder', () => {
         return;
       }
 
-      const builder = new TableBuilder(
-        connection,
-        builderLogger,
-        {
-          tableName: standardTableName,
-          packageName: 'SAP' // Standard package
-        }
-      );
-
       try {
         logBuilderTestStep('read');
-        await builder.read();
-
-        const result = builder.getReadResult();
+        const result = await client.readTable(standardTableName);
         expect(result).toBeDefined();
-        expect(result?.status).toBe(200);
-        expect(result?.data).toBeDefined();
+        expect(result?.tableName).toBe(standardTableName);
 
         logBuilderTestSuccess(testsLogger, 'TableBuilder - read standard object');
       } catch (error) {

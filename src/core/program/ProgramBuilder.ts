@@ -86,7 +86,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating program:', this.config.programName);
       const response = await validateProgramName(
@@ -95,10 +95,10 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
         this.config.description
       );
       
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger.info?.('Validation successful');
-      return this;
+      return response;
     } catch (error: any) {
       this.state.errors.push({
         method: 'validate',
@@ -106,7 +106,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Validation failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -215,7 +215,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking program:', this.config.programName, 'version:', version);
       const result = await checkProgram(
@@ -224,9 +224,10 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
         version,
         sourceCode
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Program check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -234,7 +235,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Check failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -310,13 +311,23 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<ProgramBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading program:', this.config.programName);
       const result = await getProgramSource(this.connection, this.config.programName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Program read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const sourceCode = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return {
+        programName: this.config.programName,
+        sourceCode
+      };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -324,7 +335,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Read failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -392,8 +403,20 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  getReadResult(): ProgramBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    // Program read() returns source code (plain text)
+    const sourceCode = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return {
+      programName: this.config.programName,
+      sourceCode
+    };
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

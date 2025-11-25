@@ -78,7 +78,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating interface:', this.config.interfaceName);
       const response = await validateInterfaceName(
@@ -88,16 +88,16 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
         this.config.description
       );
       
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger.info?.('Validation successful');
-      return this;
+      return response;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
         this.logger.info?.('Interface validation returned 400 - object may already exist');
-        return this;
+        return error.response;
       }
       // Store error response if available
       if (error.response) {
@@ -110,7 +110,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Validation failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -216,7 +216,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking interface:', this.config.interfaceName, 'version:', version);
       const result = await checkInterface(
@@ -224,9 +224,10 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
         this.config.interfaceName,
         version
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Interface check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -234,7 +235,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Check failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -315,13 +316,23 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<InterfaceBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading interface:', this.config.interfaceName);
       const result = await getInterfaceSource(this.connection, this.config.interfaceName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Interface read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const sourceCode = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return {
+        interfaceName: this.config.interfaceName,
+        sourceCode
+      };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -329,7 +340,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Read failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -398,8 +409,20 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  getReadResult(): InterfaceBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    // Interface read() returns source code (plain text)
+    const sourceCode = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return {
+      interfaceName: this.config.interfaceName,
+      sourceCode
+    };
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

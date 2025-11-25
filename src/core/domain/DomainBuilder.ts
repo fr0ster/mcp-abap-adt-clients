@@ -46,6 +46,7 @@ import { validateDomainName } from './validation';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getDomain, getDomainTransport } from './read';
 import { IBuilder } from '../shared/IBuilder';
+import { XMLParser } from 'fast-xml-parser';
 
 export class DomainBuilder implements IBuilder<DomainBuilderState> {
   private connection: AbapConnection;
@@ -131,9 +132,8 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
     return this;
   }
 
-  // Operation methods - return Promise<this> for Promise chaining
-  // Chain is interrupted on error (standard Promise behavior)
-  async validate(): Promise<this> {
+  // Operation methods that don't modify state - return result directly
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating domain name:', this.config.domainName);
       const result = await validateDomainName(
@@ -142,10 +142,10 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
         this.config.packageName,
         this.config.description
       );
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = result;
       this.logger.info?.('Domain name validation successful');
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'validate',
@@ -153,7 +153,7 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Validation failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -279,7 +279,9 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
         this.state.updateResult = result;
         this.logger.info?.('Domain filled with data successfully:', result.status);
       } else {
-        // For UPDATE workflow: use updateDomain to update existing domain
+        // For UPDATE workflow: use updateDomain (low-level function)
+        // lockHandle must exist (set by lock() method)
+        // stateful session mode already set by lock() method
         this.logger.info?.('Updating domain (UPDATE workflow):', this.config.domainName);
         const updateParams: UpdateDomainParams = {
           domain_name: this.config.domainName,
@@ -296,7 +298,11 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
           fixed_values: this.config.fixed_values,
           activate: false // Don't activate in low-level function
         };
-        const result = await updateDomain(this.connection, updateParams);
+        
+        // Use updateDomain (low-level) - stateful session already set by lock()
+        // Connection object maintains sessionMode state between builder instances
+        const result = await updateDomain(this.connection, updateParams, this.lockHandle, username, masterSystem);
+        
         this.state.updateResult = result;
         this.logger.info?.('Domain updated successfully:', result.status);
       }
@@ -312,7 +318,7 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking domain:', this.config.domainName, 'version:', version);
       const result = await checkDomainSyntax(
@@ -320,9 +326,10 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
         this.config.domainName,
         version
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Domain check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -330,7 +337,7 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Check failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -408,13 +415,20 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
     }
   }
 
-  async read(): Promise<this> {
+  async read(): Promise<DomainBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading domain:', this.config.domainName);
       const result = await getDomain(this.connection, this.config.domainName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Domain read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const xmlData = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return this.parseDomainXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -422,7 +436,7 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Read failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -506,8 +520,88 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  /**
+   * Parse XML response to DomainBuilderConfig
+   */
+  private parseDomainXml(xmlData: string): DomainBuilderConfig | undefined {
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+      });
+
+      const result = parser.parse(xmlData);
+      const domain = result['doma:domain'];
+
+      if (!domain) {
+        return undefined;
+      }
+
+      // Extract fixed values if present
+      const fixValues = domain['doma:content']?.['doma:valueInformation']?.['doma:fixValues']?.['doma:fixValue'];
+      const fixedValues = Array.isArray(fixValues)
+        ? fixValues.map((fv: any) => ({
+            low: fv['doma:low'] || '',
+            text: fv['doma:text'] || ''
+          }))
+        : fixValues
+        ? [{
+            low: fixValues['doma:low'] || '',
+            text: fixValues['doma:text'] || ''
+          }]
+        : undefined;
+
+      // Parse length and decimals - GET returns "000010", PUT needs "100"
+      const lengthStr = domain['doma:content']?.['doma:typeInformation']?.['doma:length'];
+      const length = lengthStr ? parseInt(lengthStr, 10) : undefined;
+      
+      const decimalsStr = domain['doma:content']?.['doma:typeInformation']?.['doma:decimals'];
+      const decimals = decimalsStr ? parseInt(decimalsStr, 10) : undefined;
+
+      // Parse conversion exit - can be empty string or missing
+      const conversionExit = domain['doma:content']?.['doma:outputInformation']?.['doma:conversionExit'];
+      const conversion_exit = conversionExit && conversionExit.trim() !== '' ? conversionExit : undefined;
+
+      // Parse boolean values - GET returns "false"/"true" as strings
+      const lowercaseStr = domain['doma:content']?.['doma:outputInformation']?.['doma:lowercase'];
+      const lowercase = lowercaseStr === 'true' || lowercaseStr === true;
+
+      const signExistsStr = domain['doma:content']?.['doma:outputInformation']?.['doma:signExists'];
+      const sign_exists = signExistsStr === 'true' || signExistsStr === true;
+
+      // Parse value table - can be empty or have adtcore:name attribute
+      const valueTableRef = domain['doma:content']?.['doma:valueInformation']?.['doma:valueTableRef'];
+      const value_table = valueTableRef?.['adtcore:name'] || (typeof valueTableRef === 'string' && valueTableRef.trim() !== '' ? valueTableRef : undefined);
+
+      return {
+        domainName: domain['adtcore:name'] || this.config.domainName,
+        packageName: domain['adtcore:packageRef']?.['adtcore:name'],
+        description: domain['adtcore:description'] || '',
+        datatype: domain['doma:content']?.['doma:typeInformation']?.['doma:datatype'],
+        length,
+        decimals,
+        conversion_exit,
+        lowercase,
+        sign_exists,
+        value_table,
+        fixed_values: fixedValues
+      };
+    } catch (error) {
+      this.logger.error?.('Failed to parse domain XML:', error);
+      return undefined;
+    }
+  }
+
+  getReadResult(): DomainBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    const xmlData = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return this.parseDomainXml(xmlData);
   }
 
   getTransportResult(): AxiosResponse | undefined {

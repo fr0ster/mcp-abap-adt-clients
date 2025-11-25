@@ -1,6 +1,6 @@
 /**
- * Unit test for DataElementBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Integration test for DataElementBuilder
+ * Tests using CrudClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -11,20 +11,20 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
 import { DataElementBuilder } from '../../../core/dataElement';
 import { IAdtLogger } from '../../../utils/logger';
 import { getDataElement } from '../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
-  logBuilderTestError,
-  logBuilderTestSkip,
   logBuilderTestStart,
+  logBuilderTestSkip,
   logBuilderTestSuccess,
+  logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep,
-  setTotalTests,
-  resetTestCounter
+  logBuilderTestStep
 } from '../../helpers/builderTestLogger';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -38,9 +38,10 @@ const {
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getTimeout,
+  getOperationDelay,
+  retryCheckAfterActivate
 } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -60,23 +61,21 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('DataElementBuilder', () => {
+describe('DataElementBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
+  let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
-    // Count total tests for progress tracking
-    const testCount = 2; // Full workflow + Read standard object
-    setTotalTests(testCount);
-
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      client = new CrudClient(connection);
+      hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
-      hasConfig = true;
     } catch (error) {
       testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
@@ -84,7 +83,6 @@ describe('DataElementBuilder', () => {
   });
 
   afterAll(async () => {
-    resetTestCounter();
     if (connection) {
       connection.reset();
     }
@@ -210,18 +208,15 @@ describe('DataElementBuilder', () => {
         return;
       }
 
-      const builder = new DataElementBuilder(
-        connection,
-        builderLogger,
-        {
-          ...buildBuilderConfig(testCase)
-        }
-      );
+      const config = buildBuilderConfig(testCase);
 
       try {
         logBuilderTestStep('validate');
-        await builder.validate();
-        const validationResponse = builder.getState().validationResponse;
+        const validationResponse = await client.validateDataElement({
+          dataElementName: config.dataElementName,
+          packageName: config.packageName!,
+          description: config.description || ''
+        });
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -230,62 +225,72 @@ describe('DataElementBuilder', () => {
         }
         expect(validationResponse?.status).toBe(200);
         
-        await builder
-          .create()
-          .then(async b => {
             logBuilderTestStep('create');
-            // Wait for SAP to finish create operation
+        await client.createDataElement(config);
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        
             logBuilderTestStep('lock');
-            return b.lock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit lock operation
+        await client.lockDataElement({ dataElementName: config.dataElementName });
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+        
             logBuilderTestStep('update');
-            return b.update();
-          })
-          .then(b => {
+        await client.updateDataElement({
+          dataElementName: config.dataElementName,
+          packageName: config.packageName!,
+          description: config.description || '',
+          domainName: config.domainName,
+          dataType: config.dataType,
+          length: config.length,
+          decimals: config.decimals,
+          shortLabel: config.shortLabel,
+          mediumLabel: config.mediumLabel,
+          longLabel: config.longLabel,
+          headingLabel: config.headingLabel,
+          typeKind: config.typeKind,
+          typeName: config.typeName
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
             logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
-          })
-          .then(b => {
+        const checkResultInactive = await client.checkDataElement({ dataElementName: config.dataElementName });
+        expect(checkResultInactive?.status).toBeDefined();
+        
             logBuilderTestStep('unlock');
-            return b.unlock();
-        })
-          .then(b => {
+        await client.unlockDataElement({ dataElementName: config.dataElementName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+        
             logBuilderTestStep('activate');
-            return b.activate();
-          })
-          .then(b => {
+        await client.activateDataElement({ dataElementName: config.dataElementName });
+        // Wait for activation to complete (activation is asynchronous)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        
             logBuilderTestStep('check(active)');
-            return b.check('active');
-          })
-          .then(b => {
+        // Retry check for active version - activation may take time
+        const checkResultActive = await retryCheckAfterActivate(
+          () => client.checkDataElement({ dataElementName: config.dataElementName }),
+          {
+            maxAttempts: 5,
+            delay: 1000,
+            logger: testsLogger,
+            objectName: config.dataElementName
+          }
+        );
+        expect(checkResultActive?.status).toBeDefined();
+        
             logBuilderTestStep('delete (cleanup)');
-            return b.delete();
-          });
+        await client.deleteDataElement({
+          dataElementName: config.dataElementName,
+          transportRequest: config.transportRequest
+        });
 
-      const state = builder.getState();
-      expect(state.createResult).toBeDefined();
-      expect(state.activateResult).toBeDefined();
-      expect(state.errors.length).toBe(0);
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
 
-        // Log success BEFORE finally block to ensure it's displayed
         logBuilderTestSuccess(testsLogger, 'DataElementBuilder - full workflow');
       } catch (error: any) {
-        // Extract error message from error object (may be in message or response.data)
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
-        const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
-        // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(testsLogger, 'DataElementBuilder - full workflow', error);
         throw error;
       } finally {
-        // Cleanup: force unlock in case of failure
-        await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(testsLogger, 'DataElementBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -317,23 +322,11 @@ describe('DataElementBuilder', () => {
         return;
       }
 
-      const builder = new DataElementBuilder(
-        connection,
-        builderLogger,
-        {
-          dataElementName: standardDataElementName,
-          packageName: 'SAP', // Standard package
-          description: '' // Not used for read operations
-        }
-      );
-
       try {
         logBuilderTestStep('read');
-        await builder.read();
-
-        const result = builder.getReadResult();
+        const result = await client.readDataElement(standardDataElementName);
         expect(result).toBeDefined();
-        expect(result?.data).toBeDefined();
+        expect(result?.dataElementName).toBe(standardDataElementName);
 
         logBuilderTestSuccess(testsLogger, 'DataElementBuilder - read standard object');
       } catch (error) {

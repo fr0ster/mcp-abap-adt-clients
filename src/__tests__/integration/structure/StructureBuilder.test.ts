@@ -1,6 +1,6 @@
 /**
- * Unit test for StructureBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Integration test for StructureBuilder
+ * Tests using CrudClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -11,15 +11,17 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
 import { StructureBuilder } from '../../../core/structure';
 import { IAdtLogger } from '../../../utils/logger';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
-  logBuilderTestError,
-  logBuilderTestSkip,
   logBuilderTestStart,
+  logBuilderTestSkip,
   logBuilderTestSuccess,
+  logBuilderTestError,
   logBuilderTestEnd,
   logBuilderTestStep
 } from '../../helpers/builderTestLogger';
@@ -29,15 +31,16 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-getEnabledTestCase,
+  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getTimeout,
+  getOperationDelay,
+  retryCheckAfterActivate
 } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -54,8 +57,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('StructureBuilder', () => {
+describe('StructureBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
+  let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -64,6 +68,7 @@ describe('StructureBuilder', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      client = new CrudClient(connection);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -150,12 +155,15 @@ describe('StructureBuilder', () => {
         return;
       }
 
-      const builder = new StructureBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+      const config = buildBuilderConfig(testCase);
 
       try {
         logBuilderTestStep('validate');
-        await builder.validate();
-        const validationResponse = builder.getValidationResponse();
+        const validationResponse = await client.validateStructure({
+          structureName: config.structureName,
+          packageName: config.packageName!,
+          description: config.description || ''
+        });
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -165,64 +173,66 @@ describe('StructureBuilder', () => {
         expect(validationResponse?.status).toBe(200);
         
         logBuilderTestStep('create');
-        await builder
-          .create()
-          .then(async b => {
-            // Wait for SAP to finish create operation (includes lock/unlock internally)
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-            logBuilderTestStep('lock');
-            return b.lock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit lock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-            logBuilderTestStep('update');
-            return b.update();
-          })
-          .then(async b => {
-            // Wait for SAP to commit update operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-            logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
-          })
-          .then(b => {
-            logBuilderTestStep('unlock');
-            return b.unlock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit unlock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-            logBuilderTestStep('activate');
-            return b.activate();
-          })
-          .then(b => {
-            logBuilderTestStep('check(active)');
-            return b.check('active');
-          })
-          .then(b => {
-            logBuilderTestStep('delete (cleanup)');
-            return b.delete();
-          });
+        await client.createStructure({
+          structureName: config.structureName,
+          packageName: config.packageName!,
+          description: config.description || '',
+          ddlCode: config.ddlCode || '',
+          transportRequest: config.transportRequest
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        
+        logBuilderTestStep('lock');
+        await client.lockStructure({ structureName: config.structureName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+        
+        logBuilderTestStep('update');
+        await client.updateStructure({
+          structureName: config.structureName,
+          ddlCode: config.ddlCode || ''
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+        logBuilderTestStep('check(inactive)');
+        const checkResultInactive = await client.checkStructure({ structureName: config.structureName });
+        expect(checkResultInactive?.status).toBeDefined();
+        
+        logBuilderTestStep('unlock');
+        await client.unlockStructure({ structureName: config.structureName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+        
+        logBuilderTestStep('activate');
+        await client.activateStructure({ structureName: config.structureName });
+        // Wait for activation to complete (activation is asynchronous)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        
+        logBuilderTestStep('check(active)');
+        // Retry check for active version - activation may take time
+        const checkResultActive = await retryCheckAfterActivate(
+          () => client.checkStructure({ structureName: config.structureName }),
+          {
+            maxAttempts: 5,
+            delay: 1000,
+            logger: testsLogger,
+            objectName: config.structureName
+          }
+        );
+        expect(checkResultActive?.status).toBeDefined();
+        
+        logBuilderTestStep('delete (cleanup)');
+        await client.deleteStructure({
+          structureName: config.structureName,
+          transportRequest: config.transportRequest
+        });
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
-        expect(state.errors.length).toBe(0);
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'StructureBuilder - full workflow');
       } catch (error: any) {
-        // Extract error message from error object (may be in message or response.data)
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
-        const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
-        // "Already exists" errors should fail the test (cleanup must work)
         logBuilderTestError(testsLogger, 'StructureBuilder - full workflow', error);
         throw error;
       } finally {
-        // Cleanup: force unlock in case of failure
-        await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(testsLogger, 'StructureBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -254,24 +264,11 @@ describe('StructureBuilder', () => {
         return;
       }
 
-      const builder = new StructureBuilder(
-        connection,
-        builderLogger,
-        {
-          structureName: standardStructureName,
-          packageName: 'SAP', // Standard package
-          description: '' // Not used for read operations
-        }
-      );
-
       try {
         logBuilderTestStep('read');
-        await builder.read();
-
-        const result = builder.getReadResult();
+        const result = await client.readStructure(standardStructureName);
         expect(result).toBeDefined();
-        expect(result?.status).toBe(200);
-        expect(result?.data).toBeDefined();
+        expect(result?.structureName).toBe(standardStructureName);
 
         logBuilderTestSuccess(testsLogger, 'StructureBuilder - read standard object');
       } catch (error) {

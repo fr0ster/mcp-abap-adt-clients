@@ -123,7 +123,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating structure name:', this.config.structureName);
       const response = await validateStructureName(
@@ -132,16 +132,16 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
         this.config.description
       );
       
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger.info?.('Structure name validation successful');
-      return this;
+      return response;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
         this.logger.info?.('Structure validation returned 400 - object may already exist');
-        return this;
+        return error.response;
       }
       // Store error response if available
       if (error.response) {
@@ -168,7 +168,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
       const result = await create(
         this.connection,
         this.config.structureName,
-        this.config.description,
+        this.config.description || '',
         this.config.packageName,
         this.config.transportRequest
       );
@@ -250,7 +250,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking structure:', this.config.structureName, 'version:', version);
       const result = await checkStructure(
@@ -258,9 +258,10 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
         this.config.structureName,
         version
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Structure check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -349,13 +350,23 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<StructureBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading structure:', this.config.structureName);
       const result = await getStructureSource(this.connection, this.config.structureName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Structure read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const ddlCode = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return {
+        structureName: this.config.structureName,
+        ddlCode
+      };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -428,8 +439,20 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  getReadResult(): StructureBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    // Structure read() returns DDL source code (plain text)
+    const ddlCode = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return {
+      structureName: this.config.structureName,
+      ddlCode
+    };
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

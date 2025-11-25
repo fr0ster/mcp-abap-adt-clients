@@ -145,7 +145,7 @@ export class ClassBuilder {
 
   // Operation methods - return Promise<this> for Promise chaining
   // Chain is interrupted on error (standard Promise behavior)
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating class:', this.config.className);
       const result = await validateClassName(
@@ -155,16 +155,16 @@ export class ClassBuilder {
         this.config.description,
         this.config.superclass
       );
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = result;
       this.logger.info?.('Validation successful');
-      return this;
+      return result;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists or validation error - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
         this.logger.info?.('Class validation returned 400 - object may already exist or validation error');
-        return this;
+        return error.response;
       }
       // Store error response if available
       if (error.response) {
@@ -177,7 +177,7 @@ export class ClassBuilder {
         timestamp: new Date()
       });
       this.logger.error?.('Validation failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -216,13 +216,23 @@ export class ClassBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<ClassBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading class source:', this.config.className, 'version:', version);
       const result = await getClassSource(this.connection, this.config.className, version);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Class source read successfully:', result.status, 'bytes:', result.data?.length || 0);
-      return this;
+      
+      // Parse and return config directly
+      const sourceCode = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return {
+        className: this.config.className,
+        sourceCode
+      };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -237,7 +247,7 @@ export class ClassBuilder {
         data: error.response?.data,
         message: error.message
       });
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -386,7 +396,7 @@ export class ClassBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking class:', this.config.className, 'version:', version);
       
@@ -399,9 +409,10 @@ export class ClassBuilder {
         version,
         codeToCheck
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Class check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -409,7 +420,7 @@ export class ClassBuilder {
         timestamp: new Date()
       });
       this.logger.error?.('Check failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -619,8 +630,20 @@ export class ClassBuilder {
     return this.state.createResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  getReadResult(): ClassBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    // Class read() returns source code (plain text)
+    const sourceCode = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return {
+      className: this.config.className,
+      sourceCode
+    };
   }
 
   getMetadataResult(): AxiosResponse | undefined {

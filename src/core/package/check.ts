@@ -12,7 +12,7 @@ export async function checkPackage(
   connection: AbapConnection,
   packageName: string,
   version: 'active' | 'inactive' = 'active'
-): Promise<void> {
+): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/checkruns`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
@@ -21,7 +21,7 @@ export async function checkPackage(
 
 </chkrun:checkObjectList>`;
 
-  await connection.makeAdtRequest({
+  return await connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),

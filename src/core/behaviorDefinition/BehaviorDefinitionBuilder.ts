@@ -101,7 +101,7 @@ export class BehaviorDefinitionBuilder {
       const params: BehaviorDefinitionValidationParams = {
         objname: this.config.name,
         rootEntity: this.config.rootEntity,
-        description: this.config.description,
+        description: this.config.description || '',
         package: this.config.packageName,
         implementationType: this.config.implementationType || 'Managed'
       };
@@ -134,7 +134,7 @@ export class BehaviorDefinitionBuilder {
       const params: BehaviorDefinitionCreateParams = {
         name: this.config.name,
         package: this.config.packageName,
-        description: this.config.description,
+        description: this.config.description || '',
         implementationType: this.config.implementationType || 'Managed',
       };
       

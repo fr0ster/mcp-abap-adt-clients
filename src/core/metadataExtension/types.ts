@@ -24,11 +24,12 @@ export interface MetadataExtensionCreateParams {
 }
 
 // Builder configuration (camelCase)
+// Note: packageName and description are required for create/validate operations (validated in builder methods)
 export interface MetadataExtensionBuilderConfig {
-  name: string;
-  description: string;
-  packageName?: string;
-  transportRequest?: string;
+  name: string; // Required
+  description?: string; // Required for create/validate operations, optional for others
+  packageName?: string; // Required for create/validate operations, optional for others
+  transportRequest?: string; // Only optional parameter
   sourceCode?: string;
   masterLanguage?: string;
   masterSystem?: string;

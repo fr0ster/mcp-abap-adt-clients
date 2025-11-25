@@ -94,7 +94,7 @@ export class ViewBuilder {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating view name:', this.config.viewName);
       const response = await validateViewName(
@@ -104,16 +104,16 @@ export class ViewBuilder {
         this.config.description
       );
       
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger.info?.('View name validation successful');
-      return this;
+      return response;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
         this.logger.info?.('View validation returned 400 - object may already exist');
-        return this;
+        return error.response;
       }
       // Store error response if available
       if (error.response) {
@@ -229,7 +229,7 @@ export class ViewBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking view:', this.config.viewName, 'version:', version);
       const result = await checkView(
@@ -237,9 +237,10 @@ export class ViewBuilder {
         this.config.viewName,
         version
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('View check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -328,13 +329,23 @@ export class ViewBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<ViewBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading view:', this.config.viewName);
       const result = await getViewSource(this.connection, this.config.viewName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('View read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const ddlSource = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return {
+        viewName: this.config.viewName,
+        ddlSource
+      };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -411,8 +422,20 @@ export class ViewBuilder {
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  getReadResult(): ViewBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    // View read() returns DDL source code (plain text)
+    const ddlSource = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return {
+      viewName: this.config.viewName,
+      ddlSource
+    };
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

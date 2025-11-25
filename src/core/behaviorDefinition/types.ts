@@ -87,13 +87,15 @@ export interface CheckRunResult {
 }
 
 // Builder configuration (camelCase)
+// Note: packageName, description, implementationType are required for create/validate operations (validated in builder methods)
+// rootEntity is required for validate operations
 export interface BehaviorDefinitionBuilderConfig {
-  name: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  implementationType?: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
-  rootEntity?: string;
+  name: string; // Required
+  packageName?: string; // Required for create/validate operations, optional for others
+  transportRequest?: string; // Only optional parameter
+  description?: string; // Required for create/validate operations, optional for others
+  implementationType?: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'; // Required for create/validate operations, optional for others
+  rootEntity?: string; // Required for validate operations, optional for others
   sourceCode?: string;
   onLock?: (lockHandle: string) => void;
 }

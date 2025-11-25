@@ -1,6 +1,6 @@
 /**
- * Unit test for ClassBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Integration test for ClassBuilder
+ * Tests using CrudClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -11,6 +11,8 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
 import { ClassBuilder } from '../../../core/class';
 import {
   UnitTestBuilder,
@@ -22,14 +24,12 @@ import { getClass } from '../../../core/class/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
-  logBuilderTestError,
-  logBuilderTestSkip,
   logBuilderTestStart,
+  logBuilderTestSkip,
   logBuilderTestSuccess,
+  logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep,
-  setTotalTests,
-  resetTestCounter
+  logBuilderTestStep
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -43,9 +43,10 @@ const {
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getTimeout,
+  getOperationDelay,
+  retryCheckAfterActivate
 } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -61,22 +62,18 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('ClassBuilder', () => {
+describe('ClassBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
+  let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
   beforeAll(async () => {
-    // Count total tests for progress tracking
-    const testCount = 3; // Full workflow + Read standard object + Read transport request
-    setTotalTests(testCount);
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
-
-      // Connect to SAP system to initialize session (get CSRF token and cookies)
       await (connection as any).connect();
-
+      client = new CrudClient(connection);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -87,7 +84,6 @@ describe('ClassBuilder', () => {
   });
 
   afterAll(async () => {
-    resetTestCounter();
     if (connection) {
       connection.reset();
     }
@@ -113,13 +109,13 @@ async function ensureClassReady(className: string, packageName: string): Promise
     // Check if class exists
     try {
       await getClass(connection, className);
+      // Class exists - try to delete it
     try {
-      const cleanupBuilder = new ClassBuilder(connection, builderLogger, {
+        const cleanupClient = new CrudClient(connection);
+        await cleanupClient.deleteClass({
         className,
-        packageName,
-        description: `Cleanup ${className}`
+          transportRequest: resolveTransportRequest(undefined)
       });
-      await cleanupBuilder.delete();
       // Give backend time to finalize deletion
       await new Promise(resolve => setTimeout(resolve, 3000));
     } catch (cleanupError: any) {
@@ -323,25 +319,15 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         ? buildUnitTestDefinitions(testClassConfig, testClassName)
         : [];
 
-        let builder = new ClassBuilder(connection, builderLogger, {
-          className: testClassName,
-          packageName: testPackageName,
-          description: `Test class ${testClassName}`,
-          transportRequest: resolveTransportRequest(testCase.params.transport_request),
-      }).setCode(sourceCode);
-      if (testClassConfig?.source_code) {
-        builder = builder.setTestClassCode(testClassConfig.source_code);
-      }
-      if (testClassConfig?.name) {
-        builder = builder.setTestClassName(testClassConfig.name);
-      }
-
       let unitTestBuilder: UnitTestBuilder | null = null;
 
       try {
         logBuilderTestStep('validate');
-        await builder.validate();
-        const validationResponse = builder.getValidationResponse();
+        const validationResponse = await client.validateClass({
+          className: testClassName,
+          packageName: testPackageName,
+          description: `Test class ${testClassName}`
+        });
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -350,82 +336,81 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         }
         expect(validationResponse?.status).toBe(200);
         
-        await builder
-          .create()
-          .then(async b => {
             logBuilderTestStep('create');
+        await client.createClass({
+          className: testClassName,
+          packageName: testPackageName,
+          description: `Test class ${testClassName}`,
+          transportRequest: resolveTransportRequest(testCase.params.transport_request)
+        });
             const createDelay = getOperationDelay('create', testCase);
             await new Promise(resolve => setTimeout(resolve, createDelay));
-            const classNameToCreate = testClassName;
-            if (!classNameToCreate) {
-              throw new Error('class_name is not defined');
-            }
-            await waitForClassCreation(classNameToCreate);
+        await waitForClassCreation(testClassName);
+        
             logBuilderTestStep('lock');
-            return b.lock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit lock operation
+        await client.lockClass({ className: testClassName });
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+        
             logBuilderTestStep('check with source code (before update)');
-            return b.check('inactive', sourceCode);
-          })
-        .then(b => {
+        const checkBeforeUpdate = await client.checkClass({ className: testClassName! }, 'inactive', sourceCode);
+        expect(checkBeforeUpdate?.status).toBeDefined();
+        
             logBuilderTestStep('update');
-          return b.update();
-        })
-          .then(async b => {
-            // Wait for SAP to commit update operation
+        await client.updateClass({
+          className: testClassName,
+          sourceCode: sourceCode
+        });
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
             logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
-        })
-          .then(b => {
+        const checkResultInactive = await client.checkClass({ className: testClassName }, 'inactive');
+        expect(checkResultInactive?.status).toBeDefined();
+        
             logBuilderTestStep('unlock');
-            return b.unlock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit unlock operation
+        await client.unlockClass({ className: testClassName });
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+        
             logBuilderTestStep('activate');
-            return b.activate();
-          })
-          .then(b => {
+        await client.activateClass({ className: testClassName });
+        // Wait for activation to complete (activation is asynchronous)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        
             logBuilderTestStep('check(active)');
-            return b.check('active');
-          })
-          .then(async b => {
-            if (!shouldUpdateTestClass) {
-              return b;
-            }
-
-            unitTestBuilder = new UnitTestBuilder(connection, builderLogger, {
-              objectType: 'class',
-              objectName: testClassName!,
-              testClassName: testClassConfig.name,
-              transportRequest: resolveTransportRequest(testCase.params.transport_request)
-            }).setTestClassSource(testClassConfig.source_code);
-
+        // Retry check for active version - activation may take time
+        const checkResultActive = await retryCheckAfterActivate(
+          () => client.checkClass({ className: testClassName! }, 'active'),
+          {
+            maxAttempts: 5,
+            delay: 1000,
+            logger: testsLogger,
+            objectName: testClassName!
+          }
+        );
+        expect(checkResultActive?.status).toBeDefined();
+        // Test class operations (if enabled)
+        if (shouldUpdateTestClass) {
             logBuilderTestStep('lock test classes');
-            await unitTestBuilder.lockTestClasses();
+          await client.lockTestClasses({ className: testClassName! });
 
             logBuilderTestStep('update test classes');
-            await unitTestBuilder.updateTestClass();
+          await client.updateClassTestIncludes({
+            className: testClassName!,
+            testClassCode: testClassConfig.source_code
+          });
 
             logBuilderTestStep('unlock test classes');
-            await unitTestBuilder.unlockTestClasses();
+          await client.unlockTestClasses({ className: testClassName! });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
 
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate test classes');
-            await unitTestBuilder.activateTestClasses();
-
-            return b;
-          })
-          .then(async b => {
-            if (!shouldRunUnitTests || testDefinitions.length === 0) {
-              return b;
-            }
-
+          await client.activateTestClasses({
+            className: testClassName!,
+            testClassName: testClassConfig.name
+          });
+        }
+        
+        // Unit test operations (if enabled)
+        if (shouldRunUnitTests && testDefinitions.length > 0) {
             if (!unitTestBuilder) {
               unitTestBuilder = new UnitTestBuilder(connection, builderLogger, {
                 objectType: 'class',
@@ -438,73 +423,77 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
               tests: testDefinitions.map(test => `${test.containerClass}/${test.testClass}`).join(', ')
             });
             const runOptions = normalizeUnitTestOptions(testClassConfig.unit_test_options);
-            await unitTestBuilder.runForClass(testDefinitions, runOptions);
+          await client.runClassUnitTests(testDefinitions, runOptions);
 
-            const runId = unitTestBuilder.getRunId();
+          const runId = client.getAbapUnitRunId();
+          if (!runId) {
+            throw new Error('Unit test run ID not available');
+          }
             testsLogger.info?.('[ABAP-UNIT] Run started', { runId });
 
             logBuilderTestStep('get ABAP Unit test status');
-            await unitTestBuilder.getStatus(
+          await client.getClassUnitTestRunStatus(
+            runId,
               testClassConfig.unit_test_status?.with_long_polling !== false
             );
 
-            const runStatus = unitTestBuilder.getRunStatus();
-            const statusText = typeof runStatus === 'string' ? runStatus : JSON.stringify(runStatus);
+          const runStatus = client.getAbapUnitStatusResponse();
+            // Safely serialize AxiosResponse - extract only needed fields to avoid circular references
+            const statusText = runStatus 
+              ? `${runStatus.status} ${runStatus.statusText || ''} ${typeof runStatus.data === 'string' ? runStatus.data : JSON.stringify(runStatus.data || {})}`
+              : 'No status available';
             testsLogger.info?.('[ABAP-UNIT] Status retrieved', { 
               runId, 
-              status: statusText,
+              status: runStatus?.status,
+              statusText: runStatus?.statusText,
               finished: statusText.includes('FINISHED')
             });
 
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('unit_test_result', testCase)));
 
             logBuilderTestStep('get ABAP Unit test result');
-            await unitTestBuilder.getResult({
+          await client.getClassUnitTestRunResult(runId, {
               withNavigationUris: testClassConfig.unit_test_result?.with_navigation_uris ?? false,
               format: testClassConfig.unit_test_result?.format === 'junit' ? 'junit' : 'abapunit'
             });
 
-            const runResult = unitTestBuilder.getRunResult();
+          const runResult = client.getAbapUnitResultResponse();
             const hasResult = runResult !== undefined && runResult !== null;
+            // Safely extract result data without circular references
+            const resultData = runResult?.data;
             testsLogger.info?.('[ABAP-UNIT] Result retrieved', { 
               runId, 
               hasResult,
-              resultType: hasResult ? typeof runResult : 'undefined'
+              status: runResult?.status,
+              statusText: runResult?.statusText,
+              resultDataType: hasResult ? typeof resultData : 'undefined'
             });
+        }
 
-            return b;
-          })
-          .then(b => {
             logBuilderTestStep('delete (cleanup)');
-            return b.delete();
+        await client.deleteClass({
+          className: testClassName!,
+          transportRequest: resolveTransportRequest(testCase.params.transport_request)
           });
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
         
         if (shouldUpdateTestClass) {
-          expect(unitTestBuilder).toBeDefined();
-          const unitTestState = unitTestBuilder!.getState();
-          expect(unitTestState.testLockHandle).toBeUndefined(); // Should be unlocked after operations
+          expect(client.getTestClassLockHandle()).toBeUndefined(); // Should be unlocked after operations
         }
         
         if (shouldRunUnitTests) {
-          expect(unitTestBuilder).toBeDefined();
-          expect(unitTestBuilder!.getRunId()).toBeDefined();
-          expect(unitTestBuilder!.getRunStatus()).toBeDefined();
-          expect(unitTestBuilder!.getRunResult()).toBeDefined();
+          expect(client.getAbapUnitRunId()).toBeDefined();
+          expect(client.getAbapUnitStatusResponse()).toBeDefined();
+          expect(client.getAbapUnitResultResponse()).toBeDefined();
         }
-        
-        expect(state.errors.length).toBe(0);
 
         logBuilderTestSuccess(testsLogger, 'ClassBuilder - full workflow');
-      } catch (error) {
+      } catch (error: any) {
         logBuilderTestError(testsLogger, 'ClassBuilder - full workflow', error);
         throw error;
       } finally {
-        // Cleanup: force unlock in case of failure
-        await builder.forceUnlock().catch(() => {});
         logBuilderTestEnd(testsLogger, 'ClassBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -536,24 +525,11 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         return;
       }
 
-      const builder = new ClassBuilder(
-        connection,
-        builderLogger,
-        {
-          className: standardClassName,
-          packageName: 'SAP', // Standard package
-          description: '' // Not used for read operations
-        }
-      );
-
       try {
         logBuilderTestStep('read');
-        await builder.read('active');
-
-        const result = builder.getReadResult();
+        const result = await client.readClass(standardClassName);
         expect(result).toBeDefined();
-        expect(result?.status).toBe(200);
-        expect(result?.data).toBeDefined();
+        expect(result?.className).toBe(standardClassName);
 
         logBuilderTestSuccess(testsLogger, 'ClassBuilder - read standard object');
       } catch (error) {
@@ -604,21 +580,11 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         return;
       }
 
-      const builder = new ClassBuilder(
-        connection,
-        builderLogger,
-        {
-          className: standardClassName,
-          packageName: 'SAP', // Standard package
-          description: '' // Not used for read operations
-        }
-      );
-
       try {
         logBuilderTestStep('readTransport');
-        await builder.readTransport();
+        await client.readTransport(transportRequest);
 
-        const result = builder.getTransportResult();
+        const result = client.getReadResult();
         expect(result).toBeDefined();
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();

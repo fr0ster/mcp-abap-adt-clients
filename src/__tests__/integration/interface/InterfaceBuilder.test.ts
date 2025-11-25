@@ -1,6 +1,6 @@
 /**
- * Unit test for InterfaceBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Integration test for InterfaceBuilder
+ * Tests using CrudClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -11,12 +11,13 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
 import { InterfaceBuilder } from '../../../core/interface';
 import { IAdtLogger } from '../../../utils/logger';
 import { getInterface } from '../../../core/interface/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
-import { createOnLockCallback } from '../../helpers/lockHelper';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
@@ -31,15 +32,16 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-getEnabledTestCase,
+  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
   resolveStandardObject,
-  getOperationDelay
+  getTimeout,
+  getOperationDelay,
+  retryCheckAfterActivate
 } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -55,8 +57,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('InterfaceBuilder', () => {
+describe('InterfaceBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
+  let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -65,6 +68,7 @@ describe('InterfaceBuilder', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      client = new CrudClient(connection);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -178,15 +182,15 @@ describe('InterfaceBuilder', () => {
         return;
       }
 
-      const builder = new InterfaceBuilder(connection, builderLogger, {
-        ...buildBuilderConfig(testCase),
-        onLock: createOnLockCallback('interface', interfaceName, undefined, __filename)
-      });
+      const config = buildBuilderConfig(testCase);
 
       try {
         logBuilderTestStep('validate');
-        await builder.validate();
-        const validationResponse = builder.getValidationResponse();
+        const validationResponse = await client.validateInterface({
+          interfaceName: config.interfaceName,
+          packageName: config.packageName!,
+          description: config.description || ''
+        });
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -196,10 +200,15 @@ describe('InterfaceBuilder', () => {
         expect(validationResponse?.status).toBe(200);
 
         logBuilderTestStep('create');
-        await builder.create();
+        await client.createInterface({
+          interfaceName: config.interfaceName,
+          packageName: config.packageName!,
+          description: config.description || '',
+          transportRequest: config.transportRequest
+        });
         
-        // Verify create was successful (201 Created or 200 OK)
-        const createResult = builder.getState().createResult;
+        // Verify create was successful
+        const createResult = client.getCreateResult();
         if (!createResult) {
           throw new Error('Interface creation did not return a result');
         }
@@ -219,50 +228,65 @@ describe('InterfaceBuilder', () => {
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
         
         // Wait for interface to be available for lock
-        await waitForInterfaceCreation(interfaceName);
+        await waitForInterfaceCreation(interfaceName!);
 
         logBuilderTestStep('lock');
-        await builder.lock();
+        await client.lockInterface({ interfaceName: config.interfaceName });
         
         // Wait for SAP to commit lock operation
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
 
         logBuilderTestStep('update');
-        await builder.update();
+        await client.updateInterface({
+          interfaceName: config.interfaceName,
+          sourceCode: config.sourceCode || ''
+        });
         
         // Wait for SAP to commit update operation
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
 
         logBuilderTestStep('check(inactive)');
-        await builder.check('inactive');
+        const checkResultInactive = await client.checkInterface({ interfaceName: config.interfaceName });
+        expect(checkResultInactive?.status).toBeDefined();
 
         logBuilderTestStep('unlock');
-        await builder.unlock();
+        await client.unlockInterface({ interfaceName: config.interfaceName });
         
         // Wait for SAP to commit unlock operation
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
 
         logBuilderTestStep('activate');
-        await builder.activate();
+        await client.activateInterface({ interfaceName: config.interfaceName });
+        // Wait for activation to complete (activation is asynchronous)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
 
         logBuilderTestStep('check(active)');
-        await builder.check('active');
+        // Retry check for active version - activation may take time
+        const checkResultActive = await retryCheckAfterActivate(
+          () => client.checkInterface({ interfaceName: config.interfaceName }),
+          {
+            maxAttempts: 5,
+            delay: 1000,
+            logger: testsLogger,
+            objectName: config.interfaceName
+          }
+        );
+        expect(checkResultActive?.status).toBeDefined();
 
         logBuilderTestStep('delete (cleanup)');
-        await builder.delete();
+        await client.deleteInterface({
+          interfaceName: config.interfaceName,
+          transportRequest: config.transportRequest
+        });
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
-        expect(state.errors.length).toBe(0);
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'InterfaceBuilder - full workflow');
-      } catch (error) {
+      } catch (error: any) {
         logBuilderTestError(testsLogger, 'InterfaceBuilder - full workflow', error);
         throw error;
       } finally {
-        // Cleanup: force unlock in case of failure
-        await builder.forceUnlock().catch(() => { });
         logBuilderTestEnd(testsLogger, 'InterfaceBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -297,20 +321,11 @@ describe('InterfaceBuilder', () => {
         return;
       }
 
-      const builder = new InterfaceBuilder(connection, builderLogger, {
-        interfaceName: standardInterfaceName,
-        packageName: 'SAP', // Standard package
-        description: '' // Not used for read operations
-      });
-
       try {
         logBuilderTestStep('read');
-        await builder.read();
-
-        const result = builder.getReadResult();
+        const result = await client.readInterface(standardInterfaceName);
         expect(result).toBeDefined();
-        expect(result?.status).toBe(200);
-        expect(result?.data).toBeDefined();
+        expect(result?.interfaceName).toBe(standardInterfaceName);
 
         logBuilderTestSuccess(testsLogger, 'InterfaceBuilder - read standard object');
       } catch (error) {

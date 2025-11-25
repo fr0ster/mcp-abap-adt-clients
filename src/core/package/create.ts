@@ -37,9 +37,11 @@ export async function createPackage(connection: AbapConnection, params: CreatePa
     process.env.SAP_USER ||
     '';
 
-  const softwareComponentXml = params.software_component
-    ? `<pak:softwareComponent pak:name="${escapeXml(params.software_component)}"/>`
-    : '<pak:softwareComponent/>';
+  // Software component is required for package creation
+  if (!params.software_component) {
+    throw new Error('Software component is required for package creation');
+  }
+  const softwareComponentXml = `<pak:softwareComponent pak:name="${escapeXml(params.software_component)}"/>`;
 
   const transportLayerXml = params.transport_layer
     ? `<pak:transportLayer pak:name="${escapeXml(params.transport_layer)}"/>`

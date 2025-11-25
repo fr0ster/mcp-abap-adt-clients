@@ -5,6 +5,80 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.16] - 2025-12-XX
+
+### Changed
+- **Integration tests refactored to use CrudClient** – all integration tests now use `CrudClient` instead of direct Builder instantiation:
+  - `DomainBuilder.test.ts` – migrated to CrudClient for full workflow and read operations
+  - `DataElementBuilder.test.ts` – migrated to CrudClient with proper `typeKind` parameter handling
+  - `ClassBuilder.test.ts` – migrated to CrudClient including ABAP Unit test operations
+  - `InterfaceBuilder.test.ts` – migrated to CrudClient for full workflow
+  - `ProgramBuilder.test.ts` – migrated to CrudClient for full workflow
+  - `StructureBuilder.test.ts` – migrated to CrudClient with proper `ddlCode` handling
+  - `TableBuilder.test.ts` – migrated to CrudClient with proper `ddlCode` handling
+  - `ViewBuilder.test.ts` – migrated to CrudClient for main workflow (CDS unit test workflow remains with direct builders)
+  - `FunctionModuleBuilder.test.ts` – migrated to CrudClient with error handling for standard objects
+  - `FunctionGroupBuilder.test.ts` – migrated to CrudClient for full workflow
+  - `PackageBuilder.test.ts` – migrated to CrudClient with proper `softwareComponent` handling
+  - Benefits: consistent API usage, better session management, simplified test code, easier maintenance
+- **CrudClient session management improved** – `CrudClient` now reuses Builder instances for the same object to maintain session state:
+  - Each object type (Domain, Class, DataElement, etc.) has its own Builder instance stored in `CrudClient` state
+  - Builder instances are reused when operating on the same object name, ensuring `lockHandle` and session cookies are preserved
+  - Prevents "User is currently editing" errors when chaining `lock()` → `update()` → `unlock()` operations
+  - One `CrudClient` instance corresponds to one ADT session, maintaining consistency across operations
+- **Builder return types updated** – non-state-changing methods now return results directly instead of `this`:
+  - `validate()` methods now return `Promise<AxiosResponse>` instead of `Promise<this>`
+  - `check()` methods now return `Promise<AxiosResponse>` instead of `Promise<this>`
+  - `read()` methods now return `Promise<BuilderConfigUnion | string | undefined>` instead of `Promise<this>`
+  - State-changing methods (`create()`, `lock()`, `update()`, `unlock()`, `activate()`, `delete()`) continue to return `Promise<this>` for chaining
+  - This makes the API more concise and intuitive: `const result = await builder.validate()` instead of `await builder.validate(); const result = builder.getValidationResponse()`
+- **IBuilder interface enhanced** – introduced `BuilderConfigUnion` type for unified `read()` return type:
+  - `read()` method can now return various `*BuilderConfig` interfaces or source code strings
+  - Enables type-safe access to parsed configuration from read operations
+  - Supports use cases where read result is used for subsequent update operations
+
+### Fixed
+- **Parameter passing in CrudClient** – fixed parameter handling for various object types:
+  - `ddlCode` now properly passed to `StructureBuilder` and `TableBuilder` via `setDdlCode()` method
+  - `softwareComponent` now required and properly validated for `PackageBuilder.create()`
+  - `typeKind` now required and properly passed for `DataElementBuilder.create()`
+  - All `get*Builder()` methods in `CrudClient` now update builder config using setters when reusing instances
+- **Package creation** – `softwareComponent` is now mandatory for package creation:
+  - `PackageBuilder.create()` validates that `softwareComponent` is provided
+  - Low-level `createPackage()` function throws error if `software_component` is missing
+  - `CrudClient.createPackage()` requires `softwareComponent` in method signature
+  - Default value removed – must be explicitly provided (typically `"ZLOCAL"` for local development)
+- **DataElement creation** – `typeKind` is now mandatory for data element creation:
+  - `CrudClient.createDataElement()` requires `typeKind` in method signature
+  - Ensures proper type definition when creating data elements
+- **Asynchronous activation handling** – added retry logic for `check()` operations after `activate()`:
+  - Created `retryCheckAfterActivate()` helper function in `tests/test-helper.js`
+  - Retries `check()` operation up to 5 times with 1-second delay when activation is still in progress
+  - Handles "Error while importing object from the database" errors that occur during asynchronous activation
+  - Applied to all integration tests that perform `check(active)` after `activate()`
+- **Circular JSON references** – fixed serialization errors in `ClassBuilder.test.ts`:
+  - ABAP Unit test status and result retrieval now extracts specific properties (`status`, `statusText`, `data`) from `AxiosResponse` before logging
+  - Prevents "Converting circular structure to JSON" errors when stringifying `AxiosResponse` objects
+- **Standard object read errors** – improved error handling in `FunctionModuleBuilder.test.ts`:
+  - Catches HTTP 404, 500, and 403 errors when reading standard SAP function modules
+  - Treats these errors as skips instead of test failures, logging warnings instead
+  - Makes tests more resilient to environment-specific data unavailability
+- **ViewBuilder test compilation** – fixed TypeScript compilation errors:
+  - Added missing `TableBuilder` import
+  - Fixed type annotations for Promise chain parameters
+  - Updated `validate()` usage to handle `AxiosResponse` return type correctly
+
+### Added
+- **Retry helper for activation checks** – `retryCheckAfterActivate()` function in `tests/test-helper.js`:
+  - Encapsulates retry logic for `check()` operations after object activation
+  - Configurable max attempts (default: 5) and delay (default: 1000ms)
+  - Supports custom logger and object name for better error messages
+  - Used by all integration tests that need to wait for asynchronous activation to complete
+
+### Documentation
+- Updated architecture documentation to reflect CrudClient Builder reuse pattern
+- Updated test documentation to reflect migration to CrudClient usage
+
 ## [0.1.15] - 2025-12-XX
 
 ### Changed

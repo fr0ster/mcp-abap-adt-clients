@@ -24,6 +24,7 @@ import { deleteDataElement } from './delete';
 import { validateDataElementName } from './validation';
 import { DataElementBuilderConfig, DataElementBuilderState } from './types';
 import { IBuilder } from '../shared/IBuilder';
+import { XMLParser } from 'fast-xml-parser';
 
 export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
   private connection: AbapConnection;
@@ -120,7 +121,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating data element name:', this.config.dataElementName);
       const result = await validateDataElementName(
@@ -129,10 +130,10 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         this.config.packageName,
         this.config.description
       );
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = result;
       this.logger.info?.('Data element name validation successful');
-      return this;
+      return result;
     } catch (error: any) {
       // If validation endpoint returns 400 and it's about object existing, that's OK for tests
       if (error.response?.status === 400) {
@@ -142,7 +143,8 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
             errorText.toLowerCase().includes('does already exist') ||
             errorText.toLowerCase().includes('resource') && errorText.toLowerCase().includes('exist')) {
           this.logger.warn?.('Data element already exists, validation skipped:', this.config.dataElementName);
-          return this;
+          this.state.validationResponse = error.response;
+          return error.response;
         }
       }
 
@@ -154,7 +156,10 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
           errorText.toLowerCase().includes('not supported') ||
           errorMsg.toLowerCase().includes('object type') && errorMsg.toLowerCase().includes('not supported')) {
         this.logger.warn?.('Validation not supported for DTEL/DE in this SAP system, skipping:', this.config.dataElementName);
-        return this;
+        if (error.response) {
+          this.state.validationResponse = error.response;
+          return error.response;
+        }
       }
 
       this.state.errors.push({
@@ -168,17 +173,24 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
       }
       
       this.logger.error?.('Validation failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
-  async read(): Promise<this> {
+  async read(): Promise<DataElementBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading data element:', this.config.dataElementName);
       const result = await getDataElement(this.connection, this.config.dataElementName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Data element read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const xmlData = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return this.parseDataElementXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -186,7 +198,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Read failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -328,7 +340,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking data element:', this.config.dataElementName, 'version:', version);
       const result = await checkDataElement(
@@ -336,24 +348,21 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         this.config.dataElementName,
         version
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Data element check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       // For DDIC objects, check may not be fully supported - log warning but continue
       const errorMsg = error.message || '';
       if (errorMsg.toLowerCase().includes('importing') &&
           errorMsg.toLowerCase().includes('database')) {
         this.logger.warn?.('Check not fully supported for data element (common for DDIC objects), continuing:', this.config.dataElementName);
-        // Return a mock successful result to allow chain to continue
-        this.state.checkResult = {
-          data: { success: true, message: 'Check skipped (not fully supported for DDIC objects)' },
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-          config: {}
-        } as AxiosResponse;
-        return this;
+        // Return error response to allow caller to handle
+        if (error.response) {
+          this.state.checkResult = error.response;
+          return error.response;
+        }
       }
 
       this.state.errors.push({
@@ -362,7 +371,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         timestamp: new Date()
       });
       this.logger.error?.('Check failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -476,8 +485,66 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
     return this.connection.getSessionId();
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  /**
+   * Parse XML response to DataElementBuilderConfig
+   */
+  private parseDataElementXml(xmlData: string): DataElementBuilderConfig | undefined {
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+      });
+
+      const result = parser.parse(xmlData);
+      const wbobj = result['blue:wbobj'] || result['wbobj'];
+
+      if (!wbobj || !wbobj['dtel:dataElement']) {
+        return undefined;
+      }
+
+      const dtel = wbobj['dtel:dataElement'];
+      const packageRef = wbobj['adtcore:packageRef'] || wbobj['packageRef'];
+
+      // Determine typeKind from XML structure
+      let typeKind: DataElementBuilderConfig['typeKind'] | undefined;
+      if (dtel['dtel:typeKind']) {
+        typeKind = dtel['dtel:typeKind'] as DataElementBuilderConfig['typeKind'];
+      } else if (dtel['dtel:typeName']) {
+        // If typeName exists, it's likely a domain or reference type
+        typeKind = 'domain'; // Default assumption
+      }
+
+      return {
+        dataElementName: wbobj['adtcore:name'] || this.config.dataElementName,
+        packageName: packageRef?.['adtcore:name'] || packageRef?.['name'],
+        description: wbobj['adtcore:description'] || '',
+        domainName: dtel['dtel:typeName'] && typeKind === 'domain' ? dtel['dtel:typeName'] : undefined,
+        typeKind,
+        typeName: dtel['dtel:typeName'],
+        dataType: dtel['dtel:dataType'],
+        length: dtel['dtel:dataTypeLength'] ? parseInt(dtel['dtel:dataTypeLength'], 10) : undefined,
+        decimals: dtel['dtel:dataTypeDecimals'] ? parseInt(dtel['dtel:dataTypeDecimals'], 10) : undefined,
+        shortLabel: dtel['dtel:shortFieldLabel'],
+        mediumLabel: dtel['dtel:mediumFieldLabel'],
+        longLabel: dtel['dtel:longFieldLabel'],
+        headingLabel: dtel['dtel:headingFieldLabel']
+      };
+    } catch (error) {
+      this.logger.error?.('Failed to parse data element XML:', error);
+      return undefined;
+    }
+  }
+
+  getReadResult(): DataElementBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    const xmlData = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return this.parseDataElementXml(xmlData);
   }
 
   getCreateResult(): AxiosResponse | undefined {

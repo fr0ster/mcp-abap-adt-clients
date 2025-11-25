@@ -22,13 +22,16 @@ export interface DeleteFunctionModuleParams {
 }
 
 // Builder configuration (camelCase)
+// Note: packageName is required for create operations (validated in builder methods)
+// description is required for create/validate operations
+// sourceCode is required for create/update operations
 export interface FunctionModuleBuilderConfig {
-  functionGroupName: string;
-  functionModuleName: string;
-  packageName?: string;
-  transportRequest?: string;
-  description: string;
-  sourceCode?: string;
+  functionGroupName: string; // Required
+  functionModuleName: string; // Required
+  packageName?: string; // Required for create operations, optional for others
+  transportRequest?: string; // Only optional parameter
+  description?: string; // Required for create/validate operations, optional for others
+  sourceCode?: string; // Required for create/update operations, optional for others
   onLock?: (lockHandle: string) => void;
 }
 

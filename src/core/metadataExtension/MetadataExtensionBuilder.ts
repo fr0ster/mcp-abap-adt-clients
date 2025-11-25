@@ -90,7 +90,7 @@ export class MetadataExtensionBuilder {
       this.logger.info?.('Validating metadata extension parameters');
       const response = await validateMetadataExtension(this.connection, {
         name: this.config.name,
-        description: this.config.description,
+        description: this.config.description || '',
         packageName: this.config.packageName || ''
       });
       
@@ -126,7 +126,7 @@ export class MetadataExtensionBuilder {
         this.connection,
         {
           name: this.config.name,
-          description: this.config.description,
+          description: this.config.description || '',
           packageName: this.config.packageName,
           transportRequest: this.config.transportRequest,
           masterLanguage: this.config.masterLanguage,

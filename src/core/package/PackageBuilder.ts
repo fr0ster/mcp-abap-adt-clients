@@ -39,6 +39,7 @@ import { unlockPackage } from './unlock';
 import { deletePackage, checkPackageDeletion, parsePackageDeletionCheck } from './delete';
 import { updatePackageDescription } from './update';
 import { CreatePackageParams, PackageBuilderConfig, PackageBuilderState } from './types';
+import { XMLParser } from 'fast-xml-parser';
 
 export class PackageBuilder {
   private connection: AbapConnection;
@@ -109,12 +110,12 @@ export class PackageBuilder {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating package:', this.config.packageName);
       const params: CreatePackageParams = {
         package_name: this.config.packageName,
-        super_package: this.config.superPackage,
+        super_package: this.config.superPackage || '',
         description: this.config.description,
         package_type: this.config.packageType,
         software_component: this.config.softwareComponent,
@@ -125,19 +126,20 @@ export class PackageBuilder {
       };
 
       // Basic validation
+      let response: AxiosResponse;
       try {
-        const response = await validatePackageBasic(this.connection, params);
-        // Store raw response - consumer decides how to interpret it
+        response = await validatePackageBasic(this.connection, params);
+        // Store raw response for backward compatibility
         this.state.validationResponse = response;
         this.logger.info?.('Package basic validation successful');
       } catch (validationError: any) {
         // Store error response if available
         if (validationError.response) {
           this.state.validationResponse = validationError.response;
+          response = validationError.response;
+        } else {
+          throw validationError;
         }
-        
-        // Re-throw validation errors - consumer decides how to handle them
-        throw validationError;
       }
 
       // Full validation only if both transport layer and software component are explicitly provided
@@ -148,10 +150,12 @@ export class PackageBuilder {
           // Store full validation response (overwrites basic if both are done)
           this.state.validationResponse = fullResponse;
           this.logger.info?.('Package full validation successful');
+          return fullResponse;
         } catch (fullValidationError: any) {
           // Store error response if available
           if (fullValidationError.response) {
             this.state.validationResponse = fullValidationError.response;
+            return fullValidationError.response;
           }
           throw fullValidationError;
         }
@@ -159,7 +163,7 @@ export class PackageBuilder {
         this.logger.info?.('Skipping full validation (transport layer or software component not provided)');
       }
 
-      return this;
+      return response!;
     } catch (error: any) {
       this.state.errors.push({
         method: 'validate',
@@ -175,6 +179,9 @@ export class PackageBuilder {
     try {
       if (!this.config.superPackage) {
         throw new Error('Super package is required');
+      }
+      if (!this.config.softwareComponent) {
+        throw new Error('Software component is required for package creation');
       }
       this.logger.info?.('Creating package:', this.config.packageName);
       const params: CreatePackageParams = {
@@ -224,13 +231,20 @@ export class PackageBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<PackageBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading package:', this.config.packageName, 'version:', version);
       const result = await getPackage(this.connection, this.config.packageName, version);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Package read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const xmlData = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return this.parsePackageXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -242,13 +256,14 @@ export class PackageBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'active'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking package:', this.config.packageName, 'version:', version);
-      await checkPackage(this.connection, this.config.packageName, version);
-      this.state.checkResult = undefined;
+      const result = await checkPackage(this.connection, this.config.packageName, version);
+      // Store result for backward compatibility
+      this.state.checkResult = result;
       this.logger.info?.('Package check successful');
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -429,8 +444,52 @@ export class PackageBuilder {
     return this.state.createResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  /**
+   * Parse XML response to PackageBuilderConfig
+   */
+  private parsePackageXml(xmlData: string): PackageBuilderConfig | undefined {
+    try {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+      });
+
+      const result = parser.parse(xmlData);
+      const pkg = result['pak:package'];
+
+      if (!pkg) {
+        return undefined;
+      }
+
+      const superPackage = pkg['pak:superPackage'];
+      const transport = pkg['pak:transport'];
+      const attributes = pkg['pak:attributes'];
+
+      return {
+        packageName: pkg['adtcore:name'] || this.config.packageName,
+        superPackage: superPackage?.['adtcore:name'] || superPackage?.['name'],
+        description: pkg['adtcore:description'] || '',
+        packageType: attributes?.['pak:packageType'],
+        softwareComponent: transport?.['pak:softwareComponent']?.['pak:name'],
+        transportLayer: transport?.['pak:transportLayer']?.['pak:name'],
+        applicationComponent: pkg['pak:applicationComponent']?.['pak:name']
+      };
+    } catch (error) {
+      this.logger.error?.('Failed to parse package XML:', error);
+      return undefined;
+    }
+  }
+
+  getReadResult(): PackageBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    const xmlData = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return this.parsePackageXml(xmlData);
   }
 
   getCheckResult(): AxiosResponse | undefined {

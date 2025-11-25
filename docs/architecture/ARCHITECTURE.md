@@ -106,33 +106,65 @@ packages/adt-clients/
 
 **Purpose:** Full CRUD functionality (Create, Read, Update, Delete)
 
+**Session Management:**
+- `CrudClient` maintains one ADT session per instance by reusing Builder instances for the same object
+- Each object type (Domain, Class, DataElement, etc.) has its own Builder instance stored in internal state
+- Builder instances are reused when operating on the same object name, ensuring `lockHandle` and session cookies are preserved
+- This prevents "User is currently editing" errors when chaining `lock()` → `update()` → `unlock()` operations
+- One `CrudClient` instance corresponds to one ADT session, maintaining consistency across operations
+
 **Additional methods (besides ReadOnlyClient):**
 
 **Create:**
-- `createClass(params: CreateClassParams)`
-- `createProgram(params: CreateProgramParams)`
-- `createInterface(params: CreateInterfaceParams)`
-- `createFunctionGroup(params: CreateFunctionGroupParams)`
-- `createFunctionModule(params: CreateFunctionModuleParams)`
-- `createTable(params: CreateTableParams)`
-- `createStructure(params: CreateStructureParams)`
-- `createView(params: CreateViewParams)`
-- `createDomain(params: CreateDomainParams)`
-- `createDataElement(params: CreateDataElementParams)`
-- `createPackage(params: CreatePackageParams)`
-- `createTransport(params: CreateTransportParams)`
+- `createClass(config: Partial<ClassBuilderConfig> & Pick<ClassBuilderConfig, 'className' | 'packageName' | 'description'>)`
+- `createProgram(config: Partial<ProgramBuilderConfig> & Pick<ProgramBuilderConfig, 'programName' | 'packageName' | 'description'>)`
+- `createInterface(config: Partial<InterfaceBuilderConfig> & Pick<InterfaceBuilderConfig, 'interfaceName' | 'packageName' | 'description'>)`
+- `createFunctionGroup(config: Partial<FunctionGroupBuilderConfig> & Pick<FunctionGroupBuilderConfig, 'functionGroupName' | 'packageName' | 'description'>)`
+- `createFunctionModule(config: Partial<FunctionModuleBuilderConfig> & Pick<FunctionModuleBuilderConfig, 'functionModuleName' | 'functionGroupName' | 'packageName' | 'description'>)`
+- `createTable(config: Partial<TableBuilderConfig> & Pick<TableBuilderConfig, 'tableName' | 'packageName' | 'description' | 'ddlCode'>)`
+- `createStructure(config: Partial<StructureBuilderConfig> & Pick<StructureBuilderConfig, 'structureName' | 'packageName' | 'description' | 'ddlCode'>)`
+- `createView(config: Partial<ViewBuilderConfig> & Pick<ViewBuilderConfig, 'viewName' | 'packageName' | 'description' | 'ddlSource'>)`
+- `createDomain(config: Partial<DomainBuilderConfig> & Pick<DomainBuilderConfig, 'domainName' | 'packageName' | 'description'>)`
+- `createDataElement(config: Partial<DataElementBuilderConfig> & Pick<DataElementBuilderConfig, 'dataElementName' | 'packageName' | 'description' | 'typeKind'>)`
+- `createPackage(config: Partial<PackageBuilderConfig> & Pick<PackageBuilderConfig, 'packageName' | 'superPackage' | 'description' | 'softwareComponent'>)`
+- `createTransport(config: CreateTransportParams)`
 
 **Update:**
-- `updateClassSource(name: string, source: string, transportRequest?: string)`
-- `updateProgramSource(name: string, source: string, transportRequest?: string)`
-- `updateInterfaceSource(name: string, source: string, transportRequest?: string)`
-- `updateFunctionModuleSource(group: string, name: string, source: string, transportRequest?: string)`
-- `updateViewSource(name: string, ddlSource: string, transportRequest?: string, options?: { lockHandle?: string; sessionId?: string })`
-- `updateDomain(name: string, params: UpdateDomainParams)`
-- `updateDataElement(name: string, params: UpdateDataElementParams)`
+- `updateClass(config: Partial<ClassBuilderConfig> & Pick<ClassBuilderConfig, 'className'>, lockHandle?: string)`
+- `updateProgram(config: Partial<ProgramBuilderConfig> & Pick<ProgramBuilderConfig, 'programName'>, lockHandle?: string)`
+- `updateInterface(config: Partial<InterfaceBuilderConfig> & Pick<InterfaceBuilderConfig, 'interfaceName'>, lockHandle?: string)`
+- `updateFunctionModule(config: Partial<FunctionModuleBuilderConfig> & Pick<FunctionModuleBuilderConfig, 'functionModuleName'>, lockHandle?: string)`
+- `updateView(config: Partial<ViewBuilderConfig> & Pick<ViewBuilderConfig, 'viewName'>, lockHandle?: string)`
+- `updateDomain(config: Partial<DomainBuilderConfig> & Pick<DomainBuilderConfig, 'domainName' | 'packageName' | 'description'>, lockHandle?: string)`
+- `updateDataElement(config: Partial<DataElementBuilderConfig> & Pick<DataElementBuilderConfig, 'dataElementName' | 'packageName' | 'description'>, lockHandle?: string)`
+- `updateStructure(config: Partial<StructureBuilderConfig> & Pick<StructureBuilderConfig, 'structureName' | 'ddlCode'>, lockHandle?: string)`
+- `updateTable(config: Partial<TableBuilderConfig> & Pick<TableBuilderConfig, 'tableName' | 'ddlCode'>, lockHandle?: string)`
+- `updatePackage(config: Partial<PackageBuilderConfig> & Pick<PackageBuilderConfig, 'packageName' | 'superPackage'>, lockHandle?: string)`
+
+**Lock/Unlock:**
+- `lockClass(config: Pick<ClassBuilderConfig, 'className'>)` → stores `lockHandle` in state
+- `unlockClass(config: Pick<ClassBuilderConfig, 'className'>, lockHandle?: string)`
+- Similar methods for all object types (Program, Interface, Domain, DataElement, Structure, Table, View, FunctionModule, FunctionGroup, Package)
+
+**Activate:**
+- `activateClass(config: Pick<ClassBuilderConfig, 'className'>)`
+- Similar methods for all object types
+
+**Check:**
+- `checkClass(config: Pick<ClassBuilderConfig, 'className'>, status?: string)` → returns `Promise<AxiosResponse>`
+- Similar methods for all object types
+
+**Validate:**
+- `validateClass(config: Pick<ClassBuilderConfig, 'className' | 'packageName' | 'description'>)` → returns `Promise<AxiosResponse>`
+- Similar methods for all object types
+
+**Read:**
+- `readClass(config: Pick<ClassBuilderConfig, 'className'>)` → returns `Promise<ClassBuilderConfig | undefined>`
+- Similar methods for all object types, returning corresponding `*BuilderConfig` or source code string
 
 **Delete:**
-- `deleteObject(name: string, type: string, transportRequest?: string)`
+- `deleteClass(config: Pick<ClassBuilderConfig, 'className'>)`
+- Similar methods for all object types
 
 **Handlers:**
 - handleCreateClass
@@ -391,6 +423,31 @@ export class ClassBuilder {
 ```
 
 **Note:** Lock handles are always logged in **full** (not truncated), making debugging easier.
+
+### Builder Return Types
+
+Builders use different return types based on whether methods modify state:
+
+**State-changing methods** (return `Promise<this>` for chaining):
+- `create()`, `lock()`, `update()`, `unlock()`, `activate()`, `delete()`
+- Enable method chaining: `await builder.create().then(b => b.lock()).then(b => b.update())`
+
+**Non-state-changing methods** (return results directly):
+- `validate()` → `Promise<AxiosResponse>` – validation response from ADT
+- `check(status?: string)` → `Promise<AxiosResponse>` – syntax/consistency check response
+- `read(version?: 'active' | 'inactive')` → `Promise<BuilderConfigUnion | string | undefined>` – parsed configuration or source code
+
+This design makes the API more concise:
+```typescript
+// Before (state-changing pattern)
+await builder.validate();
+const result = builder.getValidationResponse();
+
+// After (direct return)
+const result = await builder.validate();
+```
+
+**BuilderConfigUnion** type encompasses all possible `*BuilderConfig` interfaces, allowing type-safe access to parsed configuration from read operations.
 
 ### Connection Interface
 

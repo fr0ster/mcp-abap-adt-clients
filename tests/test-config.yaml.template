@@ -42,6 +42,7 @@ test_settings:
     unlock: 3000    # Delay after unlock operation (default: 3 seconds)
     update: 3000    # Delay after update operation (default: 3 seconds)
     create: 3000    # Delay after create operation (default: 3 seconds)
+    activate: 3000   # Delay after activate operation (default: 3 seconds)
     default: 3000   # Default delay for any operation (default: 3 seconds)
 
 # Session persistence configuration

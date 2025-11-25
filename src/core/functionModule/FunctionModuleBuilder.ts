@@ -83,7 +83,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating function module:', this.config.functionModuleName);
       const result = await validateFunctionModuleName(
@@ -92,10 +92,10 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         this.config.functionModuleName,
         this.config.description
       );
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = result;
       this.logger.info?.('Validation successful');
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'validate',
@@ -103,7 +103,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         timestamp: new Date()
       });
       this.logger.error?.('Validation failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -116,7 +116,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         this.connection,
         this.config.functionGroupName,
         this.config.functionModuleName,
-        this.config.description,
+        this.config.description || '',
         this.config.transportRequest
       );
       this.state.createResult = result;
@@ -198,7 +198,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking function module:', this.config.functionModuleName, 'version:', version);
       const result = await checkFunctionModule(
@@ -208,9 +208,10 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         version,
         sourceCode
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Function module check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -218,7 +219,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         timestamp: new Date()
       });
       this.logger.error?.('Check failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -301,7 +302,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<FunctionModuleBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading function module:', this.config.functionModuleName);
       const result = await getFunctionSource(
@@ -310,9 +311,20 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         this.config.functionGroupName,
         version
       );
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Function module read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const sourceCode = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return {
+        functionModuleName: this.config.functionModuleName,
+        functionGroupName: this.config.functionGroupName,
+        sourceCode
+      };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -320,7 +332,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         timestamp: new Date()
       });
       this.logger.error?.('Read failed:', error);
-      throw error; // Interrupts chain
+      throw error;
     }
   }
 
@@ -394,8 +406,21 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  getReadResult(): FunctionModuleBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    // FunctionModule read() returns source code (plain text)
+    const sourceCode = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return {
+      functionModuleName: this.config.functionModuleName,
+      functionGroupName: this.config.functionGroupName,
+      sourceCode
+    };
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

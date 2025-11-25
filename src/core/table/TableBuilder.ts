@@ -96,7 +96,7 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
   }
 
   // Operation methods - return Promise<this> for Promise chaining
-  async validate(): Promise<this> {
+  async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating table name:', this.config.tableName);
       const response = await validateTableName(
@@ -105,16 +105,16 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
         this.config.description
       );
       
-      // Store raw response - consumer decides how to interpret it
+      // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger.info?.('Table name validation successful');
-      return this;
+      return response;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
         this.logger.info?.('Table validation returned 400 - object may already exist');
-        return this;
+        return error.response;
       }
       // Store error response if available
       if (error.response) {
@@ -217,7 +217,7 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
     }
   }
 
-  async check(reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun'): Promise<this> {
+  async check(reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking table:', this.config.tableName, 'reporter:', reporter);
       const result = await runTableCheckRun(
@@ -225,9 +225,10 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
         reporter,
         this.config.tableName
       );
+      // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger.info?.('Table check successful:', result.status);
-      return this;
+      return result;
     } catch (error: any) {
       this.state.errors.push({
         method: 'check',
@@ -313,13 +314,23 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<this> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<TableBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading table:', this.config.tableName);
       const result = await getTableSource(this.connection, this.config.tableName);
+      // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Table read successfully:', result.status);
-      return this;
+      
+      // Parse and return config directly
+      const ddlCode = typeof result.data === 'string'
+        ? result.data
+        : JSON.stringify(result.data);
+      
+      return {
+        tableName: this.config.tableName,
+        ddlCode
+      };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
@@ -401,8 +412,20 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): AxiosResponse | undefined {
-    return this.state.readResult;
+  getReadResult(): TableBuilderConfig | undefined {
+    if (!this.state.readResult) {
+      return undefined;
+    }
+
+    // Table read() returns DDL source code (plain text)
+    const ddlCode = typeof this.state.readResult.data === 'string'
+      ? this.state.readResult.data
+      : JSON.stringify(this.state.readResult.data);
+
+    return {
+      tableName: this.config.tableName,
+      ddlCode
+    };
   }
 
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {

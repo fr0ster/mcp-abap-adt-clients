@@ -1,6 +1,6 @@
 /**
- * Unit test for ViewBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Integration test for ViewBuilder
+ * Tests using CrudClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -11,9 +11,11 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
 import { ViewBuilder } from '../../../core/view';
-import { ClassBuilder } from '../../../core/class';
 import { TableBuilder } from '../../../core/table';
+import { ClassBuilder } from '../../../core/class';
 import { UnitTestBuilder } from '../../../core/unitTest';
 import { SharedBuilder } from '../../../core/shared';
 import { IAdtLogger } from '../../../utils/logger';
@@ -21,12 +23,11 @@ import { getView } from '../../../core/view/read';
 import { getTable } from '../../../core/table/read';
 import { getClass } from '../../../core/class/read';
 import { getConfig } from '../../helpers/sessionConfig';
-import { createOnLockCallback } from '../../helpers/lockHelper';
 import {
-  logBuilderTestError,
-  logBuilderTestSkip,
   logBuilderTestStart,
+  logBuilderTestSkip,
   logBuilderTestSuccess,
+  logBuilderTestError,
   logBuilderTestEnd,
   logBuilderTestStep,
   getHttpStatusText
@@ -37,13 +38,14 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-getEnabledTestCase,
+  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
+  getTimeout,
   getOperationDelay,
-  getTimeout
+  retryCheckAfterActivate
 } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -110,8 +112,9 @@ ENDCLASS.
 `;
 }
 
-describe('ViewBuilder', () => {
+describe('ViewBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
+  let client: CrudClient;
   let hasConfig = false;
 
   beforeAll(async () => {
@@ -119,6 +122,7 @@ describe('ViewBuilder', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      client = new CrudClient(connection);
       hasConfig = true;
     } catch (error) {
       testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -206,21 +210,17 @@ describe('ViewBuilder', () => {
         return;
       }
 
+      const config = buildBuilderConfig(testCase);
+
       // Create table first if needed
-      let tableBuilder: TableBuilder | null = null;
       if (tableName && testCase.params.table_source) {
         try {
-          tableBuilder = new TableBuilder(connection, builderLogger, {
+          logBuilderTestStep('validate table');
+          const tableValidationResponse = await client.validateTable({
             tableName: tableName,
-            packageName: resolvePackageName(testCase.params.package_name),
-            transportRequest: resolveTransportRequest(testCase.params.transport_request),
-            ddlCode: testCase.params.table_source,
+            packageName: resolvePackageName(testCase.params.package_name)!,
             description: testCase.params.description || `Table for ${testCase.params.view_name}`
           });
-
-          logBuilderTestStep('validate table');
-          await tableBuilder.validate();
-          const tableValidationResponse = tableBuilder.getValidationResponse();
           if (tableValidationResponse?.status !== 200) {
             const errorData = typeof tableValidationResponse?.data === 'string' 
               ? tableValidationResponse.data 
@@ -230,114 +230,117 @@ describe('ViewBuilder', () => {
           expect(tableValidationResponse?.status).toBe(200);
           
           logBuilderTestStep('create table');
-          try {
-            await tableBuilder.create()
-              .then(async b => {
-                await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-                logBuilderTestStep('lock table');
-                return b.lock();
-              })
-              .then(async b => {
-                // Wait for SAP to commit lock operation
-                await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-                logBuilderTestStep('update table DDL');
-                return b.update();
-              })
-              .then(async b => {
-                await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-                logBuilderTestStep('unlock table');
-                return b.unlock();
-              })
-              .then(async b => {
-                await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-                logBuilderTestStep('activate table');
-                return b.activate();
-              });
-          } catch (tableWorkflowError: any) {
-            // Ensure table is unlocked even if any step fails (lock, update, unlock, activate)
-            if (tableBuilder) {
-              try {
-                await tableBuilder.forceUnlock().catch(() => {});
-              } catch (unlockError) {
-                builderLogger.warn?.(`Failed to unlock table ${tableName} after workflow error:`, unlockError);
-              }
-            }
-            throw tableWorkflowError;
-          }
+          await client.createTable({
+            tableName: tableName,
+            packageName: resolvePackageName(testCase.params.package_name)!,
+            description: testCase.params.description || `Table for ${testCase.params.view_name}`,
+            ddlCode: testCase.params.table_source,
+            transportRequest: resolveTransportRequest(testCase.params.transport_request)
+          });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+          
+          logBuilderTestStep('lock table');
+          await client.lockTable({ tableName: tableName });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+          
+          logBuilderTestStep('update table DDL');
+          await client.updateTable({
+            tableName: tableName,
+            ddlCode: testCase.params.table_source
+          });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+          
+          logBuilderTestStep('unlock table');
+          await client.unlockTable({ tableName: tableName });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+          
+          logBuilderTestStep('activate table');
+          await client.activateTable({ tableName: tableName });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
         } catch (error: any) {
           logBuilderTestError(testsLogger, 'ViewBuilder - full workflow (table creation)', error);
           throw error;
         }
       }
 
-      const builder = new ViewBuilder(connection, builderLogger, {
-        ...buildBuilderConfig(testCase),
-        onLock: createOnLockCallback('view', viewName, undefined, __filename)
-      });
-
       try {
         logBuilderTestStep('validate');
-      await builder
-        .validate()
-          .then(b => {
-            logBuilderTestStep('create');
-            return b.create();
-          })
-          .then(async b => {
-            // Wait for SAP to finish create operation (includes lock/unlock internally)
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-            logBuilderTestStep('lock');
-            return b.lock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit lock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-            logBuilderTestStep('update');
-            return b.update();
-          })
-          .then(async b => {
-            // Wait for SAP to commit update operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-            logBuilderTestStep('check(inactive)');
-            return b.check('inactive');
-          })
-          .then(b => {
-            logBuilderTestStep('unlock');
-            return b.unlock();
-          })
-          .then(async b => {
-            // Wait for SAP to commit unlock operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-            logBuilderTestStep('activate');
-            return b.activate();
-          })
-          .then(async b => {
-            // Wait for SAP to commit activation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || getOperationDelay('unlock', testCase)));
-            logBuilderTestStep('check(active)');
-            return b.check('active');
-          })
-          .then(async b => {
-            // Wait for SAP to finish check operation
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || getOperationDelay('activate', testCase)));
-            logBuilderTestStep('delete (cleanup)');
-            // Use group deletion for view and table together
-            if (tableBuilder && tableName && viewName) {
-              const sharedBuilder = new SharedBuilder(connection);
-              await sharedBuilder.deleteGroup([
-                { type: 'DDLS/DF', name: viewName },
-                { type: 'TABL/DT', name: tableName }
-              ]);
-            } else if (viewName) {
-              return b.delete();
-            }
-            return b;
+        const validationResponse = await client.validateView({
+          viewName: config.viewName,
+          packageName: config.packageName!,
+          description: config.description || ''
+        });
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        }
+        expect(validationResponse?.status).toBe(200);
+        
+        logBuilderTestStep('create');
+        await client.createView({
+          viewName: config.viewName,
+          packageName: config.packageName!,
+          description: config.description || '',
+          transportRequest: config.transportRequest
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        
+        logBuilderTestStep('lock');
+        await client.lockView({ viewName: config.viewName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+        
+        logBuilderTestStep('update');
+        await client.updateView({
+          viewName: config.viewName,
+          ddlSource: config.ddlSource || ''
+        });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+        logBuilderTestStep('check(inactive)');
+        const checkResultInactive = await client.checkView({ viewName: config.viewName });
+        expect(checkResultInactive?.status).toBeDefined();
+        
+        logBuilderTestStep('unlock');
+        await client.unlockView({ viewName: config.viewName });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+        
+        logBuilderTestStep('activate');
+        await client.activateView({ viewName: config.viewName });
+        // Wait for activation to complete (activation is asynchronous)
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        
+        logBuilderTestStep('check(active)');
+        // Retry check for active version - activation may take time
+        const checkResultActive = await retryCheckAfterActivate(
+          () => client.checkView({ viewName: config.viewName }),
+          {
+            maxAttempts: 5,
+            delay: 1000,
+            logger: testsLogger,
+            objectName: config.viewName
+          }
+        );
+        expect(checkResultActive?.status).toBeDefined();
+        
+        logBuilderTestStep('delete (cleanup)');
+        // Use group deletion for view and table together
+        if (tableName && viewName) {
+          const sharedBuilder = new SharedBuilder(connection);
+          await sharedBuilder.deleteGroup([
+            { type: 'DDLS/DF', name: viewName },
+            { type: 'TABL/DT', name: tableName }
+          ]);
+        } else if (viewName) {
+          await client.deleteView({
+            viewName: config.viewName,
+            transportRequest: config.transportRequest
           });
+        }
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.activateResult).toBeDefined();
-        expect(state.errors.length).toBe(0);
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'ViewBuilder - full workflow');
       } catch (error: any) {
@@ -359,37 +362,12 @@ describe('ViewBuilder', () => {
         if (viewName) {
           try {
             logBuilderTestStep('read');
-            await builder.read();
-
-            const readResult = builder.getReadResult();
+            const readResult = await client.readView(viewName);
             expect(readResult).toBeDefined();
-            expect(readResult?.status).toBe(200);
-            expect(readResult?.data).toBeDefined();
+            expect(readResult?.viewName).toBe(viewName);
           } catch (readError) {
             // Log warning but don't fail the test if read fails
             builderLogger.warn?.(`Failed to read view ${viewName}:`, readError);
-          }
-        }
-
-        // Cleanup: use group deletion for view and table together
-        if (viewName && tableName && tableBuilder) {
-          try {
-            await builder.forceUnlock().catch(() => {});
-            await tableBuilder.forceUnlock().catch(() => {});
-            const sharedBuilder = new SharedBuilder(connection);
-            await sharedBuilder.deleteGroup([
-              { type: 'DDLS/DF', name: viewName },
-              { type: 'TABL/DT', name: tableName }
-            ]).catch(() => {});
-          } catch (error) {
-            builderLogger.warn?.(`Failed to cleanup view ${viewName} and table ${tableName}:`, error);
-          }
-        } else if (viewName) {
-          try {
-            await builder.forceUnlock().catch(() => {});
-            await builder.delete().catch(() => {});
-          } catch (error) {
-            builderLogger.warn?.(`Failed to cleanup view ${viewName}:`, error);
           }
         }
 
@@ -489,8 +467,7 @@ describe('ViewBuilder', () => {
 
       try {
         logBuilderTestStep('validate table');
-        await tableBuilder.validate();
-        const tableValidationResponse = tableBuilder.getValidationResponse();
+        const tableValidationResponse = await tableBuilder.validate();
         if (tableValidationResponse?.status !== 200) {
           const errorData = typeof tableValidationResponse?.data === 'string' 
             ? tableValidationResponse.data 
@@ -502,23 +479,23 @@ describe('ViewBuilder', () => {
         logBuilderTestStep('create table');
         try {
           await tableBuilder.create()
-            .then(async b => {
+            .then(async (b: TableBuilder) => {
               await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
               logBuilderTestStep('lock table');
               return b.lock();
             })
-            .then(async b => {
+            .then(async (b: TableBuilder) => {
               // Wait for SAP to commit lock operation
               await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
               logBuilderTestStep('update table DDL');
               return b.update();
             })
-            .then(async b => {
+            .then(async (b: TableBuilder) => {
               await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
               logBuilderTestStep('unlock table');
               return b.unlock();
             })
-            .then(async b => {
+            .then(async (b: TableBuilder) => {
               await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
               logBuilderTestStep('activate table');
               return b.activate();
@@ -536,24 +513,23 @@ describe('ViewBuilder', () => {
         }
 
         logBuilderTestStep('create CDS view');
-        await viewBuilder
-          .validate()
-          .then(b => b.create())
-          .then(async b => {
+        await viewBuilder.validate();
+        await viewBuilder.create()
+          .then(async (b: ViewBuilder) => {
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
             logBuilderTestStep('lock view');
             return b.lock();
           })
-          .then(b => {
+          .then((b: ViewBuilder) => {
             logBuilderTestStep('update view DDL');
             return b.update();
           })
-          .then(async b => {
+          .then(async (b: ViewBuilder) => {
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
             logBuilderTestStep('unlock view');
             return b.unlock();
           })
-          .then(async b => {
+          .then(async (b: ViewBuilder) => {
             await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
             logBuilderTestStep('activate view');
             return b.activate();
