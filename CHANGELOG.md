@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.15] - 2025-12-XX
+
+### Changed
+- **Updated dependency**: Upgraded `@mcp-abap-adt/connection` from `^0.1.10` to `^0.1.11`
+  - Benefits from improved JWT token refresh handling in connection layer
+  - Enhanced error messages for expired JWT and refresh tokens
+  - Improved CSRF token fetching with automatic JWT refresh support
+  - Better error handling for authentication scenarios
+
+### Documentation
+- Updated documentation to reflect connection package upgrade and its benefits
+
 ## [0.1.14] - 2025-11-24
 
 ### Added
