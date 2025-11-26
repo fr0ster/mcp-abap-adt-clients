@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.19] - 2025-12-XX
+
+### Added
+- **Complete type exports** – all BuilderConfig and BuilderState types are now exported from main package:
+  - All `*BuilderConfig` types (ClassBuilderConfig, ProgramBuilderConfig, InterfaceBuilderConfig, DataElementBuilderConfig, DomainBuilderConfig, StructureBuilderConfig, TableBuilderConfig, ViewBuilderConfig, FunctionGroupBuilderConfig, FunctionModuleBuilderConfig, ServiceDefinitionBuilderConfig, BehaviorDefinitionBuilderConfig, BehaviorImplementationBuilderConfig, MetadataExtensionBuilderConfig)
+  - All corresponding `*BuilderState` types for each BuilderConfig
+  - `ClassUnitTestDefinition` and `ClassUnitTestRunOptions` types used in CrudClient unit test methods
+  - Enables consumers to import and use all types that are returned by client methods (e.g., `getClassReadResult(): ClassBuilderConfig`)
+  - Type-safe access to configuration objects returned from read operations
+  - Full TypeScript support for all client method return types
+
 ## [0.1.18] - 2025-12-XX
 
 ### Added

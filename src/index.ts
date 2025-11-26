@@ -48,7 +48,31 @@ export type {
   GetWhereUsedParams
 } from './core/shared';
 
+// Export package types
+export type {
+  CreatePackageParams,
+  PackageBuilderConfig,
+  PackageBuilderState
+} from './core/package';
 
+// Export all BuilderConfig types used in client methods
+export type { ClassBuilderConfig, ClassBuilderState } from './core/class';
+export type { ProgramBuilderConfig, ProgramBuilderState } from './core/program';
+export type { InterfaceBuilderConfig, InterfaceBuilderState } from './core/interface';
+export type { DataElementBuilderConfig, DataElementBuilderState } from './core/dataElement';
+export type { DomainBuilderConfig, DomainBuilderState } from './core/domain';
+export type { StructureBuilderConfig, StructureBuilderState } from './core/structure';
+export type { TableBuilderConfig, TableBuilderState } from './core/table';
+export type { ViewBuilderConfig, ViewBuilderState } from './core/view';
+export type { FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './core/functionGroup';
+export type { FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './core/functionModule';
+export type { ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderState } from './core/serviceDefinition';
+export type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState } from './core/behaviorDefinition';
+export type { BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderState } from './core/behaviorImplementation';
+export type { MetadataExtensionBuilderConfig, MetadataExtensionBuilderState } from './core/metadataExtension';
+
+// Export class unit test types
+export type { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './core/class';
 
 // Re-export types from connection package for convenience
 export type { AbapConnection, AbapRequestOptions } from '@mcp-abap-adt/connection';
