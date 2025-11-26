@@ -8,7 +8,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getFunctionGroup } from './read';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
@@ -39,15 +39,17 @@ async function updateFunctionGroupMetadata(
   const parsedXml = parser.parse(currentXml);
   const functionGroup = parsedXml['group:abapFunctionGroup'];
 
+  // Description is limited to 60 characters in SAP ADT
+  const limitedDescription = limitDescription(newDescription);
   // Update description
   if (functionGroup) {
-    functionGroup['@_adtcore:description'] = newDescription;
+    functionGroup['@_adtcore:description'] = limitedDescription;
   }
 
   // Rebuild XML (simplified - use original XML with replaced description)
   const updatedXml = currentXml.replace(
     /adtcore:description="[^"]*"/,
-    `adtcore:description="${newDescription}"`
+    `adtcore:description="${limitedDescription}"`
   );
 
   const headers: Record<string, string> = {

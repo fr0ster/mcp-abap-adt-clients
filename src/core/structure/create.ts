@@ -6,6 +6,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { limitDescription } from '../../utils/internalUtils';
 
 /**
  * Create empty structure metadata via POST
@@ -28,10 +29,12 @@ export async function create(
   const masterSystem = systemInfo ? systemId : '';
   const responsible = systemInfo ? username : '';
 
+  // Description is limited to 60 characters in SAP ADT
+  const limitedDescription = limitDescription(description);
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
 
-  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${structureName.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${structureName.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${packageName.toUpperCase()}"/>
 </blue:blueSource>`;
 

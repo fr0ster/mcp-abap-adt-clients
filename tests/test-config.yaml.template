@@ -239,7 +239,6 @@ create_package:
       params:
         package_name: "ZADT_BLD_PKG01"          # Parent package (existing)
         test_package: "ZADT_BLD_INNER_PKG01"    # Package created by the test
-        super_package: "ZADT_BLD_PKG01"
         description: "PackageBuilder workflow package"
         updated_description: "PackageBuilder workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.

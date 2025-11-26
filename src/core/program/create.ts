@@ -4,7 +4,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { lockProgram } from './lock';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
@@ -74,7 +74,8 @@ export async function create(
   connection: AbapConnection,
   args: CreateProgramParams
 ): Promise<AxiosResponse> {
-  const description = args.description || args.programName;
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.programName);
   const programType = convertProgramType(args.programType);
   const application = args.application || '*';
   const url = `/sap/bc/adt/programs/programs${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;

@@ -202,7 +202,7 @@ describe('PackageBuilder (using CrudClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_package', 'с');
+      const tc = getEnabledTestCase('create_package', 'builder_package');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -324,10 +324,16 @@ describe('PackageBuilder (using CrudClient)', () => {
         expect(checkResult2?.status).toBeDefined();
 
         logBuilderTestStep('delete (cleanup)');
-        await client.deletePackage({
+        // Create a new client with fresh session for deletion to avoid lock issues
+        // This is needed because package may still be locked in the current session after unlock
+        const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
+        await (deleteConnection as any).connect();
+        const deleteClient = new CrudClient(deleteConnection);
+        await deleteClient.deletePackage({
           packageName: config.packageName,
           transportRequest: config.transportRequest
         });
+        deleteConnection.reset();
 
         expect(client.getCreateResult()).toBeDefined();
         expect(client.getUpdateResult()).toBeDefined();

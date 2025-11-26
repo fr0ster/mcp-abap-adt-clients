@@ -5,7 +5,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 
 /**
  * Validate function group name
@@ -35,8 +35,10 @@ export async function validateFunctionGroupName(
     queryParams.append('packagename', encodeSapObjectName(packageName));
   }
 
+  // Description is limited to 60 characters in SAP ADT
+  const limitedDescription = description ? limitDescription(description) : encodedName;
   if (description) {
-    queryParams.append('description', description);
+    queryParams.append('description', limitedDescription);
   }
 
   // XML body required for validation
@@ -44,7 +46,7 @@ export async function validateFunctionGroupName(
     ? `  <adtcore:packageRef adtcore:name="${encodeSapObjectName(packageName)}"/>`
     : '';
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description || encodedName}" adtcore:language="EN" adtcore:name="${encodedName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN">
+<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${encodedName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN">
 ${packageRef}
 </group:abapFunctionGroup>`;
 

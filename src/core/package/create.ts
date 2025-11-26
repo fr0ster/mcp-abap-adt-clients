@@ -6,6 +6,7 @@ import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { CreatePackageParams } from './types';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { limitDescription } from '../../utils/internalUtils';
 
 /**
  * Create ABAP package via single ADT POST (no validation or follow-up checks).
@@ -25,7 +26,8 @@ export async function createPackage(connection: AbapConnection, params: CreatePa
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
 
-  const description = escapeXml(params.description || params.package_name);
+  // Description is limited to 60 characters in SAP ADT
+  const description = escapeXml(limitDescription(params.description || params.package_name));
   const packageType = params.package_type || 'development';
 
   const systemInfo = await getSystemInformation(connection);
@@ -59,7 +61,7 @@ export async function createPackage(connection: AbapConnection, params: CreatePa
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${escapeXml(masterSystem)}"` : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.package_name}" adtcore:type="DEVC/K" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${params.package_name}"/>
   <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="false"/>
   ${superPackageXml}

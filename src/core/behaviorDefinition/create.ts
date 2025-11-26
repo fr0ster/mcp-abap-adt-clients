@@ -6,6 +6,7 @@ import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getTimeout } from '@mcp-abap-adt/connection';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { limitDescription } from '../../utils/internalUtils';
 import { BehaviorDefinitionCreateParams } from './types';
 
 /**
@@ -51,10 +52,12 @@ export async function create(
         // Fallback to env username if not provided
         responsible = responsible || process.env.SAP_USERNAME || process.env.SAP_USER || '';
 
+        // Description is limited to 60 characters in SAP ADT
+        const description = limitDescription(params.description);
         const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
         const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
 
-        const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${params.description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="BDEF/BDO" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
+        const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${language}" adtcore:name="${params.name}" adtcore:type="BDEF/BDO" adtcore:masterLanguage="${language}"${masterSystemAttr}${responsibleAttr}>
     <adtcore:adtTemplate>
         <adtcore:adtProperty adtcore:key="implementation_type">${params.implementationType}</adtcore:adtProperty>
     </adtcore:adtTemplate>

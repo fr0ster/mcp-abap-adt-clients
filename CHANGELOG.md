@@ -5,6 +5,62 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.18] - 2025-12-XX
+
+### Added
+- **BehaviorImplementationBuilder** – new Builder class for ABAP Behavior Implementation operations:
+  - Extends `ClassBuilder` for full class lifecycle support
+  - High-level method `createBehaviorImplementation()` – executes complete workflow:
+    1. Creates class as regular class
+    2. Locks class
+    3. Updates main source with "FOR BEHAVIOR OF" clause
+    4. Updates implementations include with default local handler class
+    5. Unlocks class
+    6. Activates class
+  - Specific methods:
+    - `updateMainSource()` – updates main source with "FOR BEHAVIOR OF" clause
+    - `updateImplementations()` – updates implementations include with hardcoded default handler class code
+    - `getBehaviorDefinition()` – returns behavior definition name
+  - Automatic generation of default local handler class code based on behavior definition
+  - Integration with `CrudClient`:
+    - `createBehaviorImplementation()` – full workflow
+    - `updateBehaviorImplementationMainSource()` – update main source
+    - `updateBehaviorImplementation()` – update implementations include
+    - `validateBehaviorImplementation()` – validate class name
+    - `getBehaviorImplementationBuilderInstance()` – get builder for advanced operations
+  - All standard class operations (lock, unlock, activate, check, read, delete) available through `ClassBuilder` inheritance
+  - Integration tests in `src/__tests__/integration/behaviorImplementation/BehaviorImplementationBuilder.test.ts`
+  - Test configuration support in `test-config.yaml`:
+    - `create_behavior_implementation` section for workflow tests
+- **ClassBuilder.update() enhancements** – added support for updating multiple class parts:
+  - `update(sourceCode?, options?)` – now accepts optional `options` parameter:
+    - `options.implementations` – update implementations include
+    - `options.testClasses` – update test classes include
+  - All parts can be updated using the same lock handle (no separate lock needed for test classes)
+  - New function `updateClassImplementations()` in `core/class/update.ts` for updating implementations include
+- **UnitTestBuilder inheritance** – now extends `ClassBuilder` for CDS unit test classes:
+  - For `objectType='cds'`: full class lifecycle through `ClassBuilder` inheritance
+  - For `objectType='class'`: test include operations only (standalone)
+  - CDS unit test classes can use all `ClassBuilder` methods: `create()`, `lock()`, `update()`, `unlock()`, `activate()`, `delete()`
+
+### Changed
+- **ClassBuilder fields visibility** – changed private fields to `protected` to enable inheritance:
+  - `connection`, `logger`, `config`, `sourceCode`, `lockHandle`, `testLockHandle`, `state` are now `protected`
+  - Enables `BehaviorImplementationBuilder` and `UnitTestBuilder` to extend `ClassBuilder`
+- **ClassBuilder.update() for test classes** – now uses same lock handle as main source:
+  - Removed requirement for separate `lockTestClasses()` when updating test classes via `update()`
+  - Test classes can be updated using the same `lockHandle` from `lock()`
+- **BehaviorImplementationBuilder.updateImplementations()** – removed parameter, always uses hardcoded default implementation code
+- **CrudClient.createBehaviorImplementation()** – removed `sourceCode` parameter requirement:
+  - Implementation code is now automatically generated based on `behaviorDefinition`
+  - No need to provide implementation code manually
+
+### Fixed
+- **Description length limitation** – applied 60-character limit to all description fields across all object types:
+  - Added `limitDescription()` utility function in `utils/internalUtils.ts`
+  - Applied to all `create()`, `update()`, and `validate()` functions
+  - Ensures compliance with SAP ADT description field limitations
+
 ## [0.1.17] - 2025-12-XX
 
 ### Added

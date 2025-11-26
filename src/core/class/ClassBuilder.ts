@@ -54,13 +54,13 @@ import { deleteClass } from './delete';
 import { ClassBuilderConfig, ClassBuilderState } from './types';
 
 export class ClassBuilder {
-  private connection: AbapConnection;
-  private logger: IAdtLogger;
-  private config: ClassBuilderConfig;
-  private sourceCode?: string;
-  private lockHandle?: string;
-  private testLockHandle?: string;
-  private state: ClassBuilderState;
+  protected connection: AbapConnection;
+  protected logger: IAdtLogger;
+  protected config: ClassBuilderConfig;
+  protected sourceCode?: string;
+  protected lockHandle?: string;
+  protected testLockHandle?: string;
+  protected state: ClassBuilderState;
 
   constructor(
     connection: AbapConnection,
@@ -334,25 +334,60 @@ export class ClassBuilder {
     }
   }
 
-  async update(sourceCode?: string): Promise<this> {
+  async update(sourceCode?: string, options?: { implementations?: string; testClasses?: string }): Promise<this> {
     try {
       if (!this.lockHandle) {
         throw new Error('Class must be locked before update. Call lock() first.');
       }
-      const code = sourceCode || this.sourceCode;
-      if (!code) {
-        throw new Error('Source code is required. Use setCode() or pass as parameter.');
+
+      // Update main source if provided
+      if (sourceCode || this.sourceCode) {
+        const code = sourceCode || this.sourceCode;
+        if (!code) {
+          throw new Error('Source code is required. Use setCode() or pass as parameter.');
+        }
+        this.logger.info?.('Updating class main source:', this.config.className);
+        const result = await updateClass(
+          this.connection,
+          this.config.className,
+          code,
+          this.lockHandle,
+          this.config.transportRequest
+        );
+        this.state.updateResult = result;
+        this.logger.info?.('Class main source updated successfully:', result.status);
       }
-      this.logger.info?.('Updating class source:', this.config.className);
-      const result = await updateClass(
-        this.connection,
-        this.config.className,
-        code,
-        this.lockHandle,
-        this.config.transportRequest
-      );
-      this.state.updateResult = result;
-      this.logger.info?.('Class updated successfully:', result.status);
+
+      // Update implementations include if provided
+      if (options?.implementations) {
+        const { updateClassImplementations } = await import('./update');
+        this.logger.info?.('Updating class implementations include:', this.config.className);
+        const result = await updateClassImplementations(
+          this.connection,
+          this.config.className,
+          options.implementations,
+          this.lockHandle,
+          this.config.transportRequest
+        );
+        this.state.updateResult = result;
+        this.logger.info?.('Class implementations updated successfully:', result.status);
+      }
+
+      // Update test classes if provided (uses same lock handle as main source)
+      if (options?.testClasses) {
+        const { updateClassTestInclude } = await import('./testclasses');
+        this.logger.info?.('Updating class test classes:', this.config.className);
+        const result = await updateClassTestInclude(
+          this.connection,
+          this.config.className,
+          options.testClasses,
+          this.lockHandle,
+          this.config.transportRequest
+        );
+        this.state.testClassesResult = result;
+        this.logger.info?.('Class test classes updated successfully:', result.status);
+      }
+
       return this;
     } catch (error: any) {
       this.state.errors.push({

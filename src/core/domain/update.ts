@@ -4,7 +4,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { UpdateDomainParams } from './types';
 
 /**
@@ -38,11 +38,13 @@ export async function updateDomain(
     fixValuesXml = '    <doma:fixValues/>';
   }
 
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.domain_name);
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
              xmlns:adtcore="http://www.sap.com/adt/core"
-             adtcore:description="${args.description || args.domain_name}"
+             adtcore:description="${description}"
              adtcore:language="EN"
              adtcore:name="${args.domain_name.toUpperCase()}"
              adtcore:type="DOMA/DD"

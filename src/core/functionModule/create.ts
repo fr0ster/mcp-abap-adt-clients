@@ -5,7 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { lockFunctionModule } from './lock';
 import { unlockFunctionModule } from './unlock';
@@ -38,11 +38,13 @@ export async function create(
   const masterSystem = systemInfo?.systemID;
   const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
+  // Description is limited to 60 characters in SAP ADT
+  const limitedDescription = limitDescription(description);
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:name="${functionModuleName}" adtcore:type="FUGR/FF"${masterSystemAttr}${responsibleAttr}>
+<fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:name="${functionModuleName}" adtcore:type="FUGR/FF"${masterSystemAttr}${responsibleAttr}>
   <adtcore:containerRef adtcore:name="${functionGroupName}" adtcore:type="FUGR/F" adtcore:uri="/sap/bc/adt/functions/groups/${encodedGroupName}"/>
 </fmodule:abapFunctionModule>`;
 

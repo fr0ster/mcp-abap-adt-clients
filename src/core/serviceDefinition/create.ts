@@ -5,7 +5,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { CreateServiceDefinitionParams } from './types';
 
@@ -25,7 +25,8 @@ export async function create(
   const masterSystem = systemInfo?.systemID || '';
   const masterLanguage = systemInfo?.language || 'EN';
 
-  const description = args.description || args.service_definition_name;
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.service_definition_name);
   const serviceDefinitionName = args.service_definition_name.toUpperCase();
 
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';

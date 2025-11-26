@@ -29,6 +29,7 @@ import { FunctionModuleBuilder, FunctionModuleBuilderConfig } from '../core/func
 import { PackageBuilder, PackageBuilderConfig } from '../core/package';
 import { TransportBuilder } from '../core/transport';
 import { BehaviorDefinitionBuilder, BehaviorDefinitionBuilderConfig } from '../core/behaviorDefinition';
+import { BehaviorImplementationBuilder, BehaviorImplementationBuilderConfig } from '../core/behaviorImplementation';
 import { MetadataExtensionBuilder, MetadataExtensionBuilderConfig } from '../core/metadataExtension';
 import { ServiceDefinitionBuilder, ServiceDefinitionBuilderConfig } from '../core/serviceDefinition';
 
@@ -1025,9 +1026,44 @@ export class CrudClient extends ReadOnlyClient {
     if (config.softwareComponent) {
       builder.setSoftwareComponent(config.softwareComponent);
     }
-    await builder.create();
-    this.crudState.createResult = builder.getState().createResult;
-    return this;
+    
+    try {
+      await builder.create();
+      this.crudState.createResult = builder.getState().createResult;
+      return this;
+    } catch (error: any) {
+      // If software component is invalid, try to get it from parent package
+      const errorMessage = String(error.message || '').toLowerCase();
+      const errorData = error.response?.data || '';
+      const errorText = typeof errorData === 'string' ? errorData.toLowerCase() : JSON.stringify(errorData).toLowerCase();
+      
+      const isSoftwareComponentError = 
+        error.response?.status === 400 &&
+        (errorMessage.includes('software component') || 
+         errorMessage.includes('not a valid software component') ||
+         errorText.includes('software component') ||
+         errorText.includes('not a valid software component'));
+      
+      if (isSoftwareComponentError && config.superPackage) {
+        // Read parent package to get its software component
+        try {
+          const parentPackage = await this.readPackage(config.superPackage);
+          if (parentPackage?.softwareComponent) {
+            builder.setSoftwareComponent(parentPackage.softwareComponent);
+            // Retry creation with parent's software component
+            await builder.create();
+            this.crudState.createResult = builder.getState().createResult;
+            return this;
+          }
+        } catch (readError) {
+          // If reading parent package fails, throw original error
+          throw error;
+        }
+      }
+      
+      // Re-throw original error if not a software component error or if parent read failed
+      throw error;
+    }
   }
 
   async validatePackage(config: Partial<PackageBuilderConfig> & Pick<PackageBuilderConfig, 'packageName' | 'superPackage' | 'description'>): Promise<AxiosResponse> {
@@ -1153,6 +1189,83 @@ export class CrudClient extends ReadOnlyClient {
     await builder.delete();
     this.crudState.deleteResult = builder.getState().deleteResult;
     return this;
+  }
+
+  // ==================== Behavior Implementation operations ====================
+  
+  /**
+   * Create behavior implementation class - full workflow
+   * Creates class, locks, updates main source and implementations, unlocks and activates.
+   */
+  async createBehaviorImplementation(config: Partial<BehaviorImplementationBuilderConfig> & Pick<BehaviorImplementationBuilderConfig, 'className' | 'packageName' | 'behaviorDefinition'>): Promise<this> {
+    const builder = new BehaviorImplementationBuilder(this.connection, {}, { 
+      ...config, 
+      description: config.description || `Behavior Implementation for ${config.behaviorDefinition}`,
+      behaviorDefinition: config.behaviorDefinition
+    });
+    await builder.createBehaviorImplementation();
+    this.crudState.createResult = builder.getState().createResult;
+    this.crudState.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  /**
+   * Update behavior implementation main source with "FOR BEHAVIOR OF" clause
+   * Must be called after lockClass()
+   */
+  async updateBehaviorImplementationMainSource(config: Pick<BehaviorImplementationBuilderConfig, 'className' | 'behaviorDefinition'>, lockHandle?: string): Promise<this> {
+    const builder = new BehaviorImplementationBuilder(this.connection, {}, { 
+      className: config.className,
+      behaviorDefinition: config.behaviorDefinition,
+      description: ''
+    });
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.updateMainSource();
+    this.crudState.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  /**
+   * Update behavior implementation implementations include
+   * Must be called after lockClass() and updateBehaviorImplementationMainSource()
+   */
+  async updateBehaviorImplementation(config: Pick<BehaviorImplementationBuilderConfig, 'className' | 'behaviorDefinition'>, lockHandle?: string): Promise<this> {
+    const builder = new BehaviorImplementationBuilder(this.connection, {}, { 
+      className: config.className,
+      behaviorDefinition: config.behaviorDefinition,
+      description: ''
+    });
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.updateImplementations();
+    this.crudState.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  /**
+   * Validate behavior implementation class name
+   */
+  async validateBehaviorImplementation(config: Partial<BehaviorImplementationBuilderConfig> & Pick<BehaviorImplementationBuilderConfig, 'className' | 'packageName' | 'behaviorDefinition'>): Promise<AxiosResponse> {
+    const { validateBehaviorImplementationName } = await import('../core/behaviorImplementation/validation');
+    const result = await validateBehaviorImplementationName(
+      this.connection,
+      config.className,
+      config.packageName,
+      config.description,
+      config.behaviorDefinition
+    );
+    this.crudState.validationResponse = result;
+    return result;
+  }
+
+  /**
+   * Get BehaviorImplementationBuilder instance for advanced operations
+   */
+  getBehaviorImplementationBuilderInstance(config: Partial<BehaviorImplementationBuilderConfig> & Pick<BehaviorImplementationBuilderConfig, 'className' | 'behaviorDefinition'>): BehaviorImplementationBuilder {
+    return new BehaviorImplementationBuilder(this.connection, {}, {
+      ...config,
+      description: config.description || `Behavior Implementation for ${config.behaviorDefinition}`,
+      behaviorDefinition: config.behaviorDefinition || ''
+    });
   }
 
   // ==================== MetadataExtension operations ====================

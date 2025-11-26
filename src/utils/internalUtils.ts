@@ -13,3 +13,13 @@ export function encodeSapObjectName(objectName: string): string {
   return encodeURIComponent(objectName);
 }
 
+/**
+ * Limits description to 60 characters as per SAP ADT specification
+ * SAP ADT has a maximum length of 60 characters for adtcore:description field
+ * @param description - Description text
+ * @returns Description limited to 60 characters
+ */
+export function limitDescription(description: string): string {
+  return description.length > 60 ? description.substring(0, 60) : description;
+}
+

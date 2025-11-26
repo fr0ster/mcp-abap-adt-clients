@@ -5,7 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { UpdateDataElementParams } from './types';
 import { getSystemInformation } from '../../utils/systemInfo';
 
@@ -152,6 +152,8 @@ export async function updateDataElementInternal(
   const leftToRightDirection = args.left_to_right_direction !== undefined ? args.left_to_right_direction : false;
   const deactivateBIDIFiltering = args.deactivate_bidi_filtering !== undefined ? args.deactivate_bidi_filtering : false;
 
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.data_element_name);
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
@@ -159,7 +161,7 @@ export async function updateDataElementInternal(
             xmlns:adtcore="http://www.sap.com/adt/core"
             xmlns:atom="http://www.w3.org/2005/Atom"
             xmlns:dtel="http://www.sap.com/adt/dictionary/dataelements"
-            adtcore:description="${args.description || args.data_element_name}"
+            adtcore:description="${description}"
             adtcore:language="EN"
             adtcore:name="${args.data_element_name.toUpperCase()}"
             adtcore:type="DTEL/DE"

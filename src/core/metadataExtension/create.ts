@@ -7,6 +7,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { limitDescription } from '../../utils/internalUtils';
 import { MetadataExtensionCreateParams } from './types';
 
 /**
@@ -44,11 +45,13 @@ export async function createMetadataExtension(
   const masterSystem = systemInfo ? (params.masterSystem || systemId) : '';
   const responsible = systemInfo ? (params.responsible || username) : '';
 
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(params.description);
   // Build XML with conditional attributes
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><ddlxsources:ddlxSource xmlns:ddlxsources="http://www.sap.com/adt/ddic/ddlxsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${params.description}" adtcore:language="EN" adtcore:name="${params.name}" adtcore:type="DDLX/EX" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><ddlxsources:ddlxSource xmlns:ddlxsources="http://www.sap.com/adt/ddic/ddlxsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.name}" adtcore:type="DDLX/EX" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr}${responsibleAttr}>
     ${params.transportRequest ? `<adtcore:packageRef adtcore:name="${params.packageName}">
     <adtcore:properties>
       <adtcore:property adtcore:name="abapLanguageVersion" adtcore:value=""/>

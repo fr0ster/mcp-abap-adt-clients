@@ -5,6 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { limitDescription } from '../../utils/internalUtils';
 import { CreateClassParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -24,7 +25,8 @@ export async function create(
   connection: AbapConnection,
   args: CreateClassParams
 ): Promise<AxiosResponse> {
-  const description = args.description || args.class_name || '';
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.class_name || '');
   const url = `/sap/bc/adt/oo/classes${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   // Get masterSystem and responsible (only for cloud systems)

@@ -5,7 +5,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getDomainInfo } from './update';
 import { CreateDataElementParams } from './types';
@@ -25,7 +25,8 @@ export async function create(
   const username = systemInfo?.userName || '';
   const masterSystem = systemInfo?.systemID || '';
 
-  const description = args.description || args.data_element_name;
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.data_element_name);
   if (!args.type_kind) {
     throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
   }

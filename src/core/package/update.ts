@@ -4,7 +4,7 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { CreatePackageParams } from './types';
 
 /**
@@ -31,7 +31,9 @@ async function buildUpdatePackageXml(connection: AbapConnection, args: CreatePac
     ? `<pak:transportLayer pak:name="${args.transport_layer}"/>`
     : '<pak:transportLayer/>';
 
-  return `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${args.description || args.package_name}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.package_name);
+  return `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
 
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 
@@ -125,10 +127,12 @@ export async function updatePackageDescription(
     ? readResponse.data 
     : JSON.stringify(readResponse.data);
   
+  // Description is limited to 60 characters in SAP ADT
+  const limitedDescription = limitDescription(description);
   // Replace description attribute in XML (simple string replacement)
   // Pattern: adtcore:description="old_value" -> adtcore:description="new_value"
   const descriptionRegex = /(adtcore:description=")([^"]*)(")/;
-  const updatedXml = currentXml.replace(descriptionRegex, `$1${description.replace(/"/g, '&quot;')}$3`);
+  const updatedXml = currentXml.replace(descriptionRegex, `$1${limitedDescription.replace(/"/g, '&quot;')}$3`);
 
   const packageNameEncoded = encodeSapObjectName(packageName);
   const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${lockHandle}`;

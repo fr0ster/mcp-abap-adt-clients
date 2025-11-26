@@ -5,7 +5,7 @@
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { CreateViewParams } from './types';
 
@@ -16,7 +16,8 @@ async function createDDLSObject(
   connection: AbapConnection,
   args: CreateViewParams
 ): Promise<AxiosResponse> {
-  const description = args.description || args.view_name;
+  // Description is limited to 60 characters in SAP ADT
+  const description = limitDescription(args.description || args.view_name);
   const url = `/sap/bc/adt/ddic/ddl/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
   // Get system information - only for cloud systems

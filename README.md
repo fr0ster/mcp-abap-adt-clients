@@ -4,7 +4,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT) with a **Builder and Cli
 
 ## Features
 
-- ✅ **Builder API** – fluent interface for complex workflows with method chaining (`ClassBuilder`, `ProgramBuilder`, `UnitTestBuilder`, etc.)
+- ✅ **Builder API** – fluent interface for complex workflows with method chaining (`ClassBuilder`, `BehaviorImplementationBuilder`, `ProgramBuilder`, `UnitTestBuilder`, etc.)
 - ✅ **Client API** – simplified interface for common operations:
   - `ReadOnlyClient` – read operations for all object types
   - `CrudClient` – full CRUD operations with method chaining and state management
@@ -63,6 +63,7 @@ See [CLI Tools documentation](./bin/README.md) for details.
 | Object Type | Builder | CrudClient | ReadOnlyClient |
 |------------|---------|------------|----------------|
 | Classes (CLAS) | ✅ | ✅ | ✅ |
+| Behavior Implementations (CLAS) | ✅ | ✅ | ✅ |
 | Interfaces (INTF) | ✅ | ✅ | ✅ |
 | Programs (PROG) | ✅ | ✅ | ✅ |
 | Function Groups (FUGR) | ✅ | ✅ | ✅ |
@@ -151,6 +152,38 @@ ENDCLASS.`)
   .then(b => b.activate());
 ```
 
+### Creating Behavior Implementation Classes
+
+```typescript
+import { CrudClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new CrudClient(connection);
+
+// Full workflow: create, lock, update main source, update implementations, unlock, activate
+await client.createBehaviorImplementation({
+  className: 'ZBP_OK_I_CDS_TEST',
+  packageName: 'ZOK_TEST_PKG_01',
+  behaviorDefinition: 'ZOK_I_CDS_TEST',
+  description: 'Behavior Implementation for ZOK_I_CDS_TEST',
+  transportRequest: 'E19K900001'
+});
+
+// Or use builder directly for more control
+const builder = client.getBehaviorImplementationBuilderInstance({
+  className: 'ZBP_OK_I_CDS_TEST',
+  behaviorDefinition: 'ZOK_I_CDS_TEST'
+});
+
+await builder
+  .createBehaviorImplementation()  // Full workflow
+  .then(b => b.read())              // Read class source
+  .then(b => b.lock())              // Lock for modification
+  .then(b => b.updateMainSource())  // Update main source
+  .then(b => b.updateImplementations()) // Update implementations include
+  .then(b => b.unlock())            // Unlock
+  .then(b => b.activate());        // Activate
+```
+
 ## CLI Tools
 
 After installation, the following commands are available:
@@ -190,6 +223,7 @@ See [bin/README.md](bin/README.md) for details.
 **Create Operations:**
 - `createProgram(name, description, package, transport?)` → `Promise<this>`
 - `createClass(name, description, package, transport?)` → `Promise<this>`
+- `createBehaviorImplementation(config)` → `Promise<this>` – creates behavior implementation class with full workflow (create, lock, update main source, update implementations, unlock, activate)
 - `createInterface(name, description, package, transport?)` → `Promise<this>`
 - And more for all object types...
 
