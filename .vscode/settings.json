@@ -68,6 +68,7 @@
         "packagename",
         "preaudit",
         "SAPLSETB",
+        "SRVD",
         "STRU",
         "subfolders",
         "subrc",
@@ -82,6 +83,7 @@
         "zadt",
         "ZLOCAL",
         "ZPACKAGE",
+        "ZPLACEHOLDER",
         "ZTEST"
     ]
 }

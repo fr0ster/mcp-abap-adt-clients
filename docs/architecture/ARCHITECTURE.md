@@ -38,6 +38,7 @@ packages/adt-clients/
 - `getDataElement(name: string)`
 - `getPackage(name: string)`
 - `getInterface(name: string)`
+- `getServiceDefinition(name: string)`
 - `getInclude(name: string)`
 - `getIncludesList(name: string, type: string)`
 - `getTypeInfo(name: string, type: string)`
@@ -75,6 +76,7 @@ packages/adt-clients/
 - handleGetDataElement
 - handleGetPackage
 - handleGetInterface
+- handleGetServiceDefinition
 - handleGetInclude
 - handleGetIncludesList
 - handleGetTypeInfo
@@ -126,6 +128,7 @@ packages/adt-clients/
 - `createView(config: Partial<ViewBuilderConfig> & Pick<ViewBuilderConfig, 'viewName' | 'packageName' | 'description' | 'ddlSource'>)`
 - `createDomain(config: Partial<DomainBuilderConfig> & Pick<DomainBuilderConfig, 'domainName' | 'packageName' | 'description'>)`
 - `createDataElement(config: Partial<DataElementBuilderConfig> & Pick<DataElementBuilderConfig, 'dataElementName' | 'packageName' | 'description' | 'typeKind'>)`
+- `createServiceDefinition(config: Partial<ServiceDefinitionBuilderConfig> & Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName' | 'packageName' | 'description'>)`
 - `createPackage(config: Partial<PackageBuilderConfig> & Pick<PackageBuilderConfig, 'packageName' | 'superPackage' | 'description' | 'softwareComponent'>)`
 - `createTransport(config: CreateTransportParams)`
 
@@ -139,12 +142,13 @@ packages/adt-clients/
 - `updateDataElement(config: Partial<DataElementBuilderConfig> & Pick<DataElementBuilderConfig, 'dataElementName' | 'packageName' | 'description'>, lockHandle?: string)`
 - `updateStructure(config: Partial<StructureBuilderConfig> & Pick<StructureBuilderConfig, 'structureName' | 'ddlCode'>, lockHandle?: string)`
 - `updateTable(config: Partial<TableBuilderConfig> & Pick<TableBuilderConfig, 'tableName' | 'ddlCode'>, lockHandle?: string)`
+- `updateServiceDefinition(config: Partial<ServiceDefinitionBuilderConfig> & Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName' | 'sourceCode'>, lockHandle?: string)`
 - `updatePackage(config: Partial<PackageBuilderConfig> & Pick<PackageBuilderConfig, 'packageName' | 'superPackage'>, lockHandle?: string)`
 
 **Lock/Unlock:**
 - `lockClass(config: Pick<ClassBuilderConfig, 'className'>)` → stores `lockHandle` in state
 - `unlockClass(config: Pick<ClassBuilderConfig, 'className'>, lockHandle?: string)`
-- Similar methods for all object types (Program, Interface, Domain, DataElement, Structure, Table, View, FunctionModule, FunctionGroup, Package)
+- Similar methods for all object types (Program, Interface, Domain, DataElement, Structure, Table, View, ServiceDefinition, FunctionModule, FunctionGroup, Package)
 
 **Activate:**
 - `activateClass(config: Pick<ClassBuilderConfig, 'className'>)`
@@ -177,6 +181,7 @@ packages/adt-clients/
 - handleCreateView
 - handleCreateDomain
 - handleCreateDataElement
+- handleCreateServiceDefinition
 - handleCreatePackage
 - handleCreateTransport
 - handleUpdateClassSource

@@ -346,7 +346,9 @@ function resolveStandardObject(objectType, isCloud, testCase = null) {
     'function_module': { yamlKey: 'function_modules', paramSuffix: 'function_module_name' },
     'program': { yamlKey: 'programs', paramSuffix: 'program_name' },
     'package': { yamlKey: 'packages', paramSuffix: 'package_name' },
-    'view': { yamlKey: 'views', paramSuffix: 'view_name' }
+    'view': { yamlKey: 'views', paramSuffix: 'view_name' },
+    'serviceDefinition': { yamlKey: 'service_definitions', paramSuffix: 'service_definition_name' },
+    'service_definition': { yamlKey: 'service_definitions', paramSuffix: 'service_definition_name' }
   };
 
   const typeInfo = typeMap[objectType];

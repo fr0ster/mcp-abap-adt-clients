@@ -5,6 +5,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.17] - 2025-12-XX
+
+### Added
+- **ServiceDefinitionBuilder** – new Builder class for CDS Service Definition operations:
+  - Full CRUD support: `create()`, `read()`, `update()`, `delete()`, `lock()`, `unlock()`, `activate()`, `check()`, `validate()`
+  - Low-level functions in `core/serviceDefinition/` module:
+    - `create()` – create service definition with package and description
+    - `read()` – read service definition metadata
+    - `readSource()` – read service definition source code
+    - `lock()` / `unlock()` – lock/unlock for modification
+    - `update()` – update service definition source code
+    - `check()` – syntax check with support for active/inactive versions
+    - `activate()` – activate service definition
+    - `delete()` – delete service definition
+    - `validation()` – validate service definition name
+  - Fluent API with Promise chaining support
+  - Integration with `CrudClient` and `ReadOnlyClient`:
+    - `CrudClient.createServiceDefinition()`, `lockServiceDefinition()`, `unlockServiceDefinition()`, `updateServiceDefinition()`, `activateServiceDefinition()`, `checkServiceDefinition()`, `validateServiceDefinition()`, `deleteServiceDefinition()`
+    - `ReadOnlyClient.readServiceDefinition()`
+  - Integration tests in `src/__tests__/integration/serviceDefinition/ServiceDefinitionBuilder.test.ts`
+  - Test configuration support in `test-config.yaml`:
+    - `create_service_definition` section for workflow tests
+    - `read_service_definition` section for read-only tests
+    - `standard_objects.service_definitions` registry for standard object tests
+- **Service Definition support in checkRun utilities** – added `service_definition` and `srvd/srv` object types to `getObjectUri()` function in `utils/checkRun.ts`
+
+### Changed
+- **CrudClient parameter handling** – improved default value handling for ServiceDefinitionBuilder:
+  - `getServiceDefinitionBuilder()` now only includes explicitly provided parameters (no forced defaults)
+  - `validateServiceDefinition()` explicitly sets description on builder before validation
+  - Prevents unintended default values from being used when parameters are not provided
+- **ReadOnlyClient parameter handling** – removed unnecessary `description: ''` default for `readServiceDefinition()`:
+  - Service definition read operations don't require description parameter
+  - Builder created with only required `serviceDefinitionName` parameter
+
+### Fixed
+- **ServiceDefinitionBuilder test configuration** – added proper test case handling:
+  - Test skips gracefully if `create_service_definition` or `read_service_definition` sections are missing from YAML
+  - Read test uses separate `read_service_definition` section instead of `create_service_definition`
+  - Support for environment-specific parameters (`service_definition_name_cloud`, `service_definition_name_onprem`)
+
 ## [0.1.16] - 2025-12-XX
 
 ### Changed

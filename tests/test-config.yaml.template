@@ -19,6 +19,7 @@
 # - Tables: ZADT_BLD_TAB01, ZADT_BLD_TAB02, etc.
 # - Structures: ZADT_BLD_STRU01, ZADT_BLD_STRU02, etc.
 # - Views: ZADT_BLD_VIEW01, ZADT_BLD_VIEW02, etc.
+# - Service Definitions: ZADT_BLD_SRVD01, ZADT_BLD_SRVD02, etc.
 # - Packages: ZADT_BLD_PKG01, ZADT_BLD_PKG02, etc.
 #
 # Test settings
@@ -469,6 +470,22 @@ create_view:
             with_navigation_uris: false
             format: "abapunit"
 
+# Create Service Definition
+create_service_definition:
+  test_cases:
+    - name: "builder_service_definition"
+      enabled: false  # Set to true and configure params below to enable tests
+      description: "Service definition reserved for ServiceDefinitionBuilder tests"
+      params:
+        service_definition_name: "ZADT_BLD_SRVD01"  # Replace with your service definition name
+        description: "ServiceDefinitionBuilder workflow service definition"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        source_code: |
+          @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition'
+          define service ZADT_BLD_SRVD01 {
+            expose ZOK_C_CDS_TEST;  # Replace with your CDS view name
+          }
 # Create Function Group
 create_function_group:
   test_cases:
@@ -511,6 +528,19 @@ create_transport:
       params:
         description: "TransportBuilder workflow transport"
         # package_name: "ZADT_BLD_PKG01"
+
+# Read Service Definition
+read_service_definition:
+  test_cases:
+    - name: "read_standard_service_definition"
+      enabled: false  # Set to true and configure params below to enable read test
+      description: "Read standard SAP service definition"
+      params:
+        # Specify standard object name directly (overrides standard_objects registry)
+        service_definition_name: "I_SapPackage"  # Replace with existing service definition in your system
+        # Or use environment-specific parameters:
+        # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
+        # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
 
 # Standard SAP objects registry for read-only tests
 standard_objects:
@@ -587,6 +617,14 @@ standard_objects:
       group: "EDIN"
       description: "Returns system metadata"
       available_in: ["onprem", "cloud"]
+
+  service_definitions:
+    - name: "I_SapPackage"
+      description: "ABAP Cloud: replace with service definition name existing in tenant"
+      available_in: ["cloud"]
+    - name: "ZPLACEHOLDER_SRVD"
+      description: "Placeholder for on-premise service definition – replace with existing service definition"
+      available_in: ["onprem"]
 
   standard_criteria:
     note: "Update the entries above with objects that exist in your SAP system before running read tests."

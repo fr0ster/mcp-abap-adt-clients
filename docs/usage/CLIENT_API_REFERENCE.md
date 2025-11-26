@@ -126,6 +126,20 @@ Read package metadata.
 const response = await client.readPackage('Z_MY_PACKAGE');
 ```
 
+#### Service Definition Operations
+```typescript
+readServiceDefinition(name: string): Promise<ServiceDefinitionBuilderConfig | undefined>
+```
+
+Read service definition metadata and source code.
+
+**Example:**
+```typescript
+const result = await client.readServiceDefinition('Z_MY_SERVICE_DEF');
+console.log(result?.serviceDefinitionName);
+console.log(result?.description);
+```
+
 #### Transport Operations
 ```typescript
 readTransport(transportRequest: string): Promise<AxiosResponse>
@@ -237,6 +251,15 @@ createView(name, description, packageName, transportRequest?, options?: {
   ddlSource?: string;
 }): Promise<this>
 
+// Service Definitions
+createServiceDefinition(config: {
+  serviceDefinitionName: string;
+  packageName: string;
+  description: string;
+  transportRequest?: string;
+  sourceCode?: string;
+}): Promise<this>
+
 // Function Modules
 createFunctionGroup(name, description, packageName, transportRequest?): Promise<this>
 
@@ -311,6 +334,7 @@ lockView(name: string): Promise<this>
 lockFunctionGroup(name: string): Promise<this>
 lockFunctionModule(name: string, functionGroup: string): Promise<this>
 lockPackage(name: string): Promise<this>
+lockServiceDefinition(name: string): Promise<this>
 ```
 
 **Example:**
@@ -344,6 +368,7 @@ unlockView(name: string, lockHandle?: string): Promise<this>
 unlockFunctionGroup(name: string, lockHandle?: string): Promise<this>
 unlockFunctionModule(name: string, functionGroup: string, lockHandle?: string): Promise<this>
 unlockPackage(name: string, lockHandle?: string): Promise<this>
+unlockServiceDefinition(name: string, lockHandle?: string): Promise<this>
 ```
 
 **Example:**
@@ -375,6 +400,11 @@ updateDomain(name: string, metadata: object, lockHandle?: string): Promise<this>
 updateStructure(name: string, ddlCode: string, lockHandle?: string): Promise<this>
 updateTable(name: string, ddlCode: string, lockHandle?: string): Promise<this>
 updateView(name: string, ddlSource: string, lockHandle?: string): Promise<this>
+updateServiceDefinition(config: {
+  serviceDefinitionName: string;
+  sourceCode: string;
+  transportRequest?: string;
+}, lockHandle?: string): Promise<this>
 updateFunctionModule(name: string, functionGroup: string, sourceCode: string, lockHandle?: string): Promise<this>
 updatePackage(name: string, description: string, lockHandle?: string): Promise<this>
 ```
@@ -471,6 +501,7 @@ activateView(name: string): Promise<this>
 activateFunctionGroup(name: string): Promise<this>
 activateFunctionModule(name: string, functionGroup: string): Promise<this>
 activatePackage(name: string): Promise<this>
+activateServiceDefinition(name: string): Promise<this>
 ```
 
 **Example:**
@@ -504,6 +535,7 @@ deleteView(name: string, transportRequest?: string): Promise<this>
 deleteFunctionGroup(name: string, transportRequest?: string): Promise<this>
 deleteFunctionModule(name: string, functionGroup: string, transportRequest?: string): Promise<this>
 deletePackage(name: string, transportRequest?: string): Promise<this>
+deleteServiceDefinition(name: string, transportRequest?: string): Promise<this>
 ```
 
 **Example:**
@@ -515,34 +547,50 @@ console.log(client.getDeleteResult());
 ### Check Operations
 
 ```typescript
-checkProgram(name: string, version?: string): Promise<this>
-checkClass(name: string, version?: string): Promise<this>
-// ... similar for other object types
+checkProgram(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkClass(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkInterface(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkDataElement(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkDomain(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkStructure(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkTable(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkView(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkFunctionGroup(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkFunctionModule(name: string, functionGroup: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkServiceDefinition(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 ```
 
 Performs syntax/consistency check on the object.
 
 **Example:**
 ```typescript
-await client.checkClass('ZCL_TEST');
-const checkResult = client.getCheckResult();
+const checkResult = await client.checkClass('ZCL_TEST', 'inactive');
+console.log('Check status:', checkResult.status);
 ```
 
 ### Validation Operations
 
 ```typescript
-validateProgramName(name: string): Promise<this>
-validateClassName(name: string): Promise<this>
-// ... similar for other object types
+validateProgram(config: { programName: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateClass(config: { className: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateInterface(config: { interfaceName: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateDataElement(config: { dataElementName: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateDomain(config: { domainName: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateStructure(config: { structureName: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateTable(config: { tableName: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateView(config: { viewName: string; packageName: string; description: string }): Promise<AxiosResponse>
+validateServiceDefinition(config: { serviceDefinitionName: string; description: string }): Promise<AxiosResponse>
 ```
 
 Validates object name against SAP naming rules.
 
 **Example:**
 ```typescript
-await client.validateClassName('ZCL_TEST');
-const validation = client.getValidationResult();
-console.log('Valid:', validation.valid);
+const validation = await client.validateServiceDefinition({
+  serviceDefinitionName: 'Z_MY_SERVICE',
+  description: 'My service definition'
+});
+console.log('Validation status:', validation.status);
 ```
 
 ### CRUD State Management

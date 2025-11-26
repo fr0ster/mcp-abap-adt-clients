@@ -30,6 +30,7 @@ import { PackageBuilder, PackageBuilderConfig } from '../core/package';
 import { TransportBuilder } from '../core/transport';
 import { BehaviorDefinitionBuilder, BehaviorDefinitionBuilderConfig } from '../core/behaviorDefinition';
 import { MetadataExtensionBuilder, MetadataExtensionBuilderConfig } from '../core/metadataExtension';
+import { ServiceDefinitionBuilder, ServiceDefinitionBuilderConfig } from '../core/serviceDefinition';
 
 interface CrudClientState {
   createResult?: AxiosResponse;
@@ -70,6 +71,8 @@ interface CrudClientState {
   currentFunctionGroupName?: string;
   packageBuilder?: PackageBuilder;
   currentPackageName?: string;
+  serviceDefinitionBuilder?: ServiceDefinitionBuilder;
+  currentServiceDefinitionName?: string;
   // Note: readResult is in ReadOnlyClient's separate private state
 }
 
@@ -587,6 +590,7 @@ export class CrudClient extends ReadOnlyClient {
     if (config.typeKind) builder.setTypeKind(config.typeKind);
     if (config.packageName) builder.setPackage(config.packageName);
     if (config.description) builder.setDescription(config.description);
+    if (config.domainName) builder.setDomainName(config.domainName); // Required for domain-based data elements
     await builder.create();
     this.crudState.createResult = builder.getState().createResult;
     return this;
@@ -1278,5 +1282,107 @@ export class CrudClient extends ReadOnlyClient {
   } {
     const { parseActivationResponse } = require('../utils/managementOperations');
     return parseActivationResponse(responseData);
+  }
+
+  // ==================== Service Definition operations ====================
+  
+  private getServiceDefinitionBuilder(config: Partial<ServiceDefinitionBuilderConfig> & Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>): ServiceDefinitionBuilder {
+    // Reuse existing builder if it's for the same service definition (same session)
+    if (this.crudState.serviceDefinitionBuilder && this.crudState.currentServiceDefinitionName === config.serviceDefinitionName) {
+      return this.crudState.serviceDefinitionBuilder;
+    }
+    // Create new builder for new service definition
+    // Only include description if it's explicitly provided in config
+    const builderConfig: ServiceDefinitionBuilderConfig = {
+      serviceDefinitionName: config.serviceDefinitionName,
+      ...(config.packageName && { packageName: config.packageName }),
+      ...(config.transportRequest && { transportRequest: config.transportRequest }),
+      ...(config.description && { description: config.description }),
+      ...(config.sourceCode && { sourceCode: config.sourceCode })
+    };
+    this.crudState.serviceDefinitionBuilder = new ServiceDefinitionBuilder(this.connection, {}, builderConfig);
+    this.crudState.currentServiceDefinitionName = config.serviceDefinitionName;
+    return this.crudState.serviceDefinitionBuilder;
+  }
+
+  async createServiceDefinition(config: Partial<ServiceDefinitionBuilderConfig> & Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName' | 'packageName' | 'description'>): Promise<this> {
+    const builder = this.getServiceDefinitionBuilder(config);
+    // Ensure packageName is set on builder before create
+    if (config.packageName) {
+      builder.setPackage(config.packageName);
+    }
+    if (config.description) {
+      builder.setDescription(config.description);
+    }
+    await builder.create();
+    this.crudState.createResult = builder.getState().createResult;
+    return this;
+  }
+
+  async lockServiceDefinition(config: Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>): Promise<this> {
+    const builder = this.getServiceDefinitionBuilder(config);
+    await builder.lock();
+    this.crudState.lockHandle = builder.getState().lockHandle;
+    return this;
+  }
+
+  async unlockServiceDefinition(config: Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>, lockHandle?: string): Promise<this> {
+    const builder = this.getServiceDefinitionBuilder(config);
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.unlock();
+    this.crudState.unlockResult = builder.getState().unlockResult;
+    this.crudState.lockHandle = undefined;
+    return this;
+  }
+
+  async updateServiceDefinition(config: Partial<ServiceDefinitionBuilderConfig> & Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName' | 'sourceCode'>, lockHandle?: string): Promise<this> {
+    const builder = this.getServiceDefinitionBuilder(config);
+    // Set sourceCode if provided
+    if (config.sourceCode) {
+      builder.setSourceCode(config.sourceCode);
+    }
+    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    await builder.update();
+    this.crudState.updateResult = builder.getState().updateResult;
+    return this;
+  }
+
+  async activateServiceDefinition(config: Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>): Promise<this> {
+    const builder = this.getServiceDefinitionBuilder(config);
+    await builder.activate();
+    this.crudState.activateResult = builder.getState().activateResult;
+    return this;
+  }
+
+  async checkServiceDefinition(config: Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
+    const builder = this.getServiceDefinitionBuilder(config);
+    const result = await builder.check(version);
+    this.crudState.checkResult = builder.getState().checkResult;
+    return result;
+  }
+
+  async validateServiceDefinition(config: Partial<ServiceDefinitionBuilderConfig> & Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName' | 'description'>): Promise<AxiosResponse> {
+    const builder = this.getServiceDefinitionBuilder(config);
+    // Ensure description is set on builder before validate
+    if (config.description) {
+      builder.setDescription(config.description);
+    }
+    const result = await builder.validate();
+    this.crudState.validationResponse = builder.getState().validationResponse;
+    return result;
+  }
+
+  async deleteServiceDefinition(config: Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>, transportRequest?: string): Promise<this> {
+    const builder = this.getServiceDefinitionBuilder({ ...config, transportRequest });
+    await builder.delete();
+    this.crudState.deleteResult = builder.getState().deleteResult;
+    return this;
+  }
+
+  /**
+   * Get ServiceDefinitionBuilder instance for advanced operations
+   */
+  getServiceDefinitionBuilderInstance(config: Partial<ServiceDefinitionBuilderConfig> & Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>): ServiceDefinitionBuilder {
+    return this.getServiceDefinitionBuilder(config);
   }
 }

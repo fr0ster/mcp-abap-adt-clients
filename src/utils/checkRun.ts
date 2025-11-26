@@ -50,6 +50,9 @@ export function getObjectUri(objectType: string, objectName: string): string {
     case 'package':
     case 'devc/k':
       return `/sap/bc/adt/packages/${encodedName}`;
+    case 'service_definition':
+    case 'srvd/srv':
+      return `/sap/bc/adt/ddic/srvd/sources/${encodedName}`;
     default:
       throw new Error(`Unsupported object type: ${objectType}`);
   }

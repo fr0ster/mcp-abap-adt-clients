@@ -19,10 +19,11 @@ import { FunctionGroupBuilder, FunctionGroupBuilderConfig } from '../core/functi
 import { FunctionModuleBuilder, FunctionModuleBuilderConfig } from '../core/functionModule';
 import { PackageBuilder, PackageBuilderConfig } from '../core/package';
 import { TransportBuilder } from '../core/transport';
+import { ServiceDefinitionBuilder, ServiceDefinitionBuilderConfig } from '../core/serviceDefinition';
 
 interface ReadOnlyClientState {
   readResult?: AxiosResponse;
-  readBuilder?: DomainBuilder | ClassBuilder | InterfaceBuilder | ProgramBuilder | DataElementBuilder | StructureBuilder | TableBuilder | ViewBuilder | FunctionGroupBuilder | FunctionModuleBuilder | PackageBuilder;
+  readBuilder?: DomainBuilder | ClassBuilder | InterfaceBuilder | ProgramBuilder | DataElementBuilder | StructureBuilder | TableBuilder | ViewBuilder | FunctionGroupBuilder | FunctionModuleBuilder | PackageBuilder | ServiceDefinitionBuilder;
 }
 
 export class ReadOnlyClient {
@@ -111,6 +112,13 @@ export class ReadOnlyClient {
 
   getPackageReadResult(): PackageBuilderConfig | undefined {
     if (this.state.readBuilder instanceof PackageBuilder) {
+      return this.state.readBuilder.getReadResult();
+    }
+    return undefined;
+  }
+
+  getServiceDefinitionReadResult(): ServiceDefinitionBuilderConfig | undefined {
+    if (this.state.readBuilder instanceof ServiceDefinitionBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
@@ -251,6 +259,20 @@ export class ReadOnlyClient {
     const builder = new PackageBuilder(this.connection, {}, { packageName, description: '', superPackage: '' });
     const result = await builder.read();
     // Store builder for getPackageReadResult()
+    this.state.readBuilder = builder;
+    // Store raw response for backward compatibility
+    if (builder.getState().readResult) {
+    this.state.readResult = builder.getState().readResult;
+    }
+    return result;
+  }
+
+  // ServiceDefinition operations
+  async readServiceDefinition(serviceDefinitionName: string): Promise<ServiceDefinitionBuilderConfig | undefined> {
+    // For read operations, description is not needed - only serviceDefinitionName is required
+    const builder = new ServiceDefinitionBuilder(this.connection, {}, { serviceDefinitionName });
+    const result = await builder.read();
+    // Store builder for getServiceDefinitionReadResult()
     this.state.readBuilder = builder;
     // Store raw response for backward compatibility
     if (builder.getState().readResult) {

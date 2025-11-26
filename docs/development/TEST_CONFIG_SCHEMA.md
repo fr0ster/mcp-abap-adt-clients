@@ -283,6 +283,24 @@ create_package:
       description: Test package
 ```
 
+#### Service Definition (`create_service_definition`)
+
+```yaml
+create_service_definition:
+  builder_service_definition:
+    enabled: true
+    params:
+      service_definition_name: ZADT_BLD_SRVD01
+      package_name: ${environment.package_name}
+      transport_request: ${environment.transport_request}
+      description: Test service definition
+      source_code: |
+        @EndUserText.label: 'Test service definition'
+        define service ZADT_BLD_SRVD01 {
+          expose ZOK_C_CDS_TEST;
+        }
+```
+
 #### Transport (`create_transport`)
 
 ```yaml
@@ -293,6 +311,20 @@ create_transport:
       description: Test transport request
       # No package_name or transport_request needed
       # Transport is created dynamically
+```
+
+#### Read Service Definition (`read_service_definition`)
+
+```yaml
+read_service_definition:
+  read_standard_service_definition:
+    enabled: true
+    params:
+      # Specify standard object name directly (overrides standard_objects registry)
+      service_definition_name: "I_SapPackage"  # Replace with existing service definition
+      # Or use environment-specific parameters:
+      # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
+      # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
 ```
 
 ## Standard Objects Registry
@@ -396,6 +428,16 @@ standard_objects:
       available_in:
         - onprem
         - cloud
+
+  service_definitions:
+    - name: I_SapPackage
+      description: ABAP Cloud: replace with service definition name existing in tenant
+      available_in:
+        - cloud
+    - name: ZPLACEHOLDER_SRVD
+      description: Placeholder for on-premise service definition – replace with existing service definition
+      available_in:
+        - onprem
 ```
 
 ### Standard Object Selection

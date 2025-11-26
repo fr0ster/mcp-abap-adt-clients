@@ -19,6 +19,7 @@ import type { FunctionGroupBuilderConfig } from '../functionGroup/types';
 import type { PackageBuilderConfig } from '../package/types';
 import type { BehaviorDefinitionBuilderConfig } from '../behaviorDefinition/types';
 import type { MetadataExtensionBuilderConfig } from '../metadataExtension/types';
+import type { ServiceDefinitionBuilderConfig } from '../serviceDefinition/types';
 
 /**
  * Union type of all BuilderConfig types that can be returned by read() methods
@@ -37,6 +38,7 @@ export type BuilderConfigUnion =
   | PackageBuilderConfig
   | BehaviorDefinitionBuilderConfig
   | MetadataExtensionBuilderConfig
+  | ServiceDefinitionBuilderConfig
   | undefined;
 
 /**
