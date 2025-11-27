@@ -3,7 +3,7 @@
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
+import { AxiosResponse, AxiosError } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 
 /**
@@ -15,7 +15,7 @@ import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils
  * @param packageName - Package name
  * @param description - Description
  * @param behaviorDefinition - Behavior definition name (root entity)
- * @returns Validation response
+ * @returns Validation response (returns error response if object already exists)
  */
 export async function validateBehaviorImplementationName(
   connection: AbapConnection,
@@ -50,11 +50,19 @@ export async function validateBehaviorImplementationName(
     'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check'
   };
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    headers
-  });
+  try {
+    return await connection.makeAdtRequest({
+      url,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      headers
+    });
+  } catch (error: any) {
+    // If validation returns 400 and object already exists, return error response instead of throwing
+    if (error instanceof AxiosError && error.response?.status === 400) {
+      return error.response;
+    }
+    throw error;
+  }
 }
 

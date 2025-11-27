@@ -64,6 +64,7 @@ See [CLI Tools documentation](./bin/README.md) for details.
 |------------|---------|------------|----------------|
 | Classes (CLAS) | ✅ | ✅ | ✅ |
 | Behavior Implementations (CLAS) | ✅ | ✅ | ✅ |
+| Behavior Definitions (BDEF) | ✅ | ✅ | ✅ |
 | Interfaces (INTF) | ✅ | ✅ | ✅ |
 | Programs (PROG) | ✅ | ✅ | ✅ |
 | Function Groups (FUGR) | ✅ | ✅ | ✅ |
@@ -73,6 +74,7 @@ See [CLI Tools documentation](./bin/README.md) for details.
 | Structures (TABL/DS) | ✅ | ✅ | ✅ |
 | Tables (TABL/DT) | ✅ | ✅ | ✅ |
 | Views (DDLS) | ✅ | ✅ | ✅ |
+| Metadata Extensions (DDLX) | ✅ | ✅ | ✅ |
 | Packages (DEVC) | ✅ | ✅ | ✅ |
 | Transports (TRNS) | ✅ | ✅ | ✅ |
 

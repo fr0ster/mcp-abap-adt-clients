@@ -6,7 +6,7 @@
  */
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
+import { AxiosResponse, AxiosError } from 'axios';
 import { MetadataExtensionValidationParams } from './types';
 
 /**
@@ -17,7 +17,7 @@ import { MetadataExtensionValidationParams } from './types';
  * 
  * @param connection - ABAP connection instance
  * @param params - Validation parameters
- * @returns Raw AxiosResponse from ADT validation endpoint
+ * @returns Raw AxiosResponse from ADT validation endpoint (returns error response if object already exists)
  * 
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
@@ -35,12 +35,20 @@ export async function validateMetadataExtension(
     packagename: params.packageName
   });
 
-  return connection.makeAdtRequest({
-    url: `${url}?${queryParams.toString()}`,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    headers: {
-      'Accept': 'application/vnd.sap.as+xml'
+  try {
+    return await connection.makeAdtRequest({
+      url: `${url}?${queryParams.toString()}`,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      headers: {
+        'Accept': 'application/vnd.sap.as+xml'
+      }
+    });
+  } catch (error: any) {
+    // If validation returns 400 and object already exists, return error response instead of throwing
+    if (error instanceof AxiosError && error.response?.status === 400) {
+      return error.response;
     }
-  });
+    throw error;
+  }
 }

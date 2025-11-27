@@ -156,6 +156,10 @@ export class BehaviorDefinitionBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking behavior definition:', this.config.name);
+      
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
+
       const lockHandle = await lock(
         this.connection,
         this.config.name
@@ -283,6 +287,10 @@ export class BehaviorDefinitionBuilder {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.logger.info?.('Behavior definition unlocked successfully');
+      
+      // Enable stateless session mode
+      this.connection.setSessionType("stateless");
+
       return this;
     } catch (error: any) {
       this.state.errors.push({

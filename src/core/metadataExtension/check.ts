@@ -29,9 +29,9 @@ export async function checkMetadataExtension(
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string
 ): Promise<AxiosResponse> {
-  const lowerName = name.toLowerCase();
   const objectType = 'DDLX/EX';
-  const objectName = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
+  // Pass just the name, getObjectUri will build the full URI
+  const objectName = name;
 
   return runCheckRun(
     connection,

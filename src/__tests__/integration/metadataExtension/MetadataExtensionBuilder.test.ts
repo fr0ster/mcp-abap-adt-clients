@@ -1,15 +1,14 @@
 /**
- * Integration test for BehaviorImplementationBuilder
+ * Integration test for MetadataExtensionBuilder
  * Tests using CrudClient for unified CRUD operations
  *
  * Enable debug logs:
- * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=behaviorImplementation    (ADT-clients logs)
+ * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=metadataExtension    (ADT-clients logs)
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
-import { BehaviorImplementationBuilder } from '../../../core/behaviorImplementation';
+import { MetadataExtensionBuilder } from '../../../core/metadataExtension';
 import { IAdtLogger } from '../../../utils/logger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -52,7 +51,7 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('BehaviorImplementationBuilder (using CrudClient)', () => {
+describe('MetadataExtensionBuilder (using CrudClient)', () => {
   let connection: AbapConnection;
   let client: CrudClient;
   let connectionConfig: any = null;
@@ -79,7 +78,7 @@ describe('BehaviorImplementationBuilder (using CrudClient)', () => {
   });
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_behavior_implementation', 'builder_behavior_implementation');
+    return getTestCaseDefinition('create_metadata_extension', 'builder_metadata_extension');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -92,64 +91,51 @@ describe('BehaviorImplementationBuilder (using CrudClient)', () => {
       throw new Error('Package name is not configured. Set params.package_name or environment.default_package');
     }
 
-    const className =
-      params.class_name ||
-      params.test_class_name;
+    const extName =
+      params.ext_name ||
+      params.name ||
+      params.metadata_extension_name;
 
-    if (!className) {
-      throw new Error('class_name is not configured for BehaviorImplementationBuilder test');
+    if (!extName) {
+      throw new Error('ext_name is not configured for MetadataExtensionBuilder test');
     }
 
-    const behaviorDefinition = (
-      params.behavior_definition ||
-      params.bdef_name ||
-      params.root_entity
+    const targetEntity = (
+      params.target_entity ||
+      params.targetEntity ||
+      params.cds_view_name
     )?.trim();
 
-    if (!behaviorDefinition) {
-      throw new Error('behavior_definition is not configured for BehaviorImplementationBuilder test');
+    if (!targetEntity) {
+      throw new Error('target_entity is not configured for MetadataExtensionBuilder test');
     }
 
-    const description = params.description || `Behavior Implementation for ${behaviorDefinition}`;
+    const description = params.description || `Metadata Extension for ${targetEntity}`;
 
     return {
-      className,
+      extName,
       packageName,
-      behaviorDefinition,
+      targetEntity,
       description,
       transportRequest: params.transport_request || getEnvironmentConfig().default_transport || '',
-      sourceCode: params.source_code || generateDefaultImplementationCode(className, behaviorDefinition)
+      sourceCode: params.source_code || generateDefaultSourceCode(extName, targetEntity)
     };
   }
 
-  function generateDefaultImplementationCode(className: string, behaviorDefinition: string): string {
-    const localHandlerName = `lhc_${behaviorDefinition}`;
-    return `CLASS ${localHandlerName} DEFINITION INHERITING FROM cl_abap_behavior_handler.
-  PRIVATE SECTION.
-    METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-      IMPORTING keys REQUEST requested_authorizations FOR ${behaviorDefinition.toLowerCase()} RESULT result.
-
-    METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-      IMPORTING REQUEST requested_authorizations FOR ${behaviorDefinition.toLowerCase()} RESULT result.
-
-ENDCLASS.
-
-CLASS ${localHandlerName} IMPLEMENTATION.
-
-  METHOD get_instance_authorizations.
-
-  ENDMETHOD.
-
-  METHOD get_global_authorizations.
-
-  ENDMETHOD.
-
-ENDCLASS.`;
+  function generateDefaultSourceCode(extName: string, targetEntity: string): string {
+    return `@MetadataExtension : {
+  @EndUserText.label: 'Metadata Extension for ${targetEntity}'
+}
+extend view ${targetEntity} with "${extName}"
+{
+  @EndUserText.label: 'Sample Field'
+  SampleField;
+}`;
   }
 
   describe('Full workflow test', () => {
     let testCase: any = null;
-    let className: string | null = null;
+    let extName: string | null = null;
     let skipReason: string | null = null;
 
     beforeAll(async () => {
@@ -164,7 +150,7 @@ ENDCLASS.`;
         return;
       }
 
-      const tc = getEnabledTestCase('create_behavior_implementation', 'builder_behavior_implementation');
+      const tc = getEnabledTestCase('create_metadata_extension', 'builder_metadata_extension');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -178,33 +164,34 @@ ENDCLASS.`;
       tc.params.package_name = packageName;
 
       testCase = tc;
-      className = tc.params.class_name || tc.params.test_class_name;
+      extName = tc.params.ext_name || tc.params.name || tc.params.metadata_extension_name;
     });
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'BehaviorImplementationBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'MetadataExtensionBuilder - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'MetadataExtensionBuilder - full workflow', skipReason);
         return;
       }
 
-      if (!testCase || !className) {
-        logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', skipReason || 'Test case not available');
+      if (!testCase || !extName) {
+        logBuilderTestSkip(testsLogger, 'MetadataExtensionBuilder - full workflow', skipReason || 'Test case not available');
         return;
       }
 
       const config = buildBuilderConfig(testCase);
+      let objectCreated = false; // Track if object was created in this test
 
       try {
         logBuilderTestStep('validate');
-        const validationResponse = await client.validateBehaviorImplementation({
-          className: config.className,
+        await client.validateMetadataExtension({
+          name: config.extName,
           packageName: config.packageName,
-          behaviorDefinition: config.behaviorDefinition,
           description: config.description
         });
+        const validationResponse = client.getValidationResponse();
         
         // If validation returns 400 and object already exists, skip test
         if (validationResponse?.status === 400) {
@@ -212,11 +199,11 @@ ENDCLASS.`;
           const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData || {});
           if (errorText.toLowerCase().includes('already exists') ||
               errorText.toLowerCase().includes('does already exist') ||
-              (errorText.toLowerCase().includes('global type') && errorText.toLowerCase().includes('already exists'))) {
-            logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', 
-              `⚠️ SAFETY: Behavior implementation class ${config.className} already exists! ` +
+              (errorText.toLowerCase().includes('resource') && errorText.toLowerCase().includes('exist'))) {
+            logBuilderTestSkip(testsLogger, 'MetadataExtensionBuilder - full workflow', 
+              `⚠️ SAFETY: Metadata extension ${config.extName} already exists! ` +
               `Delete manually or use different test name to avoid accidental deletion.`);
-            return;
+            return; // Skip test - object already exists, don't delete it
           }
         }
         
@@ -230,17 +217,13 @@ ENDCLASS.`;
         }
         
         logBuilderTestStep('create');
-        await client.createBehaviorImplementation({
-          className: config.className,
+        await client.createMetadataExtension({
+          name: config.extName,
           packageName: config.packageName,
-          behaviorDefinition: config.behaviorDefinition,
           description: config.description,
           transportRequest: config.transportRequest
         });
-        
-        logBuilderTestStep('check(inactive)');
-        const checkResult1 = await client.checkClass({ className: config.className }, 'inactive');
-        expect(checkResult1?.status).toBeDefined();
+        objectCreated = true; // Mark that object was created in this test
         
         const createDelay = getOperationDelay('create', testCase);
         if (createDelay > 0) {
@@ -249,30 +232,31 @@ ENDCLASS.`;
         }
         
         logBuilderTestStep('read');
-        // Read behavior implementation class source to verify it was created
-        const builder = client.getBehaviorImplementationBuilderInstance({
-          className: config.className,
-          behaviorDefinition: config.behaviorDefinition
+        // Read metadata extension source to verify it was created
+        const builder = new MetadataExtensionBuilder(connection, builderLogger, {
+          name: config.extName,
+          packageName: config.packageName,
+          description: config.description
         });
-        const readResult = await builder.read('active');
-        expect(readResult).toBeDefined();
-        expect(readResult?.className).toBe(config.className);
+        await builder.readSource('inactive');
+        const state = builder.getState();
+        expect(state).toBeDefined();
         
         logBuilderTestStep('lock');
-        await client.lockClass({
-          className: config.className
+        await client.lockMetadataExtension({
+          name: config.extName
         });
         
-        logBuilderTestStep('updateMainSource');
-        await client.updateBehaviorImplementationMainSource({
-          className: config.className,
-          behaviorDefinition: config.behaviorDefinition
-        });
+        const lockDelay = getOperationDelay('lock', testCase);
+        if (lockDelay > 0) {
+          logBuilderTestStep(`wait (after lock ${lockDelay}ms)`);
+          await new Promise(resolve => setTimeout(resolve, lockDelay));
+        }
         
-        logBuilderTestStep('updateImplementations');
-        await client.updateBehaviorImplementation({
-          className: config.className,
-          behaviorDefinition: config.behaviorDefinition
+        logBuilderTestStep('update');
+        await client.updateMetadataExtension({
+          name: config.extName,
+          sourceCode: config.sourceCode
         });
         
         const updateDelay = getOperationDelay('update', testCase);
@@ -282,12 +266,13 @@ ENDCLASS.`;
         }
         
         logBuilderTestStep('check(inactive)');
-        const checkResult2 = await client.checkClass({ className: config.className }, 'inactive');
-        expect(checkResult2?.status).toBeDefined();
+        await client.checkMetadataExtension({ name: config.extName }, 'inactive');
+        const checkResult1 = client.getCheckResult();
+        expect(checkResult1?.status).toBeDefined();
         
         logBuilderTestStep('unlock');
-        await client.unlockClass({
-          className: config.className
+        await client.unlockMetadataExtension({
+          name: config.extName
         });
         
         const unlockDelay = getOperationDelay('unlock', testCase);
@@ -297,8 +282,8 @@ ENDCLASS.`;
         }
         
         logBuilderTestStep('activate');
-        await client.activateClass({
-          className: config.className
+        await client.activateMetadataExtension({
+          name: config.extName
         });
         
         const activateDelay = getOperationDelay('activate', testCase);
@@ -308,34 +293,35 @@ ENDCLASS.`;
         }
         
         logBuilderTestStep('check(active)');
-        const checkResult3 = await client.checkClass({ className: config.className }, 'active');
-        expect(checkResult3?.status).toBeDefined();
+        await client.checkMetadataExtension({ name: config.extName }, 'active');
+        const checkResult2 = client.getCheckResult();
+        expect(checkResult2?.status).toBeDefined();
 
         expect(client.getCreateResult()).toBeDefined();
         expect(client.getUpdateResult()).toBeDefined();
         expect(client.getActivateResult()).toBeDefined();
 
-        logBuilderTestSuccess(testsLogger, 'BehaviorImplementationBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'MetadataExtensionBuilder - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'BehaviorImplementationBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'MetadataExtensionBuilder - full workflow', error);
         throw error;
       } finally {
-        // Cleanup: delete behavior implementation class
-        if (className) {
+        // Cleanup: delete metadata extension only if it was created in this test
+        if (extName && objectCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
-            await client.deleteClass({
-              className: className,
+            await client.deleteMetadataExtension({
+              name: extName,
               transportRequest: testCase?.params?.transport_request || getEnvironmentConfig().default_transport || ''
             });
-            testsLogger.info?.('Behavior implementation class deleted successfully during cleanup');
+            testsLogger.info?.('Metadata extension deleted successfully during cleanup');
           } catch (deleteError: any) {
-            testsLogger.warn?.('Failed to delete behavior implementation class during cleanup:', deleteError.message || deleteError);
+            testsLogger.warn?.('Failed to delete metadata extension during cleanup:', deleteError.message || deleteError);
           }
         }
-        logBuilderTestEnd(testsLogger, 'BehaviorImplementationBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'MetadataExtensionBuilder - full workflow');
       }
-    });
+    }, getTimeout('test'));
   });
 });
 

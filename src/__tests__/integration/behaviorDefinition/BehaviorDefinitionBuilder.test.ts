@@ -1,0 +1,325 @@
+/**
+ * Integration test for BehaviorDefinitionBuilder
+ * Tests using CrudClient for unified CRUD operations
+ *
+ * Enable debug logs:
+ * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=behaviorDefinition    (ADT-clients logs)
+ */
+
+import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import { AxiosResponse } from 'axios';
+import { CrudClient } from '../../../clients/CrudClient';
+import { BehaviorDefinitionBuilder } from '../../../core/behaviorDefinition';
+import { IAdtLogger } from '../../../utils/logger';
+import { getConfig } from '../../helpers/sessionConfig';
+import {
+  logBuilderTestStart,
+  logBuilderTestSkip,
+  logBuilderTestSuccess,
+  logBuilderTestError,
+  logBuilderTestEnd,
+  logBuilderTestStep
+} from '../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+const {
+  getEnabledTestCase,
+  getTestCaseDefinition,
+  resolvePackageName,
+  resolveStandardObject,
+  getEnvironmentConfig,
+  getTimeout,
+  getOperationDelay
+} = require('../../../../tests/test-helper');
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
+
+const debugEnabled = process.env.DEBUG_ADT_TESTS === 'true' || process.env.DEBUG_ADT === 'true';
+const debugConnection = process.env.DEBUG_CONNECTORS === 'true'; // Connection uses DEBUG_CONNECTORS
+
+// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
+const connectionLogger: ILogger = createConnectionLogger();
+
+// Library code uses DEBUG_ADT_LIBS
+const builderLogger: IAdtLogger = createBuilderLogger();
+
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: IAdtLogger = createTestsLogger();
+
+describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
+  let connection: AbapConnection;
+  let client: CrudClient;
+  let connectionConfig: any = null;
+  let hasConfig = false;
+
+  beforeAll(async () => {
+    try {
+      const config = getConfig();
+      connectionConfig = config;
+      connection = createAbapConnection(config, connectionLogger);
+      await (connection as any).connect();
+      client = new CrudClient(connection);
+      hasConfig = true;
+    } catch (error) {
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      hasConfig = false;
+    }
+  });
+
+  afterAll(async () => {
+    if (connection) {
+      connection.reset();
+    }
+  });
+
+  function getBuilderTestDefinition() {
+    return getTestCaseDefinition('create_behavior_definition', 'builder_behavior_definition');
+  }
+
+  function buildBuilderConfig(testCase: any) {
+    const params = testCase?.params || {};
+
+    // All parameters are required - no defaults, no auto-generation
+    const bdefName = params.bdef_name;
+    if (!bdefName) {
+      throw new Error('bdef_name is required in test-config.yaml');
+    }
+
+    const rootEntity = params.root_entity;
+    if (!rootEntity) {
+      throw new Error('root_entity is required in test-config.yaml');
+    }
+
+    const sourceCode = params.source_code;
+    if (!sourceCode) {
+      throw new Error('source_code is required in test-config.yaml');
+    }
+
+    const packageName = params.package_name || resolvePackageName(undefined);
+    if (!packageName) {
+      throw new Error('Package name is not configured. Set params.package_name or environment.default_package');
+    }
+
+    const implementationType = params.implementation_type || params.implementationType;
+    if (!implementationType) {
+      throw new Error('implementation_type is required in test-config.yaml');
+    }
+
+    const description = params.description;
+    if (!description) {
+      throw new Error('description is required in test-config.yaml');
+    }
+
+    return {
+      bdefName,
+      packageName,
+      rootEntity,
+      implementationType,
+      description,
+      transportRequest: params.transport_request || getEnvironmentConfig().default_transport || '',
+      sourceCode
+    };
+  }
+
+  describe('Full workflow test', () => {
+    let testCase: any = null;
+    let skipReason: string | null = null;
+
+    beforeAll(async () => {
+      if (!hasConfig) {
+        skipReason = 'No connection configuration available';
+        return;
+      }
+
+      const tc = getEnabledTestCase('create_behavior_definition', 'builder_behavior_definition');
+      if (!tc) {
+        skipReason = 'Test case disabled or not found';
+        return;
+      }
+
+      // Validate all required parameters are present
+      if (!tc.params.bdef_name) {
+        skipReason = 'bdef_name is required in test-config.yaml';
+        return;
+      }
+
+      if (!tc.params.root_entity) {
+        skipReason = 'root_entity is required in test-config.yaml';
+        return;
+      }
+
+      if (!tc.params.source_code) {
+        skipReason = 'source_code is required in test-config.yaml';
+        return;
+      }
+
+      const packageName = tc.params.package_name || resolvePackageName(undefined);
+      if (!packageName) {
+        skipReason = 'Package name is not configured. Set params.package_name or environment.default_package';
+        return;
+      }
+
+      if (!tc.params.implementation_type && !tc.params.implementationType) {
+        skipReason = 'implementation_type is required in test-config.yaml';
+        return;
+      }
+
+      if (!tc.params.description) {
+        skipReason = 'description is required in test-config.yaml';
+        return;
+      }
+
+      testCase = tc;
+    });
+
+    it('should execute full workflow and store all results', async () => {
+      if (skipReason) {
+        logBuilderTestSkip(testsLogger, 'BehaviorDefinitionBuilder - full workflow', skipReason);
+        return;
+      }
+
+      if (!testCase) {
+        logBuilderTestSkip(testsLogger, 'BehaviorDefinitionBuilder - full workflow', skipReason || 'Test case not available');
+        return;
+      }
+
+      logBuilderTestStart(testsLogger, 'BehaviorDefinitionBuilder - full workflow', testCase);
+
+      const config = buildBuilderConfig(testCase);
+
+      try {
+        logBuilderTestStep('validate');
+        await client.validateBehaviorDefinition({
+          name: config.bdefName,
+          rootEntity: config.rootEntity,
+          packageName: config.packageName,
+          description: config.description,
+          implementationType: config.implementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'
+        });
+        const validationResponse = client.getValidationResponse();
+        if (validationResponse?.status !== 200) {
+          const errorData = typeof validationResponse?.data === 'string' 
+            ? validationResponse.data 
+            : JSON.stringify(validationResponse?.data);
+          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        }
+        expect(validationResponse?.status).toBe(200);
+        
+        logBuilderTestStep('create');
+        await client.createBehaviorDefinition({
+          name: config.bdefName,
+          packageName: config.packageName,
+          description: config.description,
+          rootEntity: config.rootEntity,
+          implementationType: config.implementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection',
+          transportRequest: config.transportRequest
+        });
+        
+        const createDelay = getOperationDelay('create', testCase);
+        if (createDelay > 0) {
+          logBuilderTestStep(`wait (after create ${createDelay}ms)`);
+          await new Promise(resolve => setTimeout(resolve, createDelay));
+        }
+        
+        logBuilderTestStep('read');
+        // Read behavior definition source to verify it was created
+        const builder = new BehaviorDefinitionBuilder(connection, builderLogger, {
+          name: config.bdefName,
+          packageName: config.packageName,
+          description: config.description,
+          rootEntity: config.rootEntity,
+          implementationType: config.implementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'
+        });
+        await builder.readSource();
+        const state = builder.getState();
+        expect(state).toBeDefined();
+        
+        logBuilderTestStep('lock');
+        await client.lockBehaviorDefinition({
+          name: config.bdefName
+        });
+        
+        const lockDelay = getOperationDelay('lock', testCase);
+        if (lockDelay > 0) {
+          logBuilderTestStep(`wait (after lock ${lockDelay}ms)`);
+          await new Promise(resolve => setTimeout(resolve, lockDelay));
+        }
+        
+        logBuilderTestStep('update');
+        await client.updateBehaviorDefinition({
+          name: config.bdefName,
+          sourceCode: config.sourceCode
+        });
+        
+        const updateDelay = getOperationDelay('update', testCase);
+        if (updateDelay > 0) {
+          logBuilderTestStep(`wait (after update ${updateDelay}ms)`);
+          await new Promise(resolve => setTimeout(resolve, updateDelay));
+        }
+        
+        logBuilderTestStep('check(inactive)');
+        await client.checkBehaviorDefinition({ name: config.bdefName }, 'inactive');
+        const checkResult1 = client.getCheckResult();
+        expect(checkResult1?.status).toBeDefined();
+        
+        logBuilderTestStep('unlock');
+        await client.unlockBehaviorDefinition({
+          name: config.bdefName
+        });
+        
+        const unlockDelay = getOperationDelay('unlock', testCase);
+        if (unlockDelay > 0) {
+          logBuilderTestStep(`wait (after unlock ${unlockDelay}ms)`);
+          await new Promise(resolve => setTimeout(resolve, unlockDelay));
+        }
+        
+        logBuilderTestStep('activate');
+        await client.activateBehaviorDefinition({
+          name: config.bdefName
+        });
+        
+        const activateDelay = getOperationDelay('activate', testCase);
+        if (activateDelay > 0) {
+          logBuilderTestStep(`wait (after activate ${activateDelay}ms)`);
+          await new Promise(resolve => setTimeout(resolve, activateDelay));
+        }
+        
+        logBuilderTestStep('check(active)');
+        await client.checkBehaviorDefinition({ name: config.bdefName }, 'active');
+        const checkResult2 = client.getCheckResult();
+        expect(checkResult2?.status).toBeDefined();
+
+        expect(client.getCreateResult()).toBeDefined();
+        expect(client.getUpdateResult()).toBeDefined();
+        expect(client.getActivateResult()).toBeDefined();
+
+        logBuilderTestSuccess(testsLogger, 'BehaviorDefinitionBuilder - full workflow');
+      } catch (error: any) {
+        logBuilderTestError(testsLogger, 'BehaviorDefinitionBuilder - full workflow', error);
+        throw error;
+      } finally {
+        // Cleanup: delete behavior definition
+        if (config) {
+          try {
+            logBuilderTestStep('delete (cleanup)');
+            await client.deleteBehaviorDefinition({
+              name: config.bdefName,
+              transportRequest: config.transportRequest
+            });
+            testsLogger.info?.('Behavior definition deleted successfully during cleanup');
+          } catch (deleteError: any) {
+            testsLogger.warn?.('Failed to delete behavior definition during cleanup:', deleteError.message || deleteError);
+          }
+        }
+        logBuilderTestEnd(testsLogger, 'BehaviorDefinitionBuilder - full workflow');
+      }
+    }, getTimeout('test'));
+  });
+});
+

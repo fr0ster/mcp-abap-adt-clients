@@ -5,6 +5,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.21] - 2025-12-XX
+
+### Added
+- **Integration tests for Behavior Definition, Behavior Implementation, and Metadata Extension**:
+  - Added `BehaviorDefinitionBuilder.test.ts` – full workflow test for behavior definition operations
+  - Added `BehaviorImplementationBuilder.test.ts` – full workflow test for behavior implementation class operations
+  - Added `MetadataExtensionBuilder.test.ts` – full workflow test for metadata extension operations
+  - All tests follow consistent pattern: validate → create → lock → update → unlock → activate → check → delete
+  - Tests gracefully skip if objects already exist (validation returns HTTP 400)
+  - Tests only attempt cleanup if object was successfully created during test run
+  - Test configuration support in `test-config.yaml.template`:
+    - `create_behavior_definition` section with required parameters (`bdef_name`, `root_entity`, `implementation_type`, `description`, `package_name`, `source_code`)
+    - `create_behavior_implementation` section with required parameters (`class_name`, `behavior_definition`, `description`, `package_name`, `source_code`)
+    - `create_metadata_extension` section with required parameters (`ext_name`, `target_entity`, `description`, `package_name`, `source_code`)
+
+### Fixed
+- **Metadata Extension check run support** – added `DDLX/EX` object type to `getObjectUri()` function in `utils/checkRun.ts`:
+  - Metadata Extension objects now correctly resolve to `/sap/bc/adt/ddic/ddlx/sources/{name}` URI
+  - `checkMetadataExtension()` now passes only object name to `runCheckRun()`, allowing `getObjectUri()` to construct the full URI
+  - Fixes "Unsupported object type: DDLX/EX" error during check operations
+- **Stateful session management in BehaviorDefinitionBuilder** – explicit session type management:
+  - `lock()` method now explicitly calls `this.connection.setSessionType("stateful")` to enable stateful session
+  - `unlock()` method now explicitly calls `this.connection.setSessionType("stateless")` to disable stateful session
+  - Ensures lock handle is correctly maintained across lock → update → unlock operations
+  - Fixes HTTP 423 "Resource is not locked (invalid lock handle)" errors
+- **Validation error handling** – graceful handling of existing objects:
+  - `validateBehaviorImplementationName()` now catches HTTP 400 errors and returns `error.response` instead of throwing
+  - `validateMetadataExtension()` now catches HTTP 400 errors and returns `error.response` instead of throwing
+  - Tests can now check `validationResponse?.status === 400` to detect existing objects and skip gracefully
+  - Prevents test failures when objects already exist in shared development environments
+
+### Changed
+- **Test parameter validation** – stricter parameter requirements for safety:
+  - `BehaviorDefinitionBuilder.test.ts` now validates all required parameters (`bdef_name`, `root_entity`, `source_code`, `package_name`, `implementation_type`, `description`) upfront
+  - Tests skip with descriptive error message if any required parameter is missing
+  - Prevents unsafe auto-generation of critical parameters in multi-developer environments
+  - All parameters must be explicitly configured in `test-config.yaml`
+- **Test cleanup logic** – improved cleanup safety:
+  - `MetadataExtensionBuilder.test.ts` now uses `objectCreated` flag to track if object was created during test
+  - Cleanup in `finally` block only executes if `objectCreated === true`
+  - Prevents attempts to delete pre-existing objects that were not created by the test
+  - `BehaviorImplementationBuilder.test.ts` and `MetadataExtensionBuilder.test.ts` skip cleanup if validation detects existing object
+
+### Documentation
+- **API Reference updated** – added Behavior Definition and Metadata Extension to supported object types:
+  - Updated `README.md` – added Behavior Definitions (BDEF) and Metadata Extensions (DDLX) to supported object types table
+  - Updated `docs/usage/CLIENT_API_REFERENCE.md` – added complete method documentation:
+    - Read operations: `readBehaviorDefinition()`, `readMetadataExtension()`
+    - Create operations: `createBehaviorDefinition()`, `createMetadataExtension()`
+    - Lock/Unlock operations: `lockBehaviorDefinition()`, `unlockBehaviorDefinition()`, `lockMetadataExtension()`, `unlockMetadataExtension()`
+    - Update operations: `updateBehaviorDefinition()`, `updateMetadataExtension()`
+    - Activate operations: `activateBehaviorDefinition()`, `activateMetadataExtension()`
+    - Delete operations: `deleteBehaviorDefinition()`, `deleteMetadataExtension()`
+    - Check operations: `checkBehaviorDefinition()`, `checkMetadataExtension()`
+    - Validation operations: `validateBehaviorDefinition()`, `validateMetadataExtension()`, `validateBehaviorImplementation()`
+- **Test configuration template updated** – `test-config.yaml.template` now includes complete examples for all three new test types:
+  - All required parameters documented with placeholders
+  - Source code templates provided for each object type
+  - Comments explain parameter usage and requirements
+
 ## [0.1.20] - 2025-12-XX
 
 ### Changed

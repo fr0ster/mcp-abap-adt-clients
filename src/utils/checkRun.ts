@@ -42,6 +42,9 @@ export function getObjectUri(objectType: string, objectName: string): string {
     case 'view':
     case 'ddls/df':
       return `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
+    case 'metadata_extension':
+    case 'ddlx/ex':
+      return `/sap/bc/adt/ddic/ddlx/sources/${encodedName}`;
     case 'domain':
       return `/sap/bc/adt/ddic/domains/${encodedName}`;
     case 'data_element':

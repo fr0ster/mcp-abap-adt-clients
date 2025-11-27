@@ -528,6 +528,89 @@ create_transport:
         description: "TransportBuilder workflow transport"
         # package_name: "ZADT_BLD_PKG01"
 
+# Create Behavior Definition
+create_behavior_definition:
+  test_cases:
+    - name: "builder_behavior_definition"
+      enabled: true
+      description: "Create test behavior definition for BehaviorDefinitionBuilder tests"
+      params:
+        bdef_name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"  # e.g., ZADT_BLD_BDEF01
+        description: "Behavior Definition for <YOUR_CDS_VIEW_NAME>"
+        package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        root_entity: "<YOUR_CDS_VIEW_NAME>"  # Root entity name (CDS view name)
+        implementation_type: "Managed"  # Managed, Unmanaged, Abstract, or Projection
+        source_code: |
+          managed implementation in class zbp_<your_cds_view_name_lowercase> unique;
+          strict ( 2 );
+
+          define behavior for <YOUR_CDS_VIEW_NAME>
+          persistent table z_<your_cds_view_name_lowercase>
+          lock master
+          authorization master ( instance )
+          {
+            create;
+            update;
+            delete;
+          }
+
+# Create Metadata Extension
+create_metadata_extension:
+  test_cases:
+    - name: "builder_metadata_extension"
+      enabled: true
+      description: "Create test metadata extension for MetadataExtensionBuilder tests"
+      params:
+        ext_name: "<YOUR_METADATA_EXTENSION_NAME>"  # e.g., ZADT_BLD_MEXT01
+        description: "Metadata Extension for <YOUR_CDS_VIEW_NAME>"
+        package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        target_entity: "<YOUR_CDS_VIEW_NAME>"  # Target CDS view name
+        source_code: |
+          @MetadataExtension : {
+            @EndUserText.label: 'Metadata Extension for <YOUR_CDS_VIEW_NAME>'
+          }
+          extend view <YOUR_CDS_VIEW_NAME> with "<YOUR_METADATA_EXTENSION_NAME>"
+          {
+            @EndUserText.label: 'Sample Field'
+            SampleField;
+          }
+
+# Create Behavior Implementation
+create_behavior_implementation:
+  test_cases:
+    - name: "builder_behavior_implementation"
+      enabled: true
+      description: "Create test behavior implementation class for BehaviorImplementationBuilder tests"
+      params:
+        class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"  # e.g., ZBP_<your_cds_view_name>
+        description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
+        package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        behavior_definition: "<YOUR_BEHAVIOR_DEFINITION_NAME>"  # Root entity name (BDEF name)
+        source_code: |
+          CLASS lhc_<your_behavior_definition_name> DEFINITION INHERITING FROM cl_abap_behavior_handler.
+            PRIVATE SECTION.
+
+              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
+                IMPORTING keys REQUEST requested_authorizations FOR <your_behavior_definition_name_lowercase> RESULT result.
+
+              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
+                IMPORTING REQUEST requested_authorizations FOR <your_behavior_definition_name_lowercase> RESULT result.
+
+          ENDCLASS.
+
+          CLASS lhc_<your_behavior_definition_name> IMPLEMENTATION.
+
+            METHOD get_instance_authorizations.
+            ENDMETHOD.
+
+            METHOD get_global_authorizations.
+            ENDMETHOD.
+
+          ENDCLASS.
+
 # Read Service Definition
 read_service_definition:
   test_cases:

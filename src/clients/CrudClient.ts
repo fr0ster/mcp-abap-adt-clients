@@ -1143,7 +1143,7 @@ export class CrudClient extends ReadOnlyClient {
   async lockBehaviorDefinition(config: Partial<BehaviorDefinitionBuilderConfig> & Pick<BehaviorDefinitionBuilderConfig, 'name'>): Promise<this> {
     const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
     await builder.lock();
-    this.crudState.lockHandle = builder.getState().lockHandle;
+    this.crudState.lockHandle = builder.getLockHandle() || builder.getState().lockHandle;
     return this;
   }
 
@@ -1158,7 +1158,11 @@ export class CrudClient extends ReadOnlyClient {
 
   async updateBehaviorDefinition(config: Partial<BehaviorDefinitionBuilderConfig> & Pick<BehaviorDefinitionBuilderConfig, 'name' | 'sourceCode'>, lockHandle?: string): Promise<this> {
     const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
-    (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    const effectiveLockHandle = lockHandle || this.crudState.lockHandle;
+    if (!effectiveLockHandle) {
+      throw new Error(`Lock handle is required for update. Call lockBehaviorDefinition() first or provide lockHandle parameter.`);
+    }
+    (builder as any).lockHandle = effectiveLockHandle;
     await builder.update();
     this.crudState.updateResult = builder.getState().updateResult;
     return this;

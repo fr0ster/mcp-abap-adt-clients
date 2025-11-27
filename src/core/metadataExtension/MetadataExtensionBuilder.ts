@@ -152,6 +152,9 @@ export class MetadataExtensionBuilder {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking metadata extension:', this.config.name);
+      
+      // Enable stateful session mode
+      this.connection.setSessionType("stateful");
       const lockHandle = await lockMetadataExtension(
         this.connection,
         this.config.name
@@ -286,6 +289,9 @@ export class MetadataExtensionBuilder {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.logger.info?.('Metadata extension unlocked');
+      
+      // Enable stateless session mode
+      this.connection.setSessionType("stateless");
       return this;
     } catch (error: any) {
       this.state.errors.push({

@@ -140,6 +140,32 @@ console.log(result?.serviceDefinitionName);
 console.log(result?.description);
 ```
 
+#### Behavior Definition Operations
+```typescript
+readBehaviorDefinition(name: string): Promise<AxiosResponse>
+```
+
+Read behavior definition source code.
+
+**Example:**
+```typescript
+const response = await client.readBehaviorDefinition('Z_MY_BDEF');
+console.log(response.data); // Behavior definition source code
+```
+
+#### Metadata Extension Operations
+```typescript
+readMetadataExtension(name: string): Promise<AxiosResponse>
+```
+
+Read metadata extension source code.
+
+**Example:**
+```typescript
+const response = await client.readMetadataExtension('Z_MY_MEXT');
+console.log(response.data); // Metadata extension source code
+```
+
 #### Transport Operations
 ```typescript
 readTransport(transportRequest: string): Promise<AxiosResponse>
@@ -260,6 +286,26 @@ createServiceDefinition(config: {
   sourceCode?: string;
 }): Promise<this>
 
+// Behavior Definitions
+createBehaviorDefinition(config: {
+  name: string;
+  packageName: string;
+  description: string;
+  rootEntity: string;
+  implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
+  transportRequest?: string;
+  sourceCode?: string;
+}): Promise<this>
+
+// Metadata Extensions
+createMetadataExtension(config: {
+  name: string;
+  packageName: string;
+  description: string;
+  transportRequest?: string;
+  sourceCode?: string;
+}): Promise<this>
+
 // Function Modules
 createFunctionGroup(name, description, packageName, transportRequest?): Promise<this>
 
@@ -335,6 +381,8 @@ lockFunctionGroup(name: string): Promise<this>
 lockFunctionModule(name: string, functionGroup: string): Promise<this>
 lockPackage(name: string): Promise<this>
 lockServiceDefinition(name: string): Promise<this>
+lockBehaviorDefinition(name: string): Promise<this>
+lockMetadataExtension(name: string): Promise<this>
 ```
 
 **Example:**
@@ -369,6 +417,8 @@ unlockFunctionGroup(name: string, lockHandle?: string): Promise<this>
 unlockFunctionModule(name: string, functionGroup: string, lockHandle?: string): Promise<this>
 unlockPackage(name: string, lockHandle?: string): Promise<this>
 unlockServiceDefinition(name: string, lockHandle?: string): Promise<this>
+unlockBehaviorDefinition(name: string, lockHandle?: string): Promise<this>
+unlockMetadataExtension(name: string, lockHandle?: string): Promise<this>
 ```
 
 **Example:**
@@ -404,6 +454,15 @@ updateServiceDefinition(config: {
   serviceDefinitionName: string;
   sourceCode: string;
   transportRequest?: string;
+}, lockHandle?: string): Promise<this>
+updateBehaviorDefinition(config: {
+  name: string;
+  sourceCode: string;
+  transportRequest?: string;
+}, lockHandle?: string): Promise<this>
+updateMetadataExtension(config: {
+  name: string;
+  sourceCode: string;
 }, lockHandle?: string): Promise<this>
 updateFunctionModule(name: string, functionGroup: string, sourceCode: string, lockHandle?: string): Promise<this>
 updatePackage(name: string, description: string, lockHandle?: string): Promise<this>
@@ -502,6 +561,8 @@ activateFunctionGroup(name: string): Promise<this>
 activateFunctionModule(name: string, functionGroup: string): Promise<this>
 activatePackage(name: string): Promise<this>
 activateServiceDefinition(name: string): Promise<this>
+activateBehaviorDefinition(name: string): Promise<this>
+activateMetadataExtension(name: string): Promise<this>
 ```
 
 **Example:**
@@ -536,6 +597,8 @@ deleteFunctionGroup(name: string, transportRequest?: string): Promise<this>
 deleteFunctionModule(name: string, functionGroup: string, transportRequest?: string): Promise<this>
 deletePackage(name: string, transportRequest?: string): Promise<this>
 deleteServiceDefinition(name: string, transportRequest?: string): Promise<this>
+deleteBehaviorDefinition(name: string, transportRequest?: string): Promise<this>
+deleteMetadataExtension(name: string, transportRequest?: string): Promise<this>
 ```
 
 **Example:**
@@ -558,6 +621,8 @@ checkView(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 checkFunctionGroup(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 checkFunctionModule(name: string, functionGroup: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 checkServiceDefinition(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkBehaviorDefinition(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkMetadataExtension(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 ```
 
 Performs syntax/consistency check on the object.
@@ -580,6 +645,24 @@ validateStructure(config: { structureName: string; packageName: string; descript
 validateTable(config: { tableName: string; packageName: string; description: string }): Promise<AxiosResponse>
 validateView(config: { viewName: string; packageName: string; description: string }): Promise<AxiosResponse>
 validateServiceDefinition(config: { serviceDefinitionName: string; description: string }): Promise<AxiosResponse>
+validateBehaviorDefinition(config: {
+  name: string;
+  rootEntity: string;
+  packageName: string;
+  description: string;
+  implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection';
+}): Promise<AxiosResponse>
+validateMetadataExtension(config: {
+  name: string;
+  packageName: string;
+  description: string;
+}): Promise<AxiosResponse>
+validateBehaviorImplementation(config: {
+  className: string;
+  packageName: string;
+  behaviorDefinition: string;
+  description: string;
+}): Promise<AxiosResponse>
 ```
 
 Validates object name against SAP naming rules.
