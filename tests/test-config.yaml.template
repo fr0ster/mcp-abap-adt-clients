@@ -568,9 +568,7 @@ create_metadata_extension:
         # transport_request: ""  # Uses environment.default_transport if omitted
         target_entity: "<YOUR_CDS_VIEW_NAME>"  # Target CDS view name
         source_code: |
-          @MetadataExtension : {
-            @EndUserText.label: 'Metadata Extension for <YOUR_CDS_VIEW_NAME>'
-          }
+          @Metadata.layer: layer
           extend view <YOUR_CDS_VIEW_NAME> with "<YOUR_METADATA_EXTENSION_NAME>"
           {
             @EndUserText.label: 'Sample Field'
