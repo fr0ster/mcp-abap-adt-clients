@@ -5,6 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.24] - 2025-01-27
+
+### Added
+- **BehaviorImplementationBuilderConfig.implementationCode** – added optional `implementationCode` parameter to `BehaviorImplementationBuilderConfig`:
+  - Allows specifying custom code for implementations include (local handler class) when updating behavior implementation
+  - Can be set via config during builder initialization or using `setImplementationCode()` method
+  - If `implementationCode` is provided, it takes precedence over `sourceCode` for implementations include updates
+  - `BehaviorImplementationBuilder.updateImplementations()` now uses `implementationCode` if available, otherwise falls back to default generated code
+  - Enables full control over local handler class implementation code in behavior implementation classes
+
+### Changed
+- **CrudClient.updateBehaviorImplementation()** – updated to accept `implementationCode` parameter:
+  - Method signature now includes optional `implementationCode` in config: `Pick<BehaviorImplementationBuilderConfig, 'className' | 'behaviorDefinition' | 'implementationCode'>`
+  - When `implementationCode` is provided, it is used for updating implementations include instead of default generated code
+  - Maintains backward compatibility: if `implementationCode` is not provided, default code is generated as before
+
+### Fixed
+- **BehaviorImplementationBuilder constructor** – fixed to properly initialize `implementationCode` from config:
+  - Now correctly uses `config.implementationCode` if available, otherwise falls back to `config.sourceCode`
+  - Ensures custom implementation code is properly set when provided via config
+
 ## [0.1.23] - 2025-12-XX
 
 ### Added

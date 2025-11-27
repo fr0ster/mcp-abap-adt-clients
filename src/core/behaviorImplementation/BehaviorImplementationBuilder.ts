@@ -11,15 +11,16 @@
  * const builder = new BehaviorImplementationBuilder(connection, logger, {
  *   className: 'ZBP_OK_I_CDS_TEST',
  *   packageName: 'ZOK_TEST_PKG_01',
- *   behaviorDefinition: 'ZOK_I_CDS_TEST'
+ *   behaviorDefinition: 'ZOK_I_CDS_TEST',
+ *   implementationCode: 'CLASS lhc_ZOK_I_CDS_TEST DEFINITION...' // Optional: custom implementation code
  * })
- *   .setImplementationCode('CLASS lhc_ZOK_I_CDS_TEST DEFINITION...');
+ *   .setImplementationCode('CLASS lhc_ZOK_I_CDS_TEST DEFINITION...'); // Or set via method
  *
  * await builder
  *   .createBehaviorImplementation()
  *   .then(b => b.lock())
  *   .then(b => b.updateMainSource())
- *   .then(b => b.updateImplementations())
+ *   .then(b => b.updateImplementations()) // Uses implementationCode if set, otherwise generates default
  *   .then(b => b.check())
  *   .then(b => b.unlock())
  *   .then(b => b.activate())
@@ -62,7 +63,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
 
     super(connection, logger, classConfig);
     this.behaviorDefinition = config.behaviorDefinition;
-    this.implementationCode = config.sourceCode;
+    this.implementationCode = config.implementationCode || config.sourceCode;
   }
 
   /**
@@ -202,7 +203,8 @@ ENDCLASS.`;
   /**
    * Update implementations include with local handler class
    * Must be called after lock() and updateMainSource()
-   * Uses hardcoded default implementation code
+   * Uses custom implementation code if set via config or setImplementationCode(),
+   * otherwise generates default implementation code
    */
   async updateImplementations(): Promise<this> {
     try {
@@ -210,7 +212,7 @@ ENDCLASS.`;
         throw new Error('Class must be locked before update. Call lock() first.');
       }
 
-      const code = this.generateDefaultImplementationCode();
+      const code = this.implementationCode || this.generateDefaultImplementationCode();
 
       this.logger.info?.('Updating behavior implementation class implementations:', this.config.className);
       const result = await updateBehaviorImplementation(

@@ -1234,12 +1234,23 @@ export class CrudClient extends ReadOnlyClient {
   /**
    * Update behavior implementation implementations include
    * Must be called after lockClass() and updateBehaviorImplementationMainSource()
+   * 
+   * @param config - Configuration object:
+   *   - `className`: Behavior implementation class name (required)
+   *   - `behaviorDefinition`: Behavior definition name (required)
+   *   - `implementationCode`: Optional custom code for implementations include (local handler class).
+   *                          If not provided, default code is generated.
+   * @param lockHandle - Optional lock handle. If not provided, uses lock handle from previous lockClass() call.
    */
-  async updateBehaviorImplementation(config: Pick<BehaviorImplementationBuilderConfig, 'className' | 'behaviorDefinition'>, lockHandle?: string): Promise<this> {
+  async updateBehaviorImplementation(
+    config: Pick<BehaviorImplementationBuilderConfig, 'className' | 'behaviorDefinition' | 'implementationCode'>,
+    lockHandle?: string
+  ): Promise<this> {
     const builder = new BehaviorImplementationBuilder(this.connection, {}, { 
       className: config.className,
       behaviorDefinition: config.behaviorDefinition,
-      description: ''
+      description: '',
+      implementationCode: config.implementationCode
     });
     (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
     await builder.updateImplementations();
