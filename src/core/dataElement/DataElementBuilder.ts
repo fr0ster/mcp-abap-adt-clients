@@ -15,7 +15,7 @@ import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { create } from './create';
 import { getDataElement } from './read';
 import { lockDataElement } from './lock';
-import { updateDataElementInternal, getDomainInfo } from './update';
+import { updateDataElementInternal } from './update';
 import { CreateDataElementParams, UpdateDataElementParams } from './types';
 import { checkDataElement } from './check';
 import { unlockDataElement } from './unlock';
@@ -67,11 +67,6 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
 
   setDescription(description: string): this {
     this.config.description = description;
-    return this;
-  }
-
-  setDomainName(domainName: string): this {
-    this.config.domainName = domainName;
     return this;
   }
 
@@ -211,16 +206,12 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         throw new Error('typeKind is required in DataElementBuilderConfig. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
       }
       const typeKind = this.config.typeKind;
-      if (typeKind === 'domain' && !this.config.domainName) {
-        throw new Error('Domain name is required for domain-based data elements');
-      }
       this.logger.info?.('Creating data element:', this.config.dataElementName);
       const params: CreateDataElementParams = {
         data_element_name: this.config.dataElementName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
         description: this.config.description,
-        domain_name: this.config.domainName,
         type_kind: typeKind,
         type_name: this.config.typeName,
         data_type: this.config.dataType,
@@ -286,25 +277,12 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
       this.logger.info?.('Updating data element:', this.config.dataElementName);
 
       const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
-      let domainInfo = { dataType: 'CHAR', length: 100, decimals: 0 };
-
-      if (typeKind === 'domain') {
-        const domainName = this.config.typeName || this.config.domainName || 'CHAR100';
-        domainInfo = await getDomainInfo(this.connection, domainName);
-      } else if (typeKind === 'predefinedAbapType') {
-        domainInfo = {
-          dataType: this.config.dataType || 'CHAR',
-          length: this.config.length || 100,
-          decimals: this.config.decimals || 0
-        };
-      }
 
       const params: UpdateDataElementParams = {
         data_element_name: this.config.dataElementName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
         description: this.config.description,
-        domain_name: this.config.domainName,
         type_kind: typeKind,
         type_name: this.config.typeName,
         data_type: this.config.dataType,
@@ -315,6 +293,13 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         long_label: this.config.longLabel,
         heading_label: this.config.headingLabel,
         activate: false // Don't activate in low-level function
+      };
+
+      // Use provided values directly - no automatic determination
+      const domainInfo = {
+        dataType: this.config.dataType || '',
+        length: this.config.length || 0,
+        decimals: this.config.decimals || 0
       };
 
       const result = await updateDataElementInternal(
@@ -518,7 +503,6 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         dataElementName: wbobj['adtcore:name'] || this.config.dataElementName,
         packageName: packageRef?.['adtcore:name'] || packageRef?.['name'],
         description: wbobj['adtcore:description'] || '',
-        domainName: dtel['dtel:typeName'] && typeKind === 'domain' ? dtel['dtel:typeName'] : undefined,
         typeKind,
         typeName: dtel['dtel:typeName'],
         dataType: dtel['dtel:dataType'],

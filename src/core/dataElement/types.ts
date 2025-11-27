@@ -12,7 +12,7 @@ import { BaseBuilderState } from '../shared/IBuilder';
  *  - refToDictionaryType
  *  - refToClifType
  *
- * When type_kind is 'domain', domain_name (or type_name) must be provided.
+ * When type_kind is 'domain', data_type must contain the domain name.
  * For the reference/predefined variants, use type_kind + data_type/length/refs accordingly.
  */
 
@@ -22,7 +22,6 @@ export interface CreateDataElementParams {
   description?: string;
   package_name: string;
   transport_request?: string;
-  domain_name?: string;
   type_kind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
   type_name?: string;
   data_type?: string;
@@ -47,7 +46,6 @@ export interface UpdateDataElementParams {
   description?: string;
   package_name: string;
   transport_request?: string;
-  domain_name?: string;
   type_kind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
   type_name?: string;
   data_type?: string;
@@ -81,7 +79,6 @@ export interface DataElementBuilderConfig {
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
   description?: string; // Required for create/validate operations, optional for others
-  domainName?: string;
   dataType?: string;
   length?: number;
   decimals?: number;

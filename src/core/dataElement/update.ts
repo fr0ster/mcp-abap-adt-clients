@@ -96,37 +96,21 @@ export async function updateDataElementInternal(
   }
   const typeKind = args.type_kind;
 
-  // Determine typeName based on typeKind (same logic as in create.ts)
+  // Use provided values directly - no automatic determination
+  // When typeKind is 'domain', dataType should contain the domain name, and it goes to typeName in XML
   let typeName = '';
   if (typeKind === 'domain') {
-    typeName = (args.domain_name || args.type_name || '').toUpperCase();
-  } else if (typeKind === 'predefinedAbapType' || typeKind === 'refToPredefinedAbapType') {
-    // For predefinedAbapType and refToPredefinedAbapType, typeName is empty
-    typeName = '';
-  } else if (typeKind === 'refToDictionaryType' || typeKind === 'refToClifType') {
-    // For refToDictionaryType and refToClifType, type_name is required
-    typeName = (args.type_name || '').toUpperCase();
-  }
-
-  let dataType = '';
-  let dataTypeLength = 0;
-  let dataTypeDecimals = 0;
-
-  if (typeKind === 'domain') {
-    dataType = domainInfo.dataType;
-    dataTypeLength = domainInfo.length;
-    dataTypeDecimals = domainInfo.decimals;
-  } else if (typeKind === 'predefinedAbapType' || typeKind === 'refToPredefinedAbapType') {
-    // For predefinedAbapType and refToPredefinedAbapType, use provided values
-    dataType = args.data_type || 'CHAR';
-    dataTypeLength = args.length || 100;
-    dataTypeDecimals = args.decimals || 0;
+    // For domain type, typeName comes from dataType
+    typeName = args.data_type ? args.data_type.toUpperCase() : '';
   } else {
-    // For refToDictionaryType and refToClifType, dataType is empty, length/decimals are 0
-    dataType = '';
-    dataTypeLength = 0;
-    dataTypeDecimals = 0;
+    // For other types, typeName comes from type_name parameter
+    typeName = args.type_name ? args.type_name.toUpperCase() : '';
   }
+
+  // Use provided values directly
+  const dataType = args.data_type || '';
+  const dataTypeLength = args.length || 0;
+  const dataTypeDecimals = args.decimals || 0;
 
   const shortMaxLength = 10;
   const mediumMaxLength = 20;
@@ -256,18 +240,12 @@ export async function updateDataElement(
   const systemInfo = await getSystemInformation(connection);
   const username = systemInfo?.userName || '';
 
-  // Get domain info if needed
-  let domainInfo = { dataType: 'CHAR', length: 100, decimals: 0 };
-  if (params.type_kind === 'domain') {
-    const domainName = params.type_name || params.domain_name || 'CHAR100';
-    domainInfo = await getDomainInfo(connection, domainName);
-  } else if (params.type_kind === 'predefinedAbapType') {
-    domainInfo = {
-      dataType: params.data_type || 'CHAR',
-      length: params.length || 100,
-      decimals: params.decimals || 0
-    };
-  }
+  // Use provided values directly - no automatic determination
+  const domainInfo = {
+    dataType: params.data_type || '',
+    length: params.length || 0,
+    decimals: params.decimals || 0
+  };
 
   return updateDataElementInternal(connection, params, lockHandle, username, domainInfo);
 }

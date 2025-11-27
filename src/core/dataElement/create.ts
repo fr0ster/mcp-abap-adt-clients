@@ -5,9 +5,8 @@
 
 import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
+import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { getDomainInfo } from './update';
 import { CreateDataElementParams } from './types';
 
 /**
@@ -30,58 +29,21 @@ export async function create(
   if (!args.type_kind) {
     throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
   }
-  const requestedTypeKind = args.type_kind;
-  // Use requestedTypeKind directly for XML (it's already one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType)
-  const typeKindXml = requestedTypeKind;
+  const typeKindXml = args.type_kind;
 
-  // Determine typeName based on typeKind
+  // Use provided values directly - no automatic determination
+  // When typeKind is 'domain', dataType should contain the domain name, and it goes to typeName in XML
   let typeName = '';
-  if (requestedTypeKind === 'domain') {
-    typeName = (args.domain_name || args.type_name || '').toUpperCase();
-  } else if (requestedTypeKind === 'predefinedAbapType' || requestedTypeKind === 'refToPredefinedAbapType') {
-    // For predefinedAbapType and refToPredefinedAbapType, typeName is empty
-    typeName = '';
-  } else if (requestedTypeKind === 'refToDictionaryType' || requestedTypeKind === 'refToClifType') {
-    // For refToDictionaryType and refToClifType, type_name is required
-    typeName = (args.type_name || '').toUpperCase();
-  }
-
-  // Get dataType, length, decimals based on typeKind
-  let dataType = '';
-  let length = 0;
-  let decimals = 0;
-
-  if (requestedTypeKind === 'domain') {
-    // For domain type, get information from the domain
-    const domainName = (args.domain_name || args.type_name || '').toUpperCase();
-    if (domainName) {
-      try {
-        const domainInfo = await getDomainInfo(connection, domainName);
-        dataType = domainInfo.dataType;
-        length = domainInfo.length;
-        decimals = domainInfo.decimals;
-      } catch (error: any) {
-        // If domain info cannot be retrieved, use defaults
-        dataType = 'CHAR';
-        length = 100;
-        decimals = 0;
-      }
-    } else {
-      dataType = 'CHAR';
-      length = 100;
-      decimals = 0;
-    }
-  } else if (requestedTypeKind === 'predefinedAbapType' || requestedTypeKind === 'refToPredefinedAbapType') {
-    // For predefinedAbapType and refToPredefinedAbapType, use provided values
-    dataType = args.data_type || 'CHAR';
-    length = args.length || 100;
-    decimals = args.decimals || 0;
+  if (typeKindXml === 'domain') {
+    // For domain type, typeName comes from dataType
+    typeName = args.data_type ? args.data_type.toUpperCase() : '';
   } else {
-    // For refToDictionaryType and refToClifType, dataType is empty, length/decimals are 0
-    dataType = '';
-    length = 0;
-    decimals = 0;
+    // For other types, typeName comes from type_name parameter
+    typeName = args.type_name ? args.type_name.toUpperCase() : '';
   }
+  const dataType = args.data_type || '';
+  const length = args.length || 0;
+  const decimals = args.decimals || 0;
 
   const shortLabel = args.short_label || '';
   const mediumLabel = args.medium_label || '';

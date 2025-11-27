@@ -566,7 +566,6 @@ export class CrudClient extends ReadOnlyClient {
       const builder = this.crudState.dataElementBuilder;
       if (config.packageName) builder.setPackage(config.packageName);
       if (config.description !== undefined) builder.setDescription(config.description);
-      if (config.domainName !== undefined) builder.setDomainName(config.domainName);
       if (config.dataType !== undefined) builder.setDataType(config.dataType);
       if (config.length !== undefined) builder.setLength(config.length);
       if (config.decimals !== undefined) builder.setDecimals(config.decimals);
@@ -591,7 +590,10 @@ export class CrudClient extends ReadOnlyClient {
     if (config.typeKind) builder.setTypeKind(config.typeKind);
     if (config.packageName) builder.setPackage(config.packageName);
     if (config.description) builder.setDescription(config.description);
-    if (config.domainName) builder.setDomainName(config.domainName); // Required for domain-based data elements
+    if (config.dataType) builder.setDataType(config.dataType);
+    if (config.typeName) builder.setTypeName(config.typeName);
+    if (config.length !== undefined) builder.setLength(config.length);
+    if (config.decimals !== undefined) builder.setDecimals(config.decimals);
     await builder.create();
     this.crudState.createResult = builder.getState().createResult;
     return this;
