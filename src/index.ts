@@ -67,7 +67,7 @@ export type { ViewBuilderConfig, ViewBuilderState } from './core/view';
 export type { FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './core/functionGroup';
 export type { FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './core/functionModule';
 export type { ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderState } from './core/serviceDefinition';
-export type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState } from './core/behaviorDefinition';
+export type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState, BehaviorDefinitionValidationParams } from './core/behaviorDefinition';
 export type { BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderState } from './core/behaviorImplementation';
 export type { MetadataExtensionBuilderConfig, MetadataExtensionBuilderState } from './core/metadataExtension';
 

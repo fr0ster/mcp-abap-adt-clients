@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.22] - 2025-12-XX
+
+### Added
+- **BehaviorDefinitionValidationParams export** – added `BehaviorDefinitionValidationParams` type export to main package index:
+  - Enables consumers to import and use the validation parameters type directly from `@mcp-abap-adt/adt-clients`
+  - Type-safe access to validation parameters structure (`objname`, `rootEntity`, `description`, `package`, `implementationType`)
+  - Supports proper type checking when constructing validation parameters for behavior definition validation operations
+
 ## [0.1.21] - 2025-12-XX
 
 ### Added
