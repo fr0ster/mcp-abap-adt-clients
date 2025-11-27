@@ -5,6 +5,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.20] - 2025-12-XX
+
+### Changed
+- **DataElement creation simplified** – removed `domainName` parameter and automatic parameter determination:
+  - Removed `domainName` from `CreateDataElementParams`, `UpdateDataElementParams`, and `DataElementBuilderConfig` types
+  - Removed `setDomainName()` method from `DataElementBuilder`
+  - When `typeKind = 'domain'`, domain name must be passed via `dataType` parameter (domain name goes to `typeName` in XML)
+  - For other `typeKind` values, `typeName` comes from `type_name` parameter
+  - Removed automatic determination of `typeName`, `dataType`, `length`, and `decimals` based on `typeKind`
+  - Removed automatic `getDomainInfo()` calls that fetched domain information
+  - Functions now use only provided values directly - no automatic parameter inference
+  - If incorrect values are provided, errors will come from SAP system, not from client-side logic
+
+### Removed
+- **DataElement `domainName` parameter** – removed from all interfaces and methods:
+  - `CreateDataElementParams.domain_name` – removed
+  - `UpdateDataElementParams.domain_name` – removed
+  - `DataElementBuilderConfig.domainName` – removed
+  - `DataElementBuilder.setDomainName()` – removed
+  - `CrudClient.createDataElement()` no longer accepts `domainName` in config
+  - `CrudClient.updateDataElement()` no longer accepts `domainName` in config
+
+### Migration Guide
+- **Before (0.1.19)**:
+  ```typescript
+  await client.createDataElement({
+    dataElementName: 'Z_TEST_DE',
+    packageName: 'ZLOCAL',
+    typeKind: 'domain',
+    domainName: 'Z_TEST_DOMAIN'  // ❌ Removed
+  });
+  ```
+
+- **After (0.1.20)**:
+  ```typescript
+  await client.createDataElement({
+    dataElementName: 'Z_TEST_DE',
+    packageName: 'ZLOCAL',
+    typeKind: 'domain',
+    dataType: 'Z_TEST_DOMAIN'  // ✅ Domain name via dataType
+  });
+  ```
+
 ## [0.1.19] - 2025-12-XX
 
 ### Added
