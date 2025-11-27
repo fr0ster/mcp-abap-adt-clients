@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.23] - 2025-12-XX
+
+### Added
+- **Complete type exports for Behavior Definition operations** – added comprehensive type exports for behavior definition operations:
+  - `BehaviorDefinitionValidationParams` – validation parameters structure (`objname`, `rootEntity`, `description`, `package`, `implementationType`)
+  - `BehaviorDefinitionImplementationType` – type union for implementation types (`'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'`)
+  - `ValidationResult` – validation result structure (`severity`, `shortText`, `longText`)
+  - `BehaviorDefinitionCreateParams` – creation parameters structure
+  - `LockResult` – lock operation result with lock handle and transport information
+  - `CheckReporter` – check reporter type union (`'bdefImplementationCheck' | 'abapCheckRun'`)
+  - `CheckMessage` – check message structure (`uri`, `type`, `shortText`, `code`)
+  - `CheckRunResult` – check run result structure with reporter, status, and messages
+  - Enables consumers to import and use all types directly from `@mcp-abap-adt/adt-clients` for type-safe operations
+  - Supports proper type checking when constructing parameters and parsing results for behavior definition operations
+- **Complete type exports for Behavior Implementation operations** – added type exports for behavior implementation:
+  - `CreateBehaviorImplementationParams` – creation parameters structure for behavior implementation classes
+  - Enables type-safe creation of behavior implementation classes
+- **Complete type exports for Metadata Extension operations** – added type exports for metadata extension:
+  - `MetadataExtensionValidationParams` – validation parameters structure
+  - `MetadataExtensionCreateParams` – creation parameters structure
+  - Enables type-safe validation and creation of metadata extensions
+
 ## [0.1.22] - 2025-12-XX
 
 ### Added

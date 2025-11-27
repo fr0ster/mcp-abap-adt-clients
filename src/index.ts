@@ -67,9 +67,29 @@ export type { ViewBuilderConfig, ViewBuilderState } from './core/view';
 export type { FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './core/functionGroup';
 export type { FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './core/functionModule';
 export type { ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderState } from './core/serviceDefinition';
-export type { BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState, BehaviorDefinitionValidationParams } from './core/behaviorDefinition';
-export type { BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderState } from './core/behaviorImplementation';
-export type { MetadataExtensionBuilderConfig, MetadataExtensionBuilderState } from './core/metadataExtension';
+export type { 
+  BehaviorDefinitionBuilderConfig, 
+  BehaviorDefinitionBuilderState, 
+  BehaviorDefinitionValidationParams,
+  BehaviorDefinitionImplementationType,
+  ValidationResult,
+  BehaviorDefinitionCreateParams,
+  LockResult,
+  CheckReporter,
+  CheckMessage,
+  CheckRunResult
+} from './core/behaviorDefinition';
+export type { 
+  BehaviorImplementationBuilderConfig, 
+  BehaviorImplementationBuilderState,
+  CreateBehaviorImplementationParams
+} from './core/behaviorImplementation';
+export type { 
+  MetadataExtensionBuilderConfig, 
+  MetadataExtensionBuilderState,
+  MetadataExtensionValidationParams,
+  MetadataExtensionCreateParams
+} from './core/metadataExtension';
 
 // Export class unit test types
 export type { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './core/class';
