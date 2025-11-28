@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.27] - 2025-01-XX
+
+### Changed
+- **Updated @mcp-abap-adt/connection dependency** – upgraded to `^0.1.12`:
+  - Connection package no longer provides `loadEnvFile()`, `loadConfigFromEnvFile()`, or `getConfigFromEnv()` functions
+  - Connection package no longer reads `.env` files or depends on `dotenv`
+  - Consumers must now pass `SapConfig` directly to connection constructors
+  - This change improves separation of concerns and resolves `stdio` mode output corruption issues
+
+### Fixed
+- **examples/read-object-transport.js** – updated to work with connection@0.1.12:
+  - Removed usage of deprecated `loadConfigFromEnvFile()` and `getConfigFromEnv()` functions
+  - Implemented manual `.env` file parsing and `SapConfig` creation
+  - Example now reads environment variables and creates `SapConfig` object directly
+  - Maintains backward compatibility with existing `.env` file structure
+
 ## [0.1.26] - 2025-01-27
 
 ### Added

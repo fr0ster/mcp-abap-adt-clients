@@ -19,7 +19,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { createAbapConnection, loadConfigFromEnvFile } = require('@mcp-abap-adt/connection');
+const { createAbapConnection, SapConfig } = require('@mcp-abap-adt/connection');
 const {
   getClassTransport,
   getInterfaceTransport,
@@ -54,20 +54,99 @@ function resolveEnvPath() {
   return null;
 }
 
+function parseEnvFile(envPath) {
+  try {
+    const content = fs.readFileSync(envPath, 'utf8');
+    const lines = content.split(/\r?\n/);
+    const env = {};
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) {
+        continue;
+      }
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex === -1) {
+        continue;
+      }
+      const key = trimmed.substring(0, eqIndex).trim();
+      const value = trimmed.substring(eqIndex + 1).trim();
+      const unquotedValue = value.replace(/^["']|["']$/g, "");
+      if (key) {
+        env[key] = unquotedValue;
+      }
+    }
+    return env;
+  } catch (error) {
+    console.warn(`[read-object-transport] Failed to parse .env file ${envPath}: ${error.message}`);
+    return {};
+  }
+}
+
 function getConfig() {
   const envPath = resolveEnvPath();
+  let env = {};
+  
   if (envPath) {
-    try {
-      return loadConfigFromEnvFile(envPath);
-    } catch (error) {
-      console.warn(`[read-object-transport] Failed to load config from ${envPath}: ${error.message}`);
-    }
+    env = parseEnvFile(envPath);
   } else {
-    console.warn('[read-object-transport] .env not found, falling back to environment variables');
+    console.warn('[read-object-transport] .env not found, using environment variables only');
   }
-
-  const { getConfigFromEnv } = require('@mcp-abap-adt/connection');
-  return getConfigFromEnv();
+  
+  // Merge with process.env (process.env takes precedence)
+  const mergedEnv = { ...env, ...process.env };
+  
+  const url = mergedEnv.SAP_URL?.trim();
+  const client = mergedEnv.SAP_CLIENT?.trim();
+  
+  // Auto-detect auth type
+  let authType = 'basic';
+  if (mergedEnv.SAP_JWT_TOKEN) {
+    authType = 'jwt';
+  } else if (mergedEnv.SAP_AUTH_TYPE) {
+    const rawAuthType = mergedEnv.SAP_AUTH_TYPE.trim();
+    authType = rawAuthType === 'xsuaa' ? 'jwt' : rawAuthType;
+  }
+  
+  if (!url || !/^https?:\/\//.test(url)) {
+    throw new Error(`Missing or invalid SAP_URL: ${url}`);
+  }
+  
+  const config = {
+    url,
+    authType,
+  };
+  
+  if (client) {
+    config.client = client;
+  }
+  
+  if (authType === 'jwt') {
+    const jwtToken = mergedEnv.SAP_JWT_TOKEN;
+    if (!jwtToken) {
+      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
+    }
+    config.jwtToken = jwtToken;
+    const refreshToken = mergedEnv.SAP_REFRESH_TOKEN;
+    if (refreshToken) {
+      config.refreshToken = refreshToken;
+    }
+    const uaaUrl = mergedEnv.SAP_UAA_URL || mergedEnv.UAA_URL;
+    const uaaClientId = mergedEnv.SAP_UAA_CLIENT_ID || mergedEnv.UAA_CLIENT_ID;
+    const uaaClientSecret = mergedEnv.SAP_UAA_CLIENT_SECRET || mergedEnv.UAA_CLIENT_SECRET;
+    if (uaaUrl) config.uaaUrl = uaaUrl;
+    if (uaaClientId) config.uaaClientId = uaaClientId;
+    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
+  } else {
+    const username = mergedEnv.SAP_USERNAME;
+    const password = mergedEnv.SAP_PASSWORD;
+    if (!username || !password) {
+      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+    }
+    config.username = username;
+    config.password = password;
+  }
+  
+  return config;
 }
 
 async function readTransport(connection, objectType, objectName, functionGroup) {
