@@ -88,6 +88,9 @@ export interface DataElementBuilderConfig {
   headingLabel?: string;
   typeKind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
   typeName?: string;
+  searchHelp?: string;
+  searchHelpParameter?: string;
+  setGetParameter?: string;
 }
 
 export interface DataElementBuilderState extends BaseBuilderState {

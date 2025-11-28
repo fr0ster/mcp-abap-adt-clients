@@ -292,6 +292,9 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         medium_label: this.config.mediumLabel,
         long_label: this.config.longLabel,
         heading_label: this.config.headingLabel,
+        search_help: this.config.searchHelp,
+        search_help_parameter: this.config.searchHelpParameter,
+        set_get_parameter: this.config.setGetParameter,
         activate: false // Don't activate in low-level function
       };
 

@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.26] - 2025-01-27
+
+### Added
+- **DataElementBuilderConfig search help and parameter support** – added support for search help and parameter configuration:
+  - `searchHelp?: string` – search help name for data element
+  - `searchHelpParameter?: string` – search help parameter name
+  - `setGetParameter?: string` – Set/Get parameter ID for data element
+  - These parameters are now properly passed through `DataElementBuilder.update()` to `UpdateDataElementParams`
+  - Enables full configuration of search help and parameter settings when updating data elements
+
+### Changed
+- **DataElementBuilder.update()** – updated to include search help and parameter fields:
+  - Now passes `search_help`, `search_help_parameter`, and `set_get_parameter` from config to `UpdateDataElementParams`
+  - Ensures all data element properties including search help configuration are properly updated
+
 ## [0.1.25] - 2025-01-27
 
 ### Changed
