@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.25] - 2025-01-27
+
+### Changed
+- **DomainBuilder.update() workflow detection** – improved workflow detection logic:
+  - `update()` method now correctly determines CREATE vs UPDATE workflow based on `this.state.createResult`
+  - For UPDATE workflow: uses `updateDomain()` low-level function (for existing domains)
+  - For CREATE workflow: uses `upload()` function (for filling newly created empty domains)
+  - Ensures proper workflow selection when updating existing domains vs filling newly created domains
+
+### Fixed
+- **Domain update workflow** – fixed issue where `DomainBuilder.update()` incorrectly used CREATE workflow for existing domains:
+  - `update()` now properly checks `this.state.createResult` to determine workflow
+  - If `createResult` exists, uses CREATE workflow (upload to fill empty domain)
+  - If `createResult` does not exist, uses UPDATE workflow (updateDomain for existing domain)
+  - Prevents "Domain already exists" errors when updating existing domains
+
 ## [0.1.24] - 2025-01-27
 
 ### Added

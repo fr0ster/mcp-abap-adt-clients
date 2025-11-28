@@ -34,7 +34,7 @@
 import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { create, upload } from './create';
+import { create } from './create';
 import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
 import { CreateDomainParams, UpdateDomainParams, FixedValue, DomainBuilderConfig, DomainBuilderState } from './types';
@@ -211,10 +211,10 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
   async lock(): Promise<this> {
     try {
       this.logger.info?.('Locking domain:', this.config.domainName);
-      
+
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
-      
+
       const lockHandle = await lockDomain(
         this.connection,
         this.config.domainName
@@ -249,63 +249,29 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
       const masterSystem = systemInfo?.systemID;
       const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
-      // Check if this is a CREATE workflow (createResult exists) or UPDATE workflow
-      const isCreateWorkflow = !!this.state.createResult;
+      this.logger.info?.('Updating domain (UPDATE workflow):', this.config.domainName);
+      const updateParams: UpdateDomainParams = {
+        domain_name: this.config.domainName,
+        package_name: this.config.packageName,
+        transport_request: this.config.transportRequest,
+        description: this.config.description,
+        datatype: this.config.datatype,
+        length: this.config.length,
+        decimals: this.config.decimals,
+        conversion_exit: this.config.conversion_exit,
+        lowercase: this.config.lowercase,
+        sign_exists: this.config.sign_exists,
+        value_table: this.config.value_table,
+        fixed_values: this.config.fixed_values,
+        activate: false // Don't activate in low-level function
+      };
 
-      if (isCreateWorkflow) {
-        // For CREATE workflow: use upload to fill empty domain with data
-        this.logger.info?.('Filling domain with data (CREATE workflow):', this.config.domainName);
-        const createParams: CreateDomainParams = {
-          domain_name: this.config.domainName,
-          package_name: this.config.packageName,
-          transport_request: this.config.transportRequest,
-          description: this.config.description,
-          datatype: this.config.datatype,
-          length: this.config.length,
-          decimals: this.config.decimals,
-          conversion_exit: this.config.conversion_exit,
-          lowercase: this.config.lowercase,
-          sign_exists: this.config.sign_exists,
-          value_table: this.config.value_table,
-          fixed_values: this.config.fixed_values
-        };
-        const result = await upload(
-          this.connection,
-          createParams,
-          this.lockHandle,
-          username,
-          masterSystem
-        );
-        this.state.updateResult = result;
-        this.logger.info?.('Domain filled with data successfully:', result.status);
-      } else {
-        // For UPDATE workflow: use updateDomain (low-level function)
-        // lockHandle must exist (set by lock() method)
-        // stateful session mode already set by lock() method
-        this.logger.info?.('Updating domain (UPDATE workflow):', this.config.domainName);
-        const updateParams: UpdateDomainParams = {
-          domain_name: this.config.domainName,
-          package_name: this.config.packageName,
-          transport_request: this.config.transportRequest,
-          description: this.config.description,
-          datatype: this.config.datatype,
-          length: this.config.length,
-          decimals: this.config.decimals,
-          conversion_exit: this.config.conversion_exit,
-          lowercase: this.config.lowercase,
-          sign_exists: this.config.sign_exists,
-          value_table: this.config.value_table,
-          fixed_values: this.config.fixed_values,
-          activate: false // Don't activate in low-level function
-        };
-        
-        // Use updateDomain (low-level) - stateful session already set by lock()
-        // Connection object maintains sessionMode state between builder instances
-        const result = await updateDomain(this.connection, updateParams, this.lockHandle, username, masterSystem);
-        
-        this.state.updateResult = result;
-        this.logger.info?.('Domain updated successfully:', result.status);
-      }
+      // Use updateDomain (low-level) - stateful session already set by lock()
+      // Connection object maintains sessionMode state between builder instances
+      const result = await updateDomain(this.connection, updateParams, this.lockHandle, username, masterSystem);
+
+      this.state.updateResult = result;
+      this.logger.info?.('Domain updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -422,12 +388,12 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger.info?.('Domain read successfully:', result.status);
-      
+
       // Parse and return config directly
       const xmlData = typeof result.data === 'string'
         ? result.data
         : JSON.stringify(result.data);
-      
+
       return this.parseDomainXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
@@ -541,20 +507,20 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
       const fixValues = domain['doma:content']?.['doma:valueInformation']?.['doma:fixValues']?.['doma:fixValue'];
       const fixedValues = Array.isArray(fixValues)
         ? fixValues.map((fv: any) => ({
-            low: fv['doma:low'] || '',
-            text: fv['doma:text'] || ''
-          }))
+          low: fv['doma:low'] || '',
+          text: fv['doma:text'] || ''
+        }))
         : fixValues
-        ? [{
+          ? [{
             low: fixValues['doma:low'] || '',
             text: fixValues['doma:text'] || ''
           }]
-        : undefined;
+          : undefined;
 
       // Parse length and decimals - GET returns "000010", PUT needs "100"
       const lengthStr = domain['doma:content']?.['doma:typeInformation']?.['doma:length'];
       const length = lengthStr ? parseInt(lengthStr, 10) : undefined;
-      
+
       const decimalsStr = domain['doma:content']?.['doma:typeInformation']?.['doma:decimals'];
       const decimals = decimalsStr ? parseInt(decimalsStr, 10) : undefined;
 
