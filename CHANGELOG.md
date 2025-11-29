@@ -5,13 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [0.1.29] - 2025-11-29
+## [0.1.31] - 2025-11-29
 
 ### Fixed
-- **CHANGELOG date corrections** – corrected all version dates in CHANGELOG to match actual release dates from git history:
-  - Fixed dates for versions 0.1.10 through 0.1.28 to reflect actual commit dates
-  - All dates now accurately represent when each version was released
+- **Versioning and documentation alignment** – aligned CHANGELOG version dates with actual git release dates:
+  - Corrected dates for versions 0.1.10 through 0.1.28 to match actual commit dates from git history
+  - Ensures CHANGELOG accurately reflects when each version was actually released
   - Improves historical accuracy and maintainability of project documentation
+
+### Changed
+- **Version management rules** – established strict version management guidelines:
+  - Added `.cursor/rules/main.mdc` with version management rules
+  - Assistant now asks user for version number when adding CHANGELOG entries
+  - Assistant never modifies `package.json` version without explicit user request
+  - Prevents accidental version changes and ensures user control over versioning
+
+## [0.1.30] - 2025-11-29
+
+## [0.1.29] - 2025-11-29
 
 ## [0.1.28] - 2025-11-29
 

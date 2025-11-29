@@ -1,0 +1,40 @@
+---
+alwaysApply: true
+description: mcp-abap-adt-clients project rules and guidelines
+---
+
+# mcp-abap-adt-clients Rules
+
+## Language Requirements
+All repository artifacts authored by the assistant (source code, documentation, comments, commit messages, etc.) must be written in English.
+
+Direct communication with the user must follow the language used by the user in the current conversation.
+
+## Project Context
+- **Name:** mcp-abap-adt-clients – ADT clients for SAP ABAP systems
+- **Purpose:** Provides Read-only and CRUD operations for SAP ABAP ADT objects
+- **Key Modules:** `src/clients/`, `src/core/`, `src/utils/`, `src/__tests__/`
+
+## Code Standards
+- Source code: English only
+- Comments: English only, explain "why" not "what"
+- Variable/function/class names: English only
+- Error messages: English only
+- Log messages: English only
+
+## Version Management
+
+**CRITICAL: NEVER change package.json version without explicit user request**
+
+- Always ask the user before modifying the `version` field in `package.json`
+- **When adding entries to CHANGELOG, always ask the user which version they plan to use for the package**
+- Do not automatically increment version numbers
+- Do not change version numbers when updating CHANGELOG
+- Version changes must be explicitly requested by the user
+- Use `npm version` command only when explicitly requested
+
+## Architecture Notes
+- Client classes: CrudClient, ReadOnlyClient
+- Builder pattern: All object types have corresponding Builder classes
+- Low-level functions: Located in `src/core/*/` modules
+- Testing: YAML-based configuration in `tests/test-config.yaml`
