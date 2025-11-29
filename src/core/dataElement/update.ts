@@ -94,14 +94,37 @@ export async function updateDataElementInternal(
   if (!args.type_kind) {
     throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
   }
+
+  // Validate required parameters based on type_kind
+  // predefinedAbapType and refToPredefinedAbapType require data_type
+  // Other types (domain, refToDictionaryType, refToClifType) require type_name
+  if (args.type_kind === 'predefinedAbapType' || args.type_kind === 'refToPredefinedAbapType') {
+    if (!args.data_type) {
+      throw new Error(`data_type is required when type_kind is '${args.type_kind}'. Provide data type (e.g., CHAR, NUMC, INT4).`);
+    }
+  } else {
+    // domain, refToDictionaryType, refToClifType require type_name
+    if (args.type_kind === 'domain') {
+      // For domain, type_name (domain name) is required, but it will be used as data_type internally
+      if (!args.type_name && !args.data_type) {
+        throw new Error(`type_name (domain name) is required when type_kind is 'domain'. Provide domain name (e.g., ZOK_AUTH_ID).`);
+      }
+    } else {
+      // refToDictionaryType, refToClifType
+      if (!args.type_name) {
+        throw new Error(`type_name is required when type_kind is '${args.type_kind}'. Provide ${args.type_kind === 'refToDictionaryType' ? 'data element name' : 'class name'}.`);
+      }
+    }
+  }
+
   const typeKind = args.type_kind;
 
   // Use provided values directly - no automatic determination
   // When typeKind is 'domain', dataType should contain the domain name, and it goes to typeName in XML
   let typeName = '';
   if (typeKind === 'domain') {
-    // For domain type, typeName comes from dataType
-    typeName = args.data_type ? args.data_type.toUpperCase() : '';
+    // For domain type, typeName comes from dataType (or type_name if dataType not provided)
+    typeName = (args.data_type || args.type_name) ? (args.data_type || args.type_name)!.toUpperCase() : '';
   } else {
     // For other types, typeName comes from type_name parameter
     typeName = args.type_name ? args.type_name.toUpperCase() : '';

@@ -206,6 +206,29 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         throw new Error('typeKind is required in DataElementBuilderConfig. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
       }
       const typeKind = this.config.typeKind;
+
+      // Validate required parameters based on type_kind
+      // predefinedAbapType and refToPredefinedAbapType require data_type
+      // Other types (domain, refToDictionaryType, refToClifType) require type_name
+      if (typeKind === 'predefinedAbapType' || typeKind === 'refToPredefinedAbapType') {
+        if (!this.config.dataType) {
+          throw new Error(`dataType is required when typeKind is '${typeKind}'. Provide data type (e.g., CHAR, NUMC, INT4).`);
+        }
+      } else {
+        // domain, refToDictionaryType, refToClifType require type_name
+        if (typeKind === 'domain') {
+          // For domain, type_name (domain name) is required, but it will be used as data_type internally
+          if (!this.config.typeName && !this.config.dataType) {
+            throw new Error(`typeName (domain name) is required when typeKind is 'domain'. Provide domain name (e.g., ZOK_AUTH_ID).`);
+          }
+        } else {
+          // refToDictionaryType, refToClifType
+          if (!this.config.typeName) {
+            throw new Error(`typeName is required when typeKind is '${typeKind}'. Provide ${typeKind === 'refToDictionaryType' ? 'data element name' : 'class name'}.`);
+          }
+        }
+      }
+
       this.logger.info?.('Creating data element:', this.config.dataElementName);
       const params: CreateDataElementParams = {
         data_element_name: this.config.dataElementName,
@@ -274,6 +297,29 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
         throw new Error('typeKind is required in DataElementBuilderConfig. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
       }
       const typeKind = this.config.typeKind;
+
+      // Validate required parameters based on type_kind
+      // predefinedAbapType and refToPredefinedAbapType require data_type
+      // Other types (domain, refToDictionaryType, refToClifType) require type_name
+      if (typeKind === 'predefinedAbapType' || typeKind === 'refToPredefinedAbapType') {
+        if (!this.config.dataType) {
+          throw new Error(`dataType is required when typeKind is '${typeKind}'. Provide data type (e.g., CHAR, NUMC, INT4).`);
+        }
+      } else {
+        // domain, refToDictionaryType, refToClifType require type_name
+        if (typeKind === 'domain') {
+          // For domain, type_name (domain name) is required, but it will be used as data_type internally
+          if (!this.config.typeName && !this.config.dataType) {
+            throw new Error(`typeName (domain name) is required when typeKind is 'domain'. Provide domain name (e.g., ZOK_AUTH_ID).`);
+          }
+        } else {
+          // refToDictionaryType, refToClifType
+          if (!this.config.typeName) {
+            throw new Error(`typeName is required when typeKind is '${typeKind}'. Provide ${typeKind === 'refToDictionaryType' ? 'data element name' : 'class name'}.`);
+          }
+        }
+      }
+
       this.logger.info?.('Updating data element:', this.config.dataElementName);
 
       const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
