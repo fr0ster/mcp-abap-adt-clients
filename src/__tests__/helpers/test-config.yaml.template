@@ -3,7 +3,7 @@
 # Builder Tests Configuration
 #
 # Usage:
-#   cp tests/test-config.yaml.template tests/test-config.yaml
+#   cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml
 #   # Edit test-config.yaml with your specific values
 #
 # IMPORTANT: Object Naming Convention
@@ -73,6 +73,7 @@ environment:
   # Cleanup configuration (applies to all tests)
   cleanup_before: true   # Clean up objects before test (default: true)
   cleanup_after: true    # Clean up objects after test (default: true)
+  skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
 
 # ============================================================================
 # BUILDER TESTS
@@ -303,13 +304,13 @@ create_interface:
         source_code: |
           INTERFACE ZADT_BLD_IF01
             PUBLIC .
+            METHODS: test_method.
+          ENDINTERFACE.
       operation_delays:
         create: 5000  # Increased delay for interface creation
         lock: 3000
         update: 3000
         unlock: 3000
-            METHODS: test_method.
-          ENDINTERFACE.
 
 # Create Program
 create_program:
@@ -385,6 +386,7 @@ create_view:
         view_name: "ZADT_BLD_VIEW01"
         description: "ViewBuilder workflow view"
         transport_request: ""
+        # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
         table_source: |
           @EndUserText.label: 'Builder view test table'
           @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -412,44 +414,100 @@ create_view:
 
     - name: "cds_unit_test"
       enabled: true
-      description: "CDS view with ABAP Unit verification"
+      description: "CDS view with ABAP Unit verification (CDS view must be created manually before test)"
       params:
-        package_name: "ZADT_BLD_PKG01"
-        table_name: "ZADT_CDS_TBL01"
-        view_name: "ZADT_BLD_CDSVW01"
+        package_name: "ZADT_BLD_PKG03"
+        # view_name: CDS view name that must exist and be active (created manually)
+        view_name: "ZOK_I_CDS_TEST"
+        # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         description: "ViewBuilder CDS unit test view"
         transport_request: ""
-        table_source: |
-          @EndUserText.label: 'Builder CDS test table'
-          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          @AbapCatalog.deliveryClass : #A
-          @AbapCatalog.dataMaintenance : #RESTRICTED
-          define table zadt_cds_tbl01 {
-            key client : abap.clnt not null;
-            key id     : abap.char(10) not null;
-            name       : abap.char(50);
-            value      : abap.dec(10,2);
-            created_at : abap.dats;
-          }
-        ddl_source: |
-          @EndUserText.label: 'Builder CDS sample view'
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define view entity ZADT_BLD_CDSVW01
-            as select from zadt_cds_tbl01
-          {
-            key id,
-            name,
-            value,
-            created_at
-          }
+        # Note: table_name, table_source, and ddl_source are not used anymore
+        # CDS view and table must be created manually before running this test
         cds_unit_test:
-          class_name: "ZADT_BLD_CDS_UT01"
-          test_class_name: "LTC_ZADT_BLD_CDSVW01"
+          class_name: "ZADT_BLD_CDS_UT02"
+          test_class_name: "LTC_ZOK_I_CDS_TEST"
           description: "CDS unit test class"
           transport_request: ""
+          template_xml: |
+            <abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
+              <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+            &lt;cds:cdstobetested xmlns:cds="http://www.sap.com/adt/cdsfrwk/cds"&gt;
+              &lt;cds:cdsundertest api_doc="true" cds_name="ZOK_I_CDS_TEST" cds_test_type="UNIT_TEST"&gt;
+                &lt;cds:testmethods&gt;
+                  &lt;cds:testmethod test_method_name="AUNIT_FOR_CDS_METHOD"/&gt;
+                &lt;/cds:testmethods&gt;
+              &lt;/cds:cdsundertest&gt;
+            &lt;/cds:cdstobetested&gt;
+            </abapsource:property>
+              <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
+            </abapsource:template>
+          test_class_source: |
+            "!@testing ZADT_BLD_CDS_UT02
+            CLASS LTC_ZOK_I_CDS_TEST DEFINITION FINAL
+              FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+
+              PRIVATE SECTION.
+                CLASS-DATA environment TYPE REF TO if_cds_test_environment.
+
+                DATA td_zok_t_cds_test TYPE STANDARD TABLE OF zok_t_cds_test WITH EMPTY KEY.
+                DATA act_results TYPE STANDARD TABLE OF zok_i_cds_test WITH EMPTY KEY.
+
+                "! In CLASS_SETUP, corresponding doubles and clone(s) for the CDS view under test and its dependencies are created.
+                CLASS-METHODS class_setup RAISING cx_static_check.
+                "! In CLASS_TEARDOWN, Generated database entities (doubles & clones) should be deleted at the end of test class execution.
+                CLASS-METHODS class_teardown.
+
+                "! SETUP method creates a common start state for each test method,
+                "! clear_doubles clears the test data for all the doubles used in the test method before each test method execution.
+                METHODS setup RAISING cx_static_check.
+                METHODS prepare_testdata.
+                "! In this method test data is inserted into the generated double(s) and the test is executed and
+                "! the results should be asserted with the actuals.
+                METHODS aunit_for_cds_method FOR TESTING RAISING cx_static_check.
+            ENDCLASS.
+
+            CLASS LTC_ZOK_I_CDS_TEST IMPLEMENTATION.
+
+              METHOD class_setup.
+                environment = cl_cds_test_environment=>create( i_for_entity = 'ZOK_I_CDS_TEST' ).
+              ENDMETHOD.
+
+              METHOD setup.
+                environment->clear_doubles( ).
+              ENDMETHOD.
+
+              METHOD class_teardown.
+                environment->destroy( ).
+              ENDMETHOD.
+
+              METHOD aunit_for_cds_method.
+                prepare_testdata( ).
+                SELECT * FROM zok_i_cds_test INTO TABLE @act_results.
+                cl_abap_unit_assert=>fail( msg = 'Place your assertions here' ).
+              ENDMETHOD.
+
+              METHOD prepare_testdata.
+                " Prepare test data for 'zok_t_cds_test'
+                td_zok_t_cds_test = VALUE #(
+                  (
+                    client = '100'
+                    fld1 = '100'
+                    fld2 = '2222'
+                    fld3 = '20251205'
+                  )
+                  (
+                    client = '100'
+                    fld1 = '200'
+                    fld2 = '4444'
+                    fld3 = '20251206'
+                  ) ).
+                environment->insert_test_data( i_data = td_zok_t_cds_test ).
+              ENDMETHOD.
+
+            ENDCLASS.
           unit_test_options:
-            title: "LTC_ZADT_BLD_CDSVW01"
+            title: "LTC_ZOK_I_CDS_TEST"
             context: "ViewBuilder CDS Unit"
             scope:
               own_tests: true

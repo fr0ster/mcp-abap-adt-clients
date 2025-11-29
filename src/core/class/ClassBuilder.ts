@@ -400,6 +400,49 @@ export class ClassBuilder {
     }
   }
 
+  /**
+   * Update test class (local class) using global class lock handle
+   * This method uses the lock handle from lock() (global class lock)
+   * Use this for CDS unit tests and other cases where test class is updated
+   * as part of the main class workflow
+   */
+  async updateTestClass(testClassSource?: string): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Class must be locked before updating test class. Call lock() first.');
+      }
+      const code = testClassSource || this.config.testClassCode;
+      if (!code) {
+        throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
+      }
+      this.logger.info?.('Updating test class (local class):', this.config.className);
+      const result = await updateClassTestInclude(
+        this.connection,
+        this.config.className,
+        code,
+        this.lockHandle, // Use global class lock handle
+        this.config.transportRequest
+      );
+      this.state.testClassesResult = result;
+      this.logger.info?.('Test class updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'updateTestClass',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update test class failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update test classes using separate test classes lock handle
+   * This method uses a separate lock handle from lockTestClasses()
+   * Use this for standalone test class operations
+   * @deprecated Consider using updateTestClass() with global lock handle instead
+   */
   async updateTestClasses(testClassSource?: string): Promise<this> {
     try {
       if (!this.testLockHandle) {

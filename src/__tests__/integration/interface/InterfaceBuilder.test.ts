@@ -43,7 +43,7 @@ const {
   getTimeout,
   getOperationDelay,
   retryCheckAfterActivate
-} = require('../../../../tests/test-helper');
+} = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {

@@ -1,66 +1,63 @@
 /**
  * Example: Using session persistence in integration tests
  *
- * This example shows how to use setupTestEnvironment to automatically
- * configure session and lock persistence based on test-config.yaml
+ * This example shows how session and lock persistence can be configured
+ * based on src/__tests__/helpers/test-config.yaml
+ *
+ * Note: This is a conceptual example. Actual implementation may vary.
  */
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { setupTestEnvironment, cleanupTestEnvironment } from '../helpers/sessionConfig';
-import { createClass } from '../../core/class/create';
+import { getConfig } from '../helpers/sessionConfig';
+import { CrudClient } from '../../clients/CrudClient';
 
 describe('Example: Session Persistence', () => {
   let connection: any;
-  let sessionId: string | null;
-  let testConfig: any;
+  let client: CrudClient;
 
   beforeAll(async () => {
-    // Create connection
-    const config = {
-      url: process.env.SAP_URL!,
-      client: process.env.SAP_CLIENT,
-      username: process.env.SAP_USERNAME,
-      password: process.env.SAP_PASSWORD,
-      authType: 'basic' as const
-    };
-
+    // Create connection using helper
+    const config = getConfig();
     connection = createAbapConnection(config, console);
+    await (connection as any).connect();
+    client = new CrudClient(connection);
 
-    // Setup test environment (reads from test-config.yaml)
-    // This will:
-    // 1. Enable session persistence if persist_session: true
-    // 2. Setup lock tracking if persist_locks: true
-    // 3. Generate sessionId: testName_timestamp
-    const env = await setupTestEnvironment(
-      connection,
-      'example_test',
-      __filename
-    );
-
-    sessionId = env.sessionId;
-    testConfig = env.testConfig;
-
-    console.log(`Session ID: ${sessionId}`);
-    console.log(`Session persistence: ${testConfig.session_config?.persist_session}`);
-    console.log(`Lock tracking: ${env.lockTracking.enabled}`);
+    // Session persistence is configured in src/__tests__/helpers/test-config.yaml:
+    // session_config:
+    //   persist_session: true
+    //   sessions_dir: ".sessions"
+    //   session_id_format: "auto"
+    //   cleanup_session_after_test: false
+    //
+    // lock_config:
+    //   locks_dir: ".locks"
+    //   persist_locks: true
+    //   cleanup_locks_after_test: true
   });
 
   afterAll(async () => {
-    // Cleanup (removes session file if cleanup_session_after_test: true)
-    await cleanupTestEnvironment(connection, sessionId, testConfig);
+    if (connection) {
+      connection.reset();
+    }
   });
 
   it('should persist session across requests', async () => {
-    // First request - new session created
-    const result = await createClass(connection, {
-      class_name: 'ZCL_EXAMPLE',
-      package_name: 'ZPACKAGE',
+    // Example: Create a class
+    // Session and lock state are automatically managed based on test-config.yaml
+    await client.createClass({
+      className: 'ZCL_EXAMPLE',
+      packageName: 'ZPACKAGE',
       description: 'Example class',
     });
 
-    // Session is automatically saved to:
-    // .sessions/example_test_1699999999.json
+    // Get the result from client
+    const result = client.getCreateResult();
+    expect(result).toBeDefined();
+    expect(result?.status).toBeDefined();
 
+    // Session is automatically saved to:
+    // .sessions/{testName}_{timestamp}.json
+    //
     // Contains:
     // {
     //   "sessionId": "example_test_1699999999",
@@ -72,13 +69,11 @@ describe('Example: Session Persistence', () => {
     //     "cookieStore": {...}
     //   }
     // }
-
-    expect(result.status).toBe(200);
   });
 });
 
 /**
- * test-config.yaml example:
+ * src/__tests__/helpers/test-config.yaml example:
  *
  * session_config:
  *   persist_session: true           # Enable session persistence

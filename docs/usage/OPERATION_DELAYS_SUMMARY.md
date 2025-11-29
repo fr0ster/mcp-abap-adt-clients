@@ -19,9 +19,9 @@ Implemented configurable operation delays with 3-tier override system:
 ### Files Modified (11 total)
 
 **Core Infrastructure (4):**
-1. `tests/test-helper.js` - Added `getOperationDelay(operation, testCase)` function
-2. `tests/test-config.yaml` - Added `operation_delays` configuration
-3. `tests/test-config.yaml.template` - Added template with examples
+1. `src/__tests__/helpers/test-helper.js` - Added `getOperationDelay(operation, testCase)` function
+2. `src/__tests__/helpers/test-config.yaml` - Added `operation_delays` configuration
+3. `src/__tests__/helpers/test-config.yaml.template` - Added template with examples
 4. `jest.config.js` - Added `maxConcurrency: 1` for strict sequential execution
 
 **Builder Tests (7):**
@@ -67,7 +67,7 @@ await new Promise(resolve => setTimeout(resolve, 2000)); // Hardcoded
 
 **After**:
 ```typescript
-const { getOperationDelay } = require('../../../../tests/test-helper');
+const { getOperationDelay } = require('../../helpers/test-helper');
 
 await builder.lock();
 await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));

@@ -1,19 +1,11 @@
 /**
  * Unit test operations - exports
+ * 
+ * All functionality is available through builders.
+ * Low-level functions are internal and not exported.
  */
 
 export * from './types';
-export { UnitTestBuilder } from './UnitTestBuilder';
-export {
-  startClassUnitTestRun,
-  startClassUnitTestRunByObject,
-  getClassUnitTestStatus,
-  getClassUnitTestResult
-} from './run';
-export {
-  lockClassTestClasses,
-  updateClassTestInclude,
-  unlockClassTestClasses,
-  activateClassTestClasses
-} from './classTest';
+export { ClassUnitTestBuilder, ClassUnitTestBuilderConfig } from './ClassUnitTestBuilder';
+export { CdsUnitTestBuilder, CdsUnitTestBuilderConfig } from './CdsUnitTestBuilder';
 

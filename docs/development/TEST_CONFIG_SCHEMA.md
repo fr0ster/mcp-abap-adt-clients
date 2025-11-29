@@ -1,18 +1,18 @@
 # Test Configuration Schema
 
-**Last Updated:** 2025-01-XX  
-**Status:** Active Schema
+**Last Updated:** 2025-11-30  
+**Status:** Active Schema (Updated with skip_cleanup parameter)
 
 ---
 
 ## Overview
 
-All test parameters are defined in `tests/test-config.yaml`. This document describes the complete YAML schema for Builder tests.
+All test parameters are defined in `src/__tests__/helpers/test-config.yaml`. This document describes the complete YAML schema for Builder tests.
 
 ## File Location
 
-- **Main config:** `packages/adt-clients/tests/test-config.yaml`
-- **Template:** `packages/adt-clients/tests/test-config.yaml.template`
+- **Main config:** `src/__tests__/helpers/test-config.yaml`
+- **Template:** `src/__tests__/helpers/test-config.yaml.template`
 
 ## Top-Level Structure
 
@@ -47,16 +47,50 @@ Global settings that apply to all tests:
 
 ```yaml
 environment:
-  package_name: ZOK_TEST_PKG_01           # Default package for test objects
-  transport_request: E19K905635           # Optional: Default transport request
+  default_package: ZOK_TEST_PKG_01        # Default package for test objects
+  default_transport: E19K905635           # Optional: Default transport request
                                            # Required only for transportable packages
                                            # Local packages ($TMP) don't need transport
+  cleanup_before: true                    # Clean up objects before test (default: true)
+  cleanup_after: true                     # Clean up objects after test (default: true)
+  skip_cleanup: false                     # Skip cleanup after test (objects left for analysis)
+                                           # Can be overridden per test case
 ```
 
 **Usage:**
 - Tests can override these values in their specific `params` section
 - If not specified in test case, environment defaults are used
-- Tests skip gracefully if `package_name` is not configured
+- Tests skip gracefully if `default_package` is not configured
+
+### Cleanup Configuration
+
+The `skip_cleanup` parameter controls whether test objects are deleted after test execution:
+
+- **Global level** (`environment.skip_cleanup`): Applies to all tests by default
+- **Test case level** (`params.skip_cleanup`): Overrides global setting for specific test
+
+**Behavior:**
+- `skip_cleanup: false` (default): Objects are deleted after test (normal cleanup)
+- `skip_cleanup: true`: Objects are **not deleted** but are **always unlocked** (for analysis)
+
+**Important:** Unlock operations are **always performed** regardless of `skip_cleanup` setting. Only delete operations are skipped when `skip_cleanup: true`.
+
+**Example:**
+```yaml
+environment:
+  skip_cleanup: false  # Default: cleanup enabled
+
+create_view:
+  test_cases:
+    - name: "builder_view"
+      params:
+        skip_cleanup: true  # Override: leave objects for analysis
+```
+
+**Use cases:**
+- Debugging: Leave objects in SAP system for manual inspection
+- Analysis: Keep test objects to verify their state after test execution
+- Troubleshooting: Preserve objects when investigating test failures
 
 ## Builder Test Cases
 
@@ -76,6 +110,9 @@ All Builder test cases support:
 
 - `enabled: boolean` - Enable/disable the test case
 - `params: object` - Test-specific parameters
+  - `skip_cleanup: boolean` - Skip cleanup after test (overrides global `environment.skip_cleanup`)
+    - `false` (default): Delete objects after test
+    - `true`: Leave objects for analysis (unlock is still performed)
 
 ### Object-Specific Parameters
 

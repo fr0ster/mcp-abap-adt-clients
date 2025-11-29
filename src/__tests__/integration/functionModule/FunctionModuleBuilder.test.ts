@@ -43,8 +43,9 @@ const {
   getOperationDelay,
   retryCheckAfterActivate,
   createDependencyFunctionGroup,
-  extractValidationErrorMessage
-} = require('../../../../tests/test-helper');
+  extractValidationErrorMessage,
+  getEnvironmentConfig
+} = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -305,6 +306,13 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
         return;
       }
 
+      // Check test-case specific first (overrides global), then fallback to global
+      const envConfig = getEnvironmentConfig();
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+
       let functionModuleCreated = false;
       let functionModuleLocked = false;
       let currentStep = '';
@@ -405,13 +413,17 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
         
-        currentStep = 'delete (cleanup FM)';
-        logBuilderTestStep(currentStep);
-        await client.deleteFunctionModule({
-          functionModuleName: functionModuleName,
-          functionGroupName: functionGroupName,
-          transportRequest: resolveTransportRequest(testCase.params.transport_request)
-        });
+        if (!skipCleanup) {
+          currentStep = 'delete (cleanup FM)';
+          logBuilderTestStep(currentStep);
+          await client.deleteFunctionModule({
+            functionModuleName: functionModuleName,
+            functionGroupName: functionGroupName,
+            transportRequest: resolveTransportRequest(testCase.params.transport_request)
+          });
+        } else {
+          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
+        }
 
         expect(client.getCreateResult()).toBeDefined();
         expect(client.getActivateResult()).toBeDefined();
@@ -421,9 +433,10 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: unlock and delete if object was created/locked
+        // Cleanup: unlock (always) and delete (if skip_cleanup is false)
         if (functionModuleLocked || functionModuleCreated) {
           try {
+            // Unlock is always required (even if skip_cleanup is true)
             if (functionModuleLocked) {
               logBuilderTestStep('unlock (cleanup)');
               await client.unlockFunctionModule({
@@ -431,13 +444,16 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
                 functionGroupName: functionGroupName
               });
             }
-            if (functionModuleCreated) {
+            // Delete only if skip_cleanup is false
+            if (!skipCleanup && functionModuleCreated) {
               logBuilderTestStep('delete (cleanup)');
               await client.deleteFunctionModule({
                 functionModuleName: functionModuleName,
                 functionGroupName: functionGroupName,
                 transportRequest: resolveTransportRequest(testCase.params.transport_request)
               });
+            } else if (skipCleanup && functionModuleCreated) {
+              testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
             }
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important

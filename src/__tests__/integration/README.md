@@ -106,7 +106,7 @@ Example debug output with `DEBUG_ADT_TESTS=true`:
 
 ## Test Configuration
 
-All test parameters come from `tests/test-config.yaml`:
+All test parameters come from `src/__tests__/helpers/test-config.yaml`:
 
 ```yaml
 create_class:

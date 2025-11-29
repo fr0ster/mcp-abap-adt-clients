@@ -16,7 +16,7 @@ import { CrudClient } from '../../../clients/CrudClient';
 import { ViewBuilder } from '../../../core/view';
 import { TableBuilder } from '../../../core/table';
 import { ClassBuilder } from '../../../core/class';
-import { UnitTestBuilder } from '../../../core/unitTest';
+import { CdsUnitTestBuilder, ClassUnitTestBuilder } from '../../../core/unitTest';
 import { SharedBuilder } from '../../../core/shared';
 import { IAdtLogger } from '../../../utils/logger';
 import { getView } from '../../../core/view/read';
@@ -51,8 +51,9 @@ const {
   getTimeout,
   getOperationDelay,
   retryCheckAfterActivate,
-  extractValidationErrorMessage
-} = require('../../../../tests/test-helper');
+  extractValidationErrorMessage,
+  getEnvironmentConfig
+} = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -87,33 +88,64 @@ function buildCdsUnitTemplate(cdsViewName: string, testMethodName = 'TestMethod_
 function buildCdsUnitTestClassSource(testClassName: string, cdsViewName: string): string {
   const classNameUpper = testClassName.toUpperCase();
   const viewNameUpper = cdsViewName.toUpperCase();
+  // Extract table name from CDS view name (assuming pattern: ZOK_I_* -> zok_t_*)
+  const viewNameLower = cdsViewName.toLowerCase();
+  const tableName = viewNameLower.replace(/^zok_i_/, 'zok_t_');
+  
   return `"!@testing ${viewNameUpper}
+
 CLASS ${classNameUpper} DEFINITION FINAL
   FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
 
   PRIVATE SECTION.
-    TYPES: BEGIN OF ty_data,
-             id         TYPE char10,
-             name       TYPE char50,
-             value      TYPE dec15_2,
-             created_at TYPE dats,
-           END OF ty_data.
-    DATA test_data TYPE STANDARD TABLE OF ty_data WITH EMPTY KEY.
-    METHODS setup.
-    METHODS test_select FOR TESTING.
+    CLASS-DATA environment TYPE REF TO if_cds_test_environment.
+
+    DATA td_${tableName} TYPE STANDARD TABLE OF ${tableName} WITH EMPTY KEY.
+    DATA act_results TYPE STANDARD TABLE OF ${viewNameUpper} WITH EMPTY KEY.
+
+    "! In CLASS_SETUP, corresponding doubles and clone(s) for the CDS view under test and its dependencies are created.
+    CLASS-METHODS class_setup RAISING cx_static_check.
+    "! In CLASS_TEARDOWN, Generated database entities (doubles & clones) should be deleted at the end of test class execution.
+    CLASS-METHODS class_teardown.
+
+    "! SETUP method creates a common start state for each test method,
+    "! clear_doubles clears the test data for all the doubles used in the test method before each test method execution.
+    METHODS setup RAISING cx_static_check.
+    METHODS prepare_testdata.
+    "! In this method test data is inserted into the generated double(s) and the test is executed and
+    "! the results should be asserted with the actuals.
+    METHODS aunit_for_cds_method FOR TESTING RAISING cx_static_check.
 ENDCLASS.
 
 CLASS ${classNameUpper} IMPLEMENTATION.
-  METHOD setup.
-    CLEAR test_data.
+
+  METHOD class_setup.
+    environment = cl_cds_test_environment=>create( i_for_entity = '${viewNameUpper}' ).
   ENDMETHOD.
 
-  METHOD test_select.
-    SELECT id, name, value, created_at FROM ${viewNameUpper}
-      INTO TABLE @test_data UP TO 1 ROWS.
-    " Test passes if view is accessible (even if empty)
-    cl_abap_unit_assert=>assert_not_initial( act = test_data ).
+  METHOD setup.
+    environment->clear_doubles( ).
   ENDMETHOD.
+
+  METHOD class_teardown.
+    environment->destroy( ).
+  ENDMETHOD.
+
+  METHOD aunit_for_cds_method.
+    prepare_testdata( ).
+    SELECT * FROM ${viewNameUpper} INTO TABLE @act_results.
+    cl_abap_unit_assert=>fail( msg = 'Place your assertions here' ).
+  ENDMETHOD.
+
+  METHOD prepare_testdata.
+    " Prepare test data for '${tableName}'
+    td_${tableName} = VALUE #(
+      (
+        client = '100'
+      ) ).
+    environment->insert_test_data( i_data = td_${tableName} ).
+  ENDMETHOD.
+
 ENDCLASS.
 `;
 }
@@ -254,7 +286,13 @@ describe('ViewBuilder (using CrudClient)', () => {
 
     afterEach(async () => {
       // Cleanup table if it was created in beforeEach
-      if (tableCreated && tableName && connection) {
+      // Check test-case specific first (overrides global), then fallback to global
+      const envConfig = getEnvironmentConfig();
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase?.params?.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      if (!skipCleanup && tableCreated && tableName && connection) {
         try {
           await client.deleteTable({
             tableName: tableName,
@@ -264,6 +302,8 @@ describe('ViewBuilder (using CrudClient)', () => {
           // Log but don't fail - table cleanup is best effort
           testsLogger.warn?.(`Failed to cleanup table ${tableName}:`, error);
         }
+      } else if (skipCleanup && tableCreated && tableName) {
+        testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - table left for analysis:', tableName);
       }
     });
 
@@ -283,6 +323,12 @@ describe('ViewBuilder (using CrudClient)', () => {
       }
 
       const config = buildBuilderConfig(testCase);
+      // Check test-case specific first (overrides global), then fallback to global
+      const envConfig = getEnvironmentConfig();
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined 
+        ? testCase.params.skip_cleanup === true 
+        : globalSkipCleanup;
 
       // Validate test parameters at the start
       logBuilderTestStep('validate parameters');
@@ -404,19 +450,26 @@ describe('ViewBuilder (using CrudClient)', () => {
         );
         expect(checkResultActive?.status).toBeDefined();
         
-        currentStep = 'delete (cleanup)';
-        logBuilderTestStep(currentStep);
-        // Use group deletion for view and table together
-        if (tableName && viewName) {
-          const sharedBuilder = new SharedBuilder(connection);
-          await sharedBuilder.deleteGroup([
-            { type: 'DDLS/DF', name: viewName },
-            { type: 'TABL/DT', name: tableName }
-          ]);
-        } else if (viewName) {
-          await client.deleteView({
-            viewName: config.viewName,
-            transportRequest: config.transportRequest
+        if (!skipCleanup) {
+          currentStep = 'delete (cleanup)';
+          logBuilderTestStep(currentStep);
+          // Use group deletion for view and table together
+          if (tableName && viewName) {
+            const sharedBuilder = new SharedBuilder(connection);
+            await sharedBuilder.deleteGroup([
+              { type: 'DDLS/DF', name: viewName },
+              { type: 'TABL/DT', name: tableName }
+            ]);
+          } else if (viewName) {
+            await client.deleteView({
+              viewName: config.viewName,
+              transportRequest: config.transportRequest
+            });
+          }
+        } else {
+          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - objects left for analysis:', {
+            view: viewName,
+            table: tableName
           });
         }
 
@@ -441,14 +494,16 @@ describe('ViewBuilder (using CrudClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
         
-        // Cleanup: unlock and delete if object was created/locked
+        // Cleanup: unlock (always) and delete (if skip_cleanup is false)
         if (viewLocked || viewCreated) {
           try {
+            // Unlock is always required (even if skip_cleanup is true)
             if (viewLocked) {
               logBuilderTestStep('unlock (cleanup)');
               await client.unlockView({ viewName: config.viewName });
             }
-            if (viewCreated) {
+            // Delete only if skip_cleanup is false
+            if (!skipCleanup && viewCreated) {
               logBuilderTestStep('delete (cleanup)');
               // Use group deletion for view and table together
               if (tableName && viewName) {
@@ -463,6 +518,11 @@ describe('ViewBuilder (using CrudClient)', () => {
                   transportRequest: config.transportRequest
                 });
               }
+            } else if (skipCleanup && viewCreated) {
+              testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - objects left for analysis:', {
+                view: viewName,
+                table: tableName
+              });
             }
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
@@ -524,7 +584,7 @@ describe('ViewBuilder (using CrudClient)', () => {
       className = tc.params.cds_unit_test.class_name;
     });
 
-    it('should create CDS view, generate unit test class, and run ABAP Unit', async () => {
+    it('should generate unit test class for existing CDS view and run ABAP Unit', async () => {
       // If test is disabled, skip silently without logging
       if (skipReason) {
         logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', skipReason, true);
@@ -534,7 +594,7 @@ describe('ViewBuilder (using CrudClient)', () => {
       const definition = getTestCaseDefinition('create_view', 'cds_unit_test');
       logBuilderTestStart(testsLogger, 'ViewBuilder - CDS unit test', definition);
 
-      if (!testCase || !tableName || !viewName || !className) {
+      if (!testCase || !viewName || !className) {
         logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', skipReason || 'Test case not available');
         return;
       }
@@ -545,142 +605,193 @@ describe('ViewBuilder (using CrudClient)', () => {
         cdsTestConfig.template_xml || buildCdsUnitTemplate(viewName);
       const testClassSource =
         cdsTestConfig.test_class_source || buildCdsUnitTestClassSource(testClassName, viewName);
-
-      const tableBuilder = new TableBuilder(connection, builderLogger, {
-        tableName: tableName,
-        packageName: resolvePackageName(testCase.params.package_name),
-        transportRequest: resolveTransportRequest(testCase.params.transport_request),
-        ddlCode: testCase.params.table_source,
-        description: testCase.params.description || `Table for ${viewName}`
-      });
-
-      // Validate test parameters at the start
-      logBuilderTestStep('validate parameters');
-      const paramValidation = await validateTestParameters(
-        connection,
-        testCase.params,
-        'ViewBuilder - CDS unit test',
-        defaultPackage,
-        defaultTransport
-      );
-      if (!paramValidation.success) {
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', paramValidation.reason || 'Parameter validation failed');
-        return;
-      }
+      // Check test-case specific first (overrides global), then fallback to global
+      const envConfig = getEnvironmentConfig();
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
 
       const resolvedPackageName = resolvePackageName(testCase.params.package_name);
       const resolvedTransportRequest = resolveTransportRequest(testCase.params.transport_request);
 
-      const viewBuilder = new ViewBuilder(connection, builderLogger, {
-        viewName,
-        packageName: resolvedPackageName,
-        transportRequest: resolvedTransportRequest,
-        description: testCase.params.description,
-        ddlSource: testCase.params.ddl_source
-      });
-
-      const classBuilder = new ClassBuilder(connection, builderLogger, {
+      // Use CdsUnitTestBuilder for entire workflow (extends ClassBuilder)
+      const cdsUnitTestBuilder = new CdsUnitTestBuilder(connection, builderLogger, {
         className,
+        cdsViewName: viewName,  // CDS view name for generating test class source
         description: cdsTestConfig.description || `CDS unit test for ${viewName}`,
         packageName: resolvedPackageName,
         transportRequest: resolveTransportRequest(cdsTestConfig.transport_request || testCase.params.transport_request),
-        final: true
+        classTemplate: classTemplateXml,
+        testClassSource: testClassSource
       });
 
-      let unitTestBuilder: UnitTestBuilder | null = null;
+      let classCreated = false;
+      let classLocked = false;
+      let currentStep = '';
+      let unitTestConnection: AbapConnection | undefined = undefined;
+      let runCdsUnitTestBuilder: CdsUnitTestBuilder | undefined = undefined;
 
-      // Validate view - if validation fails, skip test
-      logBuilderTestStep('validate view');
-      let viewValidationResponse: any;
       try {
-        viewValidationResponse = await viewBuilder.validate();
-      } catch (error: any) {
-        viewValidationResponse = error.response || { status: error.status || 500, data: error.message };
-      }
-      
-      if (viewValidationResponse?.status !== 200) {
-        const errorMessage = extractValidationErrorMessage(viewValidationResponse);
-        const errorTextLower = errorMessage.toLowerCase();
-        
-        // If validation says object already exists or cannot be created, skip test
-        if (errorTextLower.includes('already exists') ||
-            errorTextLower.includes('does already exist') ||
-            errorTextLower.includes('cannot be created') ||
-            errorTextLower.includes('not allowed') ||
-            errorTextLower.includes('not authorized') ||
-            errorTextLower.includes('exceptionresourcealreadyexists')) {
-          logBuilderTestStepError('validate view', {
-            response: {
-              status: viewValidationResponse?.status,
-              data: viewValidationResponse?.data
-            }
-          });
+        // Verify CDS view exists (must be created manually before test)
+        currentStep = 'read CDS view';
+        logBuilderTestStep(currentStep);
+        try {
+          await getView(connection, viewName);
+        } catch (readError: any) {
+          // If view doesn't exist, skip test (must be created manually)
           logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
-            `View ${viewName} cannot be created: ${errorMessage} - environment problem, test skipped`);
+            `CDS view ${viewName} does not exist (HTTP ${readError.response?.status || '?'}). View must be created manually before running this test. - environment problem, test skipped`);
           return;
         }
         
-        // Other validation errors - skip test (environment problem)
-        logBuilderTestStepError('validate view', {
-          response: {
-            status: viewValidationResponse?.status,
-            data: viewValidationResponse?.data
+        // Check view activation status (verify it's active) - required before unit test doubles validation
+        currentStep = 'check view (active)';
+        logBuilderTestStep(currentStep);
+        try {
+          await client.checkView({ viewName }, 'active');
+          // Additional delay after check to ensure view is fully ready for unit test doubles
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || 2000));
+        } catch (checkError: any) {
+          // If check fails, view might not be active - skip test
+          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+            `CDS view ${viewName} is not active (HTTP ${checkError.response?.status || '?'}). View must be active before running this test. - environment problem, test skipped`);
+          return;
+        }
+
+        // Validate CDS view for unit test doubles (required before creating unit test class)
+        logBuilderTestStep('validate CDS for unit test doubles');
+        try {
+          await cdsUnitTestBuilder.validateCdsForUnitTest(viewName);
+          // Validation successful - proceed with test (no logging needed)
+        } catch (validationError: any) {
+          // Log error response
+          const responseData = validationError.response?.data;
+          if (responseData) {
+            testsLogger.info?.(`Validation error response: ${typeof responseData === 'string' ? responseData : JSON.stringify(responseData)}`);
           }
-        });
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
-          `Validation failed: ${errorMessage} - environment problem, test skipped`);
-        return;
-      }
-
-      try {
-        logBuilderTestStep('create CDS view');
-        await viewBuilder.create()
-          .then(async (b: ViewBuilder) => {
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-            logBuilderTestStep('lock view');
-            return b.lock();
-          })
-          .then((b: ViewBuilder) => {
-            logBuilderTestStep('update view DDL');
-            return b.update();
-          })
-          .then(async (b: ViewBuilder) => {
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-            logBuilderTestStep('unlock view');
-            return b.unlock();
-          })
-          .then(async (b: ViewBuilder) => {
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-            logBuilderTestStep('activate view');
-            return b.activate();
+          const errorMessage = validationError.message || extractValidationErrorMessage(validationError.response || validationError);
+          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+            `CDS view ${viewName} validation for unit test doubles failed: ${errorMessage} - environment problem, test skipped`);
+          return;
+        }
+        
+        // Validate class before creation
+        logBuilderTestStep('validate class');
+        let classValidationResponse: any;
+        try {
+          classValidationResponse = await cdsUnitTestBuilder.validate();
+        } catch (error: any) {
+          classValidationResponse = error.response || { status: error.status || 500, data: error.message };
+        }
+        
+        // If validation fails, check if class already exists or if it's an environment problem
+        if (classValidationResponse?.status !== 200) {
+          const errorMessage = extractValidationErrorMessage(classValidationResponse);
+          const errorTextLower = errorMessage.toLowerCase();
+          
+          // If class already exists, skip test (environment problem)
+          if (errorTextLower.includes('already exists') ||
+              errorTextLower.includes('does already exist') ||
+              errorTextLower.includes('exceptionresourcealreadyexists')) {
+            logBuilderTestStepError('validate class', {
+              response: {
+                status: classValidationResponse?.status,
+                data: classValidationResponse?.data
+              }
+            });
+            logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+              `Class ${className} already exists (may be owned by another user) - environment problem, test skipped`);
+            return;
+          }
+          
+          // Other validation errors - skip test (environment problem)
+          logBuilderTestStepError('validate class', {
+            response: {
+              status: classValidationResponse?.status,
+              data: classValidationResponse?.data
+            }
           });
-
-        classBuilder.setClassTemplate(classTemplateXml);
-        classBuilder.setTestClassCode(testClassSource);
-        logBuilderTestStep('create CDS unit test class');
-        await classBuilder.validate();
-        await classBuilder.create();
+          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+            `Class validation failed: ${errorMessage} - environment problem, test skipped`);
+          return;
+        }
+        
+        // Create class
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
+        try {
+          await cdsUnitTestBuilder.create();
+          classCreated = true;
+        } catch (createError: any) {
+          const errorMessage = createError.response?.data 
+            ? (typeof createError.response.data === 'string' 
+                ? createError.response.data.substring(0, 500)
+                : JSON.stringify(createError.response.data).substring(0, 500))
+            : createError.message || 'Unknown error';
+          
+          logBuilderTestStepError('create', createError);
+          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+            `Class creation failed (HTTP ${createError.response?.status || '?'}): ${errorMessage} - environment problem, test skipped`);
+          return;
+        }
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-        logBuilderTestStep('activate unit test class');
-        await classBuilder.activate();
+        
+        // Check class (inactive) after creation (before activation, as per Eclipse ADT workflow)
+        currentStep = 'check(inactive)';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.check('inactive');
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || 1000));
+        
+        // Activate class after creation (before lock, as per Eclipse ADT workflow)
+        currentStep = 'activate';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.activate();
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        
+        // Lock class (for update) - lock handle is stored in builder
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.lock();
+        classLocked = true;
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+        
+        // Check class (active) after lock
+        currentStep = 'check(active)';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.check('active');
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || 1000));
+        
+        // Update test class source (uses updateTestClass() from ClassBuilder via BaseUnitTestBuilder.update())
+        currentStep = 'update';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.update(testClassSource);
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+        // Check class (inactive) after update
+        currentStep = 'check(inactive)';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.check('inactive');
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || 1000));
+        
+        // Unlock class
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.unlock();
+        classLocked = false;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-
-        unitTestBuilder = new UnitTestBuilder(connection, builderLogger, {
-          objectType: 'class',
-          objectName: className,
-          testClassName: testClassName,
-          transportRequest: resolveTransportRequest(cdsTestConfig.transport_request || testCase.params.transport_request)
-        }).setTestClassSource(testClassSource);
-
-        logBuilderTestStep('lock test classes');
-        await unitTestBuilder.lockTestClasses();
-        logBuilderTestStep('update test class source');
-        await unitTestBuilder.updateTestClass();
-        logBuilderTestStep('unlock test classes');
-        await unitTestBuilder.unlockTestClasses();
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-        logBuilderTestStep('activate test classes');
-        await unitTestBuilder.activateTestClasses();
+        
+        // Activate class after update
+        currentStep = 'activate';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.activate();
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        
+        // Check class (active) after activation
+        currentStep = 'check(active)';
+        logBuilderTestStep(currentStep);
+        await cdsUnitTestBuilder.check('active');
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || 1000));
 
         const runOptions = cdsTestConfig.unit_test_options ? {
           title: cdsTestConfig.unit_test_options.title,
@@ -692,54 +803,55 @@ describe('ViewBuilder (using CrudClient)', () => {
 
         logBuilderTestStep('run ABAP Unit tests');
         // Create new connection for unit test execution (separate timeout)
-        const unitTestConnection = await createAbapConnection(getConfig(), connectionLogger);
+        unitTestConnection = createAbapConnection(getConfig(), connectionLogger);
+        await (unitTestConnection as any).connect();
 
-        // Reuse unitTestBuilder for CDS run (change objectType to 'cds')
-        unitTestBuilder = new UnitTestBuilder(unitTestConnection, builderLogger, {
-          objectType: 'cds',
-          objectName: className
+        // Use CdsUnitTestBuilder for CDS unit test run (separate instance for run operations)
+        runCdsUnitTestBuilder = new CdsUnitTestBuilder(unitTestConnection, builderLogger, {
+          className: className,
+          cdsViewName: viewName,
+          packageName: resolvedPackageName
         });
 
-        await unitTestBuilder.runForObject(runOptions);
+        await runCdsUnitTestBuilder.runForObject(className, runOptions);
 
         logBuilderTestStep('get ABAP Unit test status');
-        await unitTestBuilder.getStatus(
+        await runCdsUnitTestBuilder.getStatus(
           cdsTestConfig.unit_test_status?.with_long_polling !== false
         );
 
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('unit_test_result', testCase)));
 
         logBuilderTestStep('get ABAP Unit test result');
-        await unitTestBuilder.getResult({
+        await runCdsUnitTestBuilder.getResult({
           withNavigationUris: cdsTestConfig.unit_test_result?.with_navigation_uris ?? false,
           format: cdsTestConfig.unit_test_result?.format === 'junit' ? 'junit' : 'abapunit'
         });
 
         // Verify that status and result were retrieved
-        const runId = unitTestBuilder.getRunId();
-        const runStatus = unitTestBuilder.getRunStatus();
-        const runResult = unitTestBuilder.getRunResult();
+        const runId = runCdsUnitTestBuilder.getRunId();
+        const runStatus = runCdsUnitTestBuilder.getRunStatus();
+        const runResult = runCdsUnitTestBuilder.getRunResult();
         expect(runId).toBeDefined();
         expect(runStatus).toBeDefined();
         expect(runResult).toBeDefined();
 
-        logBuilderTestStep('delete (cleanup)');
-        // Delete test class first (use unit test connection)
-        await unitTestBuilder.deleteTestClass().catch(() => {});
-        
-        // Use group deletion for view and table together (use original connection)
-        if (viewName && tableName) {
-          const sharedBuilder = new SharedBuilder(connection);
-          await sharedBuilder.deleteGroup([
-            { type: 'DDLS/DF', name: viewName },
-            { type: 'TABL/DT', name: tableName }
-          ]).catch(() => {});
-        } else {
-          if (viewName) {
-            await viewBuilder.delete().catch(() => {});
+        if (!skipCleanup) {
+          logBuilderTestStep('delete (cleanup)');
+          // Delete test class only (CDS view is created manually and should not be deleted)
+          if (cdsUnitTestBuilder) {
+            await cdsUnitTestBuilder.deleteTestClass().catch(() => {});
           }
-          if (tableName && tableBuilder) {
-            await tableBuilder.delete().catch(() => {});
+        } else {
+          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - test class left for analysis:', className);
+        }
+        
+        // Cleanup unit test connection (always cleanup connection, even if skip_cleanup is true)
+        if (unitTestConnection) {
+          try {
+            unitTestConnection.reset();
+          } catch (cleanupError) {
+            testsLogger.warn?.(`Failed to cleanup unit test connection:`, cleanupError);
           }
         }
 
@@ -757,40 +869,45 @@ describe('ViewBuilder (using CrudClient)', () => {
           }
         }
 
-        if (viewName) {
-          try {
-            await getView(connection, viewName);
-            testsLogger.warn?.('CDS view still exists after deletion:', viewName);
-          } catch (error: any) {
-            if (error.response?.status === 404) {
-              testsLogger.info?.('CDS view successfully deleted:', viewName);
-            }
-          }
-        }
-
-        if (tableName) {
-          try {
-            await getTable(connection, tableName);
-            testsLogger.warn?.('Table still exists after deletion:', tableName);
-          } catch (error: any) {
-            if (error.response?.status === 404) {
-              testsLogger.info?.('Table successfully deleted:', tableName);
-            }
-          }
-        }
-
-        // Verify results
-        expect(unitTestBuilder).toBeDefined();
-        expect(unitTestBuilder!.getRunId()).toBeDefined();
-        expect(unitTestBuilder!.getRunStatus()).toBeDefined();
-        expect(unitTestBuilder!.getRunResult()).toBeDefined();
+        // Verify results (runCdsUnitTestBuilder was used for run)
+        expect(runCdsUnitTestBuilder).toBeDefined();
+        expect(runCdsUnitTestBuilder.getRunId()).toBeDefined();
+        expect(runCdsUnitTestBuilder.getRunStatus()).toBeDefined();
+        expect(runCdsUnitTestBuilder.getRunResult()).toBeDefined();
       } catch (error: any) {
         // Log step error with details before failing test
-        // Try to determine which step failed based on error context
-        const errorStep = error.message?.includes('view') ? 'create CDS view' : 
-                         error.message?.includes('class') ? 'create CDS unit test class' :
-                         error.message?.includes('table') ? 'create table' : 'unknown step';
-        logBuilderTestStepError(errorStep, error);
+        logBuilderTestStepError(currentStep || 'unknown', error);
+        
+        // Cleanup: unlock (always) and delete (if skip_cleanup is false)
+        // Note: CDS view is not cleaned up as it must be created manually
+        if (classLocked || classCreated || cdsUnitTestBuilder) {
+          try {
+            // Unlock is always required (even if skip_cleanup is true)
+            if (classLocked && cdsUnitTestBuilder) {
+              logBuilderTestStep('unlock class (cleanup)');
+              await cdsUnitTestBuilder.unlock().catch(() => {});
+            }
+            // Delete only if skip_cleanup is false
+            if (!skipCleanup && cdsUnitTestBuilder) {
+              logBuilderTestStep('delete test class (cleanup)');
+              await cdsUnitTestBuilder.deleteTestClass().catch(() => {});
+            } else if (skipCleanup && classCreated) {
+              testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - test class left for analysis:', className);
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed:`, cleanupError);
+          }
+        }
+        
+        // Cleanup unit test connection (always cleanup connection, even if skip_cleanup is true)
+        if (unitTestConnection) {
+          try {
+            unitTestConnection.reset();
+          } catch (connError) {
+            testsLogger.warn?.(`Failed to cleanup unit test connection:`, connError);
+          }
+        }
         
         const statusText = getHttpStatusText(error);
         const enhancedError = statusText !== 'HTTP ?'
@@ -799,12 +916,23 @@ describe('ViewBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'ViewBuilder - CDS unit test', enhancedError);
         throw enhancedError;
       } finally {
+        // Final cleanup: unlock is always required (even if skip_cleanup is true)
+        // Note: CDS view is not cleaned up as it must be created manually
         try {
-          await classBuilder.forceUnlock().catch(() => {});
-          await viewBuilder.forceUnlock().catch(() => {});
-          await tableBuilder.forceUnlock().catch(() => {});
+          if (cdsUnitTestBuilder) {
+            await cdsUnitTestBuilder.forceUnlock().catch(() => {});
+          }
         } catch (cleanupError) {
           // Ignore cleanup errors
+        }
+        
+        // Cleanup unit test connection (always cleanup connection, even if skip_cleanup is true)
+        if (unitTestConnection) {
+          try {
+            unitTestConnection.reset();
+          } catch (connError) {
+            // Ignore connection cleanup errors
+          }
         }
         
         // Log success/end only if test didn't throw

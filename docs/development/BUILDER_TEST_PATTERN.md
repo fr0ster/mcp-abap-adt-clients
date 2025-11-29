@@ -1,6 +1,6 @@
 # Builder Test Pattern
 
-**Last Updated:** 2025-11-23  
+**Last Updated:** 2025-11-30  
 **Status:** Active Pattern
 
 ---
@@ -310,6 +310,57 @@ it('should read transport request for class', async () => {
 - Reads the created view
 - No separate "read standard object" test (merged into workflow)
 
+## Test Cleanup Configuration
+
+### Skip Cleanup Parameter
+
+Tests support a `skip_cleanup` parameter to control object deletion after test execution:
+
+**Configuration:**
+- **Global:** `environment.skip_cleanup` in `test-config.yaml` (applies to all tests)
+- **Per-test:** `params.skip_cleanup` in test case (overrides global setting)
+
+**Behavior:**
+- `skip_cleanup: false` (default): Normal cleanup - objects are deleted after test
+- `skip_cleanup: true`: Skip deletion - objects are left for analysis
+
+**Important:** Unlock operations are **always performed** regardless of `skip_cleanup` setting. Only delete operations are skipped.
+
+**Implementation Pattern:**
+```typescript
+// Check test-case specific first (overrides global), then fallback to global
+const envConfig = getEnvironmentConfig();
+const globalSkipCleanup = envConfig.skip_cleanup === true;
+const skipCleanup = testCase.params.skip_cleanup !== undefined
+  ? testCase.params.skip_cleanup === true
+  : globalSkipCleanup;
+
+// In catch block: unlock always, delete only if !skipCleanup
+if (objectLocked || objectCreated) {
+  try {
+    // Unlock is always required (even if skip_cleanup is true)
+    if (objectLocked) {
+      logBuilderTestStep('unlock (cleanup)');
+      await client.unlockXxx({ ... });
+    }
+    // Delete only if skip_cleanup is false
+    if (!skipCleanup && objectCreated) {
+      logBuilderTestStep('delete (cleanup)');
+      await client.deleteXxx({ ... });
+    } else if (skipCleanup && objectCreated) {
+      testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - objects left for analysis:', objectName);
+    }
+  } catch (cleanupError) {
+    testsLogger.warn?.(`Cleanup failed for ${objectName}:`, cleanupError);
+  }
+}
+```
+
+**Use Cases:**
+- Debugging: Leave objects in SAP system for manual inspection
+- Analysis: Keep test objects to verify their state after test execution
+- Troubleshooting: Preserve objects when investigating test failures
+
 ## Test Setup and Cleanup
 
 ### Connection Setup (`beforeAll`)
@@ -352,7 +403,7 @@ afterAll(async () => {
 
 ## YAML Configuration
 
-All test parameters come from `tests/test-config.yaml`:
+All test parameters come from `src/__tests__/helpers/test-config.yaml`:
 
 ```yaml
 create_class:

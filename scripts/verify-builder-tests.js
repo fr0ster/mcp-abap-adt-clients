@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 
 const TEST_DIR = path.resolve(__dirname, '../src/__tests__/integration');
-const YAML_CONFIG = path.resolve(__dirname, '../tests/test-config.yaml');
+const YAML_CONFIG = path.resolve(__dirname, '../src/__tests__/helpers/test-config.yaml');
 
 // Special cases: Builders with only 1 test
 const SINGLE_TEST_BUILDERS = ['TransportBuilder', 'ViewBuilder'];

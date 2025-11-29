@@ -11,11 +11,9 @@
  */
 
 import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
-import { ClassBuilder } from '../../../core/class';
 import {
-  UnitTestBuilder,
+  ClassUnitTestBuilder,
   ClassUnitTestDefinition,
   ClassUnitTestRunOptions
 } from '../../../core/unitTest';
@@ -47,8 +45,9 @@ const {
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate
-} = require('../../../../tests/test-helper');
+  retryCheckAfterActivate,
+  getEnvironmentConfig
+} = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -308,6 +307,12 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         logBuilderTestSkip(testsLogger, 'ClassBuilder - full workflow', 'package_name not configured');
         return;
       }
+      // Check test-case specific first (overrides global), then fallback to global
+      const envConfig = getEnvironmentConfig();
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
       const sourceCode = testCase.params.source_code || `CLASS ${testClassName} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
       const testClassConfig = testCase.params.test_class;
       const shouldUpdateTestClass = Boolean(
@@ -323,7 +328,7 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         ? buildUnitTestDefinitions(testClassConfig, testClassName)
         : [];
 
-      let unitTestBuilder: UnitTestBuilder | null = null;
+      let unitTestBuilder: ClassUnitTestBuilder | null = null;
 
       try {
         logBuilderTestStep('validate');
@@ -439,9 +444,8 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         // Unit test operations (if enabled)
         if (shouldRunUnitTests && testDefinitions.length > 0) {
             if (!unitTestBuilder) {
-              unitTestBuilder = new UnitTestBuilder(connection, builderLogger, {
-                objectType: 'class',
-                objectName: testClassName!
+              unitTestBuilder = new ClassUnitTestBuilder(connection, builderLogger, {
+                className: testClassName!
               });
             }
 
@@ -497,12 +501,16 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             });
         }
 
-          currentStep = 'delete (cleanup)';
-          logBuilderTestStep(currentStep);
-          await client.deleteClass({
-            className: testClassName!,
-            transportRequest: resolveTransportRequest(testCase.params.transport_request)
-          });
+          if (!skipCleanup) {
+            currentStep = 'delete (cleanup)';
+            logBuilderTestStep(currentStep);
+            await client.deleteClass({
+              className: testClassName!,
+              transportRequest: resolveTransportRequest(testCase.params.transport_request)
+            });
+          } else {
+            testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - class left for analysis:', testClassName);
+          }
 
           expect(client.getCreateResult()).toBeDefined();
           expect(client.getActivateResult()).toBeDefined();
@@ -522,9 +530,10 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
           
-          // Cleanup: unlock and delete if object was created/locked
+          // Cleanup: unlock (always) and delete (if skip_cleanup is false)
           if (testClassesLocked || classLocked || classCreated) {
             try {
+              // Unlock is always required (even if skip_cleanup is true)
               if (testClassesLocked) {
                 logBuilderTestStep('unlock test classes (cleanup)');
                 await client.unlockTestClasses({ className: testClassName! });
@@ -533,12 +542,15 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
                 logBuilderTestStep('unlock (cleanup)');
                 await client.unlockClass({ className: testClassName! });
               }
-              if (classCreated) {
+              // Delete only if skip_cleanup is false
+              if (!skipCleanup && classCreated) {
                 logBuilderTestStep('delete (cleanup)');
                 await client.deleteClass({
                   className: testClassName!,
                   transportRequest: resolveTransportRequest(testCase.params.transport_request)
                 });
+              } else if (skipCleanup && classCreated) {
+                testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - class left for analysis:', testClassName);
               }
             } catch (cleanupError) {
               // Log cleanup error but don't fail test - original error is more important

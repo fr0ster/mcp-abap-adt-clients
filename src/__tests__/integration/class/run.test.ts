@@ -12,8 +12,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase } = require('../../../../tests/test-helper');
-const { getTimeout } = require('../../../../tests/test-helper');
+const { getEnabledTestCase } = require('../../helpers/test-helper');
+const { getTimeout } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {

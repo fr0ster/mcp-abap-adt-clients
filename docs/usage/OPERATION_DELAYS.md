@@ -8,7 +8,7 @@ Builder integration tests use configurable delays between SAP operations to ensu
 
 ### Global Configuration (test-config.yaml)
 
-Set default delays for all tests in `tests/test-config.yaml`:
+Set default delays for all tests in `src/__tests__/helpers/test-config.yaml`:
 
 ```yaml
 test_settings:
@@ -50,7 +50,7 @@ Import the helper function:
 ```typescript
 const {
   getOperationDelay
-} = require('../../../../tests/test-helper');
+} = require('../../helpers/test-helper');
 ```
 
 Use it in your test delays:
@@ -152,9 +152,9 @@ create_class:
 ### Updated Files
 
 **Core Infrastructure:**
-- ✅ `tests/test-helper.js` - Added `getOperationDelay()` function
-- ✅ `tests/test-config.yaml` - Added `operation_delays` section with 3s defaults
-- ✅ `tests/test-config.yaml.template` - Added configuration template with examples
+- ✅ `src/__tests__/helpers/test-helper.js` - Added `getOperationDelay()` function
+- ✅ `src/__tests__/helpers/test-config.yaml` - Added `operation_delays` section with 3s defaults
+- ✅ `src/__tests__/helpers/test-config.yaml.template` - Added configuration template with examples
 - ✅ `jest.config.js` - Configured for sequential test execution (`maxWorkers: 1`, `maxConcurrency: 1`)
 
 **Builder Tests (All Updated):**
@@ -255,9 +255,9 @@ await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testC
 ### Modified Files (19 total)
 
 **Configuration Files (3):**
-1. `tests/test-helper.js` - Added `getOperationDelay(operation, testCase)` function
-2. `tests/test-config.yaml` - Added `operation_delays` section  
-3. `tests/test-config.yaml.template` - Added template with examples
+1. `src/__tests__/helpers/test-helper.js` - Added `getOperationDelay(operation, testCase)` function
+2. `src/__tests__/helpers/test-config.yaml` - Added `operation_delays` section  
+3. `src/__tests__/helpers/test-config.yaml.template` - Added template with examples
 4. `jest.config.js` - Added `maxConcurrency: 1` for strict sequential execution
 
 **Test Files (7 Builder tests):**

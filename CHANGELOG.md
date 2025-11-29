@@ -5,6 +5,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.32] - 2025-11-30
+
+### Added
+- **Test cleanup control parameter** – added `skip_cleanup` parameter for controlling object deletion after tests:
+  - Global parameter: `environment.skip_cleanup` in `test-config.yaml` (applies to all tests by default)
+  - Per-test parameter: `params.skip_cleanup` in test case configuration (overrides global setting)
+  - When `skip_cleanup: true`, objects are not deleted but are always unlocked (for analysis/debugging)
+  - When `skip_cleanup: false` (default), normal cleanup is performed (unlock + delete)
+  - Implemented in `ViewBuilder.test.ts`, `ClassBuilder.test.ts`, and `FunctionModuleBuilder.test.ts`
+  - Unlock operations are always performed regardless of `skip_cleanup` setting (only delete is skipped)
+  - Useful for debugging, analysis, and troubleshooting test failures
+
+### Changed
+- **Test cleanup logic** – improved cleanup behavior in integration tests:
+  - Unlock operations are now always performed in cleanup blocks (even when `skip_cleanup: true`)
+  - Delete operations are conditionally performed based on `skip_cleanup` parameter
+  - Ensures objects are never left locked in SAP system, even when deletion is skipped
+  - Clear logging when cleanup is skipped: `⚠️ Cleanup skipped (skip_cleanup=true) - objects left for analysis`
+
+### Documentation
+- **Test configuration documentation** – added comprehensive documentation for `skip_cleanup` parameter:
+  - Updated `TEST_CONFIG_SCHEMA.md` with cleanup configuration section
+  - Updated `BUILDER_TEST_PATTERN.md` with skip cleanup implementation pattern
+  - Documented global and per-test configuration options
+  - Added use cases and examples for debugging and analysis scenarios
+
+### Fixed
+- **CdsUnitTestBuilder double lock issue** – fixed HTTP 403 error during class activation:
+  - Added `unlock()` call after `update()` in `CdsUnitTestBuilder.create()` method
+  - Prevents "User is currently editing" error when activating class after creation
+  - Ensures class is unlocked after test class source is added, allowing activation to proceed
+  - Fixes sequence: create → lock → update → unlock (was missing unlock before)
+- **Package existence check** – fixed `checkPackageExists` function:
+  - Corrected module path from `../src/core/shared/search` to `../../core/shared/search`
+  - Added fallback to try `dist/` first, then source directory
+  - Changed query from wildcard `${packageName}*` to exact match `packageName` for better accuracy
+  - Added diagnostic logging when `DEBUG_ADT_TESTS=true` to help troubleshoot package validation issues
+- **Example file imports** – fixed `sessionPersistence.example.ts`:
+  - Removed non-existent imports: `setupTestEnvironment`, `cleanupTestEnvironment`, `createClass`
+  - Updated to use `getConfig()` and `CrudClient` instead
+  - Example now compiles without errors
+
 ## [0.1.31] - 2025-11-29
 
 ### Fixed

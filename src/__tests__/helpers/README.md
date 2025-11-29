@@ -2,11 +2,11 @@
 
 ## Overview
 
-Tests can automatically persist HTTP sessions and lock handles based on configuration in `test-config.yaml`.
+Tests can automatically persist HTTP sessions and lock handles based on configuration in `src/__tests__/helpers/test-config.yaml`.
 
 ## Configuration
 
-Edit `tests/test-config.yaml`:
+Edit `src/__tests__/helpers/test-config.yaml`:
 
 ```yaml
 # Session persistence configuration

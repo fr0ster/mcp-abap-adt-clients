@@ -17,13 +17,13 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { createAbapConnection, SapConfig, FileSessionStorage } from '@mcp-abap-adt/connection';
 import { LockStateManager } from '../../utils/lockStateManager';
-import { setupTestEnvironment, cleanupTestEnvironment, getConfig } from '../helpers/sessionConfig';
+import { getConfig } from '../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as yaml from 'yaml';
 
 // Load test configuration
-const configPath = path.join(__dirname, '../../../tests/test-config.yaml');
+const configPath = path.join(__dirname, '../helpers/test-config.yaml');
 let lockRecoveryConfig: any = null;
 
 if (fs.existsSync(configPath)) {
@@ -59,9 +59,8 @@ describe('Lock Recovery Integration Test', () => {
     try {
     const config = getConfig();
     connection = createAbapConnection(config, logger);
-    const env = await setupTestEnvironment(connection, 'lock_recovery', __filename);
-    globalSessionId = env.sessionId;
-    testConfig = env.testConfig;
+    await (connection as any).connect();
+    globalSessionId = sessionId;
     } catch (error: any) {
       if (error.message?.includes('Missing or invalid SAP_URL')) {
         // Skip test if no SAP configuration
@@ -72,7 +71,6 @@ describe('Lock Recovery Integration Test', () => {
   });
 
   afterEach(async () => {
-    await cleanupTestEnvironment(connection, globalSessionId, testConfig);
     if (connection) {
       connection.reset();
     }

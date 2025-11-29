@@ -27,15 +27,6 @@ export interface ClassUnitTestRunOptions {
   };
 }
 
-export interface UnitTestBuilderConfig {
-  objectType: 'class' | 'cds';
-  objectName: string;
-  packageName?: string;
-  transportRequest?: string;
-  testClassName?: string;
-  testClassSource?: string;
-}
-
 export interface UnitTestBuilderState {
   runId?: string;
   runStatus?: any;
