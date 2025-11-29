@@ -5,7 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [0.1.27] - 2025-01-XX
+## [0.1.28] - 2025-11-29
+
+### Added
+- **DataElement parameter validation** – added validation for required parameters based on `type_kind`:
+  - `predefinedAbapType` and `refToPredefinedAbapType` require `data_type` parameter (e.g., CHAR, NUMC, INT4)
+  - `domain`, `refToDictionaryType`, and `refToClifType` require `type_name` parameter
+  - Validation added in low-level functions (`create.ts`, `update.ts`) and `DataElementBuilder` methods (`create()`, `update()`)
+  - Clear error messages indicate which parameter is missing and what value is expected
+  - Prevents runtime errors by catching invalid parameter combinations early
+
+### Changed
+- **DataElement domain handling** – improved domain name handling when `type_kind = 'domain'`:
+  - When `type_name` is provided and `type_kind = 'domain'`, `type_name` is automatically used as `data_type` internally
+  - This aligns with ADT API requirements where domain name must be passed via `data_type` parameter
+  - Maintains backward compatibility: if `data_type` is explicitly provided, it takes precedence
+  - Updated validation logic to check for either `type_name` or `data_type` when `type_kind = 'domain'`
+
+### Fixed
+- **DataElement parameter validation order** – fixed validation to check `args.type_kind` directly before assigning to intermediate variables:
+  - Validation now uses `args.type_kind` directly in condition checks instead of intermediate `typeKindXml`/`typeKind` variables
+  - Ensures validation occurs before any variable assignment
+  - Improves code clarity and prevents potential issues with undefined values
+
+## [0.1.27] - 2025-11-28
 
 ### Changed
 - **Updated @mcp-abap-adt/connection dependency** – upgraded to `^0.1.12`:
@@ -21,7 +44,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Example now reads environment variables and creates `SapConfig` object directly
   - Maintains backward compatibility with existing `.env` file structure
 
-## [0.1.26] - 2025-01-27
+## [0.1.26] - 2025-11-28
 
 ### Added
 - **DataElementBuilderConfig search help and parameter support** – added support for search help and parameter configuration:
@@ -36,7 +59,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Now passes `search_help`, `search_help_parameter`, and `set_get_parameter` from config to `UpdateDataElementParams`
   - Ensures all data element properties including search help configuration are properly updated
 
-## [0.1.25] - 2025-01-27
+## [0.1.25] - 2025-11-28
 
 ### Changed
 - **DomainBuilder.update() workflow detection** – improved workflow detection logic:
@@ -52,7 +75,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - If `createResult` does not exist, uses UPDATE workflow (updateDomain for existing domain)
   - Prevents "Domain already exists" errors when updating existing domains
 
-## [0.1.24] - 2025-01-27
+## [0.1.24] - 2025-11-27
 
 ### Added
 - **BehaviorImplementationBuilderConfig.implementationCode** – added optional `implementationCode` parameter to `BehaviorImplementationBuilderConfig`:
@@ -73,7 +96,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Now correctly uses `config.implementationCode` if available, otherwise falls back to `config.sourceCode`
   - Ensures custom implementation code is properly set when provided via config
 
-## [0.1.23] - 2025-12-XX
+## [0.1.23] - 2025-11-27
 
 ### Added
 - **Complete type exports for Behavior Definition operations** – added comprehensive type exports for behavior definition operations:
@@ -95,7 +118,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `MetadataExtensionCreateParams` – creation parameters structure
   - Enables type-safe validation and creation of metadata extensions
 
-## [0.1.22] - 2025-12-XX
+## [0.1.22] - 2025-11-27
 
 ### Added
 - **BehaviorDefinitionValidationParams export** – added `BehaviorDefinitionValidationParams` type export to main package index:
@@ -103,7 +126,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Type-safe access to validation parameters structure (`objname`, `rootEntity`, `description`, `package`, `implementationType`)
   - Supports proper type checking when constructing validation parameters for behavior definition validation operations
 
-## [0.1.21] - 2025-12-XX
+## [0.1.21] - 2025-11-27
 
 ### Added
 - **Integration tests for Behavior Definition, Behavior Implementation, and Metadata Extension**:
@@ -163,7 +186,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Source code templates provided for each object type
   - Comments explain parameter usage and requirements
 
-## [0.1.20] - 2025-12-XX
+## [0.1.20] - 2025-11-27
 
 ### Changed
 - **DataElement creation simplified** – removed `domainName` parameter and automatic parameter determination:
@@ -206,7 +229,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   });
   ```
 
-## [0.1.19] - 2025-12-XX
+## [0.1.19] - 2025-11-26
 
 ### Added
 - **Complete type exports** – all BuilderConfig and BuilderState types are now exported from main package:
@@ -217,7 +240,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Type-safe access to configuration objects returned from read operations
   - Full TypeScript support for all client method return types
 
-## [0.1.18] - 2025-12-XX
+## [0.1.18] - 2025-11-26
 
 ### Added
 - **BehaviorImplementationBuilder** – new Builder class for ABAP Behavior Implementation operations:
@@ -273,7 +296,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Applied to all `create()`, `update()`, and `validate()` functions
   - Ensures compliance with SAP ADT description field limitations
 
-## [0.1.17] - 2025-12-XX
+## [0.1.17] - 2025-11-26
 
 ### Added
 - **ServiceDefinitionBuilder** – new Builder class for CDS Service Definition operations:
@@ -314,7 +337,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Read test uses separate `read_service_definition` section instead of `create_service_definition`
   - Support for environment-specific parameters (`service_definition_name_cloud`, `service_definition_name_onprem`)
 
-## [0.1.16] - 2025-12-XX
+## [0.1.16] - 2025-11-26
 
 ### Changed
 - **Integration tests refactored to use CrudClient** – all integration tests now use `CrudClient` instead of direct Builder instantiation:
@@ -388,7 +411,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Updated architecture documentation to reflect CrudClient Builder reuse pattern
 - Updated test documentation to reflect migration to CrudClient usage
 
-## [0.1.15] - 2025-12-XX
+## [0.1.15] - 2025-11-25
 
 ### Changed
 - **Updated dependency**: Upgraded `@mcp-abap-adt/connection` from `^0.1.10` to `^0.1.11`
@@ -400,7 +423,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Documentation
 - Updated documentation to reflect connection package upgrade and its benefits
 
-## [0.1.14] - 2025-11-24
+## [0.1.14] - 2025-11-25
 
 ### Added
 - **Configurable package creation**: `CrudClient.createPackage()` now accepts either the legacy transport-request string or a richer options object (`packageType`, `softwareComponent`, `transportLayer`, `transportRequest`, `applicationComponent`, `responsible`). This enables Cloud-specific inputs such as `software_component: "ZLOCAL"` with an empty transport layer. Both `PackageBuilder` and the MCP handlers pass the options through automatically.
@@ -478,7 +501,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Added low-level helpers (`lockClassTestClasses`, `unlockClassTestClasses`) and ClassBuilder methods (`lockTestClasses`, `updateTestClasses`, `unlockTestClasses`, `activateTestClasses`) so test includes can be managed explicitly.
   - CrudClient now proxies these methods 1:1, exposing `lockTestClasses()`, `updateClassTestIncludes()`, `unlockTestClasses()`, `activateTestClasses()` plus getters for lock/activation results.
 
-## [0.1.12] - TBD
+## [0.1.12] - 2025-11-23
 
 ### Changed
 - **Type definitions consolidated** – all type definitions moved to centralized `types.ts` files per module:
@@ -504,7 +527,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Added key concepts overview (Client classes, Builder pattern, Type system, Session management)
   - Provided links to main package documentation and support resources
 
-## [0.1.11] - TBD
+## [0.1.11] - 2025-11-23
 
 ### Changed
 - **Reorganized internal utilities** – moved internal helper modules from `src/core/shared/` to `src/utils/`:
@@ -515,7 +538,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `src/core/shared/` now contains only operations exposed through CrudClient/ReadOnlyClient
   - Updated all imports in Builders, tests, and core modules
 
-## [0.1.10] - TBD
+## [0.1.10] - 2025-11-23
 
 ### Changed
 - **Unified logger architecture** – all Builder tests now use three separate loggers:
