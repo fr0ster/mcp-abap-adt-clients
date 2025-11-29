@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.29] - 2025-11-29
+
+### Fixed
+- **CHANGELOG date corrections** – corrected all version dates in CHANGELOG to match actual release dates from git history:
+  - Fixed dates for versions 0.1.10 through 0.1.28 to reflect actual commit dates
+  - All dates now accurately represent when each version was released
+  - Improves historical accuracy and maintainability of project documentation
+
 ## [0.1.28] - 2025-11-29
 
 ### Added
