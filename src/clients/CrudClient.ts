@@ -543,7 +543,13 @@ export class CrudClient extends ReadOnlyClient {
   }
 
   async validateFunctionGroup(config: Partial<FunctionGroupBuilderConfig> & Pick<FunctionGroupBuilderConfig, 'functionGroupName' | 'description'>): Promise<AxiosResponse> {
-    const builder = new FunctionGroupBuilder(this.connection, {}, { ...config, description: config.description });
+    // packageName is required for validation to work correctly
+    // Without it, SAP ADT returns "Resource FUGR_MAINPROGRAM: wrong input data"
+    const builder = new FunctionGroupBuilder(this.connection, {}, { 
+      ...config, 
+      description: config.description,
+      packageName: config.packageName // Ensure packageName is passed to builder
+    });
     const result = await builder.validate();
     this.crudState.validationResponse = result;
     return result;
@@ -955,9 +961,9 @@ export class CrudClient extends ReadOnlyClient {
 
   async updateView(config: Partial<ViewBuilderConfig> & Pick<ViewBuilderConfig, 'viewName' | 'ddlSource'>, lockHandle?: string): Promise<this> {
     const builder = this.getViewBuilder(config);
-    // Set ddlSource if provided
+    // Set ddlSource if provided - use setDdlSource method to properly set it in config
     if (config.ddlSource) {
-      (builder as any).ddlSource = config.ddlSource;
+      builder.setDdlSource(config.ddlSource);
     }
     (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
     await builder.update();

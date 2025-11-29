@@ -86,6 +86,8 @@ function extractErrorMessage(error: unknown): string {
 
 // Force immediate output (Jest buffers console.log)
 function logImmediate(message: string): void {
+  // Use synchronous write to ensure messages appear in order
+  // This ensures test logs are not interleaved when tests run sequentially
   process.stdout.write(message + '\n');
 }
 
@@ -99,19 +101,10 @@ export function logBuilderTestStart(logger: IAdtLogger | undefined, testName: st
   testStartTimes.set(testName, startTime);
 
   const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
-  const startMessage = `${progress} ▶ ${testName} :: ${testCase.name}`;
+  const startMessage = `${progress} ▶ START ${testName} :: ${testCase.name}`;
 
   logImmediate(startMessage);
-
-  if (debugLogsEnabled) {
-    const serializedParams = JSON.stringify(testCase.params || {});
-    logImmediate(`  Params: ${serializedParams}`);
-  }
-
-  logger?.info?.(startMessage);
-  if (debugLogsEnabled) {
-    logger?.info?.(`Params: ${JSON.stringify(testCase.params || {})}`);
-  }
+  // Don't duplicate with logger.info - logImmediate already outputs
 }
 
 export function setTotalTests(count: number): void {
@@ -128,12 +121,19 @@ export function resetTestCounter(): void {
   testResults.clear();
 }
 
-export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testName: string, reason: string): void {
+export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testName: string, reason: string, silent: boolean = false): void {
+  // If test was disabled before start, don't log anything
+  if (silent) {
+    testResults.set(testName, 'SKIP');
+    return;
+  }
+  
   const currentCounter = testCounter > 0 ? testCounter : 1;
   const progress = totalTests > 0 ? `[${currentCounter}/${totalTests}]` : `[${currentCounter}]`;
   const message = `${progress} ⏭ SKIP ${testName} – ${reason}`;
   logImmediate(message);
-  logger?.warn?.(message);
+  // Don't use warn for skip - it's not an error, just info
+  logger?.info?.(message);
   testResults.set(testName, 'SKIP');
 }
 
@@ -145,7 +145,7 @@ export function logBuilderTestSuccess(logger: BuilderTestLogger | undefined, tes
     const message = `${progress} ✓ PASS ${testName}${duration}`;
     // Ensure immediate output
     logImmediate(message);
-    logger?.info?.(message);
+    // Don't duplicate with logger.info - logImmediate already outputs
     testStartTimes.delete(testName);
     testResults.set(testName, 'PASS');
   } catch (error) {
@@ -155,17 +155,25 @@ export function logBuilderTestSuccess(logger: BuilderTestLogger | undefined, tes
 }
 
 export function logBuilderTestEnd(logger: BuilderTestLogger | undefined, testName: string): void {
-  try {
-    // End is logged implicitly in success/fail, only log in debug mode
-    if (debugLogsEnabled) {
-      const message = `  END ${testName}`;
-      logImmediate(message);
-      logger?.info?.(message);
-    }
-  } catch (error) {
-    // Ignore logging errors if test already completed
-    // This can happen when tests are run in parallel and Jest considers test done
+  // Always log test completion to show clear test boundaries
+  // This ensures we see when each test finishes, making logs easier to read
+  const result = testResults.get(testName);
+  const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
+  
+  if (result === 'PASS' || result === 'FAIL') {
+    // Test already logged result, but we still log completion for clarity
+    const message = `${progress} ✓ END ${testName}`;
+    logImmediate(message);
+    // Add blank line after test completion for better readability
+    logImmediate('');
+    return;
   }
+  
+  // If test was skipped or ended without explicit result, log completion
+  const message = `${progress} ✓ END ${testName}`;
+  logImmediate(message);
+  // Add blank line after test completion for better readability
+  logImmediate('');
 }
 
 export function logBuilderTestError(
@@ -194,17 +202,60 @@ export function logBuilderTestError(
     }
   }
 
-  // Use safe error logging to avoid exposing credentials
-  if (logger) {
-    logErrorSafely(logger, testName, error);
-  }
+  // Don't use logErrorSafely here - it uses logger.error which may be async and causes log interleaving
+  // The main error message is already logged via logImmediate above, which is synchronous
+  // If detailed error logging is needed, it should be done outside of test execution flow
   testStartTimes.delete(testName);
   testResults.set(testName, 'FAIL');
 }
 
 export function logBuilderTestStep(step: string): void {
-  if (debugLogsEnabled) {
-    logImmediate(`  → ${step}`);
+  logImmediate(`  → ${step}`);
+}
+
+export function logBuilderTestStepError(step: string, error: any): void {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const axiosError = error as any;
+    const status = axiosError.response?.status;
+    const data = axiosError.response?.data;
+    
+    let errorMessage = '';
+    if (typeof data === 'string') {
+      // Try to parse XML error and extract only the meaningful message
+      try {
+        const { XMLParser } = require('fast-xml-parser');
+        const parser = new XMLParser({ ignoreAttributes: false });
+        const parsed = parser.parse(data);
+        errorMessage = parsed['exc:exception']?.localizedMessage?.['#text'] ||
+                      parsed['exc:exception']?.localizedMessage ||
+                      parsed['exc:exception']?.message?.['#text'] ||
+                      parsed['exc:exception']?.message ||
+                      parsed['exc:exception']?.reason?.['#text'] ||
+                      parsed['exc:exception']?.reason ||
+                      '';
+        
+        // Clean up HTML tags if present
+        if (errorMessage) {
+          errorMessage = errorMessage.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+        }
+      } catch {
+        // Not XML, try to extract meaningful part
+        const match = data.match(/<message[^>]*>([^<]+)<\/message>/i) ||
+                     data.match(/localizedMessage[^>]*>([^<]+)<\/localizedMessage>/i);
+        errorMessage = match ? match[1].trim() : '';
+      }
+    } else if (typeof data === 'object') {
+      errorMessage = data.message || data.error || JSON.stringify(data).substring(0, 200);
+    }
+    
+    if (errorMessage) {
+      logImmediate(`  ✗ ${step} FAILED (HTTP ${status}): ${errorMessage}`);
+    } else {
+      logImmediate(`  ✗ ${step} FAILED (HTTP ${status})`);
+    }
+  } else {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logImmediate(`  ✗ ${step} FAILED: ${errorMessage}`);
   }
 }
 

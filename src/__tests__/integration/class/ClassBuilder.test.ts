@@ -29,7 +29,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -142,6 +144,8 @@ async function waitForClassCreation(className: string, maxAttempts = 5, delayMs 
     return;
   }
 
+  // Use getClass (source endpoint) - it's more reliable than metadata endpoint
+  // Metadata endpoint may return 406 for newly created classes
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       await getClass(connection, className);
@@ -336,78 +340,101 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         }
         expect(validationResponse?.status).toBe(200);
         
-            logBuilderTestStep('create');
-        await client.createClass({
-          className: testClassName,
-          packageName: testPackageName,
-          description: `Test class ${testClassName}`,
-          transportRequest: resolveTransportRequest(testCase.params.transport_request)
-        });
-            const createDelay = getOperationDelay('create', testCase);
-            await new Promise(resolve => setTimeout(resolve, createDelay));
-        await waitForClassCreation(testClassName);
+        let classCreated = false;
+        let classLocked = false;
+        let testClassesLocked = false;
+        let currentStep = '';
         
-            logBuilderTestStep('lock');
-        await client.lockClass({ className: testClassName });
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-        
-            logBuilderTestStep('check with source code (before update)');
-        const checkBeforeUpdate = await client.checkClass({ className: testClassName! }, 'inactive', sourceCode);
-        expect(checkBeforeUpdate?.status).toBeDefined();
-        
-            logBuilderTestStep('update');
-        await client.updateClass({
-          className: testClassName,
-          sourceCode: sourceCode
-        });
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-        
-            logBuilderTestStep('check(inactive)');
-        const checkResultInactive = await client.checkClass({ className: testClassName }, 'inactive');
-        expect(checkResultInactive?.status).toBeDefined();
-        
-            logBuilderTestStep('unlock');
-        await client.unlockClass({ className: testClassName });
-            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-        
-            logBuilderTestStep('activate');
-        await client.activateClass({ className: testClassName });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
-        
-            logBuilderTestStep('check(active)');
-        // Retry check for active version - activation may take time
-        const checkResultActive = await retryCheckAfterActivate(
-          () => client.checkClass({ className: testClassName! }, 'active'),
-          {
-            maxAttempts: 5,
-            delay: 1000,
-            logger: testsLogger,
-            objectName: testClassName!
-          }
-        );
-        expect(checkResultActive?.status).toBeDefined();
-        // Test class operations (if enabled)
-        if (shouldUpdateTestClass) {
-            logBuilderTestStep('lock test classes');
-          await client.lockTestClasses({ className: testClassName! });
-
-            logBuilderTestStep('update test classes');
-          await client.updateClassTestIncludes({
-            className: testClassName!,
-            testClassCode: testClassConfig.source_code
+        try {
+          currentStep = 'create';
+          logBuilderTestStep(currentStep);
+          await client.createClass({
+            className: testClassName,
+            packageName: testPackageName,
+            description: `Test class ${testClassName}`,
+            transportRequest: resolveTransportRequest(testCase.params.transport_request)
           });
-
-            logBuilderTestStep('unlock test classes');
-          await client.unlockTestClasses({ className: testClassName! });
+          classCreated = true;
+          const createDelay = getOperationDelay('create', testCase);
+          await new Promise(resolve => setTimeout(resolve, createDelay));
+          await waitForClassCreation(testClassName);
+          
+          currentStep = 'lock';
+          logBuilderTestStep(currentStep);
+          await client.lockClass({ className: testClassName });
+          classLocked = true;
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+          
+          currentStep = 'check with source code (before update)';
+          logBuilderTestStep(currentStep);
+          const checkBeforeUpdate = await client.checkClass({ className: testClassName! }, 'inactive', sourceCode);
+          expect(checkBeforeUpdate?.status).toBeDefined();
+          
+          currentStep = 'update';
+          logBuilderTestStep(currentStep);
+          await client.updateClass({
+            className: testClassName,
+            sourceCode: sourceCode
+          });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+          currentStep = 'check(inactive)';
+          logBuilderTestStep(currentStep);
+          const checkResultInactive = await client.checkClass({ className: testClassName }, 'inactive');
+          expect(checkResultInactive?.status).toBeDefined();
+          
+          currentStep = 'unlock';
+          logBuilderTestStep(currentStep);
+          await client.unlockClass({ className: testClassName });
+          classLocked = false; // Unlocked successfully
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+          
+          currentStep = 'activate';
+          logBuilderTestStep(currentStep);
+          await client.activateClass({ className: testClassName });
+          // Wait for activation to complete (activation is asynchronous)
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+          
+          currentStep = 'check(active)';
+          logBuilderTestStep(currentStep);
+          // Retry check for active version - activation may take time
+          const checkResultActive = await retryCheckAfterActivate(
+            () => client.checkClass({ className: testClassName! }, 'active'),
+            {
+              maxAttempts: 5,
+              delay: 1000,
+              logger: testsLogger,
+              objectName: testClassName!
+            }
+          );
+          expect(checkResultActive?.status).toBeDefined();
+          // Test class operations (if enabled)
+          if (shouldUpdateTestClass) {
+            currentStep = 'lock test classes';
+            logBuilderTestStep(currentStep);
+            await client.lockTestClasses({ className: testClassName! });
+            testClassesLocked = true;
 
-            logBuilderTestStep('activate test classes');
-          await client.activateTestClasses({
-            className: testClassName!,
-            testClassName: testClassConfig.name
-          });
-        }
+            currentStep = 'update test classes';
+            logBuilderTestStep(currentStep);
+            await client.updateClassTestIncludes({
+              className: testClassName!,
+              testClassCode: testClassConfig.source_code
+            });
+
+            currentStep = 'unlock test classes';
+            logBuilderTestStep(currentStep);
+            await client.unlockTestClasses({ className: testClassName! });
+            testClassesLocked = false; // Unlocked successfully
+            await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+
+            currentStep = 'activate test classes';
+            logBuilderTestStep(currentStep);
+            await client.activateTestClasses({
+              className: testClassName!,
+              testClassName: testClassConfig.name
+            });
+          }
         
         // Unit test operations (if enabled)
         if (shouldRunUnitTests && testDefinitions.length > 0) {
@@ -470,29 +497,62 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
             });
         }
 
-            logBuilderTestStep('delete (cleanup)');
-        await client.deleteClass({
-          className: testClassName!,
-          transportRequest: resolveTransportRequest(testCase.params.transport_request)
+          currentStep = 'delete (cleanup)';
+          logBuilderTestStep(currentStep);
+          await client.deleteClass({
+            className: testClassName!,
+            transportRequest: resolveTransportRequest(testCase.params.transport_request)
           });
 
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
-        
-        if (shouldUpdateTestClass) {
-          expect(client.getTestClassLockHandle()).toBeUndefined(); // Should be unlocked after operations
-        }
-        
-        if (shouldRunUnitTests) {
-          expect(client.getAbapUnitRunId()).toBeDefined();
-          expect(client.getAbapUnitStatusResponse()).toBeDefined();
-          expect(client.getAbapUnitResultResponse()).toBeDefined();
-        }
+          expect(client.getCreateResult()).toBeDefined();
+          expect(client.getActivateResult()).toBeDefined();
+          
+          if (shouldUpdateTestClass) {
+            expect(client.getTestClassLockHandle()).toBeUndefined(); // Should be unlocked after operations
+          }
+          
+          if (shouldRunUnitTests) {
+            expect(client.getAbapUnitRunId()).toBeDefined();
+            expect(client.getAbapUnitStatusResponse()).toBeDefined();
+            expect(client.getAbapUnitResultResponse()).toBeDefined();
+          }
 
-        logBuilderTestSuccess(testsLogger, 'ClassBuilder - full workflow');
-      } catch (error: any) {
-        logBuilderTestError(testsLogger, 'ClassBuilder - full workflow', error);
-        throw error;
+          logBuilderTestSuccess(testsLogger, 'ClassBuilder - full workflow');
+        } catch (error: any) {
+          // Log step error with details before failing test
+          logBuilderTestStepError(currentStep || 'unknown', error);
+          
+          // Cleanup: unlock and delete if object was created/locked
+          if (testClassesLocked || classLocked || classCreated) {
+            try {
+              if (testClassesLocked) {
+                logBuilderTestStep('unlock test classes (cleanup)');
+                await client.unlockTestClasses({ className: testClassName! });
+              }
+              if (classLocked) {
+                logBuilderTestStep('unlock (cleanup)');
+                await client.unlockClass({ className: testClassName! });
+              }
+              if (classCreated) {
+                logBuilderTestStep('delete (cleanup)');
+                await client.deleteClass({
+                  className: testClassName!,
+                  transportRequest: resolveTransportRequest(testCase.params.transport_request)
+                });
+              }
+            } catch (cleanupError) {
+              // Log cleanup error but don't fail test - original error is more important
+              testsLogger.warn?.(`Cleanup failed for ${testClassName}:`, cleanupError);
+            }
+          }
+          
+          const statusText = getHttpStatusText(error);
+          const enhancedError = statusText !== 'HTTP ?'
+            ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+            : error;
+          logBuilderTestError(testsLogger, 'ClassBuilder - full workflow', enhancedError);
+          throw enhancedError;
+        }
       } finally {
         logBuilderTestEnd(testsLogger, 'ClassBuilder - full workflow');
       }

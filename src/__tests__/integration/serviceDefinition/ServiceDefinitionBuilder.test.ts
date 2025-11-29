@@ -24,7 +24,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -201,6 +203,9 @@ describe('ServiceDefinitionBuilder (using CrudClient)', () => {
 
       const config = buildBuilderConfig(testCase);
       let lockHandle: string | undefined;
+      let serviceDefinitionCreated = false;
+      let serviceDefinitionLocked = false;
+      let currentStep = '';
 
       try {
         // Ensure packageName is set
@@ -208,7 +213,8 @@ describe('ServiceDefinitionBuilder (using CrudClient)', () => {
           throw new Error('packageName is required but not set in config');
         }
 
-        logBuilderTestStep('validate');
+        currentStep = 'validate';
+        logBuilderTestStep(currentStep);
         const validationResponse = await client.validateServiceDefinition({
           serviceDefinitionName: config.serviceDefinitionName,
           description: config.description || ''
@@ -221,21 +227,26 @@ describe('ServiceDefinitionBuilder (using CrudClient)', () => {
         }
         expect(validationResponse?.status).toBe(200);
         
-        logBuilderTestStep('create');
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
         await client.createServiceDefinition({
           serviceDefinitionName: config.serviceDefinitionName,
           packageName: config.packageName,
           description: config.description || ''
         });
+        serviceDefinitionCreated = true;
         // Wait for SAP to finish create operation
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
         
-        logBuilderTestStep('lock');
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
         await client.lockServiceDefinition({ serviceDefinitionName: config.serviceDefinitionName });
         lockHandle = client.getLockHandle();
+        serviceDefinitionLocked = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
-        logBuilderTestStep('update');
+        currentStep = 'update';
+        logBuilderTestStep(currentStep);
         await client.updateServiceDefinition({
           serviceDefinitionName: config.serviceDefinitionName,
           sourceCode: config.sourceCode || `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n  expose ZOK_C_CDS_TEST;\n}`
@@ -246,8 +257,10 @@ describe('ServiceDefinitionBuilder (using CrudClient)', () => {
         const checkResultInactive = await client.checkServiceDefinition({ serviceDefinitionName: config.serviceDefinitionName });
         expect(checkResultInactive?.status).toBeDefined();
         
-        logBuilderTestStep('unlock');
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
         await client.unlockServiceDefinition({ serviceDefinitionName: config.serviceDefinitionName }, lockHandle);
+        serviceDefinitionLocked = false;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
         
         logBuilderTestStep('activate');
@@ -273,8 +286,38 @@ describe('ServiceDefinitionBuilder (using CrudClient)', () => {
 
         logBuilderTestSuccess(testsLogger, 'ServiceDefinitionBuilder - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'ServiceDefinitionBuilder - full workflow', error);
-        throw error;
+        // Log step error with details before failing test
+        logBuilderTestStepError(currentStep || 'unknown', error);
+
+        // Cleanup: unlock and delete if object was created/locked
+        if (serviceDefinitionLocked || serviceDefinitionCreated) {
+          try {
+            if (serviceDefinitionLocked && (lockHandle || client.getLockHandle())) {
+              logBuilderTestStep('unlock (cleanup)');
+              await client.unlockServiceDefinition(
+                { serviceDefinitionName: config.serviceDefinitionName },
+                lockHandle || client.getLockHandle()
+              );
+            }
+            if (serviceDefinitionCreated) {
+              logBuilderTestStep('delete (cleanup)');
+              await client.deleteServiceDefinition(
+                { serviceDefinitionName: config.serviceDefinitionName },
+                config?.transportRequest
+              );
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed for ${config.serviceDefinitionName}:`, cleanupError);
+          }
+        }
+
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'ServiceDefinitionBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         // Cleanup: unlock and delete
         if (serviceDefinitionName) {

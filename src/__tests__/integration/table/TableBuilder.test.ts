@@ -25,6 +25,7 @@ import {
   logBuilderTestError,
   logBuilderTestEnd,
   logBuilderTestStep,
+  logBuilderTestStepError,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
@@ -202,85 +203,123 @@ describe('TableBuilder (using CrudClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      logBuilderTestStep('validate');
+      const validationResponse = await client.validateTable({
+        tableName: config.tableName,
+        packageName: config.packageName!,
+        description: config.description || ''
+      });
+      if (validationResponse?.status !== 200) {
+        const errorData = typeof validationResponse?.data === 'string' 
+          ? validationResponse.data 
+          : JSON.stringify(validationResponse?.data);
+        console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+      }
+      expect(validationResponse?.status).toBe(200);
+      
+      let tableCreated = false;
+      let tableLocked = false;
+      let currentStep = '';
+      
       try {
-        logBuilderTestStep('validate');
-        const validationResponse = await client.validateTable({
-          tableName: config.tableName,
-          packageName: config.packageName!,
-          description: config.description || ''
-        });
-        if (validationResponse?.status !== 200) {
-          const errorData = typeof validationResponse?.data === 'string' 
-            ? validationResponse.data 
-            : JSON.stringify(validationResponse?.data);
-          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-        }
-        expect(validationResponse?.status).toBe(200);
+          currentStep = 'create';
+          logBuilderTestStep(currentStep);
+          await client.createTable({
+            tableName: config.tableName,
+            packageName: config.packageName!,
+            description: config.description || '',
+            ddlCode: config.ddlCode || '',
+            transportRequest: config.transportRequest
+          });
+          tableCreated = true;
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+          
+          currentStep = 'lock';
+          logBuilderTestStep(currentStep);
+          await client.lockTable({ tableName: config.tableName });
+          tableLocked = true;
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
+          
+          currentStep = 'update';
+          logBuilderTestStep(currentStep);
+          await client.updateTable({
+            tableName: config.tableName,
+            ddlCode: config.ddlCode || ''
+          });
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
         
-        logBuilderTestStep('create');
-        await client.createTable({
-          tableName: config.tableName,
-          packageName: config.packageName!,
-          description: config.description || '',
-          ddlCode: config.ddlCode || '',
-          transportRequest: config.transportRequest
-        });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-        
-        logBuilderTestStep('lock');
-        await client.lockTable({ tableName: config.tableName });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-        
-        logBuilderTestStep('update');
-        await client.updateTable({
-          tableName: config.tableName,
-          ddlCode: config.ddlCode || ''
-        });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-        
-        logBuilderTestStep('check(inactive)');
-        const checkResultInactive = await client.checkTable({ tableName: config.tableName });
-        expect(checkResultInactive?.status).toBeDefined();
-        
-        logBuilderTestStep('unlock');
-        await client.unlockTable({ tableName: config.tableName });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-        
-        logBuilderTestStep('activate');
-        await client.activateTable({ tableName: config.tableName });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
-        
-        logBuilderTestStep('check(active)');
-        // Retry check for active version - activation may take time
-        const checkResultActive = await retryCheckAfterActivate(
-          () => client.checkTable({ tableName: config.tableName }),
-          {
-            maxAttempts: 5,
-            delay: 1000,
-            logger: testsLogger,
-            objectName: config.tableName
+          currentStep = 'check(inactive)';
+          logBuilderTestStep(currentStep);
+          const checkResultInactive = await client.checkTable({ tableName: config.tableName });
+          expect(checkResultInactive?.status).toBeDefined();
+          
+          currentStep = 'unlock';
+          logBuilderTestStep(currentStep);
+          await client.unlockTable({ tableName: config.tableName });
+          tableLocked = false; // Unlocked successfully
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
+          
+          currentStep = 'activate';
+          logBuilderTestStep(currentStep);
+          await client.activateTable({ tableName: config.tableName });
+          // Wait for activation to complete (activation is asynchronous)
+          await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+          
+          currentStep = 'check(active)';
+          logBuilderTestStep(currentStep);
+          // Retry check for active version - activation may take time
+          const checkResultActive = await retryCheckAfterActivate(
+            () => client.checkTable({ tableName: config.tableName }),
+            {
+              maxAttempts: 5,
+              delay: 1000,
+              logger: testsLogger,
+              objectName: config.tableName
+            }
+          );
+          expect(checkResultActive?.status).toBeDefined();
+          
+          currentStep = 'delete (cleanup)';
+          logBuilderTestStep(currentStep);
+          await client.deleteTable({
+            tableName: config.tableName,
+            transportRequest: config.transportRequest
+          });
+
+          expect(client.getCreateResult()).toBeDefined();
+          expect(client.getActivateResult()).toBeDefined();
+
+          logBuilderTestSuccess(testsLogger, 'TableBuilder - full workflow');
+        } catch (error: any) {
+          // Log step error with details before failing test
+          logBuilderTestStepError(currentStep || 'unknown', error);
+          
+          // Cleanup: unlock and delete if object was created/locked
+          if (tableLocked || tableCreated) {
+            try {
+              if (tableLocked) {
+                logBuilderTestStep('unlock (cleanup)');
+                await client.unlockTable({ tableName: config.tableName });
+              }
+              if (tableCreated) {
+                logBuilderTestStep('delete (cleanup)');
+                await client.deleteTable({
+                  tableName: config.tableName,
+                  transportRequest: config.transportRequest
+                });
+              }
+            } catch (cleanupError) {
+              // Log cleanup error but don't fail test - original error is more important
+              testsLogger.warn?.(`Cleanup failed for ${config.tableName}:`, cleanupError);
+            }
           }
-        );
-        expect(checkResultActive?.status).toBeDefined();
-        
-        logBuilderTestStep('delete (cleanup)');
-        await client.deleteTable({
-          tableName: config.tableName,
-          transportRequest: config.transportRequest
-        });
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
-
-        logBuilderTestSuccess(testsLogger, 'TableBuilder - full workflow');
-      } catch (error: any) {
-        const statusText = getHttpStatusText(error);
-        const enhancedError = statusText !== 'HTTP ?'
-          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-          : error;
-        logBuilderTestError(testsLogger, 'TableBuilder - full workflow', enhancedError);
-        throw enhancedError;
+          
+          const statusText = getHttpStatusText(error);
+          const enhancedError = statusText !== 'HTTP ?'
+            ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+            : error;
+          logBuilderTestError(testsLogger, 'TableBuilder - full workflow', enhancedError);
+          throw enhancedError;
       } finally {
         logBuilderTestEnd(testsLogger, 'TableBuilder - full workflow');
       }

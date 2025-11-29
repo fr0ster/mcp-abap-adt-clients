@@ -422,6 +422,236 @@ function getOperationDelay(operation = 'default', testCase = null) {
 }
 
 /**
+ * Extract meaningful error message from validation response
+ * Parses XML to extract localized message or exception type
+ * @param {Object} response - AxiosResponse from validation endpoint
+ * @returns {string} Extracted error message or fallback to raw data
+ */
+function extractValidationErrorMessage(response) {
+  if (!response?.data) {
+    return 'Unknown validation error';
+  }
+
+  try {
+    const errorData = response.data;
+    
+    // Handle object responses (non-XML)
+    if (typeof errorData === 'object' && errorData !== null && !(errorData instanceof String)) {
+      // Try to extract meaningful fields from object
+      const obj = errorData;
+      
+      // Check for common error message fields
+      if (obj.message) {
+        return String(obj.message);
+      }
+      if (obj.error) {
+        return String(obj.error);
+      }
+      if (obj.errorMessage) {
+        return String(obj.errorMessage);
+      }
+      if (obj.localizedMessage) {
+        return String(obj.localizedMessage);
+      }
+      if (obj.shortText) {
+        return String(obj.shortText);
+      }
+      if (obj.text) {
+        return String(obj.text);
+      }
+      
+      // Check for nested exception structure
+      if (obj.exception) {
+        const exc = obj.exception;
+        if (exc.message) return String(exc.message);
+        if (exc.localizedMessage) return String(exc.localizedMessage);
+        if (exc.type) return String(exc.type);
+      }
+      
+      // Check for SEVERITY/SHORT_TEXT format (function group validation - parsed XML)
+      if (obj.SEVERITY || obj.Severity || obj.severity) {
+        const severity = obj.SEVERITY || obj.Severity || obj.severity;
+        const shortText = obj.SHORT_TEXT || obj.ShortText || obj.shortText || '';
+        if (severity !== 'OK' && shortText) {
+          return String(shortText);
+        }
+        if (severity !== 'OK') {
+          return `Validation error (${severity})`;
+        }
+      }
+      
+      // Check for asx:abap structure (parsed XML)
+      if (obj['asx:abap'] || obj['asx:values'] || obj.DATA) {
+        const data = obj['asx:abap']?.['asx:values']?.['DATA'] || obj.DATA;
+        if (data) {
+          if (data.SHORT_TEXT || data.ShortText || data.shortText) {
+            return String(data.SHORT_TEXT || data.ShortText || data.shortText);
+          }
+          if (data.SEVERITY && data.SEVERITY !== 'OK') {
+            return `Validation error: ${data.SHORT_TEXT || data.SEVERITY}`;
+          }
+        }
+      }
+      
+      // If object has toString method, use it
+      if (typeof obj.toString === 'function' && obj.toString() !== '[object Object]') {
+        return obj.toString();
+      }
+      
+      // Last resort: try to stringify with meaningful fields
+      const meaningfulFields = {};
+      for (const key in obj) {
+        if (typeof obj[key] === 'string' && obj[key].length < 200) {
+          meaningfulFields[key] = obj[key];
+        }
+      }
+      if (Object.keys(meaningfulFields).length > 0) {
+        return JSON.stringify(meaningfulFields);
+      }
+      
+      // Final fallback: return status and basic info
+      return `Validation error (HTTP ${response.status || '?'})`;
+    }
+    
+    // Handle string responses (XML or plain text)
+    const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData || {});
+    
+    // Try to parse XML
+    if (typeof errorData === 'string' && errorData.trim().startsWith('<?xml')) {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '@_'
+      });
+      const result = parser.parse(errorData);
+      
+      // Check for exception format (<exc:exception>)
+      const exception = result['exc:exception'];
+      if (exception) {
+        // Extract message - handle both string and object with #text
+        let localizedMessage = exception['localizedMessage'];
+        if (localizedMessage && typeof localizedMessage === 'object') {
+          localizedMessage = localizedMessage['#text'] || localizedMessage['text'] || localizedMessage;
+        }
+        if (typeof localizedMessage === 'object') {
+          localizedMessage = JSON.stringify(localizedMessage);
+        }
+        
+        let message = exception['message'];
+        if (message && typeof message === 'object') {
+          message = message['#text'] || message['text'] || message;
+        }
+        if (typeof message === 'object') {
+          message = JSON.stringify(message);
+        }
+        
+        // Extract exception type
+        let exceptionType = exception['type'];
+        if (exceptionType && typeof exceptionType === 'object') {
+          exceptionType = exceptionType['#text'] || exceptionType['text'] || exceptionType;
+        }
+        exceptionType = exceptionType || '';
+        
+        // Prefer localized message, fallback to regular message
+        const msgText = (localizedMessage || message || '').trim();
+        
+        // Combine exception type and message for clarity
+        if (msgText) {
+          return exceptionType ? `${exceptionType}: ${msgText}` : msgText;
+        }
+        
+        // If no message, at least return exception type
+        if (exceptionType) {
+          return exceptionType;
+        }
+      }
+      
+      // Check for other XML formats (e.g., <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT>)
+      // Function group validation uses this format
+      if (result['asx:abap'] || result['asx:values'] || result['DATA']) {
+        const data = result['asx:abap']?.['asx:values']?.['DATA'] || result['DATA'];
+        if (data) {
+          if (data['SHORT_TEXT']) {
+            return String(data['SHORT_TEXT']);
+          }
+          if (data['SEVERITY'] && data['SEVERITY'] !== 'OK') {
+            return `Validation error: ${data['SHORT_TEXT'] || data['SEVERITY']}`;
+          }
+        }
+      }
+      
+      // Check for direct SEVERITY/SHORT_TEXT format (function group validation)
+      if (result['SEVERITY']) {
+        const severity = result['SEVERITY'];
+        const shortText = result['SHORT_TEXT'] || result['shortText'] || '';
+        if (severity !== 'OK' && shortText) {
+          return String(shortText);
+        }
+        if (severity !== 'OK') {
+          return `Validation error (${severity})`;
+        }
+      }
+      
+      // Check for exception with resource information (e.g., "Resource FUGR_MAINPROGRAM ...")
+      if (result['exception'] || result['exc:exception']) {
+        const exc = result['exception'] || result['exc:exception'];
+        if (exc['message']) {
+          const msg = String(exc['message']);
+          // Extract resource name if present (e.g., "Resource FUGR_MAINPROGRAM ZADT_BLD_FGR01: wrong input data")
+          if (msg.includes('Resource') && msg.includes(':')) {
+            return msg;
+          }
+          return msg;
+        }
+      }
+      
+      // Check for nested structures that might contain error info
+      // Sometimes XML parser creates nested objects
+      const checkNested = (obj, depth = 0) => {
+        if (depth > 3) return null; // Prevent infinite recursion
+        
+        if (typeof obj === 'string' && obj.length > 0 && obj.length < 500) {
+          // If it's a meaningful string (not just whitespace), return it
+          if (obj.trim().length > 0) {
+            return obj.trim();
+          }
+        }
+        
+        if (typeof obj === 'object' && obj !== null) {
+          // Check common error fields
+          if (obj.message) return String(obj.message);
+          if (obj.error) return String(obj.error);
+          if (obj.shortText) return String(obj.shortText);
+          if (obj.SHORT_TEXT) return String(obj.SHORT_TEXT);
+          
+          // Recursively check nested objects
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              const nested = checkNested(obj[key], depth + 1);
+              if (nested) return nested;
+            }
+          }
+        }
+        
+        return null;
+      };
+      
+      const nestedMessage = checkNested(result);
+      if (nestedMessage) {
+        return nestedMessage;
+      }
+    }
+    
+    // Fallback: return first 500 chars of raw data
+    return errorText.length > 500 ? errorText.substring(0, 500) + '...' : errorText;
+  } catch (parseError) {
+    // If parsing fails, return raw data (limited)
+    const errorData = response.data;
+    const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData || {});
+    return errorText.length > 500 ? errorText.substring(0, 500) + '...' : errorText;
+  }
+}
+
+/**
  * Parse validation response from ADT
  * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
  * @param {Object} response - AxiosResponse from validation endpoint
@@ -596,6 +826,797 @@ async function retryCheckAfterActivate(checkFunction, options = {}) {
   throw lastError || new Error(`Check failed after ${maxAttempts} attempts`);
 }
 
+/**
+ * Check if package exists using searchObjects
+ * @param {Object} connection - ABAP connection
+ * @param {string} packageName - Package name to check
+ * @returns {Promise<boolean>} True if package exists, false otherwise
+ */
+async function checkPackageExists(connection, packageName) {
+  try {
+    // Dynamically require searchObjects to avoid circular dependencies
+    const { searchObjects } = require('../src/core/shared/search');
+    
+    const response = await searchObjects(connection, {
+      query: `${packageName}*`,
+      objectType: 'DEVC',
+      maxResults: 101
+    });
+    
+    if (response.status !== 200) {
+      return false;
+    }
+    
+    const xmlData = typeof response.data === 'string' ? response.data : '';
+    if (!xmlData || !xmlData.includes('<adtcore:objectReference')) {
+      return false;
+    }
+    
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+    const parsed = parser.parse(xmlData);
+    const refs = parsed['adtcore:objectReferences']?.['adtcore:objectReference'];
+    const objects = refs ? (Array.isArray(refs) ? refs : [refs]) : [];
+    
+    return objects.some((obj) => 
+      obj['@_adtcore:name']?.toUpperCase() === packageName.toUpperCase()
+    );
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Validate test parameters: package and transport request
+ * @param {Object} connection - ABAP connection
+ * @param {Object} params - Test case params
+ * @param {string} testLabel - Test label for error messages
+ * @param {string} defaultPackage - Default package name
+ * @param {string} defaultTransport - Default transport request
+ * @returns {Promise<{success: boolean, reason?: string}>}
+ */
+async function validateTestParameters(connection, params = {}, testLabel = 'test', defaultPackage = '', defaultTransport = '') {
+  // Resolve package name
+  const resolvedPackage = resolvePackageName(params.package_name);
+  if (!resolvedPackage) {
+    return {
+      success: false,
+      reason: `${testLabel}: package_name is not configured. Provide params.package_name or set environment.default_package`
+    };
+  }
+
+  // Check if package exists (if explicitly specified, not default)
+  const testPackageName = params.package_name;
+  if (testPackageName && testPackageName !== defaultPackage) {
+    const packageExists = await checkPackageExists(connection, resolvedPackage);
+    if (!packageExists) {
+      return {
+        success: false,
+        reason: `Package ${resolvedPackage} does not exist`
+      };
+    }
+  }
+
+  // Validate transport request if specified (can be added later if needed)
+  const resolvedTransport = resolveTransportRequest(params.transport_request);
+  if (resolvedTransport && resolvedTransport !== defaultTransport) {
+    // Transport request validation can be added here if needed
+  }
+
+  return { success: true };
+}
+
+/**
+ * Check default package and transport before all tests
+ * @param {Object} connection - ABAP connection
+ * @returns {Promise<{success: boolean, reason?: string, defaultPackage?: string, defaultTransport?: string}>}
+ */
+async function checkDefaultTestEnvironment(connection) {
+  const defaultPackage = getDefaultPackage();
+  const defaultTransport = getDefaultTransport();
+
+  if (!defaultPackage) {
+    return {
+      success: false,
+      reason: 'Default package is not configured. Set environment.default_package or SAP_PACKAGE',
+      defaultPackage: '',
+      defaultTransport
+    };
+  }
+
+  // Check if default package exists
+  const packageExists = await checkPackageExists(connection, defaultPackage);
+  if (!packageExists) {
+    return {
+      success: false,
+      reason: `Default package ${defaultPackage} does not exist`,
+      defaultPackage,
+      defaultTransport
+    };
+  }
+
+  return {
+    success: true,
+    defaultPackage,
+    defaultTransport
+  };
+}
+
+/**
+ * Log default test environment in one line
+ * @param {Object} logger - Logger object with info method
+ * @param {string} defaultPackage - Default package name
+ * @param {string} defaultTransport - Default transport request
+ */
+function logDefaultTestEnvironment(logger, defaultPackage = '', defaultTransport = '') {
+  const envInfo = [
+    defaultPackage && `Package: ${defaultPackage}`,
+    defaultTransport && `Transport: ${defaultTransport}`
+  ].filter(Boolean).join(', ');
+  
+  // Only log if DEBUG_ADT_TESTS is enabled - this is just informational
+  if (envInfo && process.env.DEBUG_ADT_TESTS === 'true' && logger?.info) {
+    logger.info(`✓ ${envInfo}`);
+  }
+}
+
+/**
+ * Create dependency table with full workflow (validate → create → lock → update → unlock → activate)
+ * Includes cleanup (unlock + delete) if update fails
+ * @param {Object} client - CrudClient instance
+ * @param {Object} config - Table configuration
+ *   - tableName: string - Table name
+ *   - packageName: string - Package name
+ *   - description: string - Table description
+ *   - ddlCode: string - DDL source code
+ *   - transportRequest: string - Transport request (optional)
+ * @param {Object} testCase - Test case for delays
+ * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
+ */
+async function createDependencyTable(client, config, testCase) {
+  if (!client || !config || !config.tableName) {
+    return {
+      success: false,
+      reason: 'Invalid parameters for createDependencyTable',
+      created: false
+    };
+  }
+
+  let tableCreated = false;
+  let tableLocked = false;
+  let currentStep = '';
+
+  try {
+    // Step 1: Validate
+    currentStep = 'validate';
+    const validationResponse = await client.validateTable({
+      tableName: config.tableName,
+      packageName: config.packageName,
+      description: config.description || ''
+    });
+
+    if (validationResponse?.status !== 200) {
+      const errorMessage = extractValidationErrorMessage(validationResponse);
+      const errorTextLower = errorMessage.toLowerCase();
+
+      // If table already exists, return skip reason (environment problem)
+      if (errorTextLower.includes('already exists') ||
+          errorTextLower.includes('does already exist') ||
+          errorTextLower.includes('exceptionresourcealreadyexists')) {
+        return {
+          success: false,
+          reason: `Dependency table ${config.tableName} already exists (may be owned by another user) - environment problem, test skipped`,
+          created: false
+        };
+      }
+
+      // Other validation errors (environment problem)
+      return {
+        success: false,
+        reason: `Dependency table validation failed: ${errorMessage} - environment problem, test skipped`,
+        created: false
+      };
+    }
+
+    // Step 2: Create
+    currentStep = 'create';
+    await client.createTable({
+      tableName: config.tableName,
+      packageName: config.packageName,
+      description: config.description || '',
+      ddlCode: config.ddlCode || '',
+      transportRequest: config.transportRequest
+    });
+    tableCreated = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase) || 1000));
+
+    // Step 3: Lock
+    currentStep = 'lock';
+    await client.lockTable({ tableName: config.tableName });
+    tableLocked = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase) || 1000));
+
+    // Step 4: Update
+    currentStep = 'update';
+    await client.updateTable({
+      tableName: config.tableName,
+      ddlCode: config.ddlCode || ''
+    });
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase) || 1000));
+
+    // Step 5: Unlock
+    currentStep = 'unlock';
+    await client.unlockTable({ tableName: config.tableName });
+    tableLocked = false;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000));
+
+    // Step 6: Activate
+    currentStep = 'activate';
+    await client.activateTable({ tableName: config.tableName });
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+
+    return {
+      success: true,
+      created: true
+    };
+
+  } catch (error) {
+    // Cleanup: unlock and delete if table was created/locked
+    if (tableLocked || tableCreated) {
+      try {
+        if (tableLocked) {
+          await client.unlockTable({ tableName: config.tableName });
+        }
+        if (tableCreated) {
+          await client.deleteTable({
+            tableName: config.tableName,
+            transportRequest: config.transportRequest
+          });
+        }
+      } catch (cleanupError) {
+        // Log but don't fail - original error is more important
+        // Cleanup errors are silent to avoid noise
+      }
+    }
+
+    // Any error = environment problem, test should be skipped
+    return {
+      success: false,
+      reason: `Failed to create dependency table ${config.tableName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
+      created: false
+    };
+  }
+}
+
+/**
+ * Create dependency CDS view with full workflow (validate → create → lock → update → unlock → activate)
+ * Includes cleanup (unlock + delete) if update fails
+ * @param {Object} client - CrudClient instance
+ * @param {Object} config - View configuration
+ *   - viewName: string - View name
+ *   - packageName: string - Package name
+ *   - description: string - View description
+ *   - ddlSource: string - DDL source code
+ *   - transportRequest: string - Transport request (optional)
+ * @param {Object} testCase - Test case for delays
+ * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
+ */
+async function createDependencyCdsView(client, config, testCase) {
+  if (!client || !config || !config.viewName) {
+    return {
+      success: false,
+      reason: 'Invalid parameters for createDependencyCdsView - environment problem, test skipped',
+      created: false
+    };
+  }
+
+  let viewCreated = false;
+  let viewLocked = false;
+  let currentStep = '';
+
+  try {
+    // Step 1: Validate
+    currentStep = 'validate';
+    const validationResponse = await client.validateView({
+      viewName: config.viewName,
+      packageName: config.packageName,
+      description: config.description || ''
+    });
+
+    if (validationResponse?.status !== 200) {
+      const errorMessage = extractValidationErrorMessage(validationResponse);
+      const errorTextLower = errorMessage.toLowerCase();
+
+      // If view already exists, return skip reason (environment problem)
+      if (errorTextLower.includes('already exists') ||
+          errorTextLower.includes('does already exist') ||
+          errorTextLower.includes('exceptionresourcealreadyexists')) {
+        return {
+          success: false,
+          reason: `Dependency view ${config.viewName} already exists (may be owned by another user) - environment problem, test skipped`,
+          created: false
+        };
+      }
+
+      // Other validation errors (environment problem)
+      return {
+        success: false,
+        reason: `Dependency view validation failed: ${errorMessage} - environment problem, test skipped`,
+        created: false
+      };
+    }
+
+    // Step 2: Create
+    currentStep = 'create';
+    if (!config.ddlSource) {
+      return {
+        success: false,
+        reason: 'ddlSource is required for view creation - environment problem, test skipped',
+        created: false
+      };
+    }
+    await client.createView({
+      viewName: config.viewName,
+      packageName: config.packageName,
+      description: config.description || '',
+      ddlSource: config.ddlSource,
+      transportRequest: config.transportRequest
+    });
+    viewCreated = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase) || 1000));
+
+    // Step 3: Lock
+    currentStep = 'lock';
+    await client.lockView({ viewName: config.viewName });
+    viewLocked = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase) || 1000));
+
+    // Step 4: Update
+    currentStep = 'update';
+    await client.updateView({
+      viewName: config.viewName,
+      ddlSource: config.ddlSource
+    });
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase) || 1000));
+
+    // Step 5: Unlock
+    currentStep = 'unlock';
+    await client.unlockView({ viewName: config.viewName });
+    viewLocked = false;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000));
+
+    // Step 6: Activate
+    currentStep = 'activate';
+    await client.activateView({ viewName: config.viewName });
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+
+    return {
+      success: true,
+      created: true
+    };
+
+  } catch (error) {
+    // Cleanup: unlock and delete if view was created/locked
+    if (viewLocked || viewCreated) {
+      try {
+        if (viewLocked) {
+          await client.unlockView({ viewName: config.viewName });
+        }
+        if (viewCreated) {
+          await client.deleteView({
+            viewName: config.viewName,
+            transportRequest: config.transportRequest
+          });
+        }
+      } catch (cleanupError) {
+        // Log but don't fail - original error is more important
+        // Cleanup errors are silent to avoid noise
+      }
+    }
+
+    // Any error = environment problem, test should be skipped
+    return {
+      success: false,
+      reason: `Failed to create dependency view ${config.viewName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
+      created: false
+    };
+  }
+}
+
+/**
+ * Create dependency domain with full workflow (validate → create → lock → update → unlock → activate)
+ * Includes cleanup (unlock + delete) if update fails
+ * @param {Object} client - CrudClient instance
+ * @param {Object} config - Domain configuration
+ *   - domainName: string - Domain name
+ *   - packageName: string - Package name
+ *   - description: string - Domain description
+ *   - dataType: string - Data type (e.g., 'CHAR', 'NUMC', 'DEC')
+ *   - length: number - Length
+ *   - decimals: number - Decimals (optional)
+ *   - transportRequest: string - Transport request (optional)
+ * @param {Object} testCase - Test case for delays
+ * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
+ */
+async function createDependencyDomain(client, config, testCase) {
+  if (!client || !config || !config.domainName) {
+    return {
+      success: false,
+      reason: 'Invalid parameters for createDependencyDomain - environment problem, test skipped',
+      created: false
+    };
+  }
+
+  let domainCreated = false;
+  let domainLocked = false;
+  let currentStep = '';
+
+  try {
+    // Step 1: Validate
+    currentStep = 'validate';
+    const validationResponse = await client.validateDomain({
+      domainName: config.domainName,
+      packageName: config.packageName,
+      description: config.description || ''
+    });
+
+    if (validationResponse?.status !== 200) {
+      const errorMessage = extractValidationErrorMessage(validationResponse);
+      const errorTextLower = errorMessage.toLowerCase();
+
+      // If domain already exists, return skip reason (environment problem)
+      if (errorTextLower.includes('already exists') ||
+          errorTextLower.includes('does already exist') ||
+          errorTextLower.includes('exceptionresourcealreadyexists')) {
+        return {
+          success: false,
+          reason: `Dependency domain ${config.domainName} already exists (may be owned by another user) - environment problem, test skipped`,
+          created: false
+        };
+      }
+
+      // Other validation errors (environment problem)
+      return {
+        success: false,
+        reason: `Dependency domain validation failed: ${errorMessage} - environment problem, test skipped`,
+        created: false
+      };
+    }
+
+    // Step 2: Create
+    currentStep = 'create';
+    await client.createDomain({
+      domainName: config.domainName,
+      packageName: config.packageName,
+      description: config.description || ''
+    });
+    domainCreated = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase) || 1000));
+
+    // Step 3: Lock
+    currentStep = 'lock';
+    await client.lockDomain({ domainName: config.domainName });
+    domainLocked = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase) || 1000));
+
+    // Step 4: Update (set data type, length, decimals if provided)
+    currentStep = 'update';
+    const updateConfig = {
+      domainName: config.domainName,
+      packageName: config.packageName,
+      description: config.description || ''
+    };
+    if (config.dataType) {
+      updateConfig.dataType = config.dataType;
+    }
+    if (config.length !== undefined) {
+      updateConfig.length = config.length;
+    }
+    if (config.decimals !== undefined) {
+      updateConfig.decimals = config.decimals;
+    }
+    await client.updateDomain(updateConfig);
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase) || 1000));
+
+    // Step 5: Unlock
+    currentStep = 'unlock';
+    await client.unlockDomain({ domainName: config.domainName });
+    domainLocked = false;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000));
+
+    // Step 6: Activate
+    currentStep = 'activate';
+    await client.activateDomain({ domainName: config.domainName });
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+
+    return {
+      success: true,
+      created: true
+    };
+
+  } catch (error) {
+    // Cleanup: unlock and delete if domain was created/locked
+    if (domainLocked || domainCreated) {
+      try {
+        if (domainLocked) {
+          await client.unlockDomain({ domainName: config.domainName });
+        }
+        if (domainCreated) {
+          await client.deleteDomain({
+            domainName: config.domainName,
+            transportRequest: config.transportRequest || ''
+          });
+        }
+      } catch (cleanupError) {
+        // Log but don't fail - original error is more important
+        // Cleanup errors are silent to avoid noise
+      }
+    }
+
+    // Any error = environment problem, test should be skipped
+    return {
+      success: false,
+      reason: `Failed to create dependency domain ${config.domainName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
+      created: false
+    };
+  }
+}
+
+/**
+ * Create dependency function group with full workflow (validate → create → lock → unlock → activate)
+ * Note: FunctionGroup doesn't have update operation
+ * Includes cleanup (unlock + delete) if creation fails
+ * @param {Object} client - CrudClient instance
+ * @param {Object} config - FunctionGroup configuration
+ *   - functionGroupName: string - Function group name
+ *   - packageName: string - Package name
+ *   - description: string - Function group description
+ *   - transportRequest: string - Transport request (optional)
+ * @param {Object} testCase - Test case for delays
+ * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
+ */
+async function createDependencyFunctionGroup(client, config, testCase) {
+  if (!client || !config || !config.functionGroupName) {
+    return {
+      success: false,
+      reason: 'Invalid parameters for createDependencyFunctionGroup - environment problem, test skipped',
+      created: false
+    };
+  }
+
+  let functionGroupCreated = false;
+  let functionGroupLocked = false;
+  let currentStep = '';
+
+  try {
+    // Step 1: Validate
+    currentStep = 'validate';
+    // packageName is required for function group validation
+    // Without it, SAP ADT returns "Resource FUGR_MAINPROGRAM: wrong input data"
+    const validationResponse = await client.validateFunctionGroup({
+      functionGroupName: config.functionGroupName,
+      packageName: config.packageName, // Required for validation
+      description: config.description || ''
+    });
+
+    if (validationResponse?.status !== 200) {
+      const errorMessage = extractValidationErrorMessage(validationResponse);
+      const errorTextLower = errorMessage.toLowerCase();
+
+      // If function group already exists, return skip reason (environment problem)
+      if (errorTextLower.includes('already exists') ||
+          errorTextLower.includes('does already exist') ||
+          errorTextLower.includes('exceptionresourcealreadyexists')) {
+        return {
+          success: false,
+          reason: `Dependency function group ${config.functionGroupName} already exists (may be owned by another user) - environment problem, test skipped`,
+          created: false
+        };
+      }
+
+      // Other validation errors (environment problem)
+      return {
+        success: false,
+        reason: `Dependency function group validation failed: ${errorMessage} - environment problem, test skipped`,
+        created: false
+      };
+    }
+
+    // Step 2: Create
+    currentStep = 'create';
+    await client.createFunctionGroup({
+      functionGroupName: config.functionGroupName,
+      packageName: config.packageName,
+      description: config.description || '',
+      transportRequest: config.transportRequest
+    });
+    functionGroupCreated = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase) || 1000));
+
+    // Step 3: Lock
+    currentStep = 'lock';
+    await client.lockFunctionGroup({ functionGroupName: config.functionGroupName });
+    functionGroupLocked = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase) || 1000));
+
+    // Step 4: Unlock (FunctionGroup doesn't have update operation)
+    currentStep = 'unlock';
+    await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName });
+    functionGroupLocked = false;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000));
+
+    // Step 5: Activate
+    currentStep = 'activate';
+    await client.activateFunctionGroup({ functionGroupName: config.functionGroupName });
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+
+    return {
+      success: true,
+      created: true
+    };
+
+  } catch (error) {
+    // Cleanup: unlock and delete if function group was created/locked
+    if (functionGroupLocked || functionGroupCreated) {
+      try {
+        if (functionGroupLocked) {
+          await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName });
+        }
+        if (functionGroupCreated) {
+          await client.deleteFunctionGroup({
+            functionGroupName: config.functionGroupName,
+            transportRequest: config.transportRequest || ''
+          });
+        }
+      } catch (cleanupError) {
+        // Log but don't fail - original error is more important
+        // Cleanup errors are silent to avoid noise
+      }
+    }
+
+    // Any error = environment problem, test should be skipped
+    return {
+      success: false,
+      reason: `Failed to create dependency function group ${config.functionGroupName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
+      created: false
+    };
+  }
+}
+
+/**
+ * Create dependency behavior definition with full workflow (validate → create → lock → update → unlock → activate)
+ * Includes cleanup (unlock + delete) if update fails
+ * @param {Object} client - CrudClient instance
+ * @param {Object} config - BehaviorDefinition configuration
+ *   - bdefName: string - Behavior definition name
+ *   - packageName: string - Package name
+ *   - description: string - Behavior definition description
+ *   - rootEntity: string - Root entity name
+ *   - implementationType: string - Implementation type ('Managed' | 'Unmanaged' | 'Abstract' | 'Projection')
+ *   - sourceCode: string - Source code (optional, for update)
+ *   - transportRequest: string - Transport request (optional)
+ * @param {Object} testCase - Test case for delays
+ * @returns {Promise<{success: boolean, reason?: string, created?: boolean}>}
+ */
+async function createDependencyBehaviorDefinition(client, config, testCase) {
+  if (!client || !config || !config.bdefName) {
+    return {
+      success: false,
+      reason: 'Invalid parameters for createDependencyBehaviorDefinition - environment problem, test skipped',
+      created: false
+    };
+  }
+
+  let behaviorDefinitionCreated = false;
+  let behaviorDefinitionLocked = false;
+  let currentStep = '';
+
+  try {
+    // Step 1: Validate
+    currentStep = 'validate';
+    await client.validateBehaviorDefinition({
+      rootEntity: config.rootEntity,
+      packageName: config.packageName,
+      description: config.description,
+      implementationType: config.implementationType
+    });
+    const validationResponse = client.getValidationResponse();
+    
+    if (validationResponse?.status !== 200) {
+      const errorMessage = extractValidationErrorMessage(validationResponse);
+      const errorTextLower = errorMessage.toLowerCase();
+
+      // If behavior definition already exists, return skip reason (environment problem)
+      if (errorTextLower.includes('already exists') ||
+          errorTextLower.includes('does already exist') ||
+          errorTextLower.includes('exceptionresourcealreadyexists')) {
+        return {
+          success: false,
+          reason: `Dependency behavior definition ${config.bdefName} already exists (may be owned by another user) - environment problem, test skipped`,
+          created: false
+        };
+      }
+
+      // Other validation errors (environment problem)
+      return {
+        success: false,
+        reason: `Dependency behavior definition validation failed: ${errorMessage} - environment problem, test skipped`,
+        created: false
+      };
+    }
+
+    // Step 2: Create
+    currentStep = 'create';
+    await client.createBehaviorDefinition({
+      name: config.bdefName,
+      packageName: config.packageName,
+      description: config.description,
+      rootEntity: config.rootEntity,
+      implementationType: config.implementationType,
+      transportRequest: config.transportRequest
+    });
+    behaviorDefinitionCreated = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase) || 1000));
+
+    // Step 3: Lock
+    currentStep = 'lock';
+    await client.lockBehaviorDefinition({ name: config.bdefName });
+    behaviorDefinitionLocked = true;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase) || 1000));
+
+    // Step 4: Update (if sourceCode provided)
+    if (config.sourceCode) {
+      currentStep = 'update';
+      await client.updateBehaviorDefinition({
+        name: config.bdefName,
+        sourceCode: config.sourceCode
+      });
+      await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase) || 1000));
+    }
+
+    // Step 5: Unlock
+    currentStep = 'unlock';
+    await client.unlockBehaviorDefinition({ name: config.bdefName });
+    behaviorDefinitionLocked = false;
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase) || 1000));
+
+    // Step 6: Activate
+    currentStep = 'activate';
+    await client.activateBehaviorDefinition({ name: config.bdefName });
+    await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+
+    return {
+      success: true,
+      created: true
+    };
+
+  } catch (error) {
+    // Cleanup: unlock and delete if behavior definition was created/locked
+    if (behaviorDefinitionLocked || behaviorDefinitionCreated) {
+      try {
+        if (behaviorDefinitionLocked) {
+          await client.unlockBehaviorDefinition({ name: config.bdefName });
+        }
+        if (behaviorDefinitionCreated) {
+          await client.deleteBehaviorDefinition({
+            name: config.bdefName,
+            transportRequest: config.transportRequest || ''
+          });
+        }
+      } catch (cleanupError) {
+        // Log but don't fail - original error is more important
+        // Cleanup errors are silent to avoid noise
+      }
+    }
+
+    // Any error = environment problem, test should be skipped
+    return {
+      success: false,
+      reason: `Failed to create dependency behavior definition ${config.bdefName}: ${error instanceof Error ? error.message : String(error)} - environment problem, test skipped`,
+      created: false
+    };
+  }
+}
+
 module.exports = {
   loadTestConfig,
   getEnabledTestCase,
@@ -608,8 +1629,6 @@ module.exports = {
   resolvePackageName,
   resolveTransportRequest,
   ensurePackageConfig,
-  resolvePackageName,
-  resolveTransportRequest,
   loadTestEnv,
   validateUserSpaceObject,
   validateTestCaseForUserSpace,
@@ -620,5 +1639,15 @@ module.exports = {
   parseValidationResponse,  // Parse validation response from ADT
   checkValidationResult,  // Check validation result and throw if failed
   retryCheckAfterActivate,  // Retry check operation after activate
+  checkPackageExists,  // Check if package exists using searchObjects
+  validateTestParameters,  // Validate test parameters (package, transport)
+  checkDefaultTestEnvironment,  // Check default test environment before all tests
+  logDefaultTestEnvironment,  // Log default test environment in one line
+  createDependencyTable,  // Create dependency table with full workflow (validate → create → lock → update → unlock → activate)
+  createDependencyCdsView,  // Create dependency CDS view with full workflow (validate → create → lock → update → unlock → activate)
+  createDependencyDomain,  // Create dependency domain with full workflow (validate → create → lock → update → unlock → activate)
+  createDependencyFunctionGroup,  // Create dependency function group with full workflow (validate → create → lock → unlock → activate)
+  createDependencyBehaviorDefinition,  // Create dependency behavior definition with full workflow (validate → create → lock → update → unlock → activate)
+  extractValidationErrorMessage,  // Extract meaningful error message from validation response (parses XML)
 };
 

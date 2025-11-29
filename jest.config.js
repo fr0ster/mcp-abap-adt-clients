@@ -29,7 +29,8 @@ module.exports = {
   ],
   // Force sequential execution for all tests (single worker, no parallelism)
   // Integration tests MUST run sequentially to avoid conflicts with shared SAP objects
-  maxWorkers: 1,
-  maxConcurrency: 1, // Only run 1 test suite at a time
+  maxWorkers: 1, // Only 1 worker process
+  maxConcurrency: 1, // Only run 1 test at a time (even within same file)
+  // This ensures tests run one by one, preventing log interleaving
 };
 

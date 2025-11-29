@@ -17,7 +17,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -31,7 +33,9 @@ const {
   resolveStandardObject,
   getEnvironmentConfig,
   getTimeout,
-  getOperationDelay
+  getOperationDelay,
+  resolveTransportRequest,
+  createDependencyCdsView
 } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -136,6 +140,8 @@ extend view ${targetEntity} with "${extName}"
   describe('Full workflow test', () => {
     let testCase: any = null;
     let extName: string | null = null;
+    let viewName: string | null = null;
+    let viewCreated: boolean = false;
     let skipReason: string | null = null;
 
     beforeAll(async () => {
@@ -165,6 +171,44 @@ extend view ${targetEntity} with "${extName}"
 
       testCase = tc;
       extName = tc.params.ext_name || tc.params.name || tc.params.metadata_extension_name;
+
+      // Create CDS view before test if view_name and ddl_source are provided
+      if (tc.params.view_name && tc.params.ddl_source) {
+        const viewConfig = {
+          viewName: tc.params.view_name,
+          packageName: packageName,
+          description: `Test CDS view for ${extName}`,
+          ddlSource: tc.params.ddl_source,
+          transportRequest: resolveTransportRequest(tc.params.transport_request)
+        };
+
+        const viewResult = await createDependencyCdsView(client, viewConfig, tc);
+        
+        if (!viewResult.success) {
+          skipReason = viewResult.reason || `environment problem, test skipped: Failed to create required dependency CDS view ${tc.params.view_name}`;
+          testCase = null;
+          extName = null;
+          return;
+        }
+
+        viewName = tc.params.view_name;
+        viewCreated = viewResult.created || false;
+      }
+    });
+
+    afterAll(async () => {
+      // Cleanup CDS view if it was created in beforeAll
+      if (viewCreated && viewName) {
+        try {
+          await client.deleteView({
+            viewName: viewName,
+            transportRequest: resolveTransportRequest(testCase?.params?.transport_request)
+          });
+        } catch (cleanupError) {
+          // Log but don't fail - cleanup errors are silent
+          testsLogger.warn?.(`Cleanup failed for CDS view ${viewName}:`, cleanupError);
+        }
+      }
     });
 
     it('should execute full workflow and store all results', async () => {
@@ -182,10 +226,13 @@ extend view ${targetEntity} with "${extName}"
       }
 
       const config = buildBuilderConfig(testCase);
-      let objectCreated = false; // Track if object was created in this test
+      let metadataExtensionCreated = false;
+      let metadataExtensionLocked = false;
+      let currentStep = '';
 
       try {
-        logBuilderTestStep('validate');
+        currentStep = 'validate';
+        logBuilderTestStep(currentStep);
         await client.validateMetadataExtension({
           name: config.extName,
           packageName: config.packageName,
@@ -216,14 +263,15 @@ extend view ${targetEntity} with "${extName}"
           throw new Error(`Validation failed with status ${validationResponse?.status}`);
         }
         
-        logBuilderTestStep('create');
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
         await client.createMetadataExtension({
           name: config.extName,
           packageName: config.packageName,
           description: config.description,
           transportRequest: config.transportRequest
         });
-        objectCreated = true; // Mark that object was created in this test
+        metadataExtensionCreated = true;
         
         const createDelay = getOperationDelay('create', testCase);
         if (createDelay > 0) {
@@ -242,10 +290,12 @@ extend view ${targetEntity} with "${extName}"
         const state = builder.getState();
         expect(state).toBeDefined();
         
-        logBuilderTestStep('lock');
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
         await client.lockMetadataExtension({
           name: config.extName
         });
+        metadataExtensionLocked = true;
         
         const lockDelay = getOperationDelay('lock', testCase);
         if (lockDelay > 0) {
@@ -253,7 +303,8 @@ extend view ${targetEntity} with "${extName}"
           await new Promise(resolve => setTimeout(resolve, lockDelay));
         }
         
-        logBuilderTestStep('update');
+        currentStep = 'update';
+        logBuilderTestStep(currentStep);
         await client.updateMetadataExtension({
           name: config.extName,
           sourceCode: config.sourceCode
@@ -270,10 +321,12 @@ extend view ${targetEntity} with "${extName}"
         const checkResult1 = client.getCheckResult();
         expect(checkResult1?.status).toBeDefined();
         
-        logBuilderTestStep('unlock');
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
         await client.unlockMetadataExtension({
           name: config.extName
         });
+        metadataExtensionLocked = false;
         
         const unlockDelay = getOperationDelay('unlock', testCase);
         if (unlockDelay > 0) {
@@ -303,11 +356,40 @@ extend view ${targetEntity} with "${extName}"
 
         logBuilderTestSuccess(testsLogger, 'MetadataExtensionBuilder - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'MetadataExtensionBuilder - full workflow', error);
-        throw error;
+        // Log step error with details before failing test
+        logBuilderTestStepError(currentStep || 'unknown', error);
+
+        // Cleanup: unlock and delete if object was created/locked
+        if (metadataExtensionLocked || metadataExtensionCreated) {
+          try {
+            if (metadataExtensionLocked) {
+              logBuilderTestStep('unlock (cleanup)');
+              await client.unlockMetadataExtension({
+                name: config.extName
+              });
+            }
+            if (metadataExtensionCreated) {
+              logBuilderTestStep('delete (cleanup)');
+              await client.deleteMetadataExtension({
+                name: config.extName,
+                transportRequest: config.transportRequest
+              });
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed for ${config.extName}:`, cleanupError);
+          }
+        }
+
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'MetadataExtensionBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         // Cleanup: delete metadata extension only if it was created in this test
-        if (extName && objectCreated) {
+        if (extName && metadataExtensionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.deleteMetadataExtension({

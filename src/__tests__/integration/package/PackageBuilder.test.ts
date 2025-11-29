@@ -20,7 +20,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -244,9 +246,13 @@ describe('PackageBuilder (using CrudClient)', () => {
       }
 
       const config = buildBuilderConfig(testCase);
+      let packageCreated = false;
+      let packageLocked = false;
+      let currentStep = '';
 
       try {
-        logBuilderTestStep('validate');
+        currentStep = 'validate';
+        logBuilderTestStep(currentStep);
         const validationResponse = await client.validatePackage({
           packageName: config.packageName,
           superPackage: config.superPackage,
@@ -260,7 +266,8 @@ describe('PackageBuilder (using CrudClient)', () => {
         }
         expect(validationResponse?.status).toBe(200);
         
-        logBuilderTestStep('create');
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
         await client.createPackage({
           packageName: config.packageName,
           superPackage: config.superPackage,
@@ -272,6 +279,7 @@ describe('PackageBuilder (using CrudClient)', () => {
           applicationComponent: config.applicationComponent,
           responsible: config.responsible
         });
+        packageCreated = true;
         
         logBuilderTestStep('check(active)');
         const checkResult1 = await client.checkPackage({ packageName: config.packageName, superPackage: config.superPackage });
@@ -288,13 +296,16 @@ describe('PackageBuilder (using CrudClient)', () => {
         expect(readResult).toBeDefined();
         expect(readResult?.packageName).toBe(config.packageName);
         
-        logBuilderTestStep('lock');
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
         await client.lockPackage({
           packageName: config.packageName,
           superPackage: config.superPackage
         });
+        packageLocked = true;
         
-        logBuilderTestStep('update');
+        currentStep = 'update';
+        logBuilderTestStep(currentStep);
         await client.updatePackage({
           packageName: config.packageName,
           superPackage: config.superPackage,
@@ -307,11 +318,13 @@ describe('PackageBuilder (using CrudClient)', () => {
           await new Promise(resolve => setTimeout(resolve, updateDelay));
         }
         
-        logBuilderTestStep('unlock');
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
         await client.unlockPackage({
           packageName: config.packageName,
           superPackage: config.superPackage
         });
+        packageLocked = false;
         
         const unlockDelay = getOperationDelay('unlock', testCase);
         if (unlockDelay > 0) {
@@ -366,6 +379,44 @@ describe('PackageBuilder (using CrudClient)', () => {
           );
           return;
         }
+
+        // Log step error with details before failing test
+        logBuilderTestStepError(currentStep || 'unknown', error);
+
+        // Cleanup: unlock and delete if object was created/locked
+        if (packageLocked || packageCreated) {
+          try {
+            if (packageLocked) {
+              logBuilderTestStep('unlock (cleanup)');
+              await client.unlockPackage({
+                packageName: config.packageName,
+                superPackage: config.superPackage
+              });
+            }
+            if (packageCreated) {
+              logBuilderTestStep('delete (cleanup)');
+              // Create a new client with fresh session for deletion to avoid lock issues
+              const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
+              await (deleteConnection as any).connect();
+              const deleteClient = new CrudClient(deleteConnection);
+              await deleteClient.deletePackage({
+                packageName: config.packageName,
+                transportRequest: config.transportRequest
+              });
+              deleteConnection.reset();
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed for ${config.packageName}:`, cleanupError);
+          }
+        }
+
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'PackageBuilder - full workflow', enhancedError);
+        throw enhancedError;
 
         logBuilderTestError(testsLogger, 'PackageBuilder - full workflow', error);
         throw error;

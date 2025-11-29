@@ -21,7 +21,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -154,8 +156,13 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      let functionGroupCreated = false;
+      let functionGroupLocked = false;
+      let currentStep = '';
+
       try {
-        logBuilderTestStep('validate');
+        currentStep = 'validate';
+        logBuilderTestStep(currentStep);
         const validationResponse = await client.validateFunctionGroup({
           functionGroupName: config.functionGroupName,
           packageName: config.packageName!,
@@ -169,21 +176,27 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
         }
         expect(validationResponse?.status).toBe(200);
         
-        logBuilderTestStep('create');
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
         await client.createFunctionGroup({
           functionGroupName: config.functionGroupName,
           packageName: config.packageName!,
           description: config.description || '',
           transportRequest: config.transportRequest
         });
+        functionGroupCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
         
-        logBuilderTestStep('lock');
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
         await client.lockFunctionGroup({ functionGroupName: config.functionGroupName });
+        functionGroupLocked = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
-        logBuilderTestStep('unlock');
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
         await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName });
+        functionGroupLocked = false;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
         
         logBuilderTestStep('activate');
@@ -215,8 +228,35 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
 
         logBuilderTestSuccess(testsLogger, 'FunctionGroupBuilder - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'FunctionGroupBuilder - full workflow', error);
-        throw error;
+        // Log step error with details before failing test
+        logBuilderTestStepError(currentStep || 'unknown', error);
+
+        // Cleanup: unlock and delete if object was created/locked
+        if (functionGroupLocked || functionGroupCreated) {
+          try {
+            if (functionGroupLocked) {
+              logBuilderTestStep('unlock (cleanup)');
+              await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName });
+            }
+            if (functionGroupCreated) {
+              logBuilderTestStep('delete (cleanup)');
+              await client.deleteFunctionGroup({
+                functionGroupName: config.functionGroupName,
+                transportRequest: config.transportRequest
+              });
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed for ${config.functionGroupName}:`, cleanupError);
+          }
+        }
+
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'FunctionGroupBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         logBuilderTestEnd(testsLogger, 'FunctionGroupBuilder - full workflow');
       }

@@ -96,6 +96,9 @@ export class ViewBuilder {
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
+      if (!this.config.packageName) {
+        throw new Error('Package name is required for view validation');
+      }
       this.logger.info?.('Validating view name:', this.config.viewName);
       const response = await validateViewName(
         this.connection,

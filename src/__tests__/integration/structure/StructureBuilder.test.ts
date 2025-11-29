@@ -23,7 +23,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -157,22 +159,27 @@ describe('StructureBuilder (using CrudClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      logBuilderTestStep('validate');
+      const validationResponse = await client.validateStructure({
+        structureName: config.structureName,
+        packageName: config.packageName!,
+        description: config.description || ''
+      });
+      if (validationResponse?.status !== 200) {
+        const errorData = typeof validationResponse?.data === 'string' 
+          ? validationResponse.data 
+          : JSON.stringify(validationResponse?.data);
+        console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+      }
+      expect(validationResponse?.status).toBe(200);
+      
+      let structureCreated = false;
+      let structureLocked = false;
+      let currentStep = '';
+      
       try {
-        logBuilderTestStep('validate');
-        const validationResponse = await client.validateStructure({
-          structureName: config.structureName,
-          packageName: config.packageName!,
-          description: config.description || ''
-        });
-        if (validationResponse?.status !== 200) {
-          const errorData = typeof validationResponse?.data === 'string' 
-            ? validationResponse.data 
-            : JSON.stringify(validationResponse?.data);
-          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-        }
-        expect(validationResponse?.status).toBe(200);
-        
-        logBuilderTestStep('create');
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
         await client.createStructure({
           structureName: config.structureName,
           packageName: config.packageName!,
@@ -180,33 +187,42 @@ describe('StructureBuilder (using CrudClient)', () => {
           ddlCode: config.ddlCode || '',
           transportRequest: config.transportRequest
         });
+        structureCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
         
-        logBuilderTestStep('lock');
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
         await client.lockStructure({ structureName: config.structureName });
+        structureLocked = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
-        logBuilderTestStep('update');
+        currentStep = 'update';
+        logBuilderTestStep(currentStep);
         await client.updateStructure({
           structureName: config.structureName,
           ddlCode: config.ddlCode || ''
         });
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
         
-        logBuilderTestStep('check(inactive)');
+        currentStep = 'check(inactive)';
+        logBuilderTestStep(currentStep);
         const checkResultInactive = await client.checkStructure({ structureName: config.structureName });
         expect(checkResultInactive?.status).toBeDefined();
         
-        logBuilderTestStep('unlock');
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
         await client.unlockStructure({ structureName: config.structureName });
+        structureLocked = false; // Unlocked successfully
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
         
-        logBuilderTestStep('activate');
+        currentStep = 'activate';
+        logBuilderTestStep(currentStep);
         await client.activateStructure({ structureName: config.structureName });
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
         
-        logBuilderTestStep('check(active)');
+        currentStep = 'check(active)';
+        logBuilderTestStep(currentStep);
         // Retry check for active version - activation may take time
         const checkResultActive = await retryCheckAfterActivate(
           () => client.checkStructure({ structureName: config.structureName }),
@@ -219,7 +235,8 @@ describe('StructureBuilder (using CrudClient)', () => {
         );
         expect(checkResultActive?.status).toBeDefined();
         
-        logBuilderTestStep('delete (cleanup)');
+        currentStep = 'delete (cleanup)';
+        logBuilderTestStep(currentStep);
         await client.deleteStructure({
           structureName: config.structureName,
           transportRequest: config.transportRequest
@@ -230,8 +247,35 @@ describe('StructureBuilder (using CrudClient)', () => {
 
         logBuilderTestSuccess(testsLogger, 'StructureBuilder - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'StructureBuilder - full workflow', error);
-        throw error;
+        // Log step error with details before failing test
+        logBuilderTestStepError(currentStep || 'unknown', error);
+        
+        // Cleanup: unlock and delete if object was created/locked
+        if (structureLocked || structureCreated) {
+          try {
+            if (structureLocked) {
+              logBuilderTestStep('unlock (cleanup)');
+              await client.unlockStructure({ structureName: config.structureName });
+            }
+            if (structureCreated) {
+              logBuilderTestStep('delete (cleanup)');
+              await client.deleteStructure({
+                structureName: config.structureName,
+                transportRequest: config.transportRequest
+              });
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed for ${config.structureName}:`, cleanupError);
+          }
+        }
+        
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'StructureBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         logBuilderTestEnd(testsLogger, 'StructureBuilder - full workflow');
       }

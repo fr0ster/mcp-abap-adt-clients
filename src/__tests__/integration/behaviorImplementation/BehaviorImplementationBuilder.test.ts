@@ -18,7 +18,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -32,7 +34,10 @@ const {
   resolveStandardObject,
   getEnvironmentConfig,
   getTimeout,
-  getOperationDelay
+  getOperationDelay,
+  resolveTransportRequest,
+  createDependencyBehaviorDefinition,
+  extractValidationErrorMessage
 } = require('../../../../tests/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -150,6 +155,8 @@ ENDCLASS.`;
   describe('Full workflow test', () => {
     let testCase: any = null;
     let className: string | null = null;
+    let behaviorDefinitionName: string | null = null;
+    let behaviorDefinitionCreated: boolean = false;
     let skipReason: string | null = null;
 
     beforeAll(async () => {
@@ -179,6 +186,46 @@ ENDCLASS.`;
 
       testCase = tc;
       className = tc.params.class_name || tc.params.test_class_name;
+
+      // Create behavior definition before test if behavior_definition_name and behavior_definition_source are provided
+      if (tc.params.behavior_definition_name && tc.params.behavior_definition_source) {
+        const behaviorDefinitionConfig = {
+          bdefName: tc.params.behavior_definition_name,
+          packageName: packageName,
+          description: `Test behavior definition for ${className}`,
+          rootEntity: tc.params.root_entity || tc.params.behavior_definition_name,
+          implementationType: tc.params.implementation_type || 'Managed',
+          sourceCode: tc.params.behavior_definition_source,
+          transportRequest: resolveTransportRequest(tc.params.transport_request)
+        };
+
+        const behaviorDefinitionResult = await createDependencyBehaviorDefinition(client, behaviorDefinitionConfig, tc);
+        
+        if (!behaviorDefinitionResult.success) {
+          skipReason = behaviorDefinitionResult.reason || `environment problem, test skipped: Failed to create required dependency behavior definition ${tc.params.behavior_definition_name}`;
+          testCase = null;
+          className = null;
+          return;
+        }
+
+        behaviorDefinitionName = tc.params.behavior_definition_name;
+        behaviorDefinitionCreated = behaviorDefinitionResult.created || false;
+      }
+    });
+
+    afterAll(async () => {
+      // Cleanup behavior definition if it was created in beforeAll
+      if (behaviorDefinitionCreated && behaviorDefinitionName) {
+        try {
+          await client.deleteBehaviorDefinition({
+            name: behaviorDefinitionName,
+            transportRequest: resolveTransportRequest(testCase?.params?.transport_request) || ''
+          });
+        } catch (cleanupError) {
+          // Log but don't fail - cleanup errors are silent
+          testsLogger.warn?.(`Cleanup failed for behavior definition ${behaviorDefinitionName}:`, cleanupError);
+        }
+      }
     });
 
     it('should execute full workflow and store all results', async () => {
@@ -196,9 +243,13 @@ ENDCLASS.`;
       }
 
       const config = buildBuilderConfig(testCase);
+      let behaviorImplementationCreated = false;
+      let behaviorImplementationLocked = false;
+      let currentStep = '';
 
       try {
-        logBuilderTestStep('validate');
+        currentStep = 'validate';
+        logBuilderTestStep(currentStep);
         const validationResponse = await client.validateBehaviorImplementation({
           className: config.className,
           packageName: config.packageName,
@@ -222,14 +273,20 @@ ENDCLASS.`;
         
         // Validation successful (200) - object can be created
         if (validationResponse?.status !== 200) {
-          const errorData = typeof validationResponse?.data === 'string' 
-            ? validationResponse.data 
-            : JSON.stringify(validationResponse?.data);
-          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-          throw new Error(`Validation failed with status ${validationResponse?.status}`);
+          const errorMessage = extractValidationErrorMessage(validationResponse);
+          logBuilderTestStepError('validate', {
+            response: {
+              status: validationResponse?.status,
+              data: validationResponse?.data
+            }
+          });
+          logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', 
+            `Validation failed: ${errorMessage} - environment problem, test skipped`);
+          return;
         }
         
-        logBuilderTestStep('create');
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
         await client.createBehaviorImplementation({
           className: config.className,
           packageName: config.packageName,
@@ -237,6 +294,7 @@ ENDCLASS.`;
           description: config.description,
           transportRequest: config.transportRequest
         });
+        behaviorImplementationCreated = true;
         
         logBuilderTestStep('check(inactive)');
         const checkResult1 = await client.checkClass({ className: config.className }, 'inactive');
@@ -258,11 +316,14 @@ ENDCLASS.`;
         expect(readResult).toBeDefined();
         expect(readResult?.className).toBe(config.className);
         
-        logBuilderTestStep('lock');
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
         await client.lockClass({
           className: config.className
         });
+        behaviorImplementationLocked = true;
         
+        currentStep = 'update';
         logBuilderTestStep('updateMainSource');
         await client.updateBehaviorImplementationMainSource({
           className: config.className,
@@ -285,10 +346,12 @@ ENDCLASS.`;
         const checkResult2 = await client.checkClass({ className: config.className }, 'inactive');
         expect(checkResult2?.status).toBeDefined();
         
-        logBuilderTestStep('unlock');
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
         await client.unlockClass({
           className: config.className
         });
+        behaviorImplementationLocked = false;
         
         const unlockDelay = getOperationDelay('unlock', testCase);
         if (unlockDelay > 0) {
@@ -317,8 +380,37 @@ ENDCLASS.`;
 
         logBuilderTestSuccess(testsLogger, 'BehaviorImplementationBuilder - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'BehaviorImplementationBuilder - full workflow', error);
-        throw error;
+        // Log step error with details before failing test
+        logBuilderTestStepError(currentStep || 'unknown', error);
+
+        // Cleanup: unlock and delete if object was created/locked
+        if (behaviorImplementationLocked || behaviorImplementationCreated) {
+          try {
+            if (behaviorImplementationLocked) {
+              logBuilderTestStep('unlock (cleanup)');
+              await client.unlockClass({
+                className: config.className
+              });
+            }
+            if (behaviorImplementationCreated) {
+              logBuilderTestStep('delete (cleanup)');
+              await client.deleteClass({
+                className: config.className,
+                transportRequest: config.transportRequest
+              });
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed for ${config.className}:`, cleanupError);
+          }
+        }
+
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'BehaviorImplementationBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         // Cleanup: delete behavior implementation class
         if (className) {

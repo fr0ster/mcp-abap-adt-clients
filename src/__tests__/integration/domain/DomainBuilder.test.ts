@@ -24,7 +24,9 @@ import {
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd,
-  logBuilderTestStep
+  logBuilderTestStep,
+  logBuilderTestStepError,
+  getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
 import * as path from 'path';
@@ -207,34 +209,44 @@ describe('DomainBuilder (using CrudClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      logBuilderTestStep('validate');
+      const validationResponse = await client.validateDomain({
+        domainName: config.domainName,
+        packageName: config.packageName!,
+        description: config.description || ''
+      });
+      if (validationResponse?.status !== 200) {
+        const errorData = typeof validationResponse?.data === 'string' 
+          ? validationResponse.data 
+          : JSON.stringify(validationResponse?.data);
+        console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+      }
+      expect(validationResponse?.status).toBe(200);
+      
+      let domainCreated = false;
+      let domainLocked = false;
+      let currentStep = '';
+      
       try {
-        logBuilderTestStep('validate');
-        const validationResponse = await client.validateDomain({
-          domainName: config.domainName,
-          packageName: config.packageName!,
-          description: config.description || ''
-        });
-        if (validationResponse?.status !== 200) {
-          const errorData = typeof validationResponse?.data === 'string' 
-            ? validationResponse.data 
-            : JSON.stringify(validationResponse?.data);
-          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-        }
-        expect(validationResponse?.status).toBe(200);
-        
-        logBuilderTestStep('create');
+        currentStep = 'create';
+        logBuilderTestStep(currentStep);
         await client.createDomain(config);
+        domainCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
         
-        logBuilderTestStep('check(active)');
+        currentStep = 'check(active)';
+        logBuilderTestStep(currentStep);
         const checkResultActive = await client.checkDomain({ domainName: config.domainName });
         expect(checkResultActive?.status).toBeDefined();
         
-        logBuilderTestStep('lock');
+        currentStep = 'lock';
+        logBuilderTestStep(currentStep);
         await client.lockDomain({ domainName: config.domainName });
+        domainLocked = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
-        logBuilderTestStep('update');
+        currentStep = 'update';
+        logBuilderTestStep(currentStep);
         await client.updateDomain({
           domainName: config.domainName,
           packageName: config.packageName!,
@@ -245,20 +257,25 @@ describe('DomainBuilder (using CrudClient)', () => {
         });
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
         
-        logBuilderTestStep('check(inactive)');
+        currentStep = 'check(inactive)';
+        logBuilderTestStep(currentStep);
         const checkResultInactive = await client.checkDomain({ domainName: config.domainName });
         expect(checkResultInactive?.status).toBeDefined();
         
-        logBuilderTestStep('unlock');
+        currentStep = 'unlock';
+        logBuilderTestStep(currentStep);
         await client.unlockDomain({ domainName: config.domainName });
+        domainLocked = false; // Unlocked successfully
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
         
-        logBuilderTestStep('activate');
+        currentStep = 'activate';
+        logBuilderTestStep(currentStep);
         await client.activateDomain({ domainName: config.domainName });
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase)));
         
-        logBuilderTestStep('delete (cleanup)');
+        currentStep = 'delete (cleanup)';
+        logBuilderTestStep(currentStep);
         await client.deleteDomain({
           domainName: config.domainName,
           transportRequest: config.transportRequest
@@ -268,9 +285,36 @@ describe('DomainBuilder (using CrudClient)', () => {
         expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'DomainBuilder - full workflow');
-      } catch (error) {
-        logBuilderTestError(testsLogger, 'DomainBuilder - full workflow', error);
-        throw error;
+      } catch (error: any) {
+        // Log step error with details before failing test
+        logBuilderTestStepError(currentStep || 'unknown', error);
+        
+        // Cleanup: unlock and delete if object was created/locked
+        if (domainLocked || domainCreated) {
+          try {
+            if (domainLocked) {
+              logBuilderTestStep('unlock (cleanup)');
+              await client.unlockDomain({ domainName: config.domainName });
+            }
+            if (domainCreated) {
+              logBuilderTestStep('delete (cleanup)');
+              await client.deleteDomain({
+                domainName: config.domainName,
+                transportRequest: config.transportRequest
+              });
+            }
+          } catch (cleanupError) {
+            // Log cleanup error but don't fail test - original error is more important
+            testsLogger.warn?.(`Cleanup failed for ${config.domainName}:`, cleanupError);
+          }
+        }
+        
+        const statusText = getHttpStatusText(error);
+        const enhancedError = statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
+          : error;
+        logBuilderTestError(testsLogger, 'DomainBuilder - full workflow', enhancedError);
+        throw enhancedError;
       } finally {
         logBuilderTestEnd(testsLogger, 'DomainBuilder - full workflow');
       }
