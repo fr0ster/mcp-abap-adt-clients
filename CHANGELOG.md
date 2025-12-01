@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.33] - 2025-12-01
+
+### Dependencies
+- Updated `@mcp-abap-adt/connection` to `^0.1.13`:
+  - **CSRF Token Endpoint Optimization**: Connection layer now uses `/sap/bc/adt/core/discovery` endpoint instead of `/sap/bc/adt/discovery`
+    - Lighter response payload (smaller XML response)
+    - Available on all SAP systems (on-premise and cloud)
+    - Standard ADT discovery endpoint ensures better compatibility
+  - **CSRF Configuration Export**: `CSRF_CONFIG` and `CSRF_ERROR_MESSAGES` constants are now exported from connection package
+    - Enables consistent CSRF token handling across different connection implementations
+    - Provides centralized configuration for retry logic, delays, and error messages
+    - See [PR Proposal](https://github.com/fr0ster/mcp-abap-adt/blob/main/packages/connection/PR_PROPOSAL_CSRF_CONFIG.md) for details
+  - **Impact**: All CRUD operations and read operations benefit from optimized CSRF token fetching
+    - Faster connection initialization
+    - Reduced network traffic
+    - Better compatibility across different SAP system versions
+
 ## [0.1.32] - 2025-11-30
 
 ### Added
