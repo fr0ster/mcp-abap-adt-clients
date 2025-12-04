@@ -9,9 +9,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
-import { PackageBuilder } from '../../../core/package';
 import { IAdtLogger } from '../../../utils/logger';
 import { getPackage } from '../../../core/package/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -294,9 +292,25 @@ describe('PackageBuilder (using CrudClient)', () => {
         }
         
         logBuilderTestStep('read');
-        const readResult = await client.readPackage(config.packageName);
-        expect(readResult).toBeDefined();
-        expect(readResult?.packageName).toBe(config.packageName);
+        let readResult;
+        try {
+          readResult = await client.readPackage(config.packageName);
+          expect(readResult).toBeDefined();
+          expect(readResult?.packageName).toBe(config.packageName);
+        } catch (error: any) {
+          if (error.response?.status === 404) {
+            throw new Error(`404 Not Found: Package "${config.packageName}" was not found after creation. This may indicate that the package creation did not complete successfully or the package is not yet available. Error: ${error.message}`);
+          }
+          throw error;
+        }
+        
+        // Additional delay before lock to ensure package is fully available for lock operation
+        // Use delay from YAML configuration (operation_delays.read or default)
+        const readDelay = getOperationDelay('read', testCase) || getOperationDelay('default', testCase) || 2000;
+        if (readDelay > 0) {
+          logBuilderTestStep(`wait (after read ${readDelay}ms)`);
+          await new Promise(resolve => setTimeout(resolve, readDelay));
+        }
         
         currentStep = 'lock';
         logBuilderTestStep(currentStep);
@@ -430,8 +444,8 @@ describe('PackageBuilder (using CrudClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP package', async () => {
-      const testCase = getTestCaseDefinition('create_package', 'builder_package');
-      const standardObject = resolveStandardObject('package', isCloudSystem, testCase);
+      // Read tests use standard_objects registry, not create_package test case
+      const standardObject = resolveStandardObject('package', isCloudSystem, null);
 
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'PackageBuilder - read standard object', {

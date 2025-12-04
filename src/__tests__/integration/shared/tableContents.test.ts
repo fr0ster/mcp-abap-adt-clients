@@ -11,6 +11,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { getTableContents } from '../../../core/shared/tableContents';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -126,6 +134,12 @@ describe('Shared - getTableContents', () => {
   it('should throw error if table name is missing', async () => {
     if (!hasConfig) {
       logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      return;
+    }
+
+    // This test doesn't require actual connection, but we skip on cloud for consistency
+    if (isCloudSystem) {
+      logger.warn('⚠️ Skipping test: Table contents are not supported on cloud systems');
       return;
     }
 

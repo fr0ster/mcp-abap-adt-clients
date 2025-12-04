@@ -8,6 +8,14 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { getWhereUsed } from '../../../core/shared/whereUsed';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -85,12 +93,19 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    const result = await getWhereUsed(connection, {
-      object_name: 'CL_ABAP_CHAR_UTILITIES',
-      object_type: 'class'
-    });
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    try {
+      const result = await getWhereUsed(connection, {
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class'
+      });
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+    } catch (error: any) {
+      if (error.response?.status === 415) {
+        throw new Error(`415 Unsupported Media Type: The server cannot process the request Content-Type. This may indicate an issue with the Content-Type header format. Error: ${error.message}`);
+      }
+      throw error;
+    }
   }, 15000);
 
   it('should get where-used for table', async () => {
@@ -99,13 +114,23 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    const result = await getWhereUsed(connection, {
-      object_name: 'T000',
-      object_type: 'table'
-    });
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-  }, 15000);
+    try {
+      const result = await getWhereUsed(connection, {
+        object_name: 'T000',
+        object_type: 'table'
+      });
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+    } catch (error: any) {
+      if (error.response?.status === 415) {
+        throw new Error(`415 Unsupported Media Type: The server cannot process the request Content-Type. This may indicate an issue with the Content-Type header format. Error: ${error.message}`);
+      }
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw new Error(`Request timeout: Where-used query for table "T000" exceeded timeout. This may indicate that the query is too complex or the system is slow. Consider increasing the timeout or using a simpler test object. Error: ${error.message}`);
+      }
+      throw error;
+    }
+  }, 60000); // Increased timeout to 60s for table where-used queries which can be slow
 
   it('should throw error if object name is missing', async () => {
     if (!hasConfig) {

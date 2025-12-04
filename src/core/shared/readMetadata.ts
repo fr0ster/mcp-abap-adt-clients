@@ -59,6 +59,52 @@ export function getObjectMetadataUri(objectType: string, objectName: string, fun
 }
 
 /**
+ * Get Accept header for object type
+ */
+function getAcceptHeader(objectType: string): string {
+  const type = objectType.toLowerCase();
+  
+  switch (type) {
+    case 'class':
+    case 'clas/oc':
+      return 'application/vnd.sap.adt.oo.classes.v4+xml, application/vnd.sap.adt.oo.classes.v3+xml, application/vnd.sap.adt.oo.classes.v2+xml, application/vnd.sap.adt.oo.classes.v1+xml';
+    case 'interface':
+    case 'intf/if':
+      return 'application/vnd.sap.adt.oo.interfaces.v2+xml, application/vnd.sap.adt.oo.interfaces.v1+xml';
+    case 'table':
+    case 'tabl/dt':
+      return 'application/vnd.sap.adt.tables.v2+xml, application/vnd.sap.adt.tables.v1+xml, application/vnd.sap.adt.blues.v1+xml';
+    case 'domain':
+    case 'doma/dd':
+      return 'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml';
+    case 'dataelement':
+    case 'dtel':
+      return 'application/vnd.sap.adt.dataelements.v2+xml, application/vnd.sap.adt.dataelements.v1+xml';
+    case 'structure':
+    case 'stru/dt':
+      return 'application/vnd.sap.adt.structures.v2+xml, application/vnd.sap.adt.structures.v1+xml';
+    case 'view':
+    case 'ddls/df':
+      return 'application/vnd.sap.adt.ddlSource.v2+xml, application/vnd.sap.adt.ddlSource.v1+xml';
+    case 'program':
+    case 'prog/p':
+      return 'application/vnd.sap.adt.programs.programs.v2+xml, application/vnd.sap.adt.programs.programs.v1+xml';
+    case 'functiongroup':
+    case 'fugr':
+      return 'application/vnd.sap.adt.functions.groups.v2+xml, application/vnd.sap.adt.functions.groups.v1+xml';
+    case 'functionmodule':
+    case 'fugr/ff':
+      return 'application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v1+xml';
+    case 'package':
+    case 'devc/k':
+      return 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml';
+    default:
+      // Fallback to generic XML for unknown types
+      return 'application/xml';
+  }
+}
+
+/**
  * Read object metadata (without source code)
  */
 export async function readObjectMetadata(
@@ -68,13 +114,14 @@ export async function readObjectMetadata(
   functionGroup?: string
 ): Promise<AxiosResponse> {
   const uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+  const acceptHeader = getAcceptHeader(objectType);
 
   return connection.makeAdtRequest({
     url: uri,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
+      'Accept': acceptHeader
     }
   });
 }

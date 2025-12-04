@@ -90,8 +90,8 @@ export async function getWhereUsed(
     timeout: getTimeout('default'),
     data: requestBody,
     headers: {
-      'Content-Type': 'application/xml',
-      'Accept': 'application/xml'
+      'Content-Type': 'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
+      'Accept': 'application/vnd.sap.adt.repository.usagereferences.result.v1+xml'
     }
   });
 }

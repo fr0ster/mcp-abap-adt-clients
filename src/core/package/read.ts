@@ -22,7 +22,9 @@ export async function getPackage(
     url,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: {}
+    headers: {
+      'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml'
+    }
   });
 }
 

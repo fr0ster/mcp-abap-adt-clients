@@ -391,6 +391,8 @@ describe('ViewBuilder (using CrudClient)', () => {
       let viewCreated = false;
       let viewLocked = false;
       let currentStep = '';
+      // Track if table was created in beforeEach (for cleanup in catch block)
+      const shouldCleanupTable = tableCreated && tableName;
       
       try {
         currentStep = 'create';
@@ -497,7 +499,7 @@ describe('ViewBuilder (using CrudClient)', () => {
         logBuilderTestStepError(currentStep || 'unknown', error);
         
         // Cleanup: unlock (always) and delete (if skip_cleanup is false)
-        if (viewLocked || viewCreated) {
+        if (viewLocked || viewCreated || shouldCleanupTable) {
           try {
             // Unlock is always required (even if skip_cleanup is true)
             if (viewLocked) {
@@ -505,22 +507,31 @@ describe('ViewBuilder (using CrudClient)', () => {
               await client.unlockView({ viewName: config.viewName });
             }
             // Delete only if skip_cleanup is false
-            if (!skipCleanup && viewCreated) {
+            if (!skipCleanup && (viewCreated || shouldCleanupTable)) {
               logBuilderTestStep('delete (cleanup)');
               // Use group deletion for view and table together
-              if (tableName && viewName) {
+              if (tableName && viewName && (viewCreated || shouldCleanupTable)) {
                 const sharedBuilder = new SharedBuilder(connection);
                 await sharedBuilder.deleteGroup([
                   { type: 'DDLS/DF', name: viewName },
                   { type: 'TABL/DT', name: tableName }
                 ]);
-              } else if (viewName) {
+                // Mark table as cleaned up to prevent afterEach from trying again
+                tableCreated = false;
+              } else if (viewName && viewCreated) {
                 await client.deleteView({
                   viewName: config.viewName,
                   transportRequest: config.transportRequest
                 });
+              } else if (shouldCleanupTable && tableName) {
+                // Cleanup table only if view wasn't created
+                await client.deleteTable({
+                  tableName: tableName,
+                  transportRequest: resolveTransportRequest(testCase?.params?.transport_request)
+                });
+                tableCreated = false;
               }
-            } else if (skipCleanup && viewCreated) {
+            } else if (skipCleanup && (viewCreated || shouldCleanupTable)) {
               testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - objects left for analysis:', {
                 view: viewName,
                 table: tableName
@@ -539,6 +550,16 @@ describe('ViewBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'ViewBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (viewLocked) {
+            await client.unlockView({ viewName: config.viewName }).catch(() => {});
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
+        }
         logBuilderTestEnd(testsLogger, 'ViewBuilder - full workflow');
       }
     }, getTimeout('test')); // Full workflow test timeout (200 seconds)

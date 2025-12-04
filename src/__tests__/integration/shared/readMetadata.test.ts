@@ -8,6 +8,14 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { readObjectMetadata } from '../../../core/shared/readMetadata';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, quiet: true });
+}
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
 const logger = {
@@ -87,9 +95,16 @@ describe('Shared - readMetadata', () => {
 
     // Use a standard SAP class that should exist
     const className = 'CL_ABAP_CHAR_UTILITIES';
-    const result = await readObjectMetadata(connection, 'class', className);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    try {
+      const result = await readObjectMetadata(connection, 'class', className);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+    } catch (error: any) {
+      if (error.response?.status === 406) {
+        throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);
+      }
+      throw error;
+    }
   }, 15000);
 
   it('should read domain metadata', async () => {
@@ -100,9 +115,16 @@ describe('Shared - readMetadata', () => {
 
     // Use a standard SAP domain that should exist
     const domainName = 'MANDT';
-    const result = await readObjectMetadata(connection, 'domain', domainName);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    try {
+      const result = await readObjectMetadata(connection, 'domain', domainName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+    } catch (error: any) {
+      if (error.response?.status === 406) {
+        throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);
+      }
+      throw error;
+    }
   }, 15000);
 
   it('should read table metadata', async () => {
@@ -113,9 +135,16 @@ describe('Shared - readMetadata', () => {
 
     // Use a standard SAP table that should exist
     const tableName = 'T000';
-    const result = await readObjectMetadata(connection, 'table', tableName);
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    try {
+      const result = await readObjectMetadata(connection, 'table', tableName);
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+    } catch (error: any) {
+      if (error.response?.status === 406) {
+        throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);
+      }
+      throw error;
+    }
   }, 15000);
 
   it('should throw error for unsupported object type', async () => {

@@ -568,6 +568,21 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
           throw enhancedError;
         }
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (classLocked || testClassesLocked) {
+            if (testClassesLocked) {
+              await client.unlockTestClasses({ className: testClassName! }).catch(() => {});
+            }
+            if (classLocked) {
+              await client.unlockClass({ className: testClassName! }).catch(() => {});
+            }
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
+        }
         logBuilderTestEnd(testsLogger, 'ClassBuilder - full workflow');
       }
     }, getTimeout('test'));

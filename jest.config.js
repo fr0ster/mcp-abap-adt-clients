@@ -7,7 +7,7 @@ module.exports = {
     '**/__tests__/**/*.integration.test.[tj]s',
     '!**/**/index.test.[tj]s', // No tests for index.ts files
   ],
-  testTimeout: 300000, // 5 minutes - allows for long-running integration tests (CDS unit tests can take 2+ minutes)
+  testTimeout: 900000, // 15 minutes - allows for long-running integration tests when running all tests sequentially (CDS unit tests can take 2+ minutes, and sequential execution means all tests run one by one)
   forceExit: true,
   silent: false, // Show test output
   verbose: false, // Don't show individual test names unless failed

@@ -7,6 +7,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [0.1.35] - 2024-12-04
 
+### Fixed
+- **getPackage Accept Headers**: Fixed 404 (Not Found) errors by adding proper ADT-specific Accept header for package read operations
+  - Accept: `application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml`
+- **readMetadata Accept Headers**: Fixed 406 (Not Acceptable) errors by using proper ADT-specific Accept headers for different object types
+  - Classes: `application/vnd.sap.adt.oo.classes.v4+xml` (with fallback to v3, v2, v1)
+  - Tables: `application/vnd.sap.adt.tables.v2+xml` (with fallback to v1 and blues.v1)
+  - Domains: `application/vnd.sap.adt.domains.v2+xml` (with fallback to v1)
+  - Data Elements: `application/vnd.sap.adt.dataelements.v2+xml` (with fallback to v1)
+  - Structures: `application/vnd.sap.adt.structures.v2+xml` (with fallback to v1)
+  - Views: `application/vnd.sap.adt.ddlSource.v2+xml` (with fallback to v1)
+  - Programs: `application/vnd.sap.adt.programs.programs.v2+xml` (with fallback to v1)
+  - Function Groups: `application/vnd.sap.adt.functions.groups.v2+xml` (with fallback to v1)
+  - Function Modules: `application/vnd.sap.adt.functions.fmodules.v2+xml` (with fallback to v1)
+  - Packages: `application/vnd.sap.adt.packages.v2+xml` (with fallback to v1)
+- **whereUsed Content-Type Headers**: Fixed 415 (Unsupported Media Type) errors by using proper ADT-specific headers for usageReferences API
+  - Content-Type: `application/vnd.sap.adt.repository.usagereferences.request.v1+xml`
+  - Accept: `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`
+- **Integration Tests**: Added proper error handling for 406 and 415 errors in shared integration tests
+  - Tests now provide clear error messages when these HTTP errors occur
+  - Added `.env` file loading in all shared integration tests (`readMetadata`, `whereUsed`, `search`, `readSource`, `tableContents`, `sqlQuery`)
+
+## [0.1.35] - 2024-12-04
+
 ### Added
 - **Interfaces Package Integration**: Migrated to use `@mcp-abap-adt/interfaces` package for all interface definitions
   - All interfaces now imported from shared package
