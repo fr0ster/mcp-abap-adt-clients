@@ -13,6 +13,57 @@ TypeScript clients for SAP ABAP Development Tools (ADT) with a **Builder and Cli
 - ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
 - ✅ **TypeScript-first** – full type safety with comprehensive interfaces
 
+## Responsibilities and Design Principles
+
+### Core Development Principle
+
+**Interface-Only Communication**: This package follows a fundamental development principle: **all interactions with external dependencies happen ONLY through interfaces**. The code knows **NOTHING beyond what is defined in the interfaces**.
+
+This means:
+- Does not know about concrete implementation classes from other packages
+- Does not know about internal data structures or methods not defined in interfaces
+- Does not make assumptions about implementation behavior beyond interface contracts
+- Does not access properties or methods not explicitly defined in interfaces
+
+This principle ensures:
+- **Loose coupling**: Clients are decoupled from concrete implementations in other packages
+- **Flexibility**: New implementations can be added without modifying clients
+- **Testability**: Easy to mock dependencies for testing
+- **Maintainability**: Changes to implementations don't affect clients
+
+### Package Responsibilities
+
+This package is responsible for:
+
+1. **ADT operations**: Provides high-level and low-level APIs for interacting with SAP ABAP Development Tools (ADT)
+2. **Object management**: CRUD operations for ABAP objects (classes, interfaces, programs, etc.)
+3. **Builder pattern**: Fluent interface for complex workflows with method chaining
+4. **Session management**: Maintains session state across operations using `sap-adt-connection-id`
+5. **Lock management**: Handles object locking with persistent registry
+
+#### What This Package Does
+
+- **Provides ADT clients**: `ReadOnlyClient`, `CrudClient`, and specialized clients for ADT operations
+- **Implements builders**: Builder classes for different ABAP object types with method chaining
+- **Manages locks**: Lock registry with persistent storage and CLI tools
+- **Handles requests**: Makes HTTP requests to SAP ADT endpoints through connection interface
+- **Manages state**: Maintains object state across chained operations
+
+#### What This Package Does NOT Do
+
+- **Does NOT handle authentication**: Authentication is handled by `@mcp-abap-adt/connection`
+- **Does NOT manage connections**: Connection management is handled by `@mcp-abap-adt/connection`
+- **Does NOT validate headers**: Header validation is handled by `@mcp-abap-adt/header-validator`
+- **Does NOT store tokens**: Token storage is handled by `@mcp-abap-adt/auth-stores`
+- **Does NOT orchestrate authentication**: Token lifecycle is handled by `@mcp-abap-adt/auth-broker`
+
+### External Dependencies
+
+This package interacts with external packages **ONLY through interfaces**:
+
+- **`@mcp-abap-adt/connection`**: Uses `AbapConnection` interface for HTTP requests - does not know about concrete connection implementation
+- **No direct dependencies on other packages**: All interactions happen through well-defined interfaces
+
 ## Installation
 
 ### As npm Package
