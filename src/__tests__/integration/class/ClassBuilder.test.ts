@@ -10,7 +10,9 @@
  * Run: npm test -- --testPathPattern=class/ClassBuilder
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { CrudClient } from '../../../clients/CrudClient';
 import {
   ClassUnitTestBuilder,
@@ -64,7 +66,7 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('ClassBuilder (using CrudClient)', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;

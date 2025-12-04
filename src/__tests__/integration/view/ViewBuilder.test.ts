@@ -10,7 +10,9 @@
  * Run: npm test -- --testPathPattern=view/ViewBuilder
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
 import { ViewBuilder } from '../../../core/view';
@@ -151,7 +153,7 @@ ENDCLASS.
 }
 
 describe('ViewBuilder (using CrudClient)', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let client: CrudClient;
   let hasConfig = false;
   let defaultPackage: string = '';
@@ -629,7 +631,7 @@ describe('ViewBuilder (using CrudClient)', () => {
       let classCreated = false;
       let classLocked = false;
       let currentStep = '';
-      let unitTestConnection: AbapConnection | undefined = undefined;
+      let unitTestConnection: IAbapConnection | undefined = undefined;
       let runCdsUnitTestBuilder: CdsUnitTestBuilder | undefined = undefined;
 
       try {

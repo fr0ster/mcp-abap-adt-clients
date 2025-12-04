@@ -2,7 +2,8 @@
  * Table create operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { CreateTableParams } from './types';
@@ -14,7 +15,7 @@ import { getSystemInformation } from '../../utils/systemInfo';
  * DDL code should be added via update() method
  */
 export async function createTable(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: CreateTableParams
 ): Promise<AxiosResponse> {
   if (!params.table_name) {

@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.35] - 2024-12-04
+
+### Added
+- **Interfaces Package Integration**: Migrated to use `@mcp-abap-adt/interfaces` package for all interface definitions
+  - All interfaces now imported from shared package
+  - Dependency on `@mcp-abap-adt/interfaces@^0.1.1` added
+  - Added `axios@^1.11.0` as dependency (required for `AxiosResponse` type)
+- **Local Timeout Utilities**: Created local `getTimeout` implementation in `src/utils/timeouts.ts`
+  - Removed dependency on `@mcp-abap-adt/connection` package
+  - Timeout configuration now independent of connection package
+
+### Changed
+- **Removed Connection Dependency**: Removed `@mcp-abap-adt/connection` from dependencies
+  - Package now depends only on `@mcp-abap-adt/interfaces` for type definitions
+  - All connection-related types now use `IAbapConnection` and `IAbapRequestOptions` from interfaces package
+- **Interface Renaming**: All connection types now use interface names with `I` prefix:
+  - `AbapConnection` → `IAbapConnection` (imported from `@mcp-abap-adt/interfaces`)
+  - `AbapRequestOptions` → `IAbapRequestOptions` (imported from `@mcp-abap-adt/interfaces`)
+- **Type Exports**: Now exports only interface names from `@mcp-abap-adt/interfaces`:
+  - `IAbapConnection`, `IAbapRequestOptions`
+
+## [0.1.34] - 2025-XX-XX
+
 ## [0.1.33] - 2025-12-01
 
 ### Dependencies

@@ -7,7 +7,8 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/sqlQuery.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { getSqlQuery } from '../../../core/shared/sqlQuery';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 
@@ -61,7 +62,7 @@ function getConfig(): SapConfig {
 }
 
 describe('Shared - getSqlQuery', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let hasConfig = false;
   let isCloudSystem = false;
 

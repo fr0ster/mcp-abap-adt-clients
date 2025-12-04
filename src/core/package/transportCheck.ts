@@ -2,7 +2,8 @@
  * Package transport check operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from 'fast-xml-parser';
 import { CreatePackageParams } from './types';
 
@@ -10,7 +11,7 @@ import { CreatePackageParams } from './types';
  * Step 2: Check transport requirements
  */
 export async function checkTransportRequirements(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreatePackageParams,
   transportLayer: string
 ): Promise<string[]> {

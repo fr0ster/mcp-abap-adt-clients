@@ -2,7 +2,8 @@
  * Class create operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
@@ -22,7 +23,7 @@ const logger = {
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function create(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreateClassParams
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT

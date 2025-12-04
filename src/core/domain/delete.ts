@@ -2,7 +2,8 @@
  * Domain delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { DeleteDomainParams } from './types';
@@ -11,7 +12,7 @@ import { DeleteDomainParams } from './types';
  * Low-level: Check if domain can be deleted
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteDomainParams
 ): Promise<AxiosResponse> {
   const { domain_name } = params;
@@ -48,7 +49,7 @@ export async function checkDeletion(
  * Low-level: Delete domain
  */
 export async function deleteDomain(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteDomainParams
 ): Promise<AxiosResponse> {
   const { domain_name, transport_request } = params;

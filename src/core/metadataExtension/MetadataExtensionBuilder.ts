@@ -4,7 +4,7 @@
  * Supports method chaining with Promise-based operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger } from '../../utils/logger';
 import { validateMetadataExtension } from './validation';
@@ -19,14 +19,14 @@ import { deleteMetadataExtension } from './delete';
 import { MetadataExtensionBuilderConfig, MetadataExtensionBuilderState } from './types';
 
 export class MetadataExtensionBuilder {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: MetadataExtensionBuilderConfig;
   private lockHandle?: string;
   private state: MetadataExtensionBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: MetadataExtensionBuilderConfig
   ) {

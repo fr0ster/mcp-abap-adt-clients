@@ -2,7 +2,7 @@
  * Domain check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
@@ -16,7 +16,7 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * @returns Check result with errors/warnings
  */
 export async function checkDomainSyntax(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   domainName: string,
   version: 'active' | 'inactive',
   sourceCode?: string

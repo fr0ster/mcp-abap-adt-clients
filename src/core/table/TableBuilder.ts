@@ -29,7 +29,7 @@
  * ```
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createTable } from './create';
@@ -45,14 +45,14 @@ import { getTableSource } from './read';
 import { IBuilder } from '../shared/IBuilder';
 
 export class TableBuilder implements IBuilder<TableBuilderState> {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: TableBuilderConfig;
   private lockHandle?: string;
   private state: TableBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: TableBuilderConfig
   ) {

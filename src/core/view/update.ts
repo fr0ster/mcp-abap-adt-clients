@@ -2,10 +2,10 @@
  * View update operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { getTimeout } from '../../utils/timeouts';
 import { UpdateViewSourceParams } from './types';
 
 /**
@@ -14,7 +14,7 @@ import { UpdateViewSourceParams } from './types';
  * For complete workflow, use ViewBuilder
  */
 export async function updateView(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string,
   ddlSource: string,
   lockHandle: string,

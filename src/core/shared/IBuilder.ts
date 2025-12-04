@@ -3,9 +3,7 @@
  * Ensures consistent API across all builder implementations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
 import type { DomainBuilderConfig } from '../domain/types';
 import type { ClassBuilderConfig } from '../class/types';
 import type { InterfaceBuilderConfig } from '../interface/types';

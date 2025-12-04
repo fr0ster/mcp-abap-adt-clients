@@ -2,7 +2,8 @@
  * Class test include operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { XMLParser } from 'fast-xml-parser';
@@ -12,7 +13,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * Lock test classes for a class
  */
 export async function lockClassTestClasses(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string
 ): Promise<string> {
   const encodedName = encodeSapObjectName(className).toLowerCase();
@@ -45,7 +46,7 @@ export async function lockClassTestClasses(
  * Update test class source code
  */
 export async function updateClassTestInclude(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   testClassSource: string,
   lockHandle: string,
@@ -79,7 +80,7 @@ export async function updateClassTestInclude(
  * Unlock test classes
  */
 export async function unlockClassTestClasses(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   lockHandle: string
 ): Promise<AxiosResponse> {
@@ -107,7 +108,7 @@ export async function unlockClassTestClasses(
  * Activate test classes
  */
 export async function activateClassTestClasses(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   testClassName: string
 ): Promise<AxiosResponse> {

@@ -4,7 +4,8 @@
  * without source code
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -61,7 +62,7 @@ export function getObjectMetadataUri(objectType: string, objectName: string, fun
  * Read object metadata (without source code)
  */
 export async function readObjectMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectType: string,
   objectName: string,
   functionGroup?: string

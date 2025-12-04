@@ -2,7 +2,8 @@
  * FunctionModule read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
@@ -12,7 +13,7 @@ import { readObjectSource } from '../shared/readSource';
  * Get ABAP function module metadata (without source code)
  */
 export async function getFunctionMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionName: string,
   functionGroup: string
 ): Promise<AxiosResponse> {
@@ -27,7 +28,7 @@ export async function getFunctionMetadata(
  * @param version - 'active' (default) or 'inactive' to read modified but not activated version
  */
 export async function getFunctionSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
   version: 'active' | 'inactive' = 'active'
@@ -40,7 +41,7 @@ export async function getFunctionSource(
  * @deprecated Use getFunctionSource() or getFunctionMetadata() instead
  */
 export async function getFunction(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
   version: 'active' | 'inactive' = 'active'
@@ -56,7 +57,7 @@ export async function getFunction(
  * @returns Transport request information
  */
 export async function getFunctionModuleTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionName: string,
   functionGroup: string
 ): Promise<AxiosResponse> {

@@ -2,14 +2,15 @@
  * Domain read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Get ABAP domain
  */
-export async function getDomain(connection: AbapConnection, domainName: string): Promise<AxiosResponse> {
+export async function getDomain(connection: IAbapConnection, domainName: string): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(domainName);
   const url = `/sap/bc/adt/ddic/domains/${encodedName}`;
 
@@ -28,7 +29,7 @@ export async function getDomain(connection: AbapConnection, domainName: string):
  * @returns Transport request information
  */
 export async function getDomainTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   domainName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(domainName);

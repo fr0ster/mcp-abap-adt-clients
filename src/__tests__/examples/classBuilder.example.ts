@@ -9,7 +9,8 @@
  * - Chain interruption on error
  */
 
-import { createAbapConnection, SapConfig, ILogger } from '@mcp-abap-adt/connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { ClassBuilder, ClassBuilderLogger } from '../../core/class';
 
 // Example logger for connection (ILogger interface)

@@ -6,7 +6,8 @@
  * This function works only for on-premise systems with basic authentication.
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { GetSqlQueryParams } from './types';
 
@@ -18,7 +19,7 @@ import { GetSqlQueryParams } from './types';
  * @returns Query results
  */
 export async function getSqlQuery(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: GetSqlQueryParams
 ): Promise<AxiosResponse> {
   if (!params.sql_query) {

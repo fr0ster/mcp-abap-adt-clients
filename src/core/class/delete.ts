@@ -2,7 +2,8 @@
  * Class delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { DeleteClassParams } from './types';
@@ -11,7 +12,7 @@ import { DeleteClassParams } from './types';
  * Low-level: Check if class can be deleted (deletion check)
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteClassParams
 ): Promise<AxiosResponse> {
   const { class_name } = params;
@@ -48,7 +49,7 @@ export async function checkDeletion(
  * Low-level: Delete class using ADT deletion API
  */
 export async function deleteClass(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteClassParams
 ): Promise<AxiosResponse> {
   const { class_name, transport_request } = params;

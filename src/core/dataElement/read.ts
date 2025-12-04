@@ -2,14 +2,15 @@
  * DataElement read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Get ABAP data element
  */
-export async function getDataElement(connection: AbapConnection, dataElementName: string): Promise<AxiosResponse> {
+export async function getDataElement(connection: IAbapConnection, dataElementName: string): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const url = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
 
@@ -28,7 +29,7 @@ export async function getDataElement(connection: AbapConnection, dataElementName
  * @returns Transport request information
  */
 export async function getDataElementTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   dataElementName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);

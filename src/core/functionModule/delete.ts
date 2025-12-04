@@ -2,7 +2,8 @@
  * FunctionModule delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { DeleteFunctionModuleParams } from './types';
@@ -11,7 +12,7 @@ import { DeleteFunctionModuleParams } from './types';
  * Low-level: Check if function module can be deleted
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteFunctionModuleParams
 ): Promise<AxiosResponse> {
   const { function_module_name, function_group_name } = params;
@@ -52,7 +53,7 @@ export async function checkDeletion(
  * Low-level: Delete function module
  */
 export async function deleteFunctionModule(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteFunctionModuleParams
 ): Promise<AxiosResponse> {
   const { function_module_name, function_group_name, transport_request } = params;

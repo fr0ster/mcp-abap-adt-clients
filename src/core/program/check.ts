@@ -2,7 +2,7 @@
  * Program check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
@@ -10,7 +10,7 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * Check program syntax
  */
 export async function checkProgram(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string,
   version: string = 'active',
   sessionId?: string,

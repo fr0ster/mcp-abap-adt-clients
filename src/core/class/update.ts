@@ -2,7 +2,8 @@
  * Class update operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -13,7 +14,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateClass(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   sourceCode: string,
   lockHandle: string,
@@ -54,7 +55,7 @@ export async function updateClass(
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateClassImplementations(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   implementationCode: string,
   lockHandle: string,

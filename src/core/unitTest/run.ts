@@ -2,7 +2,8 @@
  * ABAP Unit test run operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './types';
@@ -16,7 +17,7 @@ function boolAttr(value: boolean | undefined, fallback: boolean) {
  * Uses aunit:tests format (for regular class unit tests)
  */
 export async function startClassUnitTestRun(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tests: ClassUnitTestDefinition[],
   options?: ClassUnitTestRunOptions
 ): Promise<AxiosResponse> {
@@ -61,7 +62,7 @@ export async function startClassUnitTestRun(
  * Uses osl:objectSet instead of aunit:tests
  */
 export async function startClassUnitTestRunByObject(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   options?: ClassUnitTestRunOptions
 ): Promise<AxiosResponse> {
@@ -96,7 +97,7 @@ export async function startClassUnitTestRunByObject(
 }
 
 export async function getClassUnitTestStatus(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   runId: string,
   withLongPolling: boolean = true
 ): Promise<AxiosResponse> {
@@ -115,7 +116,7 @@ export async function getClassUnitTestStatus(
 }
 
 export async function getClassUnitTestResult(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   runId: string,
   options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' }
 ): Promise<AxiosResponse> {

@@ -4,7 +4,8 @@
  * NOTE: Builder should call connection.setSessionType("stateful") before creating
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
@@ -29,7 +30,7 @@ ENDINTERFACE.`;
  * Does NOT lock/upload/activate - just creates the object
  */
 export async function create(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string,
   description: string,
   packageName: string,
@@ -114,7 +115,7 @@ export async function create(
  * Requires lock handle - does NOT lock/unlock
  */
 export async function upload(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string,
   sourceCode: string,
   lockHandle: string,

@@ -2,7 +2,8 @@
  * Domain create operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
@@ -20,7 +21,7 @@ import { CreateDomainParams } from './types';
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function create(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreateDomainParams,
   username: string,
   masterSystem?: string

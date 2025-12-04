@@ -2,7 +2,8 @@
  * ServiceDefinition activation operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -51,7 +52,7 @@ function parseActivationResponse(response: AxiosResponse): { success: boolean; m
  * Makes service definition active and usable in SAP system
  */
 export async function activateServiceDefinition(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   serviceDefinitionName: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;

@@ -3,7 +3,8 @@
  * NOTE: Builder should call connection.setSessionType("stateful") before creating
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
@@ -14,7 +15,7 @@ import { CreateServiceDefinitionParams } from './types';
  * Does NOT activate - just creates the object
  */
 export async function create(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreateServiceDefinitionParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/srvd/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;

@@ -2,7 +2,8 @@
  * Class lock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -14,7 +15,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function lockClass(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string
 ): Promise<string> {
   const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
@@ -50,7 +51,7 @@ export async function lockClass(
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function lockClassForUpdate(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string
 ): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {
   const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;

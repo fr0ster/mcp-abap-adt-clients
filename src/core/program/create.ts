@@ -2,7 +2,8 @@
  * Program create operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { lockProgram } from './lock';
@@ -71,7 +72,7 @@ START-OF-SELECTION.
  * Does NOT lock/upload/activate - just creates the object
  */
 export async function create(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreateProgramParams
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
@@ -115,7 +116,7 @@ export async function create(
  * Upload program source code
  */
 async function uploadProgramSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string,
   sourceCode: string,
   lockHandle: string,

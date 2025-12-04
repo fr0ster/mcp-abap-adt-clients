@@ -2,7 +2,8 @@
  * Search operations for ABAP objects
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { SearchObjectsParams } from './types';
@@ -15,7 +16,7 @@ import { SearchObjectsParams } from './types';
  * @returns Search results
  */
 export async function searchObjects(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: SearchObjectsParams
 ): Promise<AxiosResponse> {
   const encodedQuery = encodeSapObjectName(params.query);

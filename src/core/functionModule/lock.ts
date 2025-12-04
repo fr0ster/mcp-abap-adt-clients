@@ -2,7 +2,8 @@
  * FunctionModule lock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -11,7 +12,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Lock function module for editing
  */
 export async function lockFunctionModule(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
 ): Promise<string> {
@@ -49,7 +50,7 @@ export async function lockFunctionModule(
  * Lock function module for editing (for update)
  */
 export async function lockFunctionModuleForUpdate(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
   sessionId: string

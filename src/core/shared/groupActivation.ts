@@ -2,7 +2,8 @@
  * Group Activation operations - activate multiple objects with session support
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { ObjectReference } from './types';
@@ -39,7 +40,7 @@ import { ObjectReference } from './types';
  * ```
  */
 export async function activateObjectsGroup(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     objects: ObjectReference[],
     preauditRequested: boolean = false
 ): Promise<AxiosResponse> {

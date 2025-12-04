@@ -2,7 +2,8 @@
  * Structure update operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { UpdateStructureParams } from './types';
@@ -13,7 +14,7 @@ import { UpdateStructureParams } from './types';
  * Used internally by StructureBuilder
  */
 export async function upload(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string,
   ddlCode: string,
   lockHandle: string,
@@ -40,7 +41,7 @@ export async function upload(
  * Update structure with DDL code
  */
 export async function updateStructure(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: UpdateStructureParams,
   lockHandle: string
 ): Promise<AxiosResponse> {

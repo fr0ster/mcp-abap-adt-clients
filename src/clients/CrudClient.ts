@@ -6,7 +6,7 @@
  */
 
 import { ReadOnlyClient } from './ReadOnlyClient';
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { ProgramBuilder, ProgramBuilderConfig } from '../core/program';
 import {
@@ -80,7 +80,7 @@ interface CrudClientState {
 export class CrudClient extends ReadOnlyClient {
   private crudState: CrudClientState = {};
   
-  constructor(connection: AbapConnection) {
+  constructor(connection: IAbapConnection) {
     super(connection);
   }
 

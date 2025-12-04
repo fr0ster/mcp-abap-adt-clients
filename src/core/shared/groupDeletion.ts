@@ -2,7 +2,8 @@
  * Group Deletion operations - delete multiple objects with session support
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { ObjectReference } from './types';
@@ -37,7 +38,7 @@ import { ObjectReference } from './types';
  * ```
  */
 export async function checkDeletionGroup(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     objects: ObjectReference[]
 ): Promise<AxiosResponse> {
     const checkUrl = `/sap/bc/adt/deletion/check`;
@@ -97,7 +98,7 @@ ${objectElements}
  * ```
  */
 export async function deleteObjectsGroup(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     objects: ObjectReference[],
     transportRequest?: string
 ): Promise<AxiosResponse> {

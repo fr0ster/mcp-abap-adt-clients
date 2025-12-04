@@ -2,7 +2,7 @@
  * FunctionModule activation operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { activateObjectInSession } from '../../utils/activationUtils';
@@ -11,7 +11,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * Activate function module
  */
 export async function activateFunctionModule(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string
 ): Promise<AxiosResponse> {

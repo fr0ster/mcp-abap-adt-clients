@@ -2,7 +2,7 @@
  * Structure activation operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { activateObjectInSession } from '../../utils/activationUtils';
@@ -11,7 +11,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * Activate the structure after creation
  */
 export async function activateStructure(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}`;

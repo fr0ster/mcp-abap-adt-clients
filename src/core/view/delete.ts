@@ -2,7 +2,8 @@
  * View delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { DeleteViewParams } from './types';
@@ -11,7 +12,7 @@ import { DeleteViewParams } from './types';
  * Low-level: Check if view can be deleted
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteViewParams
 ): Promise<AxiosResponse> {
   const { view_name } = params;
@@ -48,7 +49,7 @@ export async function checkDeletion(
  * Low-level: Delete view (DDLS)
  */
 export async function deleteView(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteViewParams
 ): Promise<AxiosResponse> {
   const { view_name, transport_request } = params;

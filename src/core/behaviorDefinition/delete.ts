@@ -2,7 +2,8 @@
  * Behavior Definition delete operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -23,7 +24,7 @@ import { AxiosResponse } from 'axios';
  * ```
  */
 export async function checkDeletion(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
 ): Promise<AxiosResponse> {
     const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}`;
@@ -69,7 +70,7 @@ export async function checkDeletion(
  * ```
  */
 export async function deleteBehaviorDefinition(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     transportRequest?: string
 ): Promise<AxiosResponse> {

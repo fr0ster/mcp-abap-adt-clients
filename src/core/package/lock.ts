@@ -2,7 +2,8 @@
  * Package lock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -14,7 +15,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * before calling this function
  */
 export async function lockPackage(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   packageName: string
 ): Promise<string> {
   const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName)}?_action=LOCK&accessMode=MODIFY`;

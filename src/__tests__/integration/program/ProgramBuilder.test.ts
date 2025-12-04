@@ -10,7 +10,9 @@
  * Run: npm test -- --testPathPattern=program/ProgramBuilder
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
 import { ProgramBuilder } from '../../../core/program';
@@ -60,7 +62,7 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('ProgramBuilder (using CrudClient)', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;

@@ -62,11 +62,13 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/connection": "^0.1.13",
+    "@mcp-abap-adt/interfaces": "^0.1.1",
+    "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
+    "@mcp-abap-adt/connection": "^0.1.14",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.2.1",
     "dotenv": "^17.2.1",

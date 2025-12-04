@@ -6,7 +6,9 @@
  * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=package    (ADT-clients logs)
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
 import { PackageBuilder } from '../../../core/package';
@@ -57,7 +59,7 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('PackageBuilder (using CrudClient)', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let client: CrudClient;
   let connectionConfig: any = null;
   let hasConfig = false;

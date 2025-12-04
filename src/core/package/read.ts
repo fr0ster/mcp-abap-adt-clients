@@ -2,7 +2,8 @@
  * Package read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -10,7 +11,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Get ABAP package
  */
 export async function getPackage(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   packageName: string,
   version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {
@@ -32,7 +33,7 @@ export async function getPackage(
  * @returns Transport request information
  */
 export async function getPackageTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   packageName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(packageName);

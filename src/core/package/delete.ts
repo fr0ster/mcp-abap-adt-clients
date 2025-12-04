@@ -2,7 +2,8 @@
  * Package delete operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -19,7 +20,7 @@ export interface DeletePackageParams {
  * NOTE: Uses stateful session headers automatically if connection has stateful mode enabled
  */
 export async function checkPackageDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeletePackageParams
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
@@ -82,7 +83,7 @@ export function parsePackageDeletionCheck(response: AxiosResponse): { isDeletabl
  * For packages, empty transportNumber tag may be required
  */
 export async function deletePackage(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeletePackageParams
 ): Promise<AxiosResponse> {
   if (!params.package_name) {

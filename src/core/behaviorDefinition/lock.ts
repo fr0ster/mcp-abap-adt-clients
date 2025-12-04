@@ -2,7 +2,8 @@
  * Behavior Definition lock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -24,7 +25,7 @@ import { XMLParser } from 'fast-xml-parser';
  * ```
  */
 export async function lock(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     accessMode: string = 'MODIFY'
 ): Promise<string> {
@@ -86,7 +87,7 @@ export async function lock(
  * ```
  */
 export async function lockForUpdate(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     sessionId: string,
     accessMode: string = 'MODIFY'

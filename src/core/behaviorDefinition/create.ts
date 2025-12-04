@@ -2,9 +2,9 @@
  * Behavior Definition create operations - Low-level functions
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { getTimeout } from '../../utils/timeouts';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
 import { BehaviorDefinitionCreateParams } from './types';
@@ -33,7 +33,7 @@ import { BehaviorDefinitionCreateParams } from './types';
  * ```
  */
 export async function create(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     params: BehaviorDefinitionCreateParams,
 ): Promise<AxiosResponse> {
     try {

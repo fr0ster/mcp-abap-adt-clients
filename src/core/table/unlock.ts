@@ -2,7 +2,8 @@
  * Table unlock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -11,7 +12,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Must use same session and lock handle from lock operation
  */
 export async function unlockTable(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tableName: string,
   lockHandle: string
 ): Promise<AxiosResponse> {
@@ -30,7 +31,7 @@ export async function unlockTable(
  * Delete table lock (cleanup)
  */
 export async function deleteTableLock(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeSapObjectName(tableName)}`;

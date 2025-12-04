@@ -2,7 +2,8 @@
  * Domain update operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { UpdateDomainParams } from './types';
@@ -13,7 +14,7 @@ import { UpdateDomainParams } from './types';
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateDomain(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: UpdateDomainParams,
   lockHandle: string,
   username: string,

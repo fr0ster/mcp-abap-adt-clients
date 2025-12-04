@@ -2,7 +2,8 @@
  * ServiceDefinition delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { DeleteServiceDefinitionParams } from './types';
@@ -11,7 +12,7 @@ import { DeleteServiceDefinitionParams } from './types';
  * Low-level: Check if service definition can be deleted
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteServiceDefinitionParams
 ): Promise<AxiosResponse> {
   const { service_definition_name } = params;
@@ -48,7 +49,7 @@ export async function checkDeletion(
  * Low-level: Delete service definition
  */
 export async function deleteServiceDefinition(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteServiceDefinitionParams
 ): Promise<AxiosResponse> {
   const { service_definition_name, transport_request } = params;

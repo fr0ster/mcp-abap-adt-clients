@@ -2,7 +2,7 @@
  * Structure check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
@@ -12,7 +12,7 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * If check fails with "inactive version does not exist" or "importing from database" error, it's often safe to skip.
  */
 export async function checkStructure(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string,
   version: string = 'active',
   sourceCode?: string

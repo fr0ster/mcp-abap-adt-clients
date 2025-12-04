@@ -2,7 +2,8 @@
  * Package unlock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -14,7 +15,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * after calling this function
  */
 export async function unlockPackage(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   packageName: string,
   lockHandle: string
 ): Promise<AxiosResponse> {

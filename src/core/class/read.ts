@@ -2,7 +2,8 @@
  * Class read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
@@ -14,7 +15,7 @@ import { readObjectSource } from '../shared/readSource';
  * @param className - Class name
  */
 export async function getClassMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'class', className);
@@ -27,7 +28,7 @@ export async function getClassMetadata(
  * @param version - 'active' (default) or 'inactive' to read modified but not activated version
  */
 export async function getClassSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {
@@ -42,7 +43,7 @@ export async function getClassSource(
  * @deprecated Use getClassSource() or getClassMetadata() instead
  */
 export async function getClass(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {
@@ -56,7 +57,7 @@ export async function getClass(
  * @returns Transport request information
  */
 export async function getClassTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);

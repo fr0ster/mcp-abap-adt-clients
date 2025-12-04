@@ -2,7 +2,8 @@
  * Package update operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { CreatePackageParams } from './types';
@@ -11,7 +12,7 @@ import { CreatePackageParams } from './types';
  * Build XML for package update (similar to create)
  * Note: masterSystem and responsible should only be included for cloud systems
  */
-async function buildUpdatePackageXml(connection: AbapConnection, args: CreatePackageParams): Promise<string> {
+async function buildUpdatePackageXml(connection: IAbapConnection, args: CreatePackageParams): Promise<string> {
   const { getSystemInformation } = await import('../../utils/systemInfo');
   
   // Get system information - only for cloud systems
@@ -72,7 +73,7 @@ export interface UpdatePackageParams extends CreatePackageParams {
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updatePackage(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: UpdatePackageParams,
   lockHandle: string
 ): Promise<AxiosResponse> {
@@ -106,7 +107,7 @@ export async function updatePackage(
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updatePackageDescription(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   packageName: string,
   description: string,
   lockHandle: string

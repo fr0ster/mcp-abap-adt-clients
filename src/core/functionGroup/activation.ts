@@ -2,7 +2,7 @@
  * FunctionGroup activation operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -10,7 +10,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Activate function group
  */
 export async function activateFunctionGroup(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName).toLowerCase();

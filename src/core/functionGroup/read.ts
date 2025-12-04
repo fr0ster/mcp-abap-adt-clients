@@ -2,14 +2,15 @@
  * FunctionGroup read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Get ABAP function group
  */
-export async function getFunctionGroup(connection: AbapConnection, functionGroupName: string): Promise<AxiosResponse> {
+export async function getFunctionGroup(connection: IAbapConnection, functionGroupName: string): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
   const url = `/sap/bc/adt/functions/groups/${encodedName}`;
 
@@ -28,7 +29,7 @@ export async function getFunctionGroup(connection: AbapConnection, functionGroup
  * @returns Transport request information
  */
 export async function getFunctionGroupTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);

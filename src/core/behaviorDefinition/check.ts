@@ -2,7 +2,8 @@
  * Behavior Definition check operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { CheckReporter } from './types';
 
@@ -29,7 +30,7 @@ import { CheckReporter } from './types';
  * ```
  */
 export async function check(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     reporter: CheckReporter,
     sessionId: string,
@@ -95,7 +96,7 @@ export async function check(
  * ```
  */
 export async function checkImplementation(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     sessionId: string,
     version: string = 'inactive',
@@ -126,7 +127,7 @@ export async function checkImplementation(
  * ```
  */
 export async function checkAbap(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     sessionId: string,
     version: string = 'inactive',

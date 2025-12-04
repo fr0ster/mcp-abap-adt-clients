@@ -34,7 +34,7 @@
  * ```
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { validateClassName } from './validation';
@@ -54,7 +54,7 @@ import { deleteClass } from './delete';
 import { ClassBuilderConfig, ClassBuilderState } from './types';
 
 export class ClassBuilder {
-  protected connection: AbapConnection;
+  protected connection: IAbapConnection;
   protected logger: IAdtLogger;
   protected config: ClassBuilderConfig;
   protected sourceCode?: string;
@@ -63,7 +63,7 @@ export class ClassBuilder {
   protected state: ClassBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: ClassBuilderConfig
   ) {

@@ -2,7 +2,7 @@
  * View check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
@@ -22,7 +22,7 @@ function delay(ms: number): Promise<void> {
 }
 
 export async function checkView(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string,
   version: string = 'active',
   sessionId?: string,

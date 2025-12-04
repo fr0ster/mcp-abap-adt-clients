@@ -2,7 +2,8 @@
  * View lock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -11,7 +12,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Lock DDLS for modification
  */
 export async function lockDDLS(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string
 ): Promise<string> {
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
@@ -37,7 +38,7 @@ export async function lockDDLS(
  * Lock DDLS for editing (for update)
  */
 export async function lockDDLSForUpdate(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string
 ): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;

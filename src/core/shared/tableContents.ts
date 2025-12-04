@@ -6,7 +6,8 @@
  * This function works only for on-premise systems with basic authentication.
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { GetTableContentsParams } from './types';
@@ -19,7 +20,7 @@ import { GetTableContentsParams } from './types';
  * @returns Table contents
  */
 export async function getTableContents(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: GetTableContentsParams
 ): Promise<AxiosResponse> {
   if (!params.table_name) {

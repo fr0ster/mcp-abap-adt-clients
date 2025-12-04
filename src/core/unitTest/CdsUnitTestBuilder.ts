@@ -4,7 +4,7 @@
  * Extends ClassBuilder for full class operations and adds CDS-specific validation
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger } from '../../utils/logger';
 import { ClassBuilderConfig } from '../class/types';
 import { BaseUnitTestBuilder } from './BaseUnitTestBuilder';
@@ -50,7 +50,7 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
   private cdsConfig: CdsUnitTestBuilderConfig;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: CdsUnitTestBuilderConfig
   ) {

@@ -94,8 +94,8 @@ export type {
 // Export class unit test types
 export type { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './core/class';
 
-// Re-export types from connection package for convenience
-export type { AbapConnection, AbapRequestOptions } from '@mcp-abap-adt/connection';
+// Re-export types from interfaces package for convenience
+export type { IAbapConnection, IAbapRequestOptions } from '@mcp-abap-adt/interfaces';
 
 // Export utilities
 export { encodeSapObjectName } from './utils/internalUtils';

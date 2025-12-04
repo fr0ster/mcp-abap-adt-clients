@@ -2,7 +2,7 @@
  * Behavior Implementation read operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
@@ -13,7 +13,7 @@ import { readObjectSource } from '../shared/readSource';
  * @param className - Behavior implementation class name
  */
 export async function getBehaviorImplementationMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'class', className);
@@ -26,7 +26,7 @@ export async function getBehaviorImplementationMetadata(
  * @param version - 'active' (default) or 'inactive' to read modified but not activated version
  */
 export async function getBehaviorImplementationSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {
@@ -40,12 +40,12 @@ export async function getBehaviorImplementationSource(
  * @param version - 'active' (default) or 'inactive' to read modified but not activated version
  */
 export async function getBehaviorImplementationImplementations(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' | 'workingArea' = 'active'
 ): Promise<AxiosResponse> {
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
-  const { getTimeout } = await import('@mcp-abap-adt/connection');
+  const { getTimeout } = await import('../../utils/timeouts');
   
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${version !== 'active' ? `?version=${version}` : ''}`;

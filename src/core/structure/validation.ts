@@ -3,7 +3,8 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/structures/validation
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -18,7 +19,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * - Error: <exc:exception> with message about existing object or validation failure
  */
 export async function validateStructureName(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string,
   description?: string
 ): Promise<AxiosResponse> {

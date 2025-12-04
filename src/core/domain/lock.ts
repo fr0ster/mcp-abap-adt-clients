@@ -2,7 +2,8 @@
  * Domain lock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -14,7 +15,7 @@ import { CreateDomainParams } from './types';
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function acquireLockHandle(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreateDomainParams
 ): Promise<string> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
@@ -66,7 +67,7 @@ export async function acquireLockHandle(
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function lockDomain(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   domainName: string
 ): Promise<string> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());

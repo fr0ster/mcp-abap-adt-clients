@@ -4,7 +4,8 @@
  * Endpoint: POST /sap/bc/adt/ddic/ddlx/sources/{name}?_action=LOCK&accessMode=MODIFY
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -22,7 +23,7 @@ import { XMLParser } from 'fast-xml-parser';
  * ```
  */
 export async function lockMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   name: string
 ): Promise<string> {
   const lowerName = name.toLowerCase();

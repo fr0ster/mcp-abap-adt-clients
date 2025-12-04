@@ -7,8 +7,8 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from './timeouts';
 import { encodeSapObjectName } from './internalUtils';
 
 /**
@@ -94,7 +94,7 @@ export function buildObjectUri(name: string, type?: string): string {
  * @returns Axios response with activation result
  */
 export async function activateObjectInSession(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectUri: string,
   objectName: string,
   preaudit: boolean = true

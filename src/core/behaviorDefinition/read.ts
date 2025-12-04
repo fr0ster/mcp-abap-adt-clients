@@ -2,7 +2,8 @@
  * Behavior Definition read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -23,7 +24,7 @@ import { AxiosResponse } from 'axios';
  * ```
  */
 export async function read(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     sessionId: string,
     version: string = 'inactive'
@@ -60,7 +61,7 @@ export async function read(
  * ```
  */
 export async function readSource(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     version: string = 'inactive'
 ): Promise<AxiosResponse> {

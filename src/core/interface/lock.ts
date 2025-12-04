@@ -2,18 +2,18 @@
  * Interface lock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Lock interface for modification
  * Returns lock handle and transport number
  */
 export async function lockInterface(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string
 ): Promise<{ lockHandle: string; corrNr?: string }> {
   const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
@@ -45,7 +45,7 @@ export async function lockInterface(
  * Returns lock handle and transport number
  */
 export async function lockInterfaceForUpdate(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string,
   sessionId: string
 ): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {

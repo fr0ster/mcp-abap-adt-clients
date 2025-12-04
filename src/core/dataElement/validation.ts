@@ -3,7 +3,8 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/dataelements/validation
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -18,7 +19,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message
  */
 export async function validateDataElementName(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   dataElementName: string,
   packageName?: string,
   description?: string

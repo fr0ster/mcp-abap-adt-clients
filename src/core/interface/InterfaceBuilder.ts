@@ -9,9 +9,9 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { getTimeout } from '../../utils/timeouts';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { validateInterfaceName } from './validation';
 import { create as createInterfaceObject, generateInterfaceTemplate } from './create';
@@ -26,7 +26,7 @@ import { InterfaceBuilderConfig, InterfaceBuilderState } from './types';
 import { IBuilder } from '../shared/IBuilder';
 
 export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: InterfaceBuilderConfig;
   private sourceCode?: string;
@@ -34,7 +34,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
   private state: InterfaceBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: InterfaceBuilderConfig
   ) {

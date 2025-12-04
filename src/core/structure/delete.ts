@@ -2,7 +2,8 @@
  * Structure delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -15,7 +16,7 @@ export interface DeleteStructureParams {
  * Low-level: Check if structure can be deleted
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteStructureParams
 ): Promise<AxiosResponse> {
   const { structure_name } = params;
@@ -53,7 +54,7 @@ export async function checkDeletion(
  * Note: Structures should NOT have empty transportNumber tag
  */
 export async function deleteStructure(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteStructureParams
 ): Promise<AxiosResponse> {
   const { structure_name, transport_request } = params;

@@ -2,7 +2,8 @@
  * Table check operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -22,7 +23,7 @@ function buildCheckRunPayload(tableName: string): string {
  * Note: This is a table-specific check function. For generic check, use runCheckRun from shared/checkRun
  */
 export async function runTableCheckRun(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   reporter: 'tableStatusCheck' | 'abapCheckRun',
   tableName: string
 ): Promise<AxiosResponse> {

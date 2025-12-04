@@ -2,7 +2,8 @@
  * View unlock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -10,7 +11,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Unlock DDLS
  */
 export async function unlockDDLS(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string,
   lockHandle: string
 ): Promise<AxiosResponse> {

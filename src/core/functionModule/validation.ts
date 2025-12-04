@@ -3,7 +3,8 @@
  * Uses ADT validation endpoint: /sap/bc/adt/functions/validation
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -24,7 +25,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message (e.g., "Function module ... already exists")
  */
 export async function validateFunctionModuleName(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
   description?: string
@@ -69,7 +70,7 @@ export async function validateFunctionModuleName(
  * @throws Error if validation finds syntax errors
  */
 export async function validateFunctionModuleSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
   sourceCode?: string,

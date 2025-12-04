@@ -31,7 +31,7 @@
  * ```
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { create } from './create';
@@ -49,14 +49,14 @@ import { IBuilder } from '../shared/IBuilder';
 import { XMLParser } from 'fast-xml-parser';
 
 export class DomainBuilder implements IBuilder<DomainBuilderState> {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: DomainBuilderConfig;
   private lockHandle?: string;
   private state: DomainBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: DomainBuilderConfig
   ) {

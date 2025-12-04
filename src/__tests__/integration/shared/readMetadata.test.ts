@@ -5,7 +5,8 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/readMetadata.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { readObjectMetadata } from '../../../core/shared/readMetadata';
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -58,7 +59,7 @@ function getConfig(): SapConfig {
 }
 
 describe('Shared - readMetadata', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let hasConfig = false;
 
   beforeEach(async () => {

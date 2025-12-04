@@ -3,7 +3,8 @@
  * Copy this structure to all test files
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { getConfig } from '../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -26,7 +27,7 @@ const logger = {
 };
 
 describe('Module - Operation', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let hasConfig = false;
 
   beforeAll(async () => {

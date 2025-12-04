@@ -10,7 +10,9 @@
  * Run: npm test -- --testPathPattern=structure/StructureBuilder
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
 import { StructureBuilder } from '../../../core/structure';
@@ -60,7 +62,7 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('StructureBuilder (using CrudClient)', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let client: CrudClient;
   let hasConfig = false;
   let isCloudSystem = false;

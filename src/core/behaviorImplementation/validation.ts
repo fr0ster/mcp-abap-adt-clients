@@ -2,7 +2,8 @@
  * Behavior Implementation validation
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse, AxiosError } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 
@@ -18,7 +19,7 @@ import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils
  * @returns Validation response (returns error response if object already exists)
  */
 export async function validateBehaviorImplementationName(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   packageName?: string,
   description?: string,

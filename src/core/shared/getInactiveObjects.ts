@@ -2,7 +2,8 @@
  * Get Inactive Objects - retrieve list of objects not yet activated
  */
 
-import { AbapConnection, getTimeout } from "@mcp-abap-adt/connection";
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from "fast-xml-parser";
 import { ObjectReference, InactiveObjectsResponse } from "./types";
 
@@ -31,7 +32,7 @@ const xmlParser = new XMLParser({
  * ```
  */
 export async function getInactiveObjects(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   options?: {
     includeRawXml?: boolean;
   }

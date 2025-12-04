@@ -2,7 +2,7 @@
  * Behavior Definition activation operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { activateObjectInSession } from '../../utils/activationUtils';
 
@@ -25,7 +25,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * ```
  */
 export async function activate(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     name: string,
     preauditRequested: boolean = true
 ): Promise<AxiosResponse> {

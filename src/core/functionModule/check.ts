@@ -2,7 +2,8 @@
  * FunctionModule check operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { parseCheckRunResponse } from '../../utils/checkRun';
@@ -58,7 +59,7 @@ function buildCheckRunXml(
  * @returns Check result with errors/warnings
  */
 export async function checkFunctionModule(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
   version: 'active' | 'inactive',

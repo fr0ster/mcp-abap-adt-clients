@@ -2,7 +2,8 @@
  * Structure read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
@@ -12,7 +13,7 @@ import { readObjectSource } from '../shared/readSource';
  * Get ABAP structure metadata (without source code)
  */
 export async function getStructureMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'structure', structureName);
@@ -22,7 +23,7 @@ export async function getStructureMetadata(
  * Get ABAP structure source code
  */
 export async function getStructureSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string
 ): Promise<AxiosResponse> {
   return readObjectSource(connection, 'structure', structureName);
@@ -33,7 +34,7 @@ export async function getStructureSource(
  * @deprecated Use getStructureSource() or getStructureMetadata() instead
  */
 export async function getStructure(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string
 ): Promise<AxiosResponse> {
   return getStructureSource(connection, structureName);
@@ -46,7 +47,7 @@ export async function getStructure(
  * @returns Transport request information
  */
 export async function getStructureTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(structureName);

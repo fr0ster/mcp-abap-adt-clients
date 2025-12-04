@@ -2,7 +2,7 @@
  * Domain activation operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { activateObjectInSession } from '../../utils/activationUtils';
@@ -14,7 +14,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function activateDomain(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   domainName: string
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/ddic/domains/${encodeSapObjectName(domainName.toLowerCase())}`;

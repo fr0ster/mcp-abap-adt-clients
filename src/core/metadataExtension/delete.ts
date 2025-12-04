@@ -4,7 +4,8 @@
  * Endpoint: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -22,7 +23,7 @@ import { AxiosResponse } from 'axios';
  * ```
  */
 export async function deleteMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   name: string,
   transportRequest: string | undefined
 ): Promise<AxiosResponse> {

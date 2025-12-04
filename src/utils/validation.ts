@@ -17,7 +17,8 @@
  * the generic /sap/bc/adt/functions/validation endpoint.
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from './timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from './internalUtils';
 
@@ -36,7 +37,7 @@ import { encodeSapObjectName } from './internalUtils';
  * @returns Raw AxiosResponse from validation endpoint
  */
 export async function validateObjectName(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectType: string,
   objectName: string,
   additionalParams?: Record<string, string>

@@ -5,7 +5,7 @@
  * All methods return raw AxiosResponse - no MCP formatting.
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { ProgramBuilder, ProgramBuilderConfig } from '../core/program';
 import { ClassBuilder, ClassBuilderConfig } from '../core/class';
@@ -27,10 +27,10 @@ interface ReadOnlyClientState {
 }
 
 export class ReadOnlyClient {
-  protected connection: AbapConnection;
+  protected connection: IAbapConnection;
   private state: ReadOnlyClientState = {};
 
-  constructor(connection: AbapConnection) {
+  constructor(connection: IAbapConnection) {
     this.connection = connection;
   }
 

@@ -2,7 +2,8 @@
  * ServiceDefinition update operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { UpdateServiceDefinitionParams } from './types';
@@ -12,7 +13,7 @@ import { UpdateServiceDefinitionParams } from './types';
  * Requires object to be locked first (lockHandle must be provided)
  */
 export async function updateServiceDefinition(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: UpdateServiceDefinitionParams,
   lockHandle: string
 ): Promise<AxiosResponse> {

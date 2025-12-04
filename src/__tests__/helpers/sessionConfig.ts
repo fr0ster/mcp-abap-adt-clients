@@ -3,7 +3,7 @@
  * Provides SAP configuration from environment variables
  */
 
-import { SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 
 /**
  * Get SAP configuration from environment variables

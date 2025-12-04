@@ -4,7 +4,7 @@
  * Uses standard ABAP check run endpoint
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun } from '../../utils/checkRun';
 
@@ -24,7 +24,7 @@ import { runCheckRun } from '../../utils/checkRun';
  * ```
  */
 export async function checkMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   name: string,
   version: 'active' | 'inactive' = 'inactive',
   sourceCode?: string

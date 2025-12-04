@@ -4,7 +4,8 @@
  * Endpoint: PUT /sap/bc/adt/ddic/ddlx/sources/{name}/source/main?lockHandle={lockHandle}
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -31,7 +32,7 @@ import { AxiosResponse } from 'axios';
  * ```
  */
 export async function updateMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   name: string,
   sourceCode: string,
   lockHandle: string

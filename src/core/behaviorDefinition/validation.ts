@@ -1,4 +1,5 @@
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { BehaviorDefinitionValidationParams } from './types';
 
@@ -30,7 +31,7 @@ import { BehaviorDefinitionValidationParams } from './types';
  * ```
  */
 export async function validate(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     params: BehaviorDefinitionValidationParams
 ): Promise<AxiosResponse> {
     try {

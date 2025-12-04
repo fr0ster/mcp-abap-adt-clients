@@ -2,7 +2,8 @@
  * Program read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
@@ -12,7 +13,7 @@ import { readObjectSource } from '../shared/readSource';
  * Get ABAP program metadata (without source code)
  */
 export async function getProgramMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'program', programName);
@@ -22,7 +23,7 @@ export async function getProgramMetadata(
  * Get ABAP program source code
  */
 export async function getProgramSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string
 ): Promise<AxiosResponse> {
   return readObjectSource(connection, 'program', programName);
@@ -33,7 +34,7 @@ export async function getProgramSource(
  * @deprecated Use getProgramSource() or getProgramMetadata() instead
  */
 export async function getProgram(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string
 ): Promise<AxiosResponse> {
   return getProgramSource(connection, programName);
@@ -46,7 +47,7 @@ export async function getProgram(
  * @returns Transport request information
  */
 export async function getProgramTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(programName);

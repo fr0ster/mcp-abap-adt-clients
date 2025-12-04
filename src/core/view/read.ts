@@ -2,7 +2,8 @@
  * View read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
@@ -12,7 +13,7 @@ import { readObjectSource } from '../shared/readSource';
  * Get ABAP view metadata (without source code)
  */
 export async function getViewMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'view', viewName);
@@ -22,7 +23,7 @@ export async function getViewMetadata(
  * Get ABAP view source code
  */
 export async function getViewSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string
 ): Promise<AxiosResponse> {
   return readObjectSource(connection, 'view', viewName);
@@ -33,7 +34,7 @@ export async function getViewSource(
  * @deprecated Use getViewSource() or getViewMetadata() instead
  */
 export async function getView(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string
 ): Promise<AxiosResponse> {
   return getViewSource(connection, viewName);
@@ -46,7 +47,7 @@ export async function getView(
  * @returns Transport request information
  */
 export async function getViewTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   viewName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(viewName);

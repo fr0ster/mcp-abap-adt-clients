@@ -2,7 +2,8 @@
  * FunctionGroup create operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
@@ -21,7 +22,7 @@ const logger = {
  * Low-level function - creates function group without workflow logic
  */
 export async function create(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   description: string,
   packageName: string,

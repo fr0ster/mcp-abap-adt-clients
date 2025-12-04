@@ -2,7 +2,8 @@
  * FunctionModule update operations - low-level functions for FunctionModuleBuilder
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -12,7 +13,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Used internally by FunctionModuleBuilder
  */
 export async function update(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   functionModuleName: string,
   lockHandle: string,

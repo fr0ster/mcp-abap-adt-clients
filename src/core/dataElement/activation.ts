@@ -2,7 +2,8 @@
  * DataElement activation operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -51,7 +52,7 @@ function parseActivationResponse(response: AxiosResponse): { success: boolean; m
  * Makes data element active and usable in SAP system
  */
 export async function activateDataElement(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   dataElementName: string
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=true`;

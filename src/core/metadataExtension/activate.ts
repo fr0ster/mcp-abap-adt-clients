@@ -4,7 +4,7 @@
  * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=true
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { activateObjectInSession } from '../../utils/activationUtils';
 
@@ -23,7 +23,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * ```
  */
 export async function activateMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   name: string,
   preaudit: boolean = true
 ): Promise<AxiosResponse> {

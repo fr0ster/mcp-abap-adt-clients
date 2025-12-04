@@ -4,7 +4,8 @@
  * Only available for objects that have source code
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -72,7 +73,7 @@ export function supportsSourceCode(objectType: string): boolean {
  * Only works for objects that have source code (class, program, interface, etc.)
  */
 export async function readObjectSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectType: string,
   objectName: string,
   functionGroup?: string,

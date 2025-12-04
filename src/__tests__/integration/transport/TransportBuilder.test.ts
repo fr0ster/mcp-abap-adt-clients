@@ -10,7 +10,9 @@
  * Run: npm test -- --testPathPattern=transport/TransportBuilder
  */
 
-import { AbapConnection, createAbapConnection, ILogger } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { TransportBuilder } from '../../../core/transport/TransportBuilder';
 import { IAdtLogger } from '../../../utils/logger';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -48,7 +50,7 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('TransportBuilder', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let hasConfig = false;
 
   beforeAll(async () => {

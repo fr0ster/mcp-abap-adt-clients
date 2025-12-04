@@ -2,7 +2,8 @@
  * Class run operations - execute ABAP classes that implement if_oo_adt_classrun
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -51,7 +52,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * ```
  */
 export async function runClass(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   runnable: boolean = true,
   sessionId?: string
@@ -108,7 +109,7 @@ function boolAttr(value: boolean | undefined, fallback: boolean) {
 }
 
 export async function startClassUnitTestRun(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tests: ClassUnitTestDefinition[],
   options?: ClassUnitTestRunOptions
 ): Promise<AxiosResponse> {
@@ -149,7 +150,7 @@ export async function startClassUnitTestRun(
 }
 
 export async function getClassUnitTestStatus(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   runId: string,
   withLongPolling: boolean = true
 ): Promise<AxiosResponse> {
@@ -168,7 +169,7 @@ export async function getClassUnitTestStatus(
 }
 
 export async function getClassUnitTestResult(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   runId: string,
   options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' }
 ): Promise<AxiosResponse> {
@@ -201,7 +202,7 @@ export async function getClassUnitTestResult(
  * Uses osl:objectSet instead of aunit:tests
  */
 export async function startClassUnitTestRunByObject(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   options?: ClassUnitTestRunOptions
 ): Promise<AxiosResponse> {

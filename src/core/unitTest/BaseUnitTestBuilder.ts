@@ -4,7 +4,8 @@
  * Extends ClassBuilder and overrides read() and update() to work with test class (local class)
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { IAdtLogger } from '../../utils/logger';
 import { ClassBuilder } from '../class/ClassBuilder';
 import { ClassBuilderConfig } from '../class/types';
@@ -29,7 +30,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
   protected unitTestState: UnitTestBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: ClassBuilderConfig
   ) {

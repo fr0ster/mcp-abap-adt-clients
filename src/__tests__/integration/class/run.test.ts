@@ -5,7 +5,8 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/run.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { runClass } from '../../../core/class/run';
 import { getConfig } from '../../helpers/sessionConfig';
 import * as path from 'path';
@@ -30,7 +31,7 @@ const logger = {
 };
 
 describe('Class - Run', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let hasConfig = false;
 
   beforeEach(async () => {

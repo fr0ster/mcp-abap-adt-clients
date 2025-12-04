@@ -3,16 +3,16 @@
  * All read-only methods are implemented here once and reused by clients
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../utils/internalUtils';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { getTimeout } from './timeouts';
 
 /**
  * Internal helper to make ADT request
  */
 async function makeAdtRequest(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   url: string,
   method: string = 'GET',
   timeout: 'default' | 'csrf' | 'long' | number = 'default',
@@ -38,7 +38,7 @@ async function makeAdtRequest(
 /**
  * Get ABAP program source code
  */
-export async function getProgram(connection: AbapConnection, programName: string): Promise<AxiosResponse> {
+export async function getProgram(connection: IAbapConnection, programName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(programName);
   const url = `/sap/bc/adt/programs/programs/${encodedName}/source/main`;
@@ -48,7 +48,7 @@ export async function getProgram(connection: AbapConnection, programName: string
 /**
  * Get ABAP class source code
  */
-export async function getClass(connection: AbapConnection, className: string): Promise<AxiosResponse> {
+export async function getClass(connection: IAbapConnection, className: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(className);
   const url = `/sap/bc/adt/oo/classes/${encodedName}/source/main`;
@@ -58,7 +58,7 @@ export async function getClass(connection: AbapConnection, className: string): P
 /**
  * Get ABAP table structure
  */
-export async function getTable(connection: AbapConnection, tableName: string): Promise<AxiosResponse> {
+export async function getTable(connection: IAbapConnection, tableName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(tableName);
   const url = `/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
@@ -68,7 +68,7 @@ export async function getTable(connection: AbapConnection, tableName: string): P
 /**
  * Get ABAP structure
  */
-export async function getStructure(connection: AbapConnection, structureName: string): Promise<AxiosResponse> {
+export async function getStructure(connection: IAbapConnection, structureName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(structureName);
   const url = `/sap/bc/adt/ddic/structures/${encodedName}/source/main`;
@@ -78,7 +78,7 @@ export async function getStructure(connection: AbapConnection, structureName: st
 /**
  * Get ABAP domain
  */
-export async function getDomain(connection: AbapConnection, domainName: string): Promise<AxiosResponse> {
+export async function getDomain(connection: IAbapConnection, domainName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(domainName);
   const url = `/sap/bc/adt/ddic/domains/${encodedName}`;
@@ -88,7 +88,7 @@ export async function getDomain(connection: AbapConnection, domainName: string):
 /**
  * Get ABAP data element
  */
-export async function getDataElement(connection: AbapConnection, dataElementName: string): Promise<AxiosResponse> {
+export async function getDataElement(connection: IAbapConnection, dataElementName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(dataElementName);
   const url = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
@@ -98,7 +98,7 @@ export async function getDataElement(connection: AbapConnection, dataElementName
 /**
  * Get ABAP interface
  */
-export async function getInterface(connection: AbapConnection, interfaceName: string): Promise<AxiosResponse> {
+export async function getInterface(connection: IAbapConnection, interfaceName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(interfaceName);
   const url = `/sap/bc/adt/oo/interfaces/${encodedName}/source/main`;
@@ -108,7 +108,7 @@ export async function getInterface(connection: AbapConnection, interfaceName: st
 /**
  * Get ABAP function group
  */
-export async function getFunctionGroup(connection: AbapConnection, functionGroupName: string): Promise<AxiosResponse> {
+export async function getFunctionGroup(connection: IAbapConnection, functionGroupName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(functionGroupName);
   const url = `/sap/bc/adt/functions/groups/${encodedName}`;
@@ -119,7 +119,7 @@ export async function getFunctionGroup(connection: AbapConnection, functionGroup
  * Get ABAP function module
  */
 export async function getFunction(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionName: string,
   functionGroup: string
 ): Promise<AxiosResponse> {
@@ -133,7 +133,7 @@ export async function getFunction(
 /**
  * Get ABAP package
  */
-export async function getPackage(connection: AbapConnection, packageName: string): Promise<AxiosResponse> {
+export async function getPackage(connection: IAbapConnection, packageName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(packageName);
   const url = `/sap/bc/adt/packages/${encodedName}`;
@@ -143,7 +143,7 @@ export async function getPackage(connection: AbapConnection, packageName: string
 /**
  * Get ABAP view (CDS or Classic)
  */
-export async function getView(connection: AbapConnection, viewName: string): Promise<AxiosResponse> {
+export async function getView(connection: IAbapConnection, viewName: string): Promise<AxiosResponse> {
   
   const encodedName = encodeSapObjectName(viewName);
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
@@ -154,7 +154,7 @@ export async function getView(connection: AbapConnection, viewName: string): Pro
  * Fetches node structure from SAP ADT repository
  */
 export async function fetchNodeStructure(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   parentName: string,
   parentTechName: string,
   parentType: string,
@@ -187,7 +187,7 @@ export async function fetchNodeStructure(
  * Returns systemID and userName if available
  */
 export async function getSystemInformation(
-  connection: AbapConnection
+  connection: IAbapConnection
 ): Promise<{ systemID?: string; userName?: string } | null> {
   try {
     

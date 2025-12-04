@@ -2,7 +2,8 @@
  * DataElement update operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
@@ -13,7 +14,7 @@ import { getSystemInformation } from '../../utils/systemInfo';
  * Get domain info to extract dataType, length, decimals
  */
 export async function getDomainInfo(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   domainName: string
 ): Promise<{ dataType: string; length: number; decimals: number }> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
@@ -49,7 +50,7 @@ export async function getDomainInfo(
  * Get data element to verify update
  */
 async function getDataElementForVerification(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   dataElementName: string
 ): Promise<any> {
   const dataElementNameEncoded = encodeSapObjectName(dataElementName.toLowerCase());
@@ -80,7 +81,7 @@ async function getDataElementForVerification(
  * Requires object to be locked first (lockHandle must be provided)
  */
 export async function updateDataElementInternal(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: UpdateDataElementParams,
   lockHandle: string,
   username: string,
@@ -245,7 +246,7 @@ export async function updateDataElementInternal(
  * NOTE: Builder should call connection.setSessionType("stateful") before locking
  */
 export async function updateDataElement(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: UpdateDataElementParams,
   lockHandle: string
 ): Promise<AxiosResponse> {

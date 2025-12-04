@@ -2,7 +2,7 @@
  * ServiceDefinition check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
@@ -10,7 +10,7 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * Check service definition syntax
  */
 export async function checkServiceDefinition(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   serviceDefinitionName: string,
   version: string = 'inactive',
   sourceCode?: string

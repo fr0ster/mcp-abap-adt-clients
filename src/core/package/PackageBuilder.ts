@@ -27,7 +27,7 @@
  * ```
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createPackage } from './create';
@@ -42,13 +42,13 @@ import { CreatePackageParams, PackageBuilderConfig, PackageBuilderState } from '
 import { XMLParser } from 'fast-xml-parser';
 
 export class PackageBuilder {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: PackageBuilderConfig;
   private state: PackageBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: PackageBuilderConfig
   ) {

@@ -30,7 +30,7 @@
  * ```
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { ClassBuilder } from '../class/ClassBuilder';
@@ -44,7 +44,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
   private implementationCode?: string;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: BehaviorImplementationBuilderConfig
   ) {

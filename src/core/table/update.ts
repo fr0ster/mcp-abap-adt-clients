@@ -2,7 +2,8 @@
  * Table update operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { UpdateTableParams } from './types';
@@ -11,7 +12,7 @@ import { UpdateTableParams } from './types';
  * Update table using existing lock/session (Builder workflow)
  */
 export async function updateTable(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: UpdateTableParams,
   lockHandle: string
 ): Promise<AxiosResponse> {

@@ -2,7 +2,7 @@
  * Program activation operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { activateObjectInSession } from '../../utils/activationUtils';
@@ -12,7 +12,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  * Makes program active and usable in SAP system
  */
 export async function activateProgram(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`;

@@ -2,7 +2,8 @@
  * DataElement delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { DeleteDataElementParams } from './types';
@@ -11,7 +12,7 @@ import { DeleteDataElementParams } from './types';
  * Low-level: Check if data element can be deleted
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteDataElementParams
 ): Promise<AxiosResponse> {
   const { data_element_name } = params;
@@ -48,7 +49,7 @@ export async function checkDeletion(
  * Low-level: Delete data element
  */
 export async function deleteDataElement(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteDataElementParams
 ): Promise<AxiosResponse> {
   const { data_element_name, transport_request } = params;

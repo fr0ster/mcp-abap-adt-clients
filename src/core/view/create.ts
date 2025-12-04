@@ -2,7 +2,8 @@
  * View create operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
@@ -13,7 +14,7 @@ import { CreateViewParams } from './types';
  * Create DDLS object with metadata
  */
 async function createDDLSObject(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreateViewParams
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
@@ -51,7 +52,7 @@ async function createDDLSObject(
  * For complete workflow, use ViewBuilder
  */
 export async function createView(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: CreateViewParams
 ): Promise<AxiosResponse> {
   if (!params.view_name || !params.package_name) {

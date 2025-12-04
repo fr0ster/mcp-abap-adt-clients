@@ -4,7 +4,7 @@
  * Handles test include operations: lock, update, unlock, activate
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger } from '../../utils/logger';
 import { ClassBuilderConfig } from '../class/types';
 import {
@@ -50,7 +50,7 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
   // testLockHandle is inherited from ClassBuilder (protected)
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: ClassUnitTestBuilderConfig
   ) {

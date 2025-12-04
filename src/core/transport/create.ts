@@ -2,7 +2,8 @@
  * Transport create operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { CreateTransportParams } from './types';
@@ -64,7 +65,7 @@ function parseTransportResponse(xmlData: string): any {
  * Create ABAP transport request
  */
 export async function createTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: CreateTransportParams
 ): Promise<AxiosResponse> {
   if (!params.description) {

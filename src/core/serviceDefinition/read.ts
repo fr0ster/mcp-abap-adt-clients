@@ -2,7 +2,8 @@
  * ServiceDefinition read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -10,7 +11,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Get ABAP service definition
  */
 export async function getServiceDefinition(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   serviceDefinitionName: string,
   version: 'active' | 'inactive' | 'workingArea' = 'inactive'
 ): Promise<AxiosResponse> {
@@ -31,7 +32,7 @@ export async function getServiceDefinition(
  * Get service definition source code
  */
 export async function getServiceDefinitionSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   serviceDefinitionName: string,
   version: 'active' | 'inactive' | 'workingArea' = 'inactive'
 ): Promise<AxiosResponse> {

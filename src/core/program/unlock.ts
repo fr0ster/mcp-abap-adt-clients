@@ -2,7 +2,8 @@
  * Program unlock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -11,7 +12,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Must use same session and lock handle from lock operation
  */
 export async function unlockProgram(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string,
   lockHandle: string
 ): Promise<AxiosResponse> {

@@ -9,7 +9,7 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { create } from './create';
@@ -27,14 +27,14 @@ import { IBuilder } from '../shared/IBuilder';
 import { XMLParser } from 'fast-xml-parser';
 
 export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuilderState> {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: ServiceDefinitionBuilderConfig;
   private lockHandle?: string;
   private state: ServiceDefinitionBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: ServiceDefinitionBuilderConfig
   ) {

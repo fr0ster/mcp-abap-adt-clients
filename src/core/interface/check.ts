@@ -2,7 +2,7 @@
  * Interface check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
 
@@ -10,7 +10,7 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * Check interface syntax
  */
 export async function checkInterface(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string,
   version: string = 'active',
   sessionId?: string,

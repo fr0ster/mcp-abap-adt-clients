@@ -3,7 +3,8 @@
  * Uses ADT validation endpoint: /sap/bc/adt/functions/groups/validation
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 
@@ -18,7 +19,7 @@ import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message (e.g., "Function group ... already exists")
  */
 export async function validateFunctionGroupName(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   packageName?: string,
   description?: string

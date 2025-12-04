@@ -2,8 +2,8 @@
  * Program update operations - low-level functions for ProgramBuilder
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { UpdateProgramSourceParams } from './types';
 
@@ -13,7 +13,7 @@ import { UpdateProgramSourceParams } from './types';
  * Used internally by ProgramBuilder
  */
 export async function uploadProgramSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string,
   sourceCode: string,
   lockHandle: string,

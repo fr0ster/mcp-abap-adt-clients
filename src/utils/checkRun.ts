@@ -2,7 +2,8 @@
  * Shared check run utilities
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from './timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from './internalUtils';
@@ -231,7 +232,7 @@ export function parseCheckRunResponse(response: AxiosResponse): {
  * Run check run for any object type
  */
 export async function runCheckRun(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectType: string,
   objectName: string,
   version: string = 'active',
@@ -276,7 +277,7 @@ export async function runCheckRun(
  * @returns Promise resolving to AxiosResponse with check results
  */
 export async function runCheckRunWithSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objectType: string,
   objectName: string,
   sourceCode: string,

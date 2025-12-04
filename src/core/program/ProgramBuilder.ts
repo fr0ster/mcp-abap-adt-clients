@@ -9,7 +9,7 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { validateProgramName } from './validation';
@@ -24,7 +24,7 @@ import { ProgramBuilderConfig, ProgramBuilderState, CreateProgramParams } from '
 import { IBuilder } from '../shared/IBuilder';
 
 export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: ProgramBuilderConfig;
   private sourceCode?: string;
@@ -32,7 +32,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
   private state: ProgramBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: ProgramBuilderConfig
   ) {
@@ -192,7 +192,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
         'Accept': 'text/plain'
       };
 
-      const { getTimeout } = await import('@mcp-abap-adt/connection');
+      const { getTimeout } = await import('../../utils/timeouts');
       const result = await this.connection.makeAdtRequest({
         url,
         method: 'PUT',

@@ -3,15 +3,15 @@
  * All activation and check methods are implemented here once and reused by clients
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { getTimeout } from './timeouts';
 
 /**
  * Internal helper to make ADT request
  */
 async function makeAdtRequest(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   url: string,
   method: string = 'GET',
   timeout: 'default' | 'csrf' | 'long' | number = 'default',
@@ -39,7 +39,7 @@ async function makeAdtRequest(
  * Uses ADT activation/runs endpoint for batch activation
  */
 export async function activateObjectsGroup(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   objects: Array<{ uri: string; name: string }>,
   preaudit: boolean = true
 ): Promise<AxiosResponse> {
@@ -126,7 +126,7 @@ export function parseActivationResponse(responseData: string | any): {
  * Uses shared checkRun utility for all object types
  */
 export async function checkObject(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   name: string,
   type: string,
   version?: string

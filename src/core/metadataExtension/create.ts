@@ -4,7 +4,8 @@
  * Endpoint: POST /sap/bc/adt/ddic/ddlx/sources
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
@@ -29,7 +30,7 @@ import { MetadataExtensionCreateParams } from './types';
  * ```
  */
 export async function createMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: MetadataExtensionCreateParams
 ): Promise<AxiosResponse> {
   const url = '/sap/bc/adt/ddic/ddlx/sources';

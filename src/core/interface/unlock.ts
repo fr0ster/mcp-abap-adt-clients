@@ -2,17 +2,17 @@
  * Interface unlock operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock interface
  * Must use same session and lock handle from lock operation
  */
 export async function unlockInterface(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string,
   lockHandle: string
 ): Promise<AxiosResponse> {

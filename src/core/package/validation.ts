@@ -2,7 +2,8 @@
  * Package validation operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { CreatePackageParams } from './types';
 
@@ -11,7 +12,7 @@ import { CreatePackageParams } from './types';
  * Returns raw response from ADT - consumer decides how to interpret it
  */
 export async function validatePackageBasic(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreatePackageParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/packages/validation`;
@@ -39,7 +40,7 @@ export async function validatePackageBasic(
  * Returns raw response from ADT - consumer decides how to interpret it
  */
 export async function validatePackageFull(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   args: CreatePackageParams,
   swcomp: string,
   transportLayer: string

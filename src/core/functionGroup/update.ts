@@ -5,7 +5,8 @@
  * They don't have source code to update directly, but metadata can be updated.
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
@@ -18,7 +19,7 @@ import { UpdateFunctionGroupParams } from './types';
  * Update function group metadata via PUT
  */
 async function updateFunctionGroupMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   currentXml: string,
   newDescription: string,
@@ -71,7 +72,7 @@ async function updateFunctionGroupMetadata(
  * Full workflow: lock -> get current -> update -> unlock
  */
 export async function updateFunctionGroup(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: UpdateFunctionGroupParams
 ): Promise<AxiosResponse> {
   if (!params.function_group_name) {

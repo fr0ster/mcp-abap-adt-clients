@@ -2,7 +2,8 @@
  * Interface read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
@@ -12,7 +13,7 @@ import { readObjectSource } from '../shared/readSource';
  * Get ABAP interface metadata (without source code)
  */
 export async function getInterfaceMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'interface', interfaceName);
@@ -22,7 +23,7 @@ export async function getInterfaceMetadata(
  * Get ABAP interface source code
  */
 export async function getInterfaceSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string
 ): Promise<AxiosResponse> {
   return readObjectSource(connection, 'interface', interfaceName);
@@ -33,7 +34,7 @@ export async function getInterfaceSource(
  * @deprecated Use getInterfaceSource() or getInterfaceMetadata() instead
  */
 export async function getInterface(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string
 ): Promise<AxiosResponse> {
   return getInterfaceSource(connection, interfaceName);
@@ -46,7 +47,7 @@ export async function getInterface(
  * @returns Transport request information
  */
 export async function getInterfaceTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   interfaceName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(interfaceName);

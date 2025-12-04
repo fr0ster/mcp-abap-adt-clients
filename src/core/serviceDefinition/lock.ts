@@ -3,7 +3,8 @@
  * NOTE: Builder should call connection.setSessionType("stateful") before locking
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
@@ -12,7 +13,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Returns lock handle that must be used in subsequent requests
  */
 export async function lockServiceDefinition(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   serviceDefinitionName: string
 ): Promise<string> {
   const serviceDefinitionNameEncoded = encodeSapObjectName(serviceDefinitionName.toLowerCase());

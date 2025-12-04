@@ -5,7 +5,8 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/search.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { searchObjects } from '../../../core/shared/search';
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -58,7 +59,7 @@ function getConfig(): SapConfig {
 }
 
 describe('Shared - searchObjects', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let hasConfig = false;
 
   beforeEach(async () => {

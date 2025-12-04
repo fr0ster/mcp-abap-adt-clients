@@ -9,7 +9,7 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { validateFunctionGroupName } from './validation';
@@ -25,14 +25,14 @@ import { IBuilder } from '../shared/IBuilder';
 import { XMLParser } from 'fast-xml-parser';
 
 export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState> {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: FunctionGroupBuilderConfig;
   private lockHandle?: string;
   private state: FunctionGroupBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: FunctionGroupBuilderConfig
   ) {

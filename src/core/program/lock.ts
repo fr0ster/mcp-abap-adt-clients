@@ -2,7 +2,8 @@
  * Program lock operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -12,7 +13,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * Returns lock handle that must be used in subsequent requests
  */
 export async function lockProgram(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string
 ): Promise<string> {
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
@@ -40,7 +41,7 @@ export async function lockProgram(
  * Returns lock handle and transport number
  */
 export async function lockProgramForUpdate(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   programName: string,
   sessionId: string
 ): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {

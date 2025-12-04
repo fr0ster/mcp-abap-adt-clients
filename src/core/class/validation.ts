@@ -2,7 +2,8 @@
  * Class validation
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { runCheckRunWithSource, parseCheckRunResponse } from '../../utils/checkRun';
@@ -17,7 +18,7 @@ import { runCheckRunWithSource, parseCheckRunResponse } from '../../utils/checkR
  * Returns raw response from ADT - consumer decides how to interpret it
  */
 export async function validateClassName(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   packageName?: string,
   description?: string,
@@ -71,7 +72,7 @@ export async function validateClassName(
  * @throws Error if validation finds syntax errors
  */
 export async function validateClassSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   sourceCode?: string,
   version: 'inactive' | 'active' = 'active',

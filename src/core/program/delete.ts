@@ -2,7 +2,8 @@
  * Program delete operations - Low-level functions
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { DeleteProgramParams } from './types';
@@ -11,7 +12,7 @@ import { DeleteProgramParams } from './types';
  * Low-level: Check if program can be deleted
  */
 export async function checkDeletion(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteProgramParams
 ): Promise<AxiosResponse> {
   const { programName: program_name } = params;
@@ -48,7 +49,7 @@ export async function checkDeletion(
  * Low-level: Delete program
  */
 export async function deleteProgram(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: DeleteProgramParams
 ): Promise<AxiosResponse> {
   const { programName: program_name, transportRequest: transport_request } = params;

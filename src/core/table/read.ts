@@ -2,7 +2,8 @@
  * Table read operations
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { readObjectMetadata } from '../shared/readMetadata';
@@ -12,7 +13,7 @@ import { readObjectSource } from '../shared/readSource';
  * Get ABAP table metadata (without source code)
  */
 export async function getTableMetadata(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'table', tableName);
@@ -22,7 +23,7 @@ export async function getTableMetadata(
  * Get ABAP table source code (DDL)
  */
 export async function getTableSource(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
   return readObjectSource(connection, 'table', tableName);
@@ -33,7 +34,7 @@ export async function getTableSource(
  * @deprecated Use getTableSource() or getTableMetadata() instead
  */
 export async function getTable(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
   return getTableSource(connection, tableName);
@@ -46,7 +47,7 @@ export async function getTable(
  * @returns Transport request information
  */
 export async function getTableTransport(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   tableName: string
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableName);

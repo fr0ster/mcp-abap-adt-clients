@@ -6,7 +6,8 @@
  * NOTE: Builder should call connection.setSessionType("stateless") after unlocking
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -24,7 +25,7 @@ import { AxiosResponse } from 'axios';
  * ```
  */
 export async function unlockMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   name: string,
   lockHandle: string
 ): Promise<AxiosResponse> {

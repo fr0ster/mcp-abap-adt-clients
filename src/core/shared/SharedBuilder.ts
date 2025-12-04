@@ -11,7 +11,7 @@
  * - SQL queries and table contents
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { getInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
@@ -48,10 +48,10 @@ interface SharedBuilderState {
  * SharedBuilder provides access to cross-cutting ADT operations
  */
 export class SharedBuilder {
-  protected connection: AbapConnection;
+  protected connection: IAbapConnection;
   private state: SharedBuilderState = {};
 
-  constructor(connection: AbapConnection) {
+  constructor(connection: IAbapConnection) {
     this.connection = connection;
   }
 

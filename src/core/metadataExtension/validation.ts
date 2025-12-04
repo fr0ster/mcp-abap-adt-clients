@@ -5,7 +5,8 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/ddlx/sources/validation
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse, AxiosError } from 'axios';
 import { MetadataExtensionValidationParams } from './types';
 
@@ -24,7 +25,7 @@ import { MetadataExtensionValidationParams } from './types';
  * - Error: <exc:exception> with message about existing object or validation failure
  */
 export async function validateMetadataExtension(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: MetadataExtensionValidationParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/ddlx/sources/validation`;

@@ -2,8 +2,8 @@
  * Lock Function Group operations
  */
 
-import type { AbapConnection } from '@mcp-abap-adt/connection';
-import { getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -16,7 +16,7 @@ import { XMLParser } from 'fast-xml-parser';
  * @returns Lock handle string
  */
 export async function lockFunctionGroup(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   sessionId: string = ''
 ): Promise<string> {
@@ -60,7 +60,7 @@ export async function lockFunctionGroup(
  * @returns AxiosResponse from unlock request
  */
 export async function unlockFunctionGroup(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   functionGroupName: string,
   lockHandle: string,
   sessionId: string = ''

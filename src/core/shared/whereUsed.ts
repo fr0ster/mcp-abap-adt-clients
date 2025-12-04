@@ -2,7 +2,8 @@
  * Where-used operations for ABAP objects
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { GetWhereUsedParams } from './types';
@@ -68,7 +69,7 @@ function buildObjectUri(objectName: string, objectType: string): string {
  * @returns Where-used references
  */
 export async function getWhereUsed(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   params: GetWhereUsedParams
 ): Promise<AxiosResponse> {
   if (!params.object_name) {

@@ -3,7 +3,8 @@
  * NOTE: Builder should call connection.setSessionType("stateful") before creating
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
@@ -13,7 +14,7 @@ import { limitDescription } from '../../utils/internalUtils';
  * Low-level function - creates metadata without DDL content
  */
 export async function create(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   structureName: string,
   description: string,
   packageName: string,

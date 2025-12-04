@@ -2,7 +2,8 @@
  * Shared system information utilities
  */
 
-import { AbapConnection, getTimeout } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from './timeouts';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -10,7 +11,7 @@ import { AxiosResponse } from 'axios';
  * Returns systemID and userName if available
  */
 export async function getSystemInformation(
-  connection: AbapConnection
+  connection: IAbapConnection
 ): Promise<{ systemID?: string; userName?: string; client?: string; language?: string; userFullName?: string } | null> {
   try {
     const url = `/sap/bc/adt/core/http/systeminformation`;
@@ -66,7 +67,7 @@ export async function getSystemInformation(
  * Returns true if the systeminformation endpoint is available (cloud system)
  * Returns false if the endpoint doesn't exist (on-premise system)
  */
-export async function isCloudEnvironment(connection: AbapConnection): Promise<boolean> {
+export async function isCloudEnvironment(connection: IAbapConnection): Promise<boolean> {
   const systemInfo = await getSystemInformation(connection);
   return systemInfo !== null;
 }

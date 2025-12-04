@@ -5,7 +5,8 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/readSource.test
  */
 
-import { AbapConnection, createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { readObjectSource, supportsSourceCode } from '../../../core/shared/readSource';
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
@@ -58,7 +59,7 @@ function getConfig(): SapConfig {
 }
 
 describe('Shared - readSource', () => {
-  let connection: AbapConnection;
+  let connection: IAbapConnection;
   let hasConfig = false;
 
   beforeEach(async () => {

@@ -2,7 +2,7 @@
  * Class check operations
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 
 /**
@@ -23,7 +23,7 @@ import { AxiosResponse } from 'axios';
  * @returns Check result with errors/warnings
  */
 export async function checkClass(
-  connection: AbapConnection,
+  connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive',
   sourceCode?: string,

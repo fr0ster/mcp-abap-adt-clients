@@ -29,7 +29,7 @@
  * ```
  */
 
-import { AbapConnection } from '@mcp-abap-adt/connection';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createView } from './create';
@@ -44,14 +44,14 @@ import { CreateViewParams, UpdateViewSourceParams, ViewBuilderConfig, ViewBuilde
 import { getViewSource } from './read';
 
 export class ViewBuilder {
-  private connection: AbapConnection;
+  private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: ViewBuilderConfig;
   private lockHandle?: string;
   private state: ViewBuilderState;
 
   constructor(
-    connection: AbapConnection,
+    connection: IAbapConnection,
     logger: IAdtLogger,
     config: ViewBuilderConfig
   ) {
