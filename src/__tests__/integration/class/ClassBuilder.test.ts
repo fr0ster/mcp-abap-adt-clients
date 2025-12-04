@@ -331,6 +331,11 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
         : [];
 
       let unitTestBuilder: ClassUnitTestBuilder | null = null;
+      // Declare cleanup tracking variables at outer scope so they're accessible in finally block
+      let classCreated = false;
+      let classLocked = false;
+      let testClassesLocked = false;
+      let currentStep = '';
 
       try {
         logBuilderTestStep('validate');
@@ -346,11 +351,6 @@ function extractRunIdFromResponse(response: { headers?: Record<string, any> }): 
           console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
         }
         expect(validationResponse?.status).toBe(200);
-        
-        let classCreated = false;
-        let classLocked = false;
-        let testClassesLocked = false;
-        let currentStep = '';
         
         try {
           currentStep = 'create';

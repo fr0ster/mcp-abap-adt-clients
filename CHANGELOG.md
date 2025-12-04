@@ -24,9 +24,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - **whereUsed Content-Type Headers**: Fixed 415 (Unsupported Media Type) errors by using proper ADT-specific headers for usageReferences API
   - Content-Type: `application/vnd.sap.adt.repository.usagereferences.request.v1+xml`
   - Accept: `application/vnd.sap.adt.repository.usagereferences.result.v1+xml`
-- **Integration Tests**: Added proper error handling for 406 and 415 errors in shared integration tests
+- **Integration Tests**: Added proper error handling for 406, 415, and 404 errors in shared integration tests
   - Tests now provide clear error messages when these HTTP errors occur
   - Added `.env` file loading in all shared integration tests (`readMetadata`, `whereUsed`, `search`, `readSource`, `tableContents`, `sqlQuery`)
+  - Added error handling for 404 errors in PackageBuilder tests with clear error messages
+- **Test Cleanup Improvements**: Enhanced cleanup logic in integration tests to ensure objects are always cleaned up
+  - Added final cleanup in `finally` blocks for guaranteed unlock even if previous cleanup failed
+  - Fixed cleanup for tables created in `beforeEach` in ViewBuilder tests (now cleaned up in catch blocks)
+  - Ensures objects are unlocked even if test fails after creation
+- **Test Timeout Configuration**: Increased Jest global timeout to accommodate sequential test execution
+  - Global `testTimeout` increased from 5 minutes (300000ms) to 15 minutes (900000ms)
+  - Individual test timeout for `whereUsed` table test increased to 60 seconds (60000ms) for complex queries
 
 ## [0.1.35] - 2024-12-04
 
