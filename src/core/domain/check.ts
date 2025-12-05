@@ -12,16 +12,16 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * @param connection - SAP connection
  * @param domainName - Domain name
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
- * @param sourceCode - Optional source code to validate
  * @returns Check result with errors/warnings
+ * 
+ * Note: Domains do not have source code - they are metadata-only objects.
  */
 export async function checkDomainSyntax(
   connection: IAbapConnection,
   domainName: string,
-  version: 'active' | 'inactive',
-  sourceCode?: string
+  version: 'active' | 'inactive'
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'domain', domainName, version, 'abapCheckRun', sourceCode);
+  const response = await runCheckRun(connection, 'domain', domainName, version, 'abapCheckRun', undefined);
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {

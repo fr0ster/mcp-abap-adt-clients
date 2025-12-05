@@ -267,14 +267,15 @@ export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuild
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking service definition:', this.config.serviceDefinitionName, 'version:', version);
+      const codeToCheck = sourceCode || this.config.sourceCode;
+      this.logger.info?.('Checking service definition:', this.config.serviceDefinitionName, 'version:', version, codeToCheck ? 'with source code' : 'saved version');
       const result = await checkServiceDefinition(
         this.connection,
         this.config.serviceDefinitionName,
         version,
-        this.config.sourceCode
+        codeToCheck
       );
       // Store result for backward compatibility
       this.state.checkResult = result;

@@ -5,6 +5,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.37] - 2025-12-05
+
+### Added
+- **Source Code Validation in Check Methods**: All check methods now support optional `sourceCode` parameter for validating new/unsaved code
+  - **Table**: `checkTable(config, sourceCode?, version?)` - validates DDL code (base64 encoded in request)
+  - **View**: `checkView(config, sourceCode?, version?)` - validates DDL code (base64 encoded in request)
+  - **Structure**: `checkStructure(config, sourceCode?, version?)` - validates DDL code (base64 encoded in request)
+  - **Class**: `checkClass(config, version?, sourceCode?)` - validates ABAP code (base64 encoded in request)
+  - **Program**: `checkProgram(config, version?, sourceCode?)` - validates ABAP code (base64 encoded in request)
+  - **FunctionModule**: `checkFunctionModule(config, version?, sourceCode?)` - validates ABAP code (base64 encoded in request)
+  - **Interface**: `checkInterface(config, sourceCode?, version?)` - validates ABAP code (base64 encoded in request)
+  - **BehaviorDefinition**: `checkBehaviorDefinition(config, sourceCode?, version?)` - validates BDEF code (base64 encoded in request)
+  - **ServiceDefinition**: `checkServiceDefinition(config, sourceCode?, version?)` - validates SRVD code (base64 encoded in request)
+  - **MetadataExtension**: `checkMetadataExtension(config, sourceCode?, version?)` - validates DDLX code (base64 encoded in request)
+  - When `sourceCode` is provided, code is automatically base64 encoded and included in check request body as `<chkrun:artifacts><chkrun:content>`
+  - This enables "live validation" of unsaved code, similar to Eclipse ADT editor behavior
+  - All 11 code-bearing object types now support this feature
+
+### Changed
+- **CrudClient.checkBehaviorDefinition()**: Added `sourceCode?: string` parameter to support validation of new/unsaved BDEF code
+- **CrudClient.checkMetadataExtension()**: Added `sourceCode?: string` parameter to support validation of new/unsaved DDLX code
+- **Integration Tests**: Updated Table, View, and Structure tests to include validation of new code after lock/update operations
+  - Tests now verify `check(new_code)` step before unlock, ensuring unsaved code can be validated
+
+### Fixed
+- **Domain and DataElement Check Methods**: Removed incorrect `sourceCode` parameter support (these objects are metadata-only and don't have source code)
+
 ## [0.1.36] - 2025-12-05
 
 ### Changed

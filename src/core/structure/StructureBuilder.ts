@@ -250,13 +250,15 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking structure:', this.config.structureName, 'version:', version);
+      const codeToCheck = sourceCode || this.config.ddlCode;
+      this.logger.info?.('Checking structure:', this.config.structureName, 'version:', version, codeToCheck ? 'with source code' : 'saved version');
       const result = await checkStructure(
         this.connection,
         this.config.structureName,
-        version
+        version,
+        codeToCheck
       );
       // Store result for backward compatibility
       this.state.checkResult = result;

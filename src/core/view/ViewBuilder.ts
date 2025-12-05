@@ -232,13 +232,16 @@ export class ViewBuilder {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking view:', this.config.viewName, 'version:', version);
+      const codeToCheck = sourceCode || this.config.ddlSource;
+      this.logger.info?.('Checking view:', this.config.viewName, 'version:', version, codeToCheck ? 'with source code' : 'saved version');
       const result = await checkView(
         this.connection,
         this.config.viewName,
-        version
+        version,
+        undefined, // sessionId
+        codeToCheck
       );
       // Store result for backward compatibility
       this.state.checkResult = result;

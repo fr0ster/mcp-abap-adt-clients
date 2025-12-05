@@ -609,29 +609,70 @@ console.log(client.getDeleteResult());
 
 ### Check Operations
 
+All check methods support optional `sourceCode` parameter for validating new/unsaved code. When provided, the code is automatically base64 encoded and included in the check request body, enabling "live validation" similar to Eclipse ADT editor.
+
 ```typescript
-checkProgram(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkClass(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkInterface(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkDataElement(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkDomain(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkStructure(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkTable(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkView(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkFunctionGroup(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkFunctionModule(name: string, functionGroup: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkServiceDefinition(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkBehaviorDefinition(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
-checkMetadataExtension(name: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+// Check saved version (object must exist in SAP)
+checkProgram(config, version?: 'active' | 'inactive', sourceCode?: string): Promise<AxiosResponse>
+checkClass(config, version?: 'active' | 'inactive', sourceCode?: string): Promise<AxiosResponse>
+checkInterface(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkFunctionModule(config, version?: 'active' | 'inactive', sourceCode?: string): Promise<AxiosResponse>
+checkStructure(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkTable(config, sourceCode?: string, version?: 'active' | 'inactive' | 'new'): Promise<AxiosResponse>
+checkView(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkServiceDefinition(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkBehaviorDefinition(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<this>
+checkMetadataExtension(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<this>
+
+// Metadata-only objects (no source code support)
+checkDataElement(config, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+checkDomain(config, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 ```
 
-Performs syntax/consistency check on the object.
+**Parameters:**
+- `config`: Object configuration (e.g., `{ tableName: 'Z_MY_TABLE' }`)
+- `sourceCode` (optional): Source code to validate. If provided, validates unsaved code (base64 encoded in request)
+- `version` (optional): `'active'` (activated version) or `'inactive'` (saved but not activated). Default varies by object type
 
-**Example:**
+**Examples:**
+
 ```typescript
-const checkResult = await client.checkClass('ZCL_TEST', 'inactive');
+// Check saved version (object must exist)
+const checkResult = await client.checkClass({ className: 'ZCL_TEST' }, 'inactive');
 console.log('Check status:', checkResult.status);
+
+// Check new/unsaved code (live validation)
+const newCode = `CLASS zcl_test DEFINITION PUBLIC.
+  PUBLIC SECTION.
+    METHODS: hello.
+ENDCLASS.`;
+
+const liveCheckResult = await client.checkClass(
+  { className: 'ZCL_TEST' },
+  'inactive',
+  newCode  // Validates code before saving
+);
+console.log('Live check status:', liveCheckResult.status);
+
+// Check DDL code for table
+const ddlCode = `@EndUserText.label: 'Test Table'
+define table z_my_table {
+  key field1 : abap.char(10);
+  field2 : abap.char(20);
+}`;
+
+const tableCheckResult = await client.checkTable(
+  { tableName: 'Z_MY_TABLE' },
+  ddlCode,  // Validates DDL code
+  'new'
+);
 ```
+
+**Use Cases:**
+- **Validate saved code**: Check syntax of existing object (active or inactive version)
+- **Live validation**: Validate new/unsaved code before creating or updating object
+- **Pre-flight validation**: Test code syntax without modifying SAP system
+- **Real-time checking**: Similar to Eclipse ADT editor's live validation feature
 
 ### Validation Operations
 

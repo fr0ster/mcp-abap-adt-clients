@@ -216,13 +216,16 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking interface:', this.config.interfaceName, 'version:', version);
+      const codeToCheck = sourceCode || this.config.sourceCode;
+      this.logger.info?.('Checking interface:', this.config.interfaceName, 'version:', version, codeToCheck ? 'with source code' : 'saved version');
       const result = await checkInterface(
         this.connection,
         this.config.interfaceName,
-        version
+        version,
+        undefined, // sessionId
+        codeToCheck
       );
       // Store result for backward compatibility
       this.state.checkResult = result;

@@ -217,13 +217,16 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
     }
   }
 
-  async check(reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun'): Promise<AxiosResponse> {
+  async check(reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun', sourceCode?: string, version: 'active' | 'inactive' | 'new' = 'new'): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking table:', this.config.tableName, 'reporter:', reporter);
+      this.logger.info?.('Checking table:', this.config.tableName, 'reporter:', reporter, sourceCode ? 'with source code' : 'saved version');
+      const codeToCheck = sourceCode || this.config.ddlCode;
       const result = await runTableCheckRun(
         this.connection,
         reporter,
-        this.config.tableName
+        this.config.tableName,
+        codeToCheck,
+        version
       );
       // Store result for backward compatibility
       this.state.checkResult = result;

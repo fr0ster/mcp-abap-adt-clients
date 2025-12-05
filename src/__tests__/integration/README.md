@@ -149,7 +149,7 @@ GET /sap/bc/adt/oo/classes/ZCL_TEST
 - Default behavior (no version parameter)
 
 #### 2. Run Syntax Check (POST) - `checkClass()`
-**Check Inactive:**
+**Check Inactive (saved version):**
 ```http
 POST /sap/bc/adt/checkruns?reporters=abapCheckRun
 Body: <version>inactive</version>
@@ -157,8 +157,9 @@ Body: <version>inactive</version>
 - **Runs ATC/syntax checker** on inactive version
 - Returns errors/warnings/messages
 - Validates changes before activation
+- Object must exist in SAP system
 
-**Check Active:**
+**Check Active (saved version):**
 ```http
 POST /sap/bc/adt/checkruns?reporters=abapCheckRun
 Body: <version>active</version>
@@ -166,6 +167,24 @@ Body: <version>active</version>
 - **Runs ATC/syntax checker** on active version
 - Validates currently deployed code
 - Returns errors/warnings/messages
+- Object must exist in SAP system
+
+**Check with New Code (unsaved code validation):**
+```http
+POST /sap/bc/adt/checkruns?reporters=abapCheckRun
+Body: <checkObject>
+  <artifacts>
+    <artifact contentType="text/plain; charset=utf-8" uri="/sap/bc/adt/oo/classes/zcl_test/source/main">
+      <content>BASE64_ENCODED_SOURCE</content>
+    </artifact>
+  </artifacts>
+</checkObject>
+```
+- **Validates code that hasn't been saved to SAP yet**
+- Source code is base64 encoded in request body
+- Similar to live validation, but uses check endpoint
+- Can validate code before creating or updating object
+- All 11 code-bearing object types support this feature (Table, View, Structure, Class, Program, FunctionModule, Interface, BehaviorDefinition, ServiceDefinition, MetadataExtension, BehaviorImplementation)
 
 #### 3. Live Validation (POST) - `validateClassSource()`
 **Validate Unsaved Source:**

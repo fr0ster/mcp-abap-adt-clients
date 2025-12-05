@@ -393,9 +393,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkInterface(config: Pick<InterfaceBuilderConfig, 'interfaceName'>): Promise<AxiosResponse> {
+  async checkInterface(config: Pick<InterfaceBuilderConfig, 'interfaceName'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     const builder = this.getInterfaceBuilder(config);
-    const result = await builder.check();
+    const result = await builder.check(version, sourceCode);
     this.crudState.checkResult = result;
     return result;
   }
@@ -636,9 +636,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkDataElement(config: Pick<DataElementBuilderConfig, 'dataElementName'>): Promise<AxiosResponse> {
+  async checkDataElement(config: Pick<DataElementBuilderConfig, 'dataElementName'>, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     const builder = this.getDataElementBuilder(config);
-    const result = await builder.check();
+    const result = await builder.check(version);
     this.crudState.checkResult = result;
     return result;
   }
@@ -714,9 +714,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkDomain(config: Pick<DomainBuilderConfig, 'domainName'>): Promise<AxiosResponse> {
+  async checkDomain(config: Pick<DomainBuilderConfig, 'domainName'>, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     const builder = this.getDomainBuilder(config);
-    const result = await builder.check();
+    const result = await builder.check(version);
     this.crudState.checkResult = result;
     return result;
   }
@@ -805,9 +805,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkStructure(config: Pick<StructureBuilderConfig, 'structureName'>): Promise<AxiosResponse> {
+  async checkStructure(config: Pick<StructureBuilderConfig, 'structureName'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     const builder = this.getStructureBuilder(config);
-    const result = await builder.check();
+    const result = await builder.check(version, sourceCode);
     this.crudState.checkResult = result;
     return result;
   }
@@ -896,9 +896,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkTable(config: Pick<TableBuilderConfig, 'tableName'>): Promise<AxiosResponse> {
+  async checkTable(config: Pick<TableBuilderConfig, 'tableName'>, sourceCode?: string, version: 'active' | 'inactive' | 'new' = 'new'): Promise<AxiosResponse> {
     const builder = this.getTableBuilder(config);
-    const result = await builder.check();
+    const result = await builder.check('abapCheckRun', sourceCode, version);
     this.crudState.checkResult = result;
     return result;
   }
@@ -978,9 +978,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkView(config: Pick<ViewBuilderConfig, 'viewName'>, version?: 'active' | 'inactive'): Promise<AxiosResponse> {
+  async checkView(config: Pick<ViewBuilderConfig, 'viewName'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     const builder = this.getViewBuilder(config);
-    const result = await builder.check(version);
+    const result = await builder.check(version, sourceCode);
     this.crudState.checkResult = result;
     return result;
   }
@@ -1181,9 +1181,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkBehaviorDefinition(config: Partial<BehaviorDefinitionBuilderConfig> & Pick<BehaviorDefinitionBuilderConfig, 'name'>, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async checkBehaviorDefinition(config: Partial<BehaviorDefinitionBuilderConfig> & Pick<BehaviorDefinitionBuilderConfig, 'name'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
     const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
-    await builder.check(version);
+    await builder.check(version, sourceCode);
     this.crudState.checkResult = builder.getState().checkResults?.[0];
     return this;
   }
@@ -1331,9 +1331,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkMetadataExtension(config: Partial<MetadataExtensionBuilderConfig> & Pick<MetadataExtensionBuilderConfig, 'name'>, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async checkMetadataExtension(config: Partial<MetadataExtensionBuilderConfig> & Pick<MetadataExtensionBuilderConfig, 'name'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
     const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description || '' });
-    await builder.check(version);
+    await builder.check(version, sourceCode);
     this.crudState.checkResult = builder.getState().checkResult;
     return this;
   }
@@ -1490,9 +1490,9 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
-  async checkServiceDefinition(config: Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
+  async checkServiceDefinition(config: Pick<ServiceDefinitionBuilderConfig, 'serviceDefinitionName'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     const builder = this.getServiceDefinitionBuilder(config);
-    const result = await builder.check(version);
+    const result = await builder.check(version, sourceCode);
     this.crudState.checkResult = builder.getState().checkResult;
     return result;
   }

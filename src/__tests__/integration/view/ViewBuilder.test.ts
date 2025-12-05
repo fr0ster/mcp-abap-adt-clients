@@ -417,11 +417,20 @@ describe('ViewBuilder (using CrudClient)', () => {
         if (!config.ddlSource) {
           throw new Error('ddlSource is required for view update');
         }
+        // Use updated_ddl_source if available, otherwise use ddlSource
+        const updatedDdlSource = testCase.params.updated_ddl_source || config.ddlSource;
         await client.updateView({
           viewName: config.viewName,
-          ddlSource: config.ddlSource
+          ddlSource: updatedDdlSource
         });
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+        // Check with new code (before unlock) - validates unsaved code
+        currentStep = 'check(new_code)';
+        logBuilderTestStep(currentStep);
+        const checkResultNewCode = await client.checkView({ viewName: config.viewName }, updatedDdlSource, 'inactive');
+        expect(checkResultNewCode?.status).toBeDefined();
+        testsLogger.info?.(`✅ Check with new code completed: ${checkResultNewCode?.status === 200 ? 'OK' : 'Has errors/warnings'}`);
         
         currentStep = 'check(inactive)';
         logBuilderTestStep(currentStep);

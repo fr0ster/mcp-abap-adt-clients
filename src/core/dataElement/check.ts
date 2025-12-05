@@ -10,14 +10,14 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * Check data element syntax
  * Note: For DDIC objects like data elements, check may not be fully supported in all SAP systems.
  * If check fails with "importing from database" error, it's often safe to skip.
+ * Note: Data elements do not have source code - they are metadata-only objects.
  */
 export async function checkDataElement(
   connection: IAbapConnection,
   dataElementName: string,
-  version: string = 'active',
-  sourceCode?: string
+  version: string = 'active'
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'data_element', dataElementName, version, 'abapCheckRun', sourceCode);
+  const response = await runCheckRun(connection, 'data_element', dataElementName, version, 'abapCheckRun', undefined);
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {

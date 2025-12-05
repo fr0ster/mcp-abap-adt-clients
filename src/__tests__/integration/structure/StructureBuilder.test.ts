@@ -200,11 +200,20 @@ describe('StructureBuilder (using CrudClient)', () => {
         
         currentStep = 'update';
         logBuilderTestStep(currentStep);
+        // Use updated_ddl_code if available, otherwise use ddlCode
+        const updatedDdlCode = testCase.params.updated_ddl_code || config.ddlCode || '';
         await client.updateStructure({
           structureName: config.structureName,
-          ddlCode: config.ddlCode || ''
+          ddlCode: updatedDdlCode
         });
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        
+        // Check with new code (before unlock) - validates unsaved code
+        currentStep = 'check(new_code)';
+        logBuilderTestStep(currentStep);
+        const checkResultNewCode = await client.checkStructure({ structureName: config.structureName }, updatedDdlCode, 'inactive');
+        expect(checkResultNewCode?.status).toBeDefined();
+        testsLogger.info?.(`✅ Check with new code completed: ${checkResultNewCode?.status === 200 ? 'OK' : 'Has errors/warnings'}`);
         
         currentStep = 'check(inactive)';
         logBuilderTestStep(currentStep);
