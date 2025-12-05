@@ -5,6 +5,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.38] - 2025-12-06
+
+### Changed
+- **Unified Parameter Structures**: All low-level create and update functions now use parameter structures (Params) instead of individual parameters
+  - **Create Functions**: All create functions now accept a single `CreateXParams` object
+    - `createStructure()`: Now uses `CreateStructureParams` (camelCase)
+    - `createInterface()`: Now uses `CreateInterfaceParams` (camelCase)
+    - `createFunctionGroup()`: Now uses `CreateFunctionGroupParams` (camelCase)
+    - `createFunctionModule()`: Already used `CreateFunctionModuleParams` (camelCase)
+  - **Update Functions**: All update functions now accept a single `UpdateXParams` object
+    - `updateFunctionModule()`: Now uses `UpdateFunctionModuleParams` (camelCase)
+    - `updateBehaviorDefinition()`: Now uses `UpdateBehaviorDefinitionParams` (camelCase)
+    - `uploadStructure()`: Now uses `UpdateStructureParams` (camelCase)
+  - **Benefits**: Improved readability, type safety, scalability, and consistency across all functions
+  - **Naming Convention**: All new Params interfaces use camelCase (matching BuilderConfig convention)
+- **Removed sessionId Parameter**: Removed `sessionId` parameter from all check functions
+  - Connection now manages session internally
+  - Affected functions: `checkClass()`, `checkInterface()`, `checkView()`, `checkFunctionModule()`, `checkFunctionGroup()`, `checkProgram()`, `validateClassSource()`, `validateFunctionModuleSource()`
+  - Low-level check utilities: `runCheckRun()`, `runCheckRunWithSource()` no longer accept `sessionId`
+
+### Added
+- **New Parameter Interfaces**: Added parameter structures for functions that previously used individual parameters
+  - `CreateStructureParams`: Structure creation parameters (camelCase)
+  - `CreateInterfaceParams`: Interface creation parameters (camelCase)
+  - `CreateFunctionGroupParams`: Function group creation parameters (camelCase)
+  - `UpdateFunctionModuleParams`: Function module update parameters (camelCase)
+  - `UpdateBehaviorDefinitionParams`: Behavior definition update parameters (camelCase)
+  - `UpdateStructureParams`: Updated to camelCase (was snake_case)
+
+### Documentation
+- **Parameters Analysis**: Added comprehensive analysis document in `docs/development/archive/PARAMETERS_ANALYSIS.md`
+  - Documents advantages of using parameter structures
+  - Migration status and recommendations
+  - Naming convention guidelines
+
 ## [0.1.37] - 2025-12-05
 
 ### Added

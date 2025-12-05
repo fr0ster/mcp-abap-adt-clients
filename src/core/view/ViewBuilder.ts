@@ -240,7 +240,6 @@ export class ViewBuilder {
         this.connection,
         this.config.viewName,
         version,
-        undefined, // sessionId
         codeToCheck
       );
       // Store result for backward compatibility

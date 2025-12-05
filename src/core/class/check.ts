@@ -19,15 +19,13 @@ import { AxiosResponse } from 'axios';
  * @param className - Class name
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @param sourceCode - Optional: source code to validate. If provided, validates hypothetical code without creating object
- * @param sessionId - Optional session ID
  * @returns Check result with errors/warnings
  */
 export async function checkClass(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive',
-  sourceCode?: string,
-  sessionId?: string
+  sourceCode?: string
 ): Promise<AxiosResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
 
@@ -35,10 +33,10 @@ export async function checkClass(
 
   if (sourceCode) {
     // Validate hypothetical code (object doesn't need to exist)
-    response = await runCheckRunWithSource(connection, 'class', className, sourceCode, version, 'abapCheckRun', sessionId);
+    response = await runCheckRunWithSource(connection, 'class', className, sourceCode, version, 'abapCheckRun');
   } else {
     // Validate existing object in SAP (reads from system)
-    response = await runCheckRun(connection, 'class', className, version, 'abapCheckRun', sessionId);
+    response = await runCheckRun(connection, 'class', className, version, 'abapCheckRun');
   }
 
   const checkResult = parseCheckRunResponse(response);

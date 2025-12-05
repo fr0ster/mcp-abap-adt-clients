@@ -20,7 +20,7 @@ import { update } from './update';
 import { checkImplementation, checkAbap } from './check';
 import { activate } from './activation';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
-import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams, BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState } from './types';
+import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams, UpdateBehaviorDefinitionParams, BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState } from './types';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 
 export class BehaviorDefinitionBuilder {
@@ -214,13 +214,13 @@ export class BehaviorDefinitionBuilder {
       }
       this.logger.info?.('Updating behavior definition source:', this.config.name);
 
-      const result = await update(
-        this.connection,
-        this.config.name,
-        code,
-        this.lockHandle,
-        this.config.transportRequest
-      );
+      const params: UpdateBehaviorDefinitionParams = {
+        name: this.config.name,
+        sourceCode: code,
+        lockHandle: this.lockHandle,
+        transportRequest: this.config.transportRequest
+      };
+      const result = await update(this.connection, params);
 
       this.state.updateResult = result;
       this.logger.info?.('Behavior definition updated successfully:', result.status);

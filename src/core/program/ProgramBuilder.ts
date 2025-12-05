@@ -217,7 +217,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking program:', this.config.programName, 'version:', version);
+      this.logger.info?.('Checking program:', this.config.programName, 'version:', version, sourceCode ? 'with source code' : 'saved version');
       const result = await checkProgram(
         this.connection,
         this.config.programName,

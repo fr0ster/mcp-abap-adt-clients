@@ -49,6 +49,20 @@ export interface BehaviorDefinitionCreateParams {
 }
 
 /**
+ * Parameters for updating a behavior definition
+ */
+export interface UpdateBehaviorDefinitionParams {
+    /** Name of the behavior definition */
+    name: string;
+    /** Source code */
+    sourceCode: string;
+    /** Lock handle from lock operation */
+    lockHandle: string;
+    /** Optional transport request number */
+    transportRequest?: string;
+}
+
+/**
  * Lock result containing lock handle
  */
 export interface LockResult {

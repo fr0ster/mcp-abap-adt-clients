@@ -112,13 +112,13 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
       this.logger.info?.('Creating function group:', this.config.functionGroupName);
       
       // Call low-level create function
-      const result = await create(
-        this.connection,
-        this.config.functionGroupName,
-        this.config.description || '',
-        this.config.packageName,
-        this.config.transportRequest
-      );
+      const params: CreateFunctionGroupParams = {
+        functionGroupName: this.config.functionGroupName,
+        description: this.config.description || '',
+        packageName: this.config.packageName,
+        transportRequest: this.config.transportRequest
+      };
+      const result = await create(this.connection, params);
       this.state.createResult = result;
       this.logger.info?.('Function group created successfully:', result.status);
       return this;

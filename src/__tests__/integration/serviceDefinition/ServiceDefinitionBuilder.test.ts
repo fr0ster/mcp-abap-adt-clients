@@ -13,9 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
 import { CrudClient } from '../../../clients/CrudClient';
-import { ServiceDefinitionBuilder } from '../../../core/serviceDefinition';
 import { IAdtLogger } from '../../../utils/logger';
 import { getServiceDefinition } from '../../../core/serviceDefinition/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -30,7 +28,7 @@ import {
   logBuilderTestStepError,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
+import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';

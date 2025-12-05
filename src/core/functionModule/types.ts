@@ -4,15 +4,20 @@
 
 import { BaseBuilderState } from '../shared/IBuilder';
 
-// Low-level function parameters (snake_case)
+// Low-level function parameters (camelCase, matching Builder config)
 export interface CreateFunctionModuleParams {
-  function_group_name: string;
-  function_module_name: string;
-  source_code: string;
-  package_name?: string; // optional: used to auto-create the function group if it doesn't exist
-  description?: string;
-  transport_request?: string;
-  activate?: boolean;
+  functionGroupName: string;
+  functionModuleName: string;
+  description: string;
+  transportRequest?: string;
+}
+
+export interface UpdateFunctionModuleParams {
+  functionGroupName: string;
+  functionModuleName: string;
+  lockHandle: string;
+  sourceCode: string;
+  transportRequest?: string;
 }
 
 export interface DeleteFunctionModuleParams {

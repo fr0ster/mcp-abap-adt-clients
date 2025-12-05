@@ -237,7 +237,6 @@ export async function runCheckRun(
   objectName: string,
   version: string = 'active',
   reporter: string = 'abapCheckRun',
-  sessionId?: string,
   sourceCode?: string
 ): Promise<AxiosResponse> {
   const objectUri = getObjectUri(objectType, objectName);
@@ -282,8 +281,7 @@ export async function runCheckRunWithSource(
   objectName: string,
   sourceCode: string,
   version: string = 'active',
-  reporter: string = 'abapCheckRun',
-  sessionId?: string
+  reporter: string = 'abapCheckRun'
 ): Promise<AxiosResponse> {
   const objectUri = await getObjectUri(objectType, objectName);
   const xmlBody = buildCheckRunXmlWithSource(objectUri, sourceCode, version);

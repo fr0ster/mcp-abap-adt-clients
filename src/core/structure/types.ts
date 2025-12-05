@@ -21,22 +21,18 @@ export interface StructureInclude {
   suffix?: string;
 }
 
-// Low-level function parameters (snake_case)
+// Low-level function parameters (camelCase)
 export interface CreateStructureParams {
-  structure_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  ddl_code: string; // DDL SQL source code for structure
-  // Legacy fields (deprecated, use ddl_code instead)
-  fields?: StructureField[];
-  includes?: StructureInclude[];
+  structureName: string;
+  description: string;
+  packageName: string;
+  transportRequest?: string;
 }
 
 export interface UpdateStructureParams {
-  structure_name: string;
-  ddl_code: string; // DDL SQL source code for structure
-  transport_request?: string;
+  structureName: string;
+  ddlCode: string; // DDL SQL source code for structure
+  transportRequest?: string;
 }
 
 export interface DeleteStructureParams {

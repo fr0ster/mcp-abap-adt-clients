@@ -9,6 +9,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { CreateInterfaceParams } from './types';
 
 /**
  * Generate minimal interface source code if not provided
@@ -31,18 +32,13 @@ ENDINTERFACE.`;
  */
 export async function create(
   connection: IAbapConnection,
-  interfaceName: string,
-  description: string,
-  packageName: string,
-  transportRequest: string | undefined,
-  masterSystem?: string,
-  responsible?: string
+  params: CreateInterfaceParams
 ): Promise<AxiosResponse> {
   // Get system information - only for cloud systems
   const systemInfo = await getSystemInformation(connection);
   
-  let finalMasterSystem = masterSystem;
-  let finalResponsible = responsible;
+  let finalMasterSystem = params.masterSystem;
+  let finalResponsible = params.responsible;
 
   if (systemInfo) {
     // Only for cloud systems - use systemInfo or provided values
@@ -55,21 +51,21 @@ export async function create(
   }
 
   // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = limitDescription(description);
+  const limitedDescription = limitDescription(params.description);
   const masterSystemAttr = finalMasterSystem ? ` adtcore:masterSystem="${finalMasterSystem}"` : '';
   const responsibleAttr = finalResponsible ? ` adtcore:responsible="${finalResponsible}"` : '';
 
-  const payload = `<?xml version="1.0" encoding="UTF-8"?><intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${interfaceName}" adtcore:type="INTF/OI" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  const payload = `<?xml version="1.0" encoding="UTF-8"?><intf:abapInterface xmlns:intf="http://www.sap.com/adt/oo/interfaces" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${params.interfaceName}" adtcore:type="INTF/OI" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
 
 
 
-  <adtcore:packageRef adtcore:name="${packageName}"/>
+  <adtcore:packageRef adtcore:name="${params.packageName}"/>
 
 
 
 </intf:abapInterface>`;
 
-  const url = `/sap/bc/adt/oo/interfaces${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
+  const url = `/sap/bc/adt/oo/interfaces${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   const headers = {
     'Content-Type': 'application/vnd.sap.adt.oo.interfaces.v5+xml',

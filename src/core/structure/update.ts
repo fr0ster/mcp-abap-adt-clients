@@ -15,13 +15,11 @@ import { UpdateStructureParams } from './types';
  */
 export async function upload(
   connection: IAbapConnection,
-  structureName: string,
-  ddlCode: string,
-  lockHandle: string,
-  transportRequest?: string
+  params: UpdateStructureParams,
+  lockHandle: string
 ): Promise<AxiosResponse> {
-  const structureNameEncoded = encodeSapObjectName(structureName);
-  const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
+  const structureNameEncoded = encodeSapObjectName(params.structureName);
+  const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${lockHandle}${params.transportRequest ? `&corrNr=${params.transportRequest}` : ''}`;
 
   const headers = {
     'Accept': 'application/xml, application/json, text/plain, */*',
@@ -32,39 +30,17 @@ export async function upload(
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: ddlCode,
+    data: params.ddlCode,
     headers
   });
 }
 
 /**
- * Update structure with DDL code
+ * Update structure with DDL code (alias for upload with lockHandle in params)
  */
 export async function updateStructure(
   connection: IAbapConnection,
-  params: UpdateStructureParams,
-  lockHandle: string
+  params: UpdateStructureParams & { lockHandle: string }
 ): Promise<AxiosResponse> {
-  if (!params.structure_name) {
-    throw new Error('structure_name is required');
-  }
-  if (!params.ddl_code) {
-    throw new Error('ddl_code is required');
-  }
-
-  const structureNameEncoded = encodeSapObjectName(params.structure_name);
-  const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${lockHandle}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
-
-  const headers = {
-    'Accept': 'application/xml, application/json, text/plain, */*',
-    'Content-Type': 'text/plain; charset=utf-8'
-  };
-
-  return connection.makeAdtRequest({
-    url,
-    method: 'PUT',
-    timeout: getTimeout('default'),
-    data: params.ddl_code,
-    headers
-  });
+  return upload(connection, params, params.lockHandle);
 }

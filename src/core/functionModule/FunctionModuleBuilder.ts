@@ -16,7 +16,7 @@ import { validateFunctionModuleName } from './validation';
 import { create } from './create';
 import { lockFunctionModule } from './lock';
 import { update } from './update';
-import { CreateFunctionModuleParams, FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './types';
+import { UpdateFunctionModuleParams, FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './types';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
@@ -112,13 +112,13 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
       this.logger.info?.('Creating function module metadata:', this.config.functionModuleName);
       
       // Call low-level create function (metadata only)
-      const result = await create(
-        this.connection,
-        this.config.functionGroupName,
-        this.config.functionModuleName,
-        this.config.description || '',
-        this.config.transportRequest
-      );
+      const params = {
+        functionGroupName: this.config.functionGroupName,
+        functionModuleName: this.config.functionModuleName,
+        description: this.config.description || '',
+        transportRequest: this.config.transportRequest
+      };
+      const result = await create(this.connection, params);
       this.state.createResult = result;
       this.logger.info?.('Function module metadata created successfully:', result.status);
       return this;
@@ -176,14 +176,14 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
       this.logger.info?.('Updating function module source:', this.config.functionModuleName);
-      const result = await update(
-        this.connection,
-        this.config.functionGroupName,
-        this.config.functionModuleName,
-        this.lockHandle,
-        code,
-        this.config.transportRequest
-      );
+      const params: UpdateFunctionModuleParams = {
+        functionGroupName: this.config.functionGroupName,
+        functionModuleName: this.config.functionModuleName,
+        lockHandle: this.lockHandle,
+        sourceCode: code,
+        transportRequest: this.config.transportRequest
+      };
+      const result = await update(this.connection, params);
       this.state.updateResult = result;
       this.logger.info?.('Function module updated successfully:', result.status);
       return this;
@@ -200,7 +200,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking function module:', this.config.functionModuleName, 'version:', version);
+      this.logger.info?.('Checking function module:', this.config.functionModuleName, 'version:', version, sourceCode ? 'with source code' : 'saved version');
       const result = await checkFunctionModule(
         this.connection,
         this.config.functionGroupName,

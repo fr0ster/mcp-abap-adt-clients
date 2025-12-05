@@ -23,12 +23,9 @@ const logger = {
  */
 export async function create(
   connection: IAbapConnection,
-  functionGroupName: string,
-  description: string,
-  packageName: string,
-  transportRequest?: string
+  params: CreateFunctionGroupParams
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/functions/groups${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
+  const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   // Get masterSystem and responsible (only for cloud systems)
   // On cloud, getSystemInformation returns systemID and userName
@@ -88,11 +85,11 @@ export async function create(
   }
 
   // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = limitDescription(description);
+  const limitedDescription = limitDescription(params.description);
   // Build XML payload - no escaping (same as old working code)
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${functionGroupName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${packageName}"/>
+<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${params.functionGroupName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${params.packageName}"/>
 </group:abapFunctionGroup>`;
 
   const headers: Record<string, string> = {

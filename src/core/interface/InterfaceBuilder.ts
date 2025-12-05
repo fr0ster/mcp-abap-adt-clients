@@ -22,7 +22,7 @@ import { activateInterface } from './activation';
 import { deleteInterface } from './delete';
 import { getInterfaceSource } from './read';
 import { get } from 'http';
-import { InterfaceBuilderConfig, InterfaceBuilderState } from './types';
+import { CreateInterfaceParams, InterfaceBuilderConfig, InterfaceBuilderState } from './types';
 import { IBuilder } from '../shared/IBuilder';
 
 export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
@@ -124,13 +124,13 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
       const finalDescription = this.config.description || this.config.interfaceName;
       
       // Call low-level function
-      const result = await createInterfaceObject(
-        this.connection,
-        this.config.interfaceName,
-        finalDescription,
-        this.config.packageName,
-        this.config.transportRequest
-      );
+      const params: CreateInterfaceParams = {
+        interfaceName: this.config.interfaceName,
+        description: finalDescription,
+        packageName: this.config.packageName,
+        transportRequest: this.config.transportRequest
+      };
+      const result = await createInterfaceObject(this.connection, params);
       
       this.state.createResult = result;
       this.logger.info?.('Interface object created successfully:', result.status);
@@ -224,7 +224,6 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
         this.connection,
         this.config.interfaceName,
         version,
-        undefined, // sessionId
         codeToCheck
       );
       // Store result for backward compatibility

@@ -165,13 +165,13 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
       this.logger.info?.('Creating structure metadata:', this.config.structureName);
       
       // Call low-level create function (metadata only)
-      const result = await create(
-        this.connection,
-        this.config.structureName,
-        this.config.description || '',
-        this.config.packageName,
-        this.config.transportRequest
-      );
+      const params: CreateStructureParams = {
+        structureName: this.config.structureName,
+        description: this.config.description || '',
+        packageName: this.config.packageName,
+        transportRequest: this.config.transportRequest
+      };
+      const result = await create(this.connection, params);
       this.state.createResult = result;
       this.logger.info?.('Structure metadata created successfully:', result.status);
       return this;
@@ -229,13 +229,12 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
       }
       this.logger.info?.('Updating structure DDL:', this.config.structureName);
       
-      const result = await upload(
-        this.connection,
-        this.config.structureName,
-        code,
-        this.lockHandle,
-        this.config.transportRequest
-      );
+      const params: UpdateStructureParams = {
+        structureName: this.config.structureName,
+        ddlCode: code,
+        transportRequest: this.config.transportRequest
+      };
+      const result = await upload(this.connection, params, this.lockHandle);
       this.state.updateResult = result;
       this.logger.info?.('Structure updated successfully:', result.status);
       return this;

@@ -54,7 +54,6 @@ function buildCheckRunXml(
  * @param functionGroupName - Function group name
  * @param functionModuleName - Function module name
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
- * @param sessionId - Optional session ID
  * @param sourceCode - Optional source code to validate
  * @returns Check result with errors/warnings
  */
@@ -63,7 +62,6 @@ export async function checkFunctionModule(
   functionGroupName: string,
   functionModuleName: string,
   version: 'active' | 'inactive',
-  sessionId?: string,
   sourceCode?: string
 ): Promise<AxiosResponse> {
   const xmlBody = buildCheckRunXml(functionGroupName, functionModuleName, version, sourceCode);

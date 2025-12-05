@@ -5,6 +5,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
+import { UpdateBehaviorDefinitionParams } from './types';
 
 /**
  * Update behavior definition source code
@@ -14,11 +15,7 @@ import { AxiosResponse } from 'axios';
  * Requires behavior definition to be locked first
  * 
  * @param connection - ABAP connection instance
- * @param name - Behavior definition name
- * @param source - BDEF source code
- * @param lockHandle - Lock handle from lock operation
- * @param sessionId - Session ID for request tracking
- * @param transportRequest - Optional transport request number
+ * @param params - Update parameters
  * @returns Axios response with updated source code
  * 
  * @example
@@ -37,28 +34,30 @@ import { AxiosResponse } from 'axios';
  * }`;
  * 
  * const lockHandle = await lock(connection, 'Z_MY_BDEF', sessionId);
- * await update(connection, 'Z_MY_BDEF', source, lockHandle, sessionId);
+ * await update(connection, {
+ *   name: 'Z_MY_BDEF',
+ *   sourceCode: source,
+ *   lockHandle,
+ *   transportRequest: 'E19K905635'
+ * });
  * await unlock(connection, 'Z_MY_BDEF', lockHandle, sessionId);
  * ```
  */
 export async function update(
     connection: IAbapConnection,
-    name: string,
-    source: string,
-    lockHandle: string,
-    transportRequest?: string
+    params: UpdateBehaviorDefinitionParams
 ): Promise<AxiosResponse> {
-    if (!source) {
-        throw new Error('source is required');
+    if (!params.sourceCode) {
+        throw new Error('sourceCode is required');
     }
 
-    if (!lockHandle) {
+    if (!params.lockHandle) {
         throw new Error('lockHandle is required');
     }
 
-    let url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main?lockHandle=${lockHandle}`;
-    if (transportRequest) {
-        url += `&corrNr=${transportRequest}`;
+    let url = `/sap/bc/adt/bo/behaviordefinitions/${params.name.toLowerCase()}/source/main?lockHandle=${params.lockHandle}`;
+    if (params.transportRequest) {
+        url += `&corrNr=${params.transportRequest}`;
     }
 
     const headers = {
@@ -70,7 +69,7 @@ export async function update(
         url,
         method: 'PUT',
         timeout: getTimeout('default'),
-        data: source,
+        data: params.sourceCode,
         headers
     });
 }

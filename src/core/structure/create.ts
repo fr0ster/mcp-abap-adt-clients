@@ -8,6 +8,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
+import { CreateStructureParams } from './types';
 
 /**
  * Create empty structure metadata via POST
@@ -15,11 +16,9 @@ import { limitDescription } from '../../utils/internalUtils';
  */
 export async function create(
   connection: IAbapConnection,
-  structureName: string,
-  description: string,
-  packageName: string,
-  transportRequest: string | undefined): Promise<AxiosResponse> {
-  const createUrl = `/sap/bc/adt/ddic/structures${transportRequest ? `?corrNr=${transportRequest}` : ''}`;
+  params: CreateStructureParams
+): Promise<AxiosResponse> {
+  const createUrl = `/sap/bc/adt/ddic/structures${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   // Get system information - only for cloud systems
   const systemInfo = await getSystemInformation(connection);
@@ -31,12 +30,12 @@ export async function create(
   const responsible = systemInfo ? username : '';
 
   // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = limitDescription(description);
+  const limitedDescription = limitDescription(params.description);
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
 
-  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${structureName.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${packageName.toUpperCase()}"/>
+  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${params.structureName.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${params.packageName.toUpperCase()}"/>
 </blue:blueSource>`;
 
   const headers = {

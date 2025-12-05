@@ -20,15 +20,13 @@ import { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } from '../..
  * @param functionGroupName - Function group name
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @param sourceCode - Optional: source code to validate. If provided, validates hypothetical code without creating object
- * @param sessionId - Optional session ID
  * @returns Check result with errors/warnings
  */
 export async function checkFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
   version: 'active' | 'inactive',
-  sourceCode?: string,
-  sessionId?: string
+  sourceCode?: string
 ): Promise<AxiosResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
 
@@ -36,10 +34,10 @@ export async function checkFunctionGroup(
 
   if (sourceCode) {
     // Validate hypothetical code (object doesn't need to exist)
-    response = await runCheckRunWithSource(connection, 'function_group', functionGroupName, sourceCode, version, 'abapCheckRun', sessionId);
+    response = await runCheckRunWithSource(connection, 'function_group', functionGroupName, sourceCode, version, 'abapCheckRun');
   } else {
     // Validate existing object in SAP (reads from system)
-    response = await runCheckRun(connection, 'function_group', functionGroupName, version, 'abapCheckRun', sessionId);
+    response = await runCheckRun(connection, 'function_group', functionGroupName, version, 'abapCheckRun');
   }
 
   const checkResult = parseCheckRunResponse(response);

@@ -74,8 +74,7 @@ export async function validateFunctionModuleSource(
   functionGroupName: string,
   functionModuleName: string,
   sourceCode?: string,
-  version: 'inactive' | 'active' = 'active',
-  sessionId?: string
+  version: 'inactive' | 'active' = 'active'
 ): Promise<AxiosResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
 
@@ -87,10 +86,10 @@ export async function validateFunctionModuleSource(
 
   if (sourceCode) {
     // Live validation with artifacts (code not saved to SAP)
-    response = await runCheckRunWithSource(connection, objectType, objectName, sourceCode, version, 'abapCheckRun', sessionId);
+    response = await runCheckRunWithSource(connection, objectType, objectName, sourceCode, version, 'abapCheckRun');
   } else {
     // Validate existing object in SAP (without artifacts)
-    response = await runCheckRun(connection, objectType, objectName, version, 'abapCheckRun', sessionId);
+    response = await runCheckRun(connection, objectType, objectName, version, 'abapCheckRun');
   }
 
   const checkResult = parseCheckRunResponse(response);
