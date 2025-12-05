@@ -22,3 +22,4 @@ coverage/**
 !.locks/.keep
 mcp-abap-adt-adt-clients-*.tgz
 sk.json
+src/__tests__/helpers/test-config.yaml
