@@ -15,6 +15,10 @@ These tests verify individual operations (create, read, update, delete, lock, un
 - ✅ **Configurable debug logs** - control output verbosity
 - ✅ **Real SAP validation** - tests against actual SAP system
 - ✅ **YAML configuration** - all parameters from test-config.yaml
+- ✅ **JWT Token Auto-Refresh** - all tests support automatic JWT token refresh when refresh credentials are provided
+  - Tests automatically refresh expired JWT tokens during execution
+  - Prevents "JWT token has expired" errors in long-running test suites
+  - Requires `SAP_REFRESH_TOKEN`, `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, and `SAP_UAA_CLIENT_SECRET` in `.env`
 
 ## Test Structure
 
@@ -103,6 +107,42 @@ Example debug output with `DEBUG_ADT_TESTS=true`:
   → delete (cleanup)
 [1/3] ✓ PASS ViewBuilder - full workflow (12.3s)
 ```
+
+## Environment Variables
+
+Tests require SAP connection configuration in `.env` file or environment variables:
+
+### Required Variables
+
+**For Basic Authentication:**
+- `SAP_URL` - SAP system URL (e.g., `https://your-system.example.com`)
+- `SAP_USERNAME` - SAP username
+- `SAP_PASSWORD` - SAP password
+- `SAP_CLIENT` - SAP client (optional)
+- `SAP_AUTH_TYPE=basic` - Authentication type (default: `basic`)
+
+**For JWT Authentication:**
+- `SAP_URL` - SAP system URL
+- `SAP_JWT_TOKEN` - JWT access token
+- `SAP_CLIENT` - SAP client (optional)
+- `SAP_AUTH_TYPE=jwt` or `SAP_AUTH_TYPE=xsuaa` - Authentication type
+
+### Optional Variables (for JWT Auto-Refresh)
+
+To enable automatic JWT token refresh during test execution, add these variables:
+
+- `SAP_REFRESH_TOKEN` - Refresh token for obtaining new access tokens
+- `SAP_UAA_URL` or `UAA_URL` - UAA OAuth endpoint URL
+- `SAP_UAA_CLIENT_ID` or `UAA_CLIENT_ID` - UAA client ID
+- `SAP_UAA_CLIENT_SECRET` or `UAA_CLIENT_SECRET` - UAA client secret
+
+**Benefits of Auto-Refresh:**
+- Tests continue running even if JWT token expires during execution
+- No manual token refresh required for long-running test suites
+- Prevents "JWT token has expired" errors
+- Connection automatically refreshes token on 401/403 errors
+
+**Note:** All shared module tests (`whereUsed`, `readMetadata`, `readSource`, `search`, `sqlQuery`, `tableContents`) now support auto-refresh when refresh credentials are provided.
 
 ## Test Configuration
 

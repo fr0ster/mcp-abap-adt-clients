@@ -53,6 +53,20 @@ function getConfig(): SapConfig {
       throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
     }
     config.jwtToken = jwtToken;
+
+    // Add refresh credentials for auto-refresh (if available)
+    const refreshToken = process.env.SAP_REFRESH_TOKEN;
+    if (refreshToken) {
+      config.refreshToken = refreshToken;
+    }
+
+    const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
+    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+
+    if (uaaUrl) config.uaaUrl = uaaUrl;
+    if (uaaClientId) config.uaaClientId = uaaClientId;
+    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
   } else {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;

@@ -31,6 +31,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Fixed
 - **Domain and DataElement Check Methods**: Removed incorrect `sourceCode` parameter support (these objects are metadata-only and don't have source code)
+- **Shared Module Tests - JWT Token Auto-Refresh**: Fixed all shared module integration tests to support automatic JWT token refresh
+  - Updated `getConfig()` functions in all shared tests to include refresh credentials (`refreshToken`, `uaaUrl`, `uaaClientId`, `uaaClientSecret`)
+  - Tests affected: `whereUsed.test.ts`, `readMetadata.test.ts`, `readSource.test.ts`, `search.test.ts`, `sqlQuery.test.ts`, `tableContents.test.ts`
+  - Tests now automatically refresh expired JWT tokens during execution, preventing "JWT token has expired" errors
+  - Connection automatically handles token refresh via `JwtAbapConnection.makeAdtRequest()` when refresh credentials are provided
 
 ## [0.1.36] - 2025-12-05
 
