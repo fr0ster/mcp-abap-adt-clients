@@ -245,6 +245,11 @@ describe('ServiceDefinitionBuilder (using CrudClient)', () => {
         serviceDefinitionLocked = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
+        currentStep = 'check before update';
+        logBuilderTestStep(currentStep);
+        const checkBeforeUpdate = await client.checkServiceDefinition({ serviceDefinitionName: config.serviceDefinitionName });
+        expect(checkBeforeUpdate?.status).toBeDefined();
+        
         currentStep = 'update';
         logBuilderTestStep(currentStep);
         await client.updateServiceDefinition({

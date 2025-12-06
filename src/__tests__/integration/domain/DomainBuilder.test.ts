@@ -247,6 +247,11 @@ describe('DomainBuilder (using CrudClient)', () => {
         domainLocked = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
+        currentStep = 'check before update';
+        logBuilderTestStep(currentStep);
+        const checkBeforeUpdate = await client.checkDomain({ domainName: config.domainName });
+        expect(checkBeforeUpdate?.status).toBeDefined();
+        
         currentStep = 'update';
         logBuilderTestStep(currentStep);
         await client.updateDomain({
@@ -318,6 +323,16 @@ describe('DomainBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'DomainBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (domainLocked) {
+            await client.unlockDomain({ domainName: config.domainName }).catch(() => {});
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
+        }
         logBuilderTestEnd(testsLogger, 'DomainBuilder - full workflow');
       }
     }, getTimeout('test'));

@@ -246,6 +246,42 @@ export class CrudClient extends ReadOnlyClient {
     return this;
   }
 
+  async updateClassLocalTypes(config: Partial<ClassBuilderConfig> & Pick<ClassBuilderConfig, 'className' | 'localTypesCode'>, lockHandle?: string): Promise<this> {
+    const builder = this.getClassBuilder(config);
+    if (config.localTypesCode) {
+      builder.setLocalTypesCode(config.localTypesCode);
+    }
+    if (lockHandle || this.crudState.lockHandle) {
+      (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    }
+    await builder.updateLocalTypes();
+    return this;
+  }
+
+  async updateClassDefinitions(config: Partial<ClassBuilderConfig> & Pick<ClassBuilderConfig, 'className' | 'definitionsCode'>, lockHandle?: string): Promise<this> {
+    const builder = this.getClassBuilder(config);
+    if (config.definitionsCode) {
+      builder.setDefinitionsCode(config.definitionsCode);
+    }
+    if (lockHandle || this.crudState.lockHandle) {
+      (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    }
+    await builder.updateDefinitions();
+    return this;
+  }
+
+  async updateClassMacros(config: Partial<ClassBuilderConfig> & Pick<ClassBuilderConfig, 'className' | 'macrosCode'>, lockHandle?: string): Promise<this> {
+    const builder = this.getClassBuilder(config);
+    if (config.macrosCode) {
+      builder.setMacrosCode(config.macrosCode);
+    }
+    if (lockHandle || this.crudState.lockHandle) {
+      (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
+    }
+    await builder.updateMacros();
+    return this;
+  }
+
   async lockTestClasses(config: Pick<ClassBuilderConfig, 'className'>): Promise<this> {
     const builder = this.getClassBuilder(config);
     await builder.lockTestClasses();
@@ -283,6 +319,30 @@ export class CrudClient extends ReadOnlyClient {
     const result = await builder.check(version, sourceCode);
     this.crudState.checkResult = result;
     return result;
+  }
+
+  async checkClassTestClass(config: Pick<ClassBuilderConfig, 'className' | 'testClassCode'>): Promise<this> {
+    const builder = this.getClassBuilder(config);
+    await builder.checkTestClass(config.testClassCode);
+    return this;
+  }
+
+  async checkClassLocalTypes(config: Pick<ClassBuilderConfig, 'className' | 'localTypesCode'>): Promise<this> {
+    const builder = this.getClassBuilder(config);
+    await builder.checkLocalTypes(config.localTypesCode);
+    return this;
+  }
+
+  async checkClassDefinitions(config: Pick<ClassBuilderConfig, 'className' | 'definitionsCode'>): Promise<this> {
+    const builder = this.getClassBuilder(config);
+    await builder.checkDefinitions(config.definitionsCode);
+    return this;
+  }
+
+  async checkClassMacros(config: Pick<ClassBuilderConfig, 'className' | 'macrosCode'>): Promise<this> {
+    const builder = this.getClassBuilder(config);
+    await builder.checkMacros(config.macrosCode);
+    return this;
   }
 
   async validateClass(config: Partial<ClassBuilderConfig> & Pick<ClassBuilderConfig, 'className' | 'packageName' | 'description'>): Promise<AxiosResponse> {

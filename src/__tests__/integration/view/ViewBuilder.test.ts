@@ -412,6 +412,11 @@ describe('ViewBuilder (using CrudClient)', () => {
         viewLocked = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
+        currentStep = 'check before update';
+        logBuilderTestStep(currentStep);
+        const checkBeforeUpdate = await client.checkView({ viewName: config.viewName });
+        expect(checkBeforeUpdate?.status).toBeDefined();
+        
         currentStep = 'update';
         logBuilderTestStep(currentStep);
         if (!config.ddlSource) {
@@ -948,14 +953,15 @@ describe('ViewBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'ViewBuilder - CDS unit test', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: unlock is always required (even if skip_cleanup is true)
-        // Note: CDS view is not cleaned up as it must be created manually
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
         try {
-          if (cdsUnitTestBuilder) {
-            await cdsUnitTestBuilder.forceUnlock().catch(() => {});
+          if (classLocked && cdsUnitTestBuilder) {
+            await cdsUnitTestBuilder.unlock().catch(() => {});
           }
-        } catch (cleanupError) {
-          // Ignore cleanup errors
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final unlock cleanup failed (ignored):`, finalCleanupError);
         }
         
         // Cleanup unit test connection (always cleanup connection, even if skip_cleanup is true)
@@ -967,12 +973,6 @@ describe('ViewBuilder (using CrudClient)', () => {
           }
         }
         
-        // Log success/end only if test didn't throw
-        try {
-          logBuilderTestSuccess(testsLogger, 'ViewBuilder - CDS unit test');
-        } catch (logError) {
-          // Ignore logging errors if test already completed
-        }
         logBuilderTestEnd(testsLogger, 'ViewBuilder - CDS unit test');
       }
     }, getTimeout('long')); // CDS unit test needs more time (400 seconds = 6.67 minutes)

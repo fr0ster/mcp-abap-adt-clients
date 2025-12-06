@@ -287,10 +287,68 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
   async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Checking domain:', this.config.domainName, 'version:', version);
+
+      // Generate XML content to check (same as will be sent in PUT)
+      let xmlContent: string | undefined;
+      if (this.config.packageName) {
+        // Only generate XML if we have enough config to build it
+        const systemInfo = await getSystemInformation(this.connection);
+        const masterSystem = systemInfo?.systemID;
+        const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+        const datatype = this.config.datatype || 'CHAR';
+        const length = this.config.length || 100;
+        const decimals = this.config.decimals || 0;
+
+        let fixValuesXml = '';
+        if (this.config.fixed_values && this.config.fixed_values.length > 0) {
+          const fixValueItems = this.config.fixed_values.map(fv =>
+            `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`
+          ).join('\n');
+          fixValuesXml = `    <doma:fixValues>\n${fixValueItems}\n    </doma:fixValues>`;
+        } else {
+          fixValuesXml = '    <doma:fixValues/>';
+        }
+
+        const description = this.config.description || this.config.domainName;
+        const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+
+        xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
+             xmlns:adtcore="http://www.sap.com/adt/core"
+             adtcore:description="${description}"
+             adtcore:language="EN"
+             adtcore:name="${this.config.domainName.toUpperCase()}"
+             adtcore:type="DOMA/DD"
+             adtcore:masterLanguage="EN"${masterSystemAttr}
+             adtcore:responsible="${username}">
+  <adtcore:packageRef adtcore:name="${this.config.packageName.toUpperCase()}"/>
+  <doma:content>
+    <doma:typeInformation>
+      <doma:datatype>${datatype}</doma:datatype>
+      <doma:length>${length}</doma:length>
+      <doma:decimals>${decimals}</doma:decimals>
+    </doma:typeInformation>
+    <doma:outputInformation>
+      <doma:length>${length}</doma:length>
+      <doma:conversionExit>${this.config.conversion_exit || ''}</doma:conversionExit>
+      <doma:signExists>${this.config.sign_exists || false}</doma:signExists>
+      <doma:lowercase>${this.config.lowercase || false}</doma:lowercase>
+    </doma:outputInformation>
+    <doma:valueInformation>
+      <doma:valueTableRef adtcore:name="${this.config.value_table || ''}"/>
+      <doma:appendExists>false</doma:appendExists>
+${fixValuesXml}
+    </doma:valueInformation>
+  </doma:content>
+</doma:domain>`;
+      }
+
       const result = await checkDomainSyntax(
         this.connection,
         this.config.domainName,
-        version
+        version,
+        xmlContent
       );
       // Store result for backward compatibility
       this.state.checkResult = result;

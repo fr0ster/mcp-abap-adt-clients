@@ -305,6 +305,10 @@ extend view ${targetEntity} with "${extName}"
           await new Promise(resolve => setTimeout(resolve, lockDelay));
         }
         
+        currentStep = 'check before update';
+        logBuilderTestStep(currentStep);
+        await client.checkMetadataExtension({ name: config.extName });
+        
         currentStep = 'update';
         logBuilderTestStep(currentStep);
         await client.updateMetadataExtension({
@@ -390,6 +394,17 @@ extend view ${targetEntity} with "${extName}"
         logBuilderTestError(testsLogger, 'MetadataExtensionBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (metadataExtensionLocked) {
+            await client.unlockMetadataExtension({ name: extName }).catch(() => {});
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final unlock cleanup failed (ignored):`, finalCleanupError);
+        }
+        
         // Cleanup: delete metadata extension only if it was created in this test
         if (extName && metadataExtensionCreated) {
           try {

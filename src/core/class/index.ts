@@ -13,3 +13,15 @@ export {
   ClassUnitTestDefinition,
   ClassUnitTestRunOptions
 } from './run';
+export { 
+  checkClass, 
+  checkClassLocalTestClass,
+  checkClassLocalTypes,
+  checkClassDefinitions,
+  checkClassMacros
+} from './check';
+export {
+  updateClassLocalTypes,
+  updateClassDefinitions,
+  updateClassMacros
+} from './includes';

@@ -63,16 +63,11 @@ lock_config:
   locks_dir: ".locks"
   # Track locks in persistent storage
   persist_locks: true
-  # Auto-cleanup locks after test
-  cleanup_locks_after_test: true
 
 # Environment configuration
 environment:
   default_package: "ZADT_BLD_PKG01"  # Default package for creating objects (used if not specified in test case)
   default_transport: ""  # Default transport request (used if not specified in test case)
-  # Cleanup configuration (applies to all tests)
-  cleanup_before: true   # Clean up objects before test (default: true)
-  cleanup_after: true    # Clean up objects after test (default: true)
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
 
 # ============================================================================

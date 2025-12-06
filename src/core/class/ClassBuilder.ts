@@ -112,6 +112,24 @@ export class ClassBuilder {
     return this;
   }
 
+  setLocalTypesCode(localTypesCode: string): this {
+    this.config.localTypesCode = localTypesCode;
+    this.logger.debug?.('Local types code set, length:', localTypesCode.length);
+    return this;
+  }
+
+  setDefinitionsCode(definitionsCode: string): this {
+    this.config.definitionsCode = definitionsCode;
+    this.logger.debug?.('Definitions code set, length:', definitionsCode.length);
+    return this;
+  }
+
+  setMacrosCode(macrosCode: string): this {
+    this.config.macrosCode = macrosCode;
+    this.logger.debug?.('Macros code set, length:', macrosCode.length);
+    return this;
+  }
+
   setClassTemplate(templateXml: string): this {
     this.config.classTemplate = templateXml;
     this.logger.debug?.('Class template set, length:', templateXml.length);
@@ -334,6 +352,113 @@ export class ClassBuilder {
     }
   }
 
+  /**
+   * Check test class code
+   * 
+   * Validates ABAP Unit test class source code using SAP check run.
+   * This is a separate validation from main class check because test classes
+   * use a different URI (/includes/testclasses vs /source/main).
+   * 
+   * @param testClassSource - Optional test class source code. If not provided, uses stored testClassCode
+   * @returns this for chaining
+   * @throws Error if check finds errors (chkrun:type="E")
+   */
+  async checkTestClass(testClassSource?: string): Promise<this> {
+    try {
+      const code = testClassSource || this.config.testClassCode;
+      if (!code) {
+        throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
+      }
+      
+      this.logger.info?.('Checking test class code:', this.config.className);
+      const { checkClassLocalTestClass } = await import('./check');
+      await checkClassLocalTestClass(this.connection, this.config.className, code, 'inactive');
+      this.logger.info?.('Test class code check passed');
+      
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'checkTestClass',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Test class check failed:', error);
+      throw error;
+    }
+  }
+
+  async checkLocalTypes(localTypesSource?: string): Promise<this> {
+    try {
+      const code = localTypesSource || this.config.localTypesCode;
+      if (!code) {
+        throw new Error('Local types source code is required. Use setLocalTypesCode() or pass as parameter.');
+      }
+      
+      this.logger.info?.('Checking local types code:', this.config.className);
+      const { checkClassLocalTypes } = await import('./check');
+      await checkClassLocalTypes(this.connection, this.config.className, code, 'inactive');
+      this.logger.info?.('Local types code check passed');
+      
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'checkLocalTypes',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Local types check failed:', error);
+      throw error;
+    }
+  }
+
+  async checkDefinitions(definitionsSource?: string): Promise<this> {
+    try {
+      const code = definitionsSource || this.config.definitionsCode;
+      if (!code) {
+        throw new Error('Definitions source code is required. Use setDefinitionsCode() or pass as parameter.');
+      }
+      
+      this.logger.info?.('Checking definitions code:', this.config.className);
+      const { checkClassDefinitions } = await import('./check');
+      await checkClassDefinitions(this.connection, this.config.className, code, 'inactive');
+      this.logger.info?.('Definitions code check passed');
+      
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'checkDefinitions',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Definitions check failed:', error);
+      throw error;
+    }
+  }
+
+  async checkMacros(macrosSource?: string): Promise<this> {
+    try {
+      const code = macrosSource || this.config.macrosCode;
+      if (!code) {
+        throw new Error('Macros source code is required. Use setMacrosCode() or pass as parameter.');
+      }
+      
+      this.logger.info?.('Checking macros code:', this.config.className);
+      const { checkClassMacros } = await import('./check');
+      await checkClassMacros(this.connection, this.config.className, code, 'inactive');
+      this.logger.info?.('Macros code check passed');
+      
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'checkMacros',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Macros check failed:', error);
+      throw error;
+    }
+  }
+
   async update(sourceCode?: string, options?: { implementations?: string; testClasses?: string }): Promise<this> {
     try {
       if (!this.lockHandle) {
@@ -415,6 +540,7 @@ export class ClassBuilder {
       if (!code) {
         throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
       }
+      
       this.logger.info?.('Updating test class (local class):', this.config.className);
       const result = await updateClassTestInclude(
         this.connection,
@@ -452,6 +578,10 @@ export class ClassBuilder {
       if (!code) {
         throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
       }
+      
+      // Check test class code before update using dedicated method
+      await this.checkTestClass(code);
+      
       this.logger.info?.('Updating class test include:', this.config.className);
       const result = await updateClassTestInclude(
         this.connection,
@@ -470,6 +600,102 @@ export class ClassBuilder {
         timestamp: new Date()
       });
       this.logger.error?.('Update test classes failed:', error);
+      throw error;
+    }
+  }
+
+  async updateLocalTypes(localTypesSource?: string): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Class must be locked before updating local types. Call lock() first.');
+      }
+      const code = localTypesSource || this.config.localTypesCode;
+      if (!code) {
+        throw new Error('Local types source code is required. Use setLocalTypesCode() or pass as parameter.');
+      }
+      
+      this.logger.info?.('Updating local types:', this.config.className);
+      const { updateClassLocalTypes } = await import('./includes');
+      const result = await updateClassLocalTypes(
+        this.connection,
+        this.config.className,
+        code,
+        this.lockHandle,
+        this.config.transportRequest
+      );
+      this.logger.info?.('Local types updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'updateLocalTypes',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update local types failed:', error);
+      throw error;
+    }
+  }
+
+  async updateDefinitions(definitionsSource?: string): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Class must be locked before updating definitions. Call lock() first.');
+      }
+      const code = definitionsSource || this.config.definitionsCode;
+      if (!code) {
+        throw new Error('Definitions source code is required. Use setDefinitionsCode() or pass as parameter.');
+      }
+      
+      this.logger.info?.('Updating definitions:', this.config.className);
+      const { updateClassDefinitions } = await import('./includes');
+      const result = await updateClassDefinitions(
+        this.connection,
+        this.config.className,
+        code,
+        this.lockHandle,
+        this.config.transportRequest
+      );
+      this.logger.info?.('Definitions updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'updateDefinitions',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update definitions failed:', error);
+      throw error;
+    }
+  }
+
+  async updateMacros(macrosSource?: string): Promise<this> {
+    try {
+      if (!this.lockHandle) {
+        throw new Error('Class must be locked before updating macros. Call lock() first.');
+      }
+      const code = macrosSource || this.config.macrosCode;
+      if (!code) {
+        throw new Error('Macros source code is required. Use setMacrosCode() or pass as parameter.');
+      }
+      
+      this.logger.info?.('Updating macros:', this.config.className);
+      const { updateClassMacros } = await import('./includes');
+      const result = await updateClassMacros(
+        this.connection,
+        this.config.className,
+        code,
+        this.lockHandle,
+        this.config.transportRequest
+      );
+      this.logger.info?.('Macros updated successfully:', result.status);
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'updateMacros',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Update macros failed:', error);
       throw error;
     }
   }

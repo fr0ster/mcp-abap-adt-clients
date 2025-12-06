@@ -263,6 +263,10 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
           await new Promise(resolve => setTimeout(resolve, lockDelay));
         }
         
+        currentStep = 'check before update';
+        logBuilderTestStep(currentStep);
+        await client.checkBehaviorDefinition({ name: config.bdefName });
+        
         currentStep = 'update';
         logBuilderTestStep(currentStep);
         await client.updateBehaviorDefinition({
@@ -348,6 +352,17 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'BehaviorDefinitionBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (behaviorDefinitionLocked) {
+            await client.unlockBehaviorDefinition({ name: config.bdefName }).catch(() => {});
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final unlock cleanup failed (ignored):`, finalCleanupError);
+        }
+        
         // Cleanup: delete behavior definition
         if (config) {
           try {

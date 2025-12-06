@@ -331,6 +331,16 @@ describe('ProgramBuilder (using CrudClient)', () => {
           logBuilderTestError(testsLogger, 'ProgramBuilder - full workflow', enhancedError);
           throw enhancedError;
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (programLocked) {
+            await client.unlockProgram({ programName: config.programName }).catch(() => {});
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
+        }
         logBuilderTestEnd(testsLogger, 'ProgramBuilder - full workflow');
       }
     }, getTimeout('test'));

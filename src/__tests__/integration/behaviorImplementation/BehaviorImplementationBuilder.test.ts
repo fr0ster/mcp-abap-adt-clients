@@ -325,6 +325,10 @@ ENDCLASS.`;
         });
         behaviorImplementationLocked = true;
         
+        currentStep = 'check before update';
+        logBuilderTestStep(currentStep);
+        await client.checkClass({ className: config.className });
+        
         currentStep = 'update';
         logBuilderTestStep('updateMainSource');
         await client.updateBehaviorImplementationMainSource({
@@ -414,6 +418,17 @@ ENDCLASS.`;
         logBuilderTestError(testsLogger, 'BehaviorImplementationBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (behaviorImplementationLocked) {
+            await client.unlockClass({ className: config.className }).catch(() => {});
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final unlock cleanup failed (ignored):`, finalCleanupError);
+        }
+        
         // Cleanup: delete behavior implementation class
         if (className) {
           try {

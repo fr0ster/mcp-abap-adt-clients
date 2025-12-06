@@ -36,6 +36,9 @@ export interface ClassBuilderConfig {
   sourceCode?: string;
   testClassCode?: string;
   testClassName?: string;
+  localTypesCode?: string; // Local helper classes, interface definitions and type declarations
+  definitionsCode?: string; // Class-relevant local types (private section types)
+  macrosCode?: string; // Macro definitions (legacy ABAP)
   superclass?: string;
   final?: boolean;
   abstract?: boolean;

@@ -260,6 +260,16 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'FunctionGroupBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
+        // Final cleanup: ensure unlock even if previous cleanup failed
+        // This is a safety net to prevent objects from being left locked
+        try {
+          if (functionGroupLocked) {
+            await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName }).catch(() => {});
+          }
+        } catch (finalCleanupError) {
+          // Ignore final cleanup errors - we've already tried cleanup in catch block
+          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
+        }
         logBuilderTestEnd(testsLogger, 'FunctionGroupBuilder - full workflow');
       }
     }, getTimeout('test'));

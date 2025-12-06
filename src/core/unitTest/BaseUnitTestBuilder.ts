@@ -120,6 +120,43 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
   }
 
   /**
+   * Override check() to validate test class code instead of main class
+   * 
+   * For unit test builders, check() validates the test class source code,
+   * not the main class. This is because unit test builders work with test classes.
+   * 
+   * @param version - Version to check ('active' or 'inactive')
+   * @param sourceCode - Optional test class source code to check
+   * @returns Promise with check result
+   */
+  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<any> {
+    try {
+      const code = sourceCode || this.config.testClassCode;
+      if (!code) {
+        throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
+      }
+
+      this.logger.info?.('Checking test class code:', this.config.className);
+      
+      // Use checkTestClass() from ClassBuilder
+      await super.checkTestClass(code);
+      
+      this.logger.info?.('Test class check passed');
+      
+      // Return this for compatibility with builder pattern
+      return this;
+    } catch (error: any) {
+      this.state.errors.push({
+        method: 'check',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date()
+      });
+      this.logger.error?.('Check failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Start unit test run for class (test includes)
    */
   async runForClass(

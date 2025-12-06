@@ -5,6 +5,8 @@
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
+import { getTimeout } from '../../utils/timeouts';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Check domain syntax
@@ -12,16 +14,55 @@ import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
  * @param connection - SAP connection
  * @param domainName - Domain name
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
+ * @param xmlContent - Optional XML content to validate (same format as PUT body). If provided, check validates this content instead of saved version.
  * @returns Check result with errors/warnings
  * 
- * Note: Domains do not have source code - they are metadata-only objects.
+ * Note: When xmlContent is provided, it should be the same XML that will be sent in PUT request.
  */
 export async function checkDomainSyntax(
   connection: IAbapConnection,
   domainName: string,
-  version: 'active' | 'inactive'
+  version: 'active' | 'inactive',
+  xmlContent?: string
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'domain', domainName, version, 'abapCheckRun', undefined);
+  let response: AxiosResponse;
+
+  if (xmlContent) {
+    // Check with XML content (for unsaved changes or new content validation)
+    const encodedName = encodeSapObjectName(domainName.toLowerCase());
+    const objectUri = `/sap/bc/adt/ddic/domains/${encodedName}`;
+    const base64Content = Buffer.from(xmlContent, 'utf-8').toString('base64');
+
+    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+<chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
+  <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
+    <chkrun:artifacts>
+      <chkrun:artifact chkrun:contentType="application/vnd.sap.adt.domains.v2+xml; charset=utf-8" chkrun:uri="${objectUri}">
+        <chkrun:content>${base64Content}</chkrun:content>
+      </chkrun:artifact>
+    </chkrun:artifacts>
+  </chkrun:checkObject>
+</chkrun:checkObjectList>`;
+
+    const headers = {
+      'Accept': 'application/vnd.sap.adt.checkmessages+xml',
+      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+    };
+
+    const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
+
+    response = await connection.makeAdtRequest({
+      url,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      data: xmlBody,
+      headers
+    });
+  } else {
+    // Check saved version (without XML content)
+    response = await runCheckRun(connection, 'domain', domainName, version, 'abapCheckRun', undefined);
+  }
+
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {

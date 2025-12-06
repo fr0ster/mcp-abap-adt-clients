@@ -15,6 +15,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 - [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `ReadOnlyClient` and `CrudClient`
 - [**STATEFUL_SESSION_GUIDE.md**](usage/STATEFUL_SESSION_GUIDE.md) - Guide for stateful session management
+- [**CHECK_LOCAL_TEST_CLASS.md**](usage/CHECK_LOCAL_TEST_CLASS.md) - Guide for validating ABAP Unit test classes
 - [**DEBUG.md**](usage/DEBUG.md) - Debugging and troubleshooting guide
 - [**OPERATION_DELAYS.md**](usage/OPERATION_DELAYS.md) - Detailed guide on operation delays and timing
 - [**OPERATION_DELAYS_SUMMARY.md**](usage/OPERATION_DELAYS_SUMMARY.md) - Quick reference for operation delays
@@ -23,6 +24,10 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 - [**BUILDER_TEST_PATTERN.md**](development/BUILDER_TEST_PATTERN.md) - Testing patterns for Builder classes
 - [**TEST_CONFIG_SCHEMA.md**](development/TEST_CONFIG_SCHEMA.md) - Test configuration schema and guidelines
+- [**CHECK_METHODS_COVERAGE.md**](development/CHECK_METHODS_COVERAGE.md) - Complete coverage of check methods across all layers
+- [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
+- [**TESTING_READINESS.md**](development/TESTING_READINESS.md) - Testing readiness status for all object types
+- [**ROADMAP.md**](development/ROADMAP.md) - Development roadmap and planned features
 
 ## Documentation Structure
 
@@ -39,7 +44,11 @@ docs/
 │   └── OPERATION_DELAYS_SUMMARY.md   # Operation delays (summary)
 └── development/
     ├── BUILDER_TEST_PATTERN.md       # Testing patterns
-    └── TEST_CONFIG_SCHEMA.md         # Test configuration
+    ├── TEST_CONFIG_SCHEMA.md         # Test configuration
+    ├── CHECK_METHODS_COVERAGE.md     # Check methods coverage (100%)
+    ├── UPDATE_CONTENT_TYPES.md       # Update content types reference
+    ├── TESTING_READINESS.md          # Testing readiness status
+    └── ROADMAP.md                    # Development roadmap
 ```
 
 ## Key Concepts

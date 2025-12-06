@@ -624,6 +624,12 @@ checkServiceDefinition(config, sourceCode?: string, version?: 'active' | 'inacti
 checkBehaviorDefinition(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<this>
 checkMetadataExtension(config, sourceCode?: string, version?: 'active' | 'inactive'): Promise<this>
 
+// Special check for local test classes (separate include file)
+checkClassLocalTestClass(connection, className: string, testClassSource: string, version?: 'active' | 'inactive'): Promise<AxiosResponse>
+
+// Or via CrudClient (recommended)
+checkClassTestClass(config: { className: string, testClassCode: string }): Promise<this>
+
 // Metadata-only objects (no source code support)
 checkDataElement(config, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 checkDomain(config, version?: 'active' | 'inactive'): Promise<AxiosResponse>
@@ -634,12 +640,22 @@ checkDomain(config, version?: 'active' | 'inactive'): Promise<AxiosResponse>
 - `sourceCode` (optional): Source code to validate. If provided, validates unsaved code (base64 encoded in request)
 - `version` (optional): `'active'` (activated version) or `'inactive'` (saved but not activated). Default varies by object type
 
+**Note on Local Test Classes:**
+Regular `checkClass()` **cannot** validate local test classes because they use a different URI (`/includes/testclasses` vs `/source/main`). Use `checkClassTestClass()` method in CrudClient or low-level `checkClassLocalTestClass()` function for ABAP Unit test class validation. See [Check Local Test Class Guide](./CHECK_LOCAL_TEST_CLASS.md) for details.
+
 **Examples:**
 
 ```typescript
 // Check saved version (object must exist)
 const checkResult = await client.checkClass({ className: 'ZCL_TEST' }, 'inactive');
 console.log('Check status:', checkResult.status);
+
+// Check local test class (separate from main class)
+await client.checkClassTestClass({
+  className: 'ZCL_TEST',
+  testClassCode: testClassSource
+});
+console.log('Test class check passed');
 
 // Check new/unsaved code (live validation)
 const newCode = `CLASS zcl_test DEFINITION PUBLIC.
@@ -653,6 +669,28 @@ const liveCheckResult = await client.checkClass(
   newCode  // Validates code before saving
 );
 console.log('Live check status:', liveCheckResult.status);
+
+// Check local test class (separate from main class)
+const testClassCode = `CLASS ltcl_test DEFINITION FOR TESTING.
+  PRIVATE SECTION.
+    METHODS test_method FOR TESTING.
+ENDCLASS.`;
+
+await client.checkClassTestClass({
+  className: 'ZCL_TEST',
+  testClassCode: testClassCode
+});
+console.log('Test class check passed');
+
+// Or using low-level function
+const { checkClassLocalTestClass } = require('@mcp-abap-adt/adt-clients');
+const testCheckResult = await checkClassLocalTestClass(
+  connection,
+  'ZCL_TEST',      // Container class name
+  testClassCode,   // Test class source
+  'inactive'
+);
+console.log('Test class check status:', testCheckResult.status);
 
 // Check DDL code for table
 const ddlCode = `@EndUserText.label: 'Test Table'
@@ -673,6 +711,7 @@ const tableCheckResult = await client.checkTable(
 - **Live validation**: Validate new/unsaved code before creating or updating object
 - **Pre-flight validation**: Test code syntax without modifying SAP system
 - **Real-time checking**: Similar to Eclipse ADT editor's live validation feature
+- **Test class validation**: Validate ABAP Unit test classes before updating (using `checkClassLocalTestClass`)
 
 ### Validation Operations
 

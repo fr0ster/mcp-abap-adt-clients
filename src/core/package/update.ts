@@ -102,7 +102,7 @@ export async function updatePackage(
 
 /**
  * Update only package description (safe update - only modifiable field)
- * Reads current package data and updates only description attribute
+ * Generates minimal XML with updated description without reading current package
  * 
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
@@ -110,7 +110,8 @@ export async function updatePackageDescription(
   connection: IAbapConnection,
   packageName: string,
   description: string,
-  lockHandle: string
+  lockHandle: string,
+  superPackage?: string
 ): Promise<AxiosResponse> {
   if (!packageName) {
     throw new Error('package_name is required');
@@ -119,36 +120,19 @@ export async function updatePackageDescription(
     throw new Error('description is required');
   }
 
-  // Read current package to get existing XML
-  const { getPackage } = await import('./read');
-  const readResponse = await getPackage(connection, packageName);
-  
-  // Get current XML as string
-  const currentXml = typeof readResponse.data === 'string' 
-    ? readResponse.data 
-    : JSON.stringify(readResponse.data);
-  
   // Description is limited to 60 characters in SAP ADT
   const limitedDescription = limitDescription(description);
-  // Replace description attribute in XML (simple string replacement)
-  // Pattern: adtcore:description="old_value" -> adtcore:description="new_value"
-  const descriptionRegex = /(adtcore:description=")([^"]*)(")/;
-  const updatedXml = currentXml.replace(descriptionRegex, `$1${limitedDescription.replace(/"/g, '&quot;')}$3`);
-
-  const packageNameEncoded = encodeSapObjectName(packageName);
-  const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${lockHandle}`;
-
-  const headers = {
-    'Content-Type': 'application/vnd.sap.adt.packages.v2+xml',
-    'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml'
+  
+  // Generate minimal package XML with just description update
+  // We don't need to GET the full package - SAP will merge this with existing data
+  const params: UpdatePackageParams = {
+    package_name: packageName,
+    super_package: superPackage || '',
+    description: limitedDescription,
+    package_type: 'development' // Default, SAP will use existing if not changing
   };
-
-  return await connection.makeAdtRequest({
-    url,
-    method: 'PUT',
-    timeout: getTimeout('default'),
-    data: updatedXml,
-    headers
-  });
+  
+  // Use the full updatePackage which doesn't do GET
+  return updatePackage(connection, params, lockHandle);
 }
 

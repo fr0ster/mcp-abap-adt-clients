@@ -350,7 +350,8 @@ export class PackageBuilder {
         this.connection,
         this.config.packageName,
         descriptionToUpdate,
-        this.state.lockHandle
+        this.state.lockHandle,
+        this.config.superPackage
       );
       this.state.updateResult = result;
       this.logger.info?.('Package description updated successfully:', result.status);
