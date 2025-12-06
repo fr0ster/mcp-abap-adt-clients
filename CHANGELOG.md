@@ -5,6 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.39] - 2025-12-06
+
+### Documentation
+- **Removed Outdated Documentation**: Cleaned up documentation structure
+  - Removed `CHECK_CONTENT_FORMAT.md` - information consolidated into `UPDATE_CONTENT_TYPES.md` and `CHECK_METHODS_COVERAGE.md`
+  - Removed `docs/development/archive/` directory with outdated analysis documents:
+    - `PARAMETERS_ANALYSIS.md` - outdated parameters analysis
+    - `TEST_CLEANUP_ROADMAP.md` - outdated cleanup plan
+    - `TEST_DEPENDENCIES_ROADMAP.md` - outdated dependencies plan
+
+### Added
+- **Check Methods Coverage Documentation**: Added comprehensive `CHECK_METHODS_COVERAGE.md`
+  - Complete coverage table for all 21 check methods across all object types
+  - Implementation details for text/plain (15 objects) and XML metadata (4 objects) checks
+  - Usage patterns: Core functions → Builders → CrudClient
+  - Check response format and error handling examples
+  - 100% coverage verification across all layers (Core, Builder, CrudClient)
+
 ## [0.1.38] - 2025-12-06
 
 ### Changed
