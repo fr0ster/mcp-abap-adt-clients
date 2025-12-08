@@ -19,7 +19,11 @@ async function createDDLSObject(
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.view_name);
-  const url = `/sap/bc/adt/ddic/ddl/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
+  // Check if transport_request is provided and not empty
+  // Handle both string and undefined/null cases safely
+  const transportRequest = args.transport_request?.trim();
+  const hasTransportRequest = transportRequest && transportRequest.length > 0;
+  const url = `/sap/bc/adt/ddic/ddl/sources${hasTransportRequest ? `?corrNr=${encodeURIComponent(transportRequest)}` : ''}`;
 
   // Get system information - only for cloud systems
   const systemInfo = await getSystemInformation(connection);

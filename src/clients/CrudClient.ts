@@ -106,6 +106,10 @@ export class CrudClient extends ReadOnlyClient {
   private getProgramBuilder(config: Partial<ProgramBuilderConfig> & Pick<ProgramBuilderConfig, 'programName'>): ProgramBuilder {
     // Reuse existing builder if it's for the same program (same session)
     if (this.crudState.programBuilder && this.crudState.currentProgramName === config.programName) {
+      // Update transportRequest if provided in config
+      if (config.transportRequest !== undefined) {
+        this.crudState.programBuilder.setRequest(config.transportRequest);
+      }
       return this.crudState.programBuilder;
     }
     // Create new builder for new program
@@ -187,6 +191,10 @@ export class CrudClient extends ReadOnlyClient {
   private getClassBuilder(config: Partial<ClassBuilderConfig> & Pick<ClassBuilderConfig, 'className'>): ClassBuilder {
     // Reuse existing builder if it's for the same class (same session)
     if (this.crudState.classBuilder && this.crudState.currentClassName === config.className) {
+      // Update transportRequest if provided in config
+      if (config.transportRequest !== undefined) {
+        this.crudState.classBuilder.setRequest(config.transportRequest);
+      }
       return this.crudState.classBuilder;
     }
     // Create new builder for new class
@@ -403,6 +411,10 @@ export class CrudClient extends ReadOnlyClient {
   private getInterfaceBuilder(config: Partial<InterfaceBuilderConfig> & Pick<InterfaceBuilderConfig, 'interfaceName'>): InterfaceBuilder {
     // Reuse existing builder if it's for the same interface (same session)
     if (this.crudState.interfaceBuilder && this.crudState.currentInterfaceName === config.interfaceName) {
+      // Update transportRequest if provided in config
+      if (config.transportRequest !== undefined) {
+        this.crudState.interfaceBuilder.setRequest(config.transportRequest);
+      }
       return this.crudState.interfaceBuilder;
     }
     // Create new builder for new interface
@@ -486,6 +498,10 @@ export class CrudClient extends ReadOnlyClient {
     // Reuse existing builder if it's for the same function module (same session)
     const key = `${config.functionGroupName}/${config.functionModuleName}`;
     if (this.crudState.functionModuleBuilder && this.crudState.currentFunctionModuleName === key) {
+      // Update transportRequest if provided in config
+      if (config.transportRequest !== undefined) {
+        this.crudState.functionModuleBuilder.setRequest(config.transportRequest);
+      }
       return this.crudState.functionModuleBuilder;
     }
     // Create new builder for new function module
@@ -728,6 +744,10 @@ export class CrudClient extends ReadOnlyClient {
   private getDomainBuilder(config: Partial<DomainBuilderConfig> & Pick<DomainBuilderConfig, 'domainName'>): DomainBuilder {
     // Reuse existing builder if it's for the same domain (same session)
     if (this.crudState.domainBuilder && this.crudState.currentDomainName === config.domainName) {
+      // Update transportRequest if provided in config
+      if (config.transportRequest !== undefined) {
+        this.crudState.domainBuilder.setRequest(config.transportRequest);
+      }
       return this.crudState.domainBuilder;
     }
     // Create new builder for new domain
@@ -988,6 +1008,10 @@ export class CrudClient extends ReadOnlyClient {
   private getViewBuilder(config: Partial<ViewBuilderConfig> & Pick<ViewBuilderConfig, 'viewName'>): ViewBuilder {
     // Reuse existing builder if it's for the same view (same session)
     if (this.crudState.viewBuilder && this.crudState.currentViewName === config.viewName) {
+      // Update transportRequest if provided in config
+      if (config.transportRequest !== undefined) {
+        this.crudState.viewBuilder.setRequest(config.transportRequest);
+      }
       return this.crudState.viewBuilder;
     }
     // Create new builder for new view

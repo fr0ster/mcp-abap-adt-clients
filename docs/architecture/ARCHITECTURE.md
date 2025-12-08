@@ -114,6 +114,9 @@ packages/adt-clients/
 - Builder instances are reused when operating on the same object name, ensuring `lockHandle` and session cookies are preserved
 - This prevents "User is currently editing" errors when chaining `lock()` → `update()` → `unlock()` operations
 - One `CrudClient` instance corresponds to one ADT session, maintaining consistency across operations
+- **Parameter Updates**: When a builder is reused, parameters like `transportRequest` are automatically updated if provided in the new config
+  - All `get*Builder()` methods (e.g., `getClassBuilder()`, `getViewBuilder()`) now update `transportRequest` via `builder.setRequest()` when reusing existing builders
+  - This ensures parameters are never lost when reusing builders for the same object
 
 **Additional methods (besides ReadOnlyClient):**
 

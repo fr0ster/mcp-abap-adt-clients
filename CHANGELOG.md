@@ -5,6 +5,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.1.40] - 2025-12-08
+
+### Fixed
+- **Parameter Passing in Builder Reuse**: Fixed issue where `transportRequest` parameter was lost when reusing existing builders
+  - Updated all `get*Builder` methods in `CrudClient` to update `transportRequest` when builder is reused for the same object
+  - Affected methods: `getProgramBuilder()`, `getClassBuilder()`, `getInterfaceBuilder()`, `getFunctionModuleBuilder()`, `getDomainBuilder()`, `getViewBuilder()`
+  - Previously, when a builder was reused (same object, same session), the `transportRequest` parameter was not updated, causing it to be lost in subsequent operations
+  - Now, if `transportRequest` is provided in config, it is automatically updated via `builder.setRequest()` method
+- **Transport Request URL Encoding**: Improved `transportRequest` parameter handling in `createView()` function
+  - Added `encodeURIComponent()` for safe URL encoding of transport request values
+  - Improved parameter validation with optional chaining (`?.`) for safer null/undefined handling
+  - Better handling of empty strings and whitespace-only values
+
+### Added
+- **Parameter Passing Unit Tests Roadmap**: Added comprehensive roadmap for unit tests to verify parameter passing
+  - Created `doc/roadmaps/parameter_passing_unit_tests_roadmap.md` in mcp-abap-adt
+  - Detailed test strategy for verifying all parameters pass correctly from client to low-level functions
+  - Test implementation plan with phases and examples
+  - Coverage goals and success criteria
+
+### Testing
+- **BehaviorImplementation Test Configuration**: Fixed test configuration for BehaviorImplementationBuilder
+  - Enabled `builder_behavior_implementation` test case in `test-config.yaml`
+  - Test was previously skipped due to `enabled: false` setting
+
+### Documentation
+- **Architecture Documentation**: Updated documentation to reflect parameter update behavior
+  - Added note in `ARCHITECTURE.md` about automatic parameter updates when reusing builders
+  - Updated `STATEFUL_SESSION_GUIDE.md` with information about parameter preservation during builder reuse
+  - Clarified that `transportRequest` and other parameters are automatically updated when builders are reused for the same object
+
 ## [0.1.39] - 2025-12-06
 
 ### Documentation

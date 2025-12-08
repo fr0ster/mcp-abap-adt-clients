@@ -56,6 +56,7 @@ const builder = new TableBuilder(connection, logger, {
 
 - `sessionId` is optional; supply it to force multiple Builders to share a session.
 - The `createOnLockCallback` helper (tests) records `(objectType, objectName, sessionId, lockHandle)` in the lock registry for recovery.
+- **Parameter Updates**: When `CrudClient` reuses a builder for the same object, parameters like `transportRequest` are automatically updated if provided in the new config. This ensures parameters are never lost when reusing builders within the same session.
 
 ---
 
