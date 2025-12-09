@@ -32,15 +32,16 @@ This roadmap describes the implementation of high-level CRUD operations that enc
 ### Create Operation Chain
 
 ```
-validate() 
-  → create() 
-  → check() 
-  → lock() 
-  → check('inactive') [with code/xml for update] 
-  → update() 
-  → unlock() 
-  → check() 
-  → activate() [if activateOnCreate=true]
+validate() [no stateful]
+  → create() [stateful]
+  → check() [stateful]
+  → lock() [stateful]
+  → check('inactive') [with code/xml for update] [stateful]
+  → update() [stateful]
+  → unlock() [stateful → stateless after unlock]
+  → check() [stateless]
+  → activate() [if activateOnCreate=true, no stateful needed, uses same session/cookies]
+  → return basic info without sourceCode if activated (object may not be ready)
 ```
 
 **Error Handling:**
@@ -49,23 +50,27 @@ validate()
 - If check fails after create → unlock (if locked), optionally delete (if `deleteOnFailure=true`)
 - If update fails → unlock, optionally delete (if `deleteOnFailure=true`)
 - If any operation locks the object → ensure unlock in finally block
+- After activation, don't read source code (return basic info only)
 
 ### Update Operation Chain
 
 ```
-lock() 
-  → check('inactive') [with code/xml for update] 
-  → update() 
-  → unlock() 
-  → check() 
-  → activate() [if activateOnUpdate=true]
+lock() [stateful]
+  → check('inactive') [with code/xml for update] [stateful]
+  → update() [stateful]
+  → unlock() [stateful → stateless after unlock]
+  → check() [stateless]
+  → activate() [if activateOnUpdate=true, no stateful needed, uses same session/cookies]
+  → return basic info without sourceCode if activated (object may not be ready)
 ```
 
 **Error Handling:**
+- Update always starts with lock (no external lockHandle in options)
 - If lock fails → stop
 - If check fails before update → unlock, optionally delete (if `deleteOnFailure=true`)
 - If update fails → unlock, optionally delete (if `deleteOnFailure=true`)
 - Always unlock in finally block if object was locked
+- After activation, don't read source code (return basic info only)
 
 ### Delete Operation Chain
 
@@ -186,11 +191,6 @@ export interface UpdateOptions {
    * @default false
    */
   deleteOnFailure?: boolean;
-
-  /**
-   * Lock handle if object is already locked
-   */
-  lockHandle?: string;
 }
 ```
 
@@ -200,12 +200,12 @@ export interface UpdateOptions {
 
 Each object CRUD class will:
 
-1. **Wrap Builder Operations**
-   - Use existing Builder classes for low-level operations
+1. **Use Low-Level Functions Directly**
+   - Use low-level functions from `src/core/{entity}/*.ts` modules directly
    - Compose operation chains
-   - Handle state management
-   - Accept connection and logger in constructor (same as Builders)
-   - Create Builder instances internally as needed
+   - Handle session state management explicitly
+   - Accept connection and logger in constructor
+   - No Builder classes used internally
 
 2. **Error Handling**
    - Try-catch-finally blocks for resource cleanup
@@ -307,6 +307,10 @@ await domainOps.update(config, { activateOnUpdate: true });
   - [x] Implement `check()` method
   - [x] Error handling with cleanup (unlock, delete on failure)
   - [x] Integration with `AdtClient.getClass()`
+  - [x] Use low-level functions directly (not Builder classes)
+  - [x] Proper session management (stateful only for lock/update/unlock, stateless after unlock)
+  - [x] After activation, return basic info without reading source code (object may not be ready)
+  - [x] Remove `lockHandle` from `UpdateOptions` (update always starts with lock)
 - [ ] Test create chain with all error scenarios
 - [ ] Test update chain with all error scenarios
 - [ ] Test delete operation
@@ -347,7 +351,7 @@ await domainOps.update(config, { activateOnUpdate: true });
 
 ### Files
 - CRUD class: `src/core/{entity}/Adt{Entity}.ts` (e.g., `src/core/class/AdtClass.ts`)
-- Interface: `src/core/shared/IAdtObject.ts` (follows existing pattern with `IBuilder`)
+- Interface: `@mcp-abap-adt/interfaces/src/adt/IAdtObject.ts` (in interfaces package)
 - Client: `src/clients/AdtClient.ts`
 
 ### Methods
@@ -374,15 +378,20 @@ async create(config: TConfig, options?: CreateOptions): Promise<TReadResult> {
 ```typescript
 let lockHandle: string | undefined;
 try {
-  lockHandle = await builder.lock();
-  // ... operations
+  connection.setSessionType('stateful');
+  lockHandle = await lockClass(connection, className);
+  // ... operations (still in stateful)
 } finally {
   if (lockHandle) {
     try {
-      await builder.unlock();
+      // We're already in stateful after lock, just unlock and set stateless
+      await unlockClass(connection, className, lockHandle);
+      connection.setSessionType('stateless');
     } catch (unlockError) {
       logger.warn?.('Failed to unlock during cleanup:', unlockError);
     }
+  } else {
+    connection.setSessionType('stateless');
   }
 }
 ```
