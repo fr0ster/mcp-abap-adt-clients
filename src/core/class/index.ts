@@ -4,6 +4,7 @@
 
 export * from './types';
 export { ClassBuilder } from './ClassBuilder';
+export { AdtClass } from './AdtClass';
 export {
   runClass,
   startClassUnitTestRun,

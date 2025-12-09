@@ -11,3 +11,14 @@ export type {
   GetTableContentsParams,
   GetWhereUsedParams
 } from './types';
+
+// Error classes for unsupported operations
+export {
+  UnsupportedAdtOperationError,
+  UnsupportedCreateOperationError,
+  UnsupportedUpdateOperationError,
+  UnsupportedDeleteOperationError,
+  UnsupportedActivateOperationError,
+  UnsupportedCheckOperationError,
+  UnsupportedValidateOperationError
+} from './errors';

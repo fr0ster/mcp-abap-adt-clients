@@ -15,10 +15,11 @@ This roadmap describes the implementation of high-level CRUD operations that enc
    - Uses existing Builder classes internally for low-level operations
    - Each CRUD class wraps the corresponding Builder (e.g., `AdtClass` uses `ClassBuilder`)
 
-2. **IAdtObject Interface** (`src/core/shared/IAdtObject.ts`)
+2. **IAdtObject Interface** (`@mcp-abap-adt/interfaces/src/adt/IAdtObject.ts`)
    - Common interface for all object CRUD classes
    - Defines standard CRUD operations: create, read, update, delete, validate, activate, check
-   - Follows existing pattern (similar to `IBuilder` in `src/core/shared/IBuilder.ts`)
+   - Includes `CreateOptions` and `UpdateOptions` interfaces
+   - Exported from `@mcp-abap-adt/interfaces` package
    - Uses "Object" terminology which is accurate for ADT context (ABAP objects)
 
 3. **AdtClient** (`src/clients/AdtClient.ts`)
@@ -289,26 +290,51 @@ await domainOps.update(config, { activateOnUpdate: true });
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure
-- [ ] Create `IAdtObject` interface in `src/core/shared/IAdtObject.ts`
-- [ ] Create `CreateOptions` and `UpdateOptions` interfaces (in same file or separate `types.ts`)
-- [ ] Create base error classes for unsupported operations
-- [ ] Create `AdtClient` skeleton in `src/clients/AdtClient.ts`
-- [ ] Export `IAdtObject` from `src/core/shared/index.ts`
+- [x] Create `IAdtObject` interface in `@mcp-abap-adt/interfaces/src/adt/IAdtObject.ts`
+- [x] Create `CreateOptions` and `UpdateOptions` interfaces (in same file)
+- [x] Create base error classes for unsupported operations in `src/core/shared/errors.ts`
+- [x] Create `AdtClient` skeleton in `src/clients/AdtClient.ts`
+- [x] Export `IAdtObject` from `@mcp-abap-adt/interfaces` package
 
 ### Phase 2: Reference Implementation
-- [ ] Implement `AdtClass` as reference implementation
+- [x] Implement `AdtClass` as reference implementation in `src/core/class/AdtClass.ts`
+  - [x] Implement `validate()` method
+  - [x] Implement `create()` with full operation chain (validate → create → check → lock → check(inactive) → update → unlock → check → activate)
+  - [x] Implement `read()` method
+  - [x] Implement `update()` with full operation chain (lock → check(inactive) → update → unlock → check → activate)
+  - [x] Implement `delete()` with deletion check
+  - [x] Implement `activate()` method
+  - [x] Implement `check()` method
+  - [x] Error handling with cleanup (unlock, delete on failure)
+  - [x] Integration with `AdtClient.getClass()`
 - [ ] Test create chain with all error scenarios
 - [ ] Test update chain with all error scenarios
 - [ ] Test delete operation
 - [ ] Document patterns and best practices
 
-### Phase 3: Entity CRUD Classes
-- [ ] Implement CRUD classes for all entity types
+### Phase 3: Object CRUD Classes
+- [x] Implement `AdtClass` as reference (completed in Phase 2)
+- [ ] Implement CRUD classes for remaining object types:
+  - [ ] `AdtProgram`
+  - [ ] `AdtInterface`
+  - [ ] `AdtDomain`
+  - [ ] `AdtDataElement`
+  - [ ] `AdtStructure`
+  - [ ] `AdtTable`
+  - [ ] `AdtView`
+  - [ ] `AdtFunctionGroup`
+  - [ ] `AdtFunctionModule`
+  - [ ] `AdtPackage`
+  - [ ] `AdtServiceDefinition`
+  - [ ] `AdtBehaviorDefinition`
+  - [ ] `AdtBehaviorImplementation`
+  - [ ] `AdtMetadataExtension`
 - [ ] Add operation stubs for unsupported operations
-- [ ] Ensure consistent error handling across all entities
+- [ ] Ensure consistent error handling across all objects
 
 ### Phase 4: Integration
-- [ ] Complete `AdtClient` with all factory methods (`getClass()`, `getProgram()`, etc.)
+- [x] Complete `AdtClient` with factory method for Class (`getClass()`)
+- [ ] Complete `AdtClient` with remaining factory methods (`getProgram()`, `getInterface()`, etc.)
 - [ ] Add integration tests
 - [ ] Update documentation
 - [ ] Add usage examples with clean API
