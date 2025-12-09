@@ -2,7 +2,7 @@
  * Transport module type definitions
  */
 
-// Low-level function parameters (snake_case)
+// Low-level function parameters (snake_case) - internal use only
 export interface CreateTransportParams {
   transport_type?: string;
   description: string;
@@ -10,14 +10,7 @@ export interface CreateTransportParams {
   owner?: string;
 }
 
-// Builder configuration (camelCase)
-export interface TransportBuilderConfig {
-  description: string;
-  transportType?: 'workbench' | 'customizing';
-  targetSystem?: string;
-  owner?: string;
-}
-
+// Builder state - internal use only
 export interface TransportBuilderState {
   createResult?: any;
   readResult?: any;

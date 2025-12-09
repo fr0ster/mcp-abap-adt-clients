@@ -31,6 +31,9 @@ import { ServiceDefinitionBuilderConfig, AdtServiceDefinition } from '../core/se
 import { BehaviorDefinitionBuilderConfig, AdtBehaviorDefinition } from '../core/behaviorDefinition';
 import { BehaviorImplementationBuilderConfig, AdtBehaviorImplementation } from '../core/behaviorImplementation';
 import { MetadataExtensionBuilderConfig, AdtMetadataExtension } from '../core/metadataExtension';
+import { AdtRequest } from '../core/transport';
+import { AdtUnitTest } from '../core/unitTest';
+import { ITransportBuilderConfig, IUnitTestBuilderConfig } from '@mcp-abap-adt/interfaces';
 
 export class AdtClient {
   private connection: IAbapConnection;
@@ -162,5 +165,21 @@ export class AdtClient {
    */
   getMetadataExtension(): IAdtObject<MetadataExtensionBuilderConfig, MetadataExtensionBuilderConfig> {
     return new AdtMetadataExtension(this.connection, this.logger);
+  }
+
+  /**
+   * Get high-level operations for UnitTest objects
+   * @returns IAdtObject instance for UnitTest operations
+   */
+  getUnitTest(): IAdtObject<IUnitTestBuilderConfig, IUnitTestBuilderConfig> {
+    return new AdtUnitTest(this.connection, this.logger);
+  }
+
+  /**
+   * Get high-level operations for Request (Transport Request) objects
+   * @returns IAdtObject instance for Request operations
+   */
+  getRequest(): IAdtObject<ITransportBuilderConfig, ITransportBuilderConfig> {
+    return new AdtRequest(this.connection, this.logger);
   }
 }

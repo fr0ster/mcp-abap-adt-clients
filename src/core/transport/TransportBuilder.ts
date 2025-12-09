@@ -24,23 +24,23 @@
  * ```
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection, ITransportBuilderConfig } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createTransport } from './create';
 import { getTransport } from './read';
-import { CreateTransportParams, TransportBuilderConfig, TransportBuilderState } from './types';
+import { CreateTransportParams, TransportBuilderState } from './types';
 
 export class TransportBuilder {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: TransportBuilderConfig;
+  private config: ITransportBuilderConfig;
   private state: TransportBuilderState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: TransportBuilderConfig
+    config: ITransportBuilderConfig
   ) {
     this.connection = connection;
     this.logger = logger;

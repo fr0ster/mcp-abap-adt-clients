@@ -5,7 +5,7 @@
  * Low-level functions are internal and not exported.
  */
 
-export * from './types';
 export { ClassUnitTestBuilder, ClassUnitTestBuilderConfig } from './ClassUnitTestBuilder';
 export { CdsUnitTestBuilder, CdsUnitTestBuilderConfig } from './CdsUnitTestBuilder';
+export { AdtUnitTest } from './AdtUnitTest';
 

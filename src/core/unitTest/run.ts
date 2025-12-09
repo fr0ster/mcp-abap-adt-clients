@@ -2,11 +2,10 @@
  * ABAP Unit test run operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, IClassUnitTestDefinition, IClassUnitTestRunOptions } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './types';
 
 function boolAttr(value: boolean | undefined, fallback: boolean) {
   return (value ?? fallback) ? 'true' : 'false';
@@ -18,8 +17,8 @@ function boolAttr(value: boolean | undefined, fallback: boolean) {
  */
 export async function startClassUnitTestRun(
   connection: IAbapConnection,
-  tests: ClassUnitTestDefinition[],
-  options?: ClassUnitTestRunOptions
+  tests: IClassUnitTestDefinition[],
+  options?: IClassUnitTestRunOptions
 ): Promise<AxiosResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
@@ -64,7 +63,7 @@ export async function startClassUnitTestRun(
 export async function startClassUnitTestRunByObject(
   connection: IAbapConnection,
   className: string,
-  options?: ClassUnitTestRunOptions
+  options?: IClassUnitTestRunOptions
 ): Promise<AxiosResponse> {
   if (!className) {
     throw new Error('className is required');

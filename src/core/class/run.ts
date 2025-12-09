@@ -79,39 +79,22 @@ export async function runClass(
 // ABAP Unit helper functions
 // =============================================================================
 
-export interface ClassUnitTestDefinition {
-  containerClass: string;
-  testClass: string;
-}
-
-export interface ClassUnitTestRunOptions {
-  title?: string;
-  context?: string;
-  scope?: {
-    ownTests?: boolean;
-    foreignTests?: boolean;
-    addForeignTestsAsPreview?: boolean;
-  };
-  riskLevel?: {
-    harmless?: boolean;
-    dangerous?: boolean;
-    critical?: boolean;
-  };
-  duration?: {
-    short?: boolean;
-    medium?: boolean;
-    long?: boolean;
-  };
-}
+// Re-export interfaces from interfaces package
+export type { 
+  IClassUnitTestDefinition as ClassUnitTestDefinition,
+  IClassUnitTestRunOptions as ClassUnitTestRunOptions
+} from '@mcp-abap-adt/interfaces';
 
 function boolAttr(value: boolean | undefined, fallback: boolean) {
   return (value ?? fallback) ? 'true' : 'false';
 }
 
+import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from '@mcp-abap-adt/interfaces';
+
 export async function startClassUnitTestRun(
   connection: IAbapConnection,
-  tests: ClassUnitTestDefinition[],
-  options?: ClassUnitTestRunOptions
+  tests: IClassUnitTestDefinition[],
+  options?: IClassUnitTestRunOptions
 ): Promise<AxiosResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
@@ -204,7 +187,7 @@ export async function getClassUnitTestResult(
 export async function startClassUnitTestRunByObject(
   connection: IAbapConnection,
   className: string,
-  options?: ClassUnitTestRunOptions
+  options?: IClassUnitTestRunOptions
 ): Promise<AxiosResponse> {
   if (!className) {
     throw new Error('className is required');
