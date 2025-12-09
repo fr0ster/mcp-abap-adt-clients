@@ -502,29 +502,33 @@ await domainOps.update(config, { activateOnUpdate: true });
 
 ### Phase 3: Object CRUD Classes
 - [x] Implement `AdtClass` as reference (completed in Phase 2)
-- [x] Implement `AdtProgram` in `src/core/program/AdtProgram.ts`
-- [x] Implement `AdtInterface` in `src/core/interface/AdtInterface.ts`
-- [x] Implement `AdtDomain` in `src/core/domain/AdtDomain.ts`
-- [ ] Implement `AdtDataElement` in `src/core/dataElement/AdtDataElement.ts`
-- [ ] Implement CRUD classes for remaining object types:
-  - [ ] `AdtStructure`
-  - [ ] `AdtTable`
-  - [ ] `AdtView`
-  - [ ] `AdtFunctionGroup`
-  - [ ] `AdtFunctionModule`
-  - [ ] `AdtPackage`
-  - [ ] `AdtServiceDefinition`
-  - [ ] `AdtBehaviorDefinition`
-  - [ ] `AdtBehaviorImplementation`
-  - [ ] `AdtMetadataExtension`
-- [ ] Add operation stubs for unsupported operations
-- [ ] Ensure consistent error handling across all objects
+- [x] Implement CRUD classes for remaining object types:
+  - [x] Implement `AdtProgram` in `src/core/program/AdtProgram.ts`
+  - [x] Implement `AdtInterface` in `src/core/interface/AdtInterface.ts`
+  - [x] Implement `AdtDomain` in `src/core/domain/AdtDomain.ts`
+  - [x] Implement `AdtDataElement` in `src/core/dataElement/AdtDataElement.ts`
+  - [x] `AdtStructure` in `src/core/structure/AdtStructure.ts`
+  - [x] `AdtTable` in `src/core/table/AdtTable.ts`
+  - [x] `AdtView` in `src/core/view/AdtView.ts`
+  - [x] `AdtFunctionGroup` in `src/core/functionGroup/AdtFunctionGroup.ts`
+  - [x] `AdtFunctionModule` in `src/core/functionModule/AdtFunctionModule.ts`
+  - [x] `AdtPackage` in `src/core/package/AdtPackage.ts`
+  - [x] `AdtServiceDefinition` in `src/core/serviceDefinition/AdtServiceDefinition.ts`
+  - [x] `AdtBehaviorDefinition` in `src/core/behaviorDefinition/AdtBehaviorDefinition.ts`
+  - [x] `AdtBehaviorImplementation` in `src/core/behaviorImplementation/AdtBehaviorImplementation.ts`
+  - [x] `AdtMetadataExtension` in `src/core/metadataExtension/AdtMetadataExtension.ts`
+- [x] Add operation stubs for unsupported operations (Package.activate() returns error)
+- [x] Ensure consistent error handling across all objects (all use logErrorSafely, try-catch-finally for cleanup)
 
 ### Phase 4: Integration
 - [x] Complete `AdtClient` with factory method for Class (`getClass()`)
 - [x] Complete `AdtClient` with factory methods for Program, Interface, Domain (`getProgram()`, `getInterface()`, `getDomain()`)
-- [ ] Complete `AdtClient` with factory method for DataElement (`getDataElement()`)
-- [x] Export new classes from index files (`src/core/program/index.ts`, `src/core/interface/index.ts`, `src/core/domain/index.ts`)
+- [x] Complete `AdtClient` with factory method for DataElement (`getDataElement()`)
+- [x] Complete `AdtClient` with factory methods for Structure, Table, View (`getStructure()`, `getTable()`, `getView()`)
+- [x] Complete `AdtClient` with factory methods for FunctionGroup, FunctionModule (`getFunctionGroup()`, `getFunctionModule()`)
+- [x] Complete `AdtClient` with factory method for Package (`getPackage()`)
+- [x] Complete `AdtClient` with factory methods for ServiceDefinition, BehaviorDefinition, BehaviorImplementation, MetadataExtension (`getServiceDefinition()`, `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`)
+- [x] Export new classes from index files (`src/core/program/index.ts`, `src/core/interface/index.ts`, `src/core/domain/index.ts`, `src/core/dataElement/index.ts`, `src/core/structure/index.ts`, `src/core/table/index.ts`, `src/core/view/index.ts`, `src/core/functionGroup/index.ts`, `src/core/functionModule/index.ts`, `src/core/package/index.ts`, `src/core/serviceDefinition/index.ts`, `src/core/behaviorDefinition/index.ts`, `src/core/behaviorImplementation/index.ts`, `src/core/metadataExtension/index.ts`)
 - [ ] Add integration tests
 - [ ] Update documentation
 - [ ] Add usage examples with clean API

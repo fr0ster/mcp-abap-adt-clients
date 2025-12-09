@@ -20,17 +20,17 @@ import { ClassBuilderConfig, AdtClass } from '../core/class';
 import { ProgramBuilderConfig, AdtProgram } from '../core/program';
 import { InterfaceBuilderConfig, AdtInterface } from '../core/interface';
 import { DomainBuilderConfig, AdtDomain } from '../core/domain';
-import { DataElementBuilderConfig } from '../core/dataElement';
-import { StructureBuilderConfig } from '../core/structure';
-import { TableBuilderConfig } from '../core/table';
-import { ViewBuilderConfig } from '../core/view';
-import { FunctionGroupBuilderConfig } from '../core/functionGroup';
-import { FunctionModuleBuilderConfig } from '../core/functionModule';
-import { PackageBuilderConfig } from '../core/package';
-import { ServiceDefinitionBuilderConfig } from '../core/serviceDefinition';
-import { BehaviorDefinitionBuilderConfig } from '../core/behaviorDefinition';
-import { BehaviorImplementationBuilderConfig } from '../core/behaviorImplementation';
-import { MetadataExtensionBuilderConfig } from '../core/metadataExtension';
+import { DataElementBuilderConfig, AdtDataElement } from '../core/dataElement';
+import { StructureBuilderConfig, AdtStructure } from '../core/structure';
+import { TableBuilderConfig, AdtTable } from '../core/table';
+import { ViewBuilderConfig, AdtView } from '../core/view';
+import { FunctionGroupBuilderConfig, AdtFunctionGroup } from '../core/functionGroup';
+import { FunctionModuleBuilderConfig, AdtFunctionModule } from '../core/functionModule';
+import { PackageBuilderConfig, AdtPackage } from '../core/package';
+import { ServiceDefinitionBuilderConfig, AdtServiceDefinition } from '../core/serviceDefinition';
+import { BehaviorDefinitionBuilderConfig, AdtBehaviorDefinition } from '../core/behaviorDefinition';
+import { BehaviorImplementationBuilderConfig, AdtBehaviorImplementation } from '../core/behaviorImplementation';
+import { MetadataExtensionBuilderConfig, AdtMetadataExtension } from '../core/metadataExtension';
 
 export class AdtClient {
   private connection: IAbapConnection;
@@ -81,8 +81,7 @@ export class AdtClient {
    * @returns IAdtObject instance for DataElement operations
    */
   getDataElement(): IAdtObject<DataElementBuilderConfig, DataElementBuilderConfig> {
-    // TODO: Implement AdtDataElement
-    throw new Error('AdtDataElement not yet implemented');
+    return new AdtDataElement(this.connection, this.logger);
   }
 
   /**
@@ -90,8 +89,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Structure operations
    */
   getStructure(): IAdtObject<StructureBuilderConfig, StructureBuilderConfig> {
-    // TODO: Implement AdtStructure
-    throw new Error('AdtStructure not yet implemented');
+    return new AdtStructure(this.connection, this.logger);
   }
 
   /**
@@ -99,8 +97,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Table operations
    */
   getTable(): IAdtObject<TableBuilderConfig, TableBuilderConfig> {
-    // TODO: Implement AdtTable
-    throw new Error('AdtTable not yet implemented');
+    return new AdtTable(this.connection, this.logger);
   }
 
   /**
@@ -108,8 +105,7 @@ export class AdtClient {
    * @returns IAdtObject instance for View operations
    */
   getView(): IAdtObject<ViewBuilderConfig, ViewBuilderConfig> {
-    // TODO: Implement AdtView
-    throw new Error('AdtView not yet implemented');
+    return new AdtView(this.connection, this.logger);
   }
 
   /**
@@ -117,8 +113,7 @@ export class AdtClient {
    * @returns IAdtObject instance for FunctionGroup operations
    */
   getFunctionGroup(): IAdtObject<FunctionGroupBuilderConfig, FunctionGroupBuilderConfig> {
-    // TODO: Implement AdtFunctionGroup
-    throw new Error('AdtFunctionGroup not yet implemented');
+    return new AdtFunctionGroup(this.connection, this.logger);
   }
 
   /**
@@ -126,8 +121,7 @@ export class AdtClient {
    * @returns IAdtObject instance for FunctionModule operations
    */
   getFunctionModule(): IAdtObject<FunctionModuleBuilderConfig, FunctionModuleBuilderConfig> {
-    // TODO: Implement AdtFunctionModule
-    throw new Error('AdtFunctionModule not yet implemented');
+    return new AdtFunctionModule(this.connection, this.logger);
   }
 
   /**
@@ -135,8 +129,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Package operations
    */
   getPackage(): IAdtObject<PackageBuilderConfig, PackageBuilderConfig> {
-    // TODO: Implement AdtPackage
-    throw new Error('AdtPackage not yet implemented');
+    return new AdtPackage(this.connection, this.logger);
   }
 
   /**
@@ -144,8 +137,7 @@ export class AdtClient {
    * @returns IAdtObject instance for ServiceDefinition operations
    */
   getServiceDefinition(): IAdtObject<ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderConfig> {
-    // TODO: Implement AdtServiceDefinition
-    throw new Error('AdtServiceDefinition not yet implemented');
+    return new AdtServiceDefinition(this.connection, this.logger);
   }
 
   /**
@@ -153,8 +145,7 @@ export class AdtClient {
    * @returns IAdtObject instance for BehaviorDefinition operations
    */
   getBehaviorDefinition(): IAdtObject<BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderConfig> {
-    // TODO: Implement AdtBehaviorDefinition
-    throw new Error('AdtBehaviorDefinition not yet implemented');
+    return new AdtBehaviorDefinition(this.connection, this.logger);
   }
 
   /**
@@ -162,8 +153,7 @@ export class AdtClient {
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
   getBehaviorImplementation(): IAdtObject<BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderConfig> {
-    // TODO: Implement AdtBehaviorImplementation
-    throw new Error('AdtBehaviorImplementation not yet implemented');
+    return new AdtBehaviorImplementation(this.connection, this.logger);
   }
 
   /**
@@ -171,7 +161,6 @@ export class AdtClient {
    * @returns IAdtObject instance for MetadataExtension operations
    */
   getMetadataExtension(): IAdtObject<MetadataExtensionBuilderConfig, MetadataExtensionBuilderConfig> {
-    // TODO: Implement AdtMetadataExtension
-    throw new Error('AdtMetadataExtension not yet implemented');
+    return new AdtMetadataExtension(this.connection, this.logger);
   }
 }

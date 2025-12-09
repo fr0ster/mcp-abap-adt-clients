@@ -4,3 +4,4 @@
 
 export * from './types';
 export { FunctionModuleBuilder } from './FunctionModuleBuilder';
+export { AdtFunctionModule } from './AdtFunctionModule';

@@ -34,12 +34,13 @@
 // Client APIs (Public API)
 export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
+export { AdtClient } from './clients/AdtClient';
 
 // Export SharedBuilder
 export { SharedBuilder } from './core/shared';
 
 // Export shared types
-export type { 
+export type {
   InactiveObjectsResponse,
   ObjectReference,
   SearchObjectsParams,
@@ -67,9 +68,9 @@ export type { ViewBuilderConfig, ViewBuilderState } from './core/view';
 export type { FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './core/functionGroup';
 export type { FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './core/functionModule';
 export type { ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderState } from './core/serviceDefinition';
-export type { 
-  BehaviorDefinitionBuilderConfig, 
-  BehaviorDefinitionBuilderState, 
+export type {
+  BehaviorDefinitionBuilderConfig,
+  BehaviorDefinitionBuilderState,
   BehaviorDefinitionValidationParams,
   BehaviorDefinitionImplementationType,
   ValidationResult,
@@ -79,20 +80,17 @@ export type {
   CheckMessage,
   CheckRunResult
 } from './core/behaviorDefinition';
-export type { 
-  BehaviorImplementationBuilderConfig, 
+export type {
+  BehaviorImplementationBuilderConfig,
   BehaviorImplementationBuilderState,
   CreateBehaviorImplementationParams
 } from './core/behaviorImplementation';
-export type { 
-  MetadataExtensionBuilderConfig, 
+export type {
+  MetadataExtensionBuilderConfig,
   MetadataExtensionBuilderState,
   MetadataExtensionValidationParams,
   MetadataExtensionCreateParams
 } from './core/metadataExtension';
-
-// Export class unit test types
-export type { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './core/class';
 
 // Re-export types from interfaces package for convenience
 export type { IAbapConnection, IAbapRequestOptions } from '@mcp-abap-adt/interfaces';

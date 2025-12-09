@@ -422,4 +422,27 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
     return await checkClass(this.connection, config.className, version, config.sourceCode);
   }
+
+
+  /**
+   * Lock class
+   */
+  async lock(config: Partial<ClassBuilderConfig>): Promise<string> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockClass(this.connection, config.className);
+  }
+
+  /**
+   * Unlock class
+   */
+  async unlock(config: Partial<ClassBuilderConfig>, lockHandle: string): Promise<AxiosResponse> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+    return await unlockClass(this.connection, config.className, lockHandle);
+  }
 }
