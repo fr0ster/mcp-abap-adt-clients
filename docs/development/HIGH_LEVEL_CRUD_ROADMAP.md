@@ -454,8 +454,8 @@ export class AdtClient {
   getBehaviorDefinition(): IAdtObject<BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderConfig>;
   getBehaviorImplementation(): IAdtObject<BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderConfig>;
   getMetadataExtension(): IAdtObject<MetadataExtensionBuilderConfig, MetadataExtensionBuilderConfig>;
-  getUnitTest(): IAdtObject<UnitTestBuilderConfig, UnitTestBuilderConfig>;
-  getRequest(): IAdtObject<RequestBuilderConfig, RequestBuilderConfig>;
+  getUnitTest(): IAdtObject<IUnitTestBuilderConfig, IUnitTestBuilderConfig>;
+  getRequest(): IAdtObject<ITransportBuilderConfig, ITransportBuilderConfig>;
 }
 ```
 
@@ -521,8 +521,8 @@ await domainOps.update(config, { activateOnUpdate: true });
   - [x] `AdtBehaviorDefinition` in `src/core/behaviorDefinition/AdtBehaviorDefinition.ts`
   - [x] `AdtBehaviorImplementation` in `src/core/behaviorImplementation/AdtBehaviorImplementation.ts`
   - [x] `AdtMetadataExtension` in `src/core/metadataExtension/AdtMetadataExtension.ts`
-  - [ ] `AdtUnitTest` in `src/core/unitTest/AdtUnitTest.ts`
-  - [ ] `AdtRequest` (Transport Request) in `src/core/transport/AdtRequest.ts`
+  - [x] `AdtUnitTest` in `src/core/unitTest/AdtUnitTest.ts`
+  - [x] `AdtRequest` (Transport Request) in `src/core/transport/AdtRequest.ts`
 - [x] Add operation stubs for unsupported operations (Package.activate() returns error)
 - [x] Ensure consistent error handling across all objects (all use logErrorSafely, try-catch-finally for cleanup)
 
@@ -534,9 +534,9 @@ await domainOps.update(config, { activateOnUpdate: true });
 - [x] Complete `AdtClient` with factory methods for FunctionGroup, FunctionModule (`getFunctionGroup()`, `getFunctionModule()`)
 - [x] Complete `AdtClient` with factory method for Package (`getPackage()`)
 - [x] Complete `AdtClient` with factory methods for ServiceDefinition, BehaviorDefinition, BehaviorImplementation, MetadataExtension (`getServiceDefinition()`, `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`)
-- [ ] Complete `AdtClient` with factory methods for UnitTest and Request (`getUnitTest()`, `getRequest()`)
+- [x] Complete `AdtClient` with factory methods for UnitTest and Request (`getUnitTest()`, `getRequest()`)
 - [x] Export new classes from index files (`src/core/program/index.ts`, `src/core/interface/index.ts`, `src/core/domain/index.ts`, `src/core/dataElement/index.ts`, `src/core/structure/index.ts`, `src/core/table/index.ts`, `src/core/view/index.ts`, `src/core/functionGroup/index.ts`, `src/core/functionModule/index.ts`, `src/core/package/index.ts`, `src/core/serviceDefinition/index.ts`, `src/core/behaviorDefinition/index.ts`, `src/core/behaviorImplementation/index.ts`, `src/core/metadataExtension/index.ts`)
-- [ ] Export new classes from index files for UnitTest and Request (`src/core/unitTest/index.ts`, `src/core/transport/index.ts`)
+- [x] Export new classes from index files for UnitTest and Request (`src/core/unitTest/index.ts`, `src/core/transport/index.ts`)
 - [ ] Add integration tests
 - [ ] Update documentation
 - [ ] Add usage examples with clean API
