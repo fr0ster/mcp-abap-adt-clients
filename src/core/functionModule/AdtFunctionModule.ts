@@ -34,10 +34,10 @@ import { getFunctionSource } from './read';
 
 export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig, FunctionModuleBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'FunctionModule';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -83,17 +83,17 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating function module configuration');
+      this.logger?.info?.('Step 1: Validating function module configuration');
       await validateFunctionModuleName(
         this.connection,
         config.functionGroupName,
         config.functionModuleName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating function module');
+      this.logger?.info?.('Step 2: Creating function module');
       await createFunctionModule(this.connection, {
         functionGroupName: config.functionGroupName,
         functionModuleName: config.functionModuleName,
@@ -101,30 +101,30 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
         description: config.description
       });
       objectCreated = true;
-      this.logger.info?.('Function module created');
+      this.logger?.info?.('Function module created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created function module');
+      this.logger?.info?.('Step 3: Checking created function module');
       await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking function module');
+      this.logger?.info?.('Step 4: Locking function module');
       this.connection.setSessionType('stateful');
       lockHandle = await lockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
-      this.logger.info?.('Function module locked, handle:', lockHandle);
+      this.logger?.info?.('Function module locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating function module with source code');
+        this.logger?.info?.('Step 6: Updating function module with source code');
         await update(
           this.connection,
           {
@@ -135,28 +135,28 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
             transportRequest: config.transportRequest
           }
         );
-        this.logger.info?.('Function module updated');
+        this.logger?.info?.('Function module updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking function module');
+        this.logger?.info?.('Step 7: Unlocking function module');
         await unlockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Function module unlocked');
+        this.logger?.info?.('Function module unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating function module');
+        this.logger?.info?.('Step 9: Activating function module');
         const activateResponse = await activateFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
-        this.logger.info?.('Function module activated, status:', activateResponse.status);
+        this.logger?.info?.('Function module activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -181,12 +181,12 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking function module during error cleanup');
+          this.logger?.warn?.('Unlocking function module during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -195,7 +195,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting function module after failure');
+          this.logger?.warn?.('Deleting function module after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteFunctionModule(this.connection, {
             function_module_name: config.functionModuleName,
@@ -203,7 +203,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete function module after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete function module after failure:', deleteError);
         }
       }
 
@@ -264,22 +264,22 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking function module');
+      this.logger?.info?.('Step 1: Locking function module');
       this.connection.setSessionType('stateful');
       lockHandle = await lockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
-      this.logger.info?.('Function module locked, handle:', lockHandle);
+      this.logger?.info?.('Function module locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating function module');
+        this.logger?.info?.('Step 3: Updating function module');
         await update(
           this.connection,
           {
@@ -290,28 +290,28 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
             transportRequest: config.transportRequest
           }
         );
-        this.logger.info?.('Function module updated');
+        this.logger?.info?.('Function module updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking function module');
+        this.logger?.info?.('Step 4: Unlocking function module');
         await unlockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Function module unlocked');
+        this.logger?.info?.('Function module unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating function module');
+        this.logger?.info?.('Step 6: Activating function module');
         const activateResponse = await activateFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
-        this.logger.info?.('Function module activated, status:', activateResponse.status);
+        this.logger?.info?.('Function module activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -336,12 +336,12 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking function module during error cleanup');
+          this.logger?.warn?.('Unlocking function module during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -350,7 +350,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting function module after failure');
+          this.logger?.warn?.('Deleting function module after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteFunctionModule(this.connection, {
             function_module_name: config.functionModuleName,
@@ -358,7 +358,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete function module after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete function module after failure:', deleteError);
         }
       }
 
@@ -380,22 +380,22 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking function module for deletion');
+      this.logger?.info?.('Checking function module for deletion');
       await checkDeletion(this.connection, {
         function_module_name: config.functionModuleName,
         function_group_name: config.functionGroupName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting function module');
+      this.logger?.info?.('Deleting function module');
       const result = await deleteFunctionModule(this.connection, {
         function_module_name: config.functionModuleName,
         function_group_name: config.functionGroupName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Function module deleted');
+      this.logger?.info?.('Function module deleted');
 
       return result;
     } catch (error: any) {

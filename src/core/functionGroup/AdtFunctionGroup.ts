@@ -36,10 +36,10 @@ import { getFunctionGroup } from './read';
 
 export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, FunctionGroupBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'FunctionGroup';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -83,17 +83,17 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating function group configuration');
+      this.logger?.info?.('Step 1: Validating function group configuration');
       await validateFunctionGroupName(
         this.connection,
         config.functionGroupName,
         config.packageName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating function group');
+      this.logger?.info?.('Step 2: Creating function group');
       await createFunctionGroup(this.connection, {
         functionGroupName: config.functionGroupName,
         packageName: config.packageName,
@@ -101,20 +101,20 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
         description: config.description
       });
       objectCreated = true;
-      this.logger.info?.('Function group created');
+      this.logger?.info?.('Function group created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created function group');
+      this.logger?.info?.('Step 3: Checking created function group');
       await checkFunctionGroup(this.connection, config.functionGroupName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // Note: Function groups are containers - no source code to update after create
 
       // 4. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 4: Activating function group');
+        this.logger?.info?.('Step 4: Activating function group');
         const activateResponse = await activateFunctionGroup(this.connection, config.functionGroupName);
-        this.logger.info?.('Function group activated, status:', activateResponse.status);
+        this.logger?.info?.('Function group activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -136,14 +136,14 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting function group after failure');
+          this.logger?.warn?.('Deleting function group after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteFunctionGroup(this.connection, {
             function_group_name: config.functionGroupName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete function group after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete function group after failure:', deleteError);
         }
       }
 
@@ -197,40 +197,40 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking function group');
+      this.logger?.info?.('Step 1: Locking function group');
       this.connection.setSessionType('stateful');
       lockHandle = await lockFunctionGroup(this.connection, config.functionGroupName, sessionId);
-      this.logger.info?.('Function group locked, handle:', lockHandle);
+      this.logger?.info?.('Function group locked, handle:', lockHandle);
 
       // 2. Update metadata (description)
-      this.logger.info?.('Step 2: Updating function group metadata');
+      this.logger?.info?.('Step 2: Updating function group metadata');
       await updateFunctionGroup(this.connection, {
         function_group_name: config.functionGroupName,
         description: config.description,
         transport_request: config.transportRequest,
         lock_handle: lockHandle
       });
-      this.logger.info?.('Function group updated');
+      this.logger?.info?.('Function group updated');
 
       // 3. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 3: Unlocking function group');
+        this.logger?.info?.('Step 3: Unlocking function group');
         await unlockFunctionGroup(this.connection, config.functionGroupName, lockHandle, sessionId);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Function group unlocked');
+        this.logger?.info?.('Function group unlocked');
       }
 
       // 4. Final check (no stateful needed)
-      this.logger.info?.('Step 4: Final check');
+      this.logger?.info?.('Step 4: Final check');
       await checkFunctionGroup(this.connection, config.functionGroupName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 5. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 5: Activating function group');
+        this.logger?.info?.('Step 5: Activating function group');
         const activateResponse = await activateFunctionGroup(this.connection, config.functionGroupName);
-        this.logger.info?.('Function group activated, status:', activateResponse.status);
+        this.logger?.info?.('Function group activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -248,12 +248,12 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking function group during error cleanup');
+          this.logger?.warn?.('Unlocking function group during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockFunctionGroup(this.connection, config.functionGroupName, lockHandle, sessionId);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -262,14 +262,14 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting function group after failure');
+          this.logger?.warn?.('Deleting function group after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteFunctionGroup(this.connection, {
             function_group_name: config.functionGroupName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete function group after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete function group after failure:', deleteError);
         }
       }
 
@@ -288,20 +288,20 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking function group for deletion');
+      this.logger?.info?.('Checking function group for deletion');
       await checkDeletion(this.connection, {
         function_group_name: config.functionGroupName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting function group');
+      this.logger?.info?.('Deleting function group');
       const result = await deleteFunctionGroup(this.connection, {
         function_group_name: config.functionGroupName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Function group deleted');
+      this.logger?.info?.('Function group deleted');
 
       return result;
     } catch (error: any) {

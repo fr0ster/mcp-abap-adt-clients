@@ -34,10 +34,10 @@ import { getProgramSource } from './read';
 
 export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Program';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -77,16 +77,16 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating program configuration');
+      this.logger?.info?.('Step 1: Validating program configuration');
       await validateProgramName(
         this.connection,
         config.programName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (requires stateful)
-      this.logger.info?.('Step 2: Creating program');
+      this.logger?.info?.('Step 2: Creating program');
       await createProgram(this.connection, {
         programName: config.programName,
         packageName: config.packageName,
@@ -97,30 +97,30 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
         sourceCode: options?.sourceCode || config.sourceCode
       });
       objectCreated = true;
-      this.logger.info?.('Program created');
+      this.logger?.info?.('Program created');
 
       // 3. Check after create (stateful still set from create)
-      this.logger.info?.('Step 3: Checking created program');
+      this.logger?.info?.('Step 3: Checking created program');
       await checkProgram(this.connection, config.programName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful already set, keep it)
-      this.logger.info?.('Step 4: Locking program');
+      this.logger?.info?.('Step 4: Locking program');
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
-      this.logger.info?.('Program locked, handle:', lockHandle);
+      this.logger?.info?.('Program locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating program with source code');
+        this.logger?.info?.('Step 6: Updating program with source code');
         await uploadProgramSource(
           this.connection,
           config.programName,
@@ -129,28 +129,28 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
           sessionId,
           config.transportRequest
         );
-        this.logger.info?.('Program updated');
+        this.logger?.info?.('Program updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking program');
+        this.logger?.info?.('Step 7: Unlocking program');
         await unlockProgram(this.connection, config.programName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Program unlocked');
+        this.logger?.info?.('Program unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkProgram(this.connection, config.programName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating program');
+        this.logger?.info?.('Step 9: Activating program');
         const activateResponse = await activateProgram(this.connection, config.programName);
-        this.logger.info?.('Program activated, status:', activateResponse.status);
+        this.logger?.info?.('Program activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info without sourceCode (activation returns 201)
@@ -175,12 +175,12 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking program during error cleanup');
+          this.logger?.warn?.('Unlocking program during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockProgram(this.connection, config.programName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -189,7 +189,7 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting program after failure');
+          this.logger?.warn?.('Deleting program after failure');
           this.connection.setSessionType('stateful');
           await deleteProgram(this.connection, {
             programName: config.programName,
@@ -197,7 +197,7 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete program after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete program after failure:', deleteError);
         }
       }
 
@@ -252,22 +252,22 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
 
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
-      this.logger.info?.('Step 1: Locking program');
+      this.logger?.info?.('Step 1: Locking program');
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
-      this.logger.info?.('Program locked, handle:', lockHandle);
+      this.logger?.info?.('Program locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating program');
+        this.logger?.info?.('Step 3: Updating program');
         await uploadProgramSource(
           this.connection,
           config.programName,
@@ -276,28 +276,28 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
           sessionId,
           config.transportRequest
         );
-        this.logger.info?.('Program updated');
+        this.logger?.info?.('Program updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking program');
+        this.logger?.info?.('Step 4: Unlocking program');
         await unlockProgram(this.connection, config.programName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Program unlocked');
+        this.logger?.info?.('Program unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkProgram(this.connection, config.programName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating program');
+        this.logger?.info?.('Step 6: Activating program');
         const activateResponse = await activateProgram(this.connection, config.programName);
-        this.logger.info?.('Program activated, status:', activateResponse.status);
+        this.logger?.info?.('Program activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info without sourceCode (activation returns 201)
@@ -320,12 +320,12 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking program during error cleanup');
+          this.logger?.warn?.('Unlocking program during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockProgram(this.connection, config.programName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -334,7 +334,7 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting program after failure');
+          this.logger?.warn?.('Deleting program after failure');
           this.connection.setSessionType('stateful');
           await deleteProgram(this.connection, {
             programName: config.programName,
@@ -342,7 +342,7 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete program after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete program after failure:', deleteError);
         }
       }
 
@@ -361,21 +361,21 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking program for deletion');
+      this.logger?.info?.('Checking program for deletion');
       await checkDeletion(this.connection, {
         programName: config.programName,
         transportRequest: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (requires stateful, but no lock)
-      this.logger.info?.('Deleting program');
+      this.logger?.info?.('Deleting program');
       this.connection.setSessionType('stateful');
       const result = await deleteProgram(this.connection, {
         programName: config.programName,
         transportRequest: config.transportRequest
       });
-      this.logger.info?.('Program deleted');
+      this.logger?.info?.('Program deleted');
 
       return result;
     } catch (error: any) {

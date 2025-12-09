@@ -34,10 +34,10 @@ import { getServiceDefinitionSource } from './read';
 
 export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'ServiceDefinition';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -79,16 +79,16 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating service definition configuration');
+      this.logger?.info?.('Step 1: Validating service definition configuration');
       await validateServiceDefinitionName(
         this.connection,
         config.serviceDefinitionName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating service definition');
+      this.logger?.info?.('Step 2: Creating service definition');
       await createServiceDefinition(this.connection, {
         service_definition_name: config.serviceDefinitionName,
         package_name: config.packageName,
@@ -97,30 +97,30 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
         source_code: options?.sourceCode || config.sourceCode
       });
       objectCreated = true;
-      this.logger.info?.('Service definition created');
+      this.logger?.info?.('Service definition created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created service definition');
+      this.logger?.info?.('Step 3: Checking created service definition');
       await checkServiceDefinition(this.connection, config.serviceDefinitionName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking service definition');
+      this.logger?.info?.('Step 4: Locking service definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lockServiceDefinition(this.connection, config.serviceDefinitionName);
-      this.logger.info?.('Service definition locked, handle:', lockHandle);
+      this.logger?.info?.('Service definition locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkServiceDefinition(this.connection, config.serviceDefinitionName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating service definition with source code');
+        this.logger?.info?.('Step 6: Updating service definition with source code');
         await updateServiceDefinition(
           this.connection,
           {
@@ -130,28 +130,28 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
           },
           lockHandle
         );
-        this.logger.info?.('Service definition updated');
+        this.logger?.info?.('Service definition updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking service definition');
+        this.logger?.info?.('Step 7: Unlocking service definition');
         await unlockServiceDefinition(this.connection, config.serviceDefinitionName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Service definition unlocked');
+        this.logger?.info?.('Service definition unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkServiceDefinition(this.connection, config.serviceDefinitionName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating service definition');
+        this.logger?.info?.('Step 9: Activating service definition');
         const activateResponse = await activateServiceDefinition(this.connection, config.serviceDefinitionName);
-        this.logger.info?.('Service definition activated, status:', activateResponse.status);
+        this.logger?.info?.('Service definition activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -176,12 +176,12 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking service definition during error cleanup');
+          this.logger?.warn?.('Unlocking service definition during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockServiceDefinition(this.connection, config.serviceDefinitionName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -190,14 +190,14 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting service definition after failure');
+          this.logger?.warn?.('Deleting service definition after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteServiceDefinition(this.connection, {
             service_definition_name: config.serviceDefinitionName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete service definition after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete service definition after failure:', deleteError);
         }
       }
 
@@ -251,22 +251,22 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking service definition');
+      this.logger?.info?.('Step 1: Locking service definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lockServiceDefinition(this.connection, config.serviceDefinitionName);
-      this.logger.info?.('Service definition locked, handle:', lockHandle);
+      this.logger?.info?.('Service definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkServiceDefinition(this.connection, config.serviceDefinitionName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating service definition');
+        this.logger?.info?.('Step 3: Updating service definition');
         await updateServiceDefinition(
           this.connection,
           {
@@ -276,28 +276,28 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
           },
           lockHandle
         );
-        this.logger.info?.('Service definition updated');
+        this.logger?.info?.('Service definition updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking service definition');
+        this.logger?.info?.('Step 4: Unlocking service definition');
         await unlockServiceDefinition(this.connection, config.serviceDefinitionName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Service definition unlocked');
+        this.logger?.info?.('Service definition unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkServiceDefinition(this.connection, config.serviceDefinitionName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating service definition');
+        this.logger?.info?.('Step 6: Activating service definition');
         const activateResponse = await activateServiceDefinition(this.connection, config.serviceDefinitionName);
-        this.logger.info?.('Service definition activated, status:', activateResponse.status);
+        this.logger?.info?.('Service definition activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -320,12 +320,12 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking service definition during error cleanup');
+          this.logger?.warn?.('Unlocking service definition during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockServiceDefinition(this.connection, config.serviceDefinitionName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -334,14 +334,14 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting service definition after failure');
+          this.logger?.warn?.('Deleting service definition after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteServiceDefinition(this.connection, {
             service_definition_name: config.serviceDefinitionName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete service definition after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete service definition after failure:', deleteError);
         }
       }
 
@@ -360,20 +360,20 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking service definition for deletion');
+      this.logger?.info?.('Checking service definition for deletion');
       await checkDeletion(this.connection, {
         service_definition_name: config.serviceDefinitionName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting service definition');
+      this.logger?.info?.('Deleting service definition');
       const result = await deleteServiceDefinition(this.connection, {
         service_definition_name: config.serviceDefinitionName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Service definition deleted');
+      this.logger?.info?.('Service definition deleted');
 
       return result;
     } catch (error: any) {

@@ -34,10 +34,10 @@ import { getViewSource } from './read';
 
 export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'View';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -80,17 +80,17 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating view configuration');
+      this.logger?.info?.('Step 1: Validating view configuration');
       await validateViewName(
         this.connection,
         config.viewName,
         config.packageName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating view');
+      this.logger?.info?.('Step 2: Creating view');
       await createView(this.connection, {
         view_name: config.viewName,
         package_name: config.packageName,
@@ -99,30 +99,30 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
         ddl_source: options?.sourceCode || config.ddlSource
       });
       objectCreated = true;
-      this.logger.info?.('View created');
+      this.logger?.info?.('View created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created view');
+      this.logger?.info?.('Step 3: Checking created view');
       await checkView(this.connection, config.viewName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking view');
+      this.logger?.info?.('Step 4: Locking view');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDDLS(this.connection, config.viewName);
-      this.logger.info?.('View locked, handle:', lockHandle);
+      this.logger?.info?.('View locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlSource;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkView(this.connection, config.viewName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating view with DDL source');
+        this.logger?.info?.('Step 6: Updating view with DDL source');
         await updateView(
           this.connection,
           config.viewName,
@@ -130,28 +130,28 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('View updated');
+        this.logger?.info?.('View updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking view');
+        this.logger?.info?.('Step 7: Unlocking view');
         await unlockDDLS(this.connection, config.viewName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('View unlocked');
+        this.logger?.info?.('View unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkView(this.connection, config.viewName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating view');
+        this.logger?.info?.('Step 9: Activating view');
         const activateResponse = await activateDDLS(this.connection, config.viewName);
-        this.logger.info?.('View activated, status:', activateResponse.status);
+        this.logger?.info?.('View activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -176,12 +176,12 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking view during error cleanup');
+          this.logger?.warn?.('Unlocking view during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockDDLS(this.connection, config.viewName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -190,14 +190,14 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting view after failure');
+          this.logger?.warn?.('Deleting view after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteView(this.connection, {
             view_name: config.viewName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete view after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete view after failure:', deleteError);
         }
       }
 
@@ -251,22 +251,22 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking view');
+      this.logger?.info?.('Step 1: Locking view');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDDLS(this.connection, config.viewName);
-      this.logger.info?.('View locked, handle:', lockHandle);
+      this.logger?.info?.('View locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlSource;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkView(this.connection, config.viewName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating view');
+        this.logger?.info?.('Step 3: Updating view');
         await updateView(
           this.connection,
           config.viewName,
@@ -274,28 +274,28 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('View updated');
+        this.logger?.info?.('View updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking view');
+        this.logger?.info?.('Step 4: Unlocking view');
         await unlockDDLS(this.connection, config.viewName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('View unlocked');
+        this.logger?.info?.('View unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkView(this.connection, config.viewName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating view');
+        this.logger?.info?.('Step 6: Activating view');
         const activateResponse = await activateDDLS(this.connection, config.viewName);
-        this.logger.info?.('View activated, status:', activateResponse.status);
+        this.logger?.info?.('View activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -318,12 +318,12 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking view during error cleanup');
+          this.logger?.warn?.('Unlocking view during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockDDLS(this.connection, config.viewName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -332,14 +332,14 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting view after failure');
+          this.logger?.warn?.('Deleting view after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteView(this.connection, {
             view_name: config.viewName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete view after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete view after failure:', deleteError);
         }
       }
 
@@ -358,20 +358,20 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking view for deletion');
+      this.logger?.info?.('Checking view for deletion');
       await checkDeletion(this.connection, {
         view_name: config.viewName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting view');
+      this.logger?.info?.('Deleting view');
       const result = await deleteView(this.connection, {
         view_name: config.viewName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('View deleted');
+      this.logger?.info?.('View deleted');
 
       return result;
     } catch (error: any) {

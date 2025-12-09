@@ -34,10 +34,10 @@ import { getInterfaceSource } from './read';
 
 export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, InterfaceBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Interface';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -80,17 +80,17 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating interface configuration');
+      this.logger?.info?.('Step 1: Validating interface configuration');
       await validateInterfaceName(
         this.connection,
         config.interfaceName,
         config.packageName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating interface');
+      this.logger?.info?.('Step 2: Creating interface');
       await createInterface(this.connection, {
         interfaceName: config.interfaceName,
         packageName: config.packageName,
@@ -98,31 +98,31 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
         description: config.description
       });
       objectCreated = true;
-      this.logger.info?.('Interface created');
+      this.logger?.info?.('Interface created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created interface');
+      this.logger?.info?.('Step 3: Checking created interface');
       await checkInterface(this.connection, config.interfaceName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ТІЛЬКИ перед lock)
-      this.logger.info?.('Step 4: Locking interface');
+      this.logger?.info?.('Step 4: Locking interface');
       this.connection.setSessionType('stateful');
       const lockResult = await lockInterface(this.connection, config.interfaceName);
       lockHandle = lockResult.lockHandle;
-      this.logger.info?.('Interface locked, handle:', lockHandle);
+      this.logger?.info?.('Interface locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkInterface(this.connection, config.interfaceName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating interface with source code');
+        this.logger?.info?.('Step 6: Updating interface with source code');
         await upload(
           this.connection,
           config.interfaceName,
@@ -130,28 +130,28 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('Interface updated');
+        this.logger?.info?.('Interface updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking interface');
+        this.logger?.info?.('Step 7: Unlocking interface');
         await unlockInterface(this.connection, config.interfaceName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Interface unlocked');
+        this.logger?.info?.('Interface unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkInterface(this.connection, config.interfaceName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating interface');
+        this.logger?.info?.('Step 9: Activating interface');
         const activateResponse = await activateInterface(this.connection, config.interfaceName);
-        this.logger.info?.('Interface activated, status:', activateResponse.status);
+        this.logger?.info?.('Interface activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info without sourceCode (activation returns 201)
@@ -176,12 +176,12 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking interface during error cleanup');
+          this.logger?.warn?.('Unlocking interface during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockInterface(this.connection, config.interfaceName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -190,7 +190,7 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting interface after failure');
+          this.logger?.warn?.('Deleting interface after failure');
           this.connection.setSessionType('stateful');
           await deleteInterface(this.connection, {
             interface_name: config.interfaceName,
@@ -198,7 +198,7 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete interface after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete interface after failure:', deleteError);
         }
       }
 
@@ -252,23 +252,23 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
 
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
-      this.logger.info?.('Step 1: Locking interface');
+      this.logger?.info?.('Step 1: Locking interface');
       this.connection.setSessionType('stateful');
       const lockResult = await lockInterface(this.connection, config.interfaceName);
       lockHandle = lockResult.lockHandle;
-      this.logger.info?.('Interface locked, handle:', lockHandle);
+      this.logger?.info?.('Interface locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkInterface(this.connection, config.interfaceName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating interface');
+        this.logger?.info?.('Step 3: Updating interface');
         await upload(
           this.connection,
           config.interfaceName,
@@ -276,28 +276,28 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('Interface updated');
+        this.logger?.info?.('Interface updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking interface');
+        this.logger?.info?.('Step 4: Unlocking interface');
         await unlockInterface(this.connection, config.interfaceName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Interface unlocked');
+        this.logger?.info?.('Interface unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkInterface(this.connection, config.interfaceName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating interface');
+        this.logger?.info?.('Step 6: Activating interface');
         const activateResponse = await activateInterface(this.connection, config.interfaceName);
-        this.logger.info?.('Interface activated, status:', activateResponse.status);
+        this.logger?.info?.('Interface activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info without sourceCode (activation returns 201)
@@ -320,12 +320,12 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking interface during error cleanup');
+          this.logger?.warn?.('Unlocking interface during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockInterface(this.connection, config.interfaceName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -334,7 +334,7 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting interface after failure');
+          this.logger?.warn?.('Deleting interface after failure');
           this.connection.setSessionType('stateful');
           await deleteInterface(this.connection, {
             interface_name: config.interfaceName,
@@ -342,7 +342,7 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete interface after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete interface after failure:', deleteError);
         }
       }
 
@@ -361,21 +361,21 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking interface for deletion');
+      this.logger?.info?.('Checking interface for deletion');
       await checkDeletion(this.connection, {
         interface_name: config.interfaceName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (requires stateful, but no lock)
-      this.logger.info?.('Deleting interface');
+      this.logger?.info?.('Deleting interface');
       this.connection.setSessionType('stateful');
       const result = await deleteInterface(this.connection, {
         interface_name: config.interfaceName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Interface deleted');
+      this.logger?.info?.('Interface deleted');
 
       return result;
     } catch (error: any) {

@@ -27,10 +27,10 @@ import { getTransport } from './read';
 
 export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITransportBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Request';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -67,7 +67,7 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
     }
 
     try {
-      this.logger.info?.('Creating transport request');
+      this.logger?.info?.('Creating transport request');
       const response = await createTransport(this.connection, {
         transport_type: config.transportType === 'customizing' ? 'customizing' : 'workbench',
         description: config.description,
@@ -81,7 +81,7 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
         throw new Error('Failed to create transport request: transport number not returned');
       }
 
-      this.logger.info?.('Transport request created:', transportNumber);
+      this.logger?.info?.('Transport request created:', transportNumber);
 
       return {
         description: config.description,

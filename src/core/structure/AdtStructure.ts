@@ -34,10 +34,10 @@ import { getStructureSource } from './read';
 
 export class AdtStructure implements IAdtObject<StructureBuilderConfig, StructureBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Structure';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -79,16 +79,16 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating structure configuration');
+      this.logger?.info?.('Step 1: Validating structure configuration');
       await validateStructureName(
         this.connection,
         config.structureName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating structure');
+      this.logger?.info?.('Step 2: Creating structure');
       await createStructure(this.connection, {
         structureName: config.structureName,
         packageName: config.packageName,
@@ -96,30 +96,30 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
         description: config.description
       });
       objectCreated = true;
-      this.logger.info?.('Structure created');
+      this.logger?.info?.('Structure created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created structure');
+      this.logger?.info?.('Step 3: Checking created structure');
       await checkStructure(this.connection, config.structureName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking structure');
+      this.logger?.info?.('Step 4: Locking structure');
       this.connection.setSessionType('stateful');
       lockHandle = await lockStructure(this.connection, config.structureName);
-      this.logger.info?.('Structure locked, handle:', lockHandle);
+      this.logger?.info?.('Structure locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkStructure(this.connection, config.structureName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating structure with DDL code');
+        this.logger?.info?.('Step 6: Updating structure with DDL code');
         await upload(
           this.connection,
           {
@@ -129,28 +129,28 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
           },
           lockHandle
         );
-        this.logger.info?.('Structure updated');
+        this.logger?.info?.('Structure updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking structure');
+        this.logger?.info?.('Step 7: Unlocking structure');
         await unlockStructure(this.connection, config.structureName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Structure unlocked');
+        this.logger?.info?.('Structure unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkStructure(this.connection, config.structureName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating structure');
+        this.logger?.info?.('Step 9: Activating structure');
         const activateResponse = await activateStructure(this.connection, config.structureName);
-        this.logger.info?.('Structure activated, status:', activateResponse.status);
+        this.logger?.info?.('Structure activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -175,12 +175,12 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking structure during error cleanup');
+          this.logger?.warn?.('Unlocking structure during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockStructure(this.connection, config.structureName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -189,14 +189,14 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting structure after failure');
+          this.logger?.warn?.('Deleting structure after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteStructure(this.connection, {
             structure_name: config.structureName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete structure after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete structure after failure:', deleteError);
         }
       }
 
@@ -250,22 +250,22 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking structure');
+      this.logger?.info?.('Step 1: Locking structure');
       this.connection.setSessionType('stateful');
       lockHandle = await lockStructure(this.connection, config.structureName);
-      this.logger.info?.('Structure locked, handle:', lockHandle);
+      this.logger?.info?.('Structure locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkStructure(this.connection, config.structureName, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating structure');
+        this.logger?.info?.('Step 3: Updating structure');
         await upload(
           this.connection,
           {
@@ -275,28 +275,28 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
           },
           lockHandle
         );
-        this.logger.info?.('Structure updated');
+        this.logger?.info?.('Structure updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking structure');
+        this.logger?.info?.('Step 4: Unlocking structure');
         await unlockStructure(this.connection, config.structureName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Structure unlocked');
+        this.logger?.info?.('Structure unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkStructure(this.connection, config.structureName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating structure');
+        this.logger?.info?.('Step 6: Activating structure');
         const activateResponse = await activateStructure(this.connection, config.structureName);
-        this.logger.info?.('Structure activated, status:', activateResponse.status);
+        this.logger?.info?.('Structure activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -319,12 +319,12 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking structure during error cleanup');
+          this.logger?.warn?.('Unlocking structure during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockStructure(this.connection, config.structureName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -333,14 +333,14 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting structure after failure');
+          this.logger?.warn?.('Deleting structure after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteStructure(this.connection, {
             structure_name: config.structureName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete structure after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete structure after failure:', deleteError);
         }
       }
 
@@ -359,20 +359,20 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking structure for deletion');
+      this.logger?.info?.('Checking structure for deletion');
       await checkDeletion(this.connection, {
         structure_name: config.structureName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting structure');
+      this.logger?.info?.('Deleting structure');
       const result = await deleteStructure(this.connection, {
         structure_name: config.structureName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Structure deleted');
+      this.logger?.info?.('Structure deleted');
 
       return result;
     } catch (error: any) {

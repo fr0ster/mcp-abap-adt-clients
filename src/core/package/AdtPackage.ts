@@ -37,10 +37,10 @@ import { getSystemInformation } from '../../utils/systemInfo';
 
 export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Package';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -97,7 +97,7 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating package configuration');
+      this.logger?.info?.('Step 1: Validating package configuration');
       await validatePackageBasic(
         this.connection,
         {
@@ -112,10 +112,10 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
           responsible: config.responsible
         }
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating package');
+      this.logger?.info?.('Step 2: Creating package');
       await createPackage(this.connection, {
         package_name: config.packageName,
         super_package: config.superPackage,
@@ -128,12 +128,12 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
         responsible: config.responsible
       });
       objectCreated = true;
-      this.logger.info?.('Package created');
+      this.logger?.info?.('Package created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created package');
+      this.logger?.info?.('Step 3: Checking created package');
       await checkPackage(this.connection, config.packageName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // Note: Packages are containers - no source code to update after create
       // Note: Packages don't have activate operation
@@ -150,14 +150,14 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting package after failure');
+          this.logger?.warn?.('Deleting package after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deletePackage(this.connection, {
             package_name: config.packageName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete package after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete package after failure:', deleteError);
         }
       }
 
@@ -214,22 +214,22 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking package');
+      this.logger?.info?.('Step 1: Locking package');
       this.connection.setSessionType('stateful');
       lockHandle = await lockPackage(this.connection, config.packageName);
-      this.logger.info?.('Package locked, handle:', lockHandle);
+      this.logger?.info?.('Package locked, handle:', lockHandle);
 
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkPackage(this.connection, config.packageName, 'inactive', xmlToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update metadata
       if (lockHandle) {
-        this.logger.info?.('Step 3: Updating package metadata');
+        this.logger?.info?.('Step 3: Updating package metadata');
         await updatePackage(
           this.connection,
           {
@@ -245,22 +245,22 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
           },
           lockHandle
         );
-        this.logger.info?.('Package updated');
+        this.logger?.info?.('Package updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking package');
+        this.logger?.info?.('Step 4: Unlocking package');
         await unlockPackage(this.connection, config.packageName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Package unlocked');
+        this.logger?.info?.('Package unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkPackage(this.connection, config.packageName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // Note: Packages don't have activate operation
 
@@ -273,12 +273,12 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking package during error cleanup');
+          this.logger?.warn?.('Unlocking package during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockPackage(this.connection, config.packageName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -287,14 +287,14 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting package after failure');
+          this.logger?.warn?.('Deleting package after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deletePackage(this.connection, {
             package_name: config.packageName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete package after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete package after failure:', deleteError);
         }
       }
 
@@ -313,20 +313,20 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking package for deletion');
+      this.logger?.info?.('Checking package for deletion');
       await checkPackageDeletion(this.connection, {
         package_name: config.packageName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting package');
+      this.logger?.info?.('Deleting package');
       const result = await deletePackage(this.connection, {
         package_name: config.packageName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Package deleted');
+      this.logger?.info?.('Package deleted');
 
       return result;
     } catch (error: any) {

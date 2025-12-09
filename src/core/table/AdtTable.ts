@@ -34,10 +34,10 @@ import { getTableSource } from './read';
 
 export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Table';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -76,16 +76,16 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating table configuration');
+      this.logger?.info?.('Step 1: Validating table configuration');
       await validateTableName(
         this.connection,
         config.tableName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating table');
+      this.logger?.info?.('Step 2: Creating table');
       await createTable(this.connection, {
         table_name: config.tableName,
         package_name: config.packageName,
@@ -93,30 +93,30 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
         ddl_code: options?.sourceCode || config.ddlCode
       });
       objectCreated = true;
-      this.logger.info?.('Table created');
+      this.logger?.info?.('Table created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created table');
+      this.logger?.info?.('Step 3: Checking created table');
       await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking table');
+      this.logger?.info?.('Step 4: Locking table');
       this.connection.setSessionType('stateful');
       lockHandle = await acquireTableLockHandle(this.connection, config.tableName);
-      this.logger.info?.('Table locked, handle:', lockHandle);
+      this.logger?.info?.('Table locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, codeToCheck, 'inactive');
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating table with DDL code');
+        this.logger?.info?.('Step 6: Updating table with DDL code');
         await updateTable(
           this.connection,
           {
@@ -126,28 +126,28 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
           },
           lockHandle
         );
-        this.logger.info?.('Table updated');
+        this.logger?.info?.('Table updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking table');
+        this.logger?.info?.('Step 7: Unlocking table');
         await unlockTable(this.connection, config.tableName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Table unlocked');
+        this.logger?.info?.('Table unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating table');
+        this.logger?.info?.('Step 9: Activating table');
         const activateResponse = await activateTable(this.connection, config.tableName);
-        this.logger.info?.('Table activated, status:', activateResponse.status);
+        this.logger?.info?.('Table activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -172,12 +172,12 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking table during error cleanup');
+          this.logger?.warn?.('Unlocking table during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockTable(this.connection, config.tableName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -186,14 +186,14 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting table after failure');
+          this.logger?.warn?.('Deleting table after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteTable(this.connection, {
             table_name: config.tableName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete table after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete table after failure:', deleteError);
         }
       }
 
@@ -247,22 +247,22 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking table');
+      this.logger?.info?.('Step 1: Locking table');
       this.connection.setSessionType('stateful');
       lockHandle = await acquireTableLockHandle(this.connection, config.tableName);
-      this.logger.info?.('Table locked, handle:', lockHandle);
+      this.logger?.info?.('Table locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, codeToCheck, 'inactive');
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating table');
+        this.logger?.info?.('Step 3: Updating table');
         await updateTable(
           this.connection,
           {
@@ -272,28 +272,28 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
           },
           lockHandle
         );
-        this.logger.info?.('Table updated');
+        this.logger?.info?.('Table updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking table');
+        this.logger?.info?.('Step 4: Unlocking table');
         await unlockTable(this.connection, config.tableName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Table unlocked');
+        this.logger?.info?.('Table unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating table');
+        this.logger?.info?.('Step 6: Activating table');
         const activateResponse = await activateTable(this.connection, config.tableName);
-        this.logger.info?.('Table activated, status:', activateResponse.status);
+        this.logger?.info?.('Table activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -316,12 +316,12 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking table during error cleanup');
+          this.logger?.warn?.('Unlocking table during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockTable(this.connection, config.tableName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -330,14 +330,14 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting table after failure');
+          this.logger?.warn?.('Deleting table after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteTable(this.connection, {
             table_name: config.tableName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete table after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete table after failure:', deleteError);
         }
       }
 
@@ -356,20 +356,20 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking table for deletion');
+      this.logger?.info?.('Checking table for deletion');
       await checkDeletion(this.connection, {
         table_name: config.tableName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting table');
+      this.logger?.info?.('Deleting table');
       const result = await deleteTable(this.connection, {
         table_name: config.tableName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Table deleted');
+      this.logger?.info?.('Table deleted');
 
       return result;
     } catch (error: any) {

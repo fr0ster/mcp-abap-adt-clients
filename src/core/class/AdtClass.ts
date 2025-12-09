@@ -23,20 +23,21 @@ import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { ClassBuilderConfig } from './types';
 import { validateClassName } from './validation';
 import { create as createClass } from './create';
-import { checkClass } from './check';
+import { checkClass, checkClassLocalTestClass } from './check';
 import { lockClass } from './lock';
 import { updateClass } from './update';
 import { unlockClass } from './unlock';
 import { activateClass } from './activation';
 import { checkDeletion, deleteClass } from './delete';
 import { getClassSource } from './read';
+import { lockClassTestClasses, unlockClassTestClasses, updateClassTestInclude, activateClassTestClasses } from './testclasses';
 
 export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Class';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -77,7 +78,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating class configuration');
+      this.logger?.info?.('Step 1: Validating class configuration');
       await validateClassName(
         this.connection,
         config.className,
@@ -85,10 +86,10 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         config.description,
         config.superclass
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (requires stateful)
-      this.logger.info?.('Step 2: Creating class');
+      this.logger?.info?.('Step 2: Creating class');
       this.connection.setSessionType('stateful');
       await createClass(this.connection, {
         class_name: config.className,
@@ -104,29 +105,29 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         template_xml: config.classTemplate
       });
       objectCreated = true;
-      this.logger.info?.('Class created');
+      this.logger?.info?.('Class created');
 
       // 3. Check after create (stateful still set from create)
-      this.logger.info?.('Step 3: Checking created class');
+      this.logger?.info?.('Step 3: Checking created class');
       await checkClass(this.connection, config.className, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful already set, keep it)
-      this.logger.info?.('Step 4: Locking class');
+      this.logger?.info?.('Step 4: Locking class');
       lockHandle = await lockClass(this.connection, config.className);
-      this.logger.info?.('Class locked, handle:', lockHandle);
+      this.logger?.info?.('Class locked, handle:', lockHandle);
 
       // 5. Check inactive with code/xml for update
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkClass(this.connection, config.className, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating class with source code');
+        this.logger?.info?.('Step 6: Updating class with source code');
         await updateClass(
           this.connection,
           config.className,
@@ -134,28 +135,28 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('Class updated');
+        this.logger?.info?.('Class updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking class');
+        this.logger?.info?.('Step 7: Unlocking class');
         await unlockClass(this.connection, config.className, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Class unlocked');
+        this.logger?.info?.('Class unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkClass(this.connection, config.className, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating class');
+        this.logger?.info?.('Step 9: Activating class');
         const activateResponse = await activateClass(this.connection, config.className);
-        this.logger.info?.('Class activated, status:', activateResponse.status);
+        this.logger?.info?.('Class activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info without sourceCode (activation returns 201)
@@ -180,12 +181,12 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking class during error cleanup');
+          this.logger?.warn?.('Unlocking class during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -194,7 +195,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting class after failure');
+          this.logger?.warn?.('Deleting class after failure');
           this.connection.setSessionType('stateful');
           await deleteClass(this.connection, {
             class_name: config.className,
@@ -202,7 +203,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete class after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete class after failure:', deleteError);
         }
       }
 
@@ -256,22 +257,22 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
-      this.logger.info?.('Step 1: Locking class');
+      this.logger?.info?.('Step 1: Locking class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
-      this.logger.info?.('Class locked, handle:', lockHandle);
+      this.logger?.info?.('Class locked, handle:', lockHandle);
 
       // 2. Check inactive with code/xml for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkClass(this.connection, config.className, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating class');
+        this.logger?.info?.('Step 3: Updating class');
         await updateClass(
           this.connection,
           config.className,
@@ -279,28 +280,28 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('Class updated');
+        this.logger?.info?.('Class updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking class');
+        this.logger?.info?.('Step 4: Unlocking class');
         await unlockClass(this.connection, config.className, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Class unlocked');
+        this.logger?.info?.('Class unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkClass(this.connection, config.className, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating class');
+        this.logger?.info?.('Step 6: Activating class');
         const activateResponse = await activateClass(this.connection, config.className);
-        this.logger.info?.('Class activated, status:', activateResponse.status);
+        this.logger?.info?.('Class activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info without sourceCode (activation returns 201)
@@ -323,12 +324,12 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking class during error cleanup');
+          this.logger?.warn?.('Unlocking class during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -337,7 +338,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting class after failure');
+          this.logger?.warn?.('Deleting class after failure');
           this.connection.setSessionType('stateful');
           await deleteClass(this.connection, {
             class_name: config.className,
@@ -345,7 +346,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete class after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete class after failure:', deleteError);
         }
       }
 
@@ -364,21 +365,21 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking class for deletion');
+      this.logger?.info?.('Checking class for deletion');
       await checkDeletion(this.connection, {
         class_name: config.className,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (requires stateful, but no lock)
-      this.logger.info?.('Deleting class');
+      this.logger?.info?.('Deleting class');
       this.connection.setSessionType('stateful');
       const result = await deleteClass(this.connection, {
         class_name: config.className,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Class deleted');
+      this.logger?.info?.('Class deleted');
 
       return result;
     } catch (error: any) {
@@ -444,5 +445,122 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       throw new Error('Class name is required');
     }
     return await unlockClass(this.connection, config.className, lockHandle);
+  }
+
+  /**
+   * Lock test classes (local classes) for modification
+   */
+  async lockTestClasses(config: Partial<ClassBuilderConfig>): Promise<string> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+    this.connection.setSessionType('stateful');
+    return await lockClassTestClasses(this.connection, config.className);
+  }
+
+  /**
+   * Unlock test classes (local classes)
+   */
+  async unlockTestClasses(config: Partial<ClassBuilderConfig>, lockHandle: string): Promise<AxiosResponse> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+    const result = await unlockClassTestClasses(this.connection, config.className, lockHandle);
+    this.connection.setSessionType('stateless');
+    return result;
+  }
+
+  /**
+   * Check test class code (local class)
+   */
+  async checkTestClass(
+    config: Partial<ClassBuilderConfig> & { testClassCode: string },
+    version: 'active' | 'inactive' = 'inactive'
+  ): Promise<AxiosResponse> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+    if (!config.testClassCode) {
+      throw new Error('Test class code is required');
+    }
+    return await checkClassLocalTestClass(
+      this.connection,
+      config.className,
+      config.testClassCode,
+      version
+    );
+  }
+
+  /**
+   * Update test classes (local classes) with full operation chain
+   * Always starts with lock
+   */
+  async updateTestClasses(
+    config: Partial<ClassBuilderConfig> & { testClassCode: string }
+  ): Promise<AxiosResponse> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+    if (!config.testClassCode) {
+      throw new Error('Test class code is required');
+    }
+
+    let lockHandle: string | undefined;
+
+    try {
+      // 1. Lock test classes (stateful only for lock)
+      this.logger?.info?.('Step 1: Locking test classes');
+      this.connection.setSessionType('stateful');
+      lockHandle = await lockClassTestClasses(this.connection, config.className);
+      this.logger?.info?.('Test classes locked, handle:', lockHandle);
+
+      // 2. Update test classes
+      this.logger?.info?.('Step 2: Updating test classes');
+      const response = await updateClassTestInclude(
+        this.connection,
+        config.className,
+        config.testClassCode,
+        lockHandle,
+        config.transportRequest
+      );
+
+      // 3. Unlock test classes (switch to stateless after unlock)
+      this.logger?.info?.('Step 3: Unlocking test classes');
+      await unlockClassTestClasses(this.connection, config.className, lockHandle);
+      this.connection.setSessionType('stateless');
+
+      return response;
+    } catch (error) {
+      // Cleanup: unlock on error
+      if (lockHandle) {
+        try {
+          this.logger?.warn?.('Unlocking test classes after error');
+          await unlockClassTestClasses(this.connection, config.className, lockHandle);
+          this.connection.setSessionType('stateless');
+        } catch (unlockError) {
+          this.logger?.warn?.('Failed to unlock test classes after error:', unlockError);
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Activate test classes (local classes)
+   */
+  async activateTestClasses(
+    config: Partial<ClassBuilderConfig> & { testClassName: string }
+  ): Promise<AxiosResponse> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+    if (!config.testClassName) {
+      throw new Error('Test class name is required');
+    }
+    return await activateClassTestClasses(
+      this.connection,
+      config.className,
+      config.testClassName
+    );
   }
 }

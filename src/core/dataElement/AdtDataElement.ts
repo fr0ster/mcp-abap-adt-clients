@@ -35,10 +35,10 @@ import { getSystemInformation } from '../../utils/systemInfo';
 
 export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, DataElementBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'DataElement';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -88,17 +88,17 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating data element configuration');
+      this.logger?.info?.('Step 1: Validating data element configuration');
       await validateDataElementName(
         this.connection,
         config.dataElementName,
         config.packageName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating data element');
+      this.logger?.info?.('Step 2: Creating data element');
       await createDataElement(
         this.connection,
         {
@@ -121,30 +121,30 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
         }
       );
       objectCreated = true;
-      this.logger.info?.('Data element created');
+      this.logger?.info?.('Data element created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created data element');
+      this.logger?.info?.('Step 3: Checking created data element');
       await checkDataElement(this.connection, config.dataElementName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking data element');
+      this.logger?.info?.('Step 4: Locking data element');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDataElement(this.connection, config.dataElementName);
-      this.logger.info?.('Data element locked, handle:', lockHandle);
+      this.logger?.info?.('Data element locked, handle:', lockHandle);
 
       // 5. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkDataElement(this.connection, config.dataElementName, 'inactive', xmlToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update (if XML provided)
       if (xmlToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating data element with XML');
+        this.logger?.info?.('Step 6: Updating data element with XML');
         await updateDataElement(
           this.connection,
           {
@@ -167,28 +167,28 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
           },
           lockHandle
         );
-        this.logger.info?.('Data element updated');
+        this.logger?.info?.('Data element updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking data element');
+        this.logger?.info?.('Step 7: Unlocking data element');
         await unlockDataElement(this.connection, config.dataElementName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Data element unlocked');
+        this.logger?.info?.('Data element unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkDataElement(this.connection, config.dataElementName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating data element');
+        this.logger?.info?.('Step 9: Activating data element');
         const activateResponse = await activateDataElement(this.connection, config.dataElementName);
-        this.logger.info?.('Data element activated, status:', activateResponse.status);
+        this.logger?.info?.('Data element activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -208,12 +208,12 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking data element during error cleanup');
+          this.logger?.warn?.('Unlocking data element during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockDataElement(this.connection, config.dataElementName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -222,14 +222,14 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting data element after failure');
+          this.logger?.warn?.('Deleting data element after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteDataElement(this.connection, {
             data_element_name: config.dataElementName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete data element after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete data element after failure:', deleteError);
         }
       }
 
@@ -285,22 +285,22 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking data element');
+      this.logger?.info?.('Step 1: Locking data element');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDataElement(this.connection, config.dataElementName);
-      this.logger.info?.('Data element locked, handle:', lockHandle);
+      this.logger?.info?.('Data element locked, handle:', lockHandle);
 
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkDataElement(this.connection, config.dataElementName, 'inactive', xmlToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (lockHandle) {
-        this.logger.info?.('Step 3: Updating data element');
+        this.logger?.info?.('Step 3: Updating data element');
         await updateDataElement(
           this.connection,
           {
@@ -323,28 +323,28 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
           },
           lockHandle
         );
-        this.logger.info?.('Data element updated');
+        this.logger?.info?.('Data element updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking data element');
+        this.logger?.info?.('Step 4: Unlocking data element');
         await unlockDataElement(this.connection, config.dataElementName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Data element unlocked');
+        this.logger?.info?.('Data element unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkDataElement(this.connection, config.dataElementName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating data element');
+        this.logger?.info?.('Step 6: Activating data element');
         const activateResponse = await activateDataElement(this.connection, config.dataElementName);
-        this.logger.info?.('Data element activated, status:', activateResponse.status);
+        this.logger?.info?.('Data element activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -362,12 +362,12 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking data element during error cleanup');
+          this.logger?.warn?.('Unlocking data element during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockDataElement(this.connection, config.dataElementName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -376,14 +376,14 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting data element after failure');
+          this.logger?.warn?.('Deleting data element after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteDataElement(this.connection, {
             data_element_name: config.dataElementName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete data element after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete data element after failure:', deleteError);
         }
       }
 
@@ -402,20 +402,20 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking data element for deletion');
+      this.logger?.info?.('Checking data element for deletion');
       await checkDeletion(this.connection, {
         data_element_name: config.dataElementName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting data element');
+      this.logger?.info?.('Deleting data element');
       const result = await deleteDataElement(this.connection, {
         data_element_name: config.dataElementName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Data element deleted');
+      this.logger?.info?.('Data element deleted');
 
       return result;
     } catch (error: any) {

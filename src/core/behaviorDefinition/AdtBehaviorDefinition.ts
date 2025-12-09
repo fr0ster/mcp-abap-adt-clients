@@ -34,10 +34,10 @@ import { readSource } from './read';
 
 export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'BehaviorDefinition';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -99,7 +99,7 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating behavior definition configuration');
+      this.logger?.info?.('Step 1: Validating behavior definition configuration');
       await validate(
         this.connection,
         {
@@ -110,10 +110,10 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
           implementationType: config.implementationType
         }
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating behavior definition');
+      this.logger?.info?.('Step 2: Creating behavior definition');
       await createBehaviorDefinition(this.connection, {
         name: config.name,
         package: config.packageName,
@@ -121,30 +121,30 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
         implementationType: config.implementationType,
       });
       objectCreated = true;
-      this.logger.info?.('Behavior definition created');
+      this.logger?.info?.('Behavior definition created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created behavior definition');
+      this.logger?.info?.('Step 3: Checking created behavior definition');
       await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking behavior definition');
+      this.logger?.info?.('Step 4: Locking behavior definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
-      this.logger.info?.('Behavior definition locked, handle:', lockHandle);
+      this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkBehaviorDefinition(this.connection, config.name, 'abapCheckRun', '', 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating behavior definition with source code');
+        this.logger?.info?.('Step 6: Updating behavior definition with source code');
         await update(
           this.connection,
           {
@@ -154,28 +154,28 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
             transportRequest: config.transportRequest
           }
         );
-        this.logger.info?.('Behavior definition updated');
+        this.logger?.info?.('Behavior definition updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking behavior definition');
+        this.logger?.info?.('Step 7: Unlocking behavior definition');
         await unlock(this.connection, config.name, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Behavior definition unlocked');
+        this.logger?.info?.('Behavior definition unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating behavior definition');
+        this.logger?.info?.('Step 9: Activating behavior definition');
         const activateResponse = await activate(this.connection, config.name);
-        this.logger.info?.('Behavior definition activated, status:', activateResponse.status);
+        this.logger?.info?.('Behavior definition activated, status:', activateResponse.status);
 
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -200,12 +200,12 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking behavior definition during error cleanup');
+          this.logger?.warn?.('Unlocking behavior definition during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlock(this.connection, config.name, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -214,11 +214,11 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting behavior definition after failure');
+          this.logger?.warn?.('Deleting behavior definition after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteBehaviorDefinition(this.connection, config.name, config.transportRequest);
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete behavior definition after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete behavior definition after failure:', deleteError);
         }
       }
 
@@ -272,22 +272,22 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking behavior definition');
+      this.logger?.info?.('Step 1: Locking behavior definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
-      this.logger.info?.('Behavior definition locked, handle:', lockHandle);
+      this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkBehaviorDefinition(this.connection, config.name, 'abapCheckRun', '', 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating behavior definition');
+        this.logger?.info?.('Step 3: Updating behavior definition');
         await update(
           this.connection,
           {
@@ -297,28 +297,28 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
             transportRequest: config.transportRequest
           }
         );
-        this.logger.info?.('Behavior definition updated');
+        this.logger?.info?.('Behavior definition updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking behavior definition');
+        this.logger?.info?.('Step 4: Unlocking behavior definition');
         await unlock(this.connection, config.name, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Behavior definition unlocked');
+        this.logger?.info?.('Behavior definition unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating behavior definition');
+        this.logger?.info?.('Step 6: Activating behavior definition');
         const activateResponse = await activate(this.connection, config.name);
-        this.logger.info?.('Behavior definition activated, status:', activateResponse.status);
+        this.logger?.info?.('Behavior definition activated, status:', activateResponse.status);
 
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -341,12 +341,12 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking behavior definition during error cleanup');
+          this.logger?.warn?.('Unlocking behavior definition during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlock(this.connection, config.name, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -355,11 +355,11 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting behavior definition after failure');
+          this.logger?.warn?.('Deleting behavior definition after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteBehaviorDefinition(this.connection, config.name, config.transportRequest);
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete behavior definition after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete behavior definition after failure:', deleteError);
         }
       }
 
@@ -378,14 +378,14 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking behavior definition for deletion');
+      this.logger?.info?.('Checking behavior definition for deletion');
       await checkDeletion(this.connection, config.name);
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting behavior definition');
+      this.logger?.info?.('Deleting behavior definition');
       const result = await deleteBehaviorDefinition(this.connection, config.name, config.transportRequest);
-      this.logger.info?.('Behavior definition deleted');
+      this.logger?.info?.('Behavior definition deleted');
 
       return result;
     } catch (error: any) {

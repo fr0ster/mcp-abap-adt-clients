@@ -19,7 +19,7 @@
  * - Check: not supported (test runs don't have check operation)
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions, IUnitTestBuilderConfig } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection, IAdtObject, IAdtOperationOptions, IUnitTestBuilderConfig, IClassUnitTestDefinition, IClassUnitTestRunOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { startClassUnitTestRun } from './run';
@@ -27,10 +27,15 @@ import { getClassUnitTestStatus, getClassUnitTestResult } from '../class/run';
 
 export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTestBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'UnitTest';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  // Internal state for convenience methods
+  private lastRunId?: string;
+  private lastStatusResponse?: AxiosResponse;
+  private lastResultResponse?: AxiosResponse;
+
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -67,7 +72,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
     }
 
     try {
-      this.logger.info?.('Starting unit test run');
+      this.logger?.info?.('Starting unit test run');
       const response = await startClassUnitTestRun(
         this.connection,
         config.tests,
@@ -77,12 +82,12 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
       // Extract run ID from response
       // Response format: XML with aunit:run element containing uri attribute
       const runId = this.extractRunId(response);
-      
+
       if (!runId) {
         throw new Error('Failed to start unit test run: run ID not returned');
       }
 
-      this.logger.info?.('Unit test run started, run ID:', runId);
+      this.logger?.info?.('Unit test run started, run ID:', runId);
 
       return {
         tests: config.tests,
@@ -120,7 +125,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
         resultResponse = await getClassUnitTestResult(this.connection, config.runId);
       } catch (error) {
         // Result might not be available yet
-        this.logger.info?.('Test result not available yet');
+        this.logger?.info?.('Test result not available yet');
       }
 
       return {
@@ -174,6 +179,74 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
     status?: string
   ): Promise<AxiosResponse> {
     throw new Error('Check operation is not supported for Unit Test objects in ADT');
+  }
+
+  /**
+   * Run unit tests (convenience method that wraps create)
+   */
+  async run(
+    tests: IClassUnitTestDefinition[],
+    options?: IClassUnitTestRunOptions
+  ): Promise<string> {
+    const result = await this.create({
+      tests,
+      options
+    });
+    this.lastRunId = result.runId;
+    return result.runId!;
+  }
+
+  /**
+   * Get run ID from last operation
+   */
+  getRunId(): string | undefined {
+    return this.lastRunId;
+  }
+
+  /**
+   * Get unit test status (convenience method)
+   */
+  async getStatus(
+    runId: string,
+    withLongPolling: boolean = true
+  ): Promise<AxiosResponse> {
+    const response = await getClassUnitTestStatus(
+      this.connection,
+      runId,
+      withLongPolling
+    );
+    this.lastStatusResponse = response;
+    return response;
+  }
+
+  /**
+   * Get status response from last getStatus call
+   */
+  getStatusResponse(): AxiosResponse | undefined {
+    return this.lastStatusResponse;
+  }
+
+  /**
+   * Get unit test result (convenience method)
+   */
+  async getResult(
+    runId: string,
+    options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' }
+  ): Promise<AxiosResponse> {
+    const response = await getClassUnitTestResult(
+      this.connection,
+      runId,
+      options
+    );
+    this.lastResultResponse = response;
+    return response;
+  }
+
+  /**
+   * Get result response from last getResult call
+   */
+  getResultResponse(): AxiosResponse | undefined {
+    return this.lastResultResponse;
   }
 
   /**

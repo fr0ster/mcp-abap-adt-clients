@@ -16,7 +16,18 @@
 
 import { IAbapConnection, IAdtObject } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger, emptyLogger } from '../utils/logger';
-import { ClassBuilderConfig, AdtClass } from '../core/class';
+import { 
+  ClassBuilderConfig, 
+  AdtClass,
+  AdtLocalTestClass,
+  AdtLocalTypes,
+  AdtLocalDefinitions,
+  AdtLocalMacros,
+  LocalTestClassConfig,
+  LocalTypesConfig,
+  LocalDefinitionsConfig,
+  LocalMacrosConfig
+} from '../core/class';
 import { ProgramBuilderConfig, AdtProgram } from '../core/program';
 import { InterfaceBuilderConfig, AdtInterface } from '../core/interface';
 import { DomainBuilderConfig, AdtDomain } from '../core/domain';
@@ -181,5 +192,42 @@ export class AdtClient {
    */
   getRequest(): IAdtObject<ITransportBuilderConfig, ITransportBuilderConfig> {
     return new AdtRequest(this.connection, this.logger);
+  }
+
+
+  /**
+   * Get high-level operations for LocalTestClass objects
+   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
+   * @returns IAdtObject instance for LocalTestClass operations
+   */
+  getLocalTestClass(adtClass?: AdtClass): IAdtObject<LocalTestClassConfig, LocalTestClassConfig> {
+    return new AdtLocalTestClass(this.connection, adtClass, this.logger);
+  }
+
+  /**
+   * Get high-level operations for LocalTypes objects
+   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
+   * @returns IAdtObject instance for LocalTypes operations
+   */
+  getLocalTypes(adtClass?: AdtClass): IAdtObject<LocalTypesConfig, LocalTypesConfig> {
+    return new AdtLocalTypes(this.connection, adtClass, this.logger);
+  }
+
+  /**
+   * Get high-level operations for LocalDefinitions objects
+   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
+   * @returns IAdtObject instance for LocalDefinitions operations
+   */
+  getLocalDefinitions(adtClass?: AdtClass): IAdtObject<LocalDefinitionsConfig, LocalDefinitionsConfig> {
+    return new AdtLocalDefinitions(this.connection, adtClass, this.logger);
+  }
+
+  /**
+   * Get high-level operations for LocalMacros objects
+   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
+   * @returns IAdtObject instance for LocalMacros operations
+   */
+  getLocalMacros(adtClass?: AdtClass): IAdtObject<LocalMacrosConfig, LocalMacrosConfig> {
+    return new AdtLocalMacros(this.connection, adtClass, this.logger);
   }
 }

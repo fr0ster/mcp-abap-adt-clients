@@ -538,6 +538,29 @@ await domainOps.update(config, { activateOnUpdate: true });
 - [x] Export new classes from index files (`src/core/program/index.ts`, `src/core/interface/index.ts`, `src/core/domain/index.ts`, `src/core/dataElement/index.ts`, `src/core/structure/index.ts`, `src/core/table/index.ts`, `src/core/view/index.ts`, `src/core/functionGroup/index.ts`, `src/core/functionModule/index.ts`, `src/core/package/index.ts`, `src/core/serviceDefinition/index.ts`, `src/core/behaviorDefinition/index.ts`, `src/core/behaviorImplementation/index.ts`, `src/core/metadataExtension/index.ts`)
 - [x] Export new classes from index files for UnitTest and Request (`src/core/unitTest/index.ts`, `src/core/transport/index.ts`)
 - [ ] Add integration tests
+  - [x] Migrate `ClassBuilder.test.ts` to use `AdtClient` (all operations including test classes)
+    - [x] Removed all Builder classes (`ClassUnitTestBuilder`)
+    - [x] Removed all `CrudClient` usage
+    - [x] Removed all low-level function imports (`getClass`, `parseCheckRunResponse`)
+    - [x] Test classes operations use `AdtClass` methods (`lockTestClasses`, `updateTestClasses`, `unlockTestClasses`, `activateTestClasses`, `checkTestClass`)
+    - [x] Unit test runs use `AdtClient.getUnitTest()` with convenience methods
+    - [x] All operations use only `AdtClient` high-level API
+  - [ ] Migrate `ProgramBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `InterfaceBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `DomainBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `DataElementBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `StructureBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `TableBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `ViewBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `FunctionGroupBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `FunctionModuleBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `PackageBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `ServiceDefinitionBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `BehaviorDefinitionBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `BehaviorImplementationBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate `MetadataExtensionBuilder.test.ts` to use `AdtClient`
+  - [ ] Migrate shared tests (`groupActivation.test.ts`, `readSource.test.ts`, `readMetadata.test.ts`, etc.) to use `AdtClient` where applicable
+  - [ ] Keep `TransportBuilder.test.ts` and `class/run.test.ts` on `CrudClient` (specific low-level operations)
 - [ ] Update documentation
 - [ ] Add usage examples with clean API
 

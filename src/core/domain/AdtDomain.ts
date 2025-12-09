@@ -35,10 +35,10 @@ import { getSystemInformation } from '../../utils/systemInfo';
 
 export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Domain';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -85,17 +85,17 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating domain configuration');
+      this.logger?.info?.('Step 1: Validating domain configuration');
       await validateDomainName(
         this.connection,
         config.domainName,
         config.packageName,
         config.description
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating domain');
+      this.logger?.info?.('Step 2: Creating domain');
       await createDomain(
         this.connection,
         {
@@ -116,30 +116,30 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
         masterSystem
       );
       objectCreated = true;
-      this.logger.info?.('Domain created');
+      this.logger?.info?.('Domain created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created domain');
+      this.logger?.info?.('Step 3: Checking created domain');
       await checkDomainSyntax(this.connection, config.domainName, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking domain');
+      this.logger?.info?.('Step 4: Locking domain');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
-      this.logger.info?.('Domain locked, handle:', lockHandle);
+      this.logger?.info?.('Domain locked, handle:', lockHandle);
 
       // 5. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update (if XML provided)
       if (xmlToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating domain with XML');
+        this.logger?.info?.('Step 6: Updating domain with XML');
         await updateDomain(
           this.connection,
           {
@@ -160,28 +160,28 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
           username,
           masterSystem
         );
-        this.logger.info?.('Domain updated');
+        this.logger?.info?.('Domain updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking domain');
+        this.logger?.info?.('Step 7: Unlocking domain');
         await unlockDomain(this.connection, config.domainName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Domain unlocked');
+        this.logger?.info?.('Domain unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkDomainSyntax(this.connection, config.domainName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating domain');
+        this.logger?.info?.('Step 9: Activating domain');
         const activateResponse = await activateDomain(this.connection, config.domainName);
-        this.logger.info?.('Domain activated, status:', activateResponse.status);
+        this.logger?.info?.('Domain activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -201,12 +201,12 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking domain during error cleanup');
+          this.logger?.warn?.('Unlocking domain during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockDomain(this.connection, config.domainName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -215,14 +215,14 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting domain after failure');
+          this.logger?.warn?.('Deleting domain after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteDomain(this.connection, {
             domain_name: config.domainName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete domain after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete domain after failure:', deleteError);
         }
       }
 
@@ -278,22 +278,22 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking domain');
+      this.logger?.info?.('Step 1: Locking domain');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
-      this.logger.info?.('Domain locked, handle:', lockHandle);
+      this.logger?.info?.('Domain locked, handle:', lockHandle);
 
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (lockHandle) {
-        this.logger.info?.('Step 3: Updating domain');
+        this.logger?.info?.('Step 3: Updating domain');
         await updateDomain(
           this.connection,
           {
@@ -314,28 +314,28 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
           username,
           masterSystem
         );
-        this.logger.info?.('Domain updated');
+        this.logger?.info?.('Domain updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking domain');
+        this.logger?.info?.('Step 4: Unlocking domain');
         await unlockDomain(this.connection, config.domainName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Domain unlocked');
+        this.logger?.info?.('Domain unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkDomainSyntax(this.connection, config.domainName, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating domain');
+        this.logger?.info?.('Step 6: Activating domain');
         const activateResponse = await activateDomain(this.connection, config.domainName);
-        this.logger.info?.('Domain activated, status:', activateResponse.status);
+        this.logger?.info?.('Domain activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -353,12 +353,12 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking domain during error cleanup');
+          this.logger?.warn?.('Unlocking domain during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockDomain(this.connection, config.domainName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -367,14 +367,14 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting domain after failure');
+          this.logger?.warn?.('Deleting domain after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteDomain(this.connection, {
             domain_name: config.domainName,
             transport_request: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete domain after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete domain after failure:', deleteError);
         }
       }
 
@@ -393,20 +393,20 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
 
     try {
       // Check for deletion (no stateful needed)
-      this.logger.info?.('Checking domain for deletion');
+      this.logger?.info?.('Checking domain for deletion');
       await checkDeletion(this.connection, {
         domain_name: config.domainName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Deletion check passed');
+      this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
-      this.logger.info?.('Deleting domain');
+      this.logger?.info?.('Deleting domain');
       const result = await deleteDomain(this.connection, {
         domain_name: config.domainName,
         transport_request: config.transportRequest
       });
-      this.logger.info?.('Domain deleted');
+      this.logger?.info?.('Domain deleted');
 
       return result;
     } catch (error: any) {

@@ -34,10 +34,10 @@ import { readMetadataExtensionSource } from './read';
 
 export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilderConfig, MetadataExtensionBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'MetadataExtension';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -85,7 +85,7 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating metadata extension configuration');
+      this.logger?.info?.('Step 1: Validating metadata extension configuration');
       await validateMetadataExtension(
         this.connection,
         {
@@ -94,10 +94,10 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
           packageName: config.packageName
         }
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
-      this.logger.info?.('Step 2: Creating metadata extension');
+      this.logger?.info?.('Step 2: Creating metadata extension');
       await createMetadataExtension(this.connection, {
         name: config.name,
         packageName: config.packageName,
@@ -108,58 +108,58 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
         responsible: config.responsible
       });
       objectCreated = true;
-      this.logger.info?.('Metadata extension created');
+      this.logger?.info?.('Metadata extension created');
 
       // 3. Check after create (no stateful needed)
-      this.logger.info?.('Step 3: Checking created metadata extension');
+      this.logger?.info?.('Step 3: Checking created metadata extension');
       await checkMetadataExtension(this.connection, config.name, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger.info?.('Step 4: Locking metadata extension');
+      this.logger?.info?.('Step 4: Locking metadata extension');
       this.connection.setSessionType('stateful');
       lockHandle = await lockMetadataExtension(this.connection, config.name);
-      this.logger.info?.('Metadata extension locked, handle:', lockHandle);
+      this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await checkMetadataExtension(this.connection, config.name, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating metadata extension with source code');
+        this.logger?.info?.('Step 6: Updating metadata extension with source code');
         await updateMetadataExtension(
           this.connection,
           config.name,
           codeToCheck,
           lockHandle
         );
-        this.logger.info?.('Metadata extension updated');
+        this.logger?.info?.('Metadata extension updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking metadata extension');
+        this.logger?.info?.('Step 7: Unlocking metadata extension');
         await unlockMetadataExtension(this.connection, config.name, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Metadata extension unlocked');
+        this.logger?.info?.('Metadata extension unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await checkMetadataExtension(this.connection, config.name, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating metadata extension');
+        this.logger?.info?.('Step 9: Activating metadata extension');
         const activateResponse = await activateMetadataExtension(this.connection, config.name);
-        this.logger.info?.('Metadata extension activated, status:', activateResponse.status);
+        this.logger?.info?.('Metadata extension activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -184,12 +184,12 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking metadata extension during error cleanup');
+          this.logger?.warn?.('Unlocking metadata extension during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockMetadataExtension(this.connection, config.name, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -198,11 +198,11 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting metadata extension after failure');
+          this.logger?.warn?.('Deleting metadata extension after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteMetadataExtension(this.connection, config.name, config.transportRequest);
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete metadata extension after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete metadata extension after failure:', deleteError);
         }
       }
 
@@ -256,50 +256,50 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger.info?.('Step 1: Locking metadata extension');
+      this.logger?.info?.('Step 1: Locking metadata extension');
       this.connection.setSessionType('stateful');
       lockHandle = await lockMetadataExtension(this.connection, config.name);
-      this.logger.info?.('Metadata extension locked, handle:', lockHandle);
+      this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await checkMetadataExtension(this.connection, config.name, 'inactive', codeToCheck);
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating metadata extension');
+        this.logger?.info?.('Step 3: Updating metadata extension');
         await updateMetadataExtension(
           this.connection,
           config.name,
           codeToCheck,
           lockHandle
         );
-        this.logger.info?.('Metadata extension updated');
+        this.logger?.info?.('Metadata extension updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking metadata extension');
+        this.logger?.info?.('Step 4: Unlocking metadata extension');
         await unlockMetadataExtension(this.connection, config.name, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Metadata extension unlocked');
+        this.logger?.info?.('Metadata extension unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await checkMetadataExtension(this.connection, config.name, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating metadata extension');
+        this.logger?.info?.('Step 6: Activating metadata extension');
         const activateResponse = await activateMetadataExtension(this.connection, config.name);
-        this.logger.info?.('Metadata extension activated, status:', activateResponse.status);
+        this.logger?.info?.('Metadata extension activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -322,12 +322,12 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking metadata extension during error cleanup');
+          this.logger?.warn?.('Unlocking metadata extension during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
           await unlockMetadataExtension(this.connection, config.name, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -336,11 +336,11 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting metadata extension after failure');
+          this.logger?.warn?.('Deleting metadata extension after failure');
           // No stateful needed - delete doesn't use lock/unlock
           await deleteMetadataExtension(this.connection, config.name, config.transportRequest);
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete metadata extension after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete metadata extension after failure:', deleteError);
         }
       }
 
@@ -359,9 +359,9 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
 
     try {
       // Delete (no stateful needed - no lock/unlock, no deletion check for metadata extensions)
-      this.logger.info?.('Deleting metadata extension');
+      this.logger?.info?.('Deleting metadata extension');
       const result = await deleteMetadataExtension(this.connection, config.name, config.transportRequest);
-      this.logger.info?.('Metadata extension deleted');
+      this.logger?.info?.('Metadata extension deleted');
 
       return result;
     } catch (error: any) {

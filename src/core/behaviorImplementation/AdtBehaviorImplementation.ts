@@ -35,11 +35,11 @@ import { AdtClass } from '../class';
 
 export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderConfig> {
   private readonly connection: IAbapConnection;
-  private readonly logger: IAdtLogger;
+  private readonly logger?: IAdtLogger;
   private readonly class: AdtClass;
   public readonly objectType: string = 'BehaviorImplementation';
 
-  constructor(connection: IAbapConnection, logger: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
     this.class = new AdtClass(connection, logger);
@@ -93,7 +93,7 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger.info?.('Step 1: Validating behavior implementation configuration');
+      this.logger?.info?.('Step 1: Validating behavior implementation configuration');
       await validateBehaviorImplementationName(
         this.connection,
         config.className,
@@ -101,11 +101,11 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
         config.description,
         config.behaviorDefinition
       );
-      this.logger.info?.('Validation passed');
+      this.logger?.info?.('Validation passed');
 
       // 2. Create class via AdtClass (creates empty class, sets stateful internally, then stateless after unlock)
       // We pass empty sourceCode to skip the update step in AdtClass.create(), since we need to update implementations include separately
-      this.logger.info?.('Step 2: Creating behavior implementation class');
+      this.logger?.info?.('Step 2: Creating behavior implementation class');
       await this.class.create(
         {
           className: config.className,
@@ -119,29 +119,29 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
         { activateOnCreate: false } // Don't activate yet, we need to update implementations include first
       );
       objectCreated = true;
-      this.logger.info?.('Behavior implementation class created');
+      this.logger?.info?.('Behavior implementation class created');
 
       // 3. Check after create (no stateful needed - AdtClass.create() sets stateless after unlock)
-      this.logger.info?.('Step 3: Checking created behavior implementation class');
+      this.logger?.info?.('Step 3: Checking created behavior implementation class');
       await this.class.check({ className: config.className }, 'inactive');
-      this.logger.info?.('Check after create passed');
+      this.logger?.info?.('Check after create passed');
 
       // 4. Lock for updating implementations include (stateful set inside lock method)
-      this.logger.info?.('Step 4: Locking behavior implementation class');
+      this.logger?.info?.('Step 4: Locking behavior implementation class');
       lockHandle = await this.class.lock({ className: config.className });
-      this.logger.info?.('Behavior implementation class locked, handle:', lockHandle);
+      this.logger?.info?.('Behavior implementation class locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.implementationCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('Step 5: Checking inactive version with update content');
         await this.class.check({ className: config.className, sourceCode: codeToCheck }, 'inactive');
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update implementations include
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 6: Updating behavior implementation implementations include');
+        this.logger?.info?.('Step 6: Updating behavior implementation implementations include');
         await updateBehaviorImplementation(
           this.connection,
           config.className,
@@ -149,28 +149,28 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('Behavior implementation updated');
+        this.logger?.info?.('Behavior implementation updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 7: Unlocking behavior implementation class');
+        this.logger?.info?.('Step 7: Unlocking behavior implementation class');
         await this.class.unlock({ className: config.className }, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Behavior implementation class unlocked');
+        this.logger?.info?.('Behavior implementation class unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger.info?.('Step 8: Final check');
+      this.logger?.info?.('Step 8: Final check');
       await this.class.check({ className: config.className }, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger.info?.('Step 9: Activating behavior implementation class');
+        this.logger?.info?.('Step 9: Activating behavior implementation class');
         const activateResponse = await this.class.activate({ className: config.className });
-        this.logger.info?.('Behavior implementation class activated, status:', activateResponse.status);
+        this.logger?.info?.('Behavior implementation class activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -197,11 +197,11 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking behavior implementation class during error cleanup');
+          this.logger?.warn?.('Unlocking behavior implementation class during error cleanup');
           await this.class.unlock({ className: config.className }, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if no lock was acquired
@@ -210,13 +210,13 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting behavior implementation class after failure');
+          this.logger?.warn?.('Deleting behavior implementation class after failure');
           await this.class.delete({
             className: config.className,
             transportRequest: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete behavior implementation class after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete behavior implementation class after failure:', deleteError);
         }
       }
 
@@ -271,21 +271,21 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
 
     try {
       // 1. Lock (update always starts with lock, stateful set inside lock method)
-      this.logger.info?.('Step 1: Locking behavior implementation class');
+      this.logger?.info?.('Step 1: Locking behavior implementation class');
       lockHandle = await this.class.lock({ className: config.className });
-      this.logger.info?.('Behavior implementation class locked, handle:', lockHandle);
+      this.logger?.info?.('Behavior implementation class locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.implementationCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('Step 2: Checking inactive version with update content');
         await this.class.check({ className: config.className, sourceCode: codeToCheck }, 'inactive');
-        this.logger.info?.('Check inactive with update content passed');
+        this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update implementations include
       if (codeToCheck && lockHandle) {
-        this.logger.info?.('Step 3: Updating behavior implementation');
+        this.logger?.info?.('Step 3: Updating behavior implementation');
         await updateBehaviorImplementation(
           this.connection,
           config.className,
@@ -293,28 +293,28 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
           lockHandle,
           config.transportRequest
         );
-        this.logger.info?.('Behavior implementation updated');
+        this.logger?.info?.('Behavior implementation updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger.info?.('Step 4: Unlocking behavior implementation class');
+        this.logger?.info?.('Step 4: Unlocking behavior implementation class');
         await this.class.unlock({ className: config.className }, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger.info?.('Behavior implementation class unlocked');
+        this.logger?.info?.('Behavior implementation class unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger.info?.('Step 5: Final check');
+      this.logger?.info?.('Step 5: Final check');
       await this.class.check({ className: config.className }, 'inactive');
-      this.logger.info?.('Final check passed');
+      this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger.info?.('Step 6: Activating behavior implementation class');
+        this.logger?.info?.('Step 6: Activating behavior implementation class');
         const activateResponse = await this.class.activate({ className: config.className });
-        this.logger.info?.('Behavior implementation class activated, status:', activateResponse.status);
+        this.logger?.info?.('Behavior implementation class activated, status:', activateResponse.status);
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
@@ -339,11 +339,11 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger.warn?.('Unlocking behavior implementation class during error cleanup');
+          this.logger?.warn?.('Unlocking behavior implementation class during error cleanup');
           await this.class.unlock({ className: config.className }, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
         }
       } else {
         // Ensure stateless if lock failed
@@ -352,13 +352,13 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger.warn?.('Deleting behavior implementation class after failure');
+          this.logger?.warn?.('Deleting behavior implementation class after failure');
           await this.class.delete({
             className: config.className,
             transportRequest: config.transportRequest
           });
         } catch (deleteError) {
-          this.logger.warn?.('Failed to delete behavior implementation class after failure:', deleteError);
+          this.logger?.warn?.('Failed to delete behavior implementation class after failure:', deleteError);
         }
       }
 
@@ -377,12 +377,12 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
 
     try {
       // Delete via AdtClass (handles check and delete)
-      this.logger.info?.('Deleting behavior implementation class');
+      this.logger?.info?.('Deleting behavior implementation class');
       const result = await this.class.delete({
         className: config.className,
         transportRequest: config.transportRequest
       });
-      this.logger.info?.('Behavior implementation class deleted');
+      this.logger?.info?.('Behavior implementation class deleted');
 
       return result;
     } catch (error: any) {
