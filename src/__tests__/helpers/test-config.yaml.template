@@ -70,8 +70,112 @@ environment:
   default_transport: ""  # Default transport request (used if not specified in test case)
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
 
+# Standard SAP objects registry for read-only tests
+standard_objects:
+  classes:
+    - name: "CL_ABAP_CHAR_UTILITIES"
+      description: "Character utilities helper (available everywhere)"
+      available_in: ["onprem", "cloud"]
+    - name: "CL_ABAP_CORRESPONDING"
+      description: "Corresponding-move helper for ABAP"
+      available_in: ["onprem", "cloud"]
+
+  interfaces:
+    - name: "IF_BUPA_API_MODIFY"
+      description: "Interface zum BAdI: BUPA_API_MODIFY"
+      available_in: ["onprem", "cloud"]
+
+  domains:
+    - name: "MANDT"
+      description: "Client domain"
+      available_in: ["onprem", "cloud"]
+    - name: "ABAP_BOOL"
+      description: "Boolean domain"
+      available_in: ["onprem", "cloud"]
+
+  data_elements:
+    - name: "MANDT"
+      description: "Client data element"
+      available_in: ["onprem", "cloud"]
+    - name: "ABAP_BOOL"
+      description: "Boolean data element"
+      available_in: ["onprem", "cloud"]
+
+  tables:
+    - name: "T000"
+      description: "Client table (on-premise SAP systems)"
+      available_in: ["onprem"]
+    - name: "T000"
+      description: "Clients"
+      available_in: ["cloud"]
+
+  structures:
+    - name: "SYST"
+      description: "System fields structure"
+      available_in: ["onprem", "cloud"]
+
+  packages:
+    - name: "$TMP"
+      description: "Local package"
+      available_in: ["onprem"]
+    - name: "ZLOCAL"
+      description: "Placeholder for ABAP Cloud package – replace with existing package"
+      available_in: ["cloud"]
+
+  programs:
+    - name: "SAPLSETB"
+      description: "Standard SAP settings program"
+      available_in: ["onprem"]
+
+  views:
+    - name: "H_T000"
+      description: "Client table help view"
+      available_in: ["onprem"]
+    - name: "I_SapPackage"
+      description: "ABAP Cloud: replace with CDS view name existing in tenant"
+      available_in: ["cloud"]
+
+  function_groups:
+    - name: "EDIN"
+      description: "System function group"
+      available_in: ["onprem", "cloud"]
+
+  function_modules:
+    - name: "IDOC_INBOUND_XML_SOAP_HTTP"
+      group: "EDIN"
+      description: "Returns system metadata"
+      available_in: ["onprem", "cloud"]
+
+  service_definitions:
+    - name: "I_SapPackage"
+      description: "ABAP Cloud: replace with service definition name existing in tenant"
+      available_in: ["cloud"]
+    - name: "ZPLACEHOLDER_SRVD"
+      description: "Placeholder for on-premise service definition – replace with existing service definition"
+      available_in: ["onprem"]
+
+  standard_criteria:
+    note: "Update the entries above with objects that exist in your SAP system before running read tests."
+
 # ============================================================================
-# BUILDER TESTS
+# READ TESTS (Read-only operations on existing objects)
+# ============================================================================
+
+# Read Service Definition
+read_service_definition:
+  test_cases:
+    - name: "read_standard_service_definition"
+      enabled: false  # Set to true and configure params below to enable read test
+      description: "Read standard SAP service definition"
+      params:
+        # Specify standard object name directly (overrides standard_objects registry)
+        service_definition_name: "I_SapPackage"  # Replace with existing service definition in your system
+        # Or use environment-specific parameters:
+        # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
+        # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
+
+# ============================================================================
+# FLOW TESTS (Create/Update/Delete operations - Builder tests)
 # ============================================================================
 
 # Create Class
@@ -662,102 +766,27 @@ create_behavior_implementation:
 
           ENDCLASS.
 
-# Read Service Definition
-read_service_definition:
+# Group Activation Test
+group_activation:
   test_cases:
-    - name: "read_standard_service_definition"
-      enabled: false  # Set to true and configure params below to enable read test
-      description: "Read standard SAP service definition"
+    - name: "builder_group_activation"
+      enabled: true
+      description: "Group activation test - domain, data element, structure"
       params:
-        # Specify standard object name directly (overrides standard_objects registry)
-        service_definition_name: "I_SapPackage"  # Replace with existing service definition in your system
-        # Or use environment-specific parameters:
-        # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
-        # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
-
-# Standard SAP objects registry for read-only tests
-standard_objects:
-  classes:
-    - name: "CL_ABAP_CHAR_UTILITIES"
-      description: "Character utilities helper (available everywhere)"
-      available_in: ["onprem", "cloud"]
-    - name: "CL_ABAP_CORRESPONDING"
-      description: "Corresponding-move helper for ABAP"
-      available_in: ["onprem", "cloud"]
-
-  interfaces:
-    - name: "IF_BUPA_API_MODIFY"
-      description: "Interface zum BAdI: BUPA_API_MODIFY"
-      available_in: ["onprem", "cloud"]
-
-  domains:
-    - name: "MANDT"
-      description: "Client domain"
-      available_in: ["onprem", "cloud"]
-    - name: "ABAP_BOOL"
-      description: "Boolean domain"
-      available_in: ["onprem", "cloud"]
-
-  data_elements:
-    - name: "MANDT"
-      description: "Client data element"
-      available_in: ["onprem", "cloud"]
-    - name: "ABAP_BOOL"
-      description: "Boolean data element"
-      available_in: ["onprem", "cloud"]
-
-  tables:
-    - name: "T000"
-      description: "Client table (on-premise SAP systems)"
-      available_in: ["onprem"]
-    - name: "T000"
-      description: "Clients"
-      available_in: ["cloud"]
-
-  structures:
-    - name: "SYST"
-      description: "System fields structure"
-      available_in: ["onprem", "cloud"]
-
-  packages:
-    - name: "$TMP"
-      description: "Local package"
-      available_in: ["onprem"]
-    - name: "ZLOCAL"
-      description: "Placeholder for ABAP Cloud package – replace with existing package"
-      available_in: ["cloud"]
-
-  programs:
-    - name: "SAPLSETB"
-      description: "Standard SAP settings program"
-      available_in: ["onprem"]
-
-  views:
-    - name: "H_T000"
-      description: "Client table help view"
-      available_in: ["onprem"]
-    - name: "I_SapPackage"
-      description: "ABAP Cloud: replace with CDS view name existing in tenant"
-      available_in: ["cloud"]
-
-  function_groups:
-    - name: "EDIN"
-      description: "System function group"
-      available_in: ["onprem", "cloud"]
-
-  function_modules:
-    - name: "IDOC_INBOUND_XML_SOAP_HTTP"
-      group: "EDIN"
-      description: "Returns system metadata"
-      available_in: ["onprem", "cloud"]
-
-  service_definitions:
-    - name: "I_SapPackage"
-      description: "ABAP Cloud: replace with service definition name existing in tenant"
-      available_in: ["cloud"]
-    - name: "ZPLACEHOLDER_SRVD"
-      description: "Placeholder for on-premise service definition – replace with existing service definition"
-      available_in: ["onprem"]
-
-  standard_criteria:
-    note: "Update the entries above with objects that exist in your SAP system before running read tests."
+        domain_name: "ZADT_BLD_DOM_GRP"
+        data_element_name: "ZADT_BLD_DTEL_GRP"
+        structure_name: "ZADT_BLD_STRU_GRP"
+        description: "Group activation test objects"
+        # package_name: "ZADT_BLD_PKG03"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        domain_datatype: "CHAR"
+        domain_length: 10
+        domain_decimals: 0
+        data_element_type_kind: "domain"
+        structure_ddl_code: |
+          @EndUserText.label: 'Group activation test structure'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define structure ZADT_BLD_STRU_GRP {
+            mandt : abap.clnt;
+            test_field : ZADT_BLD_DTEL_GRP;
+          }
