@@ -4,6 +4,58 @@
 
 This roadmap describes the implementation of high-level CRUD operations that encapsulate complex operation chains for each ADT object type. These operations provide a simplified API for common workflows while maintaining proper error handling and resource cleanup.
 
+## ⚠️ CRITICAL: Session Management Rules
+
+**MANDATORY RULES FOR ALL IMPLEMENTATIONS:**
+
+1. **`stateful` session:**
+   - **ONLY** set before `lock` operations
+   - **NEVER** set for `create`, `delete`, `activate`, `validate`, `check`, `read`
+   - **NEVER** set in cleanup before `unlock` (already in stateful after lock)
+
+2. **`stateless` session:**
+   - **ALWAYS** set after `unlock` operations
+   - **ALWAYS** set in cleanup after `unlock` in error handlers
+
+3. **Pattern:**
+   ```typescript
+   // ✅ CORRECT
+   this.connection.setSessionType('stateful');  // ONLY before lock
+   lockHandle = await lockClass(...);
+   // ... operations ...
+   await unlockClass(...);
+   this.connection.setSessionType('stateless'); // MANDATORY after unlock
+   ```
+
+**See "Session Management Rules" section below for detailed documentation.**
+
+## ⚠️ CRITICAL: Timeout Configuration
+
+**MANDATORY FOR ALL IMPLEMENTATIONS:**
+
+1. **Default timeout:**
+   - **Default:** 1000 ms (1 second)
+   - **Configurable:** via `timeout` option in `CreateOptions` and `UpdateOptions`
+
+2. **Why timeouts are critical:**
+   - Without timeouts, operations may fail due to system not completing commands in time
+   - System may be slow or under load
+   - Complex operations (activate, check) may take longer
+
+3. **Usage:**
+   ```typescript
+   // Default timeout (1000 ms)
+   await adtClass.create(config);
+   
+   // Custom timeout (5 seconds)
+   await adtClass.create(config, { timeout: 5000 });
+   
+   // Custom timeout for update
+   await adtClass.update(config, { timeout: 10000 });
+   ```
+
+**See "Timeout Configuration Rules" section below for detailed documentation.**
+
 ## Architecture
 
 ### Components
@@ -12,8 +64,8 @@ This roadmap describes the implementation of high-level CRUD operations that enc
    - High-level CRUD operations for each object type
    - Encapsulates operation chains with proper error handling
    - Handles resource cleanup (unlock, delete on failure)
-   - Uses existing Builder classes internally for low-level operations
-   - Each CRUD class wraps the corresponding Builder (e.g., `AdtClass` uses `ClassBuilder`)
+   - Uses low-level functions directly (not Builder classes)
+   - Each CRUD class uses low-level functions from `src/core/{entity}/*.ts` modules
 
 2. **IAdtObject Interface** (`@mcp-abap-adt/interfaces/src/adt/IAdtObject.ts`)
    - Common interface for all object CRUD classes
@@ -27,20 +79,138 @@ This roadmap describes the implementation of high-level CRUD operations that enc
    - Factory methods for each object type (`getClass()`, `getProgram()`, etc.)
    - Maintains connection and logger context
 
+### Session Management Rules
+
+**CRITICAL: These rules MUST be followed in ALL CRUD classes**
+
+1. **stateful session:**
+   - **ONLY** set before `lock` operations
+   - **NEVER** set for `create`, `delete`, `activate`, `validate`, `check`, `read` operations
+   - **NEVER** set in cleanup blocks before `unlock` (we're already in stateful after lock)
+
+2. **stateless session:**
+   - **ALWAYS** set after `unlock` operations
+   - **ALWAYS** set in cleanup blocks after `unlock` in error handlers
+   - Set in `finally` blocks for `delete` operations (if stateful was set, but delete doesn't use lock/unlock, so no stateful needed)
+
+3. **Operations that DO NOT need stateful:**
+   - `validate()` - no stateful needed
+   - `create()` - no stateful needed (unless it internally uses lock, but create itself doesn't)
+   - `read()` - no stateful needed
+   - `check()` - no stateful needed
+   - `activate()` - no stateful needed (uses same session/cookies)
+   - `delete()` - no stateful needed (if no lock/unlock involved)
+
+4. **Operations that REQUIRE stateful:**
+   - `lock()` - **MUST** set stateful before calling
+   - `update()` - requires lock, so stateful is set before lock
+   - `unlock()` - we're already in stateful after lock, just unlock and set stateless
+
+5. **Correct pattern:**
+   ```typescript
+   // ✅ CORRECT: stateful ONLY before lock
+   this.connection.setSessionType('stateful');
+   lockHandle = await lockClass(this.connection, className);
+   
+   // ... operations while locked (still in stateful) ...
+   
+   // ✅ CORRECT: stateless MANDATORY after unlock
+   await unlockClass(this.connection, className, lockHandle);
+   this.connection.setSessionType('stateless');
+   ```
+
+6. **Incorrect patterns (NEVER DO THIS):**
+   ```typescript
+   // ❌ WRONG: stateful before create
+   this.connection.setSessionType('stateful');
+   await createClass(...);
+   
+   // ❌ WRONG: stateful before delete (if no lock/unlock)
+   this.connection.setSessionType('stateful');
+   await deleteClass(...);
+   
+   // ❌ WRONG: stateful before activate
+   this.connection.setSessionType('stateful');
+   await activateClass(...);
+   
+   // ❌ WRONG: stateful in cleanup before unlock (we're already in stateful)
+   if (lockHandle) {
+     this.connection.setSessionType('stateful'); // ❌ NOT NEEDED!
+     await unlockClass(...);
+   }
+   ```
+
+7. **Cleanup pattern:**
+   ```typescript
+   catch (error: any) {
+     if (lockHandle) {
+       try {
+         // ✅ CORRECT: we're already in stateful after lock, just unlock and set stateless
+         await unlockClass(this.connection, className, lockHandle);
+         this.connection.setSessionType('stateless');
+       } catch (unlockError) {
+         // ...
+       }
+     } else {
+       // ✅ CORRECT: if lock was not acquired, set stateless
+       this.connection.setSessionType('stateless');
+     }
+   }
+   ```
+
+### Timeout Configuration Rules
+
+**CRITICAL: These rules MUST be followed in ALL CRUD classes**
+
+1. **Default timeout:**
+   - **Default:** 1000 ms (1 second)
+   - **Configurable:** via `timeout` option in `CreateOptions` and `UpdateOptions`
+
+2. **Why timeouts are critical:**
+   - Without timeouts, operations may fail due to system not completing commands in time
+   - System may be slow or under load
+   - Complex operations (activate, check) may take longer
+
+3. **Usage:**
+   ```typescript
+   // Default timeout (1000 ms)
+   await adtClass.create(config);
+   
+   // Custom timeout (5 seconds)
+   await adtClass.create(config, { timeout: 5000 });
+   
+   // Custom timeout for update
+   await adtClass.update(config, { timeout: 10000 });
+   ```
+
+4. **Implementation:**
+   - All low-level function calls should use `options?.timeout || 1000` for timeout value
+   - Pass timeout to `connection.makeAdtRequest({ timeout: ... })`
+   - For operations without options, use default 1000 ms
+   - Timeout applies to all operations in the chain (validate, create, check, lock, update, unlock, activate)
+
+5. **Example implementation:**
+   ```typescript
+   const timeout = options?.timeout || 1000;
+   await validateClassName(this.connection, config.className, { timeout });
+   await createClass(this.connection, config, { timeout });
+   // ... etc
+   ```
+
 ## Operation Chains
 
 ### Create Operation Chain
 
 ```
-validate() [no stateful]
-  → create() [stateful]
-  → check() [stateful]
-  → lock() [stateful]
-  → check('inactive') [with code/xml for update] [stateful]
-  → update() [stateful]
-  → unlock() [stateful → stateless after unlock]
-  → check() [stateless]
-  → activate() [if activateOnCreate=true, no stateful needed, uses same session/cookies]
+validate() [no stateful, uses timeout from options or default 1000ms]
+  → create() [no stateful, uses timeout from options or default 1000ms]
+  → check() [no stateful, uses timeout from options or default 1000ms]
+  → lock() [stateful ONLY before lock, uses timeout from options or default 1000ms]
+  → check('inactive') [with code/xml for update] [stateful, uses timeout from options or default 1000ms]
+  → update() [stateful, uses timeout from options or default 1000ms]
+  → unlock() [stateful → stateless MANDATORY after unlock, uses timeout from options or default 1000ms]
+  → check() [stateless, uses timeout from options or default 1000ms]
+  → activate() [if activateOnCreate=true, no stateful needed, uses same session/cookies, uses timeout from options or default 1000ms]
   → return basic info without sourceCode if activated (object may not be ready)
 ```
 
@@ -55,12 +225,12 @@ validate() [no stateful]
 ### Update Operation Chain
 
 ```
-lock() [stateful]
-  → check('inactive') [with code/xml for update] [stateful]
-  → update() [stateful]
-  → unlock() [stateful → stateless after unlock]
-  → check() [stateless]
-  → activate() [if activateOnUpdate=true, no stateful needed, uses same session/cookies]
+lock() [stateful ONLY before lock, uses timeout from options or default 1000ms]
+  → check('inactive') [with code/xml for update] [stateful, uses timeout from options or default 1000ms]
+  → update() [stateful, uses timeout from options or default 1000ms]
+  → unlock() [stateful → stateless MANDATORY after unlock, uses timeout from options or default 1000ms]
+  → check() [stateless, uses timeout from options or default 1000ms]
+  → activate() [if activateOnUpdate=true, no stateful needed, uses same session/cookies, uses timeout from options or default 1000ms]
   → return basic info without sourceCode if activated (object may not be ready)
 ```
 
@@ -177,6 +347,17 @@ export interface CreateOptions {
    */
   sourceCode?: string;
   xmlContent?: string;
+
+  /**
+   * Timeout for operations in milliseconds
+   * @default 1000 (1 second)
+   * 
+   * CRITICAL: Without timeouts, operations may fail due to system not completing commands in time.
+   * Increase timeout for complex operations or slow systems.
+   * 
+   * Example: timeout: 5000 for 5 seconds
+   */
+  timeout?: number;
 }
 
 export interface UpdateOptions {
@@ -191,6 +372,17 @@ export interface UpdateOptions {
    * @default false
    */
   deleteOnFailure?: boolean;
+
+  /**
+   * Timeout for operations in milliseconds
+   * @default 1000 (1 second)
+   * 
+   * CRITICAL: Without timeouts, operations may fail due to system not completing commands in time.
+   * Increase timeout for complex operations or slow systems.
+   * 
+   * Example: timeout: 5000 for 5 seconds
+   */
+  timeout?: number;
 }
 ```
 
@@ -375,22 +567,30 @@ async create(config: TConfig, options?: CreateOptions): Promise<TReadResult> {
 
 ### Lock Cleanup
 
+**CRITICAL SESSION MANAGEMENT RULES:**
+- `stateful` ONLY before `lock`
+- `stateless` MANDATORY after `unlock`
+- If no lock/unlock, then stateful is NOT needed
+
 ```typescript
 let lockHandle: string | undefined;
 try {
+  // ✅ CORRECT: stateful ONLY before lock
   connection.setSessionType('stateful');
   lockHandle = await lockClass(connection, className);
   // ... operations (still in stateful)
 } finally {
   if (lockHandle) {
     try {
-      // We're already in stateful after lock, just unlock and set stateless
+      // ✅ CORRECT: we're already in stateful after lock, just unlock and set stateless
+      // DO NOT set stateful here - we're already in stateful!
       await unlockClass(connection, className, lockHandle);
       connection.setSessionType('stateless');
     } catch (unlockError) {
       logger.warn?.('Failed to unlock during cleanup:', unlockError);
     }
   } else {
+    // ✅ CORRECT: if lock was not acquired, set stateless
     connection.setSessionType('stateless');
   }
 }
