@@ -18,7 +18,7 @@
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, CreateOptions, UpdateOptions } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { ProgramBuilderConfig } from './types';
@@ -62,7 +62,7 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
    */
   async create(
     config: ProgramBuilderConfig,
-    options?: CreateOptions
+    options?: IAdtOperationOptions
   ): Promise<ProgramBuilderConfig> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -241,7 +241,7 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
    */
   async update(
     config: Partial<ProgramBuilderConfig>,
-    options?: UpdateOptions
+    options?: IAdtOperationOptions
   ): Promise<ProgramBuilderConfig> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -257,20 +257,21 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
       lockHandle = await lockProgram(this.connection, config.programName);
       this.logger.info?.('Program locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update
-      if (config.sourceCode) {
+      // 2. Check inactive with code for update (from options or config)
+      const codeToCheck = options?.sourceCode || config.sourceCode;
+      if (codeToCheck) {
         this.logger.info?.('Step 2: Checking inactive version with update content');
-        await checkProgram(this.connection, config.programName, 'inactive', config.sourceCode);
+        await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
         this.logger.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
-      if (config.sourceCode && lockHandle) {
+      if (codeToCheck && lockHandle) {
         this.logger.info?.('Step 3: Updating program');
         await uploadProgramSource(
           this.connection,
           config.programName,
-          config.sourceCode,
+          codeToCheck,
           lockHandle,
           sessionId,
           config.transportRequest

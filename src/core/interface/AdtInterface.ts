@@ -18,7 +18,7 @@
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, CreateOptions, UpdateOptions } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { InterfaceBuilderConfig } from './types';
@@ -63,7 +63,7 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
    */
   async create(
     config: InterfaceBuilderConfig,
-    options?: CreateOptions
+    options?: IAdtOperationOptions
   ): Promise<InterfaceBuilderConfig> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -242,7 +242,7 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
    */
   async update(
     config: Partial<InterfaceBuilderConfig>,
-    options?: UpdateOptions
+    options?: IAdtOperationOptions
   ): Promise<InterfaceBuilderConfig> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -258,20 +258,21 @@ export class AdtInterface implements IAdtObject<InterfaceBuilderConfig, Interfac
       lockHandle = lockResult.lockHandle;
       this.logger.info?.('Interface locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update
-      if (config.sourceCode) {
+      // 2. Check inactive with code for update (from options or config)
+      const codeToCheck = options?.sourceCode || config.sourceCode;
+      if (codeToCheck) {
         this.logger.info?.('Step 2: Checking inactive version with update content');
-        await checkInterface(this.connection, config.interfaceName, 'inactive', config.sourceCode);
+        await checkInterface(this.connection, config.interfaceName, 'inactive', codeToCheck);
         this.logger.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
-      if (config.sourceCode && lockHandle) {
+      if (codeToCheck && lockHandle) {
         this.logger.info?.('Step 3: Updating interface');
         await upload(
           this.connection,
           config.interfaceName,
-          config.sourceCode,
+          codeToCheck,
           lockHandle,
           config.transportRequest
         );

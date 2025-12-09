@@ -17,7 +17,7 @@
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, CreateOptions, UpdateOptions } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { ClassBuilderConfig } from './types';
@@ -63,7 +63,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    */
   async create(
     config: ClassBuilderConfig,
-    options?: CreateOptions
+    options?: IAdtOperationOptions
   ): Promise<ClassBuilderConfig> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -246,7 +246,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    */
   async update(
     config: Partial<ClassBuilderConfig>,
-    options?: UpdateOptions
+    options?: IAdtOperationOptions
   ): Promise<ClassBuilderConfig> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -261,20 +261,21 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       lockHandle = await lockClass(this.connection, config.className);
       this.logger.info?.('Class locked, handle:', lockHandle);
 
-      // 2. Check inactive with code/xml for update
-      if (config.sourceCode) {
+      // 2. Check inactive with code/xml for update (from options or config)
+      const codeToCheck = options?.sourceCode || config.sourceCode;
+      if (codeToCheck) {
         this.logger.info?.('Step 2: Checking inactive version with update content');
-        await checkClass(this.connection, config.className, 'inactive', config.sourceCode);
+        await checkClass(this.connection, config.className, 'inactive', codeToCheck);
         this.logger.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
-      if (config.sourceCode && lockHandle) {
+      if (codeToCheck && lockHandle) {
         this.logger.info?.('Step 3: Updating class');
         await updateClass(
           this.connection,
           config.className,
-          config.sourceCode,
+          codeToCheck,
           lockHandle,
           config.transportRequest
         );

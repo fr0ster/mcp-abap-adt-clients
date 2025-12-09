@@ -17,9 +17,9 @@
 import { IAbapConnection, IAdtObject } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger, emptyLogger } from '../utils/logger';
 import { ClassBuilderConfig, AdtClass } from '../core/class';
-import { ProgramBuilderConfig } from '../core/program';
-import { InterfaceBuilderConfig } from '../core/interface';
-import { DomainBuilderConfig } from '../core/domain';
+import { ProgramBuilderConfig, AdtProgram } from '../core/program';
+import { InterfaceBuilderConfig, AdtInterface } from '../core/interface';
+import { DomainBuilderConfig, AdtDomain } from '../core/domain';
 import { DataElementBuilderConfig } from '../core/dataElement';
 import { StructureBuilderConfig } from '../core/structure';
 import { TableBuilderConfig } from '../core/table';
@@ -57,8 +57,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Program operations
    */
   getProgram(): IAdtObject<ProgramBuilderConfig, ProgramBuilderConfig> {
-    // TODO: Implement AdtProgram
-    throw new Error('AdtProgram not yet implemented');
+    return new AdtProgram(this.connection, this.logger);
   }
 
   /**
@@ -66,8 +65,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Interface operations
    */
   getInterface(): IAdtObject<InterfaceBuilderConfig, InterfaceBuilderConfig> {
-    // TODO: Implement AdtInterface
-    throw new Error('AdtInterface not yet implemented');
+    return new AdtInterface(this.connection, this.logger);
   }
 
   /**
@@ -75,8 +73,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Domain operations
    */
   getDomain(): IAdtObject<DomainBuilderConfig, DomainBuilderConfig> {
-    // TODO: Implement AdtDomain
-    throw new Error('AdtDomain not yet implemented');
+    return new AdtDomain(this.connection, this.logger);
   }
 
   /**

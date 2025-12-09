@@ -35,7 +35,7 @@ This roadmap describes the implementation of high-level CRUD operations that enc
 
 1. **Default timeout:**
    - **Default:** 1000 ms (1 second)
-   - **Configurable:** via `timeout` option in `CreateOptions` and `UpdateOptions`
+   - **Configurable:** via `timeout` option in `IAdtOperationOptions`
 
 2. **Why timeouts are critical:**
    - Without timeouts, operations may fail due to system not completing commands in time
@@ -70,7 +70,7 @@ This roadmap describes the implementation of high-level CRUD operations that enc
 2. **IAdtObject Interface** (`@mcp-abap-adt/interfaces/src/adt/IAdtObject.ts`)
    - Common interface for all object CRUD classes
    - Defines standard CRUD operations: create, read, update, delete, validate, activate, check
-   - Includes `CreateOptions` and `UpdateOptions` interfaces
+   - Includes `IAdtOperationOptions` interface (unified for both create and update operations)
    - Exported from `@mcp-abap-adt/interfaces` package
    - Uses "Object" terminology which is accurate for ADT context (ABAP objects)
 
@@ -164,7 +164,7 @@ This roadmap describes the implementation of high-level CRUD operations that enc
 
 1. **Default timeout:**
    - **Default:** 1000 ms (1 second)
-   - **Configurable:** via `timeout` option in `CreateOptions` and `UpdateOptions`
+   - **Configurable:** via `timeout` option in `IAdtOperationOptions`
 
 2. **Why timeouts are critical:**
    - Without timeouts, operations may fail due to system not completing commands in time
@@ -274,7 +274,7 @@ export interface IAdtObject<TConfig, TReadResult = TConfig> {
    */
   create(
     config: TConfig,
-    options?: CreateOptions
+    options?: IAdtOperationOptions
   ): Promise<TReadResult>;
 
   /**
@@ -296,7 +296,7 @@ export interface IAdtObject<TConfig, TReadResult = TConfig> {
    */
   update(
     config: Partial<TConfig>,
-    options?: UpdateOptions
+    options?: IAdtOperationOptions
   ): Promise<TReadResult>;
 
   /**
@@ -326,26 +326,39 @@ export interface IAdtObject<TConfig, TReadResult = TConfig> {
 }
 ```
 
-### Options Interfaces
+### Options Interface
 
 ```typescript
-export interface CreateOptions {
+export interface IAdtOperationOptions {
   /**
-   * Activate object after creation
+   * Activate object after creation (for create operations)
    * @default false
    */
   activateOnCreate?: boolean;
 
   /**
-   * Delete object if creation fails
+   * Activate object after update (for update operations)
+   * @default false
+   */
+  activateOnUpdate?: boolean;
+
+  /**
+   * Delete object if operation fails
    * @default false
    */
   deleteOnFailure?: boolean;
 
   /**
-   * Source code or XML to use for update after create
+   * Source code to use for update
+   * Used in create operations for update after create, and in update operations
    */
   sourceCode?: string;
+
+  /**
+   * XML content to use for update
+   * Used for objects that use XML format (e.g., Domain, DataElement)
+   * Used in create operations for update after create, and in update operations
+   */
   xmlContent?: string;
 
   /**
@@ -359,32 +372,9 @@ export interface CreateOptions {
    */
   timeout?: number;
 }
-
-export interface UpdateOptions {
-  /**
-   * Activate object after update
-   * @default false
-   */
-  activateOnUpdate?: boolean;
-
-  /**
-   * Delete object if update fails
-   * @default false
-   */
-  deleteOnFailure?: boolean;
-
-  /**
-   * Timeout for operations in milliseconds
-   * @default 1000 (1 second)
-   * 
-   * CRITICAL: Without timeouts, operations may fail due to system not completing commands in time.
-   * Increase timeout for complex operations or slow systems.
-   * 
-   * Example: timeout: 5000 for 5 seconds
-   */
-  timeout?: number;
-}
 ```
+
+**Note:** `IAdtOperationOptions` is a unified interface for both create and update operations. The `sourceCode` and `xmlContent` fields are available for both create (for update after create) and update operations.
 
 ## Implementation Strategy
 
@@ -483,7 +473,7 @@ await domainOps.update(config, { activateOnUpdate: true });
 
 ### Phase 1: Core Infrastructure
 - [x] Create `IAdtObject` interface in `@mcp-abap-adt/interfaces/src/adt/IAdtObject.ts`
-- [x] Create `CreateOptions` and `UpdateOptions` interfaces (in same file)
+- [x] Create unified `IAdtOperationOptions` interface (replaces separate `CreateOptions` and `UpdateOptions`)
 - [x] Create base error classes for unsupported operations in `src/core/shared/errors.ts`
 - [x] Create `AdtClient` skeleton in `src/clients/AdtClient.ts`
 - [x] Export `IAdtObject` from `@mcp-abap-adt/interfaces` package
@@ -502,7 +492,9 @@ await domainOps.update(config, { activateOnUpdate: true });
   - [x] Use low-level functions directly (not Builder classes)
   - [x] Proper session management (stateful only for lock/update/unlock, stateless after unlock)
   - [x] After activation, return basic info without reading source code (object may not be ready)
-  - [x] Remove `lockHandle` from `UpdateOptions` (update always starts with lock)
+  - [x] Unified `CreateOptions` and `UpdateOptions` into `IAdtOperationOptions` interface
+  - [x] Added `sourceCode` and `xmlContent` to update operations (via `IAdtOperationOptions`)
+  - [x] Removed `lockHandle` from update options (update always starts with lock internally)
 - [ ] Test create chain with all error scenarios
 - [ ] Test update chain with all error scenarios
 - [ ] Test delete operation
@@ -510,11 +502,11 @@ await domainOps.update(config, { activateOnUpdate: true });
 
 ### Phase 3: Object CRUD Classes
 - [x] Implement `AdtClass` as reference (completed in Phase 2)
+- [x] Implement `AdtProgram` in `src/core/program/AdtProgram.ts`
+- [x] Implement `AdtInterface` in `src/core/interface/AdtInterface.ts`
+- [x] Implement `AdtDomain` in `src/core/domain/AdtDomain.ts`
+- [ ] Implement `AdtDataElement` in `src/core/dataElement/AdtDataElement.ts`
 - [ ] Implement CRUD classes for remaining object types:
-  - [ ] `AdtProgram`
-  - [ ] `AdtInterface`
-  - [ ] `AdtDomain`
-  - [ ] `AdtDataElement`
   - [ ] `AdtStructure`
   - [ ] `AdtTable`
   - [ ] `AdtView`
@@ -530,7 +522,9 @@ await domainOps.update(config, { activateOnUpdate: true });
 
 ### Phase 4: Integration
 - [x] Complete `AdtClient` with factory method for Class (`getClass()`)
-- [ ] Complete `AdtClient` with remaining factory methods (`getProgram()`, `getInterface()`, etc.)
+- [x] Complete `AdtClient` with factory methods for Program, Interface, Domain (`getProgram()`, `getInterface()`, `getDomain()`)
+- [ ] Complete `AdtClient` with factory method for DataElement (`getDataElement()`)
+- [x] Export new classes from index files (`src/core/program/index.ts`, `src/core/interface/index.ts`, `src/core/domain/index.ts`)
 - [ ] Add integration tests
 - [ ] Update documentation
 - [ ] Add usage examples with clean API
