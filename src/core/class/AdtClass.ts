@@ -6,6 +6,11 @@
  * 
  * Uses low-level functions directly (not Builder classes).
  * 
+ * Session management:
+ * - stateful: only when doing lock operations
+ * - stateless: obligatory after unlock
+ * - If no lock/unlock, no stateful needed
+ * 
  * Operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
@@ -69,13 +74,9 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
     let objectCreated = false;
     let lockHandle: string | undefined;
-    const originalSessionType = this.connection.getSessionType?.() || 'stateless';
 
     try {
-      // Enable stateful session for operations
-      this.connection.setSessionType('stateful');
-
-      // 1. Validate
+      // 1. Validate (no stateful needed)
       this.logger.info?.('Step 1: Validating class configuration');
       await validateClassName(
         this.connection,
@@ -86,8 +87,9 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       );
       this.logger.info?.('Validation passed');
 
-      // 2. Create
+      // 2. Create (requires stateful)
       this.logger.info?.('Step 2: Creating class');
+      this.connection.setSessionType('stateful');
       await createClass(this.connection, {
         class_name: config.className,
         package_name: config.packageName,
@@ -104,12 +106,12 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       objectCreated = true;
       this.logger.info?.('Class created');
 
-      // 3. Check after create
+      // 3. Check after create (stateful still set from create)
       this.logger.info?.('Step 3: Checking created class');
       await checkClass(this.connection, config.className, 'inactive');
       this.logger.info?.('Check after create passed');
 
-      // 4. Lock
+      // 4. Lock (stateful already set, keep it)
       this.logger.info?.('Step 4: Locking class');
       lockHandle = await lockClass(this.connection, config.className);
       this.logger.info?.('Class locked, handle:', lockHandle);
@@ -135,7 +137,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         this.logger.info?.('Class updated');
       }
 
-      // 7. Unlock
+      // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger.info?.('Step 7: Unlocking class');
         await unlockClass(this.connection, config.className, lockHandle);
@@ -144,21 +146,26 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         this.logger.info?.('Class unlocked');
       }
 
-      // 8. Final check
+      // 8. Final check (no stateful needed)
       this.logger.info?.('Step 8: Final check');
       await checkClass(this.connection, config.className, 'inactive');
       this.logger.info?.('Final check passed');
 
-      // 9. Activate (if requested)
+      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
         this.logger.info?.('Step 9: Activating class');
-        this.connection.setSessionType('stateful');
-        await activateClass(this.connection, config.className);
-        this.connection.setSessionType('stateless');
-        this.logger.info?.('Class activated');
+        const activateResponse = await activateClass(this.connection, config.className);
+        this.logger.info?.('Class activated, status:', activateResponse.status);
+        
+        // Don't read after activation - object may not be ready yet
+        // Return basic info without sourceCode (activation returns 201)
+        return {
+          className: config.className,
+          packageName: config.packageName
+        };
       }
 
-      // Read and return result
+      // Read and return result (no stateful needed)
       const readResponse = await getClassSource(this.connection, config.className, 'active');
       const sourceCode = typeof readResponse.data === 'string'
         ? readResponse.data
@@ -170,19 +177,19 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         sourceCode
       };
     } catch (error: any) {
-      // Restore session type
-      this.connection.setSessionType(originalSessionType);
-
-      // Cleanup on error
+      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
           this.logger.warn?.('Unlocking class during error cleanup');
-          this.connection.setSessionType('stateful');
+          // We're already in stateful after lock, just unlock and set stateless
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
           this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
         }
+      } else {
+        // Ensure stateless if no lock was acquired
+        this.connection.setSessionType('stateless');
       }
 
       if (objectCreated && options?.deleteOnFailure) {
@@ -235,6 +242,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
   /**
    * Update class with full operation chain
+   * Always starts with lock
    */
   async update(
     config: Partial<ClassBuilderConfig>,
@@ -245,25 +253,13 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
     }
 
     let lockHandle: string | undefined;
-    let wasLocked = false;
-    const originalSessionType = this.connection.getSessionType?.() || 'stateless';
 
     try {
-      // Enable stateful session for operations
+      // 1. Lock (update always starts with lock, stateful only for lock)
+      this.logger.info?.('Step 1: Locking class');
       this.connection.setSessionType('stateful');
-
-      // 1. Lock (or use provided lock handle)
-      if (options?.lockHandle) {
-        this.logger.info?.('Using provided lock handle');
-        lockHandle = options.lockHandle;
-        // Note: If lock handle is provided, we assume object is already locked
-        // We'll skip unlock in cleanup if lock handle was provided
-      } else {
-        this.logger.info?.('Step 1: Locking class');
-        lockHandle = await lockClass(this.connection, config.className);
-        wasLocked = true;
-        this.logger.info?.('Class locked, handle:', lockHandle);
-      }
+      lockHandle = await lockClass(this.connection, config.className);
+      this.logger.info?.('Class locked, handle:', lockHandle);
 
       // 2. Check inactive with code/xml for update
       if (config.sourceCode) {
@@ -285,8 +281,8 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         this.logger.info?.('Class updated');
       }
 
-      // 4. Unlock (only if we locked it)
-      if (wasLocked && lockHandle) {
+      // 4. Unlock (obligatory stateless after unlock)
+      if (lockHandle) {
         this.logger.info?.('Step 4: Unlocking class');
         await unlockClass(this.connection, config.className, lockHandle);
         this.connection.setSessionType('stateless');
@@ -294,21 +290,25 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         this.logger.info?.('Class unlocked');
       }
 
-      // 5. Final check
+      // 5. Final check (no stateful needed)
       this.logger.info?.('Step 5: Final check');
       await checkClass(this.connection, config.className, 'inactive');
       this.logger.info?.('Final check passed');
 
-      // 6. Activate (if requested)
+      // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger.info?.('Step 6: Activating class');
-        this.connection.setSessionType('stateful');
-        await activateClass(this.connection, config.className);
-        this.connection.setSessionType('stateless');
-        this.logger.info?.('Class activated');
+        const activateResponse = await activateClass(this.connection, config.className);
+        this.logger.info?.('Class activated, status:', activateResponse.status);
+        
+        // Don't read after activation - object may not be ready yet
+        // Return basic info without sourceCode (activation returns 201)
+        return {
+          className: config.className
+        };
       }
 
-      // Read and return result
+      // Read and return result (no stateful needed)
       const readResponse = await getClassSource(this.connection, config.className, 'active');
       const sourceCode = typeof readResponse.data === 'string'
         ? readResponse.data
@@ -319,19 +319,19 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
         sourceCode
       };
     } catch (error: any) {
-      // Restore session type
-      this.connection.setSessionType(originalSessionType);
-
-      // Cleanup on error (only if we locked it, not if lock handle was provided)
-      if (wasLocked && lockHandle) {
+      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
+      if (lockHandle) {
         try {
           this.logger.warn?.('Unlocking class during error cleanup');
-          this.connection.setSessionType('stateful');
+          // We're already in stateful after lock, just unlock and set stateless
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
           this.logger.warn?.('Failed to unlock during cleanup:', unlockError);
         }
+      } else {
+        // Ensure stateless if lock failed
+        this.connection.setSessionType('stateless');
       }
 
       if (options?.deleteOnFailure) {
@@ -361,13 +361,8 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       throw new Error('Class name is required');
     }
 
-    const originalSessionType = this.connection.getSessionType?.() || 'stateless';
-
     try {
-      // Enable stateful session for operations
-      this.connection.setSessionType('stateful');
-
-      // Check for deletion
+      // Check for deletion (no stateful needed)
       this.logger.info?.('Checking class for deletion');
       await checkDeletion(this.connection, {
         class_name: config.className,
@@ -375,8 +370,9 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       });
       this.logger.info?.('Deletion check passed');
 
-      // Delete
+      // Delete (requires stateful, but no lock)
       this.logger.info?.('Deleting class');
+      this.connection.setSessionType('stateful');
       const result = await deleteClass(this.connection, {
         class_name: config.className,
         transport_request: config.transportRequest
@@ -385,33 +381,28 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
       return result;
     } catch (error: any) {
-      this.connection.setSessionType(originalSessionType);
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
     } finally {
-      this.connection.setSessionType(originalSessionType);
+      this.connection.setSessionType('stateless');
     }
   }
 
   /**
    * Activate class
+   * No stateful needed - uses same session/cookies
    */
   async activate(config: Partial<ClassBuilderConfig>): Promise<AxiosResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    const originalSessionType = this.connection.getSessionType?.() || 'stateless';
-
     try {
-      this.connection.setSessionType('stateful');
       const result = await activateClass(this.connection, config.className);
       return result;
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
-    } finally {
-      this.connection.setSessionType(originalSessionType);
     }
   }
 
