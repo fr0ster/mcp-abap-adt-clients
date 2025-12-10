@@ -10,7 +10,8 @@
  * Run: npm test -- --testPathPattern=class/ClassBuilder
  */
 
-import type { IAbapConnection, IClassUnitTestDefinition, IClassUnitTestRunOptions } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from '../../../core/unitTest/types';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
@@ -31,7 +32,6 @@ import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
-import { AdtUnitTest } from '../../../core/unitTest/AdtUnitTest';
 
 const {
   getEnabledTestCase,
@@ -308,17 +308,16 @@ describe('ClassBuilder (using AdtClient)', () => {
 
       // Declare cleanup tracking variables at outer scope so they're accessible in finally block
       let classCreated = false;
-      let classLocked = false;
-      let lockHandle: string | undefined;
       let currentStep = '';
 
       try {
         logBuilderTestStep('validate');
-        const validationResponse = await client.getClass().validate({
+        const validationState = await client.getClass().validate({
           className: testClassName,
           packageName: testPackageName,
           description: `Test class ${testClassName}`
         });
+        const validationResponse = validationState?.validationResponse;
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string'
             ? validationResponse.data
@@ -342,10 +341,11 @@ describe('ClassBuilder (using AdtClient)', () => {
 
           currentStep = 'check with source code (before update)';
           logBuilderTestStep(currentStep);
-          const checkBeforeUpdate = await client.getClass().check({ 
+          const checkBeforeUpdateState = await client.getClass().check({ 
             className: testClassName!,
             sourceCode: sourceCode
           }, 'inactive');
+          const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
           expect(checkBeforeUpdate?.status).toBeDefined();
 
           // Verify check response - if status is not 200, there might be errors
@@ -365,7 +365,8 @@ describe('ClassBuilder (using AdtClient)', () => {
 
           currentStep = 'check(inactive)';
           logBuilderTestStep(currentStep);
-          const checkResultInactive = await client.getClass().check({ className: testClassName }, 'inactive');
+          const checkResultInactiveState = await client.getClass().check({ className: testClassName }, 'inactive');
+          const checkResultInactive = checkResultInactiveState?.checkResult;
           expect(checkResultInactive?.status).toBeDefined();
 
           currentStep = 'activate';
@@ -377,8 +378,11 @@ describe('ClassBuilder (using AdtClient)', () => {
           currentStep = 'check(active)';
           logBuilderTestStep(currentStep);
           // Retry check for active version - activation may take time
-          const checkResultActive = await retryCheckAfterActivate(
-            () => client.getClass().check({ className: testClassName! }, 'active'),
+          const checkResultActiveState = await retryCheckAfterActivate(
+            async () => {
+              const state = await client.getClass().check({ className: testClassName! }, 'active');
+              return state?.checkResult;
+            },
             {
               maxAttempts: 5,
               delay: 1000,
@@ -386,7 +390,7 @@ describe('ClassBuilder (using AdtClient)', () => {
               objectName: testClassName!
             }
           );
-          expect(checkResultActive?.status).toBeDefined();
+          expect(checkResultActiveState?.status).toBeDefined();
           // Test class operations (if enabled) - using AdtClient (test classes are local classes, not unit test runs)
           if (shouldUpdateTestClass) {
             currentStep = 'check test class before update';
@@ -425,7 +429,7 @@ describe('ClassBuilder (using AdtClient)', () => {
               tests: testDefinitions.map(test => `${test.containerClass}/${test.testClass}`).join(', ')
             });
             const runOptions = normalizeUnitTestOptions(testClassConfig.unit_test_options);
-            const unitTest = client.getUnitTest() as any; // Type assertion for convenience methods
+            const unitTest = client.getUnitTest() as any; // AdtUnitTest has convenience methods beyond IAdtObject
             const runId = await unitTest.run(testDefinitions, runOptions);
 
             if (!runId) {
@@ -488,7 +492,7 @@ describe('ClassBuilder (using AdtClient)', () => {
 
           // Only check unit test results if test class was successfully updated and tests ran
           if (shouldRunUnitTests && testClassUpdateSucceeded) {
-            const unitTest = client.getUnitTest() as any; // Type assertion for convenience methods
+            const unitTest = client.getUnitTest() as any; // AdtUnitTest has convenience methods beyond IAdtObject
             expect(unitTest.getRunId()).toBeDefined();
             expect(unitTest.getStatusResponse()).toBeDefined();
             expect(unitTest.getResultResponse()).toBeDefined();
@@ -499,17 +503,18 @@ describe('ClassBuilder (using AdtClient)', () => {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
 
-          // Cleanup: unlock (always) and delete (if skip_cleanup is false)
-          if (classLocked || classCreated) {
+          // Cleanup: delete (if skip_cleanup is false)
+          // Note: AdtClient automatically handles unlock in update() method, so we only need to delete
+          if (classCreated) {
             try {
               // Delete only if skip_cleanup is false
-              if (!skipCleanup && classCreated) {
+              if (!skipCleanup) {
                 logBuilderTestStep('delete (cleanup)');
                 await client.getClass().delete({
                   className: testClassName!,
                   transportRequest: resolveTransportRequest(testCase.params.transport_request)
                 });
-              } else if (skipCleanup && classCreated) {
+              } else {
                 testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - class left for analysis:', testClassName);
               }
             } catch (cleanupError) {
@@ -561,7 +566,8 @@ describe('ClassBuilder (using AdtClient)', () => {
         logBuilderTestStep('read');
         const result = await client.getClass().read({ className: standardClassName });
         expect(result).toBeDefined();
-        expect(result?.className).toBe(standardClassName);
+        // IClassState doesn't have className directly, check readResult
+        expect(result?.readResult).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'ClassBuilder - read standard object');
       } catch (error) {
@@ -617,7 +623,7 @@ describe('ClassBuilder (using AdtClient)', () => {
 
         const result = await client.getRequest().read({ transportNumber: transportRequest });
         expect(result).toBeDefined();
-        expect(result?.transportNumber).toBe(transportRequest);
+        expect(result?.transportNumber || result?.readResult?.data?.transport_request).toBe(transportRequest);
 
         logBuilderTestSuccess(testsLogger, 'ClassBuilder - read transport request');
       } catch (error) {

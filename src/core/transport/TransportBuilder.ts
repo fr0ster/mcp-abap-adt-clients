@@ -24,7 +24,8 @@
  * ```
  */
 
-import { IAbapConnection, ITransportBuilderConfig } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { ITransportConfig } from './types';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createTransport } from './create';
@@ -34,13 +35,13 @@ import { ICreateTransportParams, ITransportState } from './types';
 export class TransportBuilder {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: ITransportBuilderConfig;
+  private config: ITransportConfig;
   private state: ITransportState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: ITransportBuilderConfig
+    config: ITransportConfig
   ) {
     this.connection = connection;
     this.logger = logger;

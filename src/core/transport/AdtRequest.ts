@@ -19,13 +19,14 @@
  * - Check: not supported (transport requests don't have check operation)
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions, ITransportBuilderConfig } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createTransport } from './create';
 import { getTransport } from './read';
 import { getClassTransport } from '../class/read';
+import { ITransportConfig, ITransportState } from './types';
 
-export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITransportBuilderConfig> {
+export class AdtRequest implements IAdtObject<ITransportConfig, ITransportState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Request';
@@ -39,28 +40,25 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
    * Validate transport request configuration before creation
    * Note: ADT doesn't provide validation endpoint for transport requests
    */
-  async validate(config: Partial<ITransportBuilderConfig>): Promise<ITransportBuilderConfig> {
+  async validate(config: Partial<ITransportConfig>): Promise<ITransportState> {
     if (!config.description) {
       throw new Error('Transport request description is required for validation');
     }
 
     // ADT doesn't provide validation endpoint for transport requests
-    // Return a mock success response
+    // Return empty state
     return {
-      description: config.description,
-      transportType: config.transportType,
-      targetSystem: config.targetSystem,
-      owner: config.owner
-    } as ITransportBuilderConfig;
+      errors: []
+    };
   }
 
   /**
    * Create transport request
    */
   async create(
-    config: ITransportBuilderConfig,
+    config: ITransportConfig,
     options?: IAdtOperationOptions
-  ): Promise<ITransportBuilderConfig> {
+  ): Promise<ITransportState> {
     if (!config.description) {
       throw new Error('Transport request description is required');
     }
@@ -83,10 +81,8 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
       this.logger?.info?.('Transport request created:', transportNumber);
 
       return {
-        description: config.description,
-        transportType: config.transportType,
-        targetSystem: config.targetSystem,
-        owner: config.owner
+        transportNumber,
+        errors: []
       };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Create', error);
@@ -98,9 +94,9 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
    * Read transport request
    */
   async read(
-    config: Partial<ITransportBuilderConfig>,
+    config: Partial<ITransportConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<ITransportBuilderConfig | undefined> {
+  ): Promise<ITransportState | undefined> {
     if (!config.transportNumber) {
       throw new Error('Transport request number is required');
     }
@@ -114,10 +110,8 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
       
       return {
         transportNumber: config.transportNumber,
-        description: data?.description || data?.desc,
-        transportType: data?.type === 'T' ? 'customizing' : 'workbench',
-        targetSystem: data?.target_system || data?.target,
-        owner: data?.owner
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -131,7 +125,7 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
    * Read transport request metadata
    * For transport requests, read() already returns all metadata (description, owner, etc.)
    */
-  async readMetadata(config: Partial<ITransportBuilderConfig>): Promise<ITransportBuilderConfig> {
+  async readMetadata(config: Partial<ITransportConfig>): Promise<ITransportState> {
     // For transport requests, metadata is the same as read() result
     const readResult = await this.read(config);
     if (!readResult) {
@@ -145,9 +139,9 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
    * Note: Transport requests are immutable after creation in ADT
    */
   async update(
-    config: Partial<ITransportBuilderConfig>,
+    config: Partial<ITransportConfig>,
     options?: IAdtOperationOptions
-  ): Promise<ITransportBuilderConfig> {
+  ): Promise<ITransportState> {
     throw new Error('Update operation is not supported for Transport Request objects in ADT');
   }
 
@@ -155,7 +149,7 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
    * Delete transport request
    * Note: Transport requests cannot be deleted via ADT
    */
-  async delete(config: Partial<ITransportBuilderConfig>): Promise<ITransportBuilderConfig> {
+  async delete(config: Partial<ITransportConfig>): Promise<ITransportState> {
     throw new Error('Delete operation is not supported for Transport Request objects in ADT');
   }
 
@@ -163,7 +157,7 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
    * Activate transport request
    * Note: Transport requests are not activated (they are containers for objects)
    */
-  async activate(config: Partial<ITransportBuilderConfig>): Promise<ITransportBuilderConfig> {
+  async activate(config: Partial<ITransportConfig>): Promise<ITransportState> {
     throw new Error('Activate operation is not supported for Transport Request objects in ADT');
   }
 
@@ -172,16 +166,16 @@ export class AdtRequest implements IAdtObject<ITransportBuilderConfig, ITranspor
    * Note: Transport requests don't have check operation
    */
   async check(
-    config: Partial<ITransportBuilderConfig>,
+    config: Partial<ITransportConfig>,
     status?: string
-  ): Promise<ITransportBuilderConfig> {
+  ): Promise<ITransportState> {
     throw new Error('Check operation is not supported for Transport Request objects in ADT');
   }
 
   /**
    * Read transport request information for the class
    */
-  async readTransport(config: Partial<ITransportBuilderConfig>): Promise<ITransportBuilderConfig> {
+  async readTransport(config: Partial<ITransportConfig>): Promise<ITransportState> {
     throw new Error('readTransport operation is not supported for Transport Request objects in ADT');
   }
 }

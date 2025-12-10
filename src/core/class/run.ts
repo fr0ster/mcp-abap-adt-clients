@@ -80,16 +80,16 @@ export async function runClass(
 // =============================================================================
 
 // Re-export interfaces from interfaces package
-export type { 
+export type {
   IClassUnitTestDefinition as ClassUnitTestDefinition,
   IClassUnitTestRunOptions as ClassUnitTestRunOptions
-} from '@mcp-abap-adt/interfaces';
+} from '../unitTest/types';
 
 function boolAttr(value: boolean | undefined, fallback: boolean) {
   return (value ?? fallback) ? 'true' : 'false';
 }
 
-import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from '@mcp-abap-adt/interfaces';
+import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from '../unitTest/types';
 
 export async function startClassUnitTestRun(
   connection: IAbapConnection,

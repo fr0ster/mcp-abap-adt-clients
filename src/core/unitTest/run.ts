@@ -2,7 +2,8 @@
  * ABAP Unit test run operations
  */
 
-import type { IAbapConnection, IClassUnitTestDefinition, IClassUnitTestRunOptions } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from './types';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';

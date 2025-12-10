@@ -11,7 +11,8 @@
 
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { ClassBuilder, ClassBuilderLogger } from '../../core/class';
+import { ClassBuilder } from '../../core/class';
+import { IAdtLogger } from '../../utils/logger';
 
 // Example logger for connection (ILogger interface)
 const connectionLogger: ILogger = {
@@ -19,11 +20,10 @@ const connectionLogger: ILogger = {
   info: (message: string, meta?: any) => console.log(message, meta),
   warn: (message: string, meta?: any) => console.warn(message, meta),
   error: (message: string, meta?: any) => console.error(message, meta),
-  csrfToken: (action: string, token?: string) => console.log(`CSRF ${action}:`, token),
 };
 
 // Example logger for ClassBuilder (ClassBuilderLogger interface)
-const builderLogger: ClassBuilderLogger = {
+const builderLogger: IAdtLogger = {
   debug: console.log,
   info: console.log,
   warn: console.warn,
@@ -57,12 +57,12 @@ async function example1(
     builder.setCode(sourceCode);
   }
 
-  // Promise chain - переривається при першій помилці
+  // Promise chain - interrupted on first error
   await builder
     .validate()
     .then(b => {
-      console.log('Validation result:', b.getValidationResult());
-      return b.create();
+      console.log('Validation result:', (b as any).state.validationResponse);
+      return (b as any).create();
     })
     .then(b => {
       console.log('Create result:', b.getCreateResult()?.status);
@@ -89,11 +89,11 @@ async function example1(
       console.log('All results:', b.getResults());
     })
     .catch(error => {
-      // Обробка помилок - виконується при першій помилці
+      // Error handling - executed on first error
       console.error('Operation failed:', error);
       console.error('Errors in chain:', builder.getErrors());
 
-      // Cleanup при помилці - перевірити чи клас заблокований
+      // Cleanup on error - check if class is locked
       if (builder.getLockHandle()) {
         console.log('Attempting to unlock class after error...');
         builder.unlock().catch(unlockError => {
@@ -102,10 +102,10 @@ async function example1(
       }
     })
     .finally(() => {
-      // Cleanup - завжди виконується, навіть при помилці
+      // Cleanup - always executed, even on error
       console.log('Cleanup: ensuring class is unlocked');
 
-      // Фінальна перевірка та cleanup
+      // Final check and cleanup
       if (builder.getLockHandle()) {
         builder.unlock().catch(console.error);
       }
@@ -141,18 +141,18 @@ async function example2(
   try {
     await builder
       .validate()
-      .then(b => b.create())
+      .then(b => (b as any).create())
       .then(b => b.lock())
       .then(b => b.update())
       .then(b => b.check())
       .then(b => b.unlock())
       .then(b => b.activate());
 
-    // Успішне виконання
+    // Successful execution
     console.log('All operations completed successfully');
     console.log('Final state:', builder.getState());
   } catch (error: any) {
-    // Обробка помилок
+    // Error handling
     if (error.message?.includes('validation')) {
       console.error('Validation error:', error);
     } else if (error.message?.includes('create')) {
@@ -161,11 +161,11 @@ async function example2(
       console.error('Unknown error:', error);
     }
 
-    // Отримати всі помилки з ланцюга
+    // Get all errors from chain
     const errors = builder.getErrors();
     console.error('All errors:', errors);
 
-    // Cleanup при помилці
+    // Cleanup on error
     if (builder.getLockHandle()) {
       try {
         await builder.unlock();
@@ -206,16 +206,16 @@ async function example3(
   await builder
     .validate()
     .then(b => {
-      const validationResult = b.getValidationResult();
+      const validationResult = (b as any).state.validationResponse;
       if (validationResult?.valid) {
-        return b.create();
+        return (b as any).create();
       } else {
         throw new Error(`Validation failed: ${validationResult?.message}`);
       }
     })
     .then(b => b.lock())
     .then(b => {
-      // Умовна логіка
+      // Conditional logic
       if (!skipUpdate) {
         return b.update();
       } else {
@@ -230,7 +230,7 @@ async function example3(
       console.error('Chain interrupted:', error);
     })
     .finally(() => {
-      // Cleanup завжди виконується
+      // Cleanup always executed
       console.log('Cleanup completed');
     });
 }
@@ -263,16 +263,16 @@ async function example4(
 
   await builder
     .validate()
-    .then(b => b.create())
+    .then(b => (b as any).create())
     .then(b => b.lock())
     .then(b => b.update())
     .then(b => b.unlock())
     .then(b => b.activate())
     .then(async (b) => {
-      // Після успішного виконання можна виконати паралельні операції
+      // After successful execution, parallel operations can be performed
       const results = await Promise.all([
         b.check('active'),
-        // Інші операції
+        // Other operations
       ]);
       return b;
     })
