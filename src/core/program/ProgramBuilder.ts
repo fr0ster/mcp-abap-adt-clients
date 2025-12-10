@@ -20,21 +20,21 @@ import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
 import { getProgramSource } from './read';
 import { deleteProgram } from './delete';
-import { ProgramBuilderConfig, ProgramBuilderState, CreateProgramParams } from './types';
+import { IProgramConfig, IProgramState, ICreateProgramParams } from './types';
 import { IBuilder } from '../shared/IBuilder';
 
-export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
+export class ProgramBuilder implements IBuilder<IProgramState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: ProgramBuilderConfig;
+  private config: IProgramConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private state: ProgramBuilderState;
+  private state: IProgramState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: ProgramBuilderConfig
+    config: IProgramConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -116,7 +116,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
         throw new Error('Package name is required');
       }
       this.logger.info?.('Creating program:', this.config.programName);
-      const params: CreateProgramParams = {
+      const params: ICreateProgramParams = {
         programName: this.config.programName,
         packageName: this.config.packageName,
         transportRequest: this.config.transportRequest,
@@ -311,7 +311,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<ProgramBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IProgramConfig | undefined> {
     try {
       this.logger.info?.('Reading program:', this.config.programName);
       const result = await getProgramSource(this.connection, this.config.programName);
@@ -359,7 +359,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
   }
 
   // Getters for accessing results
-  getState(): Readonly<ProgramBuilderState> {
+  getState(): Readonly<IProgramState> {
     return { ...this.state };
   }
 
@@ -403,7 +403,7 @@ export class ProgramBuilder implements IBuilder<ProgramBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): ProgramBuilderConfig | undefined {
+  getReadResult(): IProgramConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

@@ -5,14 +5,14 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
-import { CreatePackageParams } from './types';
+import { ICreatePackageParams } from './types';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
 
 /**
  * Create ABAP package via single ADT POST (no validation or follow-up checks).
  */
-export async function createPackage(connection: IAbapConnection, params: CreatePackageParams): Promise<AxiosResponse> {
+export async function createPackage(connection: IAbapConnection, params: ICreatePackageParams): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('Package name is required');
   }

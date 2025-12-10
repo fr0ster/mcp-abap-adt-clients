@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { UpdateDomainParams } from './types';
+import { IUpdateDomainParams } from './types';
 
 /**
  * Update domain with new data
@@ -15,7 +15,7 @@ import { UpdateDomainParams } from './types';
  */
 export async function updateDomain(
   connection: IAbapConnection,
-  args: UpdateDomainParams,
+  args: IUpdateDomainParams,
   lockHandle: string,
   username: string,
   masterSystem?: string

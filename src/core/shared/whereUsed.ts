@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { GetWhereUsedParams } from './types';
+import { IGetWhereUsedParams } from './types';
 
 /**
  * Build object URI based on type and name
@@ -70,7 +70,7 @@ function buildObjectUri(objectName: string, objectType: string): string {
  */
 export async function getWhereUsed(
   connection: IAbapConnection,
-  params: GetWhereUsedParams
+  params: IGetWhereUsedParams
 ): Promise<AxiosResponse> {
   if (!params.object_name) {
     throw new Error('Object name is required');

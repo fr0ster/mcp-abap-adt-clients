@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { DomainBuilderConfig } from './types';
+import { IDomainConfig, IDomainState } from './types';
 import { validateDomainName } from './validation';
 import { create as createDomain } from './create';
 import { checkDomainSyntax } from './check';
@@ -30,10 +30,11 @@ import { updateDomain } from './update';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { checkDeletion, deleteDomain } from './delete';
-import { getDomain } from './read';
+import { getDomain, getDomainTransport } from './read';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { getClassTransport } from '../class/read';
 
-export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderConfig> {
+export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Domain';
@@ -46,26 +47,31 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
   /**
    * Validate domain configuration before creation
    */
-  async validate(config: Partial<DomainBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IDomainConfig>): Promise<IDomainState> {
     if (!config.domainName) {
       throw new Error('Domain name is required for validation');
     }
 
-    return await validateDomainName(
+    const validationResponse = await validateDomainName(
       this.connection,
       config.domainName,
       config.packageName,
       config.description
     );
+
+    return {
+      validationResponse: validationResponse,
+      errors: []
+    };
   }
 
   /**
    * Create domain with full operation chain
    */
   async create(
-    config: DomainBuilderConfig,
+    config: IDomainConfig,
     options?: IAdtOperationOptions
-  ): Promise<DomainBuilderConfig> {
+  ): Promise<IDomainState> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
     }
@@ -82,21 +88,25 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
     const timeout = options?.timeout || 1000;
+    const state: IDomainState = {
+      errors: []
+    };
 
     try {
       // 1. Validate (no stateful needed)
       this.logger?.info?.('Step 1: Validating domain configuration');
-      await validateDomainName(
+      const validationResponse = await validateDomainName(
         this.connection,
         config.domainName,
         config.packageName,
         config.description
       );
+      state.validationResponse = validationResponse;
       this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
       this.logger?.info?.('Step 2: Creating domain');
-      await createDomain(
+      const createResponse = await createDomain(
         this.connection,
         {
           domain_name: config.domainName,
@@ -115,25 +125,29 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
         username,
         masterSystem
       );
+      state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Domain created');
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created domain');
-      await checkDomainSyntax(this.connection, config.domainName, 'inactive');
+      const checkResponse1 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
+      state.checkResult = checkResponse1;
       this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
       this.logger?.info?.('Step 4: Locking domain');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Domain locked, handle:', lockHandle);
 
       // 5. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
         this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
+        const checkResponse2 = await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
+        state.checkResult = checkResponse2;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -160,13 +174,15 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
           username,
           masterSystem
         );
+        // updateDomain returns void, so we don't store it in state
         this.logger?.info?.('Domain updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 7: Unlocking domain');
-        await unlockDomain(this.connection, config.domainName, lockHandle);
+        const unlockResponse = await unlockDomain(this.connection, config.domainName, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Domain unlocked');
@@ -174,29 +190,23 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
 
       // 8. Final check (no stateful needed)
       this.logger?.info?.('Step 8: Final check');
-      await checkDomainSyntax(this.connection, config.domainName, 'inactive');
+      const checkResponse3 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
+      state.checkResult = checkResponse3;
       this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
         this.logger?.info?.('Step 9: Activating domain');
         const activateResponse = await activateDomain(this.connection, config.domainName);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Domain activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          domainName: config.domainName,
-          packageName: config.packageName
-        };
+      } else {
+        // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
+        const readResponse = await getDomain(this.connection, config.domainName);
+        state.readResult = readResponse;
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getDomain(this.connection, config.domainName);
-      return {
-        domainName: config.domainName,
-        packageName: config.packageName
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -235,9 +245,9 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
    * Read domain
    */
   async read(
-    config: Partial<DomainBuilderConfig>,
+    config: Partial<IDomainConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<DomainBuilderConfig | undefined> {
+  ): Promise<IDomainState | undefined> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
     }
@@ -245,13 +255,47 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
     try {
       const response = await getDomain(this.connection, config.domainName);
       return {
-        domainName: config.domainName
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
         return undefined;
       }
+      logErrorSafely(this.logger, 'Read', error);
       throw error;
+    }
+  }
+
+  /**
+   * Read domain metadata (object characteristics: package, responsible, description, etc.)
+   * For domains, read() already returns metadata since there's no source code.
+   */
+  async readMetadata(config: Partial<IDomainConfig>): Promise<IDomainState> {
+    const state: IDomainState = { errors: [] };
+    if (!config.domainName) {
+      const error = new Error('Domain name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      // For objects without source code, read() already returns metadata
+      const readState = await this.read(config);
+      if (readState) {
+        state.metadataResult = readState.readResult;
+        state.readResult = readState.readResult;
+      } else {
+        const error = new Error(`Domain '${config.domainName}' not found`);
+        state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+        throw error;
+      }
+      this.logger?.info?.('Domain metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
     }
   }
 
@@ -260,9 +304,9 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
    * Always starts with lock
    */
   async update(
-    config: Partial<DomainBuilderConfig>,
+    config: Partial<IDomainConfig>,
     options?: IAdtOperationOptions
-  ): Promise<DomainBuilderConfig> {
+  ): Promise<IDomainState> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
     }
@@ -275,19 +319,24 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
     const timeout = options?.timeout || 1000;
+    const state: IDomainState = {
+      errors: []
+    };
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking domain');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Domain locked, handle:', lockHandle);
 
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
         this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
+        const checkResponse = await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
+        state.checkResult = checkResponse;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -314,13 +363,15 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
           username,
           masterSystem
         );
+        // updateDomain returns void, so we don't store it in state
         this.logger?.info?.('Domain updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking domain');
-        await unlockDomain(this.connection, config.domainName, lockHandle);
+        const unlockResponse = await unlockDomain(this.connection, config.domainName, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Domain unlocked');
@@ -328,27 +379,23 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkDomainSyntax(this.connection, config.domainName, 'inactive');
+      const checkResponse2 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
+      state.checkResult = checkResponse2;
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating domain');
         const activateResponse = await activateDomain(this.connection, config.domainName);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Domain activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          domainName: config.domainName
-        };
+      } else {
+        // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
+        const readResponse = await getDomain(this.connection, config.domainName);
+        state.readResult = readResponse;
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getDomain(this.connection, config.domainName);
-      return {
-        domainName: config.domainName
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -386,29 +433,35 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
   /**
    * Delete domain
    */
-  async delete(config: Partial<DomainBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IDomainConfig>): Promise<IDomainState> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
     }
 
+    const state: IDomainState = {
+      errors: []
+    };
+
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking domain for deletion');
-      await checkDeletion(this.connection, {
+      const checkResponse = await checkDeletion(this.connection, {
         domain_name: config.domainName,
         transport_request: config.transportRequest
       });
+      state.checkResult = checkResponse;
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
       this.logger?.info?.('Deleting domain');
-      const result = await deleteDomain(this.connection, {
+      const deleteResponse = await deleteDomain(this.connection, {
         domain_name: config.domainName,
         transport_request: config.transportRequest
       });
+      state.deleteResult = deleteResponse;
       this.logger?.info?.('Domain deleted');
 
-      return result;
+      return state;
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -419,14 +472,19 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
    * Activate domain
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<DomainBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IDomainConfig>): Promise<IDomainState> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
     }
 
+    const state: IDomainState = {
+      errors: []
+    };
+
     try {
-      const result = await activateDomain(this.connection, config.domainName);
-      return result;
+      const activateResponse = await activateDomain(this.connection, config.domainName);
+      state.activateResult = activateResponse;
+      return state;
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -437,15 +495,56 @@ export class AdtDomain implements IAdtObject<DomainBuilderConfig, DomainBuilderC
    * Check domain
    */
   async check(
-    config: Partial<DomainBuilderConfig>,
+    config: Partial<IDomainConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IDomainState> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
     }
 
+    const state: IDomainState = {
+      errors: []
+    };
+
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkDomainSyntax(this.connection, config.domainName, version);
+    const checkResponse = await checkDomainSyntax(this.connection, config.domainName, version);
+    state.checkResult = checkResponse;
+    return state;
+  }
+
+  /**
+   * Read transport request information for the domain
+   */
+  async readTransport(config: Partial<IDomainConfig>): Promise<IDomainState> {
+    const state: IDomainState = {
+      errors: []
+    };
+
+    if (!config.domainName) {
+      const error = new Error('Domain name is required');
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date()
+      });
+      throw error;
+    }
+
+    try {
+      const response = await getDomainTransport(this.connection, config.domainName);
+      state.transportResult = response;
+      this.logger?.info?.('Transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date()
+      });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
   }
 }

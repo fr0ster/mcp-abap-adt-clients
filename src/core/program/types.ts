@@ -2,10 +2,10 @@
  * Program module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
-export interface CreateProgramParams {
+export interface ICreateProgramParams {
   programName: string;
   description?: string;
   packageName: string;
@@ -18,13 +18,13 @@ export interface CreateProgramParams {
   activate?: boolean;
 }
 
-export interface UpdateProgramSourceParams {
+export interface IUpdateProgramSourceParams {
   programName: string;
   sourceCode: string;
   activate?: boolean;
 }
 
-export interface DeleteProgramParams {
+export interface IDeleteProgramParams {
   programName: string;
   transportRequest?: string;
 }
@@ -32,7 +32,7 @@ export interface DeleteProgramParams {
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface ProgramBuilderConfig {
+export interface IProgramConfig {
   programName: string;
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -44,7 +44,9 @@ export interface ProgramBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface ProgramBuilderState extends BaseBuilderState {
+export interface IProgramState extends IAdtObjectState {
   runResult?: any; // Program-specific: result of program execution
-  // Other fields inherited from BaseBuilderState
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
 }

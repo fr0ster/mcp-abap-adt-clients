@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { ViewBuilderConfig } from './types';
+import { IViewConfig, IViewState } from './types';
 import { validateViewName } from './validation';
 import { createView } from './create';
 import { checkView } from './check';
@@ -30,9 +30,9 @@ import { updateView } from './update';
 import { unlockDDLS } from './unlock';
 import { activateDDLS } from './activation';
 import { checkDeletion, deleteView } from './delete';
-import { getViewSource } from './read';
+import { getViewSource, getViewMetadata, getViewTransport } from './read';
 
-export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig> {
+export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'View';
@@ -45,26 +45,35 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
   /**
    * Validate view configuration before creation
    */
-  async validate(config: Partial<ViewBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IViewConfig>): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required for validation');
     }
 
-    return await validateViewName(
+    const state: IViewState = { errors: [] };
+    try {
+      const response = await validateViewName(
       this.connection,
       config.viewName,
       config.packageName,
       config.description
     );
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+    logErrorSafely(this.logger, 'validate', err);
+    throw err;
   }
+  return state;
+}
 
   /**
    * Create view with full operation chain
    */
   async create(
-    config: ViewBuilderConfig,
+    config: IViewConfig,
     options?: IAdtOperationOptions
-  ): Promise<ViewBuilderConfig> {
+  ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
@@ -156,8 +165,8 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          viewName: config.viewName,
-          packageName: config.packageName
+          readResult: activateResponse,
+          errors: []
         };
       }
 
@@ -168,9 +177,8 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
         : JSON.stringify(readResponse.data);
 
       return {
-        viewName: config.viewName,
-        packageName: config.packageName,
-        ddlSource
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -210,22 +218,18 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
    * Read view
    */
   async read(
-    config: Partial<ViewBuilderConfig>,
+    config: Partial<IViewConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<ViewBuilderConfig | undefined> {
+  ): Promise<IViewState | undefined> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
 
     try {
       const response = await getViewSource(this.connection, config.viewName);
-      const ddlSource = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
       return {
-        viewName: config.viewName,
-        ddlSource
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -236,13 +240,59 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
   }
 
   /**
+   * Read view metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IViewConfig>): Promise<IViewState> {
+    const state: IViewState = { errors: [] };
+    if (!config.viewName) {
+      const error = new Error('View name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getViewMetadata(this.connection, config.viewName);
+      state.metadataResult = response;
+      this.logger?.info?.('View metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the view
+   */
+  async readTransport(config: Partial<IViewConfig>): Promise<IViewState> {
+    const state: IViewState = { errors: [] };
+    if (!config.viewName) {
+      const error = new Error('View name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getViewTransport(this.connection, config.viewName);
+      state.transportResult = response;
+      this.logger?.info?.('View transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
+  }
+
+  /**
    * Update view with full operation chain
    * Always starts with lock
    */
   async update(
-    config: Partial<ViewBuilderConfig>,
+    config: Partial<IViewConfig>,
     options?: IAdtOperationOptions
-  ): Promise<ViewBuilderConfig> {
+  ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
@@ -300,7 +350,8 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          viewName: config.viewName
+          readResult: activateResponse,
+          errors: []
         };
       }
 
@@ -311,8 +362,8 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
         : JSON.stringify(readResponse.data);
 
       return {
-        viewName: config.viewName,
-        ddlSource
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -351,7 +402,7 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
   /**
    * Delete view
    */
-  async delete(config: Partial<ViewBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IViewConfig>): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
@@ -373,7 +424,10 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
       });
       this.logger?.info?.('View deleted');
 
-      return result;
+      return {
+        deleteResult: result,
+        errors: []
+      };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -384,14 +438,17 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
    * Activate view
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<ViewBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IViewConfig>): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
 
     try {
       const result = await activateDDLS(this.connection, config.viewName);
-      return result;
+      return {
+        activateResult: result,
+        errors: []
+      };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -402,15 +459,18 @@ export class AdtView implements IAdtObject<ViewBuilderConfig, ViewBuilderConfig>
    * Check view
    */
   async check(
-    config: Partial<ViewBuilderConfig>,
+    config: Partial<IViewConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
 
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkView(this.connection, config.viewName, version);
+    return {
+      checkResult: await checkView(this.connection, config.viewName, version),
+      errors: []
+    };
   }
 }

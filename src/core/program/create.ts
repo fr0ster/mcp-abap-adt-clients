@@ -10,7 +10,7 @@ import { lockProgram } from './lock';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { CreateProgramParams } from './types';
+import { ICreateProgramParams } from './types';
 
 /**
  * Convert readable program type to SAP internal code
@@ -73,7 +73,7 @@ START-OF-SELECTION.
  */
 export async function create(
   connection: IAbapConnection,
-  args: CreateProgramParams
+  args: ICreateProgramParams
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.programName);

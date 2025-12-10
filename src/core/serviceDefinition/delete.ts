@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteServiceDefinitionParams } from './types';
+import { IDeleteServiceDefinitionParams } from './types';
 
 /**
  * Low-level: Check if service definition can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteServiceDefinitionParams
+  params: IDeleteServiceDefinitionParams
 ): Promise<AxiosResponse> {
   const { service_definition_name } = params;
 
@@ -50,7 +50,7 @@ export async function checkDeletion(
  */
 export async function deleteServiceDefinition(
   connection: IAbapConnection,
-  params: DeleteServiceDefinitionParams
+  params: IDeleteServiceDefinitionParams
 ): Promise<AxiosResponse> {
   const { service_definition_name, transport_request } = params;
 

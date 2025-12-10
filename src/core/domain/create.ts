@@ -12,7 +12,7 @@ import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { CreateDomainParams } from './types';
+import { ICreateDomainParams } from './types';
 
 /**
  * Create empty domain (initial POST to register the name)
@@ -22,7 +22,7 @@ import { CreateDomainParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
-  args: CreateDomainParams,
+  args: ICreateDomainParams,
   username: string,
   masterSystem?: string
 ): Promise<AxiosResponse> {

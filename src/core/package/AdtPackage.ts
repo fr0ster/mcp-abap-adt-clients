@@ -24,7 +24,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { PackageBuilderConfig } from './types';
+import { IPackageConfig, IPackageState } from './types';
 import { validatePackageBasic } from './validation';
 import { createPackage } from './create';
 import { checkPackage } from './check';
@@ -32,23 +32,23 @@ import { lockPackage } from './lock';
 import { updatePackage } from './update';
 import { unlockPackage } from './unlock';
 import { checkPackageDeletion, deletePackage } from './delete';
-import { getPackage } from './read';
+import { getPackage, getPackageTransport } from './read';
 import { getSystemInformation } from '../../utils/systemInfo';
 
-export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuilderConfig> {
+export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Package';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
-    this.connection = connection;
-    this.logger = logger;
-  }
+    constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+      this.connection = connection;
+      this.logger = logger;
+    }
 
   /**
    * Validate package configuration before creation
    */
-  async validate(config: Partial<PackageBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IPackageConfig>): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required for validation');
     }
@@ -56,7 +56,7 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
       throw new Error('Super package is required for validation');
     }
 
-    return await validatePackageBasic(
+    const response = await validatePackageBasic(
       this.connection,
       {
         package_name: config.packageName,
@@ -70,6 +70,11 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
         responsible: config.responsible
       }
     );
+    
+    return {
+      validationResponse: response,
+      errors: []
+    };
   }
 
   /**
@@ -77,9 +82,9 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
    * Note: Packages are containers, so no source code update after create
    */
   async create(
-    config: PackageBuilderConfig,
+    config: IPackageConfig,
     options?: IAdtOperationOptions
-  ): Promise<PackageBuilderConfig> {
+  ): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -141,8 +146,8 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
       // Read and return result (no stateful needed)
       const readResponse = await getPackage(this.connection, config.packageName);
       return {
-        packageName: config.packageName,
-        superPackage: config.superPackage
+        createResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Ensure stateless if needed
@@ -170,9 +175,9 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
    * Read package
    */
   async read(
-    config: Partial<PackageBuilderConfig>,
+    config: Partial<IPackageConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<PackageBuilderConfig | undefined> {
+  ): Promise<IPackageState | undefined> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -180,7 +185,8 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
     try {
       const response = await getPackage(this.connection, config.packageName, version);
       return {
-        packageName: config.packageName
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -191,14 +197,63 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
   }
 
   /**
+   * Read package metadata (object characteristics: package, responsible, description, etc.)
+   * For packages, read() already returns metadata since there's no source code.
+   */
+  async readMetadata(config: Partial<IPackageConfig>): Promise<IPackageState> {
+    const state: IPackageState = { errors: [] };
+    if (!config.packageName) {
+      const error = new Error('Package name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      // For objects without source code, read() already returns metadata
+      const response = await getPackage(this.connection, config.packageName);
+      state.metadataResult = response;
+      state.readResult = response;
+      this.logger?.info?.('Package metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the package
+   */
+  async readTransport(config: Partial<IPackageConfig>): Promise<IPackageState> {
+    const state: IPackageState = { errors: [] };
+    if (!config.packageName) {
+      const error = new Error('Package name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getPackageTransport(this.connection, config.packageName);
+      state.transportResult = response;
+      this.logger?.info?.('Package transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
+  }
+
+  /**
    * Update package with full operation chain
    * Always starts with lock
    * Note: Packages only support metadata updates (description, superPackage, etc.)
    */
   async update(
-    config: Partial<PackageBuilderConfig>,
+    config: Partial<IPackageConfig>,
     options?: IAdtOperationOptions
-  ): Promise<PackageBuilderConfig> {
+  ): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -267,7 +322,8 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
       // Read and return result (no stateful needed)
       const readResponse = await getPackage(this.connection, config.packageName);
       return {
-        packageName: config.packageName
+        updateResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -306,7 +362,7 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
   /**
    * Delete package
    */
-  async delete(config: Partial<PackageBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IPackageConfig>): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
@@ -328,7 +384,7 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
       });
       this.logger?.info?.('Package deleted');
 
-      return result;
+      return { deleteResult: result, errors: [] };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -339,7 +395,7 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
    * Activate package
    * Note: Packages don't have activate operation - this is a stub
    */
-  async activate(config: Partial<PackageBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IPackageConfig>): Promise<IPackageState> {
     throw new Error('Activate operation is not supported for Package objects in ADT');
   }
 
@@ -347,15 +403,18 @@ export class AdtPackage implements IAdtObject<PackageBuilderConfig, PackageBuild
    * Check package
    */
   async check(
-    config: Partial<PackageBuilderConfig>,
+    config: Partial<IPackageConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
 
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkPackage(this.connection, config.packageName, version);
+    return {
+      checkResult: await checkPackage(this.connection, config.packageName, version),
+      errors: []
+    };
   }
 }

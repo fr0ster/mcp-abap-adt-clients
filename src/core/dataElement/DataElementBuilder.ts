@@ -16,27 +16,27 @@ import { create } from './create';
 import { getDataElement } from './read';
 import { lockDataElement } from './lock';
 import { updateDataElementInternal } from './update';
-import { CreateDataElementParams, UpdateDataElementParams } from './types';
+import { ICreateDataElementParams, IUpdateDataElementParams } from './types';
 import { checkDataElement } from './check';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { deleteDataElement } from './delete';
 import { validateDataElementName } from './validation';
-import { DataElementBuilderConfig, DataElementBuilderState } from './types';
+import { IDataElementConfig, IDataElementState } from './types';
 import { IBuilder } from '../shared/IBuilder';
 import { XMLParser } from 'fast-xml-parser';
 
-export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
+export class DataElementBuilder implements IBuilder<IDataElementState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: DataElementBuilderConfig;
+  private config: IDataElementConfig;
   private lockHandle?: string;
-  private state: DataElementBuilderState;
+  private state: IDataElementState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: DataElementBuilderConfig
+    config: IDataElementConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -172,7 +172,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
     }
   }
 
-  async read(): Promise<DataElementBuilderConfig | undefined> {
+  async read(): Promise<IDataElementConfig | undefined> {
     try {
       this.logger.info?.('Reading data element:', this.config.dataElementName);
       const result = await getDataElement(this.connection, this.config.dataElementName);
@@ -230,7 +230,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
       }
 
       this.logger.info?.('Creating data element:', this.config.dataElementName);
-      const params: CreateDataElementParams = {
+      const params: ICreateDataElementParams = {
         data_element_name: this.config.dataElementName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -324,7 +324,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
 
       const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
-      const params: UpdateDataElementParams = {
+      const params: IUpdateDataElementParams = {
         data_element_name: this.config.dataElementName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -503,7 +503,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
   }
 
   // Getters for accessing results
-  getState(): Readonly<DataElementBuilderState> {
+  getState(): Readonly<IDataElementState> {
     return { ...this.state };
   }
 
@@ -522,7 +522,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
   /**
    * Parse XML response to DataElementBuilderConfig
    */
-  private parseDataElementXml(xmlData: string): DataElementBuilderConfig | undefined {
+  private parseDataElementXml(xmlData: string): IDataElementConfig | undefined {
     try {
       const parser = new XMLParser({
         ignoreAttributes: false,
@@ -540,9 +540,9 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
       const packageRef = wbobj['adtcore:packageRef'] || wbobj['packageRef'];
 
       // Determine typeKind from XML structure
-      let typeKind: DataElementBuilderConfig['typeKind'] | undefined;
+      let typeKind: IDataElementConfig['typeKind'] | undefined;
       if (dtel['dtel:typeKind']) {
-        typeKind = dtel['dtel:typeKind'] as DataElementBuilderConfig['typeKind'];
+        typeKind = dtel['dtel:typeKind'] as IDataElementConfig['typeKind'];
       } else if (dtel['dtel:typeName']) {
         // If typeName exists, it's likely a domain or reference type
         typeKind = 'domain'; // Default assumption
@@ -568,7 +568,7 @@ export class DataElementBuilder implements IBuilder<DataElementBuilderState> {
     }
   }
 
-  getReadResult(): DataElementBuilderConfig | undefined {
+  getReadResult(): IDataElementConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

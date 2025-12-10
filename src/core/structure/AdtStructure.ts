@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { StructureBuilderConfig } from './types';
+import { IStructureConfig, IStructureState } from './types';
 import { validateStructureName } from './validation';
 import { create as createStructure } from './create';
 import { checkStructure } from './check';
@@ -30,9 +30,9 @@ import { upload } from './update';
 import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
 import { checkDeletion, deleteStructure } from './delete';
-import { getStructureSource } from './read';
+import { getStructureSource, getStructureMetadata, getStructureTransport } from './read';
 
-export class AdtStructure implements IAdtObject<StructureBuilderConfig, StructureBuilderConfig> {
+export class AdtStructure implements IAdtObject<IStructureConfig, IStructureState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Structure';
@@ -45,25 +45,34 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
   /**
    * Validate structure configuration before creation
    */
-  async validate(config: Partial<StructureBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IStructureConfig>): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required for validation');
     }
 
-    return await validateStructureName(
+    const state: IStructureState = { errors: [] };
+    try {
+      const response = await validateStructureName(
       this.connection,
       config.structureName,
       config.description
     );
+    state.validationResponse = response;
+    return state;
+  } catch (error: any) {
+    state.errors.push({ method: 'validate', error: error instanceof Error ? error : new Error(String(error)), timestamp: new Date() });
+    logErrorSafely(this.logger, 'validate', error);
+    throw error;
+  }
   }
 
   /**
    * Create structure with full operation chain
    */
   async create(
-    config: StructureBuilderConfig,
+    config: IStructureConfig,
     options?: IAdtOperationOptions
-  ): Promise<StructureBuilderConfig> {
+  ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
@@ -155,21 +164,16 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          structureName: config.structureName,
-          packageName: config.packageName
+          createResult: activateResponse,
+          errors: []
         };
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getStructureSource(this.connection, config.structureName);
-      const ddlCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
       return {
-        structureName: config.structureName,
-        packageName: config.packageName,
-        ddlCode
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -209,22 +213,18 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
    * Read structure
    */
   async read(
-    config: Partial<StructureBuilderConfig>,
+    config: Partial<IStructureConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<StructureBuilderConfig | undefined> {
+  ): Promise<IStructureState | undefined> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
 
     try {
       const response = await getStructureSource(this.connection, config.structureName);
-      const ddlCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
       return {
-        structureName: config.structureName,
-        ddlCode
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -235,13 +235,59 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
   }
 
   /**
+   * Read structure metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IStructureConfig>): Promise<IStructureState> {
+    const state: IStructureState = { errors: [] };
+    if (!config.structureName) {
+      const error = new Error('Structure name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getStructureMetadata(this.connection, config.structureName);
+      state.metadataResult = response;
+      this.logger?.info?.('Structure metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the structure
+   */
+  async readTransport(config: Partial<IStructureConfig>): Promise<IStructureState> {
+    const state: IStructureState = { errors: [] };
+    if (!config.structureName) {
+      const error = new Error('Structure name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getStructureTransport(this.connection, config.structureName);
+      state.transportResult = response;
+      this.logger?.info?.('Structure transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
+  }
+
+  /**
    * Update structure with full operation chain
    * Always starts with lock
    */
   async update(
-    config: Partial<StructureBuilderConfig>,
+    config: Partial<IStructureConfig>,
     options?: IAdtOperationOptions
-  ): Promise<StructureBuilderConfig> {
+  ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
@@ -301,19 +347,16 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          structureName: config.structureName
+          activateResult: activateResponse,
+          errors: []
         };
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getStructureSource(this.connection, config.structureName);
-      const ddlCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
       return {
-        structureName: config.structureName,
-        ddlCode
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -352,7 +395,7 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
   /**
    * Delete structure
    */
-  async delete(config: Partial<StructureBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IStructureConfig>): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
@@ -374,7 +417,10 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
       });
       this.logger?.info?.('Structure deleted');
 
-      return result;
+      return {
+        deleteResult: result,
+        errors: []
+      };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -385,14 +431,17 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
    * Activate structure
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<StructureBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IStructureConfig>): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
 
     try {
       const result = await activateStructure(this.connection, config.structureName);
-      return result;
+      return {
+        activateResult: result,
+        errors: []
+      };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -403,15 +452,18 @@ export class AdtStructure implements IAdtObject<StructureBuilderConfig, Structur
    * Check structure
    */
   async check(
-    config: Partial<StructureBuilderConfig>,
+    config: Partial<IStructureConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
 
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkStructure(this.connection, config.structureName, version);
+    return {
+      checkResult: await checkStructure(this.connection, config.structureName, version),
+      errors: []
+    };
   }
 }

@@ -8,7 +8,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
-import { CreateStructureParams } from './types';
+import { ICreateStructureParams } from './types';
 
 /**
  * Create empty structure metadata via POST
@@ -16,7 +16,7 @@ import { CreateStructureParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
-  params: CreateStructureParams
+  params: ICreateStructureParams
 ): Promise<AxiosResponse> {
   const createUrl = `/sap/bc/adt/ddic/structures${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 

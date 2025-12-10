@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { CreateTableParams } from './types';
+import { ICreateTableParams } from './types';
 import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
@@ -16,7 +16,7 @@ import { getSystemInformation } from '../../utils/systemInfo';
  */
 export async function createTable(
   connection: IAbapConnection,
-  params: CreateTableParams
+  params: ICreateTableParams
 ): Promise<AxiosResponse> {
   if (!params.table_name) {
     throw new Error('Table name is required');

@@ -40,20 +40,20 @@ import { unlockDDLS } from './unlock';
 import { activateDDLS } from './activation';
 import { deleteView } from './delete';
 import { validateViewName } from './validation';
-import { CreateViewParams, UpdateViewSourceParams, ViewBuilderConfig, ViewBuilderState } from './types';
+import { ICreateViewParams, IUpdateViewSourceParams, IViewConfig, IViewState } from './types';
 import { getViewSource } from './read';
 
 export class ViewBuilder {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: ViewBuilderConfig;
+  private config: IViewConfig;
   private lockHandle?: string;
-  private state: ViewBuilderState;
+  private state: IViewState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: ViewBuilderConfig
+    config: IViewConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -144,7 +144,7 @@ export class ViewBuilder {
       // Enable stateful session mode for create operation
       this.connection.setSessionType("stateful");
       
-      const params: CreateViewParams = {
+      const params: ICreateViewParams = {
         view_name: this.config.viewName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -334,7 +334,7 @@ export class ViewBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<ViewBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IViewConfig | undefined> {
     try {
       this.logger.info?.('Reading view:', this.config.viewName);
       const result = await getViewSource(this.connection, this.config.viewName);
@@ -382,7 +382,7 @@ export class ViewBuilder {
   }
 
   // Getters for accessing results
-  getState(): Readonly<ViewBuilderState> {
+  getState(): Readonly<IViewState> {
     return { ...this.state };
   }
 
@@ -427,7 +427,7 @@ export class ViewBuilder {
     return this.state.deleteResult;
   }
 
-  getReadResult(): ViewBuilderConfig | undefined {
+  getReadResult(): IViewConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

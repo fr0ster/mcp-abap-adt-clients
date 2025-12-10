@@ -8,7 +8,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { IAdtLogger } from '../../utils/logger';
 import { ClassBuilder } from '../class/ClassBuilder';
-import { ClassBuilderConfig } from '../class/types';
+import { IClassBuilderConfig } from '../class';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { updateClassTestInclude } from '../class/testclasses';
 import {
@@ -17,7 +17,7 @@ import {
   getClassUnitTestStatus,
   getClassUnitTestResult
 } from './run';
-import { UnitTestBuilderState, ClassUnitTestDefinition, ClassUnitTestRunOptions } from './types';
+import { IUnitTestState, ClassUnitTestDefinition, ClassUnitTestRunOptions } from './types';
 
 /**
  * Base class for unit test builders
@@ -27,12 +27,12 @@ import { UnitTestBuilderState, ClassUnitTestDefinition, ClassUnitTestRunOptions 
  * but not exported from index.ts (not part of public API)
  */
 export abstract class BaseUnitTestBuilder extends ClassBuilder {
-  protected unitTestState: UnitTestBuilderState;
+  protected unitTestState: IUnitTestState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: ClassBuilderConfig
+    config: IClassBuilderConfig
   ) {
     super(connection, logger, config);
     this.unitTestState = {
@@ -43,7 +43,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
   /**
    * Override read() to read test class (local class) source
    */
-  async read(version: 'active' | 'inactive' = 'active'): Promise<ClassBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IClassBuilderConfig | undefined> {
     try {
       this.logger.info?.('Reading test class source:', this.config.className, 'version:', version);
       const encodedName = encodeSapObjectName(this.config.className).toLowerCase();
@@ -273,7 +273,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
   }
 
   // Getters
-  getUnitTestState(): Readonly<UnitTestBuilderState> {
+  getUnitTestState(): Readonly<IUnitTestState> {
     return { ...this.unitTestState };
   }
 

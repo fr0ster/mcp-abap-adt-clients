@@ -9,7 +9,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { activateFunctionGroup } from './activation';
-import { CreateFunctionGroupParams } from './types';
+import { ICreateFunctionGroupParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 const logger = {
@@ -23,7 +23,7 @@ const logger = {
  */
 export async function create(
   connection: IAbapConnection,
-  params: CreateFunctionGroupParams
+  params: ICreateFunctionGroupParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 

@@ -49,3 +49,26 @@ export async function getServiceDefinitionSource(
   });
 }
 
+/**
+ * Get transport request for ABAP service definition
+ * @param connection - SAP connection
+ * @param serviceDefinitionName - Service definition name
+ * @returns Transport request information
+ */
+export async function getServiceDefinitionTransport(
+  connection: IAbapConnection,
+  serviceDefinitionName: string
+): Promise<AxiosResponse> {
+  const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
+  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/transport`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    }
+  });
+}
+

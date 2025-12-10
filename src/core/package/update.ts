@@ -6,13 +6,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { CreatePackageParams } from './types';
+import { ICreatePackageParams } from './types';
 
 /**
  * Build XML for package update (similar to create)
  * Note: masterSystem and responsible should only be included for cloud systems
  */
-async function buildUpdatePackageXml(connection: IAbapConnection, args: CreatePackageParams): Promise<string> {
+async function buildUpdatePackageXml(connection: IAbapConnection, args: ICreatePackageParams): Promise<string> {
   const { getSystemInformation } = await import('../../utils/systemInfo');
   
   // Get system information - only for cloud systems
@@ -63,7 +63,7 @@ async function buildUpdatePackageXml(connection: IAbapConnection, args: CreatePa
 </pak:package>`;
 }
 
-export interface UpdatePackageParams extends CreatePackageParams {
+export interface UpdatePackageParams extends ICreatePackageParams {
   package_name: string;
 }
 

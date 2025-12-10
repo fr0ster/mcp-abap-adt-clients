@@ -16,27 +16,27 @@ import { create } from './create';
 import { getServiceDefinition, getServiceDefinitionSource } from './read';
 import { lockServiceDefinition } from './lock';
 import { updateServiceDefinition } from './update';
-import { CreateServiceDefinitionParams, UpdateServiceDefinitionParams } from './types';
+import { ICreateServiceDefinitionParams, IUpdateServiceDefinitionParams } from './types';
 import { checkServiceDefinition } from './check';
 import { unlockServiceDefinition } from './unlock';
 import { activateServiceDefinition } from './activation';
 import { deleteServiceDefinition } from './delete';
 import { validateServiceDefinitionName } from './validation';
-import { ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderState } from './types';
+import { IServiceDefinitionConfig, IServiceDefinitionState } from './types';
 import { IBuilder } from '../shared/IBuilder';
 import { XMLParser } from 'fast-xml-parser';
 
-export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuilderState> {
+export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: ServiceDefinitionBuilderConfig;
+  private config: IServiceDefinitionConfig;
   private lockHandle?: string;
-  private state: ServiceDefinitionBuilderState;
+  private state: IServiceDefinitionState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: ServiceDefinitionBuilderConfig
+    config: IServiceDefinitionConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -131,7 +131,7 @@ export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuild
     }
   }
 
-  async read(): Promise<ServiceDefinitionBuilderConfig | undefined> {
+  async read(): Promise<IServiceDefinitionConfig | undefined> {
     try {
       this.logger.info?.('Reading service definition:', this.config.serviceDefinitionName);
       const result = await getServiceDefinition(this.connection, this.config.serviceDefinitionName);
@@ -183,7 +183,7 @@ export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuild
         throw new Error('Package name is required');
       }
       this.logger.info?.('Creating service definition:', this.config.serviceDefinitionName);
-      const params: CreateServiceDefinitionParams = {
+      const params: ICreateServiceDefinitionParams = {
         service_definition_name: this.config.serviceDefinitionName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -240,7 +240,7 @@ export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuild
       }
       this.logger.info?.('Updating service definition:', this.config.serviceDefinitionName);
 
-      const params: UpdateServiceDefinitionParams = {
+      const params: IUpdateServiceDefinitionParams = {
         service_definition_name: this.config.serviceDefinitionName,
         source_code: this.config.sourceCode,
         transport_request: this.config.transportRequest
@@ -386,7 +386,7 @@ export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuild
   }
 
   // Getters for accessing results
-  getState(): Readonly<ServiceDefinitionBuilderState> {
+  getState(): Readonly<IServiceDefinitionState> {
     return { ...this.state };
   }
 
@@ -405,7 +405,7 @@ export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuild
   /**
    * Parse XML response to ServiceDefinitionBuilderConfig
    */
-  private parseServiceDefinitionXml(xmlData: string): ServiceDefinitionBuilderConfig | undefined {
+  private parseServiceDefinitionXml(xmlData: string): IServiceDefinitionConfig | undefined {
     try {
       const parser = new XMLParser({
         ignoreAttributes: false,
@@ -433,7 +433,7 @@ export class ServiceDefinitionBuilder implements IBuilder<ServiceDefinitionBuild
     }
   }
 
-  getReadResult(): ServiceDefinitionBuilderConfig | undefined {
+  getReadResult(): IServiceDefinitionConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

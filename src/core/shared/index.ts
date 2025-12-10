@@ -4,12 +4,12 @@
 
 export { SharedBuilder } from './SharedBuilder';
 export type { 
-  ObjectReference,
-  InactiveObjectsResponse,
-  SearchObjectsParams,
-  GetSqlQueryParams,
-  GetTableContentsParams,
-  GetWhereUsedParams
+  IObjectReference as ObjectReference,
+  IInactiveObjectsResponse as InactiveObjectsResponse,
+  ISearchObjectsParams as SearchObjectsParams,
+  IGetSqlQueryParams as GetSqlQueryParams,
+  IGetTableContentsParams as GetTableContentsParams,
+  IGetWhereUsedParams as GetWhereUsedParams
 } from './types';
 
 // Error classes for unsupported operations

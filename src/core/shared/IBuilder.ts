@@ -4,45 +4,46 @@
  */
 
 import { AxiosResponse } from 'axios';
-import type { DomainBuilderConfig } from '../domain/types';
-import type { ClassBuilderConfig } from '../class/types';
-import type { InterfaceBuilderConfig } from '../interface/types';
-import type { ProgramBuilderConfig } from '../program/types';
-import type { DataElementBuilderConfig } from '../dataElement/types';
-import type { StructureBuilderConfig } from '../structure/types';
-import type { TableBuilderConfig } from '../table/types';
-import type { ViewBuilderConfig } from '../view/types';
-import type { FunctionModuleBuilderConfig } from '../functionModule/types';
-import type { FunctionGroupBuilderConfig } from '../functionGroup/types';
-import type { PackageBuilderConfig } from '../package/types';
-import type { BehaviorDefinitionBuilderConfig } from '../behaviorDefinition/types';
-import type { MetadataExtensionBuilderConfig } from '../metadataExtension/types';
-import type { ServiceDefinitionBuilderConfig } from '../serviceDefinition/types';
+import type { IAdtObjectState, IAdtObjectConfig } from '@mcp-abap-adt/interfaces';
+import type { IDomainConfig } from '../domain/types';
+import type { IClassConfig } from '../class/types';
+import type { IInterfaceConfig } from '../interface/types';
+import type { IProgramConfig } from '../program/types';
+import type { IDataElementConfig } from '../dataElement/types';
+import type { IStructureConfig } from '../structure/types';
+import type { ITableConfig } from '../table/types';
+import type { IViewConfig } from '../view/types';
+import type { IFunctionModuleConfig } from '../functionModule/types';
+import type { IFunctionGroupConfig } from '../functionGroup/types';
+import type { IPackageConfig } from '../package/types';
+import type { IBehaviorDefinitionConfig } from '../behaviorDefinition/types';
+import type { IMetadataExtensionConfig } from '../metadataExtension/types';
+import type { IServiceDefinitionConfig } from '../serviceDefinition/types';
 
 /**
  * Union type of all BuilderConfig types that can be returned by read() methods
  */
 export type BuilderConfigUnion =
-  | DomainBuilderConfig
-  | ClassBuilderConfig
-  | InterfaceBuilderConfig
-  | ProgramBuilderConfig
-  | DataElementBuilderConfig
-  | StructureBuilderConfig
-  | TableBuilderConfig
-  | ViewBuilderConfig
-  | FunctionModuleBuilderConfig
-  | FunctionGroupBuilderConfig
-  | PackageBuilderConfig
-  | BehaviorDefinitionBuilderConfig
-  | MetadataExtensionBuilderConfig
-  | ServiceDefinitionBuilderConfig
+  | IDomainConfig
+  | IClassConfig
+  | IInterfaceConfig
+  | IProgramConfig
+  | IDataElementConfig
+  | IStructureConfig
+  | ITableConfig
+  | IViewConfig
+  | IFunctionModuleConfig
+  | IFunctionGroupConfig
+  | IPackageConfig
+  | IBehaviorDefinitionConfig
+  | IMetadataExtensionConfig
+  | IServiceDefinitionConfig
   | undefined;
 
 /**
  * Base state interface that all Builder states should extend
  */
-export interface BaseBuilderState {
+export interface IAdtBaseState {
   validationResponse?: AxiosResponse;
   createResult?: AxiosResponse;
   lockHandle?: string;
@@ -60,7 +61,7 @@ export interface BaseBuilderState {
  * All builders must implement these methods
  * If an endpoint is not available for a specific object type, implement a stub method
  */
-export interface IBuilder<TState extends BaseBuilderState = BaseBuilderState> {
+export interface IBuilder<TState extends IAdtBaseState = IAdtBaseState> {
   /**
    * Validate object name and configuration
    * Returns raw response from ADT - consumer decides how to interpret it

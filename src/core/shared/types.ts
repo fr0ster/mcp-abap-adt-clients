@@ -5,7 +5,7 @@
 /**
  * Object reference for group activation and inactive objects
  */
-export interface ObjectReference {
+export interface IObjectReference {
     type: string;
     name: string;
 }
@@ -13,15 +13,15 @@ export interface ObjectReference {
 /**
  * Response from getInactiveObjects
  */
-export interface InactiveObjectsResponse {
-  objects: ObjectReference[];
+export interface IInactiveObjectsResponse {
+  objects: IObjectReference[];
   xmlStr?: string;
 }
 
 /**
  * Search objects parameters
  */
-export interface SearchObjectsParams {
+export interface ISearchObjectsParams {
   query: string;
   objectType?: string;
   maxResults?: number;
@@ -30,7 +30,7 @@ export interface SearchObjectsParams {
 /**
  * Search result entry
  */
-export interface SearchResult {
+export interface ISearchResult {
   name: string;
   type: string;
   description: string;
@@ -41,7 +41,7 @@ export interface SearchResult {
 /**
  * SQL query parameters
  */
-export interface GetSqlQueryParams {
+export interface IGetSqlQueryParams {
   sql_query: string;
   row_number?: number;
 }
@@ -49,7 +49,7 @@ export interface GetSqlQueryParams {
 /**
  * Table contents parameters
  */
-export interface GetTableContentsParams {
+export interface IGetTableContentsParams {
   table_name: string;
   max_rows?: number;
 }
@@ -57,7 +57,7 @@ export interface GetTableContentsParams {
 /**
  * Where-used parameters
  */
-export interface GetWhereUsedParams {
+export interface IGetWhereUsedParams {
   object_name: string;
   object_type: string;
   detailed?: boolean;

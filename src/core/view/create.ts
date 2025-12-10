@@ -8,14 +8,14 @@ import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { CreateViewParams } from './types';
+import { ICreateViewParams } from './types';
 
 /**
  * Create DDLS object with metadata
  */
 async function createDDLSObject(
   connection: IAbapConnection,
-  args: CreateViewParams
+  args: ICreateViewParams
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.view_name);
@@ -57,7 +57,7 @@ async function createDDLSObject(
  */
 export async function createView(
   connection: IAbapConnection,
-  params: CreateViewParams
+  params: ICreateViewParams
 ): Promise<AxiosResponse> {
   if (!params.view_name || !params.package_name) {
     throw new Error('Missing required parameters: view_name and package_name');

@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { UpdateServiceDefinitionParams } from './types';
+import { IUpdateServiceDefinitionParams } from './types';
 
 /**
  * Update service definition source code
@@ -14,7 +14,7 @@ import { UpdateServiceDefinitionParams } from './types';
  */
 export async function updateServiceDefinition(
   connection: IAbapConnection,
-  args: UpdateServiceDefinitionParams,
+  args: IUpdateServiceDefinitionParams,
   lockHandle: string
 ): Promise<AxiosResponse> {
   const serviceDefinitionNameEncoded = encodeSapObjectName(args.service_definition_name.toLowerCase());

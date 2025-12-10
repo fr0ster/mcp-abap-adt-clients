@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteDataElementParams } from './types';
+import { IDeleteDataElementParams } from './types';
 
 /**
  * Low-level: Check if data element can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteDataElementParams
+  params: IDeleteDataElementParams
 ): Promise<AxiosResponse> {
   const { data_element_name } = params;
 
@@ -50,7 +50,7 @@ export async function checkDeletion(
  */
 export async function deleteDataElement(
   connection: IAbapConnection,
-  params: DeleteDataElementParams
+  params: IDeleteDataElementParams
 ): Promise<AxiosResponse> {
   const { data_element_name, transport_request } = params;
 

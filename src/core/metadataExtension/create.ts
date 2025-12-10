@@ -9,7 +9,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
-import { MetadataExtensionCreateParams } from './types';
+import { IMetadataExtensionCreateParams } from './types';
 
 /**
  * Create a new metadata extension (DDLX)
@@ -31,7 +31,7 @@ import { MetadataExtensionCreateParams } from './types';
  */
 export async function createMetadataExtension(
   connection: IAbapConnection,
-  params: MetadataExtensionCreateParams
+  params: IMetadataExtensionCreateParams
 ): Promise<AxiosResponse> {
   const url = '/sap/bc/adt/ddic/ddlx/sources';
 

@@ -2,9 +2,9 @@
  * Structure module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-export interface StructureField {
+export interface IStructureField {
   name: string;
   data_type?: string;
   length?: number;
@@ -16,26 +16,26 @@ export interface StructureField {
   description?: string;
 }
 
-export interface StructureInclude {
+export interface IStructureInclude {
   name: string;
   suffix?: string;
 }
 
 // Low-level function parameters (camelCase)
-export interface CreateStructureParams {
+export interface ICreateStructureParams {
   structureName: string;
   description: string;
   packageName: string;
   transportRequest?: string;
 }
 
-export interface UpdateStructureParams {
+export interface IUpdateStructureParams {
   structureName: string;
   ddlCode: string; // DDL SQL source code for structure
   transportRequest?: string;
 }
 
-export interface DeleteStructureParams {
+export interface IDeleteStructureParams {
   structure_name: string;
   transport_request?: string;
 }
@@ -43,18 +43,21 @@ export interface DeleteStructureParams {
 // Builder configuration (camelCase)
 // Note: packageName and ddlCode are required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface StructureBuilderConfig {
+export interface IStructureConfig {
   structureName: string;
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
   description?: string; // Required for create/validate operations, optional for others
   ddlCode?: string; // Required for create operation - DDL SQL source code for structure
   // Legacy fields (deprecated, use ddlCode instead)
-  fields?: StructureField[];
-  includes?: StructureInclude[];
+  fields?: IStructureField[];
+  includes?: IStructureInclude[];
   onLock?: (lockHandle: string) => void;
 }
 
-export interface StructureBuilderState extends BaseBuilderState {
-  // Structure-specific state can be added here if needed
+export interface IStructureState extends IAdtObjectState {
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
+  // Structure-specific fields can be added here if needed
 }

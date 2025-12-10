@@ -1,7 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
-import { BehaviorDefinitionValidationParams } from './types';
+import { IBehaviorDefinitionValidationParams } from './types';
 
 /**
  * Validate behavior definition parameters before creation
@@ -32,7 +32,7 @@ import { BehaviorDefinitionValidationParams } from './types';
  */
 export async function validate(
     connection: IAbapConnection,
-    params: BehaviorDefinitionValidationParams
+    params: IBehaviorDefinitionValidationParams
 ): Promise<AxiosResponse> {
     try {
         const queryParams = new URLSearchParams({

@@ -217,7 +217,7 @@ describe('Group Activation (SharedBuilder)', () => {
           domainName: domainName,
           packageName: packageName,
           description: testCase.params.description || `Test domain for group activation`,
-          dataType: testCase.params.domain_datatype || 'CHAR',
+          datatype: testCase.params.domain_datatype || 'CHAR',
           length: testCase.params.domain_length || 10,
           decimals: testCase.params.domain_decimals || 0,
           transportRequest: transportRequest
@@ -269,9 +269,10 @@ define structure ${structureName} {
           { type: 'STRU/DT', name: structureName }
         ];
 
-        const activationResult = await sharedBuilder.activateGroup(objectsToActivate, false);
+        await sharedBuilder.activateGroup(objectsToActivate, false);
+        const activationResult = sharedBuilder.getActivateResult();
         expect(activationResult).toBeDefined();
-        expect(activationResult.status).toBe(200);
+        expect(activationResult?.status).toBe(200);
         testsLogger.info?.('✅ Group activation completed successfully');
 
         // Step 5: Verify activation by checking inactive objects
@@ -292,7 +293,7 @@ define structure ${structureName} {
 
         logBuilderTestSuccess(testsLogger, 'Group Activation - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'Group Activation - full workflow', currentStep, error);
+        logBuilderTestError(testsLogger, 'Group Activation - full workflow', error);
         throw error;
       } finally {
         logBuilderTestEnd(testsLogger, 'Group Activation - full workflow');

@@ -38,19 +38,19 @@ import { lockPackage } from './lock';
 import { unlockPackage } from './unlock';
 import { deletePackage, checkPackageDeletion, parsePackageDeletionCheck } from './delete';
 import { updatePackageDescription } from './update';
-import { CreatePackageParams, PackageBuilderConfig, PackageBuilderState } from './types';
+import { ICreatePackageParams, IPackageConfig, IPackageState } from './types';
 import { XMLParser } from 'fast-xml-parser';
 
 export class PackageBuilder {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: PackageBuilderConfig;
-  private state: PackageBuilderState;
+  private config: IPackageConfig;
+  private state: IPackageState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: PackageBuilderConfig
+    config: IPackageConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -113,7 +113,7 @@ export class PackageBuilder {
   async validate(): Promise<AxiosResponse> {
     try {
       this.logger.info?.('Validating package:', this.config.packageName);
-      const params: CreatePackageParams = {
+      const params: ICreatePackageParams = {
         package_name: this.config.packageName,
         super_package: this.config.superPackage || '',
         description: this.config.description,
@@ -184,7 +184,7 @@ export class PackageBuilder {
         throw new Error('Software component is required for package creation');
       }
       this.logger.info?.('Creating package:', this.config.packageName);
-      const params: CreatePackageParams = {
+      const params: ICreatePackageParams = {
         package_name: this.config.packageName,
         super_package: this.config.superPackage,
         description: this.config.description,
@@ -231,7 +231,7 @@ export class PackageBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<PackageBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IPackageConfig | undefined> {
     try {
       this.logger.info?.('Reading package:', this.config.packageName, 'version:', version);
       const result = await getPackage(this.connection, this.config.packageName, version);
@@ -286,7 +286,6 @@ export class PackageBuilder {
         this.config.packageName
       );
       this.state.lockHandle = lockHandle;
-      this.state.lockResult = lockHandle;
 
       // Register lock in persistent storage if callback provided
       if (this.config.onLock) {
@@ -429,7 +428,7 @@ export class PackageBuilder {
   }
 
   // Getters for accessing results
-  getState(): Readonly<PackageBuilderState> {
+  getState(): Readonly<IPackageState> {
     return { ...this.state };
   }
 
@@ -448,7 +447,7 @@ export class PackageBuilder {
   /**
    * Parse XML response to PackageBuilderConfig
    */
-  private parsePackageXml(xmlData: string): PackageBuilderConfig | undefined {
+  private parsePackageXml(xmlData: string): IPackageConfig | undefined {
     try {
       const parser = new XMLParser({
         ignoreAttributes: false,
@@ -481,7 +480,7 @@ export class PackageBuilder {
     }
   }
 
-  getReadResult(): PackageBuilderConfig | undefined {
+  getReadResult(): IPackageConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }
@@ -510,7 +509,7 @@ export class PackageBuilder {
   }
 
   getLockResult(): string | undefined {
-    return this.state.lockResult;
+    return this.state.lockHandle;
   }
 
   getUnlockResult(): AxiosResponse | undefined {

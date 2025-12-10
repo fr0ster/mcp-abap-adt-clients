@@ -7,7 +7,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { UpdateDataElementParams } from './types';
+import { IUpdateDataElementParams } from './types';
 import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
@@ -82,7 +82,7 @@ async function getDataElementForVerification(
  */
 export async function updateDataElementInternal(
   connection: IAbapConnection,
-  args: UpdateDataElementParams,
+  args: IUpdateDataElementParams,
   lockHandle: string,
   username: string,
   domainInfo: { dataType: string; length: number; decimals: number }
@@ -247,7 +247,7 @@ export async function updateDataElementInternal(
  */
 export async function updateDataElement(
   connection: IAbapConnection,
-  params: UpdateDataElementParams,
+  params: IUpdateDataElementParams,
   lockHandle: string
 ): Promise<AxiosResponse> {
   if (!params.data_element_name) {

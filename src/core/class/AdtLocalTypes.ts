@@ -11,29 +11,25 @@ import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
 import { AdtClass } from './AdtClass';
+import { IClassState } from './types';
 
-export interface LocalTypesConfig {
+export interface ILocalTypesConfig {
   className: string;
   localTypesCode?: string;
   transportRequest?: string;
 }
 
-export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesConfig> {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
-  private readonly adtClass: AdtClass;
+export class AdtLocalTypes extends AdtClass {
   public readonly objectType: string = 'LocalTypes';
 
-  constructor(connection: IAbapConnection, adtClass?: AdtClass, logger?: IAdtLogger) {
-    this.connection = connection;
-    this.logger = logger;
-    this.adtClass = adtClass || new AdtClass(connection, logger);
+  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+    super(connection, logger);
   }
 
   /**
    * Validate local types code
    */
-  async validate(config: Partial<LocalTypesConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<ILocalTypesConfig>): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
@@ -41,12 +37,17 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
       throw new Error('Local types code is required for validation');
     }
 
-    return await checkClassLocalTypes(
+    const checkResponse = await checkClassLocalTypes(
       this.connection,
       config.className,
       config.localTypesCode,
       'inactive'
     );
+
+    return {
+      checkResult: checkResponse,
+      errors: []
+    };
   }
 
   /**
@@ -54,9 +55,9 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
    * Requires parent class to be locked
    */
   async create(
-    config: Partial<LocalTypesConfig>,
+    config: Partial<ILocalTypesConfig>,
     options?: IAdtOperationOptions
-  ): Promise<LocalTypesConfig> {
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -69,49 +70,52 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
     try {
       // 1. Lock parent class (stateful only for lock)
       this.logger?.info?.('Step 1: Locking parent class');
-      lockHandle = await this.adtClass.lock({ className: config.className });
+      lockHandle = await super.lock({ className: config.className });
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Check local types code
       const codeToCheck = options?.sourceCode || config.localTypesCode;
+      const state: IClassState = {
+        errors: []
+      };
+      
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking local types code');
-        await checkClassLocalTypes(
+        const checkResponse = await checkClassLocalTypes(
           this.connection,
           config.className,
           codeToCheck,
           'inactive'
         );
+        state.checkResult = checkResponse;
         this.logger?.info?.('Local types check passed');
       }
 
       // 3. Update local types
       this.logger?.info?.('Step 3: Creating local types');
-      await updateClassLocalTypes(
+      const updateResponse = await updateClassLocalTypes(
         this.connection,
         config.className,
         codeToCheck!,
         lockHandle,
         config.transportRequest
       );
+      state.updateResult = updateResponse;
       this.logger?.info?.('Local types created');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      await this.adtClass.unlock({ className: config.className }, lockHandle);
+      const unlockResponse = await super.unlock({ className: config.className }, lockHandle);
+      state.unlockResult = unlockResponse;
       lockHandle = undefined;
 
-      return {
-        className: config.className,
-        localTypesCode: config.localTypesCode,
-        transportRequest: config.transportRequest
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await this.adtClass.unlock({ className: config.className }, lockHandle);
+          await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
           this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
         }
@@ -126,20 +130,27 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
    * Read local types code
    */
   async read(
-    config: Partial<LocalTypesConfig>,
+    config: Partial<ILocalTypesConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<LocalTypesConfig | undefined> {
+  ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    // Reading local types requires reading the parent class and extracting implementations include
-    // This is a simplified implementation - in practice, you'd need to parse the class source
-    // For now, return basic config
-    return {
-      className: config.className,
-      localTypesCode: config.localTypesCode
-    };
+    try {
+      const { getClassImplementationsInclude } = await import('./read');
+      const response = await getClassImplementationsInclude(this.connection, config.className, version);
+      return {
+        readResult: response,
+        errors: []
+      };
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return undefined;
+      }
+      logErrorSafely(this.logger, 'Read LocalTypes', error);
+      throw error;
+    }
   }
 
   /**
@@ -147,9 +158,9 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
    * Requires parent class to be locked
    */
   async update(
-    config: Partial<LocalTypesConfig>,
+    config: Partial<ILocalTypesConfig>,
     options?: IAdtOperationOptions
-  ): Promise<LocalTypesConfig> {
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -162,49 +173,52 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
     try {
       // 1. Lock parent class (stateful only for lock)
       this.logger?.info?.('Step 1: Locking parent class');
-      lockHandle = await this.adtClass.lock({ className: config.className });
+      lockHandle = await super.lock({ className: config.className });
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Check local types code
       const codeToCheck = options?.sourceCode || config.localTypesCode;
+      const state: IClassState = {
+        errors: []
+      };
+      
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking local types code');
-        await checkClassLocalTypes(
+        const checkResponse = await checkClassLocalTypes(
           this.connection,
           config.className,
           codeToCheck,
           'inactive'
         );
+        state.checkResult = checkResponse;
         this.logger?.info?.('Local types check passed');
       }
 
       // 3. Update local types
       this.logger?.info?.('Step 3: Updating local types');
-      await updateClassLocalTypes(
+      const updateResponse = await updateClassLocalTypes(
         this.connection,
         config.className,
         codeToCheck!,
         lockHandle,
         config.transportRequest
       );
+      state.updateResult = updateResponse;
       this.logger?.info?.('Local types updated');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      await this.adtClass.unlock({ className: config.className }, lockHandle);
+      const unlockResponse = await super.unlock({ className: config.className }, lockHandle);
+      state.unlockResult = unlockResponse;
       lockHandle = undefined;
 
-      return {
-        className: config.className,
-        localTypesCode: config.localTypesCode,
-        transportRequest: config.transportRequest
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
-          await this.adtClass.unlock({ className: config.className }, lockHandle);
+          await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
           this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
         }
@@ -219,39 +233,36 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
    * Delete local types
    * Performs update with empty code to remove the local types
    */
-  async delete(config: Partial<LocalTypesConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<ILocalTypesConfig>): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
     // Delete by updating with empty code
-    await this.update({
+    return await this.update({
       ...config,
       localTypesCode: ''
     });
-    
-    // Return empty response (update already completed)
-    return { status: 200, statusText: 'OK', data: {}, headers: {}, config: {} } as AxiosResponse;
   }
 
   /**
    * Activate parent class (local types are activated with parent class)
    */
-  async activate(config: Partial<LocalTypesConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<ILocalTypesConfig>): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    return await this.adtClass.activate({ className: config.className });
+    return await super.activate({ className: config.className });
   }
 
   /**
    * Check local types code
    */
   async check(
-    config: Partial<LocalTypesConfig>,
+    config: Partial<ILocalTypesConfig>,
     version: 'active' | 'inactive' = 'inactive'
-  ): Promise<AxiosResponse> {
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -259,36 +270,16 @@ export class AdtLocalTypes implements IAdtObject<LocalTypesConfig, LocalTypesCon
       throw new Error('Local types code is required');
     }
 
-    return await checkClassLocalTypes(
+    const checkResponse = await checkClassLocalTypes(
       this.connection,
       config.className,
       config.localTypesCode,
       version
     );
-  }
 
-  /**
-   * Lock parent class (required for local types operations)
-   */
-  async lock(config: Partial<LocalTypesConfig>): Promise<string> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
-    return await this.adtClass.lock({ className: config.className });
-  }
-
-  /**
-   * Unlock parent class
-   */
-  async unlock(config: Partial<LocalTypesConfig>, lockHandle: string): Promise<void> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    if (!lockHandle) {
-      throw new Error('Lock handle is required');
-    }
-
-    await this.adtClass.unlock({ className: config.className }, lockHandle);
+    return {
+      checkResult: checkResponse,
+      errors: []
+    };
   }
 }

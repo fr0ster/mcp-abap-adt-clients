@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { ObjectReference } from './types';
+import { IObjectReference } from './types';
 import { XMLParser } from 'fast-xml-parser';
 
 const xmlParser = new XMLParser({
@@ -132,7 +132,7 @@ async function getActivationResults(
  */
 export async function activateObjectsGroup(
     connection: IAbapConnection,
-    objects: ObjectReference[],
+    objects: IObjectReference[],
     preauditRequested: boolean = false
 ): Promise<AxiosResponse> {
     // Step 1: Start activation run

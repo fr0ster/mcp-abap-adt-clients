@@ -2,7 +2,7 @@
  * DataElement module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 /**
  * SAP ADT supports the following type kinds for data elements:
@@ -17,7 +17,7 @@ import { BaseBuilderState } from '../shared/IBuilder';
  */
 
 // Low-level function parameters (snake_case)
-export interface CreateDataElementParams {
+export interface ICreateDataElementParams {
   data_element_name: string;
   description?: string;
   package_name: string;
@@ -41,7 +41,7 @@ export interface CreateDataElementParams {
   deactivate_bidi_filtering?: boolean;
 }
 
-export interface UpdateDataElementParams {
+export interface IUpdateDataElementParams {
   data_element_name: string;
   description?: string;
   package_name: string;
@@ -66,7 +66,7 @@ export interface UpdateDataElementParams {
   activate?: boolean;
 }
 
-export interface DeleteDataElementParams {
+export interface IDeleteDataElementParams {
   data_element_name: string;
   transport_request?: string;
 }
@@ -74,7 +74,7 @@ export interface DeleteDataElementParams {
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface DataElementBuilderConfig {
+export interface IDataElementConfig {
   dataElementName: string;
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -93,6 +93,6 @@ export interface DataElementBuilderConfig {
   setGetParameter?: string;
 }
 
-export interface DataElementBuilderState extends BaseBuilderState {
+export interface IDataElementState extends IAdtObjectState {
   // DataElement-specific state can be added here if needed
 }

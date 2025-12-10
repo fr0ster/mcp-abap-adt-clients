@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteInterfaceParams } from './types';
+import { IDeleteInterfaceParams } from './types';
 
 /**
  * Low-level: Check if interface can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteInterfaceParams
+  params: IDeleteInterfaceParams
 ): Promise<AxiosResponse> {
   const { interface_name } = params;
 
@@ -50,7 +50,7 @@ export async function checkDeletion(
  */
 export async function deleteInterface(
   connection: IAbapConnection,
-  params: DeleteInterfaceParams
+  params: IDeleteInterfaceParams
 ): Promise<AxiosResponse> {
   const { interface_name, transport_request } = params;
 

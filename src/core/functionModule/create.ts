@@ -7,7 +7,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { CreateFunctionModuleParams } from './types';
+import { ICreateFunctionModuleParams } from './types';
 
 /**
  * Create function module metadata
@@ -15,7 +15,7 @@ import { CreateFunctionModuleParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
-  params: CreateFunctionModuleParams
+  params: ICreateFunctionModuleParams
 ): Promise<AxiosResponse> {
   const encodedGroupName = encodeSapObjectName(params.functionGroupName).toLowerCase();
 

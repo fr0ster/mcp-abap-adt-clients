@@ -60,3 +60,18 @@ export async function getBehaviorImplementationImplementations(
   });
 }
 
+/**
+ * Get transport request for ABAP behavior implementation class
+ * @param connection - SAP connection
+ * @param className - Behavior implementation class name
+ * @returns Transport request information
+ */
+export async function getBehaviorImplementationTransport(
+  connection: IAbapConnection,
+  className: string
+): Promise<AxiosResponse> {
+  // Behavior implementation is a class, so use class transport endpoint
+  const { getClassTransport } = await import('../class/read');
+  return getClassTransport(connection, className);
+}
+

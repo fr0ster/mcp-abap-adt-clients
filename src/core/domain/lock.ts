@@ -7,7 +7,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { CreateDomainParams } from './types';
+import { ICreateDomainParams } from './types';
 
 /**
  * Acquire lock handle by attempting to lock the domain (for create)
@@ -16,7 +16,7 @@ import { CreateDomainParams } from './types';
  */
 export async function acquireLockHandle(
   connection: IAbapConnection,
-  args: CreateDomainParams
+  args: ICreateDomainParams
 ): Promise<string> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=LOCK&accessMode=MODIFY`;

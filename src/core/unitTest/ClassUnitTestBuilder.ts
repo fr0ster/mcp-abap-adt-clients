@@ -6,7 +6,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger } from '../../utils/logger';
-import { ClassBuilderConfig } from '../class/types';
+import { IClassBuilderConfig } from '../class';
 import {
   lockClassTestClasses,
   updateClassTestInclude,
@@ -55,7 +55,7 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
     config: ClassUnitTestBuilderConfig
   ) {
     // Create ClassBuilderConfig for base class
-    const classConfig: ClassBuilderConfig = {
+    const classConfig: IClassBuilderConfig = {
       className: config.className,
       description: '',
       packageName: config.packageName,

@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteClassParams } from './types';
+import { IDeleteClassParams } from './types';
 
 /**
  * Low-level: Check if class can be deleted (deletion check)
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteClassParams
+  params: IDeleteClassParams
 ): Promise<AxiosResponse> {
   const { class_name } = params;
 
@@ -50,7 +50,7 @@ export async function checkDeletion(
  */
 export async function deleteClass(
   connection: IAbapConnection,
-  params: DeleteClassParams
+  params: IDeleteClassParams
 ): Promise<AxiosResponse> {
   const { class_name, transport_request } = params;
 

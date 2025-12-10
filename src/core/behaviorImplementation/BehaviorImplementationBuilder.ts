@@ -34,10 +34,10 @@ import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { ClassBuilder } from '../class/ClassBuilder';
-import { ClassBuilderConfig } from '../class/types';
+import { IClassBuilderConfig } from '../class';
 import { updateClass } from '../class/update';
 import { updateBehaviorImplementation } from './update';
-import { BehaviorImplementationBuilderConfig } from './types';
+import { IBehaviorImplementationConfig } from './types';
 
 export class BehaviorImplementationBuilder extends ClassBuilder {
   private behaviorDefinition: string;
@@ -46,10 +46,10 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: BehaviorImplementationBuilderConfig
+    config: IBehaviorImplementationConfig
   ) {
     // Convert BehaviorImplementationBuilderConfig to ClassBuilderConfig
-    const classConfig: ClassBuilderConfig = {
+    const classConfig: IClassBuilderConfig = {
       className: config.className,
       description: config.description || `Behavior Implementation for ${config.behaviorDefinition}`,
       packageName: config.packageName,

@@ -24,7 +24,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { FunctionGroupBuilderConfig } from './types';
+import { IFunctionGroupConfig, IFunctionGroupState } from './types';
 import { validateFunctionGroupName } from './validation';
 import { create as createFunctionGroup } from './create';
 import { checkFunctionGroup } from './check';
@@ -32,9 +32,9 @@ import { lockFunctionGroup, unlockFunctionGroup } from './lock';
 import { updateFunctionGroup } from './update';
 import { activateFunctionGroup } from './activation';
 import { checkDeletion, deleteFunctionGroup } from './delete';
-import { getFunctionGroup } from './read';
+import { getFunctionGroup, getFunctionGroupTransport } from './read';
 
-export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, FunctionGroupBuilderConfig> {
+export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'FunctionGroup';
@@ -47,17 +47,20 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
   /**
    * Validate function group configuration before creation
    */
-  async validate(config: Partial<FunctionGroupBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IFunctionGroupConfig>): Promise<IFunctionGroupState> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required for validation');
     }
 
-    return await validateFunctionGroupName(
+    return {
+      validationResponse: await validateFunctionGroupName(
       this.connection,
       config.functionGroupName,
       config.packageName,
       config.description
-    );
+    ),
+    errors: []
+  };
   }
 
   /**
@@ -65,9 +68,9 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
    * Note: Function groups are containers, so no source code update after create
    */
   async create(
-    config: FunctionGroupBuilderConfig,
+    config: IFunctionGroupConfig,
     options?: IAdtOperationOptions
-  ): Promise<FunctionGroupBuilderConfig> {
+  ): Promise<IFunctionGroupState> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -119,16 +122,16 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          functionGroupName: config.functionGroupName,
-          packageName: config.packageName
+          createResult: activateResponse,
+          errors: []
         };
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getFunctionGroup(this.connection, config.functionGroupName);
       return {
-        functionGroupName: config.functionGroupName,
-        packageName: config.packageName
+        createResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Ensure stateless if needed
@@ -156,9 +159,9 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
    * Read function group
    */
   async read(
-    config: Partial<FunctionGroupBuilderConfig>,
+    config: Partial<IFunctionGroupConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<FunctionGroupBuilderConfig | undefined> {
+  ): Promise<IFunctionGroupState | undefined> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -166,7 +169,8 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
     try {
       const response = await getFunctionGroup(this.connection, config.functionGroupName);
       return {
-        functionGroupName: config.functionGroupName
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -177,14 +181,69 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
   }
 
   /**
+   * Read function group metadata (object characteristics: package, responsible, description, etc.)
+   * For function groups, read() already returns metadata since there's no source code.
+   */
+  async readMetadata(config: Partial<IFunctionGroupConfig>): Promise<IFunctionGroupState> {
+    const state: IFunctionGroupState = { errors: [] };
+    if (!config.functionGroupName) {
+      const error = new Error('Function group name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      // For objects without source code, read() already returns metadata
+      const readState = await this.read(config);
+      if (readState) {
+        state.metadataResult = readState.readResult;
+        state.readResult = readState.readResult;
+      } else {
+        const error = new Error(`Function group '${config.functionGroupName}' not found`);
+        state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+        throw error;
+      }
+      this.logger?.info?.('Function group metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the function group
+   */
+  async readTransport(config: Partial<IFunctionGroupConfig>): Promise<IFunctionGroupState> {
+    const state: IFunctionGroupState = { errors: [] };
+    if (!config.functionGroupName) {
+      const error = new Error('Function group name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getFunctionGroupTransport(this.connection, config.functionGroupName);
+      state.transportResult = response;
+      this.logger?.info?.('Function group transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
+  }
+
+  /**
    * Update function group with full operation chain
    * Always starts with lock
    * Note: Function groups only support metadata updates (description)
    */
   async update(
-    config: Partial<FunctionGroupBuilderConfig>,
+    config: Partial<IFunctionGroupConfig>,
     options?: IAdtOperationOptions
-  ): Promise<FunctionGroupBuilderConfig> {
+  ): Promise<IFunctionGroupState> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -235,14 +294,16 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          functionGroupName: config.functionGroupName
+          updateResult: activateResponse,
+          errors: []
         };
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getFunctionGroup(this.connection, config.functionGroupName);
       return {
-        functionGroupName: config.functionGroupName
+        updateResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -281,7 +342,7 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
   /**
    * Delete function group
    */
-  async delete(config: Partial<FunctionGroupBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IFunctionGroupConfig>): Promise<IFunctionGroupState> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
@@ -303,7 +364,7 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
       });
       this.logger?.info?.('Function group deleted');
 
-      return result;
+      return { deleteResult: result, errors: [] };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -314,14 +375,14 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
    * Activate function group
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<FunctionGroupBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IFunctionGroupConfig>): Promise<IFunctionGroupState> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
 
     try {
       const result = await activateFunctionGroup(this.connection, config.functionGroupName);
-      return result;
+      return { activateResult: result, errors: [] };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -332,15 +393,18 @@ export class AdtFunctionGroup implements IAdtObject<FunctionGroupBuilderConfig, 
    * Check function group
    */
   async check(
-    config: Partial<FunctionGroupBuilderConfig>,
+    config: Partial<IFunctionGroupConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IFunctionGroupState> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
 
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkFunctionGroup(this.connection, config.functionGroupName, version);
+    return {
+      checkResult: await checkFunctionGroup(this.connection, config.functionGroupName, version),
+      errors: []
+    };
   }
 }

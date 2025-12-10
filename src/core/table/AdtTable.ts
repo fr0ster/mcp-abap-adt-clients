@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { TableBuilderConfig } from './types';
+import { ITableConfig, ITableState } from './types';
 import { validateTableName } from './validation';
 import { createTable } from './create';
 import { runTableCheckRun } from './check';
@@ -30,9 +30,9 @@ import { updateTable } from './update';
 import { unlockTable } from './unlock';
 import { activateTable } from './activation';
 import { checkDeletion, deleteTable } from './delete';
-import { getTableSource } from './read';
+import { getTableSource, getTableMetadata, getTableTransport } from './read';
 
-export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConfig> {
+export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Table';
@@ -45,25 +45,26 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
   /**
    * Validate table configuration before creation
    */
-  async validate(config: Partial<TableBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<ITableConfig>): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required for validation');
     }
 
-    return await validateTableName(
+    const validationResponse = await validateTableName(
       this.connection,
       config.tableName,
       config.description
     );
+    return { validationResponse, errors: [] };
   }
 
   /**
    * Create table with full operation chain
    */
   async create(
-    config: TableBuilderConfig,
+    config: ITableConfig,
     options?: IAdtOperationOptions
-  ): Promise<TableBuilderConfig> {
+  ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
@@ -151,23 +152,12 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
         
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
-        return {
-          tableName: config.tableName,
-          packageName: config.packageName
-        };
+        return { createResult: activateResponse, errors: [] };
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getTableSource(this.connection, config.tableName);
-      const ddlCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
-      return {
-        tableName: config.tableName,
-        packageName: config.packageName,
-        ddlCode
-      };
+      return { createResult: readResponse, errors: [] };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -206,28 +196,67 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
    * Read table
    */
   async read(
-    config: Partial<TableBuilderConfig>,
+    config: Partial<ITableConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<TableBuilderConfig | undefined> {
+  ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
 
     try {
-      const response = await getTableSource(this.connection, config.tableName);
-      const ddlCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
-      return {
-        tableName: config.tableName,
-        ddlCode
-      };
+      const readResult = await getTableSource(this.connection, config.tableName);
+      return { readResult, errors: [] };
     } catch (error: any) {
       if (error.response?.status === 404) {
-        return undefined;
+        return { readResult: undefined, errors: [] };
       }
       throw error;
+    }
+  }
+
+  /**
+   * Read table metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<ITableConfig>): Promise<ITableState> {
+    const state: ITableState = { errors: [] };
+    if (!config.tableName) {
+      const error = new Error('Table name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getTableMetadata(this.connection, config.tableName);
+      state.metadataResult = response;
+      this.logger?.info?.('Table metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the table
+   */
+  async readTransport(config: Partial<ITableConfig>): Promise<ITableState> {
+    const state: ITableState = { errors: [] };
+    if (!config.tableName) {
+      const error = new Error('Table name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getTableTransport(this.connection, config.tableName);
+      state.transportResult = response;
+      this.logger?.info?.('Table transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
     }
   }
 
@@ -236,9 +265,9 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
    * Always starts with lock
    */
   async update(
-    config: Partial<TableBuilderConfig>,
+    config: Partial<ITableConfig>,
     options?: IAdtOperationOptions
-  ): Promise<TableBuilderConfig> {
+  ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
@@ -298,19 +327,16 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          tableName: config.tableName
+          activateResult: activateResponse,
+          errors: []
         };
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getTableSource(this.connection, config.tableName);
-      const ddlCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
       return {
-        tableName: config.tableName,
-        ddlCode
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -349,7 +375,7 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
   /**
    * Delete table
    */
-  async delete(config: Partial<TableBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<ITableConfig>): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
@@ -371,7 +397,7 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
       });
       this.logger?.info?.('Table deleted');
 
-      return result;
+      return { deleteResult: result, errors: [] };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -382,14 +408,14 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
    * Activate table
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<TableBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<ITableConfig>): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
 
     try {
       const result = await activateTable(this.connection, config.tableName);
-      return result;
+      return { activateResult: result, errors: [] };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -400,15 +426,18 @@ export class AdtTable implements IAdtObject<TableBuilderConfig, TableBuilderConf
    * Check table
    */
   async check(
-    config: Partial<TableBuilderConfig>,
+    config: Partial<ITableConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
 
     // Map status to version
     const version: string = status === 'active' ? 'active' : 'inactive';
-    return await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, version);
+    return {
+      checkResult: await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, version),
+      errors: []
+    };
   }
 }

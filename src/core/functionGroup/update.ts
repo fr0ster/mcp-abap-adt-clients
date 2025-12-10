@@ -13,7 +13,7 @@ import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils
 import { getFunctionGroup } from './read';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
-import { UpdateFunctionGroupParams } from './types';
+import { IUpdateFunctionGroupParams } from './types';
 
 /**
  * Update function group metadata via PUT
@@ -73,7 +73,7 @@ async function updateFunctionGroupMetadata(
  */
 export async function updateFunctionGroup(
   connection: IAbapConnection,
-  params: UpdateFunctionGroupParams
+  params: IUpdateFunctionGroupParams
 ): Promise<AxiosResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');

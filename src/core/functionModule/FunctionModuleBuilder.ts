@@ -16,7 +16,7 @@ import { validateFunctionModuleName } from './validation';
 import { create } from './create';
 import { lockFunctionModule } from './lock';
 import { update } from './update';
-import { UpdateFunctionModuleParams, FunctionModuleBuilderConfig, FunctionModuleBuilderState } from './types';
+import { IUpdateFunctionModuleParams, IFunctionModuleConfig, IFunctionModuleState } from './types';
 import { checkFunctionModule } from './check';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
@@ -24,18 +24,18 @@ import { deleteFunctionModule } from './delete';
 import { getFunctionSource } from './read';
 import { IBuilder } from '../shared/IBuilder';
 
-export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderState> {
+export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: FunctionModuleBuilderConfig;
+  private config: IFunctionModuleConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private state: FunctionModuleBuilderState;
+  private state: IFunctionModuleState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: FunctionModuleBuilderConfig
+    config: IFunctionModuleConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -176,7 +176,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
       this.logger.info?.('Updating function module source:', this.config.functionModuleName);
-      const params: UpdateFunctionModuleParams = {
+      const params: IUpdateFunctionModuleParams = {
         functionGroupName: this.config.functionGroupName,
         functionModuleName: this.config.functionModuleName,
         lockHandle: this.lockHandle,
@@ -302,7 +302,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<FunctionModuleBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IFunctionModuleConfig | undefined> {
     try {
       this.logger.info?.('Reading function module:', this.config.functionModuleName);
       const result = await getFunctionSource(
@@ -357,7 +357,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
   }
 
   // Getters for accessing results
-  getState(): Readonly<FunctionModuleBuilderState> {
+  getState(): Readonly<IFunctionModuleState> {
     return { ...this.state };
   }
 
@@ -406,7 +406,7 @@ export class FunctionModuleBuilder implements IBuilder<FunctionModuleBuilderStat
     return this.state.deleteResult;
   }
 
-  getReadResult(): FunctionModuleBuilderConfig | undefined {
+  getReadResult(): IFunctionModuleConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

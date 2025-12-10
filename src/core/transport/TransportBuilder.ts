@@ -29,13 +29,13 @@ import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { createTransport } from './create';
 import { getTransport } from './read';
-import { CreateTransportParams, TransportBuilderState } from './types';
+import { ICreateTransportParams, ITransportState } from './types';
 
 export class TransportBuilder {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
   private config: ITransportBuilderConfig;
-  private state: TransportBuilderState;
+  private state: ITransportState;
 
   constructor(
     connection: IAbapConnection,
@@ -79,7 +79,7 @@ export class TransportBuilder {
   async create(): Promise<this> {
     try {
       this.logger.info?.('Creating transport request:', this.config.description);
-      const params: CreateTransportParams = {
+      const params: ICreateTransportParams = {
         description: this.config.description,
         transport_type: this.config.transportType || 'workbench',
         target_system: this.config.targetSystem,
@@ -142,7 +142,7 @@ export class TransportBuilder {
   }
 
   // Getters for accessing results
-  getState(): Readonly<TransportBuilderState> {
+  getState(): Readonly<ITransportState> {
     return { ...this.state };
   }
 

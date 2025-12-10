@@ -21,12 +21,14 @@ export async function getInterfaceMetadata(
 
 /**
  * Get ABAP interface source code
+ * @param version - 'active' (default) or 'inactive' to read modified but not activated version
  */
 export async function getInterfaceSource(
   connection: IAbapConnection,
-  interfaceName: string
+  interfaceName: string,
+  version: 'active' | 'inactive' = 'active'
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'interface', interfaceName);
+  return readObjectSource(connection, 'interface', interfaceName, undefined, version);
 }
 
 /**

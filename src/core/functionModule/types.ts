@@ -2,17 +2,17 @@
  * FunctionModule module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (camelCase, matching Builder config)
-export interface CreateFunctionModuleParams {
+export interface ICreateFunctionModuleParams {
   functionGroupName: string;
   functionModuleName: string;
   description: string;
   transportRequest?: string;
 }
 
-export interface UpdateFunctionModuleParams {
+export interface IUpdateFunctionModuleParams {
   functionGroupName: string;
   functionModuleName: string;
   lockHandle: string;
@@ -20,7 +20,7 @@ export interface UpdateFunctionModuleParams {
   transportRequest?: string;
 }
 
-export interface DeleteFunctionModuleParams {
+export interface IDeleteFunctionModuleParams {
   function_module_name: string;
   function_group_name: string;
   transport_request?: string;
@@ -30,7 +30,7 @@ export interface DeleteFunctionModuleParams {
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
 // sourceCode is required for create/update operations
-export interface FunctionModuleBuilderConfig {
+export interface IFunctionModuleConfig {
   functionGroupName: string; // Required
   functionModuleName: string; // Required
   packageName?: string; // Required for create operations, optional for others
@@ -40,6 +40,9 @@ export interface FunctionModuleBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface FunctionModuleBuilderState extends BaseBuilderState {
-  // FunctionModule-specific state can be added here if needed
+export interface IFunctionModuleState extends IAdtObjectState {
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
+  // FunctionModule-specific fields can be added here if needed
 }

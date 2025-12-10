@@ -8,7 +8,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { CreateDataElementParams } from './types';
+import { ICreateDataElementParams } from './types';
 
 /**
  * Low-level: Create data element (POST)
@@ -16,7 +16,7 @@ import { CreateDataElementParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
-  args: CreateDataElementParams
+  args: ICreateDataElementParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 

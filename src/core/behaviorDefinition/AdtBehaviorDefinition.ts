@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { BehaviorDefinitionBuilderConfig } from './types';
+import { IBehaviorDefinitionConfig, IBehaviorDefinitionState } from './types';
 import { validate } from './validation';
 import { create as createBehaviorDefinition } from './create';
 import { check as checkBehaviorDefinition } from './check';
@@ -30,9 +30,9 @@ import { update } from './update';
 import { unlock } from './unlock';
 import { activate } from './activation';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
-import { readSource } from './read';
+import { readSource, read as readBehaviorDefinition, getBehaviorDefinitionTransport } from './read';
 
-export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderConfig> {
+export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'BehaviorDefinition';
@@ -45,39 +45,58 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
   /**
    * Validate behavior definition configuration before creation
    */
-  async validate(config: Partial<BehaviorDefinitionBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IBehaviorDefinitionConfig>): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Behavior definition name is required for validation');
+      const error = new Error('Behavior definition name is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.rootEntity) {
-      throw new Error('Root entity is required for validation');
+      const error = new Error('Root entity is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.packageName) {
-      throw new Error('Package name is required for validation');
+      const error = new Error('Package name is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.implementationType) {
-      throw new Error('Implementation type is required for validation');
+      const error = new Error('Implementation type is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
 
-    return await validate(
-      this.connection,
-      {
-        objname: config.name,
-        rootEntity: config.rootEntity,
-        description: config.description || config.name,
-        package: config.packageName,
-        implementationType: config.implementationType
-      }
-    );
+    try {
+      const response = await validate(
+        this.connection,
+        {
+          objname: config.name,
+          rootEntity: config.rootEntity,
+          description: config.description || config.name,
+          package: config.packageName,
+          implementationType: config.implementationType
+        }
+      );
+      state.validationResponse = response;
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'validate', err);
+      throw err;
+    }
   }
 
   /**
    * Create behavior definition with full operation chain
    */
   async create(
-    config: BehaviorDefinitionBuilderConfig,
+    config: IBehaviorDefinitionConfig,
     options?: IAdtOperationOptions
-  ): Promise<BehaviorDefinitionBuilderConfig> {
+  ): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
       throw new Error('Behavior definition name is required');
     }
@@ -114,38 +133,42 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
       // 2. Create (no stateful needed)
       this.logger?.info?.('Step 2: Creating behavior definition');
-      await createBehaviorDefinition(this.connection, {
+      const createResponse = await createBehaviorDefinition(this.connection, {
         name: config.name,
         package: config.packageName,
         description: config.description,
         implementationType: config.implementationType,
       });
+      state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Behavior definition created');
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created behavior definition');
-      await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
+      const checkAfterCreateResponse = await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
+      state.checkResult = checkAfterCreateResponse;
       this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
       this.logger?.info?.('Step 4: Locking behavior definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await checkBehaviorDefinition(this.connection, config.name, 'abapCheckRun', '', 'inactive', codeToCheck);
+        const checkInactiveResponse = await checkBehaviorDefinition(this.connection, config.name, 'abapCheckRun', '', 'inactive', codeToCheck);
+        state.checkResult = checkInactiveResponse;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 6: Updating behavior definition with source code');
-        await update(
+        const updateResponse = await update(
           this.connection,
           {
             name: config.name,
@@ -154,13 +177,15 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
             transportRequest: config.transportRequest
           }
         );
+        state.updateResult = updateResponse;
         this.logger?.info?.('Behavior definition updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 7: Unlocking behavior definition');
-        await unlock(this.connection, config.name, lockHandle);
+        const unlockResponse = await unlock(this.connection, config.name, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Behavior definition unlocked');
@@ -168,35 +193,31 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
       // 8. Final check (no stateful needed)
       this.logger?.info?.('Step 8: Final check');
-      await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
+      const finalCheckResponse = await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
+      state.checkResult = finalCheckResponse;
       this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
         this.logger?.info?.('Step 9: Activating behavior definition');
         const activateResponse = await activate(this.connection, config.name);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Behavior definition activated, status:', activateResponse.status);
 
         // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          name: config.name,
-          packageName: config.packageName
-        };
+        // Return state with activation result
+        return state;
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await readSource(this.connection, config.name);
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
+      state.readResult = readResponse;
 
-      return {
-        name: config.name,
-        packageName: config.packageName,
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'create', error: err, timestamp: new Date() });
+      
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -222,8 +243,8 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
-      throw error;
+      logErrorSafely(this.logger, 'Create', err);
+      throw err;
     }
   }
 
@@ -231,28 +252,75 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
    * Read behavior definition
    */
   async read(
-    config: Partial<BehaviorDefinitionBuilderConfig>,
+    config: Partial<IBehaviorDefinitionConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<BehaviorDefinitionBuilderConfig | undefined> {
+  ): Promise<IBehaviorDefinitionState | undefined> {
+    const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Behavior definition name is required');
+      const error = new Error('Behavior definition name is required');
+      state.errors.push({ method: 'read', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
       const response = await readSource(this.connection, config.name, version);
-      const sourceCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
-      return {
-        name: config.name,
-        sourceCode
-      };
+      state.readResult = response;
+      return state;
     } catch (error: any) {
       if (error.response?.status === 404) {
         return undefined;
       }
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'read', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'read', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read behavior definition metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IBehaviorDefinitionConfig>): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
+    if (!config.name) {
+      const error = new Error('Behavior definition name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
       throw error;
+    }
+    try {
+      // Use empty sessionId for metadata read
+      const response = await readBehaviorDefinition(this.connection, config.name, '', 'inactive');
+      state.metadataResult = response;
+      this.logger?.info?.('Behavior definition metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the behavior definition
+   */
+  async readTransport(config: Partial<IBehaviorDefinitionConfig>): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
+    if (!config.name) {
+      const error = new Error('Behavior definition name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getBehaviorDefinitionTransport(this.connection, config.name);
+      state.transportResult = response;
+      this.logger?.info?.('Behavior definition transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
     }
   }
 
@@ -261,11 +329,14 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
    * Always starts with lock
    */
   async update(
-    config: Partial<BehaviorDefinitionBuilderConfig>,
+    config: Partial<IBehaviorDefinitionConfig>,
     options?: IAdtOperationOptions
-  ): Promise<BehaviorDefinitionBuilderConfig> {
+  ): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Behavior definition name is required');
+      const error = new Error('Behavior definition name is required');
+      state.errors.push({ method: 'update', error, timestamp: new Date() });
+      throw error;
     }
 
     let lockHandle: string | undefined;
@@ -275,20 +346,22 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
       this.logger?.info?.('Step 1: Locking behavior definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkBehaviorDefinition(this.connection, config.name, 'abapCheckRun', '', 'inactive', codeToCheck);
+        const checkInactiveResponse = await checkBehaviorDefinition(this.connection, config.name, 'abapCheckRun', '', 'inactive', codeToCheck);
+        state.checkResult = checkInactiveResponse;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 3: Updating behavior definition');
-        await update(
+        const updateResponse = await update(
           this.connection,
           {
             name: config.name,
@@ -297,13 +370,15 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
             transportRequest: config.transportRequest
           }
         );
+        state.updateResult = updateResponse;
         this.logger?.info?.('Behavior definition updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking behavior definition');
-        await unlock(this.connection, config.name, lockHandle);
+        const unlockResponse = await unlock(this.connection, config.name, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Behavior definition unlocked');
@@ -311,32 +386,27 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
+      const finalCheckResponse = await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
+      state.checkResult = finalCheckResponse;
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating behavior definition');
         const activateResponse = await activate(this.connection, config.name);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Behavior definition activated, status:', activateResponse.status);
 
         // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          name: config.name
-        };
+        // Return state with activation result
+        return state;
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await readSource(this.connection, config.name);
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
+      state.readResult = readResponse;
 
-      return {
-        name: config.name,
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -371,9 +441,12 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
   /**
    * Delete behavior definition
    */
-  async delete(config: Partial<BehaviorDefinitionBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IBehaviorDefinitionConfig>): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Behavior definition name is required');
+      const error = new Error('Behavior definition name is required');
+      state.errors.push({ method: 'delete', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
@@ -385,12 +458,15 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
       // Delete (no stateful needed - no lock/unlock)
       this.logger?.info?.('Deleting behavior definition');
       const result = await deleteBehaviorDefinition(this.connection, config.name, config.transportRequest);
+      state.deleteResult = result;
       this.logger?.info?.('Behavior definition deleted');
 
-      return result;
+      return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
-      throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'Delete', err);
+      throw err;
     }
   }
 
@@ -398,17 +474,23 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
    * Activate behavior definition
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<BehaviorDefinitionBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IBehaviorDefinitionConfig>): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Behavior definition name is required');
+      const error = new Error('Behavior definition name is required');
+      state.errors.push({ method: 'activate', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
       const result = await activate(this.connection, config.name);
-      return result;
+      state.activateResult = result;
+      return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
-      throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'Activate', err);
+      throw err;
     }
   }
 
@@ -416,15 +498,27 @@ export class AdtBehaviorDefinition implements IAdtObject<BehaviorDefinitionBuild
    * Check behavior definition
    */
   async check(
-    config: Partial<BehaviorDefinitionBuilderConfig>,
+    config: Partial<IBehaviorDefinitionConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IBehaviorDefinitionState> {
+    const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Behavior definition name is required');
+      const error = new Error('Behavior definition name is required');
+      state.errors.push({ method: 'check', error, timestamp: new Date() });
+      throw error;
     }
 
-    // Map status to version
-    const version: string = status === 'active' ? 'active' : 'inactive';
-    return await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', version);
+    try {
+      // Map status to version
+      const version: string = status === 'active' ? 'active' : 'inactive';
+      const response = await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', version);
+      state.checkResult = response;
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'check', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'check', err);
+      throw err;
+    }
   }
 }

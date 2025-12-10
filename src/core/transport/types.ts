@@ -2,8 +2,10 @@
  * Transport module type definitions
  */
 
+import { IAdtObjectState } from "@mcp-abap-adt/interfaces";
+
 // Low-level function parameters (snake_case) - internal use only
-export interface CreateTransportParams {
+export interface ICreateTransportParams {
   transport_type?: string;
   description: string;
   target_system?: string;
@@ -11,10 +13,7 @@ export interface CreateTransportParams {
 }
 
 // Builder state - internal use only
-export interface TransportBuilderState {
-  createResult?: any;
-  readResult?: any;
+export interface ITransportState extends IAdtObjectState {
   transportNumber?: string;
   taskNumber?: string;
-  errors: Array<{ method: string; error: Error; timestamp: Date }>;
 }

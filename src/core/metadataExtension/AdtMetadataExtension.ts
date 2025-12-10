@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { MetadataExtensionBuilderConfig } from './types';
+import { IMetadataExtensionConfig, IMetadataExtensionState } from './types';
 import { validateMetadataExtension } from './validation';
 import { createMetadataExtension } from './create';
 import { checkMetadataExtension } from './check';
@@ -30,9 +30,9 @@ import { updateMetadataExtension } from './update';
 import { unlockMetadataExtension } from './unlock';
 import { activateMetadataExtension } from './activate';
 import { deleteMetadataExtension } from './delete';
-import { readMetadataExtensionSource } from './read';
+import { readMetadataExtensionSource, readMetadataExtension, getMetadataExtensionTransport } from './read';
 
-export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilderConfig, MetadataExtensionBuilderConfig> {
+export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'MetadataExtension';
@@ -45,15 +45,20 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
   /**
    * Validate metadata extension configuration before creation
    */
-  async validate(config: Partial<MetadataExtensionBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Metadata extension name is required for validation');
+      const error = new Error('Metadata extension name is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.packageName) {
-      throw new Error('Package name is required for validation');
+      const error = new Error('Package name is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
 
-    return await validateMetadataExtension(
+    const response = await validateMetadataExtension(
       this.connection,
       {
         name: config.name,
@@ -61,23 +66,32 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
         packageName: config.packageName
       }
     );
+    state.validationResponse = response;
+    return state;
   }
 
   /**
    * Create metadata extension with full operation chain
    */
   async create(
-    config: MetadataExtensionBuilderConfig,
+    config: IMetadataExtensionConfig,
     options?: IAdtOperationOptions
-  ): Promise<MetadataExtensionBuilderConfig> {
+  ): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Metadata extension name is required');
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'create', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.packageName) {
-      throw new Error('Package name is required');
+      const error = new Error('Package name is required');
+      state.errors.push({ method: 'create', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.description) {
-      throw new Error('Description is required');
+      const error = new Error('Description is required');
+      state.errors.push({ method: 'create', error, timestamp: new Date() });
+      throw error;
     }
 
     let objectCreated = false;
@@ -164,8 +178,8 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          name: config.name,
-          packageName: config.packageName
+          activateResult: activateResponse,
+          errors: []
         };
       }
 
@@ -176,9 +190,8 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
         : JSON.stringify(readResponse.data);
 
       return {
-        name: config.name,
-        packageName: config.packageName,
-        sourceCode
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -215,11 +228,14 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
    * Read metadata extension
    */
   async read(
-    config: Partial<MetadataExtensionBuilderConfig>,
+    config: Partial<IMetadataExtensionConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<MetadataExtensionBuilderConfig | undefined> {
+  ): Promise<IMetadataExtensionState | undefined> {
+    const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Metadata extension name is required');
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'read', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
@@ -229,14 +245,64 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
         : JSON.stringify(response.data);
 
       return {
-        name: config.name,
-        sourceCode
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
-        return undefined;
+        return state;
       }
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'read', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'read', err);
+      throw err;
       throw error;
+    }
+  }
+
+  /**
+   * Read metadata extension metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
+    if (!config.name) {
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await readMetadataExtension(this.connection, config.name);
+      state.metadataResult = response;
+      this.logger?.info?.('Metadata extension metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the metadata extension
+   */
+  async readTransport(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
+    if (!config.name) {
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getMetadataExtensionTransport(this.connection, config.name);
+      state.transportResult = response;
+      this.logger?.info?.('Metadata extension transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
     }
   }
 
@@ -245,11 +311,14 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
    * Always starts with lock
    */
   async update(
-    config: Partial<MetadataExtensionBuilderConfig>,
+    config: Partial<IMetadataExtensionConfig>,
     options?: IAdtOperationOptions
-  ): Promise<MetadataExtensionBuilderConfig> {
+  ): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Metadata extension name is required');
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'update', error, timestamp: new Date() });
+      throw error;
     }
 
     let lockHandle: string | undefined;
@@ -304,7 +373,8 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          name: config.name
+          activateResult: activateResponse,
+          errors: []
         };
       }
 
@@ -315,8 +385,8 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
         : JSON.stringify(readResponse.data);
 
       return {
-        name: config.name,
-        sourceCode
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -352,9 +422,12 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
   /**
    * Delete metadata extension
    */
-  async delete(config: Partial<MetadataExtensionBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Metadata extension name is required');
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'delete', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
@@ -363,9 +436,15 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
       const result = await deleteMetadataExtension(this.connection, config.name, config.transportRequest);
       this.logger?.info?.('Metadata extension deleted');
 
-      return result;
+      return {
+        deleteResult: result,
+        errors: []
+      };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'Delete', err);
+      throw err;
       throw error;
     }
   }
@@ -374,16 +453,26 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
    * Activate metadata extension
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<MetadataExtensionBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'activate', error, timestamp: new Date() });
+      throw error;
       throw new Error('Metadata extension name is required');
     }
 
     try {
       const result = await activateMetadataExtension(this.connection, config.name);
-      return result;
+      return {
+        activateResult: result,
+        errors: []
+      };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'Activate', err);
+      throw err;
       throw error;
     }
   }
@@ -392,15 +481,20 @@ export class AdtMetadataExtension implements IAdtObject<MetadataExtensionBuilder
    * Check metadata extension
    */
   async check(
-    config: Partial<MetadataExtensionBuilderConfig>,
+    config: Partial<IMetadataExtensionConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IMetadataExtensionState> {
+    const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
-      throw new Error('Metadata extension name is required');
+      const error = new Error('Metadata extension name is required');
+      state.errors.push({ method: 'check', error, timestamp: new Date() });
+      throw error;
     }
 
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkMetadataExtension(this.connection, config.name, version);
+    const result = await checkMetadataExtension(this.connection, config.name, version);
+    state.checkResult = result;
+    return state;
   }
 }

@@ -26,14 +26,14 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { BehaviorImplementationBuilderConfig } from './types';
+import { IBehaviorImplementationConfig, IBehaviorImplementationState } from './types';
 import { validateBehaviorImplementationName } from './validation';
 import { updateBehaviorImplementation } from './update';
-import { getBehaviorImplementationSource } from './read';
+import { getBehaviorImplementationSource, getBehaviorImplementationMetadata, getBehaviorImplementationTransport } from './read';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class';
 
-export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderConfig> {
+export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   private readonly class: AdtClass;
@@ -48,30 +48,45 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
   /**
    * Validate behavior implementation configuration before creation
    */
-  async validate(config: Partial<BehaviorImplementationBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
-      throw new Error('Class name is required for validation');
+      const error = new Error('Class name is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.behaviorDefinition) {
-      throw new Error('Behavior definition is required for validation');
+      const error = new Error('Behavior definition is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
 
-    return await validateBehaviorImplementationName(
-      this.connection,
-      config.className,
-      config.packageName,
-      config.description,
-      config.behaviorDefinition
-    );
+    try {
+      const response = await validateBehaviorImplementationName(
+        this.connection,
+        config.className,
+        config.packageName,
+        config.description,
+        config.behaviorDefinition
+      );
+      state.validationResponse = response;
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'validate', err);
+      throw err;
+    }
   }
 
   /**
    * Create behavior implementation with full operation chain
    */
   async create(
-    config: BehaviorImplementationBuilderConfig,
+    config: IBehaviorImplementationConfig,
     options?: IAdtOperationOptions
-  ): Promise<BehaviorImplementationBuilderConfig> {
+  ): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -106,7 +121,7 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
       // 2. Create class via AdtClass (creates empty class, sets stateful internally, then stateless after unlock)
       // We pass empty sourceCode to skip the update step in AdtClass.create(), since we need to update implementations include separately
       this.logger?.info?.('Step 2: Creating behavior implementation class');
-      await this.class.create(
+      const createState = await this.class.create(
         {
           className: config.className,
           packageName: config.packageName,
@@ -118,44 +133,51 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
         },
         { activateOnCreate: false } // Don't activate yet, we need to update implementations include first
       );
+      state.createResult = createState.createResult;
+      state.lockHandle = createState.lockHandle;
       objectCreated = true;
       this.logger?.info?.('Behavior implementation class created');
 
       // 3. Check after create (no stateful needed - AdtClass.create() sets stateless after unlock)
       this.logger?.info?.('Step 3: Checking created behavior implementation class');
-      await this.class.check({ className: config.className }, 'inactive');
+      const checkAfterCreateState = await this.class.check({ className: config.className }, 'inactive');
+      state.checkResult = checkAfterCreateState.checkResult;
       this.logger?.info?.('Check after create passed');
 
       // 4. Lock for updating implementations include (stateful set inside lock method)
       this.logger?.info?.('Step 4: Locking behavior implementation class');
       lockHandle = await this.class.lock({ className: config.className });
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Behavior implementation class locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.implementationCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await this.class.check({ className: config.className, sourceCode: codeToCheck }, 'inactive');
+        const checkInactiveState = await this.class.check({ className: config.className, sourceCode: codeToCheck }, 'inactive');
+        state.checkResult = checkInactiveState.checkResult;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update implementations include
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 6: Updating behavior implementation implementations include');
-        await updateBehaviorImplementation(
+        const updateResponse = await updateBehaviorImplementation(
           this.connection,
           config.className,
           codeToCheck,
           lockHandle,
           config.transportRequest
         );
+        state.updateResult = updateResponse;
         this.logger?.info?.('Behavior implementation updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 7: Unlocking behavior implementation class');
-        await this.class.unlock({ className: config.className }, lockHandle);
+        const unlockResponse = await this.class.unlock({ className: config.className }, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Behavior implementation class unlocked');
@@ -163,37 +185,31 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
 
       // 8. Final check (no stateful needed)
       this.logger?.info?.('Step 8: Final check');
-      await this.class.check({ className: config.className }, 'inactive');
+      const finalCheckState = await this.class.check({ className: config.className }, 'inactive');
+      state.checkResult = finalCheckState.checkResult;
       this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
         this.logger?.info?.('Step 9: Activating behavior implementation class');
-        const activateResponse = await this.class.activate({ className: config.className });
-        this.logger?.info?.('Behavior implementation class activated, status:', activateResponse.status);
+        const activateState = await this.class.activate({ className: config.className });
+        state.activateResult = activateState.activateResult;
+        this.logger?.info?.('Behavior implementation class activated, status:', activateState.activateResult?.status);
         
         // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          className: config.className,
-          packageName: config.packageName,
-          behaviorDefinition: config.behaviorDefinition
-        };
+        // Return state with activation result
+        return state;
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getBehaviorImplementationSource(this.connection, config.className);
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
+      state.readResult = readResponse;
 
-      return {
-        className: config.className,
-        packageName: config.packageName,
-        behaviorDefinition: config.behaviorDefinition,
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'create', error: err, timestamp: new Date() });
+      
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -220,8 +236,8 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
-      throw error;
+      logErrorSafely(this.logger, 'Create', err);
+      throw err;
     }
   }
 
@@ -229,29 +245,74 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
    * Read behavior implementation
    */
   async read(
-    config: Partial<BehaviorImplementationBuilderConfig>,
+    config: Partial<IBehaviorImplementationConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<BehaviorImplementationBuilderConfig | undefined> {
+  ): Promise<IBehaviorImplementationState | undefined> {
+    const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
-      throw new Error('Class name is required');
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'read', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
       const response = await getBehaviorImplementationSource(this.connection, config.className, version);
-      const sourceCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
-      return {
-        className: config.className,
-        behaviorDefinition: config.behaviorDefinition || '',
-        sourceCode
-      };
+      state.readResult = response;
+      return state;
     } catch (error: any) {
       if (error.response?.status === 404) {
         return undefined;
       }
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'read', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'read', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read behavior implementation metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
+    if (!config.className) {
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
       throw error;
+    }
+    try {
+      const response = await getBehaviorImplementationMetadata(this.connection, config.className);
+      state.metadataResult = response;
+      this.logger?.info?.('Behavior implementation metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the behavior implementation
+   */
+  async readTransport(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
+    if (!config.className) {
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getBehaviorImplementationTransport(this.connection, config.className);
+      state.transportResult = response;
+      this.logger?.info?.('Behavior implementation transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
     }
   }
 
@@ -260,11 +321,14 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
    * Always starts with lock
    */
   async update(
-    config: Partial<BehaviorImplementationBuilderConfig>,
+    config: Partial<IBehaviorImplementationConfig>,
     options?: IAdtOperationOptions
-  ): Promise<BehaviorImplementationBuilderConfig> {
+  ): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
-      throw new Error('Class name is required');
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'update', error, timestamp: new Date() });
+      throw error;
     }
 
     let lockHandle: string | undefined;
@@ -273,33 +337,37 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
       // 1. Lock (update always starts with lock, stateful set inside lock method)
       this.logger?.info?.('Step 1: Locking behavior implementation class');
       lockHandle = await this.class.lock({ className: config.className });
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Behavior implementation class locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.implementationCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await this.class.check({ className: config.className, sourceCode: codeToCheck }, 'inactive');
+        const checkInactiveState = await this.class.check({ className: config.className, sourceCode: codeToCheck }, 'inactive');
+        state.checkResult = checkInactiveState.checkResult;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update implementations include
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 3: Updating behavior implementation');
-        await updateBehaviorImplementation(
+        const updateResponse = await updateBehaviorImplementation(
           this.connection,
           config.className,
           codeToCheck,
           lockHandle,
           config.transportRequest
         );
+        state.updateResult = updateResponse;
         this.logger?.info?.('Behavior implementation updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking behavior implementation class');
-        await this.class.unlock({ className: config.className }, lockHandle);
+        const unlockResponse = await this.class.unlock({ className: config.className }, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Behavior implementation class unlocked');
@@ -307,34 +375,27 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await this.class.check({ className: config.className }, 'inactive');
+      const finalCheckState = await this.class.check({ className: config.className }, 'inactive');
+      state.checkResult = finalCheckState.checkResult;
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating behavior implementation class');
-        const activateResponse = await this.class.activate({ className: config.className });
-        this.logger?.info?.('Behavior implementation class activated, status:', activateResponse.status);
+        const activateState = await this.class.activate({ className: config.className });
+        state.activateResult = activateState.activateResult;
+        this.logger?.info?.('Behavior implementation class activated, status:', activateState.activateResult?.status);
         
         // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          className: config.className,
-          behaviorDefinition: config.behaviorDefinition || ''
-        };
+        // Return state with activation result
+        return state;
       }
 
       // Read and return result (no stateful needed)
       const readResponse = await getBehaviorImplementationSource(this.connection, config.className);
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
+      state.readResult = readResponse;
 
-      return {
-        className: config.className,
-        behaviorDefinition: config.behaviorDefinition || '',
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -370,24 +431,30 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
   /**
    * Delete behavior implementation
    */
-  async delete(config: Partial<BehaviorImplementationBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
-      throw new Error('Class name is required');
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'delete', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
       // Delete via AdtClass (handles check and delete)
       this.logger?.info?.('Deleting behavior implementation class');
-      const result = await this.class.delete({
+      const deleteState = await this.class.delete({
         className: config.className,
         transportRequest: config.transportRequest
       });
+      state.deleteResult = deleteState.deleteResult;
       this.logger?.info?.('Behavior implementation class deleted');
 
-      return result;
+      return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
-      throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'Delete', err);
+      throw err;
     }
   }
 
@@ -395,16 +462,23 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
    * Activate behavior implementation
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<BehaviorImplementationBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
-      throw new Error('Class name is required');
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'activate', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
-      return await this.class.activate({ className: config.className });
+      const activateState = await this.class.activate({ className: config.className });
+      state.activateResult = activateState.activateResult;
+      return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
-      throw error;
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'Activate', err);
+      throw err;
     }
   }
 
@@ -412,13 +486,25 @@ export class AdtBehaviorImplementation implements IAdtObject<BehaviorImplementat
    * Check behavior implementation
    */
   async check(
-    config: Partial<BehaviorImplementationBuilderConfig>,
+    config: Partial<IBehaviorImplementationConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IBehaviorImplementationState> {
+    const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
-      throw new Error('Class name is required');
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'check', error, timestamp: new Date() });
+      throw error;
     }
 
-    return await this.class.check({ className: config.className }, status);
+    try {
+      const checkState = await this.class.check({ className: config.className }, status);
+      state.checkResult = checkState.checkResult;
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'check', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'check', err);
+      throw err;
+    }
   }
 }

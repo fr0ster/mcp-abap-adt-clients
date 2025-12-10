@@ -40,21 +40,21 @@ import { unlockTable } from './unlock';
 import { activateTable } from './activation';
 import { deleteTable } from './delete';
 import { validateTableName } from './validation';
-import { CreateTableParams, UpdateTableParams, TableBuilderConfig, TableBuilderState } from './types';
+import { ICreateTableParams, IUpdateTableParams, ITableConfig, ITableState } from './types';
 import { getTableSource } from './read';
 import { IBuilder } from '../shared/IBuilder';
 
-export class TableBuilder implements IBuilder<TableBuilderState> {
+export class TableBuilder implements IBuilder<ITableState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: TableBuilderConfig;
+  private config: ITableConfig;
   private lockHandle?: string;
-  private state: TableBuilderState;
+  private state: ITableState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: TableBuilderConfig
+    config: ITableConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -138,7 +138,7 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
       }
       this.logger.info?.('Creating table:', this.config.tableName);
       this.connection.setSessionType("stateful");
-      const params: CreateTableParams = {
+      const params: ICreateTableParams = {
         table_name: this.config.tableName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -192,7 +192,7 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
         throw new Error('DDL code is required');
       }
       this.logger.info?.('Updating table:', this.config.tableName);
-      const params: UpdateTableParams = {
+      const params: IUpdateTableParams = {
         table_name: this.config.tableName,
         ddl_code: this.config.ddlCode,
         transport_request: this.config.transportRequest,
@@ -317,7 +317,7 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<TableBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<ITableConfig | undefined> {
     try {
       this.logger.info?.('Reading table:', this.config.tableName);
       const result = await getTableSource(this.connection, this.config.tableName);
@@ -370,7 +370,7 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
   }
 
   // Getters for accessing results
-  getState(): Readonly<TableBuilderState> {
+  getState(): Readonly<ITableState> {
     return { ...this.state };
   }
 
@@ -415,7 +415,7 @@ export class TableBuilder implements IBuilder<TableBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): TableBuilderConfig | undefined {
+  getReadResult(): ITableConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

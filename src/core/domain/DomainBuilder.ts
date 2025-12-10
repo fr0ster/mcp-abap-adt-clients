@@ -37,7 +37,7 @@ import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { create } from './create';
 import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
-import { CreateDomainParams, UpdateDomainParams, FixedValue, DomainBuilderConfig, DomainBuilderState } from './types';
+import { ICreateDomainParams, IUpdateDomainParams, IFixedValue, IDomainConfig, IDomainState } from './types';
 import { checkDomainSyntax } from './check';
 import { unlockDomain } from './unlock';
 import { activateDomain } from './activation';
@@ -48,17 +48,17 @@ import { getDomain, getDomainTransport } from './read';
 import { IBuilder } from '../shared/IBuilder';
 import { XMLParser } from 'fast-xml-parser';
 
-export class DomainBuilder implements IBuilder<DomainBuilderState> {
+export class DomainBuilder implements IBuilder<IDomainState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: DomainBuilderConfig;
+  private config: IDomainConfig;
   private lockHandle?: string;
-  private state: DomainBuilderState;
+  private state: IDomainState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: DomainBuilderConfig
+    config: IDomainConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -127,7 +127,7 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
     return this;
   }
 
-  setFixedValues(fixed_values: FixedValue[]): this {
+  setFixedValues(fixed_values: IFixedValue[]): this {
     this.config.fixed_values = fixed_values;
     return this;
   }
@@ -172,7 +172,7 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
 
-      const params: CreateDomainParams = {
+      const params: ICreateDomainParams = {
         domain_name: this.config.domainName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -250,7 +250,7 @@ export class DomainBuilder implements IBuilder<DomainBuilderState> {
       const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
       this.logger.info?.('Updating domain (UPDATE workflow):', this.config.domainName);
-      const updateParams: UpdateDomainParams = {
+      const updateParams: IUpdateDomainParams = {
         domain_name: this.config.domainName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
@@ -439,7 +439,7 @@ ${fixValuesXml}
     }
   }
 
-  async read(): Promise<DomainBuilderConfig | undefined> {
+  async read(): Promise<IDomainConfig | undefined> {
     try {
       this.logger.info?.('Reading domain:', this.config.domainName);
       const result = await getDomain(this.connection, this.config.domainName);
@@ -503,7 +503,7 @@ ${fixValuesXml}
   }
 
   // Getters for accessing results
-  getState(): Readonly<DomainBuilderState> {
+  getState(): Readonly<IDomainState> {
     return { ...this.state };
   }
 
@@ -547,7 +547,7 @@ ${fixValuesXml}
   /**
    * Parse XML response to DomainBuilderConfig
    */
-  private parseDomainXml(xmlData: string): DomainBuilderConfig | undefined {
+  private parseDomainXml(xmlData: string): IDomainConfig | undefined {
     try {
       const parser = new XMLParser({
         ignoreAttributes: false,
@@ -616,7 +616,7 @@ ${fixValuesXml}
     }
   }
 
-  getReadResult(): DomainBuilderConfig | undefined {
+  getReadResult(): IDomainConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

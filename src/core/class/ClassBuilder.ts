@@ -51,21 +51,21 @@ import { checkClass } from './check';
 import { unlockClass } from './unlock';
 import { activateClass } from './activation';
 import { deleteClass } from './delete';
-import { ClassBuilderConfig, ClassBuilderState } from './types';
+import { IClassConfig, IClassState } from './types';
 
 export class ClassBuilder {
   protected connection: IAbapConnection;
   protected logger: IAdtLogger;
-  protected config: ClassBuilderConfig;
+  protected config: IClassConfig;
   protected sourceCode?: string;
   protected lockHandle?: string;
   protected testLockHandle?: string;
-  protected state: ClassBuilderState;
+  protected state: IClassState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: ClassBuilderConfig
+    config: IClassConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -234,7 +234,7 @@ export class ClassBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<ClassBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IClassConfig | undefined> {
     try {
       this.logger.info?.('Reading class source:', this.config.className, 'version:', version);
       const result = await getClassSource(this.connection, this.config.className, version);
@@ -922,7 +922,7 @@ export class ClassBuilder {
   }
 
   // Getters for accessing results
-  getState(): Readonly<ClassBuilderState> {
+  getState(): Readonly<IClassState> {
     return { ...this.state };
   }
 
@@ -934,7 +934,7 @@ export class ClassBuilder {
     return this.state.createResult;
   }
 
-  getReadResult(): ClassBuilderConfig | undefined {
+  getReadResult(): IClassConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

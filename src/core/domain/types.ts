@@ -2,15 +2,15 @@
  * Domain module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-export interface FixedValue {
+export interface IFixedValue {
   low: string;
   text: string;
 }
 
 // Low-level function parameters (snake_case)
-export interface CreateDomainParams {
+export interface ICreateDomainParams {
   domain_name: string;
   description?: string;
   package_name: string;
@@ -23,10 +23,10 @@ export interface CreateDomainParams {
   sign_exists?: boolean;
   value_table?: string;
   activate?: boolean;
-  fixed_values?: FixedValue[];
+  fixed_values?: IFixedValue[];
 }
 
-export interface UpdateDomainParams {
+export interface IUpdateDomainParams {
   domain_name: string;
   description?: string;
   package_name: string;
@@ -39,10 +39,10 @@ export interface UpdateDomainParams {
   sign_exists?: boolean;
   value_table?: string;
   activate?: boolean;
-  fixed_values?: FixedValue[];
+  fixed_values?: IFixedValue[];
 }
 
-export interface DeleteDomainParams {
+export interface IDeleteDomainParams {
   domain_name: string;
   transport_request?: string;
 }
@@ -50,7 +50,7 @@ export interface DeleteDomainParams {
 // Builder configuration (camelCase)
 // Note: packageName is required for create/update operations (validated in builder methods)
 // description is required for create/update/validate operations
-export interface DomainBuilderConfig {
+export interface IDomainConfig {
   domainName: string;
   packageName?: string; // Required for create/update operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -62,10 +62,8 @@ export interface DomainBuilderConfig {
   lowercase?: boolean;
   sign_exists?: boolean;
   value_table?: string;
-  fixed_values?: FixedValue[];
+  fixed_values?: IFixedValue[];
 }
 
-export interface DomainBuilderState extends BaseBuilderState {
-  transportResult?: any; // Domain-specific: transport read result
-  // Other fields inherited from BaseBuilderState
+export interface IDomainState extends IAdtObjectState {
 }

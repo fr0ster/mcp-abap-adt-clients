@@ -8,7 +8,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse, AxiosError } from 'axios';
-import { MetadataExtensionValidationParams } from './types';
+import { IMetadataExtensionValidationParams } from './types';
 
 /**
  * Validate metadata extension parameters
@@ -26,7 +26,7 @@ import { MetadataExtensionValidationParams } from './types';
  */
 export async function validateMetadataExtension(
   connection: IAbapConnection,
-  params: MetadataExtensionValidationParams
+  params: IMetadataExtensionValidationParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/ddlx/sources/validation`;
   const queryParams = new URLSearchParams({

@@ -14,7 +14,7 @@ import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
-import { CreateFunctionGroupParams, FunctionGroupBuilderConfig, FunctionGroupBuilderState } from './types';
+import { ICreateFunctionGroupParams, IFunctionGroupConfig, IFunctionGroupState } from './types';
 import { lockFunctionGroup } from './lock';
 import { unlockFunctionGroup } from './unlock';
 import { activateFunctionGroup } from './activation';
@@ -24,17 +24,17 @@ import { getFunctionGroup } from './read';
 import { IBuilder } from '../shared/IBuilder';
 import { XMLParser } from 'fast-xml-parser';
 
-export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState> {
+export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: FunctionGroupBuilderConfig;
+  private config: IFunctionGroupConfig;
   private lockHandle?: string;
-  private state: FunctionGroupBuilderState;
+  private state: IFunctionGroupState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: FunctionGroupBuilderConfig
+    config: IFunctionGroupConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -112,7 +112,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
       this.logger.info?.('Creating function group:', this.config.functionGroupName);
       
       // Call low-level create function
-      const params: CreateFunctionGroupParams = {
+      const params: ICreateFunctionGroupParams = {
         functionGroupName: this.config.functionGroupName,
         description: this.config.description || '',
         packageName: this.config.packageName,
@@ -264,7 +264,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
     }
   }
 
-  async read(): Promise<FunctionGroupBuilderConfig | undefined> {
+  async read(): Promise<IFunctionGroupConfig | undefined> {
     try {
       this.logger.info?.('Reading function group:', this.config.functionGroupName);
       const result = await getFunctionGroup(this.connection, this.config.functionGroupName);
@@ -309,7 +309,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
   }
 
   // Getters for accessing results
-  getState(): Readonly<FunctionGroupBuilderState> {
+  getState(): Readonly<IFunctionGroupState> {
     return { ...this.state };
   }
 
@@ -352,7 +352,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
   /**
    * Parse XML response to FunctionGroupBuilderConfig
    */
-  private parseFunctionGroupXml(xmlData: string): FunctionGroupBuilderConfig | undefined {
+  private parseFunctionGroupXml(xmlData: string): IFunctionGroupConfig | undefined {
     try {
       const parser = new XMLParser({
         ignoreAttributes: false,
@@ -380,7 +380,7 @@ export class FunctionGroupBuilder implements IBuilder<FunctionGroupBuilderState>
     }
   }
 
-  getReadResult(): FunctionGroupBuilderConfig | undefined {
+  getReadResult(): IFunctionGroupConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

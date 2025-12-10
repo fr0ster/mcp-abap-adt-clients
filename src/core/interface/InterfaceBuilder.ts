@@ -22,21 +22,21 @@ import { activateInterface } from './activation';
 import { deleteInterface } from './delete';
 import { getInterfaceSource } from './read';
 import { get } from 'http';
-import { CreateInterfaceParams, InterfaceBuilderConfig, InterfaceBuilderState } from './types';
+import { ICreateInterfaceParams, IInterfaceConfig, IInterfaceState } from './types';
 import { IBuilder } from '../shared/IBuilder';
 
-export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
+export class InterfaceBuilder implements IBuilder<IInterfaceState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: InterfaceBuilderConfig;
+  private config: IInterfaceConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private state: InterfaceBuilderState;
+  private state: IInterfaceState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: InterfaceBuilderConfig
+    config: IInterfaceConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -124,7 +124,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
       const finalDescription = this.config.description || this.config.interfaceName;
       
       // Call low-level function
-      const params: CreateInterfaceParams = {
+      const params: ICreateInterfaceParams = {
         interfaceName: this.config.interfaceName,
         description: finalDescription,
         packageName: this.config.packageName,
@@ -318,7 +318,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<InterfaceBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IInterfaceConfig | undefined> {
     try {
       this.logger.info?.('Reading interface:', this.config.interfaceName);
       const result = await getInterfaceSource(this.connection, this.config.interfaceName);
@@ -366,7 +366,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
   }
 
   // Getters for accessing results
-  getState(): Readonly<InterfaceBuilderState> {
+  getState(): Readonly<IInterfaceState> {
     return { ...this.state };
   }
 
@@ -411,7 +411,7 @@ export class InterfaceBuilder implements IBuilder<InterfaceBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): InterfaceBuilderConfig | undefined {
+  getReadResult(): IInterfaceConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

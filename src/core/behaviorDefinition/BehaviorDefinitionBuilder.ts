@@ -20,21 +20,21 @@ import { update } from './update';
 import { checkImplementation, checkAbap } from './check';
 import { activate } from './activation';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
-import { BehaviorDefinitionValidationParams, BehaviorDefinitionCreateParams, UpdateBehaviorDefinitionParams, BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderState } from './types';
+import { IBehaviorDefinitionValidationParams, IBehaviorDefinitionCreateParams, IUpdateBehaviorDefinitionParams, IBehaviorDefinitionConfig, IBehaviorDefinitionState } from './types';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 
 export class BehaviorDefinitionBuilder {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: BehaviorDefinitionBuilderConfig;
+  private config: IBehaviorDefinitionConfig;
   private sourceCode?: string;
   private lockHandle?: string;
-  private state: BehaviorDefinitionBuilderState;
+  private state: IBehaviorDefinitionState;
 
   constructor(
     connection: IAbapConnection,
     logger:     IAdtLogger,
-    config: BehaviorDefinitionBuilderConfig
+    config: IBehaviorDefinitionConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -98,7 +98,7 @@ export class BehaviorDefinitionBuilder {
       
       this.logger.info?.('Validating behavior definition:', this.config.name);
       
-      const params: BehaviorDefinitionValidationParams = {
+      const params: IBehaviorDefinitionValidationParams = {
         objname: this.config.name,
         rootEntity: this.config.rootEntity,
         description: this.config.description || '',
@@ -131,7 +131,7 @@ export class BehaviorDefinitionBuilder {
       
       this.logger.info?.('Creating behavior definition:', this.config.name);
       
-      const params: BehaviorDefinitionCreateParams = {
+      const params: IBehaviorDefinitionCreateParams = {
         name: this.config.name,
         package: this.config.packageName,
         description: this.config.description || '',
@@ -214,7 +214,7 @@ export class BehaviorDefinitionBuilder {
       }
       this.logger.info?.('Updating behavior definition source:', this.config.name);
 
-      const params: UpdateBehaviorDefinitionParams = {
+      const params: IUpdateBehaviorDefinitionParams = {
         name: this.config.name,
         sourceCode: code,
         lockHandle: this.lockHandle,
@@ -406,7 +406,7 @@ export class BehaviorDefinitionBuilder {
   }
 
   // Getters for accessing results
-  getState(): Readonly<BehaviorDefinitionBuilderState> {
+  getState(): Readonly<IBehaviorDefinitionState> {
     return { ...this.state };
   }
 

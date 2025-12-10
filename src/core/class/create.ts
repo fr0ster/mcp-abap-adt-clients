@@ -7,7 +7,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
-import { CreateClassParams } from './types';
+import { ICreateClassParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 const logger = {
@@ -24,7 +24,7 @@ const logger = {
  */
 export async function create(
   connection: IAbapConnection,
-  args: CreateClassParams
+  args: ICreateClassParams
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.class_name || '');

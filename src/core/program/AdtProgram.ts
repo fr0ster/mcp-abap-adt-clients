@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { ProgramBuilderConfig } from './types';
+import { IProgramConfig, IProgramState } from './types';
 import { validateProgramName } from './validation';
 import { create as createProgram } from './create';
 import { checkProgram } from './check';
@@ -30,9 +30,9 @@ import { uploadProgramSource } from './update';
 import { unlockProgram } from './unlock';
 import { activateProgram } from './activation';
 import { checkDeletion, deleteProgram } from './delete';
-import { getProgramSource } from './read';
+import { getProgramSource, getProgramTransport, getProgramMetadata } from './read';
 
-export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuilderConfig> {
+export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Program';
@@ -45,25 +45,50 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
   /**
    * Validate program configuration before creation
    */
-  async validate(config: Partial<ProgramBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IProgramConfig>): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required for validation');
     }
 
-    return await validateProgramName(
-      this.connection,
-      config.programName,
-      config.description
-    );
+    try {
+      const validationResponse = await validateProgramName(
+        this.connection,
+        config.programName,
+        config.description
+      );
+
+      return {
+        validationResponse: validationResponse,
+        errors: []
+      };
+    } catch (error: any) {
+      const status = error.response?.status;
+      const statusText = error.response?.statusText;
+      const errorMessage = error.response?.data 
+        ? (typeof error.response.data === 'string' 
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500))
+        : error.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Validation failed: HTTP ${status} ${statusText} - ${errorMessage}`
+      );
+
+      if (status === 400 || (status >= 400 && status < 500)) {
+        throw new Error(`Validation failed: ${errorMessage}`);
+      }
+
+      throw error;
+    }
   }
 
   /**
    * Create program with full operation chain
    */
   async create(
-    config: ProgramBuilderConfig,
+    config: IProgramConfig,
     options?: IAdtOperationOptions
-  ): Promise<ProgramBuilderConfig> {
+  ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
@@ -74,20 +99,24 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
     let objectCreated = false;
     let lockHandle: string | undefined;
     const sessionId = this.connection.getSessionId?.() || '';
+    const state: IProgramState = {
+      errors: []
+    };
 
     try {
       // 1. Validate (no stateful needed)
       this.logger?.info?.('Step 1: Validating program configuration');
-      await validateProgramName(
+      const validationResponse = await validateProgramName(
         this.connection,
         config.programName,
         config.description
       );
+      state.validationResponse = validationResponse;
       this.logger?.info?.('Validation passed');
 
       // 2. Create (requires stateful)
       this.logger?.info?.('Step 2: Creating program');
-      await createProgram(this.connection, {
+      const createResponse = await createProgram(this.connection, {
         programName: config.programName,
         packageName: config.packageName,
         transportRequest: config.transportRequest,
@@ -96,32 +125,36 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
         application: config.application,
         sourceCode: options?.sourceCode || config.sourceCode
       });
+      state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Program created');
 
       // 3. Check after create (stateful still set from create)
       this.logger?.info?.('Step 3: Checking created program');
-      await checkProgram(this.connection, config.programName, 'inactive');
+      const checkResponse1 = await checkProgram(this.connection, config.programName, 'inactive');
+      state.checkResult = checkResponse1;
       this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful already set, keep it)
       this.logger?.info?.('Step 4: Locking program');
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Program locked, handle:', lockHandle);
 
       // 5. Check inactive with code for update
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
+        const checkResponse2 = await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
+        state.checkResult = checkResponse2;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 6: Updating program with source code');
-        await uploadProgramSource(
+        const updateResponse = await uploadProgramSource(
           this.connection,
           config.programName,
           codeToCheck,
@@ -129,13 +162,15 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
           sessionId,
           config.transportRequest
         );
+        state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 7: Unlocking program');
-        await unlockProgram(this.connection, config.programName, lockHandle);
+        const unlockResponse = await unlockProgram(this.connection, config.programName, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Program unlocked');
@@ -143,34 +178,19 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
 
       // 8. Final check (no stateful needed)
       this.logger?.info?.('Step 8: Final check');
-      await checkProgram(this.connection, config.programName, 'inactive');
+      const checkResponse3 = await checkProgram(this.connection, config.programName, 'inactive');
+      state.checkResult = checkResponse3;
       this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
         this.logger?.info?.('Step 9: Activating program');
         const activateResponse = await activateProgram(this.connection, config.programName);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Program activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info without sourceCode (activation returns 201)
-        return {
-          programName: config.programName,
-          packageName: config.packageName
-        };
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getProgramSource(this.connection, config.programName);
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
-      return {
-        programName: config.programName,
-        packageName: config.packageName,
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -210,22 +230,18 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
    * Read program
    */
   async read(
-    config: Partial<ProgramBuilderConfig>,
+    config: Partial<IProgramConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<ProgramBuilderConfig | undefined> {
+  ): Promise<IProgramState | undefined> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
     try {
       const response = await getProgramSource(this.connection, config.programName);
-      const sourceCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
       return {
-        programName: config.programName,
-        sourceCode
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -236,39 +252,67 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
   }
 
   /**
+   * Read program metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IProgramConfig>): Promise<IProgramState> {
+    const state: IProgramState = { errors: [] };
+    if (!config.programName) {
+      const error = new Error('Program name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getProgramMetadata(this.connection, config.programName);
+      state.metadataResult = response;
+      this.logger?.info?.('Program metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
    * Update program with full operation chain
    * Always starts with lock
    */
   async update(
-    config: Partial<ProgramBuilderConfig>,
+    config: Partial<IProgramConfig>,
     options?: IAdtOperationOptions
-  ): Promise<ProgramBuilderConfig> {
+  ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
     let lockHandle: string | undefined;
     const sessionId = this.connection.getSessionId?.() || '';
+    const state: IProgramState = {
+      errors: []
+    };
 
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
       this.logger?.info?.('Step 1: Locking program');
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Program locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
+        const checkResponse = await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
+        state.checkResult = checkResponse;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 3: Updating program');
-        await uploadProgramSource(
+        const updateResponse = await uploadProgramSource(
           this.connection,
           config.programName,
           codeToCheck,
@@ -276,13 +320,15 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
           sessionId,
           config.transportRequest
         );
+        state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking program');
-        await unlockProgram(this.connection, config.programName, lockHandle);
+        const unlockResponse = await unlockProgram(this.connection, config.programName, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Program unlocked');
@@ -290,32 +336,19 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkProgram(this.connection, config.programName, 'inactive');
+      const checkResponse2 = await checkProgram(this.connection, config.programName, 'inactive');
+      state.checkResult = checkResponse2;
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating program');
         const activateResponse = await activateProgram(this.connection, config.programName);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Program activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info without sourceCode (activation returns 201)
-        return {
-          programName: config.programName
-        };
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getProgramSource(this.connection, config.programName);
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
-      return {
-        programName: config.programName,
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -354,30 +387,36 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
   /**
    * Delete program
    */
-  async delete(config: Partial<ProgramBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IProgramConfig>): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
+    const state: IProgramState = {
+      errors: []
+    };
+
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking program for deletion');
-      await checkDeletion(this.connection, {
+      const checkResponse = await checkDeletion(this.connection, {
         programName: config.programName,
         transportRequest: config.transportRequest
       });
+      state.checkResult = checkResponse;
       this.logger?.info?.('Deletion check passed');
 
       // Delete (requires stateful, but no lock)
       this.logger?.info?.('Deleting program');
       this.connection.setSessionType('stateful');
-      const result = await deleteProgram(this.connection, {
+      const deleteResponse = await deleteProgram(this.connection, {
         programName: config.programName,
         transportRequest: config.transportRequest
       });
+      state.deleteResult = deleteResponse;
       this.logger?.info?.('Program deleted');
 
-      return result;
+      return state;
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -390,15 +429,32 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
    * Activate program
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<ProgramBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IProgramConfig>): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
+    const state: IProgramState = {
+      errors: []
+    };
+
     try {
-      const result = await activateProgram(this.connection, config.programName);
-      return result;
+      const activateResponse = await activateProgram(this.connection, config.programName);
+      state.activateResult = activateResponse;
+      return state;
     } catch (error: any) {
+      const status = error.response?.status;
+      const statusText = error.response?.statusText;
+      const errorMessage = error.response?.data 
+        ? (typeof error.response.data === 'string' 
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500))
+        : error.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Activate failed: HTTP ${status} ${statusText} - ${errorMessage}`
+      );
+
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
     }
@@ -408,15 +464,61 @@ export class AdtProgram implements IAdtObject<ProgramBuilderConfig, ProgramBuild
    * Check program
    */
   async check(
-    config: Partial<ProgramBuilderConfig>,
+    config: Partial<IProgramConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
-    // Map status to version
-    const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkProgram(this.connection, config.programName, version, config.sourceCode);
+    const state: IProgramState = {
+      errors: []
+    };
+
+    try {
+      // Map status to version
+      const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
+      const checkResponse = await checkProgram(this.connection, config.programName, version, config.sourceCode);
+      state.checkResult = checkResponse;
+      return state;
+    } catch (error: any) {
+      logErrorSafely(this.logger, 'Check', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Read transport request information for the program
+   */
+  async readTransport(config: Partial<IProgramConfig>): Promise<IProgramState> {
+    const state: IProgramState = {
+      errors: []
+    };
+
+    if (!config.programName) {
+      const error = new Error('Program name is required');
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date()
+      });
+      throw error;
+    }
+
+    try {
+      const response = await getProgramTransport(this.connection, config.programName);
+      state.transportResult = response;
+      this.logger?.info?.('Transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date()
+      });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
   }
 }

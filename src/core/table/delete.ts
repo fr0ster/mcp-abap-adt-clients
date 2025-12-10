@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteTableParams } from './types';
+import { IDeleteTableParams } from './types';
 
 /**
  * Low-level: Check if table can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteTableParams
+  params: IDeleteTableParams
 ): Promise<AxiosResponse> {
   const { table_name } = params;
 
@@ -50,7 +50,7 @@ export async function checkDeletion(
  */
 export async function deleteTable(
   connection: IAbapConnection,
-  params: DeleteTableParams
+  params: IDeleteTableParams
 ): Promise<AxiosResponse> {
   const { table_name, transport_request } = params;
 

@@ -5,7 +5,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from "fast-xml-parser";
-import { ObjectReference, InactiveObjectsResponse } from "./types";
+import { IObjectReference, IInactiveObjectsResponse } from "./types";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -36,7 +36,7 @@ export async function getInactiveObjects(
   options?: {
     includeRawXml?: boolean;
   }
-): Promise<InactiveObjectsResponse> {
+): Promise<IInactiveObjectsResponse> {
 
   const response = await connection.makeAdtRequest({
     method: "GET",
@@ -50,7 +50,7 @@ export async function getInactiveObjects(
   const xml = response.data;
   const parsed = xmlParser.parse(xml);
 
-  const objects: ObjectReference[] = [];
+  const objects: IObjectReference[] = [];
 
   // Parse XML response
   const root = parsed["ioc:inactiveObjects"];

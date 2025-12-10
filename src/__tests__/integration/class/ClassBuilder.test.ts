@@ -137,31 +137,6 @@ describe('ClassBuilder (using AdtClient)', () => {
     return { success: true };
   }
 
-  async function waitForClassCreation(className: string, maxAttempts = 5, delayMs = 2000): Promise<void> {
-    if (!connection) {
-      return;
-    }
-
-    // Use read method from AdtClient - it's more reliable than metadata endpoint
-    // Metadata endpoint may return 406 for newly created classes
-    const tempClient = new AdtClient(connection, builderLogger);
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        const result = await tempClient.getClass().read({ className });
-        if (result) {
-          return;
-        }
-      } catch (error: any) {
-        if (error.response?.status !== 404) {
-          throw error;
-        }
-        if (attempt === maxAttempts) {
-          throw error;
-        }
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-    }
-  }
 
   function buildUnitTestDefinitions(config: any, fallbackClassName: string): IClassUnitTestDefinition[] {
     if (!config) {
@@ -364,7 +339,6 @@ describe('ClassBuilder (using AdtClient)', () => {
           classCreated = true;
           const createDelay = getOperationDelay('create', testCase);
           await new Promise(resolve => setTimeout(resolve, createDelay));
-          await waitForClassCreation(testClassName);
 
           currentStep = 'check with source code (before update)';
           logBuilderTestStep(currentStep);

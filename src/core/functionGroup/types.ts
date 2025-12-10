@@ -2,24 +2,24 @@
  * FunctionGroup module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (camelCase)
-export interface CreateFunctionGroupParams {
+export interface ICreateFunctionGroupParams {
   functionGroupName: string;
   description: string;
   packageName: string;
   transportRequest?: string;
 }
 
-export interface UpdateFunctionGroupParams {
+export interface IUpdateFunctionGroupParams {
   function_group_name: string;
   description?: string;
   transport_request?: string;
   lock_handle?: string;
 }
 
-export interface DeleteFunctionGroupParams {
+export interface IDeleteFunctionGroupParams {
   function_group_name: string;
   transport_request?: string;
 }
@@ -27,7 +27,7 @@ export interface DeleteFunctionGroupParams {
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface FunctionGroupBuilderConfig {
+export interface IFunctionGroupConfig {
   functionGroupName: string; // Required
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -36,6 +36,9 @@ export interface FunctionGroupBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface FunctionGroupBuilderState extends BaseBuilderState {
-  // FunctionGroup-specific state can be added here if needed
+export interface IFunctionGroupState extends IAdtObjectState {
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
+  // FunctionGroup-specific fields can be added here if needed
 }

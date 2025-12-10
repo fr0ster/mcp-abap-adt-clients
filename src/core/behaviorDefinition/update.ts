@@ -5,7 +5,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
-import { UpdateBehaviorDefinitionParams } from './types';
+import { IUpdateBehaviorDefinitionParams } from './types';
 
 /**
  * Update behavior definition source code
@@ -45,7 +45,7 @@ import { UpdateBehaviorDefinitionParams } from './types';
  */
 export async function update(
     connection: IAbapConnection,
-    params: UpdateBehaviorDefinitionParams
+    params: IUpdateBehaviorDefinitionParams
 ): Promise<AxiosResponse> {
     if (!params.sourceCode) {
         throw new Error('sourceCode is required');

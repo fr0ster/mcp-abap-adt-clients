@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteViewParams } from './types';
+import { IDeleteViewParams } from './types';
 
 /**
  * Low-level: Check if view can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteViewParams
+  params: IDeleteViewParams
 ): Promise<AxiosResponse> {
   const { view_name } = params;
 
@@ -50,7 +50,7 @@ export async function checkDeletion(
  */
 export async function deleteView(
   connection: IAbapConnection,
-  params: DeleteViewParams
+  params: IDeleteViewParams
 ): Promise<AxiosResponse> {
   const { view_name, transport_request } = params;
 

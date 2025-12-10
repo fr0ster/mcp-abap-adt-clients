@@ -73,3 +73,103 @@ export async function getClassTransport(
   });
 }
 
+/**
+ * Get ABAP class definitions include (local types in private section)
+ * @param connection - SAP connection
+ * @param className - Class name
+ * @param version - 'active' (default) or 'inactive' to read modified but not activated version
+ */
+export async function getClassDefinitionsInclude(
+  connection: IAbapConnection,
+  className: string,
+  version: 'active' | 'inactive' = 'active'
+): Promise<AxiosResponse> {
+  const encodedName = encodeSapObjectName(className);
+  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/definitions?version=${versionParam}`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'text/plain; charset=utf-8'
+    }
+  });
+}
+
+/**
+ * Get ABAP class macros include
+ * @param connection - SAP connection
+ * @param className - Class name
+ * @param version - 'active' (default) or 'inactive' to read modified but not activated version
+ */
+export async function getClassMacrosInclude(
+  connection: IAbapConnection,
+  className: string,
+  version: 'active' | 'inactive' = 'active'
+): Promise<AxiosResponse> {
+  const encodedName = encodeSapObjectName(className);
+  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/macros?version=${versionParam}`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'text/plain; charset=utf-8'
+    }
+  });
+}
+
+/**
+ * Get ABAP class testclasses include (local test classes)
+ * @param connection - SAP connection
+ * @param className - Class name
+ * @param version - 'active' (default) or 'inactive' to read modified but not activated version
+ */
+export async function getClassTestClassesInclude(
+  connection: IAbapConnection,
+  className: string,
+  version: 'active' | 'inactive' = 'active'
+): Promise<AxiosResponse> {
+  const encodedName = encodeSapObjectName(className);
+  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?version=${versionParam}`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'text/plain; charset=utf-8'
+    }
+  });
+}
+
+/**
+ * Get ABAP class implementations include (local types, helper classes, interfaces)
+ * @param connection - SAP connection
+ * @param className - Class name
+ * @param version - 'active' (default) or 'inactive' to read modified but not activated version
+ */
+export async function getClassImplementationsInclude(
+  connection: IAbapConnection,
+  className: string,
+  version: 'active' | 'inactive' = 'active'
+): Promise<AxiosResponse> {
+  const encodedName = encodeSapObjectName(className);
+  const versionParam = version === 'inactive' ? 'workingArea' : 'active';
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?version=${versionParam}`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: {
+      'Accept': 'text/plain; charset=utf-8'
+    }
+  });
+}
+

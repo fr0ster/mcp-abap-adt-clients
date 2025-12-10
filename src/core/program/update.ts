@@ -5,7 +5,7 @@
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { UpdateProgramSourceParams } from './types';
+import { IUpdateProgramSourceParams } from './types';
 
 /**
  * Upload program source code (low-level - uses existing lockHandle)

@@ -7,7 +7,7 @@ import { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { limitDescription } from '../../utils/internalUtils';
-import { BehaviorDefinitionCreateParams } from './types';
+import { IBehaviorDefinitionCreateParams } from './types';
 
 /**
  * Create a new behavior definition
@@ -34,7 +34,7 @@ import { BehaviorDefinitionCreateParams } from './types';
  */
 export async function create(
     connection: IAbapConnection,
-    params: BehaviorDefinitionCreateParams,
+    params: IBehaviorDefinitionCreateParams,
 ): Promise<AxiosResponse> {
     try {
         const language = params.language || 'EN';

@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { DataElementBuilderConfig } from './types';
+import { IDataElementConfig, IDataElementState } from './types';
 import { validateDataElementName } from './validation';
 import { create as createDataElement } from './create';
 import { checkDataElement } from './check';
@@ -30,10 +30,13 @@ import { updateDataElement } from './update';
 import { unlockDataElement } from './unlock';
 import { activateDataElement } from './activation';
 import { checkDeletion, deleteDataElement } from './delete';
-import { getDataElement } from './read';
+import { getDataElement, getDataElementTransport } from './read';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { IDomainConfig, IDomainState } from '../domain';
+import { IClassState } from '../class/types';
+import { getClassTransport } from '../class/read';
 
-export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, DataElementBuilderConfig> {
+export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataElementState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'DataElement';
@@ -46,26 +49,31 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
   /**
    * Validate data element configuration before creation
    */
-  async validate(config: Partial<DataElementBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IDataElementConfig>): Promise<IDataElementState> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required for validation');
     }
 
-    return await validateDataElementName(
+    const validationResponse = await validateDataElementName(
       this.connection,
       config.dataElementName,
       config.packageName,
       config.description
     );
+
+    return {
+      validationResponse: validationResponse,
+      errors: []
+    };
   }
 
   /**
    * Create data element with full operation chain
    */
   async create(
-    config: DataElementBuilderConfig,
+    config: IDataElementConfig,
     options?: IAdtOperationOptions
-  ): Promise<DataElementBuilderConfig> {
+  ): Promise<IDataElementState> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
     }
@@ -85,21 +93,25 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
     const timeout = options?.timeout || 1000;
+    const state: IDataElementState = {
+      errors: []
+    };
 
     try {
       // 1. Validate (no stateful needed)
       this.logger?.info?.('Step 1: Validating data element configuration');
-      await validateDataElementName(
+      const validationResponse = await validateDataElementName(
         this.connection,
         config.dataElementName,
         config.packageName,
         config.description
       );
+      state.validationResponse = validationResponse;
       this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
       this.logger?.info?.('Step 2: Creating data element');
-      await createDataElement(
+      const createResponse = await createDataElement(
         this.connection,
         {
           data_element_name: config.dataElementName,
@@ -120,25 +132,29 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
           set_get_parameter: config.setGetParameter
         }
       );
+      state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Data element created');
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created data element');
-      await checkDataElement(this.connection, config.dataElementName, 'inactive');
+      const checkResponse1 = await checkDataElement(this.connection, config.dataElementName, 'inactive');
+      state.checkResult = checkResponse1;
       this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful ONLY before lock)
       this.logger?.info?.('Step 4: Locking data element');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDataElement(this.connection, config.dataElementName);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Data element locked, handle:', lockHandle);
 
       // 5. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
         this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await checkDataElement(this.connection, config.dataElementName, 'inactive', xmlToCheck);
+        const checkResponse2 = await checkDataElement(this.connection, config.dataElementName, 'inactive', xmlToCheck);
+        state.checkResult = checkResponse2;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -167,13 +183,15 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
           },
           lockHandle
         );
+        // updateDataElement returns void, so we don't store it in state
         this.logger?.info?.('Data element updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 7: Unlocking data element');
-        await unlockDataElement(this.connection, config.dataElementName, lockHandle);
+        const unlockResponse = await unlockDataElement(this.connection, config.dataElementName, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Data element unlocked');
@@ -181,29 +199,23 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
       // 8. Final check (no stateful needed)
       this.logger?.info?.('Step 8: Final check');
-      await checkDataElement(this.connection, config.dataElementName, 'inactive');
+      const checkResponse3 = await checkDataElement(this.connection, config.dataElementName, 'inactive');
+      state.checkResult = checkResponse3;
       this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
         this.logger?.info?.('Step 9: Activating data element');
         const activateResponse = await activateDataElement(this.connection, config.dataElementName);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Data element activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          dataElementName: config.dataElementName,
-          packageName: config.packageName
-        };
+      } else {
+        // Read if not activated
+        const readResponse = await getDataElement(this.connection, config.dataElementName);
+        state.readResult = readResponse;
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getDataElement(this.connection, config.dataElementName);
-      return {
-        dataElementName: config.dataElementName,
-        packageName: config.packageName
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -242,9 +254,9 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
    * Read data element
    */
   async read(
-    config: Partial<DataElementBuilderConfig>,
+    config: Partial<IDataElementConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<DataElementBuilderConfig | undefined> {
+  ): Promise<IDataElementState | undefined> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
     }
@@ -252,13 +264,47 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
     try {
       const response = await getDataElement(this.connection, config.dataElementName);
       return {
-        dataElementName: config.dataElementName
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
         return undefined;
       }
+      logErrorSafely(this.logger, 'Read', error);
       throw error;
+    }
+  }
+
+  /**
+   * Read data element metadata (object characteristics: package, responsible, description, etc.)
+   * For data elements, read() already returns metadata since there's no source code.
+   */
+  async readMetadata(config: Partial<IDataElementConfig>): Promise<IDataElementState> {
+    const state: IDataElementState = { errors: [] };
+    if (!config.dataElementName) {
+      const error = new Error('Data element name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      // For objects without source code, read() already returns metadata
+      const readState = await this.read(config);
+      if (readState) {
+        state.metadataResult = readState.readResult;
+        state.readResult = readState.readResult;
+      } else {
+        const error = new Error(`Data element '${config.dataElementName}' not found`);
+        state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+        throw error;
+      }
+      this.logger?.info?.('Data element metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
     }
   }
 
@@ -267,9 +313,9 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
    * Always starts with lock
    */
   async update(
-    config: Partial<DataElementBuilderConfig>,
+    config: Partial<IDataElementConfig>,
     options?: IAdtOperationOptions
-  ): Promise<DataElementBuilderConfig> {
+  ): Promise<IDataElementState> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
     }
@@ -282,19 +328,24 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
     let lockHandle: string | undefined;
     const timeout = options?.timeout || 1000;
+    const state: IDataElementState = {
+      errors: []
+    };
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking data element');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDataElement(this.connection, config.dataElementName);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Data element locked, handle:', lockHandle);
 
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
         this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkDataElement(this.connection, config.dataElementName, 'inactive', xmlToCheck);
+        const checkResponse = await checkDataElement(this.connection, config.dataElementName, 'inactive', xmlToCheck);
+        state.checkResult = checkResponse;
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -323,13 +374,15 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
           },
           lockHandle
         );
+        // updateDataElement returns void, so we don't store it in state
         this.logger?.info?.('Data element updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking data element');
-        await unlockDataElement(this.connection, config.dataElementName, lockHandle);
+        const unlockResponse = await unlockDataElement(this.connection, config.dataElementName, lockHandle);
+        state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Data element unlocked');
@@ -337,27 +390,23 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkDataElement(this.connection, config.dataElementName, 'inactive');
+      const checkResponse2 = await checkDataElement(this.connection, config.dataElementName, 'inactive');
+      state.checkResult = checkResponse2;
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating data element');
         const activateResponse = await activateDataElement(this.connection, config.dataElementName);
+        state.activateResult = activateResponse;
         this.logger?.info?.('Data element activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
-        return {
-          dataElementName: config.dataElementName
-        };
+      } else {
+        // Read if not activated
+        const readResponse = await getDataElement(this.connection, config.dataElementName);
+        state.readResult = readResponse;
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getDataElement(this.connection, config.dataElementName);
-      return {
-        dataElementName: config.dataElementName
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -395,29 +444,35 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
   /**
    * Delete data element
    */
-  async delete(config: Partial<DataElementBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IDataElementConfig>): Promise<IDataElementState> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
     }
 
+    const state: IDataElementState = {
+      errors: []
+    };
+
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking data element for deletion');
-      await checkDeletion(this.connection, {
+      const checkResponse = await checkDeletion(this.connection, {
         data_element_name: config.dataElementName,
         transport_request: config.transportRequest
       });
+      state.checkResult = checkResponse;
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
       this.logger?.info?.('Deleting data element');
-      const result = await deleteDataElement(this.connection, {
+      const deleteResponse = await deleteDataElement(this.connection, {
         data_element_name: config.dataElementName,
         transport_request: config.transportRequest
       });
+      state.deleteResult = deleteResponse;
       this.logger?.info?.('Data element deleted');
 
-      return result;
+      return state;
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -428,14 +483,19 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
    * Activate data element
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<DataElementBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IDataElementConfig>): Promise<IDataElementState> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
     }
 
+    const state: IDataElementState = {
+      errors: []
+    };
+
     try {
-      const result = await activateDataElement(this.connection, config.dataElementName);
-      return result;
+      const activateResponse = await activateDataElement(this.connection, config.dataElementName);
+      state.activateResult = activateResponse;
+      return state;
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -446,15 +506,56 @@ export class AdtDataElement implements IAdtObject<DataElementBuilderConfig, Data
    * Check data element
    */
   async check(
-    config: Partial<DataElementBuilderConfig>,
+    config: Partial<IDataElementConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IDataElementState> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
     }
 
+    const state: IDataElementState = {
+      errors: []
+    };
+
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkDataElement(this.connection, config.dataElementName, version);
+    const checkResponse = await checkDataElement(this.connection, config.dataElementName, version);
+    state.checkResult = checkResponse;
+    return state;
+  }
+
+  /**
+   * Read transport request information for the data element
+   */
+  async readTransport(config: Partial<IDataElementConfig>): Promise<IDataElementState> {
+    const state: IDataElementState = {
+      errors: []
+    };
+
+    if (!config.dataElementName) {
+      const error = new Error('Data element name is required');
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date()
+      });
+      throw error;
+    }
+
+    try {
+      const response = await getDataElementTransport(this.connection, config.dataElementName);
+      state.transportResult = response;
+      this.logger?.info?.('Transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date()
+      });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
   }
 }

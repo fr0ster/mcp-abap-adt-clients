@@ -40,21 +40,21 @@ import { unlockStructure } from './unlock';
 import { activateStructure } from './activation';
 import { deleteStructure } from './delete';
 import { validateStructureName } from './validation';
-import { StructureField, StructureInclude, CreateStructureParams, UpdateStructureParams, StructureBuilderConfig, StructureBuilderState } from './types';
+import { IStructureField, IStructureInclude, ICreateStructureParams, IUpdateStructureParams, IStructureConfig, IStructureState } from './types';
 import { getStructureSource } from './read';
 import { IBuilder } from '../shared/IBuilder';
 
-export class StructureBuilder implements IBuilder<StructureBuilderState> {
+export class StructureBuilder implements IBuilder<IStructureState> {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: StructureBuilderConfig;
+  private config: IStructureConfig;
   private lockHandle?: string;
-  private state: StructureBuilderState;
+  private state: IStructureState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: StructureBuilderConfig
+    config: IStructureConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -94,19 +94,19 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     return this;
   }
 
-  setFields(fields: StructureField[]): this {
+  setFields(fields: IStructureField[]): this {
     this.config.fields = fields;
     this.logger.debug?.('Fields set:', fields.length);
     return this;
   }
 
-  setIncludes(includes: StructureInclude[]): this {
+  setIncludes(includes: IStructureInclude[]): this {
     this.config.includes = includes;
     this.logger.debug?.('Includes set:', includes.length);
     return this;
   }
 
-  addField(field: StructureField): this {
+  addField(field: IStructureField): this {
     if (!this.config.fields) {
       this.config.fields = [];
     }
@@ -114,7 +114,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     return this;
   }
 
-  addInclude(include: StructureInclude): this {
+  addInclude(include: IStructureInclude): this {
     if (!this.config.includes) {
       this.config.includes = [];
     }
@@ -165,7 +165,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
       this.logger.info?.('Creating structure metadata:', this.config.structureName);
       
       // Call low-level create function (metadata only)
-      const params: CreateStructureParams = {
+      const params: ICreateStructureParams = {
         structureName: this.config.structureName,
         description: this.config.description || '',
         packageName: this.config.packageName,
@@ -229,7 +229,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
       }
       this.logger.info?.('Updating structure DDL:', this.config.structureName);
       
-      const params: UpdateStructureParams = {
+      const params: IUpdateStructureParams = {
         structureName: this.config.structureName,
         ddlCode: code,
         transportRequest: this.config.transportRequest
@@ -351,7 +351,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<StructureBuilderConfig | undefined> {
+  async read(version: 'active' | 'inactive' = 'active'): Promise<IStructureConfig | undefined> {
     try {
       this.logger.info?.('Reading structure:', this.config.structureName);
       const result = await getStructureSource(this.connection, this.config.structureName);
@@ -399,7 +399,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
   }
 
   // Getters for accessing results
-  getState(): Readonly<StructureBuilderState> {
+  getState(): Readonly<IStructureState> {
     return { ...this.state };
   }
 
@@ -440,7 +440,7 @@ export class StructureBuilder implements IBuilder<StructureBuilderState> {
     return this.state.deleteResult;
   }
 
-  getReadResult(): StructureBuilderConfig | undefined {
+  getReadResult(): IStructureConfig | undefined {
     if (!this.state.readResult) {
       return undefined;
     }

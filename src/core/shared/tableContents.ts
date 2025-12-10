@@ -10,7 +10,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { GetTableContentsParams } from './types';
+import { IGetTableContentsParams } from './types';
 
 /**
  * Get table contents via ADT Data Preview API
@@ -21,7 +21,7 @@ import { GetTableContentsParams } from './types';
  */
 export async function getTableContents(
   connection: IAbapConnection,
-  params: GetTableContentsParams
+  params: IGetTableContentsParams
 ): Promise<AxiosResponse> {
   if (!params.table_name) {
     throw new Error('Table name is required');

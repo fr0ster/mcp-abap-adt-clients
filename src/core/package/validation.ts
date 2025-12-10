@@ -5,7 +5,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
-import { CreatePackageParams } from './types';
+import { ICreatePackageParams } from './types';
 
 /**
  * Step 1: Validate package parameters (basic check)
@@ -13,7 +13,7 @@ import { CreatePackageParams } from './types';
  */
 export async function validatePackageBasic(
   connection: IAbapConnection,
-  args: CreatePackageParams
+  args: ICreatePackageParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/packages/validation`;
   const params = {
@@ -41,7 +41,7 @@ export async function validatePackageBasic(
  */
 export async function validatePackageFull(
   connection: IAbapConnection,
-  args: CreatePackageParams,
+  args: ICreatePackageParams,
   swcomp: string,
   transportLayer: string
 ): Promise<AxiosResponse> {

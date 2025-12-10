@@ -16,19 +16,19 @@ import { updateMetadataExtension } from './update';
 import { checkMetadataExtension } from './check';
 import { activateMetadataExtension } from './activate';
 import { deleteMetadataExtension } from './delete';
-import { MetadataExtensionBuilderConfig, MetadataExtensionBuilderState } from './types';
+import { IMetadataExtensionConfig, IMetadataExtensionState } from './types';
 
 export class MetadataExtensionBuilder {
   private connection: IAbapConnection;
   private logger: IAdtLogger;
-  private config: MetadataExtensionBuilderConfig;
+  private config: IMetadataExtensionConfig;
   private lockHandle?: string;
-  private state: MetadataExtensionBuilderState;
+  private state: IMetadataExtensionState;
 
   constructor(
     connection: IAbapConnection,
     logger: IAdtLogger,
-    config: MetadataExtensionBuilderConfig
+    config: IMetadataExtensionConfig
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -356,7 +356,7 @@ export class MetadataExtensionBuilder {
     return this.state.sourceCode || this.config.sourceCode;
   }
 
-  getState(): MetadataExtensionBuilderState {
+  getState(): IMetadataExtensionState {
     return this.state;
   }
 

@@ -2,11 +2,10 @@
  * View module type definitions
  */
 
-import { AxiosResponse } from 'axios';
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
-export interface CreateViewParams {
+export interface ICreateViewParams {
   view_name: string;
   ddl_source?: string; // Optional - only metadata creation in low-level function
   package_name: string;
@@ -14,7 +13,7 @@ export interface CreateViewParams {
   description?: string;
 }
 
-export interface UpdateViewSourceParams {
+export interface IUpdateViewSourceParams {
   view_name: string;
   ddl_source: string;
   activate?: boolean;
@@ -22,7 +21,7 @@ export interface UpdateViewSourceParams {
   transport_request?: string;
 }
 
-export interface DeleteViewParams {
+export interface IDeleteViewParams {
   view_name: string;
   transport_request?: string;
 }
@@ -30,7 +29,7 @@ export interface DeleteViewParams {
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface ViewBuilderConfig {
+export interface IViewConfig {
   viewName: string;
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -40,6 +39,5 @@ export interface ViewBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface ViewBuilderState extends BaseBuilderState {
-  // View-specific state can be added here if needed
+export interface IViewState extends IAdtObjectState {
 }

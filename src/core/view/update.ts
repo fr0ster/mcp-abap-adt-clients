@@ -6,7 +6,7 @@ import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { UpdateViewSourceParams } from './types';
+import { IUpdateViewSourceParams } from './types';
 
 /**
  * Update view DDL source code

@@ -2,10 +2,10 @@
  * Package module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
-export interface CreatePackageParams {
+export interface ICreatePackageParams {
   package_name: string;
   description?: string;
   super_package: string;
@@ -20,7 +20,7 @@ export interface CreatePackageParams {
 // Builder configuration (camelCase)
 // Note: superPackage is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface PackageBuilderConfig {
+export interface IPackageConfig {
   packageName: string; // Required
   superPackage?: string; // Required for create operations, optional for others
   description?: string; // Required for create/validate operations, optional for others
@@ -34,7 +34,5 @@ export interface PackageBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface PackageBuilderState extends BaseBuilderState {
-  lockResult?: string; // Package-specific: lock handle from lock operation
-  // Other fields inherited from BaseBuilderState
+export interface IPackageState extends IAdtObjectState {
 }

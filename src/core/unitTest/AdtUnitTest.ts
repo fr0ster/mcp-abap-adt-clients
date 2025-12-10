@@ -44,7 +44,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
    * Validate unit test configuration before creation
    * Note: ADT doesn't provide validation endpoint for unit tests
    */
-  async validate(config: Partial<IUnitTestBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IUnitTestBuilderConfig>): Promise<IUnitTestBuilderConfig> {
     if (!config.tests || config.tests.length === 0) {
       throw new Error('At least one test definition is required for validation');
     }
@@ -52,12 +52,12 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
     // ADT doesn't provide validation endpoint for unit tests
     // Return a mock success response
     return {
-      data: { valid: true },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {}
-    } as AxiosResponse;
+      tests: config.tests,
+      options: config.options,
+      runId: undefined,
+      status: undefined,
+      result: undefined
+    };
   }
 
   /**
@@ -144,6 +144,19 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
   }
 
   /**
+   * Read unit test metadata
+   * For unit tests, metadata is the same as read() result (status/result information)
+   */
+  async readMetadata(config: Partial<IUnitTestBuilderConfig>): Promise<IUnitTestBuilderConfig> {
+    // For unit tests, metadata is the same as read() result
+    const readResult = await this.read(config);
+    if (!readResult) {
+      throw new Error('Unit test run not found');
+    }
+    return readResult;
+  }
+
+  /**
    * Update unit test run
    * Note: Test runs cannot be updated
    */
@@ -158,7 +171,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
    * Delete unit test run
    * Note: Test runs cannot be deleted via ADT
    */
-  async delete(config: Partial<IUnitTestBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IUnitTestBuilderConfig>): Promise<IUnitTestBuilderConfig> {
     throw new Error('Delete operation is not supported for Unit Test objects in ADT');
   }
 
@@ -166,7 +179,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
    * Activate unit test run
    * Note: Test runs are not activated
    */
-  async activate(config: Partial<IUnitTestBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IUnitTestBuilderConfig>): Promise<IUnitTestBuilderConfig> {
     throw new Error('Activate operation is not supported for Unit Test objects in ADT');
   }
 
@@ -177,7 +190,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
   async check(
     config: Partial<IUnitTestBuilderConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IUnitTestBuilderConfig> {
     throw new Error('Check operation is not supported for Unit Test objects in ADT');
   }
 
@@ -274,5 +287,21 @@ export class AdtUnitTest implements IAdtObject<IUnitTestBuilderConfig, IUnitTest
       }
     }
     return undefined;
+  }
+
+  /**
+   * Read transport request information for unit test
+   * Note: Unit tests are test runs, not ADT objects, so they don't have transport requests
+   */
+  async readTransport(config: Partial<IUnitTestBuilderConfig>): Promise<IUnitTestBuilderConfig> {
+    // Unit tests are test runs, not ADT objects, so they don't have transport requests
+    // Return empty config with error indication
+    return {
+      tests: config.tests || [],
+      options: config.options,
+      runId: undefined,
+      status: undefined,
+      result: undefined
+    };
   }
 }

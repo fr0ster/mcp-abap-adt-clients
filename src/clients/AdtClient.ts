@@ -17,31 +17,32 @@
 import { IAbapConnection, IAdtObject } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger, emptyLogger } from '../utils/logger';
 import { 
-  ClassBuilderConfig, 
+  IClassConfig,
+  IClassState,
   AdtClass,
   AdtLocalTestClass,
   AdtLocalTypes,
   AdtLocalDefinitions,
   AdtLocalMacros,
-  LocalTestClassConfig,
-  LocalTypesConfig,
-  LocalDefinitionsConfig,
-  LocalMacrosConfig
+  ILocalTestClassConfig,
+  ILocalTypesConfig,
+  ILocalDefinitionsConfig,
+  ILocalMacrosConfig
 } from '../core/class';
-import { ProgramBuilderConfig, AdtProgram } from '../core/program';
-import { InterfaceBuilderConfig, AdtInterface } from '../core/interface';
-import { DomainBuilderConfig, AdtDomain } from '../core/domain';
-import { DataElementBuilderConfig, AdtDataElement } from '../core/dataElement';
-import { StructureBuilderConfig, AdtStructure } from '../core/structure';
-import { TableBuilderConfig, AdtTable } from '../core/table';
-import { ViewBuilderConfig, AdtView } from '../core/view';
-import { FunctionGroupBuilderConfig, AdtFunctionGroup } from '../core/functionGroup';
-import { FunctionModuleBuilderConfig, AdtFunctionModule } from '../core/functionModule';
-import { PackageBuilderConfig, AdtPackage } from '../core/package';
-import { ServiceDefinitionBuilderConfig, AdtServiceDefinition } from '../core/serviceDefinition';
-import { BehaviorDefinitionBuilderConfig, AdtBehaviorDefinition } from '../core/behaviorDefinition';
-import { BehaviorImplementationBuilderConfig, AdtBehaviorImplementation } from '../core/behaviorImplementation';
-import { MetadataExtensionBuilderConfig, AdtMetadataExtension } from '../core/metadataExtension';
+import { IProgramConfig, IProgramState, AdtProgram } from '../core/program';
+import { IInterfaceConfig, IInterfaceState, AdtInterface } from '../core/interface';
+import { IDomainConfig, IDomainState, AdtDomain } from '../core/domain';
+import { IDataElementConfig, IDataElementState, AdtDataElement } from '../core/dataElement';
+import { IStructureConfig, IStructureState, AdtStructure } from '../core/structure';
+import { ITableConfig, ITableState, AdtTable } from '../core/table';
+import { IViewConfig, IViewState, AdtView } from '../core/view';
+import { IFunctionGroupConfig, IFunctionGroupState, AdtFunctionGroup } from '../core/functionGroup';
+import { IFunctionModuleConfig, IFunctionModuleState, AdtFunctionModule } from '../core/functionModule';
+import { IPackageConfig, IPackageState, AdtPackage } from '../core/package';
+import { IServiceDefinitionConfig, IServiceDefinitionState, AdtServiceDefinition } from '../core/serviceDefinition';
+import { IBehaviorDefinitionConfig, IBehaviorDefinitionState, AdtBehaviorDefinition } from '../core/behaviorDefinition';
+import { IBehaviorImplementationConfig, IBehaviorImplementationState, AdtBehaviorImplementation } from '../core/behaviorImplementation';
+import { IMetadataExtensionConfig, IMetadataExtensionState, AdtMetadataExtension } from '../core/metadataExtension';
 import { AdtRequest } from '../core/transport';
 import { AdtUnitTest } from '../core/unitTest';
 import { ITransportBuilderConfig, IUnitTestBuilderConfig } from '@mcp-abap-adt/interfaces';
@@ -62,7 +63,7 @@ export class AdtClient {
    * Get high-level operations for Class objects
    * @returns IAdtObject instance for Class operations
    */
-  getClass(): IAdtObject<ClassBuilderConfig, ClassBuilderConfig> {
+  getClass(): IAdtObject<IClassConfig, IClassState> {
     return new AdtClass(this.connection, this.logger);
   }
 
@@ -70,7 +71,7 @@ export class AdtClient {
    * Get high-level operations for Program objects
    * @returns IAdtObject instance for Program operations
    */
-  getProgram(): IAdtObject<ProgramBuilderConfig, ProgramBuilderConfig> {
+  getProgram(): IAdtObject<IProgramConfig, IProgramState> {
     return new AdtProgram(this.connection, this.logger);
   }
 
@@ -78,7 +79,7 @@ export class AdtClient {
    * Get high-level operations for Interface objects
    * @returns IAdtObject instance for Interface operations
    */
-  getInterface(): IAdtObject<InterfaceBuilderConfig, InterfaceBuilderConfig> {
+  getInterface(): IAdtObject<IInterfaceConfig, IInterfaceState> {
     return new AdtInterface(this.connection, this.logger);
   }
 
@@ -86,7 +87,7 @@ export class AdtClient {
    * Get high-level operations for Domain objects
    * @returns IAdtObject instance for Domain operations
    */
-  getDomain(): IAdtObject<DomainBuilderConfig, DomainBuilderConfig> {
+  getDomain(): IAdtObject<IDomainConfig, IDomainState> {
     return new AdtDomain(this.connection, this.logger);
   }
 
@@ -94,7 +95,7 @@ export class AdtClient {
    * Get high-level operations for DataElement objects
    * @returns IAdtObject instance for DataElement operations
    */
-  getDataElement(): IAdtObject<DataElementBuilderConfig, DataElementBuilderConfig> {
+  getDataElement(): IAdtObject<IDataElementConfig, IDataElementState> {
     return new AdtDataElement(this.connection, this.logger);
   }
 
@@ -102,7 +103,7 @@ export class AdtClient {
    * Get high-level operations for Structure objects
    * @returns IAdtObject instance for Structure operations
    */
-  getStructure(): IAdtObject<StructureBuilderConfig, StructureBuilderConfig> {
+  getStructure(): IAdtObject<IStructureConfig, IStructureState> {
     return new AdtStructure(this.connection, this.logger);
   }
 
@@ -110,7 +111,7 @@ export class AdtClient {
    * Get high-level operations for Table objects
    * @returns IAdtObject instance for Table operations
    */
-  getTable(): IAdtObject<TableBuilderConfig, TableBuilderConfig> {
+  getTable(): IAdtObject<ITableConfig, ITableState> {
     return new AdtTable(this.connection, this.logger);
   }
 
@@ -118,7 +119,7 @@ export class AdtClient {
    * Get high-level operations for View objects
    * @returns IAdtObject instance for View operations
    */
-  getView(): IAdtObject<ViewBuilderConfig, ViewBuilderConfig> {
+  getView(): IAdtObject<IViewConfig, IViewState> {
     return new AdtView(this.connection, this.logger);
   }
 
@@ -126,7 +127,7 @@ export class AdtClient {
    * Get high-level operations for FunctionGroup objects
    * @returns IAdtObject instance for FunctionGroup operations
    */
-  getFunctionGroup(): IAdtObject<FunctionGroupBuilderConfig, FunctionGroupBuilderConfig> {
+  getFunctionGroup(): IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
     return new AdtFunctionGroup(this.connection, this.logger);
   }
 
@@ -134,7 +135,7 @@ export class AdtClient {
    * Get high-level operations for FunctionModule objects
    * @returns IAdtObject instance for FunctionModule operations
    */
-  getFunctionModule(): IAdtObject<FunctionModuleBuilderConfig, FunctionModuleBuilderConfig> {
+  getFunctionModule(): IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
     return new AdtFunctionModule(this.connection, this.logger);
   }
 
@@ -142,7 +143,7 @@ export class AdtClient {
    * Get high-level operations for Package objects
    * @returns IAdtObject instance for Package operations
    */
-  getPackage(): IAdtObject<PackageBuilderConfig, PackageBuilderConfig> {
+  getPackage(): IAdtObject<IPackageConfig, IPackageState> {
     return new AdtPackage(this.connection, this.logger);
   }
 
@@ -150,7 +151,7 @@ export class AdtClient {
    * Get high-level operations for ServiceDefinition objects
    * @returns IAdtObject instance for ServiceDefinition operations
    */
-  getServiceDefinition(): IAdtObject<ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderConfig> {
+  getServiceDefinition(): IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState> {
     return new AdtServiceDefinition(this.connection, this.logger);
   }
 
@@ -158,7 +159,7 @@ export class AdtClient {
    * Get high-level operations for BehaviorDefinition objects
    * @returns IAdtObject instance for BehaviorDefinition operations
    */
-  getBehaviorDefinition(): IAdtObject<BehaviorDefinitionBuilderConfig, BehaviorDefinitionBuilderConfig> {
+  getBehaviorDefinition(): IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState> {
     return new AdtBehaviorDefinition(this.connection, this.logger);
   }
 
@@ -166,7 +167,7 @@ export class AdtClient {
    * Get high-level operations for BehaviorImplementation objects
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
-  getBehaviorImplementation(): IAdtObject<BehaviorImplementationBuilderConfig, BehaviorImplementationBuilderConfig> {
+  getBehaviorImplementation(): IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState> {
     return new AdtBehaviorImplementation(this.connection, this.logger);
   }
 
@@ -174,7 +175,7 @@ export class AdtClient {
    * Get high-level operations for MetadataExtension objects
    * @returns IAdtObject instance for MetadataExtension operations
    */
-  getMetadataExtension(): IAdtObject<MetadataExtensionBuilderConfig, MetadataExtensionBuilderConfig> {
+  getMetadataExtension(): IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState> {
     return new AdtMetadataExtension(this.connection, this.logger);
   }
 
@@ -197,37 +198,33 @@ export class AdtClient {
 
   /**
    * Get high-level operations for LocalTestClass objects
-   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
    * @returns IAdtObject instance for LocalTestClass operations
    */
-  getLocalTestClass(adtClass?: AdtClass): IAdtObject<LocalTestClassConfig, LocalTestClassConfig> {
-    return new AdtLocalTestClass(this.connection, adtClass, this.logger);
+  getLocalTestClass(): IAdtObject<ILocalTestClassConfig, IClassState> {
+    return new AdtLocalTestClass(this.connection, this.logger);
   }
 
   /**
    * Get high-level operations for LocalTypes objects
-   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
    * @returns IAdtObject instance for LocalTypes operations
    */
-  getLocalTypes(adtClass?: AdtClass): IAdtObject<LocalTypesConfig, LocalTypesConfig> {
-    return new AdtLocalTypes(this.connection, adtClass, this.logger);
+  getLocalTypes(): IAdtObject<ILocalTypesConfig, IClassState> {
+    return new AdtLocalTypes(this.connection, this.logger);
   }
 
   /**
    * Get high-level operations for LocalDefinitions objects
-   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
    * @returns IAdtObject instance for LocalDefinitions operations
    */
-  getLocalDefinitions(adtClass?: AdtClass): IAdtObject<LocalDefinitionsConfig, LocalDefinitionsConfig> {
-    return new AdtLocalDefinitions(this.connection, adtClass, this.logger);
+  getLocalDefinitions(): IAdtObject<ILocalDefinitionsConfig, IClassState> {
+    return new AdtLocalDefinitions(this.connection, this.logger);
   }
 
   /**
    * Get high-level operations for LocalMacros objects
-   * @param adtClass - Optional AdtClass instance (if not provided, will create new one)
    * @returns IAdtObject instance for LocalMacros operations
    */
-  getLocalMacros(adtClass?: AdtClass): IAdtObject<LocalMacrosConfig, LocalMacrosConfig> {
-    return new AdtLocalMacros(this.connection, adtClass, this.logger);
+  getLocalMacros(): IAdtObject<ILocalMacrosConfig, IClassState> {
+    return new AdtLocalMacros(this.connection, this.logger);
   }
 }

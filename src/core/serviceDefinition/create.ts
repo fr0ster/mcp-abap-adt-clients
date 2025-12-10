@@ -8,7 +8,7 @@ import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { CreateServiceDefinitionParams } from './types';
+import { ICreateServiceDefinitionParams } from './types';
 
 /**
  * Low-level: Create service definition (POST)
@@ -16,7 +16,7 @@ import { CreateServiceDefinitionParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
-  args: CreateServiceDefinitionParams
+  args: ICreateServiceDefinitionParams
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/srvd/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 

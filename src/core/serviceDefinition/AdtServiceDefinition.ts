@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { ServiceDefinitionBuilderConfig } from './types';
+import { IServiceDefinitionConfig, IServiceDefinitionState } from './types';
 import { validateServiceDefinitionName } from './validation';
 import { create as createServiceDefinition } from './create';
 import { checkServiceDefinition } from './check';
@@ -30,9 +30,9 @@ import { updateServiceDefinition } from './update';
 import { unlockServiceDefinition } from './unlock';
 import { activateServiceDefinition } from './activation';
 import { checkDeletion, deleteServiceDefinition } from './delete';
-import { getServiceDefinitionSource } from './read';
+import { getServiceDefinitionSource, getServiceDefinition, getServiceDefinitionTransport } from './read';
 
-export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilderConfig, ServiceDefinitionBuilderConfig> {
+export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'ServiceDefinition';
@@ -45,27 +45,42 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
   /**
    * Validate service definition configuration before creation
    */
-  async validate(config: Partial<ServiceDefinitionBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IServiceDefinitionConfig>): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required for validation');
+      const error = new Error('Service definition name is required for validation');
+      state.errors.push({ method: 'validate', error, timestamp: new Date() });
+      throw error;
     }
 
-    return await validateServiceDefinitionName(
+    try {
+      const response = await validateServiceDefinitionName(
       this.connection,
       config.serviceDefinitionName,
       config.description
     );
+    state.validationResponse = response;
+    return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'validate', err);
+      throw err;
+    }
   }
 
   /**
    * Create service definition with full operation chain
    */
   async create(
-    config: ServiceDefinitionBuilderConfig,
+    config: IServiceDefinitionConfig,
     options?: IAdtOperationOptions
-  ): Promise<ServiceDefinitionBuilderConfig> {
+  ): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'create', error, timestamp: new Date() });
+      throw error;
     }
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -156,8 +171,8 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          serviceDefinitionName: config.serviceDefinitionName,
-          packageName: config.packageName
+          activateResult: activateResponse,
+          errors: []
         };
       }
 
@@ -168,9 +183,8 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
         : JSON.stringify(readResponse.data);
 
       return {
-        serviceDefinitionName: config.serviceDefinitionName,
-        packageName: config.packageName,
-        sourceCode
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -210,23 +224,20 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
    * Read service definition
    */
   async read(
-    config: Partial<ServiceDefinitionBuilderConfig>,
+    config: Partial<IServiceDefinitionConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<ServiceDefinitionBuilderConfig | undefined> {
+  ): Promise<IServiceDefinitionState | undefined> {
+    const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'read', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
       const response = await getServiceDefinitionSource(this.connection, config.serviceDefinitionName, version);
-      const sourceCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
-      return {
-        serviceDefinitionName: config.serviceDefinitionName,
-        sourceCode
-      };
+      state.readResult = response;
+      return state;
     } catch (error: any) {
       if (error.response?.status === 404) {
         return undefined;
@@ -236,15 +247,64 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
   }
 
   /**
+   * Read service definition metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IServiceDefinitionConfig>): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
+    if (!config.serviceDefinitionName) {
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getServiceDefinition(this.connection, config.serviceDefinitionName);
+      state.metadataResult = response;
+      this.logger?.info?.('Service definition metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the service definition
+   */
+  async readTransport(config: Partial<IServiceDefinitionConfig>): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
+    if (!config.serviceDefinitionName) {
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getServiceDefinitionTransport(this.connection, config.serviceDefinitionName);
+      state.transportResult = response;
+      this.logger?.info?.('Service definition transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
+  }
+
+  /**
    * Update service definition with full operation chain
    * Always starts with lock
    */
   async update(
-    config: Partial<ServiceDefinitionBuilderConfig>,
+    config: Partial<IServiceDefinitionConfig>,
     options?: IAdtOperationOptions
-  ): Promise<ServiceDefinitionBuilderConfig> {
+  ): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'update', error, timestamp: new Date() });
+      throw error;
     }
 
     let lockHandle: string | undefined;
@@ -302,7 +362,8 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          serviceDefinitionName: config.serviceDefinitionName
+          activateResult: activateResponse,
+          errors: []
         };
       }
 
@@ -313,8 +374,8 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
         : JSON.stringify(readResponse.data);
 
       return {
-        serviceDefinitionName: config.serviceDefinitionName,
-        sourceCode
+        readResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -353,9 +414,12 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
   /**
    * Delete service definition
    */
-  async delete(config: Partial<ServiceDefinitionBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IServiceDefinitionConfig>): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'delete', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
@@ -375,7 +439,10 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
       });
       this.logger?.info?.('Service definition deleted');
 
-      return result;
+      return {
+        deleteResult: result,
+        errors: []
+      };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -386,14 +453,18 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
    * Activate service definition
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<ServiceDefinitionBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IServiceDefinitionConfig>): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'activate', error, timestamp: new Date() });
+      throw error;
     }
 
     try {
       const result = await activateServiceDefinition(this.connection, config.serviceDefinitionName);
-      return result;
+      state.activateResult = result;
+      return state;
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -404,15 +475,19 @@ export class AdtServiceDefinition implements IAdtObject<ServiceDefinitionBuilder
    * Check service definition
    */
   async check(
-    config: Partial<ServiceDefinitionBuilderConfig>,
+    config: Partial<IServiceDefinitionConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IServiceDefinitionState> {
+    const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
+      const error = new Error('Service definition name is required');
+      state.errors.push({ method: 'check', error, timestamp: new Date() });
+      throw error;
     }
 
     // Map status to version
     const version: string = status === 'active' ? 'active' : 'inactive';
-    return await checkServiceDefinition(this.connection, config.serviceDefinitionName, version);
+    state.checkResult = await checkServiceDefinition(this.connection, config.serviceDefinitionName, version);
+    return state;
   }
 }

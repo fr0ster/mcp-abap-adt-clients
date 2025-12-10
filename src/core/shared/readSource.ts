@@ -30,7 +30,7 @@ export function getObjectSourceUri(
       return `/sap/bc/adt/programs/programs/${encodedName}/source/main`;
     case 'interface':
     case 'intf/if':
-      return `/sap/bc/adt/oo/interfaces/${encodedName}/source/main`;
+      return `/sap/bc/adt/oo/interfaces/${encodedName}/source/main${versionParam}`;
     case 'functionmodule':
     case 'fugr/ff':
       if (!functionGroup) {

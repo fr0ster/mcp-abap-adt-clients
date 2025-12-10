@@ -6,7 +6,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { IAdtLogger } from '../../utils/logger';
-import { ClassBuilderConfig } from '../class/types';
+import { IClassBuilderConfig } from '../class';
 import { BaseUnitTestBuilder } from './BaseUnitTestBuilder';
 import { validateCdsForUnitTest } from './validateCdsForUnitTest';
 import { ClassUnitTestRunOptions } from './types';
@@ -54,7 +54,7 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
     logger: IAdtLogger,
     config: CdsUnitTestBuilderConfig
   ) {
-    const classConfig: ClassBuilderConfig = {
+    const classConfig: IClassBuilderConfig = {
       className: config.className,
       description: config.description || `CDS unit test for ${config.className}`,
       packageName: config.packageName,

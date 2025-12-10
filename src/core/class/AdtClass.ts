@@ -17,10 +17,10 @@
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { IAbapConnection, IAdtObject, IAdtOperationOptions, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { ClassBuilderConfig } from './types';
+import { IClassConfig, IClassState } from './types';
 import { validateClassName } from './validation';
 import { create as createClass } from './create';
 import { checkClass, checkClassLocalTestClass } from './check';
@@ -29,12 +29,12 @@ import { updateClass } from './update';
 import { unlockClass } from './unlock';
 import { activateClass } from './activation';
 import { checkDeletion, deleteClass } from './delete';
-import { getClassSource } from './read';
+import { getClassSource, getClassTransport, getClassMetadata } from './read';
 import { lockClassTestClasses, unlockClassTestClasses, updateClassTestInclude, activateClassTestClasses } from './testclasses';
 
-export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConfig> {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: IAdtLogger;
   public readonly objectType: string = 'Class';
 
   constructor(connection: IAbapConnection, logger?: IAdtLogger) {
@@ -45,27 +45,60 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
   /**
    * Validate class configuration before creation
    */
-  async validate(config: Partial<ClassBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IClassConfig>): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
 
-    return await validateClassName(
-      this.connection,
-      config.className,
-      config.packageName,
-      config.description,
-      config.superclass
-    );
+    try {
+      const validationResponse = await validateClassName(
+        this.connection,
+        config.className,
+        config.packageName,
+        config.description,
+        config.superclass
+      );
+
+      return {
+        validationResponse: validationResponse,
+        errors: []
+      };
+    } catch (error: any) {
+      const status = error.response?.status;
+      const statusText = error.response?.statusText;
+      const errorMessage = error.response?.data 
+        ? (typeof error.response.data === 'string' 
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500))
+        : error.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Validate failed: HTTP ${status || '?'} ${statusText || ''}`,
+        { status, statusText, message: errorMessage }
+      );
+
+      if (status && status >= 400 && status < 500) {
+        const customError = new Error(
+          `Validation failed for object '${config.className}': ${errorMessage}`
+        ) as any;
+        customError.code = AdtObjectErrorCodes.VALIDATION_FAILED;
+        customError.status = status;
+        customError.statusText = statusText;
+        customError.originalError = error;
+        throw customError;
+      }
+
+      throw error;
+    }
   }
 
   /**
    * Create class with full operation chain
    */
   async create(
-    config: ClassBuilderConfig,
+    config: IClassConfig,
     options?: IAdtOperationOptions
-  ): Promise<ClassBuilderConfig> {
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -75,23 +108,27 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
     let objectCreated = false;
     let lockHandle: string | undefined;
+    const state: IClassState = {
+      errors: []
+    };
 
     try {
       // 1. Validate (no stateful needed)
       this.logger?.info?.('Step 1: Validating class configuration');
-      await validateClassName(
+      const validationResponse = await validateClassName(
         this.connection,
         config.className,
         config.packageName,
         config.description,
         config.superclass
       );
+      state.validationResponse = validationResponse;
       this.logger?.info?.('Validation passed');
 
       // 2. Create (requires stateful)
       this.logger?.info?.('Step 2: Creating class');
       this.connection.setSessionType('stateful');
-      await createClass(this.connection, {
+      state.createResult = await createClass(this.connection, {
         class_name: config.className,
         package_name: config.packageName,
         transport_request: config.transportRequest,
@@ -109,26 +146,27 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
       // 3. Check after create (stateful still set from create)
       this.logger?.info?.('Step 3: Checking created class');
-      await checkClass(this.connection, config.className, 'inactive');
+      state.checkResult = await checkClass(this.connection, config.className, 'inactive');
       this.logger?.info?.('Check after create passed');
 
       // 4. Lock (stateful already set, keep it)
       this.logger?.info?.('Step 4: Locking class');
       lockHandle = await lockClass(this.connection, config.className);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Class locked, handle:', lockHandle);
 
       // 5. Check inactive with code/xml for update
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await checkClass(this.connection, config.className, 'inactive', codeToCheck);
+        state.checkResult = await checkClass(this.connection, config.className, 'inactive', codeToCheck);
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 6. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 6: Updating class with source code');
-        await updateClass(
+        state.updateResult = await updateClass(
           this.connection,
           config.className,
           codeToCheck,
@@ -141,7 +179,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 7: Unlocking class');
-        await unlockClass(this.connection, config.className, lockHandle);
+        state.unlockResult = await unlockClass(this.connection, config.className, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Class unlocked');
@@ -149,34 +187,17 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
       // 8. Final check (no stateful needed)
       this.logger?.info?.('Step 8: Final check');
-      await checkClass(this.connection, config.className, 'inactive');
+      state.checkResult = await checkClass(this.connection, config.className, 'inactive');
       this.logger?.info?.('Final check passed');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
         this.logger?.info?.('Step 9: Activating class');
-        const activateResponse = await activateClass(this.connection, config.className);
-        this.logger?.info?.('Class activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info without sourceCode (activation returns 201)
-        return {
-          className: config.className,
-          packageName: config.packageName
-        };
+        state.activateResult = await activateClass(this.connection, config.className);
+        this.logger?.info?.('Class activated, status:', state.activateResult.status);
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getClassSource(this.connection, config.className, 'active');
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
-      return {
-        className: config.className,
-        packageName: config.packageName,
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -216,28 +237,75 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    * Read class
    */
   async read(
-    config: Partial<ClassBuilderConfig>,
+    config: Partial<IClassConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<ClassBuilderConfig | undefined> {
+  ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
     try {
       const response = await getClassSource(this.connection, config.className, version);
-      const sourceCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
       return {
-        className: config.className,
-        sourceCode
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
-      if (error.response?.status === 404) {
+      const status = error.response?.status;
+      const statusText = error.response?.statusText;
+      const errorMessage = error.response?.data 
+        ? (typeof error.response.data === 'string' 
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500))
+        : error.message || 'Unknown error';
+
+      // Log error details
+      this.logger?.error?.(
+        `Read failed: HTTP ${status || '?'} ${statusText || ''}`,
+        { status, statusText, message: errorMessage }
+      );
+
+      // 404 - object doesn't exist
+      if (status === 404) {
         return undefined;
       }
+
+      // 4** errors - throw with error code
+      if (status && status >= 400 && status < 500) {
+        const customError = new Error(
+          `Failed to read object '${config.className}': ${errorMessage}`
+        ) as any;
+        customError.code = AdtObjectErrorCodes.OBJECT_NOT_FOUND;
+        customError.status = status;
+        customError.statusText = statusText;
+        customError.originalError = error;
+        throw customError;
+      }
+
       throw error;
+    }
+  }
+
+  /**
+   * Read class metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IClassConfig>): Promise<IClassState> {
+    const state: IClassState = { errors: [] };
+    if (!config.className) {
+      const error = new Error('Class name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getClassMetadata(this.connection, config.className);
+      state.metadataResult = response;
+      this.logger?.info?.('Class metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
     }
   }
 
@@ -246,34 +314,38 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    * Always starts with lock
    */
   async update(
-    config: Partial<ClassBuilderConfig>,
+    config: Partial<IClassConfig>,
     options?: IAdtOperationOptions
-  ): Promise<ClassBuilderConfig> {
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
     let lockHandle: string | undefined;
+    const state: IClassState = {
+      errors: []
+    };
 
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
       this.logger?.info?.('Step 1: Locking class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
+      state.lockHandle = lockHandle;
       this.logger?.info?.('Class locked, handle:', lockHandle);
 
       // 2. Check inactive with code/xml for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkClass(this.connection, config.className, 'inactive', codeToCheck);
+        state.checkResult = await checkClass(this.connection, config.className, 'inactive', codeToCheck);
         this.logger?.info?.('Check inactive with update content passed');
       }
 
       // 3. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 3: Updating class');
-        await updateClass(
+        state.updateResult = await updateClass(
           this.connection,
           config.className,
           codeToCheck,
@@ -286,7 +358,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking class');
-        await unlockClass(this.connection, config.className, lockHandle);
+        state.unlockResult = await unlockClass(this.connection, config.className, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Class unlocked');
@@ -294,32 +366,17 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkClass(this.connection, config.className, 'inactive');
+      state.checkResult = await checkClass(this.connection, config.className, 'inactive');
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating class');
-        const activateResponse = await activateClass(this.connection, config.className);
-        this.logger?.info?.('Class activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info without sourceCode (activation returns 201)
-        return {
-          className: config.className
-        };
+        state.activateResult = await activateClass(this.connection, config.className);
+        this.logger?.info?.('Class activated, status:', state.activateResult.status);
       }
 
-      // Read and return result (no stateful needed)
-      const readResponse = await getClassSource(this.connection, config.className, 'active');
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
-      return {
-        className: config.className,
-        sourceCode
-      };
+      return state;
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
@@ -358,32 +415,61 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
   /**
    * Delete class
    */
-  async delete(config: Partial<ClassBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IClassConfig>): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
+    const state: IClassState = {
+      errors: []
+    };
+
     try {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking class for deletion');
-      await checkDeletion(this.connection, {
+      const checkResult = await checkDeletion(this.connection, {
         class_name: config.className,
         transport_request: config.transportRequest
       });
+      state.checkResult = checkResult;
       this.logger?.info?.('Deletion check passed');
 
       // Delete (requires stateful, but no lock)
       this.logger?.info?.('Deleting class');
       this.connection.setSessionType('stateful');
-      const result = await deleteClass(this.connection, {
+      const deleteResult = await deleteClass(this.connection, {
         class_name: config.className,
         transport_request: config.transportRequest
       });
+      state.deleteResult = deleteResult;
       this.logger?.info?.('Class deleted');
 
-      return result;
+      return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      const status = error.response?.status;
+      const statusText = error.response?.statusText;
+      const errorMessage = error.response?.data 
+        ? (typeof error.response.data === 'string' 
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500))
+        : error.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Delete failed: HTTP ${status || '?'} ${statusText || ''}`,
+        { status, statusText, message: errorMessage }
+      );
+
+      if (status && status >= 400 && status < 500) {
+        const customError = new Error(
+          `Deletion failed for object '${config.className}': ${errorMessage}`
+        ) as any;
+        customError.code = AdtObjectErrorCodes.DELETE_FAILED;
+        customError.status = status;
+        customError.statusText = statusText;
+        customError.originalError = error;
+        throw customError;
+      }
+
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
@@ -394,16 +480,44 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    * Activate class
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<ClassBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IClassConfig>): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
+    const state: IClassState = {
+      errors: []
+    };
+
     try {
-      const result = await activateClass(this.connection, config.className);
-      return result;
+      const activateResult = await activateClass(this.connection, config.className);
+      state.activateResult = activateResult;
+      return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
+      const status = error.response?.status;
+      const statusText = error.response?.statusText;
+      const errorMessage = error.response?.data 
+        ? (typeof error.response.data === 'string' 
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500))
+        : error.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Activate failed: HTTP ${status || '?'} ${statusText || ''}`,
+        { status, statusText, message: errorMessage }
+      );
+
+      if (status && status >= 400 && status < 500) {
+        const customError = new Error(
+          `Activation failed for object '${config.className}': ${errorMessage}`
+        ) as any;
+        customError.code = AdtObjectErrorCodes.ACTIVATE_FAILED;
+        customError.status = status;
+        customError.statusText = statusText;
+        customError.originalError = error;
+        throw customError;
+      }
+
       throw error;
     }
   }
@@ -412,23 +526,80 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    * Check class
    */
   async check(
-    config: Partial<ClassBuilderConfig>,
+    config: Partial<IClassConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    // Map status to version
-    const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkClass(this.connection, config.className, version, config.sourceCode);
+    try {
+      // Map status to version
+      const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
+      const response = await checkClass(this.connection, config.className, version, config.sourceCode);
+
+      // Parse response to check for type E errors
+      const { parseCheckRunResponse } = await import('../../utils/checkRun');
+      const checkResult = parseCheckRunResponse(response);
+
+      // If there are errors (type E), throw error
+      if (checkResult.has_errors) {
+        const errorMessages = checkResult.errors.map((e: any) => e.text || '').join('; ');
+        const customError = new Error(
+          `Check failed for object '${config.className}': ${errorMessages || checkResult.message}`
+        ) as any;
+        customError.code = AdtObjectErrorCodes.CHECK_FAILED;
+        customError.status = response.status;
+        customError.statusText = response.statusText;
+        customError.checkResult = checkResult;
+        throw customError;
+      }
+
+      const state: IClassState = {
+        checkResult: response,
+        errors: []
+      };
+      return state;
+    } catch (error: any) {
+      const status = error.response?.status;
+      const statusText = error.response?.statusText;
+      const errorMessage = error.response?.data 
+        ? (typeof error.response.data === 'string' 
+            ? error.response.data.substring(0, 500)
+            : JSON.stringify(error.response.data).substring(0, 500))
+        : error.message || 'Unknown error';
+
+      this.logger?.error?.(
+        `Check failed: HTTP ${status || '?'} ${statusText || ''}`,
+        { status, statusText, message: errorMessage }
+      );
+
+      // If error already has code (from checkResult parsing), rethrow
+      if (error.code) {
+        throw error;
+      }
+
+      // 4** errors - throw with error code
+      if (status && status >= 400 && status < 500) {
+        const customError = new Error(
+          `Check failed for object '${config.className}': ${errorMessage}`
+        ) as any;
+        customError.code = AdtObjectErrorCodes.CHECK_FAILED;
+        customError.status = status;
+        customError.statusText = statusText;
+        customError.originalError = error;
+        throw customError;
+      }
+
+      throw error;
+    }
   }
 
 
   /**
    * Lock class
    */
-  async lock(config: Partial<ClassBuilderConfig>): Promise<string> {
+  async lock(config: Partial<IClassConfig>): Promise<string> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -440,7 +611,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
   /**
    * Unlock class
    */
-  async unlock(config: Partial<ClassBuilderConfig>, lockHandle: string): Promise<AxiosResponse> {
+  async unlock(config: Partial<IClassConfig>, lockHandle: string): Promise<AxiosResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -450,7 +621,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
   /**
    * Lock test classes (local classes) for modification
    */
-  async lockTestClasses(config: Partial<ClassBuilderConfig>): Promise<string> {
+  async lockTestClasses(config: Partial<IClassConfig>): Promise<string> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -461,7 +632,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
   /**
    * Unlock test classes (local classes)
    */
-  async unlockTestClasses(config: Partial<ClassBuilderConfig>, lockHandle: string): Promise<AxiosResponse> {
+  async unlockTestClasses(config: Partial<IClassConfig>, lockHandle: string): Promise<AxiosResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -474,7 +645,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    * Check test class code (local class)
    */
   async checkTestClass(
-    config: Partial<ClassBuilderConfig> & { testClassCode: string },
+    config: Partial<IClassConfig> & { testClassCode: string },
     version: 'active' | 'inactive' = 'inactive'
   ): Promise<AxiosResponse> {
     if (!config.className) {
@@ -496,7 +667,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    * Always starts with lock
    */
   async updateTestClasses(
-    config: Partial<ClassBuilderConfig> & { testClassCode: string }
+    config: Partial<IClassConfig> & { testClassCode: string }
   ): Promise<AxiosResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -549,7 +720,7 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
    * Activate test classes (local classes)
    */
   async activateTestClasses(
-    config: Partial<ClassBuilderConfig> & { testClassName: string }
+    config: Partial<IClassConfig> & { testClassName: string }
   ): Promise<AxiosResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -562,5 +733,40 @@ export class AdtClass implements IAdtObject<ClassBuilderConfig, ClassBuilderConf
       config.className,
       config.testClassName
     );
+  }
+
+  /**
+   * Read transport request information for the class
+   */
+  async readTransport(config: Partial<IClassConfig>): Promise<IClassState> {
+    const state: IClassState = {
+      errors: []
+    };
+
+    if (!config.className) {
+      const error = new Error('Class name is required');
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date()
+      });
+      throw error;
+    }
+
+    try {
+      const response = await getClassTransport(this.connection, config.className);
+      state.transportResult = response;
+      this.logger?.info?.('Transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date()
+      });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
   }
 }

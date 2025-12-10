@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteFunctionModuleParams } from './types';
+import { IDeleteFunctionModuleParams } from './types';
 
 /**
  * Low-level: Check if function module can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteFunctionModuleParams
+  params: IDeleteFunctionModuleParams
 ): Promise<AxiosResponse> {
   const { function_module_name, function_group_name } = params;
 
@@ -54,7 +54,7 @@ export async function checkDeletion(
  */
 export async function deleteFunctionModule(
   connection: IAbapConnection,
-  params: DeleteFunctionModuleParams
+  params: IDeleteFunctionModuleParams
 ): Promise<AxiosResponse> {
   const { function_module_name, function_group_name, transport_request } = params;
 

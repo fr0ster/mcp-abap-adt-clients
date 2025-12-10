@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { buildObjectUri } from '../../utils/activationUtils';
-import { ObjectReference } from './types';
+import { IObjectReference } from './types';
 
 /**
  * Check if multiple objects can be deleted (group deletion check)
@@ -39,7 +39,7 @@ import { ObjectReference } from './types';
  */
 export async function checkDeletionGroup(
     connection: IAbapConnection,
-    objects: ObjectReference[]
+    objects: IObjectReference[]
 ): Promise<AxiosResponse> {
     const checkUrl = `/sap/bc/adt/deletion/check`;
 
@@ -99,7 +99,7 @@ ${objectElements}
  */
 export async function deleteObjectsGroup(
     connection: IAbapConnection,
-    objects: ObjectReference[],
+    objects: IObjectReference[],
     transportRequest?: string
 ): Promise<AxiosResponse> {
     const deletionUrl = `/sap/bc/adt/deletion/delete`;

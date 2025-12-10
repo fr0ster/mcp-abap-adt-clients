@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { DeleteDomainParams } from './types';
+import { IDeleteDomainParams } from './types';
 
 /**
  * Low-level: Check if domain can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: DeleteDomainParams
+  params: IDeleteDomainParams
 ): Promise<AxiosResponse> {
   const { domain_name } = params;
 
@@ -50,7 +50,7 @@ export async function checkDeletion(
  */
 export async function deleteDomain(
   connection: IAbapConnection,
-  params: DeleteDomainParams
+  params: IDeleteDomainParams
 ): Promise<AxiosResponse> {
   const { domain_name, transport_request } = params;
 

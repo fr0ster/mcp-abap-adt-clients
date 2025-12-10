@@ -23,17 +23,17 @@ import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
 import { getWhereUsed } from './whereUsed';
 import {
-  InactiveObjectsResponse,
-  ObjectReference,
-  SearchObjectsParams,
-  GetSqlQueryParams,
-  GetTableContentsParams,
-  GetWhereUsedParams
+  IInactiveObjectsResponse,
+  IObjectReference,
+  ISearchObjectsParams,
+  IGetSqlQueryParams,
+  IGetTableContentsParams,
+  IGetWhereUsedParams
 } from './types';
 
 interface SharedBuilderState {
   searchResult?: AxiosResponse;
-  inactiveObjects?: InactiveObjectsResponse;
+  inactiveObjects?: IInactiveObjectsResponse;
   activateResult?: AxiosResponse;
   checkDeletionResult?: AxiosResponse;
   deleteResult?: AxiosResponse;
@@ -64,7 +64,7 @@ export class SharedBuilder {
     return this.state.searchResult;
   }
 
-  getInactiveObjects(): InactiveObjectsResponse | undefined {
+  getInactiveObjects(): IInactiveObjectsResponse | undefined {
     return this.state.inactiveObjects;
   }
 
@@ -103,7 +103,7 @@ export class SharedBuilder {
   /**
    * Search for ABAP objects by name pattern
    */
-  async search(params: SearchObjectsParams): Promise<this> {
+  async search(params: ISearchObjectsParams): Promise<this> {
     this.state.searchResult = await searchObjects(this.connection, params);
     return this;
   }
@@ -119,7 +119,7 @@ export class SharedBuilder {
   /**
    * Activate multiple objects in a group
    */
-  async activateGroup(objects: ObjectReference[], preauditRequested: boolean = false): Promise<this> {
+  async activateGroup(objects: IObjectReference[], preauditRequested: boolean = false): Promise<this> {
     this.state.activateResult = await activateObjectsGroup(this.connection, objects, preauditRequested);
     return this;
   }
@@ -127,7 +127,7 @@ export class SharedBuilder {
   /**
    * Check if multiple objects can be deleted (group deletion check)
    */
-  async checkDeletionGroup(objects: ObjectReference[]): Promise<this> {
+  async checkDeletionGroup(objects: IObjectReference[]): Promise<this> {
     this.state.checkDeletionResult = await checkDeletionGroup(this.connection, objects);
     return this;
   }
@@ -135,7 +135,7 @@ export class SharedBuilder {
   /**
    * Delete multiple objects in a group
    */
-  async deleteGroup(objects: ObjectReference[], transportRequest?: string): Promise<this> {
+  async deleteGroup(objects: IObjectReference[], transportRequest?: string): Promise<this> {
     this.state.deleteResult = await deleteObjectsGroup(this.connection, objects, transportRequest);
     return this;
   }
@@ -171,7 +171,7 @@ export class SharedBuilder {
   /**
    * Get where-used list for an object
    */
-  async whereUsed(params: GetWhereUsedParams): Promise<this> {
+  async whereUsed(params: IGetWhereUsedParams): Promise<this> {
     this.state.whereUsedResult = await getWhereUsed(this.connection, params);
     return this;
   }
@@ -180,7 +180,7 @@ export class SharedBuilder {
    * Execute SQL query via ADT Data Preview API
    * ⚠️ ABAP Cloud Limitation: Only works on on-premise systems with basic auth
    */
-  async sqlQuery(params: GetSqlQueryParams): Promise<this> {
+  async sqlQuery(params: IGetSqlQueryParams): Promise<this> {
     this.state.sqlQueryResult = await getSqlQuery(this.connection, params);
     return this;
   }
@@ -189,7 +189,7 @@ export class SharedBuilder {
    * Get table contents via ADT Data Preview API
    * ⚠️ ABAP Cloud Limitation: Only works on on-premise systems with basic auth
    */
-  async tableContents(params: GetTableContentsParams): Promise<this> {
+  async tableContents(params: IGetTableContentsParams): Promise<this> {
     this.state.tableContentsResult = await getTableContents(this.connection, params);
     return this;
   }

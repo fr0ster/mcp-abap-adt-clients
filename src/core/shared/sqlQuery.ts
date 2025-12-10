@@ -9,7 +9,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
-import { GetSqlQueryParams } from './types';
+import { IGetSqlQueryParams } from './types';
 
 /**
  * Execute freestyle SQL query via SAP ADT Data Preview API
@@ -20,7 +20,7 @@ import { GetSqlQueryParams } from './types';
  */
 export async function getSqlQuery(
   connection: IAbapConnection,
-  params: GetSqlQueryParams
+  params: IGetSqlQueryParams
 ): Promise<AxiosResponse> {
   if (!params.sql_query) {
     throw new Error('SQL query is required');

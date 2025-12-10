@@ -2,11 +2,11 @@
  * Class module type definitions
  */
 
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { BaseBuilderState } from '../shared/IBuilder';
 
 // Low-level function parameters (snake_case)
-export interface CreateClassParams {
+export interface ICreateClassParams {
   class_name: string;
   description?: string;
   package_name: string;
@@ -20,15 +20,15 @@ export interface CreateClassParams {
   template_xml?: string;
 }
 
-export interface DeleteClassParams {
+export interface IDeleteClassParams {
   class_name: string;
   transport_request?: string;
 }
 
-// Builder configuration (camelCase)
+// AdtClass configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface ClassBuilderConfig {
+export interface IClassConfig {
   className: string;
   description?: string; // Required for create/validate operations, optional for others
   packageName?: string; // Required for create operations, optional for others
@@ -48,11 +48,13 @@ export interface ClassBuilderConfig {
   classTemplate?: string;
 }
 
-export interface ClassBuilderState extends BaseBuilderState {
-  metadataResult?: any; // Class-specific: metadata read result
-  transportResult?: any; // Class-specific: transport read result
-  testClassesResult?: any; // Class-specific: test classes update result
-  testActivateResult?: any; // Class-specific: test classes activation result
-  testLockHandle?: string; // Class-specific: test classes lock handle
-  // Other fields inherited from BaseBuilderState
+export interface IClassState extends IAdtObjectState {
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
+  // Class-specific fields can be added here if needed
+  testClassCode?: string;
+  testActivateResult?: AxiosResponse;
+  testLockHandle?: string;
+  testClassesResult?: AxiosResponse;
 }

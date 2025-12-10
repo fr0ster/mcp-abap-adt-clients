@@ -6,14 +6,14 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { UpdateTableParams } from './types';
+import { IUpdateTableParams } from './types';
 
 /**
  * Update table using existing lock/session (Builder workflow)
  */
 export async function updateTable(
   connection: IAbapConnection,
-  params: UpdateTableParams,
+  params: IUpdateTableParams,
   lockHandle: string
 ): Promise<AxiosResponse> {
   if (!params.table_name) {

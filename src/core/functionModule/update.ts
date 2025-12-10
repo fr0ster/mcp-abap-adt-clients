@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { UpdateFunctionModuleParams } from './types';
+import { IUpdateFunctionModuleParams } from './types';
 
 /**
  * Upload function module source code (low-level - uses existing lockHandle)
@@ -15,7 +15,7 @@ import { UpdateFunctionModuleParams } from './types';
  */
 export async function update(
   connection: IAbapConnection,
-  params: UpdateFunctionModuleParams
+  params: IUpdateFunctionModuleParams
 ): Promise<AxiosResponse> {
   const encodedGroupName = encodeSapObjectName(params.functionGroupName).toLowerCase();
   const encodedModuleName = encodeSapObjectName(params.functionModuleName).toLowerCase();

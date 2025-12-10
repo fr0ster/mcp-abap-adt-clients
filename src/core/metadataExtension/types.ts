@@ -3,17 +3,17 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Validation parameters
-export interface MetadataExtensionValidationParams {
+export interface IMetadataExtensionValidationParams {
   name: string;
   description: string;
   packageName: string;
 }
 
 // Low-level function parameters (snake_case would be here if needed)
-export interface MetadataExtensionCreateParams {
+export interface IMetadataExtensionCreateParams {
   name: string;
   description: string;
   packageName: string;
@@ -25,7 +25,7 @@ export interface MetadataExtensionCreateParams {
 
 // Builder configuration (camelCase)
 // Note: packageName and description are required for create/validate operations (validated in builder methods)
-export interface MetadataExtensionBuilderConfig {
+export interface IMetadataExtensionConfig {
   name: string; // Required
   description?: string; // Required for create/validate operations, optional for others
   packageName?: string; // Required for create/validate operations, optional for others
@@ -37,7 +37,9 @@ export interface MetadataExtensionBuilderConfig {
   sessionId?: string;
 }
 
-export interface MetadataExtensionBuilderState extends BaseBuilderState {
+export interface IMetadataExtensionState extends IAdtObjectState {
   sourceCode?: string; // MetadataExtension-specific: stored source code
-  // Other fields inherited from BaseBuilderState
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
 }

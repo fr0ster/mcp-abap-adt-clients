@@ -21,7 +21,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { IAdtLogger, logErrorSafely } from '../../utils/logger';
-import { FunctionModuleBuilderConfig } from './types';
+import { IFunctionModuleConfig, IFunctionModuleState } from './types';
 import { validateFunctionModuleName } from './validation';
 import { create as createFunctionModule } from './create';
 import { checkFunctionModule } from './check';
@@ -30,9 +30,9 @@ import { update } from './update';
 import { unlockFunctionModule } from './unlock';
 import { activateFunctionModule } from './activation';
 import { checkDeletion, deleteFunctionModule } from './delete';
-import { getFunctionSource } from './read';
+import { getFunctionSource, getFunctionMetadata, getFunctionModuleTransport } from './read';
 
-export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig, FunctionModuleBuilderConfig> {
+export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: IAdtLogger;
   public readonly objectType: string = 'FunctionModule';
@@ -45,7 +45,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
   /**
    * Validate function module configuration before creation
    */
-  async validate(config: Partial<FunctionModuleBuilderConfig>): Promise<AxiosResponse> {
+  async validate(config: Partial<IFunctionModuleConfig>): Promise<IFunctionModuleState> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required for validation');
     }
@@ -53,21 +53,24 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
       throw new Error('Function group name is required for validation');
     }
 
-    return await validateFunctionModuleName(
+    return {
+      validationResponse: await validateFunctionModuleName(
       this.connection,
       config.functionGroupName,
       config.functionModuleName,
       config.description
-    );
+    ),
+    errors: []
+  };
   }
 
   /**
    * Create function module with full operation chain
    */
   async create(
-    config: FunctionModuleBuilderConfig,
+    config: IFunctionModuleConfig,
     options?: IAdtOperationOptions
-  ): Promise<FunctionModuleBuilderConfig> {
+  ): Promise<IFunctionModuleState> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
@@ -161,8 +164,8 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          functionGroupName: config.functionGroupName,
-          functionModuleName: config.functionModuleName
+          createResult: activateResponse,
+          errors: []
         };
       }
 
@@ -173,9 +176,8 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
         : JSON.stringify(readResponse.data);
 
       return {
-        functionGroupName: config.functionGroupName,
-        functionModuleName: config.functionModuleName,
-        sourceCode
+        createResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -216,9 +218,9 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
    * Read function module
    */
   async read(
-    config: Partial<FunctionModuleBuilderConfig>,
+    config: Partial<IFunctionModuleConfig>,
     version: 'active' | 'inactive' = 'active'
-  ): Promise<FunctionModuleBuilderConfig | undefined> {
+  ): Promise<IFunctionModuleState | undefined> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
@@ -228,14 +230,9 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
     try {
       const response = await getFunctionSource(this.connection, config.functionModuleName, config.functionGroupName, version);
-      const sourceCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
-
       return {
-        functionGroupName: config.functionGroupName,
-        functionModuleName: config.functionModuleName,
-        sourceCode
+        readResult: response,
+        errors: []
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -246,13 +243,69 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
   }
 
   /**
+   * Read function module metadata (object characteristics: package, responsible, description, etc.)
+   */
+  async readMetadata(config: Partial<IFunctionModuleConfig>): Promise<IFunctionModuleState> {
+    const state: IFunctionModuleState = { errors: [] };
+    if (!config.functionModuleName) {
+      const error = new Error('Function module name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    if (!config.functionGroupName) {
+      const error = new Error('Function group name is required');
+      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getFunctionMetadata(this.connection, config.functionModuleName, config.functionGroupName);
+      state.metadataResult = response;
+      this.logger?.info?.('Function module metadata read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readMetadata', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Read transport request information for the function module
+   */
+  async readTransport(config: Partial<IFunctionModuleConfig>): Promise<IFunctionModuleState> {
+    const state: IFunctionModuleState = { errors: [] };
+    if (!config.functionModuleName) {
+      const error = new Error('Function module name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    if (!config.functionGroupName) {
+      const error = new Error('Function group name is required');
+      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      throw error;
+    }
+    try {
+      const response = await getFunctionModuleTransport(this.connection, config.functionModuleName, config.functionGroupName);
+      state.transportResult = response;
+      this.logger?.info?.('Function module transport request read successfully');
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'readTransport', err);
+      throw err;
+    }
+  }
+
+  /**
    * Update function module with full operation chain
    * Always starts with lock
    */
   async update(
-    config: Partial<FunctionModuleBuilderConfig>,
+    config: Partial<IFunctionModuleConfig>,
     options?: IAdtOperationOptions
-  ): Promise<FunctionModuleBuilderConfig> {
+  ): Promise<IFunctionModuleState> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
@@ -316,8 +369,8 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
         // Don't read after activation - object may not be ready yet
         // Return basic info (activation returns 201)
         return {
-          functionGroupName: config.functionGroupName,
-          functionModuleName: config.functionModuleName
+          updateResult: activateResponse,
+          errors: []
         };
       }
 
@@ -328,9 +381,8 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
         : JSON.stringify(readResponse.data);
 
       return {
-        functionGroupName: config.functionGroupName,
-        functionModuleName: config.functionModuleName,
-        sourceCode
+        updateResult: readResponse,
+        errors: []
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -370,7 +422,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
   /**
    * Delete function module
    */
-  async delete(config: Partial<FunctionModuleBuilderConfig>): Promise<AxiosResponse> {
+  async delete(config: Partial<IFunctionModuleConfig>): Promise<IFunctionModuleState> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
@@ -397,7 +449,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
       });
       this.logger?.info?.('Function module deleted');
 
-      return result;
+      return { deleteResult: result, errors: [] };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Delete', error);
       throw error;
@@ -408,7 +460,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
    * Activate function module
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<FunctionModuleBuilderConfig>): Promise<AxiosResponse> {
+  async activate(config: Partial<IFunctionModuleConfig>): Promise<IFunctionModuleState> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
@@ -418,7 +470,7 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
     try {
       const result = await activateFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
-      return result;
+      return { activateResult: result, errors: [] };
     } catch (error: any) {
       logErrorSafely(this.logger, 'Activate', error);
       throw error;
@@ -429,9 +481,9 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
    * Check function module
    */
   async check(
-    config: Partial<FunctionModuleBuilderConfig>,
+    config: Partial<IFunctionModuleConfig>,
     status?: string
-  ): Promise<AxiosResponse> {
+  ): Promise<IFunctionModuleState> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
     }
@@ -441,6 +493,9 @@ export class AdtFunctionModule implements IAdtObject<FunctionModuleBuilderConfig
 
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    return await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, version);
+    return {
+      checkResult: await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, version),
+      errors: []
+    };
   }
 }

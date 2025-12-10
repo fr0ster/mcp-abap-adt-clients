@@ -73,3 +73,28 @@ export async function readMetadataExtensionSource(
     headers
   });
 }
+
+/**
+ * Get transport request for ABAP metadata extension
+ * @param connection - SAP connection
+ * @param name - Metadata extension name
+ * @returns Transport request information
+ */
+export async function getMetadataExtensionTransport(
+  connection: IAbapConnection,
+  name: string
+): Promise<AxiosResponse> {
+  const lowerName = name.toLowerCase();
+  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/transport`;
+
+  const headers = {
+    'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+  };
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers
+  });
+}

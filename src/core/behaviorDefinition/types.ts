@@ -8,7 +8,7 @@ export type BehaviorDefinitionImplementationType = 'Managed' | 'Unmanaged' | 'Ab
 /**
  * Parameters for validating a behavior definition before creation
  */
-export interface BehaviorDefinitionValidationParams {
+export interface IBehaviorDefinitionValidationParams {
     /** Name of the behavior definition object */
     objname: string;
     /** Root entity name */
@@ -24,7 +24,7 @@ export interface BehaviorDefinitionValidationParams {
 /**
  * Validation result
  */
-export interface ValidationResult {
+export interface IValidationResult {
     severity: 'OK' | 'ERROR' | 'WARNING';
     shortText?: string;
     longText?: string;
@@ -33,7 +33,7 @@ export interface ValidationResult {
 /**
  * Parameters for creating a behavior definition
  */
-export interface BehaviorDefinitionCreateParams {
+export interface IBehaviorDefinitionCreateParams {
     /** Name of the behavior definition */
     name: string;
     /** Description */
@@ -51,7 +51,7 @@ export interface BehaviorDefinitionCreateParams {
 /**
  * Parameters for updating a behavior definition
  */
-export interface UpdateBehaviorDefinitionParams {
+export interface IUpdateBehaviorDefinitionParams {
     /** Name of the behavior definition */
     name: string;
     /** Source code */
@@ -65,7 +65,7 @@ export interface UpdateBehaviorDefinitionParams {
 /**
  * Lock result containing lock handle
  */
-export interface LockResult {
+export interface ILockResult {
     lockHandle: string;
     corrnr?: string;
     corruser?: string;
@@ -82,7 +82,7 @@ export type CheckReporter = 'bdefImplementationCheck' | 'abapCheckRun';
 /**
  * Check message from validation
  */
-export interface CheckMessage {
+export interface ICheckMessage {
     uri: string;
     type: 'E' | 'W' | 'I' | 'S';
     shortText: string;
@@ -92,18 +92,18 @@ export interface CheckMessage {
 /**
  * Check run result
  */
-export interface CheckRunResult {
+export interface ICheckRunResult {
     reporter: CheckReporter;
     triggeringUri: string;
     status: string;
     statusText: string;
-    messages?: CheckMessage[];
+    messages?: ICheckMessage[];
 }
 
 // Builder configuration (camelCase)
 // Note: packageName, description, implementationType are required for create/validate operations (validated in builder methods)
 // rootEntity is required for validate operations
-export interface BehaviorDefinitionBuilderConfig {
+export interface IBehaviorDefinitionConfig {
   name: string; // Required
   packageName?: string; // Required for create/validate operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -118,12 +118,12 @@ export interface BehaviorDefinitionBuilderConfig {
  * State maintained by the Behavior Definition Builder
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 /**
  * State maintained by the Behavior Definition Builder
  */
-export interface BehaviorDefinitionBuilderState extends BaseBuilderState {
+export interface IBehaviorDefinitionState extends IAdtObjectState {
     /** Name of the behavior definition */
     name?: string;
     /** Lock result */
@@ -136,5 +136,7 @@ export interface BehaviorDefinitionBuilderState extends BaseBuilderState {
     deleteCheckResult?: AxiosResponse<any>;
     /** Validation result */
     validationResult?: AxiosResponse<any>;
-    // Other fields inherited from BaseBuilderState
+    // All operation results are in IAdtObjectState:
+    // validationResponse, createResult, lockHandle, updateResult, checkResult,
+    // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
 }

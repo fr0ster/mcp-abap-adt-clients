@@ -6,7 +6,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { UpdateStructureParams } from './types';
+import { IUpdateStructureParams } from './types';
 
 /**
  * Upload structure DDL code (low-level - uses existing lockHandle)
@@ -15,7 +15,7 @@ import { UpdateStructureParams } from './types';
  */
 export async function upload(
   connection: IAbapConnection,
-  params: UpdateStructureParams,
+  params: IUpdateStructureParams,
   lockHandle: string
 ): Promise<AxiosResponse> {
   const structureNameEncoded = encodeSapObjectName(params.structureName);
@@ -40,7 +40,7 @@ export async function upload(
  */
 export async function updateStructure(
   connection: IAbapConnection,
-  params: UpdateStructureParams & { lockHandle: string }
+  params: IUpdateStructureParams & { lockHandle: string }
 ): Promise<AxiosResponse> {
   return upload(connection, params, params.lockHandle);
 }

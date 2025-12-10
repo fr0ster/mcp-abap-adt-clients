@@ -7,19 +7,19 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { ProgramBuilder, ProgramBuilderConfig } from '../core/program';
-import { ClassBuilder, ClassBuilderConfig } from '../core/class';
-import { InterfaceBuilder, InterfaceBuilderConfig } from '../core/interface';
-import { DataElementBuilder, DataElementBuilderConfig } from '../core/dataElement';
-import { DomainBuilder, DomainBuilderConfig } from '../core/domain';
-import { StructureBuilder, StructureBuilderConfig } from '../core/structure';
-import { TableBuilder, TableBuilderConfig } from '../core/table';
-import { ViewBuilder, ViewBuilderConfig } from '../core/view';
-import { FunctionGroupBuilder, FunctionGroupBuilderConfig } from '../core/functionGroup';
-import { FunctionModuleBuilder, FunctionModuleBuilderConfig } from '../core/functionModule';
-import { PackageBuilder, PackageBuilderConfig } from '../core/package';
+import { ProgramBuilder, IProgramConfig } from '../core/program';
+import { ClassBuilder, IClassBuilderConfig } from '../core/class';
+import { InterfaceBuilder, IInterfaceConfig } from '../core/interface';
+import { DataElementBuilder, IDataElementConfig } from '../core/dataElement';
+import { DomainBuilder, IDomainConfig } from '../core/domain';
+import { StructureBuilder, IStructureConfig } from '../core/structure';
+import { TableBuilder, ITableConfig } from '../core/table';
+import { ViewBuilder, IViewConfig } from '../core/view';
+import { FunctionGroupBuilder, IFunctionGroupConfig } from '../core/functionGroup';
+import { FunctionModuleBuilder, IFunctionModuleConfig } from '../core/functionModule';
+import { PackageBuilder, IPackageConfig } from '../core/package';
 import { TransportBuilder } from '../core/transport';
-import { ServiceDefinitionBuilder, ServiceDefinitionBuilderConfig } from '../core/serviceDefinition';
+import { ServiceDefinitionBuilder, IServiceDefinitionConfig } from '../core/serviceDefinition';
 
 interface ReadOnlyClientState {
   readResult?: AxiosResponse;
@@ -40,84 +40,84 @@ export class ReadOnlyClient {
   }
 
   // Type-specific getters that return config interfaces
-  getDomainReadResult(): DomainBuilderConfig | undefined {
+  getDomainReadResult(): IDomainConfig | undefined {
     if (this.state.readBuilder instanceof DomainBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getClassReadResult(): ClassBuilderConfig | undefined {
+  getClassReadResult(): IClassBuilderConfig | undefined {
     if (this.state.readBuilder instanceof ClassBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getInterfaceReadResult(): InterfaceBuilderConfig | undefined {
+  getInterfaceReadResult(): IInterfaceConfig | undefined {
     if (this.state.readBuilder instanceof InterfaceBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getProgramReadResult(): ProgramBuilderConfig | undefined {
+  getProgramReadResult(): IProgramConfig | undefined {
     if (this.state.readBuilder instanceof ProgramBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getDataElementReadResult(): DataElementBuilderConfig | undefined {
+  getDataElementReadResult(): IDataElementConfig | undefined {
     if (this.state.readBuilder instanceof DataElementBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getStructureReadResult(): StructureBuilderConfig | undefined {
+  getStructureReadResult(): IStructureConfig | undefined {
     if (this.state.readBuilder instanceof StructureBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getTableReadResult(): TableBuilderConfig | undefined {
+  getTableReadResult(): ITableConfig | undefined {
     if (this.state.readBuilder instanceof TableBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getViewReadResult(): ViewBuilderConfig | undefined {
+  getViewReadResult(): IViewConfig | undefined {
     if (this.state.readBuilder instanceof ViewBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getFunctionGroupReadResult(): FunctionGroupBuilderConfig | undefined {
+  getFunctionGroupReadResult(): IFunctionGroupConfig | undefined {
     if (this.state.readBuilder instanceof FunctionGroupBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getFunctionModuleReadResult(): FunctionModuleBuilderConfig | undefined {
+  getFunctionModuleReadResult(): IFunctionModuleConfig | undefined {
     if (this.state.readBuilder instanceof FunctionModuleBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getPackageReadResult(): PackageBuilderConfig | undefined {
+  getPackageReadResult(): IPackageConfig | undefined {
     if (this.state.readBuilder instanceof PackageBuilder) {
       return this.state.readBuilder.getReadResult();
     }
     return undefined;
   }
 
-  getServiceDefinitionReadResult(): ServiceDefinitionBuilderConfig | undefined {
+  getServiceDefinitionReadResult(): IServiceDefinitionConfig | undefined {
     if (this.state.readBuilder instanceof ServiceDefinitionBuilder) {
       return this.state.readBuilder.getReadResult();
     }
@@ -125,7 +125,7 @@ export class ReadOnlyClient {
   }
 
   // Program operations
-  async readProgram(programName: string): Promise<ProgramBuilderConfig | undefined> {
+  async readProgram(programName: string): Promise<IProgramConfig | undefined> {
     const builder = new ProgramBuilder(this.connection, {}, { programName, description: '' });
     const result = await builder.read();
     // Store builder for getProgramReadResult()
@@ -138,7 +138,7 @@ export class ReadOnlyClient {
   }
 
   // Class operations
-  async readClass(className: string): Promise<ClassBuilderConfig | undefined> {
+  async readClass(className: string): Promise<IClassBuilderConfig | undefined> {
     const builder = new ClassBuilder(this.connection, {}, { className, description: '' });
     const result = await builder.read();
     // Store builder for getClassReadResult()
@@ -151,7 +151,7 @@ export class ReadOnlyClient {
   }
 
   // Interface operations
-  async readInterface(interfaceName: string): Promise<InterfaceBuilderConfig | undefined> {
+  async readInterface(interfaceName: string): Promise<IInterfaceConfig | undefined> {
     const builder = new InterfaceBuilder(this.connection, {}, { interfaceName, description: '' });
     const result = await builder.read();
     // Store builder for getInterfaceReadResult()
@@ -164,7 +164,7 @@ export class ReadOnlyClient {
   }
 
   // DataElement operations
-  async readDataElement(dataElementName: string): Promise<DataElementBuilderConfig | undefined> {
+  async readDataElement(dataElementName: string): Promise<IDataElementConfig | undefined> {
     const builder = new DataElementBuilder(this.connection, {}, { dataElementName, description: '' });
     const result = await builder.read();
     // Store builder for getDataElementReadResult()
@@ -177,7 +177,7 @@ export class ReadOnlyClient {
   }
 
   // Domain operations
-  async readDomain(domainName: string): Promise<DomainBuilderConfig | undefined> {
+  async readDomain(domainName: string): Promise<IDomainConfig | undefined> {
     const builder = new DomainBuilder(this.connection, {}, { domainName, description: '' });
     const result = await builder.read();
     // Store builder for getDomainReadResult()
@@ -190,7 +190,7 @@ export class ReadOnlyClient {
   }
 
   // Structure operations
-  async readStructure(structureName: string): Promise<StructureBuilderConfig | undefined> {
+  async readStructure(structureName: string): Promise<IStructureConfig | undefined> {
     const builder = new StructureBuilder(this.connection, {}, { structureName, description: '' });
     const result = await builder.read();
     // Store builder for getStructureReadResult()
@@ -203,7 +203,7 @@ export class ReadOnlyClient {
   }
 
   // Table operations
-  async readTable(tableName: string): Promise<TableBuilderConfig | undefined> {
+  async readTable(tableName: string): Promise<ITableConfig | undefined> {
     const builder = new TableBuilder(this.connection, {}, { tableName });
     const result = await builder.read();
     // Store builder for getTableReadResult()
@@ -216,7 +216,7 @@ export class ReadOnlyClient {
   }
 
   // View operations
-  async readView(viewName: string): Promise<ViewBuilderConfig | undefined> {
+  async readView(viewName: string): Promise<IViewConfig | undefined> {
     const builder = new ViewBuilder(this.connection, {}, { viewName, description: '' });
     const result = await builder.read();
     // Store builder for getViewReadResult()
@@ -229,7 +229,7 @@ export class ReadOnlyClient {
   }
 
   // FunctionGroup operations
-  async readFunctionGroup(functionGroupName: string): Promise<FunctionGroupBuilderConfig | undefined> {
+  async readFunctionGroup(functionGroupName: string): Promise<IFunctionGroupConfig | undefined> {
     const builder = new FunctionGroupBuilder(this.connection, {}, { functionGroupName, description: '' });
     const result = await builder.read();
     // Store builder for getFunctionGroupReadResult()
@@ -242,7 +242,7 @@ export class ReadOnlyClient {
   }
 
   // FunctionModule operations
-  async readFunctionModule(functionModuleName: string, functionGroupName: string): Promise<FunctionModuleBuilderConfig | undefined> {
+  async readFunctionModule(functionModuleName: string, functionGroupName: string): Promise<IFunctionModuleConfig | undefined> {
     const builder = new FunctionModuleBuilder(this.connection, {}, { functionModuleName, functionGroupName, description: '' });
     const result = await builder.read();
     // Store builder for getFunctionModuleReadResult()
@@ -255,7 +255,7 @@ export class ReadOnlyClient {
   }
 
   // Package operations
-  async readPackage(packageName: string): Promise<PackageBuilderConfig | undefined> {
+  async readPackage(packageName: string): Promise<IPackageConfig | undefined> {
     const builder = new PackageBuilder(this.connection, {}, { packageName, description: '', superPackage: '' });
     const result = await builder.read();
     // Store builder for getPackageReadResult()
@@ -268,7 +268,7 @@ export class ReadOnlyClient {
   }
 
   // ServiceDefinition operations
-  async readServiceDefinition(serviceDefinitionName: string): Promise<ServiceDefinitionBuilderConfig | undefined> {
+  async readServiceDefinition(serviceDefinitionName: string): Promise<IServiceDefinitionConfig | undefined> {
     // For read operations, description is not needed - only serviceDefinitionName is required
     const builder = new ServiceDefinitionBuilder(this.connection, {}, { serviceDefinitionName });
     const result = await builder.read();

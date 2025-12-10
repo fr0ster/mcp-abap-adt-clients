@@ -6,12 +6,12 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { CreateTransportParams } from './types';
+import { ICreateTransportParams } from './types';
 
 /**
  * Create transport request XML payload
  */
-function buildCreateTransportXml(args: CreateTransportParams, username: string): string {
+function buildCreateTransportXml(args: ICreateTransportParams, username: string): string {
   const transportType = args.transport_type === 'customizing' ? 'T' : 'K';
   const description = args.description || 'Transport request created via MCP';
   const owner = args.owner || username;
@@ -66,7 +66,7 @@ function parseTransportResponse(xmlData: string): any {
  */
 export async function createTransport(
   connection: IAbapConnection,
-  params: CreateTransportParams
+  params: ICreateTransportParams
 ): Promise<AxiosResponse> {
   if (!params.description) {
     throw new Error('Transport description is required');

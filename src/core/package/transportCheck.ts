@@ -5,14 +5,14 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from 'fast-xml-parser';
-import { CreatePackageParams } from './types';
+import { ICreatePackageParams } from './types';
 
 /**
  * Step 2: Check transport requirements
  */
 export async function checkTransportRequirements(
   connection: IAbapConnection,
-  args: CreatePackageParams,
+  args: ICreatePackageParams,
   transportLayer: string
 ): Promise<string[]> {
   const url = `/sap/bc/adt/cts/transportchecks`;

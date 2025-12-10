@@ -2,25 +2,24 @@
  * Table module type definitions
  */
 
-import { AxiosResponse } from 'axios';
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
-export interface CreateTableParams {
+export interface ICreateTableParams {
   table_name: string;
   package_name: string;
   transport_request?: string;
   ddl_code?: string; // Optional - can be added via update() later
 }
 
-export interface UpdateTableParams {
+export interface IUpdateTableParams {
   table_name: string;
   ddl_code: string;
   transport_request?: string;
   activate?: boolean;
 }
 
-export interface DeleteTableParams {
+export interface IDeleteTableParams {
   table_name: string;
   transport_request?: string;
 }
@@ -28,7 +27,7 @@ export interface DeleteTableParams {
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface TableBuilderConfig {
+export interface ITableConfig {
   tableName: string;
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -36,6 +35,9 @@ export interface TableBuilderConfig {
   description?: string; // Required for create/validate operations, optional for others
 }
 
-export interface TableBuilderState extends BaseBuilderState {
-  // Table-specific state can be added here if needed
+export interface ITableState extends IAdtObjectState {
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
+  // Table-specific fields can be added here if needed
 }

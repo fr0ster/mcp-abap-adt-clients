@@ -2,10 +2,10 @@
  * Interface module type definitions
  */
 
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectConfig, IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (camelCase)
-export interface CreateInterfaceParams {
+export interface ICreateInterfaceParams {
   interfaceName: string;
   description: string;
   packageName: string;
@@ -14,13 +14,13 @@ export interface CreateInterfaceParams {
   responsible?: string;
 }
 
-export interface UpdateInterfaceSourceParams {
+export interface IUpdateInterfaceSourceParams {
   interface_name: string;
   source_code: string;
   activate?: boolean;
 }
 
-export interface DeleteInterfaceParams {
+export interface IDeleteInterfaceParams {
   interface_name: string;
   transport_request?: string;
 }
@@ -28,7 +28,7 @@ export interface DeleteInterfaceParams {
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface InterfaceBuilderConfig {
+export interface IInterfaceConfig extends IAdtObjectConfig {
   interfaceName: string;
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -38,6 +38,6 @@ export interface InterfaceBuilderConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface InterfaceBuilderState extends BaseBuilderState {
+export interface IInterfaceState extends IAdtObjectState {
   // Interface-specific state can be added here if needed
 }

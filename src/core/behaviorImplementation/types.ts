@@ -3,10 +3,10 @@
  */
 
 import { AxiosResponse } from 'axios';
-import { BaseBuilderState } from '../shared/IBuilder';
+import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
-export interface CreateBehaviorImplementationParams {
+export interface ICreateBehaviorImplementationParams {
   class_name: string;
   description?: string;
   package_name: string;
@@ -17,7 +17,7 @@ export interface CreateBehaviorImplementationParams {
 }
 
 // Builder configuration (camelCase)
-export interface BehaviorImplementationBuilderConfig {
+export interface IBehaviorImplementationConfig {
   className: string; // Required
   description?: string; // Required for create/validate operations, optional for others
   packageName?: string; // Required for create/validate operations, optional for others
@@ -35,8 +35,10 @@ export interface BehaviorImplementationBuilderConfig {
   responsible?: string;
 }
 
-export interface BehaviorImplementationBuilderState extends BaseBuilderState {
+export interface IBehaviorImplementationState extends IAdtObjectState {
   metadataResult?: any; // Class-specific: metadata read result
-  // Other fields inherited from BaseBuilderState
+  // All operation results are in IAdtObjectState:
+  // validationResponse, createResult, lockHandle, updateResult, checkResult,
+  // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
 }
 

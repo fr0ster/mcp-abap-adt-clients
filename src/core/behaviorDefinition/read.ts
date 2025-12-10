@@ -78,3 +78,27 @@ export async function readSource(
         headers
     });
 }
+
+/**
+ * Get transport request for ABAP behavior definition
+ * @param connection - SAP connection
+ * @param name - Behavior definition name
+ * @returns Transport request information
+ */
+export async function getBehaviorDefinitionTransport(
+    connection: IAbapConnection,
+    name: string
+): Promise<AxiosResponse> {
+    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/transport`;
+
+    const headers = {
+        'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
+    };
+
+    return connection.makeAdtRequest({
+        url,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers
+    });
+}
