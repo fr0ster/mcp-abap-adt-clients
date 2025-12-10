@@ -565,8 +565,8 @@ await domainOps.update(config, { activateOnUpdate: true });
   - [ ] Migrate `BehaviorDefinitionBuilder.test.ts` to use `AdtClient`
   - [ ] Migrate `BehaviorImplementationBuilder.test.ts` to use `AdtClient`
   - [ ] Migrate `MetadataExtensionBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate shared tests (`groupActivation.test.ts`, `readSource.test.ts`, `readMetadata.test.ts`, etc.) to use `AdtClient` where applicable
-  - [x] Keep `TransportBuilder.test.ts` and `class/run.test.ts` on `CrudClient` (specific low-level operations)
+  - [ ] Review and migrate shared tests (`groupActivation.test.ts`, `readSource.test.ts`, `readMetadata.test.ts`, etc.) to use `AdtClient` where applicable
+  - [x] Keep `TransportBuilder.test.ts` and `class/run.test.ts` on appropriate APIs (specific low-level operations)
 - [ ] Update documentation
 - [ ] Add usage examples with clean API
 
@@ -575,6 +575,94 @@ await domainOps.update(config, { activateOnUpdate: true });
 - ✅ All CRUD classes are exported from index files
 - ⚠️ Only 1 out of 13 integration test files migrated to `AdtClient` (`ClassBuilder.test.ts`)
 - ⚠️ Documentation and usage examples still pending
+
+## Test Migration Tracking
+
+This section tracks the migration status of integration tests from `CrudClient`/`Builder` API to `AdtClient` API.
+
+### Object-Specific Integration Tests
+
+| Test File | Object Type | Status | Current API | Target API | Notes |
+|-----------|------------|--------|-------------|------------|-------|
+| `class/ClassBuilder.test.ts` | Class | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated, includes test classes operations |
+| `program/ProgramBuilder.test.ts` | Program | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `ProgramBuilder` |
+| `interface/InterfaceBuilder.test.ts` | Interface | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `InterfaceBuilder` |
+| `domain/DomainBuilder.test.ts` | Domain | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `DomainBuilder` |
+| `dataElement/DataElementBuilder.test.ts` | DataElement | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `DataElementBuilder` |
+| `structure/StructureBuilder.test.ts` | Structure | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `StructureBuilder` |
+| `table/TableBuilder.test.ts` | Table | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `TableBuilder` |
+| `view/ViewBuilder.test.ts` | View | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `ViewBuilder` |
+| `functionGroup/FunctionGroupBuilder.test.ts` | FunctionGroup | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `FunctionGroupBuilder` |
+| `functionModule/FunctionModuleBuilder.test.ts` | FunctionModule | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `FunctionModuleBuilder` |
+| `package/PackageBuilder.test.ts` | Package | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `PackageBuilder` |
+| `serviceDefinition/ServiceDefinitionBuilder.test.ts` | ServiceDefinition | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `ServiceDefinitionBuilder` |
+| `behaviorDefinition/BehaviorDefinitionBuilder.test.ts` | BehaviorDefinition | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `BehaviorDefinitionBuilder` |
+| `behaviorImplementation/BehaviorImplementationBuilder.test.ts` | BehaviorImplementation | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `BehaviorImplementationBuilder` |
+| `metadataExtension/MetadataExtensionBuilder.test.ts` | MetadataExtension | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `MetadataExtensionBuilder` |
+
+**Summary:** 1/14 object-specific tests migrated (7%)
+
+### Shared Integration Tests
+
+| Test File | Purpose | Status | Current API | Target API | Notes |
+|-----------|---------|--------|-------------|------------|-------|
+| `shared/groupActivation.test.ts` | Group activation operations | ⚠️ **REVIEW** | `CrudClient`, `SharedBuilder` | `AdtClient` (where applicable) | May need partial migration or remain on `CrudClient` |
+| `shared/readSource.test.ts` | Read source code operations | ⚠️ **REVIEW** | Low-level functions | `AdtClient.read()` | May need partial migration |
+| `shared/readMetadata.test.ts` | Read metadata operations | ⚠️ **REVIEW** | Low-level functions | `AdtClient.readMetadata()` | May need partial migration |
+| `shared/tableContents.test.ts` | Table contents operations | ⚠️ **REVIEW** | Low-level functions | `AdtClient` (if applicable) | May need partial migration |
+| `shared/sqlQuery.test.ts` | SQL query operations | ⚠️ **REVIEW** | Low-level functions | N/A | Likely remains on low-level API |
+| `shared/search.test.ts` | Search operations | ⚠️ **REVIEW** | Low-level functions | N/A | Likely remains on low-level API |
+| `shared/whereUsed.test.ts` | Where-used operations | ⚠️ **REVIEW** | Low-level functions | N/A | Likely remains on low-level API |
+
+**Summary:** 0/7 shared tests reviewed (0%)
+
+### Specialized Tests (No Migration Required)
+
+| Test File | Purpose | Status | API Used | Notes |
+|-----------|---------|--------|----------|-------|
+| `class/run.test.ts` | Unit test run operations | ✅ **KEEP** | Low-level `runClass` function | Tests low-level functionality, no migration needed |
+| `transport/TransportBuilder.test.ts` | Transport Builder API | ✅ **KEEP** | `TransportBuilder` | Tests Builder API specifically, no migration needed |
+
+**Summary:** 2/2 specialized tests correctly using appropriate API (100%)
+
+### Migration Progress Summary
+
+- **Object-Specific Tests:** 1/14 migrated (7%)
+- **Shared Tests:** 0/7 reviewed (0%)
+- **Specialized Tests:** 2/2 correctly using appropriate API (100%)
+- **Overall Test Migration:** 1/21 applicable tests migrated (5%)
+
+### Migration Checklist Template
+
+For each test file migration, follow this checklist:
+
+- [ ] Replace `CrudClient` imports with `AdtClient`
+- [ ] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [ ] Update test setup to use `AdtClient` factory methods
+- [ ] Replace Builder method chains with `AdtClient` CRUD operations:
+  - [ ] `builder.validate()` → `client.get{Entity}().validate()`
+  - [ ] `builder.create()` → `client.get{Entity}().create()`
+  - [ ] `builder.read()` → `client.get{Entity}().read()`
+  - [ ] `builder.update()` → `client.get{Entity}().update()`
+  - [ ] `builder.delete()` → `client.get{Entity}().delete()`
+  - [ ] `builder.activate()` → `client.get{Entity}().activate()`
+  - [ ] `builder.check()` → `client.get{Entity}().check()`
+- [ ] Update result access patterns:
+  - [ ] Builder state access → `I{Entity}State` return types
+  - [ ] Direct `AxiosResponse` → State object properties
+- [ ] Remove manual lock/unlock handling (handled by `AdtClient`)
+- [ ] Update error handling to use state objects
+- [ ] Verify all test cases pass
+- [ ] Update test file header comments
+
+### Reference Implementation
+
+See `class/ClassBuilder.test.ts` for a complete example of:
+- ✅ Full migration from `CrudClient` to `AdtClient`
+- ✅ Proper use of `IAdtObject` interface methods
+- ✅ State object result handling
+- ✅ Test classes operations using `AdtClass` methods
+- ✅ Unit test operations using `AdtClient.getUnitTest()`
 
 ## Naming Conventions
 
@@ -720,7 +808,7 @@ try {
 - **Phase 4: Integration** - ~60% ⚠️
   - Factory methods: 100% complete (17 object types + 4 local class types)
   - Exports: 100% complete
-  - Integration tests: ~8% complete (1/13 test files migrated)
+  - Integration tests: ~5% complete (1/21 applicable test files migrated)
   - Documentation: 0% (pending)
 
 ### Key Achievements:
@@ -728,16 +816,29 @@ try {
 2. ✅ Complete `AdtClient` API with all factory methods
 3. ✅ Consistent error handling and session management across all objects
 4. ✅ Reference implementation (`AdtClass`) fully functional
-5. ✅ One integration test file migrated to demonstrate pattern
+5. ✅ One integration test file migrated to demonstrate pattern (`ClassBuilder.test.ts`)
+6. ✅ Test migration tracking section added to roadmap
 
 ### Remaining Work:
-1. ⚠️ Migrate 12 remaining integration test files to `AdtClient`
-2. ⚠️ Add comprehensive error scenario tests
-3. ⚠️ Create user documentation and usage examples
-4. ⚠️ Update API documentation
+1. ⚠️ Migrate 13 remaining object-specific integration test files to `AdtClient`
+2. ⚠️ Review and migrate shared integration tests where applicable (7 files)
+3. ⚠️ Add comprehensive error scenario tests
+4. ⚠️ Create user documentation and usage examples
+5. ⚠️ Update API documentation
 
 ### Implementation Statistics:
 - **CRUD Classes:** 17/17 (100%)
 - **Factory Methods:** 21/21 (100%)
-- **Integration Tests Migrated:** 1/13 (8%)
+- **Object-Specific Tests Migrated:** 1/14 (7%)
+- **Shared Tests Reviewed:** 0/7 (0%)
+- **Specialized Tests (Correct API):** 2/2 (100%)
+- **Overall Test Migration:** 1/21 applicable tests (5%)
 - **Documentation:** 0% (pending)
+
+### Test Migration Status:
+- ✅ **Migrated:** `class/ClassBuilder.test.ts`
+- ⚠️ **Pending (13 files):** All other object-specific tests
+- ⚠️ **Review Needed (7 files):** Shared integration tests
+- ✅ **Correct API (2 files):** Specialized tests using appropriate APIs
+
+See "Test Migration Tracking" section above for detailed test migration status.
