@@ -121,7 +121,7 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_service_definition', 'builder_service_definition');
+    return getTestCaseDefinition('create_service_definition', 'adt_service_definition');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -161,13 +161,13 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_service_definition', 'builder_service_definition');
+      const tc = getEnabledTestCase('create_service_definition', 'adt_service_definition');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'ServiceDefinitionBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'ServiceDefinition - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -189,15 +189,15 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'ServiceDefinitionBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'ServiceDefinition - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'ServiceDefinitionBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'ServiceDefinition - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !serviceDefinitionName) {
-        logBuilderTestSkip(testsLogger, 'ServiceDefinitionBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'ServiceDefinition - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -280,7 +280,7 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         );
         expect(checkResultActiveState?.status).toBeDefined();
 
-        logBuilderTestSuccess(testsLogger, 'ServiceDefinitionBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'ServiceDefinition - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -303,7 +303,7 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'ServiceDefinitionBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'ServiceDefinition - full workflow', enhancedError);
         throw enhancedError;
       } finally {
         // Cleanup: delete
@@ -321,7 +321,7 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
           }
         }
         
-        logBuilderTestEnd(testsLogger, 'ServiceDefinitionBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'ServiceDefinition - full workflow');
       }
     }, getTimeout('test'));
   });

@@ -121,7 +121,7 @@ describe('DomainBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_domain', 'builder_domain');
+    return getTestCaseDefinition('create_domain', 'adt_domain');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -167,13 +167,13 @@ describe('DomainBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_domain', 'builder_domain');
+      const tc = getEnabledTestCase('create_domain', 'adt_domain');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'DomainBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'Domain - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -195,15 +195,15 @@ describe('DomainBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'DomainBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'Domain - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'DomainBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'Domain - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !domainName) {
-        logBuilderTestSkip(testsLogger, 'DomainBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'Domain - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -271,7 +271,7 @@ describe('DomainBuilder (using AdtClient)', () => {
           transportRequest: config.transportRequest
         });
 
-        logBuilderTestSuccess(testsLogger, 'DomainBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'Domain - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -294,17 +294,17 @@ describe('DomainBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'DomainBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'Domain - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'DomainBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'Domain - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP domain', async () => {
-      const testCase = getTestCaseDefinition('create_domain', 'builder_domain');
+      const testCase = getTestCaseDefinition('create_domain', 'adt_domain');
       const standardObject = resolveStandardObject('domain', isCloudSystem, testCase);
 
       if (!standardObject) {

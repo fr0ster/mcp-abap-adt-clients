@@ -88,7 +88,7 @@ describe('ClassBuilder (using AdtClient)', () => {
   });
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_class', 'builder_class');
+    return getTestCaseDefinition('create_class', 'adt_class');
   }
 
   /**
@@ -238,13 +238,13 @@ describe('ClassBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_class', 'builder_class');
+      const tc = getEnabledTestCase('create_class', 'adt_class');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'ClassBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'Class - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -267,21 +267,21 @@ describe('ClassBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'ClassBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'Class - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'ClassBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'Class - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !testClassName) {
-        logBuilderTestSkip(testsLogger, 'ClassBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'Class - full workflow', skipReason || 'Test case not available');
         return;
       }
 
       const testPackageName = resolvePackageName(testCase.params.package_name);
       if (!testPackageName) {
-        logBuilderTestSkip(testsLogger, 'ClassBuilder - full workflow', 'package_name not configured');
+        logBuilderTestSkip(testsLogger, 'Class - full workflow', 'package_name not configured');
         return;
       }
       // Check test-case specific first (overrides global), then fallback to global
@@ -498,7 +498,7 @@ describe('ClassBuilder (using AdtClient)', () => {
             expect(unitTest.getResultResponse()).toBeDefined();
           }
 
-          logBuilderTestSuccess(testsLogger, 'ClassBuilder - full workflow');
+          logBuilderTestSuccess(testsLogger, 'Class - full workflow');
         } catch (error: any) {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
@@ -527,38 +527,38 @@ describe('ClassBuilder (using AdtClient)', () => {
           const enhancedError = statusText !== 'HTTP ?'
             ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
             : error;
-          logBuilderTestError(testsLogger, 'ClassBuilder - full workflow', enhancedError);
+          logBuilderTestError(testsLogger, 'Class - full workflow', enhancedError);
           throw enhancedError;
         }
       } finally {
-        logBuilderTestEnd(testsLogger, 'ClassBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'Class - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP class', async () => {
-      const testCase = getTestCaseDefinition('create_class', 'builder_class');
+      const testCase = getTestCaseDefinition('create_class', 'adt_class');
       const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'ClassBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'Class - read standard object', {
           name: 'read_standard',
           params: {}
         });
-        logBuilderTestSkip(testsLogger, 'ClassBuilder - read standard object',
+        logBuilderTestSkip(testsLogger, 'Class - read standard object',
           `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
         return;
       }
 
       const standardClassName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'ClassBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'Class - read standard object', {
         name: 'read_standard',
         params: { class_name: standardClassName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'ClassBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'Class - read standard object', 'No SAP configuration');
         return;
       }
 
@@ -569,19 +569,19 @@ describe('ClassBuilder (using AdtClient)', () => {
         // IClassState doesn't have className directly, check readResult
         expect(result?.readResult).toBeDefined();
 
-        logBuilderTestSuccess(testsLogger, 'ClassBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'Class - read standard object');
       } catch (error) {
-        logBuilderTestError(testsLogger, 'ClassBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'Class - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, 'ClassBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'Class - read standard object');
       }
     }, getTimeout('test'));
   });
 
   describe('Read transport request', () => {
     it('should read transport request for class', async () => {
-      const testCase = getTestCaseDefinition('create_class', 'builder_class');
+      const testCase = getTestCaseDefinition('create_class', 'adt_class');
       const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
 
       if (!standardObject) {

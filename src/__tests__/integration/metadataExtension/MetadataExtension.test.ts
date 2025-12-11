@@ -83,7 +83,7 @@ describe('MetadataExtensionBuilder (using AdtClient)', () => {
   });
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_metadata_extension', 'builder_metadata_extension');
+    return getTestCaseDefinition('create_metadata_extension', 'adt_metadata_extension');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -157,7 +157,7 @@ extend view ${targetEntity} with "${extName}"
         return;
       }
 
-      const tc = getEnabledTestCase('create_metadata_extension', 'builder_metadata_extension');
+      const tc = getEnabledTestCase('create_metadata_extension', 'adt_metadata_extension');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -216,15 +216,15 @@ extend view ${targetEntity} with "${extName}"
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'MetadataExtensionBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'MetadataExtension - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'MetadataExtensionBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'MetadataExtension - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !extName) {
-        logBuilderTestSkip(testsLogger, 'MetadataExtensionBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'MetadataExtension - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -249,7 +249,7 @@ extend view ${targetEntity} with "${extName}"
           if (errorText.toLowerCase().includes('already exists') ||
               errorText.toLowerCase().includes('does already exist') ||
               (errorText.toLowerCase().includes('resource') && errorText.toLowerCase().includes('exist'))) {
-            logBuilderTestSkip(testsLogger, 'MetadataExtensionBuilder - full workflow', 
+            logBuilderTestSkip(testsLogger, 'MetadataExtension - full workflow', 
               `⚠️ SAFETY: Metadata extension ${config.extName} already exists! ` +
               `Delete manually or use different test name to avoid accidental deletion.`);
             return; // Skip test - object already exists, don't delete it
@@ -322,7 +322,7 @@ extend view ${targetEntity} with "${extName}"
         const checkResult2 = checkResult2State?.checkResult;
         expect(checkResult2?.status).toBeDefined();
 
-        logBuilderTestSuccess(testsLogger, 'MetadataExtensionBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'MetadataExtension - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -345,7 +345,7 @@ extend view ${targetEntity} with "${extName}"
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'MetadataExtensionBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'MetadataExtension - full workflow', enhancedError);
         throw enhancedError;
       } finally {
         // Cleanup: delete metadata extension only if it was created in this test
@@ -361,7 +361,7 @@ extend view ${targetEntity} with "${extName}"
             testsLogger.warn?.('Failed to delete metadata extension during cleanup:', deleteError.message || deleteError);
           }
         }
-        logBuilderTestEnd(testsLogger, 'MetadataExtensionBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'MetadataExtension - full workflow');
       }
     }, getTimeout('test'));
   });

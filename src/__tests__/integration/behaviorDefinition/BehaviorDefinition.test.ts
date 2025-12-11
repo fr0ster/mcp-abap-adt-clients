@@ -81,7 +81,7 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
   });
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_behavior_definition', 'builder_behavior_definition');
+    return getTestCaseDefinition('create_behavior_definition', 'adt_behavior_definition');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -139,7 +139,7 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_behavior_definition', 'builder_behavior_definition');
+      const tc = getEnabledTestCase('create_behavior_definition', 'adt_behavior_definition');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -182,16 +182,16 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'BehaviorDefinitionBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'BehaviorDefinition - full workflow', skipReason);
         return;
       }
 
       if (!testCase) {
-        logBuilderTestSkip(testsLogger, 'BehaviorDefinitionBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'BehaviorDefinition - full workflow', skipReason || 'Test case not available');
         return;
       }
 
-      logBuilderTestStart(testsLogger, 'BehaviorDefinitionBuilder - full workflow', testCase);
+      logBuilderTestStart(testsLogger, 'BehaviorDefinition - full workflow', testCase);
 
       const config = buildBuilderConfig(testCase);
       let behaviorDefinitionCreated = false;
@@ -275,7 +275,7 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         const checkResult2 = checkResult2State?.checkResult;
         expect(checkResult2?.status).toBeDefined();
 
-        logBuilderTestSuccess(testsLogger, 'BehaviorDefinitionBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'BehaviorDefinition - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -298,7 +298,7 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'BehaviorDefinitionBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'BehaviorDefinition - full workflow', enhancedError);
         throw enhancedError;
       } finally {
         // Cleanup: delete behavior definition
@@ -314,7 +314,7 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
             testsLogger.warn?.('Failed to delete behavior definition during cleanup:', deleteError.message || deleteError);
           }
         }
-        logBuilderTestEnd(testsLogger, 'BehaviorDefinitionBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'BehaviorDefinition - full workflow');
       }
     }, getTimeout('test'));
   });

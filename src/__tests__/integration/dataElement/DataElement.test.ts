@@ -123,7 +123,7 @@ describe('DataElementBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_data_element', 'builder_data_element');
+    return getTestCaseDefinition('create_data_element', 'adt_data_element');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -175,13 +175,13 @@ describe('DataElementBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_data_element', 'builder_data_element');
+      const tc = getEnabledTestCase('create_data_element', 'adt_data_element');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'DataElementBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'DataElement - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -308,15 +308,15 @@ describe('DataElementBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'DataElementBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'DataElement - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'DataElementBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'DataElement - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !dataElementName) {
-        logBuilderTestSkip(testsLogger, 'DataElementBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'DataElement - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -334,7 +334,7 @@ describe('DataElementBuilder (using AdtClient)', () => {
         if (validationResponse?.status !== 200) {
           const errorMessage = extractValidationErrorMessage(validationResponse);
           logBuilderTestStepError('validate', { response: { status: validationResponse?.status, data: validationResponse?.data } });
-          logBuilderTestSkip(testsLogger, 'DataElementBuilder - full workflow', `Validation failed: ${errorMessage} - environment problem, test skipped`);
+          logBuilderTestSkip(testsLogger, 'DataElement - full workflow', `Validation failed: ${errorMessage} - environment problem, test skipped`);
           return;
         }
         
@@ -350,7 +350,7 @@ describe('DataElementBuilder (using AdtClient)', () => {
         if (!updateSucceeded) {
           logBuilderTestStep('delete (cleanup after failed check)');
           await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
-          logBuilderTestSkip(testsLogger, 'DataElementBuilder - full workflow', 'Check failed - test skipped after cleanup');
+          logBuilderTestSkip(testsLogger, 'DataElement - full workflow', 'Check failed - test skipped after cleanup');
           return;
         }
         
@@ -361,19 +361,19 @@ describe('DataElementBuilder (using AdtClient)', () => {
         logBuilderTestStep('delete (cleanup)');
         await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
 
-        logBuilderTestSuccess(testsLogger, 'DataElementBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'DataElement - full workflow');
       } catch (error: any) {
-        logBuilderTestError(testsLogger, 'DataElementBuilder - full workflow', error);
+        logBuilderTestError(testsLogger, 'DataElement - full workflow', error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, 'DataElementBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'DataElement - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP data element', async () => {
-      const testCase = getTestCaseDefinition('create_data_element', 'builder_data_element');
+      const testCase = getTestCaseDefinition('create_data_element', 'adt_data_element');
       const standardObject = resolveStandardObject('dataElement', isCloudSystem, testCase);
 
       if (!standardObject) {

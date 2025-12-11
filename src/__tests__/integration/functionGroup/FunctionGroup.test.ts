@@ -88,7 +88,7 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
 
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_function_group', 'builder_function_group');
+    return getTestCaseDefinition('create_function_group', 'adt_function_group');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -126,13 +126,13 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_function_group', 'builder_function_group');
+      const tc = getEnabledTestCase('create_function_group', 'adt_function_group');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'FunctionGroupBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'FunctionGroup - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -144,15 +144,15 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'FunctionGroupBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'FunctionGroup - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'FunctionGroupBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'FunctionGroup - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !functionGroupName) {
-        logBuilderTestSkip(testsLogger, 'FunctionGroupBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'FunctionGroup - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -216,7 +216,7 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
           transportRequest: config.transportRequest
         });
 
-        logBuilderTestSuccess(testsLogger, 'FunctionGroupBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'FunctionGroup - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -239,17 +239,17 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'FunctionGroupBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'FunctionGroup - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'FunctionGroupBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'FunctionGroup - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP function group', async () => {
-      const testCase = getTestCaseDefinition('create_function_group', 'builder_function_group');
+      const testCase = getTestCaseDefinition('create_function_group', 'adt_function_group');
       const standardObject = resolveStandardObject('function_group', isCloudSystem, testCase);
 
       if (!standardObject) {

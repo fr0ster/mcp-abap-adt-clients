@@ -191,7 +191,7 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_function_module', 'builder_function_module');
+    return getTestCaseDefinition('create_function_module', 'adt_function_module');
   }
 
   describe('Full workflow', () => {
@@ -219,13 +219,13 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_function_module', 'builder_function_module');
+      const tc = getEnabledTestCase('create_function_module', 'adt_function_module');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'FunctionModuleBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'FunctionModule - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -299,15 +299,15 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'FunctionModuleBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'FunctionModule - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'FunctionModuleBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'FunctionModule - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !functionGroupName || !functionModuleName) {
-        logBuilderTestSkip(testsLogger, 'FunctionModuleBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'FunctionModule - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -325,7 +325,7 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
       try {
         const packageName = resolvePackageName(testCase.params.package_name);
         if (!packageName) {
-          logBuilderTestSkip(testsLogger, 'FunctionModuleBuilder - full workflow', 'package_name not configured');
+          logBuilderTestSkip(testsLogger, 'FunctionModule - full workflow', 'package_name not configured');
           return;
         }
         
@@ -348,7 +348,7 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
               data: validationResponse?.data
             }
           });
-          logBuilderTestSkip(testsLogger, 'FunctionModuleBuilder - full workflow', 
+          logBuilderTestSkip(testsLogger, 'FunctionModule - full workflow', 
             `Validation failed: ${errorMessage} - environment problem, test skipped`);
           return;
         }
@@ -415,7 +415,7 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
           testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
         }
 
-        logBuilderTestSuccess(testsLogger, 'FunctionModuleBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'FunctionModule - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -441,21 +441,21 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'FunctionModuleBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'FunctionModule - full workflow', enhancedError);
         throw enhancedError;
       } finally {
         // Cleanup: delete Function Group (which also deletes all FMs inside)
         await cleanupFunctionModuleAndGroup(functionGroupName!, functionModuleName!).catch(() => {
-          logBuilderTestError(testsLogger, 'FunctionModuleBuilder - full workflow', new Error('Cleanup failed'));
+          logBuilderTestError(testsLogger, 'FunctionModule - full workflow', new Error('Cleanup failed'));
         });
-        logBuilderTestEnd(testsLogger, 'FunctionModuleBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'FunctionModule - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP function module', async () => {
-      const testCase = getTestCaseDefinition('create_function_module', 'builder_function_module');
+      const testCase = getTestCaseDefinition('create_function_module', 'adt_function_module');
       const standardObject = resolveStandardObject('function_module', isCloudSystem, testCase);
 
       if (!standardObject) {

@@ -118,7 +118,7 @@ describe('TableBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_table', 'builder_table');
+    return getTestCaseDefinition('create_table', 'adt_table');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -157,13 +157,13 @@ describe('TableBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_table', 'builder_table');
+      const tc = getEnabledTestCase('create_table', 'adt_table');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'TableBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'Table - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -185,17 +185,17 @@ describe('TableBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'TableBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'Table - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'TableBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'Table - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !tableName) {
         logBuilderTestSkip(
           builderLogger,
-          'TableBuilder - full workflow',
+          'Table - full workflow',
           skipReason || 'Test case not available'
         );
         return;
@@ -240,7 +240,7 @@ describe('TableBuilder (using AdtClient)', () => {
           logBuilderTestStep(currentStep);
           const checkBeforeUpdateState = await client.getTable().check({ 
             tableName: config.tableName,
-            sourceCode: updatedDdlCode
+            ddlCode: updatedDdlCode
           }, 'inactive');
           const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
           expect(checkBeforeUpdate?.status).toBeDefined();
@@ -257,7 +257,7 @@ describe('TableBuilder (using AdtClient)', () => {
           logBuilderTestStep(currentStep);
           const checkResultNewCodeState = await client.getTable().check({ 
             tableName: config.tableName,
-            sourceCode: updatedDdlCode
+            ddlCode: updatedDdlCode
           }, 'inactive');
           const checkResultNewCode = checkResultNewCodeState?.checkResult;
           expect(checkResultNewCode?.status).toBeDefined();
@@ -299,7 +299,7 @@ describe('TableBuilder (using AdtClient)', () => {
             transportRequest: config.transportRequest
           });
 
-          logBuilderTestSuccess(testsLogger, 'TableBuilder - full workflow');
+          logBuilderTestSuccess(testsLogger, 'Table - full workflow');
         } catch (error: any) {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
@@ -322,17 +322,17 @@ describe('TableBuilder (using AdtClient)', () => {
           const enhancedError = statusText !== 'HTTP ?'
             ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
             : error;
-          logBuilderTestError(testsLogger, 'TableBuilder - full workflow', enhancedError);
+          logBuilderTestError(testsLogger, 'Table - full workflow', enhancedError);
           throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'TableBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'Table - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP table', async () => {
-      const testCase = getTestCaseDefinition('create_table', 'builder_table');
+      const testCase = getTestCaseDefinition('create_table', 'adt_table');
       const standardObject = resolveStandardObject('table', isCloudSystem, testCase);
 
       if (!standardObject) {

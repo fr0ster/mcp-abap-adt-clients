@@ -189,7 +189,7 @@ describe('View (using AdtClient)', () => {
 
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_view', 'builder_view');
+    return getTestCaseDefinition('create_view', 'adt_view');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -232,7 +232,7 @@ describe('View (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_view', 'builder_view');
+      const tc = getEnabledTestCase('create_view', 'adt_view');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -586,7 +586,7 @@ describe('View (using AdtClient)', () => {
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'ViewBuilder - CDS unit test');
+      const packageCheck = ensurePackageConfig(tc.params, 'View - CDS unit test');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -606,15 +606,15 @@ describe('View (using AdtClient)', () => {
     it('should generate unit test class for existing CDS view and run ABAP Unit', async () => {
       // If test is disabled, skip silently without logging
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', skipReason, true);
+        logBuilderTestSkip(testsLogger, 'View - CDS unit test', skipReason, true);
         return;
       }
 
       const definition = getTestCaseDefinition('create_view', 'cds_unit_test');
-      logBuilderTestStart(testsLogger, 'ViewBuilder - CDS unit test', definition);
+      logBuilderTestStart(testsLogger, 'View - CDS unit test', definition);
 
       if (!testCase || !viewName || !className) {
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'View - CDS unit test', skipReason || 'Test case not available');
         return;
       }
 
@@ -649,7 +649,7 @@ describe('View (using AdtClient)', () => {
           await getView(connection, viewName);
         } catch (readError: any) {
           // If view doesn't exist, skip test (must be created manually)
-          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+          logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
             `CDS view ${viewName} does not exist (HTTP ${readError.response?.status || '?'}). View must be created manually before running this test. - environment problem, test skipped`);
           return;
         }
@@ -664,7 +664,7 @@ describe('View (using AdtClient)', () => {
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || 2000));
         } catch (checkError: any) {
           // If check fails, view might not be active - skip test
-          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+          logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
             `CDS view ${viewName} is not active (HTTP ${checkError.response?.status || '?'}). View must be active before running this test. - environment problem, test skipped`);
           return;
         }
@@ -681,7 +681,7 @@ describe('View (using AdtClient)', () => {
             testsLogger.info?.(`Validation error response: ${typeof responseData === 'string' ? responseData : JSON.stringify(responseData)}`);
           }
           const errorMessage = validationError.message || extractValidationErrorMessage(validationError.response || validationError);
-          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+          logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
             `CDS view ${viewName} validation for unit test doubles failed: ${errorMessage} - environment problem, test skipped`);
           return;
         }
@@ -714,7 +714,7 @@ describe('View (using AdtClient)', () => {
                 data: classValidationResponse?.data
               }
             });
-            logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+            logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
               `Class ${className} already exists (may be owned by another user) - environment problem, test skipped`);
             return;
           }
@@ -726,7 +726,7 @@ describe('View (using AdtClient)', () => {
               data: classValidationResponse?.data
             }
           });
-          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+          logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
             `Class validation failed: ${errorMessage} - environment problem, test skipped`);
           return;
         }
@@ -753,7 +753,7 @@ describe('View (using AdtClient)', () => {
             : createError.message || 'Unknown error';
           
           logBuilderTestStepError('create', createError);
-          logBuilderTestSkip(testsLogger, 'ViewBuilder - CDS unit test', 
+          logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
             `Class creation failed (HTTP ${createError.response?.status || '?'}): ${errorMessage} - environment problem, test skipped`);
           return;
         }
@@ -869,7 +869,7 @@ describe('View (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'ViewBuilder - CDS unit test', enhancedError);
+        logBuilderTestError(testsLogger, 'View - CDS unit test', enhancedError);
         throw enhancedError;
       } finally {
         // Final cleanup: delete test class if it was created
@@ -892,7 +892,7 @@ describe('View (using AdtClient)', () => {
           }
         }
         
-        logBuilderTestEnd(testsLogger, 'ViewBuilder - CDS unit test');
+        logBuilderTestEnd(testsLogger, 'View - CDS unit test');
       }
     }, getTimeout('long')); // CDS unit test needs more time (400 seconds = 6.67 minutes)
   });

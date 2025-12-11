@@ -117,7 +117,7 @@ describe('ProgramBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_program', 'builder_program');
+    return getTestCaseDefinition('create_program', 'adt_program');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -162,13 +162,13 @@ describe('ProgramBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_program', 'builder_program');
+      const tc = getEnabledTestCase('create_program', 'adt_program');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'ProgramBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'Program - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -190,15 +190,15 @@ describe('ProgramBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'ProgramBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'Program - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'ProgramBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'Program - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !programName) {
-        logBuilderTestSkip(testsLogger, 'ProgramBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'Program - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -289,7 +289,7 @@ describe('ProgramBuilder (using AdtClient)', () => {
             transportRequest: config.transportRequest
           });
 
-          logBuilderTestSuccess(testsLogger, 'ProgramBuilder - full workflow');
+          logBuilderTestSuccess(testsLogger, 'Program - full workflow');
         } catch (error: any) {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
@@ -312,10 +312,10 @@ describe('ProgramBuilder (using AdtClient)', () => {
           const enhancedError = statusText !== 'HTTP ?'
             ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
             : error;
-          logBuilderTestError(testsLogger, 'ProgramBuilder - full workflow', enhancedError);
+          logBuilderTestError(testsLogger, 'Program - full workflow', enhancedError);
           throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'ProgramBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'Program - full workflow');
       }
     }, getTimeout('test'));
   });
@@ -332,7 +332,7 @@ describe('ProgramBuilder (using AdtClient)', () => {
         return;
       }
 
-      const testCase = getTestCaseDefinition('create_program', 'builder_program');
+      const testCase = getTestCaseDefinition('create_program', 'adt_program');
       const standardObject = resolveStandardObject('program', isCloudSystem, testCase);
 
       if (!standardObject) {

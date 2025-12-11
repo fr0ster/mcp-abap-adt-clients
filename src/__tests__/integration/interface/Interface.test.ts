@@ -88,7 +88,7 @@ describe('InterfaceBuilder (using AdtClient)', () => {
 
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_interface', 'builder_interface');
+    return getTestCaseDefinition('create_interface', 'adt_interface');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -154,13 +154,13 @@ describe('InterfaceBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_interface', 'builder_interface');
+      const tc = getEnabledTestCase('create_interface', 'adt_interface');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'InterfaceBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'Interface - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -172,15 +172,15 @@ describe('InterfaceBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'InterfaceBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'Interface - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'InterfaceBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'Interface - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !interfaceName) {
-        logBuilderTestSkip(testsLogger, 'InterfaceBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'Interface - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -293,7 +293,7 @@ describe('InterfaceBuilder (using AdtClient)', () => {
           transportRequest: config.transportRequest
         });
 
-        logBuilderTestSuccess(testsLogger, 'InterfaceBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'Interface - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -316,17 +316,17 @@ describe('InterfaceBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'InterfaceBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'Interface - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'InterfaceBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'Interface - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP interface', async () => {
-      const testCase = getTestCaseDefinition('create_interface', 'builder_interface');
+      const testCase = getTestCaseDefinition('create_interface', 'adt_interface');
       const standardObject = resolveStandardObject('interface', isCloudSystem, testCase);
 
       if (!standardObject) {

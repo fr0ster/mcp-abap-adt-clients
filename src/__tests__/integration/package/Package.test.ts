@@ -127,7 +127,7 @@ describe('PackageBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_package', 'builder_package');
+    return getTestCaseDefinition('create_package', 'adt_package');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -204,7 +204,7 @@ describe('PackageBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_package', 'builder_package');
+      const tc = getEnabledTestCase('create_package', 'adt_package');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -233,15 +233,15 @@ describe('PackageBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'PackageBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'Package - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'PackageBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'Package - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !packageName) {
-        logBuilderTestSkip(testsLogger, 'PackageBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'Package - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -332,7 +332,7 @@ describe('PackageBuilder (using AdtClient)', () => {
         });
         deleteConnection.reset();
 
-        logBuilderTestSuccess(testsLogger, 'PackageBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'Package - full workflow');
       } catch (error: any) {
         const errorMsg = error.message || '';
         const errorData = error.response?.data || '';
@@ -347,7 +347,7 @@ describe('PackageBuilder (using AdtClient)', () => {
         if (systemLocked) {
           logBuilderTestSkip(
             builderLogger,
-            'PackageBuilder - full workflow',
+            'Package - full workflow',
             'System change option prevents package creation (software component not modifiable)'
           );
           return;
@@ -379,10 +379,10 @@ describe('PackageBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'PackageBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'Package - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'PackageBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'Package - full workflow');
       }
     }, getTimeout('test'));
   });

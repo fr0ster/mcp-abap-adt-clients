@@ -181,7 +181,7 @@ read_service_definition:
 # Create Class
 create_class:
   test_cases:
-    - name: "builder_class"
+    - name: "adt_class"
       enabled: true
       description: "Create test class for ClassBuilder tests"
       params:
@@ -333,7 +333,7 @@ create_class:
 # Create Package
 create_package:
   test_cases:
-    - name: "builder_package"
+    - name: "adt_package"
       enabled: true
       description: "Package reserved for PackageBuilder tests"
       params:
@@ -349,7 +349,7 @@ create_package:
 # Create Domain
 create_domain:
   test_cases:
-    - name: "builder_domain"
+    - name: "adt_domain"
       enabled: true
       description: "Domain used by DomainBuilder workflow tests"
       params:
@@ -366,7 +366,7 @@ create_domain:
 # Create Data Element
 create_data_element:
   test_cases:
-    - name: "builder_data_element"
+    - name: "adt_data_element"
       enabled: true
       description: "Data element reserved for DataElementBuilder tests"
       params:
@@ -392,7 +392,7 @@ create_data_element:
 # Create Interface
 create_interface:
   test_cases:
-    - name: "builder_interface"
+    - name: "adt_interface"
       enabled: true
       description: "Interface reserved for InterfaceBuilder tests"
       params:
@@ -414,7 +414,7 @@ create_interface:
 # Create Program
 create_program:
   test_cases:
-    - name: "builder_program"
+    - name: "adt_program"
       enabled: true
       description: "Program reserved for ProgramBuilder tests"
       params:
@@ -430,7 +430,7 @@ create_program:
 # Create Table
 create_table:
   test_cases:
-    - name: "builder_table"
+    - name: "adt_table"
       enabled: true
       description: "Table reserved for TableBuilder tests"
       params:
@@ -457,7 +457,7 @@ create_table:
 # Create Structure
 create_structure:
   test_cases:
-    - name: "builder_structure"
+    - name: "adt_structure"
       enabled: true
       description: "Structure reserved for StructureBuilder tests"
       params:
@@ -476,7 +476,7 @@ create_structure:
 # Create View
 create_view:
   test_cases:
-    - name: "builder_view"
+    - name: "adt_view"
       enabled: true
       description: "View reserved for ViewBuilder tests"
       params:
@@ -629,7 +629,7 @@ create_view:
 # Create Service Definition
 create_service_definition:
   test_cases:
-    - name: "builder_service_definition"
+    - name: "adt_service_definition"
       enabled: false  # Set to true and configure params below to enable tests
       description: "Service definition reserved for ServiceDefinitionBuilder tests"
       params:
@@ -645,7 +645,7 @@ create_service_definition:
 # Create Function Group
 create_function_group:
   test_cases:
-    - name: "builder_function_group"
+    - name: "adt_function_group"
       enabled: true
       description: "Function group reserved for FunctionGroupBuilder tests"
       params:
@@ -657,7 +657,7 @@ create_function_group:
 # Create Function Module
 create_function_module:
   test_cases:
-    - name: "builder_function_module"
+    - name: "adt_function_module"
       enabled: true
       description: "Function module reserved for FunctionModuleBuilder tests"
       params:
@@ -678,7 +678,7 @@ create_function_module:
 # Create Transport
 create_transport:
   test_cases:
-    - name: "builder_transport"
+    - name: "adt_transport"
       enabled: true
       description: "Transport reserved for TransportBuilder tests"
       params:
@@ -688,7 +688,7 @@ create_transport:
 # Create Behavior Definition
 create_behavior_definition:
   test_cases:
-    - name: "builder_behavior_definition"
+    - name: "adt_behavior_definition"
       enabled: true
       description: "Create test behavior definition for BehaviorDefinitionBuilder tests"
       params:
@@ -715,7 +715,7 @@ create_behavior_definition:
 # Create Metadata Extension
 create_metadata_extension:
   test_cases:
-    - name: "builder_metadata_extension"
+    - name: "adt_metadata_extension"
       enabled: true
       description: "Create test metadata extension for MetadataExtensionBuilder tests"
       params:
@@ -735,7 +735,7 @@ create_metadata_extension:
 # Create Behavior Implementation
 create_behavior_implementation:
   test_cases:
-    - name: "builder_behavior_implementation"
+    - name: "adt_behavior_implementation"
       enabled: true
       description: "Create test behavior implementation class for BehaviorImplementationBuilder tests"
       params:
@@ -769,7 +769,7 @@ create_behavior_implementation:
 # Group Activation Test
 group_activation:
   test_cases:
-    - name: "builder_group_activation"
+    - name: "adt_group_activation"
       enabled: true
       description: "Group activation test - domain, data element, structure"
       params:

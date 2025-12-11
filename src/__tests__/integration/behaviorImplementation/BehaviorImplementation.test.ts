@@ -84,7 +84,7 @@ describe('BehaviorImplementationBuilder (using AdtClient)', () => {
   });
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_behavior_implementation', 'builder_behavior_implementation');
+    return getTestCaseDefinition('create_behavior_implementation', 'adt_behavior_implementation');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -171,7 +171,7 @@ ENDCLASS.`;
         return;
       }
 
-      const tc = getEnabledTestCase('create_behavior_implementation', 'builder_behavior_implementation');
+      const tc = getEnabledTestCase('create_behavior_implementation', 'adt_behavior_implementation');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -232,15 +232,15 @@ ENDCLASS.`;
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'BehaviorImplementationBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'BehaviorImplementation - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'BehaviorImplementation - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !className) {
-        logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'BehaviorImplementation - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -266,7 +266,7 @@ ENDCLASS.`;
           if (errorText.toLowerCase().includes('already exists') ||
               errorText.toLowerCase().includes('does already exist') ||
               (errorText.toLowerCase().includes('global type') && errorText.toLowerCase().includes('already exists'))) {
-            logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', 
+            logBuilderTestSkip(testsLogger, 'BehaviorImplementation - full workflow', 
               `⚠️ SAFETY: Behavior implementation class ${config.className} already exists! ` +
               `Delete manually or use different test name to avoid accidental deletion.`);
             return;
@@ -282,7 +282,7 @@ ENDCLASS.`;
               data: validationResponse?.data
             }
           });
-          logBuilderTestSkip(testsLogger, 'BehaviorImplementationBuilder - full workflow', 
+          logBuilderTestSkip(testsLogger, 'BehaviorImplementation - full workflow', 
             `Validation failed: ${errorMessage} - environment problem, test skipped`);
           return;
         }
@@ -354,7 +354,7 @@ ENDCLASS.`;
         const checkResult3 = checkResult3State?.checkResult;
         expect(checkResult3?.status).toBeDefined();
 
-        logBuilderTestSuccess(testsLogger, 'BehaviorImplementationBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'BehaviorImplementation - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -377,7 +377,7 @@ ENDCLASS.`;
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'BehaviorImplementationBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'BehaviorImplementation - full workflow', enhancedError);
         throw enhancedError;
       } finally {
         // Cleanup: delete behavior implementation class
@@ -393,7 +393,7 @@ ENDCLASS.`;
             testsLogger.warn?.('Failed to delete behavior implementation class during cleanup:', deleteError.message || deleteError);
           }
         }
-        logBuilderTestEnd(testsLogger, 'BehaviorImplementationBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'BehaviorImplementation - full workflow');
       }
     });
   });

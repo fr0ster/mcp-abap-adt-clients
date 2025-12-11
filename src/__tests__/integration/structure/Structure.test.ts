@@ -88,7 +88,7 @@ describe('StructureBuilder (using AdtClient)', () => {
 
 
   function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_structure', 'builder_structure');
+    return getTestCaseDefinition('create_structure', 'adt_structure');
   }
 
   function buildBuilderConfig(testCase: any) {
@@ -127,13 +127,13 @@ describe('StructureBuilder (using AdtClient)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('create_structure', 'builder_structure');
+      const tc = getEnabledTestCase('create_structure', 'adt_structure');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'StructureBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'Structure - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -145,15 +145,15 @@ describe('StructureBuilder (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'StructureBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'Structure - full workflow', definition);
 
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'StructureBuilder - full workflow', skipReason);
+        logBuilderTestSkip(testsLogger, 'Structure - full workflow', skipReason);
         return;
       }
 
       if (!testCase || !structureName) {
-        logBuilderTestSkip(testsLogger, 'StructureBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'Structure - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -255,7 +255,7 @@ describe('StructureBuilder (using AdtClient)', () => {
           transportRequest: config.transportRequest
         });
 
-        logBuilderTestSuccess(testsLogger, 'StructureBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'Structure - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -278,17 +278,17 @@ describe('StructureBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'StructureBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'Structure - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'StructureBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'Structure - full workflow');
       }
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP structure', async () => {
-      const testCase = getTestCaseDefinition('create_structure', 'builder_structure');
+      const testCase = getTestCaseDefinition('create_structure', 'adt_structure');
       const standardObject = resolveStandardObject('structure', isCloudSystem, testCase);
 
       if (!standardObject) {
