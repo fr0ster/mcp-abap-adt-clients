@@ -29,7 +29,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { IAdtLogger } from '../../utils/logger';
+import { ILogger } from '../../utils/logger';
 import { AxiosResponse } from 'axios';
 
 // Import utility functions
@@ -55,11 +55,11 @@ import type {
 
 export class AdtUtils {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger: ILogger;
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger
+    logger: ILogger
   ) {
     this.connection = connection;
     this.logger = logger;

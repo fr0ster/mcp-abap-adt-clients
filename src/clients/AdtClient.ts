@@ -15,7 +15,7 @@
  */
 
 import { IAbapConnection, IAdtObject } from '@mcp-abap-adt/interfaces';
-import { IAdtLogger, emptyLogger } from '../utils/logger';
+import { ILogger, emptyLogger } from '../utils/logger';
 import { 
   IClassConfig,
   IClassState,
@@ -50,11 +50,11 @@ import { AdtUtils } from '../core/shared/AdtUtils';
 
 export class AdtClient {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger: ILogger;
 
   constructor(
     connection: IAbapConnection,
-    logger?: IAdtLogger
+    logger?: ILogger
   ) {
     this.connection = connection;
     this.logger = logger || emptyLogger;

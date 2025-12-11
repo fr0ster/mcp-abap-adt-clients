@@ -8,8 +8,7 @@
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { IAdtLogger } from '../../../utils/logger';
-import { createConnectionLogger, createTestsLogger } from '../../helpers/testLogger';
+import { createConnectionLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -20,10 +19,8 @@ if (fs.existsSync(envPath)) {
 }
 
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
-const connectionLogger: ILogger = createConnectionLogger();
-
-// Test execution logs use DEBUG_TESTS
-const testsLogger: IAdtLogger = createTestsLogger();
+// Can be used for both connection and AdtClient (ILogger is compatible with IAdtLogger)
+const logger: ILogger = createConnectionLogger();
 
 function getConfig(): SapConfig {
   const rawUrl = process.env.SAP_URL;
@@ -87,12 +84,12 @@ describe('Shared - readSource', () => {
   beforeEach(async () => {
     try {
       const config = getConfig();
-      connection = createAbapConnection(config, connectionLogger);
+      connection = createAbapConnection(config, logger);
       await (connection as any).connect();
-      client = new AdtClient(connection, testsLogger);
+      client = new AdtClient(connection, logger);
       hasConfig = true;
     } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -105,7 +102,7 @@ describe('Shared - readSource', () => {
 
   it('should check if object type supports source code', () => {
     if (!hasConfig || !client) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
     const utils = client.getUtils();
@@ -121,7 +118,7 @@ describe('Shared - readSource', () => {
 
   it('should read class source code', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
@@ -135,7 +132,7 @@ describe('Shared - readSource', () => {
 
   it('should read class source code (inactive version)', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
@@ -147,7 +144,7 @@ describe('Shared - readSource', () => {
 
   it('should throw error for object type without source code', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 

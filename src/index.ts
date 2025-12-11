@@ -116,4 +116,4 @@ export type { AdtRequestType } from './core/transport';
 
 // Export utilities
 export { encodeSapObjectName } from './utils/internalUtils';
-export { type IAdtLogger, emptyLogger } from './utils/logger';
+export { type ILogger, emptyLogger } from './utils/logger';

@@ -1,23 +1,24 @@
 /**
  * Common logger interface for all ADT library code (Builders, low-level functions)
  * 
+ * Uses ILogger from @mcp-abap-adt/interfaces for consistency across packages.
+ * 
  * Usage:
  * - Builders accept this interface in constructor
  * - Low-level functions accept this interface as parameter
  * - Tests can provide their own implementation
  * - Server/CLI can provide their own implementation or pass empty logger
  */
-export interface IAdtLogger {
-  debug?: (message: string, ...args: any[]) => void;
-  info?: (message: string, ...args: any[]) => void;
-  warn?: (message: string, ...args: any[]) => void;
-  error?: (message: string, ...args: any[]) => void;
-}
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+
+// Re-export ILogger for convenience
+export type { ILogger };
 
 /**
  * Empty logger that does nothing (for production use or when logging is disabled)
+ * Implements ILogger interface with all required methods
  */
-export const emptyLogger: IAdtLogger = {
+export const emptyLogger: ILogger = {
   debug: () => {},
   info: () => {},
   warn: () => {},
@@ -29,7 +30,7 @@ export const emptyLogger: IAdtLogger = {
  * Only logs status, statusText, and response data (limited to 500 chars)
  */
 export function logErrorSafely(
-  logger: IAdtLogger | undefined,
+  logger: ILogger | undefined,
   operation: string,
   error: any
 ): void {
@@ -39,8 +40,8 @@ export function logErrorSafely(
     const data = typeof error.response.data === 'string' 
       ? error.response.data.substring(0, 500)
       : JSON.stringify(error.response.data).substring(0, 500);
-    logger?.error?.(`${operation} failed: HTTP ${status} ${statusText}`, { status, statusText, data });
+    logger?.error(`${operation} failed: HTTP ${status} ${statusText}`, { status, statusText, data });
   } else {
-    logger?.error?.(`${operation} failed:`, error instanceof Error ? error.message : String(error));
+    logger?.error(`${operation} failed:`, error instanceof Error ? error.message : String(error));
   }
 }
