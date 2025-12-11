@@ -1,13 +1,13 @@
 /**
- * Integration test for ViewBuilder
+ * Integration test for View
  * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
- *   DEBUG_ADT_LIBS=true        - ViewBuilder library logs
+ *   DEBUG_ADT_LIBS=true        - View library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=view/ViewBuilder
+ * Run: npm test -- --testPathPattern=view/View
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
@@ -60,7 +60,7 @@ if (fs.existsSync(envPath)) {
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
 const connectionLogger: ILogger = createConnectionLogger();
 
-// Library code (ViewBuilder) uses DEBUG_ADT_LIBS
+// Library code (View) uses DEBUG_ADT_LIBS
 const builderLogger: IAdtLogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
@@ -147,7 +147,7 @@ ENDCLASS.
 `;
 }
 
-describe('ViewBuilder (using AdtClient)', () => {
+describe('View (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
@@ -196,7 +196,7 @@ describe('ViewBuilder (using AdtClient)', () => {
     const params = testCase?.params || {};
     const packageName = resolvePackageName(params.package_name);
     if (!packageName) {
-      throw new Error('package_name not configured for ViewBuilder test');
+      throw new Error('package_name not configured for View test');
     }
     return {
       viewName: params.view_name,
@@ -238,7 +238,7 @@ describe('ViewBuilder (using AdtClient)', () => {
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'ViewBuilder - full workflow');
+      const packageCheck = ensurePackageConfig(tc.params, 'View - full workflow');
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -309,15 +309,15 @@ describe('ViewBuilder (using AdtClient)', () => {
     it('should execute full workflow and store all results', async () => {
       // If test is disabled, skip silently without logging
       if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', skipReason, true);
+        logBuilderTestSkip(testsLogger, 'View - full workflow', skipReason, true);
         return;
       }
 
       const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'ViewBuilder - full workflow', definition);
+      logBuilderTestStart(testsLogger, 'View - full workflow', definition);
 
       if (!testCase || !viewName) {
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', skipReason || 'Test case not available');
+        logBuilderTestSkip(testsLogger, 'View - full workflow', skipReason || 'Test case not available');
         return;
       }
 
@@ -334,12 +334,12 @@ describe('ViewBuilder (using AdtClient)', () => {
       const paramValidation = await validateTestParameters(
         connection,
         testCase.params,
-        'ViewBuilder - full workflow',
+        'View - full workflow',
         defaultPackage,
         defaultTransport
       );
       if (!paramValidation.success) {
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', paramValidation.reason || 'Parameter validation failed');
+        logBuilderTestSkip(testsLogger, 'View - full workflow', paramValidation.reason || 'Parameter validation failed');
         return;
       }
 
@@ -369,7 +369,7 @@ describe('ViewBuilder (using AdtClient)', () => {
               data: validationResponse?.data
             }
           });
-          logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', 
+          logBuilderTestSkip(testsLogger, 'View - full workflow', 
             `View ${config.viewName} cannot be created: ${errorMessage} - environment problem, test skipped`);
           return;
         }
@@ -381,7 +381,7 @@ describe('ViewBuilder (using AdtClient)', () => {
             data: validationResponse?.data
           }
         });
-        logBuilderTestSkip(testsLogger, 'ViewBuilder - full workflow', 
+        logBuilderTestSkip(testsLogger, 'View - full workflow', 
           `Validation failed: ${errorMessage} - environment problem, test skipped`);
         return;
       }
@@ -506,7 +506,7 @@ describe('ViewBuilder (using AdtClient)', () => {
           });
         }
 
-        logBuilderTestSuccess(testsLogger, 'ViewBuilder - full workflow');
+        logBuilderTestSuccess(testsLogger, 'View - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
@@ -553,10 +553,10 @@ describe('ViewBuilder (using AdtClient)', () => {
         const enhancedError = statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
           : error;
-        logBuilderTestError(testsLogger, 'ViewBuilder - full workflow', enhancedError);
+        logBuilderTestError(testsLogger, 'View - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        logBuilderTestEnd(testsLogger, 'ViewBuilder - full workflow');
+        logBuilderTestEnd(testsLogger, 'View - full workflow');
       }
     }, getTimeout('test')); // Full workflow test timeout (200 seconds)
   });
