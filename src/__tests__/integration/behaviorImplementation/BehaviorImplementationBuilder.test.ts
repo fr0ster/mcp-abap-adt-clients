@@ -1,6 +1,6 @@
 /**
  * Integration test for BehaviorImplementationBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=behaviorImplementation    (ADT-clients logs)
@@ -9,9 +9,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
-import { CrudClient } from '../../../clients/CrudClient';
-import { BehaviorImplementationBuilder } from '../../../core/behaviorImplementation';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -59,9 +57,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('BehaviorImplementationBuilder (using CrudClient)', () => {
+describe('BehaviorImplementationBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let connectionConfig: any = null;
   let hasConfig = false;
 
@@ -71,7 +69,7 @@ describe('BehaviorImplementationBuilder (using CrudClient)', () => {
       connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
     } catch (error) {
       testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -201,7 +199,9 @@ ENDCLASS.`;
           transportRequest: resolveTransportRequest(tc.params.transport_request)
         };
 
-        const behaviorDefinitionResult = await createDependencyBehaviorDefinition(client, behaviorDefinitionConfig, tc);
+        // Note: createDependencyBehaviorDefinition expects CrudClient, but we can use AdtClient.getBehaviorDefinition()
+        const tempCrudClient = new (require('../../../clients/CrudClient').CrudClient)(connection);
+        const behaviorDefinitionResult = await createDependencyBehaviorDefinition(tempCrudClient, behaviorDefinitionConfig, tc);
         
         if (!behaviorDefinitionResult.success) {
           skipReason = behaviorDefinitionResult.reason || `environment problem, test skipped: Failed to create required dependency behavior definition ${tc.params.behavior_definition_name}`;
@@ -219,7 +219,7 @@ ENDCLASS.`;
       // Cleanup behavior definition if it was created in beforeAll
       if (behaviorDefinitionCreated && behaviorDefinitionName) {
         try {
-          await client.deleteBehaviorDefinition({
+          await client.getBehaviorDefinition().delete({
             name: behaviorDefinitionName,
             transportRequest: resolveTransportRequest(testCase?.params?.transport_request) || ''
           });
@@ -246,18 +246,18 @@ ENDCLASS.`;
 
       const config = buildBuilderConfig(testCase);
       let behaviorImplementationCreated = false;
-      let behaviorImplementationLocked = false;
       let currentStep = '';
 
       try {
         currentStep = 'validate';
         logBuilderTestStep(currentStep);
-        const validationResponse = await client.validateBehaviorImplementation({
+        const validationState = await client.getBehaviorImplementation().validate({
           className: config.className,
           packageName: config.packageName,
           behaviorDefinition: config.behaviorDefinition,
           description: config.description
         });
+        const validationResponse = validationState?.validationResponse;
         
         // If validation returns 400 and object already exists, skip test
         if (validationResponse?.status === 400) {
@@ -289,17 +289,18 @@ ENDCLASS.`;
         
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createBehaviorImplementation({
+        await client.getBehaviorImplementation().create({
           className: config.className,
           packageName: config.packageName,
           behaviorDefinition: config.behaviorDefinition,
           description: config.description,
           transportRequest: config.transportRequest
-        });
+        }, { activateOnCreate: false, sourceCode: config.sourceCode });
         behaviorImplementationCreated = true;
         
         logBuilderTestStep('check(inactive)');
-        const checkResult1 = await client.checkClass({ className: config.className }, 'inactive');
+        const checkResult1State = await client.getClass().check({ className: config.className }, 'inactive');
+        const checkResult1 = checkResult1State?.checkResult;
         expect(checkResult1?.status).toBeDefined();
         
         const createDelay = getOperationDelay('create', testCase);
@@ -310,37 +311,23 @@ ENDCLASS.`;
         
         logBuilderTestStep('read');
         // Read behavior implementation class source to verify it was created
-        const builder = client.getBehaviorImplementationBuilderInstance({
+        const readState = await client.getBehaviorImplementation().read({ 
           className: config.className,
           behaviorDefinition: config.behaviorDefinition
         });
-        const readResult = await builder.read('active');
-        expect(readResult).toBeDefined();
-        expect(readResult?.className).toBe(config.className);
-        
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockClass({
-          className: config.className
-        });
-        behaviorImplementationLocked = true;
+        expect(readState).toBeDefined();
+        expect(readState?.readResult).toBeDefined();
         
         currentStep = 'check before update';
         logBuilderTestStep(currentStep);
-        await client.checkClass({ className: config.className });
+        await client.getClass().check({ className: config.className });
         
         currentStep = 'update';
-        logBuilderTestStep('updateMainSource');
-        await client.updateBehaviorImplementationMainSource({
+        logBuilderTestStep('update');
+        await client.getBehaviorImplementation().update({
           className: config.className,
           behaviorDefinition: config.behaviorDefinition
-        });
-        
-        logBuilderTestStep('updateImplementations');
-        await client.updateBehaviorImplementation({
-          className: config.className,
-          behaviorDefinition: config.behaviorDefinition
-        });
+        }, { sourceCode: config.sourceCode });
         
         const updateDelay = getOperationDelay('update', testCase);
         if (updateDelay > 0) {
@@ -349,26 +336,12 @@ ENDCLASS.`;
         }
         
         logBuilderTestStep('check(inactive)');
-        const checkResult2 = await client.checkClass({ className: config.className }, 'inactive');
+        const checkResult2State = await client.getClass().check({ className: config.className }, 'inactive');
+        const checkResult2 = checkResult2State?.checkResult;
         expect(checkResult2?.status).toBeDefined();
         
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockClass({
-          className: config.className
-        });
-        behaviorImplementationLocked = false;
-        
-        const unlockDelay = getOperationDelay('unlock', testCase);
-        if (unlockDelay > 0) {
-          logBuilderTestStep(`wait (after unlock ${unlockDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, unlockDelay));
-        }
-        
         logBuilderTestStep('activate');
-        await client.activateClass({
-          className: config.className
-        });
+        await client.getClass().activate({ className: config.className });
         
         const activateDelay = getOperationDelay('activate', testCase);
         if (activateDelay > 0) {
@@ -377,34 +350,23 @@ ENDCLASS.`;
         }
         
         logBuilderTestStep('check(active)');
-        const checkResult3 = await client.checkClass({ className: config.className }, 'active');
+        const checkResult3State = await client.getClass().check({ className: config.className }, 'active');
+        const checkResult3 = checkResult3State?.checkResult;
         expect(checkResult3?.status).toBeDefined();
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getUpdateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'BehaviorImplementationBuilder - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: unlock and delete if object was created/locked
-        if (behaviorImplementationLocked || behaviorImplementationCreated) {
+        // Cleanup: delete if object was created
+        if (behaviorImplementationCreated) {
           try {
-            if (behaviorImplementationLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockClass({
-                className: config.className
-              });
-            }
-            if (behaviorImplementationCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              await client.deleteClass({
-                className: config.className,
-                transportRequest: config.transportRequest
-              });
-            }
+            logBuilderTestStep('delete (cleanup)');
+            await client.getClass().delete({
+              className: config.className,
+              transportRequest: config.transportRequest
+            });
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.className}:`, cleanupError);
@@ -418,22 +380,11 @@ ENDCLASS.`;
         logBuilderTestError(testsLogger, 'BehaviorImplementationBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (behaviorImplementationLocked) {
-            await client.unlockClass({ className: config.className }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final unlock cleanup failed (ignored):`, finalCleanupError);
-        }
-        
         // Cleanup: delete behavior implementation class
-        if (className) {
+        if (className && behaviorImplementationCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
-            await client.deleteClass({
+            await client.getClass().delete({
               className: className,
               transportRequest: testCase?.params?.transport_request || getEnvironmentConfig().default_transport || ''
             });

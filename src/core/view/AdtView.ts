@@ -468,8 +468,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
 
     // Map status to version
     const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
+    // Support ddlSource for checking with source code (standard operation)
+    const sourceCode = config.ddlSource;
     return {
-      checkResult: await checkView(this.connection, config.viewName, version),
+      checkResult: await checkView(this.connection, config.viewName, version, sourceCode),
       errors: []
     };
   }

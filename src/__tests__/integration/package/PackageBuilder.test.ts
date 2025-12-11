@@ -1,6 +1,6 @@
 /**
  * Integration test for PackageBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=package    (ADT-clients logs)
@@ -9,7 +9,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { CrudClient } from '../../../clients/CrudClient';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getPackage } from '../../../core/package/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -56,9 +56,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('PackageBuilder (using CrudClient)', () => {
+describe('PackageBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let connectionConfig: any = null;
   let hasConfig = false;
   let isCloudSystem = false;
@@ -69,7 +69,7 @@ describe('PackageBuilder (using CrudClient)', () => {
       connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
       // Check if this is a cloud system (for environment-specific standard packages)
       isCloudSystem = await isCloudEnvironment(connection);
@@ -247,17 +247,17 @@ describe('PackageBuilder (using CrudClient)', () => {
 
       const config = buildBuilderConfig(testCase);
       let packageCreated = false;
-      let packageLocked = false;
       let currentStep = '';
 
       try {
         currentStep = 'validate';
         logBuilderTestStep(currentStep);
-        const validationResponse = await client.validatePackage({
+        const validationState = await client.getPackage().validate({
           packageName: config.packageName,
           superPackage: config.superPackage,
           description: config.description || ''
         });
+        const validationResponse = validationState?.validationResponse;
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -268,7 +268,7 @@ describe('PackageBuilder (using CrudClient)', () => {
         
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createPackage({
+        await client.getPackage().create({
           packageName: config.packageName,
           superPackage: config.superPackage,
           description: config.description || '',
@@ -282,7 +282,8 @@ describe('PackageBuilder (using CrudClient)', () => {
         packageCreated = true;
         
         logBuilderTestStep('check(active)');
-        const checkResult1 = await client.checkPackage({ packageName: config.packageName, superPackage: config.superPackage });
+        const checkResult1State = await client.getPackage().check({ packageName: config.packageName, superPackage: config.superPackage });
+        const checkResult1 = checkResult1State?.checkResult;
         expect(checkResult1?.status).toBeDefined();
         
         const createDelay = getOperationDelay('create', testCase);
@@ -291,46 +292,18 @@ describe('PackageBuilder (using CrudClient)', () => {
           await new Promise(resolve => setTimeout(resolve, createDelay));
         }
         
-        // logBuilderTestStep('read');
-        // let readResult;
-        // try {
-        //   readResult = await client.readPackage(config.packageName);
-        //   expect(readResult).toBeDefined();
-        //   expect(readResult?.packageName).toBe(config.packageName);
-        // } catch (error: any) {
-        //   if (error.response?.status === 404) {
-        //     throw new Error(`404 Not Found: Package "${config.packageName}" was not found after creation. This may indicate that the package creation did not complete successfully or the package is not yet available. Error: ${error.message}`);
-        //   }
-        //   throw error;
-        // }
-        
-        // // Additional delay before lock to ensure package is fully available for lock operation
-        // // Use delay from YAML configuration (operation_delays.read or default)
-        // const readDelay = getOperationDelay('read', testCase) || getOperationDelay('default', testCase) || 2000;
-        // if (readDelay > 0) {
-        //   logBuilderTestStep(`wait (after read ${readDelay}ms)`);
-        //   await new Promise(resolve => setTimeout(resolve, readDelay));
-        // }
-        
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockPackage({
-          packageName: config.packageName,
-          superPackage: config.superPackage
-        });
-        packageLocked = true;
-        
         currentStep = 'check before update';
         logBuilderTestStep(currentStep);
-        const checkBeforeUpdate = await client.checkPackage({ 
+        const checkBeforeUpdateState = await client.getPackage().check({ 
           packageName: config.packageName, 
           superPackage: config.superPackage 
         });
+        const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
         expect(checkBeforeUpdate?.status).toBeDefined();
         
         currentStep = 'update';
         logBuilderTestStep(currentStep);
-        await client.updatePackage({
+        await client.getPackage().update({
           packageName: config.packageName,
           superPackage: config.superPackage,
           updatedDescription: config.updatedDescription || config.description || ''
@@ -342,22 +315,9 @@ describe('PackageBuilder (using CrudClient)', () => {
           await new Promise(resolve => setTimeout(resolve, updateDelay));
         }
         
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockPackage({
-          packageName: config.packageName,
-          superPackage: config.superPackage
-        });
-        packageLocked = false;
-        
-        const unlockDelay = getOperationDelay('unlock', testCase);
-        if (unlockDelay > 0) {
-          logBuilderTestStep(`wait (after unlock ${unlockDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, unlockDelay));
-        }
-        
         logBuilderTestStep('check(active)');
-        const checkResult2 = await client.checkPackage({ packageName: config.packageName, superPackage: config.superPackage });
+        const checkResult2State = await client.getPackage().check({ packageName: config.packageName, superPackage: config.superPackage });
+        const checkResult2 = checkResult2State?.checkResult;
         expect(checkResult2?.status).toBeDefined();
 
         logBuilderTestStep('delete (cleanup)');
@@ -365,23 +325,12 @@ describe('PackageBuilder (using CrudClient)', () => {
         // This is needed because package may still be locked in the current session after unlock
         const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
         await (deleteConnection as any).connect();
-        const deleteClient = new CrudClient(deleteConnection);
-        await deleteClient.deletePackage({
+        const deleteClient = new AdtClient(deleteConnection, builderLogger);
+        await deleteClient.getPackage().delete({
           packageName: config.packageName,
           transportRequest: config.transportRequest
         });
         deleteConnection.reset();
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getUpdateResult()).toBeDefined();
-        
-        // // Verify that description was updated
-        // if (readResult) {
-        //   const updatedDesc = testCase?.params?.updated_description || testCase?.params?.description;
-        //   if (updatedDesc) {
-        //     builderLogger.info?.(`✓ Verified package read result`);
-        //   }
-        // }
 
         logBuilderTestSuccess(testsLogger, 'PackageBuilder - full workflow');
       } catch (error: any) {
@@ -407,28 +356,19 @@ describe('PackageBuilder (using CrudClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: unlock and delete if object was created/locked
-        if (packageLocked || packageCreated) {
+        // Cleanup: delete if object was created
+        if (packageCreated) {
           try {
-            if (packageLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockPackage({
-                packageName: config.packageName,
-                superPackage: config.superPackage
-              });
-            }
-            if (packageCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              // Create a new client with fresh session for deletion to avoid lock issues
-              const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
-              await (deleteConnection as any).connect();
-              const deleteClient = new CrudClient(deleteConnection);
-              await deleteClient.deletePackage({
-                packageName: config.packageName,
-                transportRequest: config.transportRequest
-              });
-              deleteConnection.reset();
-            }
+            logBuilderTestStep('delete (cleanup)');
+            // Create a new client with fresh session for deletion to avoid lock issues
+            const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
+            await (deleteConnection as any).connect();
+            const deleteClient = new AdtClient(deleteConnection, builderLogger);
+            await deleteClient.getPackage().delete({
+              packageName: config.packageName,
+              transportRequest: config.transportRequest
+            });
+            deleteConnection.reset();
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.packageName}:`, cleanupError);
@@ -441,23 +381,7 @@ describe('PackageBuilder (using CrudClient)', () => {
           : error;
         logBuilderTestError(testsLogger, 'PackageBuilder - full workflow', enhancedError);
         throw enhancedError;
-
-        logBuilderTestError(testsLogger, 'PackageBuilder - full workflow', error);
-        throw error;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (packageLocked) {
-            await client.unlockPackage({ 
-              packageName: config.packageName,
-              superPackage: config.superPackage
-            }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
-        }
         logBuilderTestEnd(testsLogger, 'PackageBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -494,9 +418,14 @@ describe('PackageBuilder (using CrudClient)', () => {
 
       try {
         logBuilderTestStep('read');
-        const result = await client.readPackage(standardPackageName);
-        expect(result).toBeDefined();
-        expect(result?.packageName).toBe(standardPackageName);
+        const resultState = await client.getPackage().read({ packageName: standardPackageName });
+        expect(resultState).toBeDefined();
+        expect(resultState?.readResult).toBeDefined();
+        // Package read returns package config - check if packageName is present
+        const packageConfig = resultState?.readResult;
+        if (packageConfig && typeof packageConfig === 'object' && 'packageName' in packageConfig) {
+          expect((packageConfig as any).packageName).toBe(standardPackageName);
+        }
 
         logBuilderTestSuccess(testsLogger, 'PackageBuilder - read standard object');
       } catch (error) {

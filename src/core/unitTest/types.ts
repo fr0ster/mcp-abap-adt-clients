@@ -36,10 +36,10 @@ export type ClassUnitTestRunOptions = IClassUnitTestRunOptions;
 
 // Unit test configuration (camelCase)
 export interface IUnitTestConfig {
-  tests: Array<{
+  tests?: Array<{
     containerClass: string;
     testClass: string;
-  }>;
+  }>; // Optional: required for test run, not needed for test class creation
   options?: {
     title?: string;
     context?: string;

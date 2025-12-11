@@ -1,6 +1,6 @@
 /**
  * Integration test for MetadataExtensionBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=metadataExtension    (ADT-clients logs)
@@ -9,8 +9,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { CrudClient } from '../../../clients/CrudClient';
-import { MetadataExtensionBuilder } from '../../../core/metadataExtension';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -57,9 +56,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('MetadataExtensionBuilder (using CrudClient)', () => {
+describe('MetadataExtensionBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let connectionConfig: any = null;
   let hasConfig = false;
 
@@ -69,7 +68,7 @@ describe('MetadataExtensionBuilder (using CrudClient)', () => {
       connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
     } catch (error) {
       testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -184,7 +183,9 @@ extend view ${targetEntity} with "${extName}"
           transportRequest: resolveTransportRequest(tc.params.transport_request)
         };
 
-        const viewResult = await createDependencyCdsView(client, viewConfig, tc);
+        // Note: createDependencyCdsView expects CrudClient, but we can use AdtClient.getView()
+        const tempCrudClient = new (require('../../../clients/CrudClient').CrudClient)(connection);
+        const viewResult = await createDependencyCdsView(tempCrudClient, viewConfig, tc);
         
         if (!viewResult.success) {
           skipReason = viewResult.reason || `environment problem, test skipped: Failed to create required dependency CDS view ${tc.params.view_name}`;
@@ -202,7 +203,7 @@ extend view ${targetEntity} with "${extName}"
       // Cleanup CDS view if it was created in beforeAll
       if (viewCreated && viewName) {
         try {
-          await client.deleteView({
+          await client.getView().delete({
             viewName: viewName,
             transportRequest: resolveTransportRequest(testCase?.params?.transport_request)
           });
@@ -229,18 +230,17 @@ extend view ${targetEntity} with "${extName}"
 
       const config = buildBuilderConfig(testCase);
       let metadataExtensionCreated = false;
-      let metadataExtensionLocked = false;
       let currentStep = '';
 
       try {
         currentStep = 'validate';
         logBuilderTestStep(currentStep);
-        await client.validateMetadataExtension({
+        const validationState = await client.getMetadataExtension().validate({
           name: config.extName,
           packageName: config.packageName,
           description: config.description
         });
-        const validationResponse = client.getValidationResponse();
+        const validationResponse = validationState?.validationResponse;
         
         // If validation returns 400 and object already exists, skip test
         if (validationResponse?.status === 400) {
@@ -267,12 +267,12 @@ extend view ${targetEntity} with "${extName}"
         
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createMetadataExtension({
+        await client.getMetadataExtension().create({
           name: config.extName,
           packageName: config.packageName,
           description: config.description,
           transportRequest: config.transportRequest
-        });
+        }, { activateOnCreate: false, sourceCode: config.sourceCode });
         metadataExtensionCreated = true;
         
         const createDelay = getOperationDelay('create', testCase);
@@ -283,38 +283,19 @@ extend view ${targetEntity} with "${extName}"
         
         logBuilderTestStep('read');
         // Read metadata extension source to verify it was created
-        const builder = new MetadataExtensionBuilder(connection, builderLogger, {
-          name: config.extName,
-          packageName: config.packageName,
-          description: config.description
-        });
-        await builder.readSource('inactive');
-        const state = builder.getState();
-        expect(state).toBeDefined();
-        
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockMetadataExtension({
-          name: config.extName
-        });
-        metadataExtensionLocked = true;
-        
-        const lockDelay = getOperationDelay('lock', testCase);
-        if (lockDelay > 0) {
-          logBuilderTestStep(`wait (after lock ${lockDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, lockDelay));
-        }
+        const readState = await client.getMetadataExtension().read({ name: config.extName }, 'inactive');
+        expect(readState).toBeDefined();
+        expect(readState?.readResult).toBeDefined();
         
         currentStep = 'check before update';
         logBuilderTestStep(currentStep);
-        await client.checkMetadataExtension({ name: config.extName });
+        await client.getMetadataExtension().check({ name: config.extName });
         
         currentStep = 'update';
         logBuilderTestStep(currentStep);
-        await client.updateMetadataExtension({
-          name: config.extName,
-          sourceCode: config.sourceCode
-        });
+        await client.getMetadataExtension().update({
+          name: config.extName
+        }, { sourceCode: config.sourceCode });
         
         const updateDelay = getOperationDelay('update', testCase);
         if (updateDelay > 0) {
@@ -323,27 +304,12 @@ extend view ${targetEntity} with "${extName}"
         }
         
         logBuilderTestStep('check(inactive)');
-        await client.checkMetadataExtension({ name: config.extName }, 'inactive');
-        const checkResult1 = client.getCheckResult();
+        const checkResult1State = await client.getMetadataExtension().check({ name: config.extName }, 'inactive');
+        const checkResult1 = checkResult1State?.checkResult;
         expect(checkResult1?.status).toBeDefined();
         
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockMetadataExtension({
-          name: config.extName
-        });
-        metadataExtensionLocked = false;
-        
-        const unlockDelay = getOperationDelay('unlock', testCase);
-        if (unlockDelay > 0) {
-          logBuilderTestStep(`wait (after unlock ${unlockDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, unlockDelay));
-        }
-        
         logBuilderTestStep('activate');
-        await client.activateMetadataExtension({
-          name: config.extName
-        });
+        await client.getMetadataExtension().activate({ name: config.extName });
         
         const activateDelay = getOperationDelay('activate', testCase);
         if (activateDelay > 0) {
@@ -352,35 +318,23 @@ extend view ${targetEntity} with "${extName}"
         }
         
         logBuilderTestStep('check(active)');
-        await client.checkMetadataExtension({ name: config.extName }, 'active');
-        const checkResult2 = client.getCheckResult();
+        const checkResult2State = await client.getMetadataExtension().check({ name: config.extName }, 'active');
+        const checkResult2 = checkResult2State?.checkResult;
         expect(checkResult2?.status).toBeDefined();
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getUpdateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'MetadataExtensionBuilder - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: unlock and delete if object was created/locked
-        if (metadataExtensionLocked || metadataExtensionCreated) {
+        // Cleanup: delete if object was created
+        if (metadataExtensionCreated) {
           try {
-            if (metadataExtensionLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockMetadataExtension({
-                name: config.extName
-              });
-            }
-            if (metadataExtensionCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              await client.deleteMetadataExtension({
-                name: config.extName,
-                transportRequest: config.transportRequest
-              });
-            }
+            logBuilderTestStep('delete (cleanup)');
+            await client.getMetadataExtension().delete({
+              name: config.extName,
+              transportRequest: config.transportRequest
+            });
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.extName}:`, cleanupError);
@@ -394,22 +348,11 @@ extend view ${targetEntity} with "${extName}"
         logBuilderTestError(testsLogger, 'MetadataExtensionBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (metadataExtensionLocked) {
-            await client.unlockMetadataExtension({ name: extName }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final unlock cleanup failed (ignored):`, finalCleanupError);
-        }
-        
         // Cleanup: delete metadata extension only if it was created in this test
         if (extName && metadataExtensionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
-            await client.deleteMetadataExtension({
+            await client.getMetadataExtension().delete({
               name: extName,
               transportRequest: testCase?.params?.transport_request || getEnvironmentConfig().default_transport || ''
             });

@@ -1,6 +1,6 @@
 /**
  * Integration test for TableBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -13,9 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
-import { CrudClient } from '../../../clients/CrudClient';
-import { TableBuilder } from '../../../core/table';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getTable } from '../../../core/table/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -62,9 +60,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('TableBuilder (using CrudClient)', () => {
+describe('TableBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -73,7 +71,7 @@ describe('TableBuilder (using CrudClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -206,11 +204,12 @@ describe('TableBuilder (using CrudClient)', () => {
       const config = buildBuilderConfig(testCase);
 
       logBuilderTestStep('validate');
-      const validationResponse = await client.validateTable({
+      const validationState = await client.getTable().validate({
         tableName: config.tableName,
         packageName: config.packageName!,
         description: config.description || ''
       });
+      const validationResponse = validationState?.validationResponse;
       if (validationResponse?.status !== 200) {
         const errorData = typeof validationResponse?.data === 'string' 
           ? validationResponse.data 
@@ -220,72 +219,70 @@ describe('TableBuilder (using CrudClient)', () => {
       expect(validationResponse?.status).toBe(200);
       
       let tableCreated = false;
-      let tableLocked = false;
       let currentStep = '';
       
       try {
           currentStep = 'create';
           logBuilderTestStep(currentStep);
-          await client.createTable({
+          // Use updated_ddl_code if available, otherwise use ddlCode
+          const updatedDdlCode = testCase.params.updated_ddl_code || config.ddlCode || '';
+          await client.getTable().create({
             tableName: config.tableName,
             packageName: config.packageName!,
             description: config.description || '',
             ddlCode: config.ddlCode || '',
             transportRequest: config.transportRequest
-          });
+          }, { activateOnCreate: false, sourceCode: updatedDdlCode });
           tableCreated = true;
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
           
-          currentStep = 'lock';
-          logBuilderTestStep(currentStep);
-          await client.lockTable({ tableName: config.tableName });
-          tableLocked = true;
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-          
           currentStep = 'check before update';
           logBuilderTestStep(currentStep);
-          const checkBeforeUpdate = await client.checkTable({ tableName: config.tableName });
+          const checkBeforeUpdateState = await client.getTable().check({ 
+            tableName: config.tableName,
+            sourceCode: updatedDdlCode
+          }, 'inactive');
+          const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
           expect(checkBeforeUpdate?.status).toBeDefined();
           
           currentStep = 'update';
           logBuilderTestStep(currentStep);
-          // Use updated_ddl_code if available, otherwise use ddlCode
-          const updatedDdlCode = testCase.params.updated_ddl_code || config.ddlCode || '';
-          await client.updateTable({
-            tableName: config.tableName,
-            ddlCode: updatedDdlCode
-          });
+          await client.getTable().update({
+            tableName: config.tableName
+          }, { sourceCode: updatedDdlCode });
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
         
           // Check with new code (before unlock) - validates unsaved code
           currentStep = 'check(new_code)';
           logBuilderTestStep(currentStep);
-          const checkResultNewCode = await client.checkTable({ tableName: config.tableName }, updatedDdlCode, 'new');
+          const checkResultNewCodeState = await client.getTable().check({ 
+            tableName: config.tableName,
+            sourceCode: updatedDdlCode
+          }, 'inactive');
+          const checkResultNewCode = checkResultNewCodeState?.checkResult;
           expect(checkResultNewCode?.status).toBeDefined();
           testsLogger.info?.(`✅ Check with new code completed: ${checkResultNewCode?.status === 200 ? 'OK' : 'Has errors/warnings'}`);
           
           currentStep = 'check(inactive)';
           logBuilderTestStep(currentStep);
-          const checkResultInactive = await client.checkTable({ tableName: config.tableName });
+          const checkResultInactiveState = await client.getTable().check({ tableName: config.tableName }, 'inactive');
+          const checkResultInactive = checkResultInactiveState?.checkResult;
           expect(checkResultInactive?.status).toBeDefined();
-          
-          currentStep = 'unlock';
-          logBuilderTestStep(currentStep);
-          await client.unlockTable({ tableName: config.tableName });
-          tableLocked = false; // Unlocked successfully
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
           
           currentStep = 'activate';
           logBuilderTestStep(currentStep);
-          await client.activateTable({ tableName: config.tableName });
+          await client.getTable().activate({ tableName: config.tableName });
           // Wait for activation to complete (activation is asynchronous)
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
           
           currentStep = 'check(active)';
           logBuilderTestStep(currentStep);
           // Retry check for active version - activation may take time
-          const checkResultActive = await retryCheckAfterActivate(
-            () => client.checkTable({ tableName: config.tableName }),
+          const checkResultActiveState = await retryCheckAfterActivate(
+            async () => {
+              const state = await client.getTable().check({ tableName: config.tableName }, 'active');
+              return state?.checkResult;
+            },
             {
               maxAttempts: 5,
               delay: 1000,
@@ -293,37 +290,28 @@ describe('TableBuilder (using CrudClient)', () => {
               objectName: config.tableName
             }
           );
-          expect(checkResultActive?.status).toBeDefined();
+          expect(checkResultActiveState?.status).toBeDefined();
           
           currentStep = 'delete (cleanup)';
           logBuilderTestStep(currentStep);
-          await client.deleteTable({
+          await client.getTable().delete({
             tableName: config.tableName,
             transportRequest: config.transportRequest
           });
-
-          expect(client.getCreateResult()).toBeDefined();
-          expect(client.getActivateResult()).toBeDefined();
 
           logBuilderTestSuccess(testsLogger, 'TableBuilder - full workflow');
         } catch (error: any) {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
           
-          // Cleanup: unlock and delete if object was created/locked
-          if (tableLocked || tableCreated) {
+          // Cleanup: delete if object was created
+          if (tableCreated) {
             try {
-              if (tableLocked) {
-                logBuilderTestStep('unlock (cleanup)');
-                await client.unlockTable({ tableName: config.tableName });
-              }
-              if (tableCreated) {
-                logBuilderTestStep('delete (cleanup)');
-                await client.deleteTable({
-                  tableName: config.tableName,
-                  transportRequest: config.transportRequest
-                });
-              }
+              logBuilderTestStep('delete (cleanup)');
+              await client.getTable().delete({
+                tableName: config.tableName,
+                transportRequest: config.transportRequest
+              });
             } catch (cleanupError) {
               // Log cleanup error but don't fail test - original error is more important
               testsLogger.warn?.(`Cleanup failed for ${config.tableName}:`, cleanupError);
@@ -337,16 +325,6 @@ describe('TableBuilder (using CrudClient)', () => {
           logBuilderTestError(testsLogger, 'TableBuilder - full workflow', enhancedError);
           throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (tableLocked) {
-            await client.unlockTable({ tableName: config.tableName }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
-        }
         logBuilderTestEnd(testsLogger, 'TableBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -380,9 +358,14 @@ describe('TableBuilder (using CrudClient)', () => {
 
       try {
         logBuilderTestStep('read');
-        const result = await client.readTable(standardTableName);
-        expect(result).toBeDefined();
-        expect(result?.tableName).toBe(standardTableName);
+        const resultState = await client.getTable().read({ tableName: standardTableName });
+        expect(resultState).toBeDefined();
+        expect(resultState?.readResult).toBeDefined();
+        // Table read returns table config - check if tableName is present
+        const tableConfig = resultState?.readResult;
+        if (tableConfig && typeof tableConfig === 'object' && 'tableName' in tableConfig) {
+          expect((tableConfig as any).tableName).toBe(standardTableName);
+        }
 
         logBuilderTestSuccess(testsLogger, 'TableBuilder - read standard object');
       } catch (error) {

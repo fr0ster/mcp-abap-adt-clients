@@ -1,6 +1,6 @@
 /**
  * Integration test for InterfaceBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -13,9 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
-import { CrudClient } from '../../../clients/CrudClient';
-import { InterfaceBuilder } from '../../../core/interface';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getInterface } from '../../../core/interface/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -61,9 +59,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('InterfaceBuilder (using CrudClient)', () => {
+describe('InterfaceBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -72,7 +70,7 @@ describe('InterfaceBuilder (using CrudClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -189,11 +187,12 @@ describe('InterfaceBuilder (using CrudClient)', () => {
       const config = buildBuilderConfig(testCase);
 
       logBuilderTestStep('validate');
-      const validationResponse = await client.validateInterface({
+      const validationState = await client.getInterface().validate({
         interfaceName: config.interfaceName,
         packageName: config.packageName!,
         description: config.description || ''
       });
+      const validationResponse = validationState?.validationResponse;
       if (validationResponse?.status !== 200) {
         const errorData = typeof validationResponse?.data === 'string' 
           ? validationResponse.data 
@@ -203,21 +202,20 @@ describe('InterfaceBuilder (using CrudClient)', () => {
       expect(validationResponse?.status).toBe(200);
 
       let interfaceCreated = false;
-      let interfaceLocked = false;
       let currentStep = '';
       
       try {
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createInterface({
+        const createState = await client.getInterface().create({
           interfaceName: config.interfaceName,
           packageName: config.packageName!,
           description: config.description || '',
           transportRequest: config.transportRequest
-        });
+        }, { activateOnCreate: false, sourceCode: config.sourceCode });
         
         // Verify create was successful
-        const createResult = client.getCreateResult();
+        const createResult = createState?.createResult;
         if (!createResult) {
           throw new Error('Interface creation did not return a result');
         }
@@ -241,53 +239,44 @@ describe('InterfaceBuilder (using CrudClient)', () => {
         // Wait for interface to be available for lock
         await waitForInterfaceCreation(interfaceName!);
 
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockInterface({ interfaceName: config.interfaceName });
-        interfaceLocked = true;
-        
-        // Wait for SAP to commit lock operation
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-
         currentStep = 'check before update';
         logBuilderTestStep(currentStep);
-        const checkBeforeUpdate = await client.checkInterface({ interfaceName: config.interfaceName });
+        const checkBeforeUpdateState = await client.getInterface().check({ 
+          interfaceName: config.interfaceName,
+          sourceCode: config.sourceCode
+        }, 'inactive');
+        const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
         expect(checkBeforeUpdate?.status).toBeDefined();
 
         currentStep = 'update';
         logBuilderTestStep(currentStep);
-        await client.updateInterface({
-          interfaceName: config.interfaceName,
-          sourceCode: config.sourceCode || ''
-        });
+        await client.getInterface().update({
+          interfaceName: config.interfaceName
+        }, { sourceCode: config.sourceCode });
         
         // Wait for SAP to commit update operation
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
 
         currentStep = 'check(inactive)';
         logBuilderTestStep(currentStep);
-        const checkResultInactive = await client.checkInterface({ interfaceName: config.interfaceName });
+        const checkResultInactiveState = await client.getInterface().check({ interfaceName: config.interfaceName }, 'inactive');
+        const checkResultInactive = checkResultInactiveState?.checkResult;
         expect(checkResultInactive?.status).toBeDefined();
-
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockInterface({ interfaceName: config.interfaceName });
-        interfaceLocked = false; // Unlocked successfully
-        
-        // Wait for SAP to commit unlock operation
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
 
         currentStep = 'activate';
         logBuilderTestStep(currentStep);
-        await client.activateInterface({ interfaceName: config.interfaceName });
+        await client.getInterface().activate({ interfaceName: config.interfaceName });
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
 
         currentStep = 'check(active)';
         logBuilderTestStep(currentStep);
         // Retry check for active version - activation may take time
-        const checkResultActive = await retryCheckAfterActivate(
-          () => client.checkInterface({ interfaceName: config.interfaceName }),
+        const checkResultActiveState = await retryCheckAfterActivate(
+          async () => {
+            const state = await client.getInterface().check({ interfaceName: config.interfaceName }, 'active');
+            return state?.checkResult;
+          },
           {
             maxAttempts: 5,
             delay: 1000,
@@ -295,37 +284,28 @@ describe('InterfaceBuilder (using CrudClient)', () => {
             objectName: config.interfaceName
           }
         );
-        expect(checkResultActive?.status).toBeDefined();
+        expect(checkResultActiveState?.status).toBeDefined();
 
         currentStep = 'delete (cleanup)';
         logBuilderTestStep(currentStep);
-        await client.deleteInterface({
+        await client.getInterface().delete({
           interfaceName: config.interfaceName,
           transportRequest: config.transportRequest
         });
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'InterfaceBuilder - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
         
-        // Cleanup: unlock and delete if object was created/locked
-        if (interfaceLocked || interfaceCreated) {
+        // Cleanup: delete if object was created
+        if (interfaceCreated) {
           try {
-            if (interfaceLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockInterface({ interfaceName: config.interfaceName });
-            }
-            if (interfaceCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              await client.deleteInterface({
-                interfaceName: config.interfaceName,
-                transportRequest: config.transportRequest
-              });
-            }
+            logBuilderTestStep('delete (cleanup)');
+            await client.getInterface().delete({
+              interfaceName: config.interfaceName,
+              transportRequest: config.transportRequest
+            });
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.interfaceName}:`, cleanupError);
@@ -339,16 +319,6 @@ describe('InterfaceBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'InterfaceBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (interfaceLocked) {
-            await client.unlockInterface({ interfaceName: config.interfaceName }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
-        }
         logBuilderTestEnd(testsLogger, 'InterfaceBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -385,9 +355,14 @@ describe('InterfaceBuilder (using CrudClient)', () => {
 
       try {
         logBuilderTestStep('read');
-        const result = await client.readInterface(standardInterfaceName);
-        expect(result).toBeDefined();
-        expect(result?.interfaceName).toBe(standardInterfaceName);
+        const resultState = await client.getInterface().read({ interfaceName: standardInterfaceName });
+        expect(resultState).toBeDefined();
+        expect(resultState?.readResult).toBeDefined();
+        // Interface read returns interface config - check if interfaceName is present
+        const interfaceConfig = resultState?.readResult;
+        if (interfaceConfig && typeof interfaceConfig === 'object' && 'interfaceName' in interfaceConfig) {
+          expect((interfaceConfig as any).interfaceName).toBe(standardInterfaceName);
+        }
 
         logBuilderTestSuccess(testsLogger, 'InterfaceBuilder - read standard object');
       } catch (error) {

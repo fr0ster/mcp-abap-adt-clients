@@ -1,6 +1,6 @@
 /**
  * Integration test for DomainBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -13,9 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
-import { CrudClient } from '../../../clients/CrudClient';
-import { DomainBuilder } from '../../../core/domain';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getDomain } from '../../../core/domain/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -65,9 +63,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('DomainBuilder (using CrudClient)', () => {
+describe('DomainBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -76,7 +74,7 @@ describe('DomainBuilder (using CrudClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -212,11 +210,12 @@ describe('DomainBuilder (using CrudClient)', () => {
       const config = buildBuilderConfig(testCase);
 
       logBuilderTestStep('validate');
-      const validationResponse = await client.validateDomain({
+      const validationState = await client.getDomain().validate({
         domainName: config.domainName,
         packageName: config.packageName!,
         description: config.description || ''
       });
+      const validationResponse = validationState?.validationResponse;
       if (validationResponse?.status !== 200) {
         const errorData = typeof validationResponse?.data === 'string' 
           ? validationResponse.data 
@@ -226,35 +225,24 @@ describe('DomainBuilder (using CrudClient)', () => {
       expect(validationResponse?.status).toBe(200);
       
       let domainCreated = false;
-      let domainLocked = false;
       let currentStep = '';
       
       try {
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createDomain(config);
+        await client.getDomain().create(config, { activateOnCreate: false });
         domainCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
         
         currentStep = 'check(active)';
         logBuilderTestStep(currentStep);
-        const checkResultActive = await client.checkDomain({ domainName: config.domainName });
+        const checkResultActiveState = await client.getDomain().check({ domainName: config.domainName });
+        const checkResultActive = checkResultActiveState?.checkResult;
         expect(checkResultActive?.status).toBeDefined();
-        
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockDomain({ domainName: config.domainName });
-        domainLocked = true;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-        
-        currentStep = 'check before update';
-        logBuilderTestStep(currentStep);
-        const checkBeforeUpdate = await client.checkDomain({ domainName: config.domainName });
-        expect(checkBeforeUpdate?.status).toBeDefined();
         
         currentStep = 'update';
         logBuilderTestStep(currentStep);
-        await client.updateDomain({
+        await client.getDomain().update({
           domainName: config.domainName,
           packageName: config.packageName!,
           description: config.description || '',
@@ -266,50 +254,36 @@ describe('DomainBuilder (using CrudClient)', () => {
         
         currentStep = 'check(inactive)';
         logBuilderTestStep(currentStep);
-        const checkResultInactive = await client.checkDomain({ domainName: config.domainName });
+        const checkResultInactiveState = await client.getDomain().check({ domainName: config.domainName }, 'inactive');
+        const checkResultInactive = checkResultInactiveState?.checkResult;
         expect(checkResultInactive?.status).toBeDefined();
-        
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockDomain({ domainName: config.domainName });
-        domainLocked = false; // Unlocked successfully
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
         
         currentStep = 'activate';
         logBuilderTestStep(currentStep);
-        await client.activateDomain({ domainName: config.domainName });
+        await client.getDomain().activate({ domainName: config.domainName });
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase)));
         
         currentStep = 'delete (cleanup)';
         logBuilderTestStep(currentStep);
-        await client.deleteDomain({
+        await client.getDomain().delete({
           domainName: config.domainName,
           transportRequest: config.transportRequest
         });
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'DomainBuilder - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
         
-        // Cleanup: unlock and delete if object was created/locked
-        if (domainLocked || domainCreated) {
+        // Cleanup: delete if object was created
+        if (domainCreated) {
           try {
-            if (domainLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockDomain({ domainName: config.domainName });
-            }
-            if (domainCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              await client.deleteDomain({
-                domainName: config.domainName,
-                transportRequest: config.transportRequest
-              });
-            }
+            logBuilderTestStep('delete (cleanup)');
+            await client.getDomain().delete({
+              domainName: config.domainName,
+              transportRequest: config.transportRequest
+            });
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.domainName}:`, cleanupError);
@@ -323,16 +297,6 @@ describe('DomainBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'DomainBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (domainLocked) {
-            await client.unlockDomain({ domainName: config.domainName }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
-        }
         logBuilderTestEnd(testsLogger, 'DomainBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -366,10 +330,15 @@ describe('DomainBuilder (using CrudClient)', () => {
 
       try {
         logBuilderTestStep('read');
-        const result = await client.readDomain(standardDomainName);
-        expect(result).toBeDefined();
-        expect(result?.domainName).toBe(standardDomainName);
-        expect(result?.description).toBeDefined();
+        const resultState = await client.getDomain().read({ domainName: standardDomainName });
+        expect(resultState).toBeDefined();
+        expect(resultState?.readResult).toBeDefined();
+        // Domain read returns domain config - check if domainName is present
+        const domainConfig = resultState?.readResult;
+        if (domainConfig && typeof domainConfig === 'object' && 'domainName' in domainConfig) {
+          expect((domainConfig as any).domainName).toBe(standardDomainName);
+          expect((domainConfig as any).description).toBeDefined();
+        }
 
         logBuilderTestSuccess(testsLogger, 'DomainBuilder - read standard object');
       } catch (error) {

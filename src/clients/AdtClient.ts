@@ -44,9 +44,8 @@ import { IBehaviorDefinitionConfig, IBehaviorDefinitionState, AdtBehaviorDefinit
 import { IBehaviorImplementationConfig, IBehaviorImplementationState, AdtBehaviorImplementation } from '../core/behaviorImplementation';
 import { IMetadataExtensionConfig, IMetadataExtensionState, AdtMetadataExtension } from '../core/metadataExtension';
 import { AdtRequest } from '../core/transport';
-import { AdtUnitTest } from '../core/unitTest';
+import { AdtUnitTest, AdtCdsUnitTest, IUnitTestConfig, IUnitTestState, ICdsUnitTestConfig, ICdsUnitTestState } from '../core/unitTest';
 import { ITransportConfig, ITransportState } from '../core/transport/types';
-import { IUnitTestConfig, IUnitTestState } from '../core/unitTest/types';
 
 export class AdtClient {
   private connection: IAbapConnection;
@@ -186,6 +185,14 @@ export class AdtClient {
    */
   getUnitTest(): IAdtObject<IUnitTestConfig, IUnitTestState> {
     return new AdtUnitTest(this.connection, this.logger);
+  }
+
+  /**
+   * Get high-level operations for CDS UnitTest objects
+   * @returns IAdtObject instance for CDS UnitTest operations (extends AdtUnitTest with CDS-specific methods)
+   */
+  getCdsUnitTest(): IAdtObject<ICdsUnitTestConfig, ICdsUnitTestState> {
+    return new AdtCdsUnitTest(this.connection, this.logger);
   }
 
   /**

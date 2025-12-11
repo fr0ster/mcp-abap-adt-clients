@@ -1,6 +1,6 @@
 /**
  * Integration test for BehaviorDefinitionBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=behaviorDefinition    (ADT-clients logs)
@@ -9,9 +9,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
-import { CrudClient } from '../../../clients/CrudClient';
-import { BehaviorDefinitionBuilder } from '../../../core/behaviorDefinition';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -56,9 +54,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
+describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let connectionConfig: any = null;
   let hasConfig = false;
 
@@ -68,7 +66,7 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
       connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
     } catch (error) {
       testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -197,20 +195,19 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
 
       const config = buildBuilderConfig(testCase);
       let behaviorDefinitionCreated = false;
-      let behaviorDefinitionLocked = false;
       let currentStep = '';
 
       try {
         currentStep = 'validate';
         logBuilderTestStep(currentStep);
-        await client.validateBehaviorDefinition({
+        const validationState = await client.getBehaviorDefinition().validate({
           name: config.bdefName,
           rootEntity: config.rootEntity,
           packageName: config.packageName,
           description: config.description,
           implementationType: config.implementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'
         });
-        const validationResponse = client.getValidationResponse();
+        const validationResponse = validationState?.validationResponse;
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -221,14 +218,14 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
         
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createBehaviorDefinition({
+        await client.getBehaviorDefinition().create({
           name: config.bdefName,
           packageName: config.packageName,
           description: config.description,
           rootEntity: config.rootEntity,
           implementationType: config.implementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection',
           transportRequest: config.transportRequest
-        });
+        }, { activateOnCreate: false, sourceCode: config.sourceCode });
         behaviorDefinitionCreated = true;
         
         const createDelay = getOperationDelay('create', testCase);
@@ -239,40 +236,19 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
         
         logBuilderTestStep('read');
         // Read behavior definition source to verify it was created
-        const builder = new BehaviorDefinitionBuilder(connection, builderLogger, {
-          name: config.bdefName,
-          packageName: config.packageName,
-          description: config.description,
-          rootEntity: config.rootEntity,
-          implementationType: config.implementationType as 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'
-        });
-        await builder.readSource();
-        const state = builder.getState();
-        expect(state).toBeDefined();
-        
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockBehaviorDefinition({
-          name: config.bdefName
-        });
-        behaviorDefinitionLocked = true;
-        
-        const lockDelay = getOperationDelay('lock', testCase);
-        if (lockDelay > 0) {
-          logBuilderTestStep(`wait (after lock ${lockDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, lockDelay));
-        }
+        const readState = await client.getBehaviorDefinition().read({ name: config.bdefName });
+        expect(readState).toBeDefined();
+        expect(readState?.readResult).toBeDefined();
         
         currentStep = 'check before update';
         logBuilderTestStep(currentStep);
-        await client.checkBehaviorDefinition({ name: config.bdefName });
+        await client.getBehaviorDefinition().check({ name: config.bdefName });
         
         currentStep = 'update';
         logBuilderTestStep(currentStep);
-        await client.updateBehaviorDefinition({
-          name: config.bdefName,
-          sourceCode: config.sourceCode
-        });
+        await client.getBehaviorDefinition().update({
+          name: config.bdefName
+        }, { sourceCode: config.sourceCode });
         
         const updateDelay = getOperationDelay('update', testCase);
         if (updateDelay > 0) {
@@ -281,27 +257,12 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
         }
         
         logBuilderTestStep('check(inactive)');
-        await client.checkBehaviorDefinition({ name: config.bdefName }, 'inactive');
-        const checkResult1 = client.getCheckResult();
+        const checkResult1State = await client.getBehaviorDefinition().check({ name: config.bdefName }, 'inactive');
+        const checkResult1 = checkResult1State?.checkResult;
         expect(checkResult1?.status).toBeDefined();
         
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockBehaviorDefinition({
-          name: config.bdefName
-        });
-        behaviorDefinitionLocked = false;
-        
-        const unlockDelay = getOperationDelay('unlock', testCase);
-        if (unlockDelay > 0) {
-          logBuilderTestStep(`wait (after unlock ${unlockDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, unlockDelay));
-        }
-        
         logBuilderTestStep('activate');
-        await client.activateBehaviorDefinition({
-          name: config.bdefName
-        });
+        await client.getBehaviorDefinition().activate({ name: config.bdefName });
         
         const activateDelay = getOperationDelay('activate', testCase);
         if (activateDelay > 0) {
@@ -310,35 +271,23 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
         }
         
         logBuilderTestStep('check(active)');
-        await client.checkBehaviorDefinition({ name: config.bdefName }, 'active');
-        const checkResult2 = client.getCheckResult();
+        const checkResult2State = await client.getBehaviorDefinition().check({ name: config.bdefName }, 'active');
+        const checkResult2 = checkResult2State?.checkResult;
         expect(checkResult2?.status).toBeDefined();
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getUpdateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'BehaviorDefinitionBuilder - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: unlock and delete if object was created/locked
-        if (behaviorDefinitionLocked || behaviorDefinitionCreated) {
+        // Cleanup: delete if object was created
+        if (behaviorDefinitionCreated) {
           try {
-            if (behaviorDefinitionLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockBehaviorDefinition({
-                name: config.bdefName
-              });
-            }
-            if (behaviorDefinitionCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              await client.deleteBehaviorDefinition({
-                name: config.bdefName,
-                transportRequest: config.transportRequest
-              });
-            }
+            logBuilderTestStep('delete (cleanup)');
+            await client.getBehaviorDefinition().delete({
+              name: config.bdefName,
+              transportRequest: config.transportRequest
+            });
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.bdefName}:`, cleanupError);
@@ -352,22 +301,11 @@ describe('BehaviorDefinitionBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'BehaviorDefinitionBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (behaviorDefinitionLocked) {
-            await client.unlockBehaviorDefinition({ name: config.bdefName }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final unlock cleanup failed (ignored):`, finalCleanupError);
-        }
-        
         // Cleanup: delete behavior definition
-        if (config) {
+        if (config && behaviorDefinitionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
-            await client.deleteBehaviorDefinition({
+            await client.getBehaviorDefinition().delete({
               name: config.bdefName,
               transportRequest: config.transportRequest
             });

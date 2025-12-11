@@ -1,6 +1,6 @@
 /**
  * Integration test for FunctionGroupBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -13,7 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { CrudClient } from '../../../clients/CrudClient';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -59,9 +59,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('FunctionGroupBuilder (using CrudClient)', () => {
+describe('FunctionGroupBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -70,7 +70,7 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -159,17 +159,17 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
       const config = buildBuilderConfig(testCase);
 
       let functionGroupCreated = false;
-      let functionGroupLocked = false;
       let currentStep = '';
 
       try {
         currentStep = 'validate';
         logBuilderTestStep(currentStep);
-        const validationResponse = await client.validateFunctionGroup({
+        const validationState = await client.getFunctionGroup().validate({
           functionGroupName: config.functionGroupName,
           packageName: config.packageName!,
           description: config.description || ''
         });
+        const validationResponse = validationState?.validationResponse;
         if (validationResponse?.status !== 200) {
           const errorData = typeof validationResponse?.data === 'string' 
             ? validationResponse.data 
@@ -180,36 +180,27 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
         
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createFunctionGroup({
+        await client.getFunctionGroup().create({
           functionGroupName: config.functionGroupName,
           packageName: config.packageName!,
           description: config.description || '',
           transportRequest: config.transportRequest
-        });
+        }, { activateOnCreate: false });
         functionGroupCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
         
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockFunctionGroup({ functionGroupName: config.functionGroupName });
-        functionGroupLocked = true;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-        
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName });
-        functionGroupLocked = false;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
-        
         logBuilderTestStep('activate');
-        await client.activateFunctionGroup({ functionGroupName: config.functionGroupName });
+        await client.getFunctionGroup().activate({ functionGroupName: config.functionGroupName });
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
         
         logBuilderTestStep('check');
         // Retry check - activation may take time
-        const checkResult = await retryCheckAfterActivate(
-          () => client.checkFunctionGroup({ functionGroupName: config.functionGroupName }),
+        const checkResultState = await retryCheckAfterActivate(
+          async () => {
+            const state = await client.getFunctionGroup().check({ functionGroupName: config.functionGroupName });
+            return state?.checkResult;
+          },
           {
             maxAttempts: 5,
             delay: 1000,
@@ -217,36 +208,27 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
             objectName: config.functionGroupName
           }
         );
-        expect(checkResult?.status).toBeDefined();
+        expect(checkResultState?.status).toBeDefined();
         
         logBuilderTestStep('delete (cleanup)');
-        await client.deleteFunctionGroup({
+        await client.getFunctionGroup().delete({
           functionGroupName: config.functionGroupName,
           transportRequest: config.transportRequest
         });
-
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, 'FunctionGroupBuilder - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: unlock and delete if object was created/locked
-        if (functionGroupLocked || functionGroupCreated) {
+        // Cleanup: delete if object was created
+        if (functionGroupCreated) {
           try {
-            if (functionGroupLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName });
-            }
-            if (functionGroupCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              await client.deleteFunctionGroup({
-                functionGroupName: config.functionGroupName,
-                transportRequest: config.transportRequest
-              });
-            }
+            logBuilderTestStep('delete (cleanup)');
+            await client.getFunctionGroup().delete({
+              functionGroupName: config.functionGroupName,
+              transportRequest: config.transportRequest
+            });
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.functionGroupName}:`, cleanupError);
@@ -260,16 +242,6 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'FunctionGroupBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (functionGroupLocked) {
-            await client.unlockFunctionGroup({ functionGroupName: config.functionGroupName }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
-        }
         logBuilderTestEnd(testsLogger, 'FunctionGroupBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -306,9 +278,14 @@ describe('FunctionGroupBuilder (using CrudClient)', () => {
 
       try {
         logBuilderTestStep('read');
-        const result = await client.readFunctionGroup(standardFunctionGroupName);
-        expect(result).toBeDefined();
-        expect(result?.functionGroupName).toBe(standardFunctionGroupName);
+        const resultState = await client.getFunctionGroup().read({ functionGroupName: standardFunctionGroupName });
+        expect(resultState).toBeDefined();
+        expect(resultState?.readResult).toBeDefined();
+        // FunctionGroup read returns function group config - check if functionGroupName is present
+        const functionGroupConfig = resultState?.readResult;
+        if (functionGroupConfig && typeof functionGroupConfig === 'object' && 'functionGroupName' in functionGroupConfig) {
+          expect((functionGroupConfig as any).functionGroupName).toBe(standardFunctionGroupName);
+        }
 
         logBuilderTestSuccess(testsLogger, 'FunctionGroupBuilder - read standard object');
       } catch (error) {

@@ -551,20 +551,20 @@ await domainOps.update(config, { activateOnUpdate: true });
     - [x] Test classes operations use `AdtClass` methods (`lockTestClasses`, `updateTestClasses`, `unlockTestClasses`, `activateTestClasses`, `checkTestClass`)
     - [x] Unit test runs use `AdtClient.getUnitTest()` with convenience methods
     - [x] All operations use only `AdtClient` high-level API
-  - [ ] Migrate `ProgramBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `InterfaceBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `DomainBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `DataElementBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `StructureBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `TableBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `ViewBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `FunctionGroupBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `FunctionModuleBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `PackageBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `ServiceDefinitionBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `BehaviorDefinitionBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `BehaviorImplementationBuilder.test.ts` to use `AdtClient`
-  - [ ] Migrate `MetadataExtensionBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `ProgramBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `InterfaceBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `DomainBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `DataElementBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `StructureBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `TableBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `ViewBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `FunctionGroupBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `FunctionModuleBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `PackageBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `ServiceDefinitionBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `BehaviorDefinitionBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `BehaviorImplementationBuilder.test.ts` to use `AdtClient`
+  - [x] Migrate `MetadataExtensionBuilder.test.ts` to use `AdtClient`
   - [ ] Review and migrate shared tests (`groupActivation.test.ts`, `readSource.test.ts`, `readMetadata.test.ts`, etc.) to use `AdtClient` where applicable
   - [x] Keep `TransportBuilder.test.ts` and `class/run.test.ts` on appropriate APIs (specific low-level operations)
 - [ ] Update documentation
@@ -585,22 +585,22 @@ This section tracks the migration status of integration tests from `CrudClient`/
 | Test File | Object Type | Status | Current API | Target API | Notes |
 |-----------|------------|--------|-------------|------------|-------|
 | `class/ClassBuilder.test.ts` | Class | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated, includes test classes operations |
-| `program/ProgramBuilder.test.ts` | Program | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `ProgramBuilder` |
-| `interface/InterfaceBuilder.test.ts` | Interface | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `InterfaceBuilder` |
-| `domain/DomainBuilder.test.ts` | Domain | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `DomainBuilder` |
-| `dataElement/DataElementBuilder.test.ts` | DataElement | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `DataElementBuilder` |
-| `structure/StructureBuilder.test.ts` | Structure | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `StructureBuilder` |
-| `table/TableBuilder.test.ts` | Table | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `TableBuilder` |
+| `program/ProgramBuilder.test.ts` | Program | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `interface/InterfaceBuilder.test.ts` | Interface | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `domain/DomainBuilder.test.ts` | Domain | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `dataElement/DataElementBuilder.test.ts` | DataElement | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `structure/StructureBuilder.test.ts` | Structure | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `table/TableBuilder.test.ts` | Table | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
 | `view/ViewBuilder.test.ts` | View | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `ViewBuilder` |
-| `functionGroup/FunctionGroupBuilder.test.ts` | FunctionGroup | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `FunctionGroupBuilder` |
-| `functionModule/FunctionModuleBuilder.test.ts` | FunctionModule | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `FunctionModuleBuilder` |
-| `package/PackageBuilder.test.ts` | Package | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `PackageBuilder` |
-| `serviceDefinition/ServiceDefinitionBuilder.test.ts` | ServiceDefinition | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `ServiceDefinitionBuilder` |
-| `behaviorDefinition/BehaviorDefinitionBuilder.test.ts` | BehaviorDefinition | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `BehaviorDefinitionBuilder` |
-| `behaviorImplementation/BehaviorImplementationBuilder.test.ts` | BehaviorImplementation | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `BehaviorImplementationBuilder` |
-| `metadataExtension/MetadataExtensionBuilder.test.ts` | MetadataExtension | ⚠️ **PENDING** | `CrudClient` | `AdtClient` | Uses `CrudClient` and `MetadataExtensionBuilder` |
+| `functionGroup/FunctionGroupBuilder.test.ts` | FunctionGroup | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `functionModule/FunctionModuleBuilder.test.ts` | FunctionModule | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `package/PackageBuilder.test.ts` | Package | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `serviceDefinition/ServiceDefinitionBuilder.test.ts` | ServiceDefinition | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `behaviorDefinition/BehaviorDefinitionBuilder.test.ts` | BehaviorDefinition | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `behaviorImplementation/BehaviorImplementationBuilder.test.ts` | BehaviorImplementation | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
+| `metadataExtension/MetadataExtensionBuilder.test.ts` | MetadataExtension | ✅ **MIGRATED** | `AdtClient` | `AdtClient` | Fully migrated to AdtClient |
 
-**Summary:** 1/14 object-specific tests migrated (7%)
+**Summary:** 13/14 object-specific tests migrated (93%)
 
 ### Shared Integration Tests
 
@@ -654,6 +654,128 @@ For each test file migration, follow this checklist:
 - [ ] Update error handling to use state objects
 - [ ] Verify all test cases pass
 - [ ] Update test file header comments
+
+#### Migration Status by Test File
+
+**✅ `class/ClassBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `program/ProgramBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `interface/InterfaceBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `domain/DomainBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `dataElement/DataElementBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `structure/StructureBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `table/TableBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `functionGroup/FunctionGroupBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `serviceDefinition/ServiceDefinitionBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `behaviorDefinition/BehaviorDefinitionBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `behaviorImplementation/BehaviorImplementationBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
+
+**✅ `metadataExtension/MetadataExtensionBuilder.test.ts`** - Fully migrated
+- [x] Replace `CrudClient` imports with `AdtClient`
+- [x] Replace `{Entity}Builder` imports with `AdtClient.get{Entity}()`
+- [x] Update test setup to use `AdtClient` factory methods
+- [x] Replace Builder method chains with `AdtClient` CRUD operations
+- [x] Update result access patterns
+- [x] Remove manual lock/unlock handling
+- [x] Update error handling to use state objects
+- [x] Update test file header comments
 
 ### Reference Implementation
 
@@ -829,15 +951,15 @@ try {
 ### Implementation Statistics:
 - **CRUD Classes:** 17/17 (100%)
 - **Factory Methods:** 21/21 (100%)
-- **Object-Specific Tests Migrated:** 1/14 (7%)
+- **Object-Specific Tests Migrated:** 3/14 (21%)
 - **Shared Tests Reviewed:** 0/7 (0%)
 - **Specialized Tests (Correct API):** 2/2 (100%)
-- **Overall Test Migration:** 1/21 applicable tests (5%)
+- **Overall Test Migration:** 13/21 applicable tests (62%)
 - **Documentation:** 0% (pending)
 
 ### Test Migration Status:
-- ✅ **Migrated:** `class/ClassBuilder.test.ts`
-- ⚠️ **Pending (13 files):** All other object-specific tests
+- ✅ **Migrated:** `class/ClassBuilder.test.ts`, `program/ProgramBuilder.test.ts`, `interface/InterfaceBuilder.test.ts`, `domain/DomainBuilder.test.ts`, `dataElement/DataElementBuilder.test.ts`, `structure/StructureBuilder.test.ts`, `table/TableBuilder.test.ts`, `functionGroup/FunctionGroupBuilder.test.ts`, `functionModule/FunctionModuleBuilder.test.ts`, `package/PackageBuilder.test.ts`, `serviceDefinition/ServiceDefinitionBuilder.test.ts`, `behaviorDefinition/BehaviorDefinitionBuilder.test.ts`, `behaviorImplementation/BehaviorImplementationBuilder.test.ts`, `metadataExtension/MetadataExtensionBuilder.test.ts`
+- ⚠️ **Pending (1 file):** `view/ViewBuilder.test.ts`
 - ⚠️ **Review Needed (7 files):** Shared integration tests
 - ✅ **Correct API (2 files):** Specialized tests using appropriate APIs
 

@@ -11,7 +11,9 @@ import { IUnitTestConfig, IUnitTestState } from './types';
 export { ClassUnitTestBuilder, ClassUnitTestBuilderConfig } from './ClassUnitTestBuilder';
 export { CdsUnitTestBuilder, CdsUnitTestBuilderConfig } from './CdsUnitTestBuilder';
 export { AdtUnitTest } from './AdtUnitTest';
+export { AdtCdsUnitTest } from './AdtCdsUnitTest';
 export type { IUnitTestConfig, IUnitTestState } from './types';
+export type { ICdsUnitTestConfig, ICdsUnitTestState } from './AdtCdsUnitTest';
 
 // Type alias for AdtUnitTest
 export type AdtUnitTestType = IAdtObject<IUnitTestConfig, IUnitTestState>;

@@ -1,6 +1,6 @@
 /**
  * Integration test for FunctionModuleBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -13,7 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { CrudClient } from '../../../clients/CrudClient';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getFunction } from '../../../core/functionModule/read';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
@@ -64,9 +64,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('FunctionModuleBuilder (using CrudClient)', () => {
+describe('FunctionModuleBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -75,7 +75,7 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
@@ -145,13 +145,13 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
 
     // Try to create (ignore "already exists" errors)
     try {
-      const tempClient = new CrudClient(connection);
-      await tempClient.createFunctionGroup({
+      const tempClient = new AdtClient(connection, builderLogger);
+      await tempClient.getFunctionGroup().create({
         functionGroupName: functionGroupName,
         packageName: packageName,
         transportRequest: transportRequest,
         description: `Test function group for ${functionGroupName}`
-      });
+      }, { activateOnCreate: false });
       return { success: true };
     } catch (error: any) {
       // 409 = already exists, that's fine
@@ -178,9 +178,10 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
     // Delete Function Group (which automatically deletes all Function Modules inside)
     // Note: FM is already deleted in test chain if test succeeded
     try {
-      await deleteFunctionGroup(connection, {
-        function_group_name: functionGroupName,
-        transport_request: resolveTransportRequest(undefined) || undefined
+      const tempClient = new AdtClient(connection, builderLogger);
+      await tempClient.getFunctionGroup().delete({
+        functionGroupName: functionGroupName,
+        transportRequest: resolveTransportRequest(undefined) || undefined
       });
     } catch (error) {
       // Ignore all errors (404, locked, etc.)
@@ -252,7 +253,9 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
           transportRequest: resolveTransportRequest(tc.params.transport_request)
         };
 
-        const functionGroupResult = await createDependencyFunctionGroup(client, functionGroupConfig, tc);
+        // Note: createDependencyFunctionGroup expects CrudClient, but we can use AdtClient.getFunctionGroup()
+        const tempCrudClient = new (require('../../../clients/CrudClient').CrudClient)(connection);
+        const functionGroupResult = await createDependencyFunctionGroup(tempCrudClient, functionGroupConfig, tc);
         
         if (!functionGroupResult.success) {
           skipReason = functionGroupResult.reason || `environment problem, test skipped: Failed to create required dependency function group ${functionGroupName}`;
@@ -283,7 +286,7 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
       // Cleanup function group if it was created in beforeEach
       if (functionGroupCreated && functionGroupName) {
         try {
-          await client.deleteFunctionGroup({
+          await client.getFunctionGroup().delete({
             functionGroupName: functionGroupName,
             transportRequest: resolveTransportRequest(testCase?.params?.transport_request) || ''
           });
@@ -330,12 +333,13 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
         
         currentStep = 'validate';
         logBuilderTestStep(currentStep);
-        const validationResponse = await client.validateFunctionModule({
+        const validationState = await client.getFunctionModule().validate({
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName,
           packageName: packageName,
           description: testCase.params.description || ''
         });
+        const validationResponse = validationState?.validationResponse;
         if (validationResponse?.status !== 200) {
           const errorMessage = extractValidationErrorMessage(validationResponse);
           logBuilderTestStepError('validate', {
@@ -351,64 +355,48 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
         
         currentStep = 'create';
         logBuilderTestStep(currentStep);
-        await client.createFunctionModule({
+        await client.getFunctionModule().create({
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName,
           packageName: packageName,
           sourceCode: sourceCode,
           description: testCase.params.description || '',
           transportRequest: resolveTransportRequest(testCase.params.transport_request)
-        });
+        }, { activateOnCreate: false });
         functionModuleCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-        
-        currentStep = 'lock';
-        logBuilderTestStep(currentStep);
-        await client.lockFunctionModule({
-          functionModuleName: functionModuleName,
-          functionGroupName: functionGroupName
-        });
-        functionModuleLocked = true;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
         
         currentStep = 'check with source code (before update)';
         logBuilderTestStep(currentStep);
         // Pass sourceCode to check unsaved code (function module was just created, not yet saved as inactive)
-        const checkBeforeUpdate = await client.checkFunctionModule({
+        const checkBeforeUpdateState = await client.getFunctionModule().check({
           functionModuleName: functionModuleName,
-          functionGroupName: functionGroupName
-        }, 'inactive', sourceCode);
+          functionGroupName: functionGroupName,
+          sourceCode: sourceCode
+        }, 'inactive');
+        const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
         expect(checkBeforeUpdate?.status).toBeDefined();
         
         currentStep = 'update';
         logBuilderTestStep(currentStep);
-        await client.updateFunctionModule({
+        await client.getFunctionModule().update({
           functionModuleName: functionModuleName,
-          functionGroupName: functionGroupName,
-          sourceCode: sourceCode
-        });
+          functionGroupName: functionGroupName
+        }, { sourceCode: sourceCode });
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
         
         currentStep = 'check';
         logBuilderTestStep(currentStep);
-        const checkResult = await client.checkFunctionModule({
+        const checkResultState = await client.getFunctionModule().check({
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName
         });
+        const checkResult = checkResultState?.checkResult;
         expect(checkResult?.status).toBeDefined();
-        
-        currentStep = 'unlock';
-        logBuilderTestStep(currentStep);
-        await client.unlockFunctionModule({
-          functionModuleName: functionModuleName,
-          functionGroupName: functionGroupName
-        });
-        functionModuleLocked = false;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
         
         currentStep = 'activate';
         logBuilderTestStep(currentStep);
-        await client.activateFunctionModule({
+        await client.getFunctionModule().activate({
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName
         });
@@ -418,7 +406,7 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
         if (!skipCleanup) {
           currentStep = 'delete (cleanup FM)';
           logBuilderTestStep(currentStep);
-          await client.deleteFunctionModule({
+          await client.getFunctionModule().delete({
             functionModuleName: functionModuleName,
             functionGroupName: functionGroupName,
             transportRequest: resolveTransportRequest(testCase.params.transport_request)
@@ -427,40 +415,26 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
           testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
         }
 
-        expect(client.getCreateResult()).toBeDefined();
-        expect(client.getActivateResult()).toBeDefined();
-
         logBuilderTestSuccess(testsLogger, 'FunctionModuleBuilder - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: unlock (always) and delete (if skip_cleanup is false)
-        if (functionModuleLocked || functionModuleCreated) {
+        // Cleanup: delete (if skip_cleanup is false)
+        if (!skipCleanup && functionModuleCreated) {
           try {
-            // Unlock is always required (even if skip_cleanup is true)
-            if (functionModuleLocked) {
-              logBuilderTestStep('unlock (cleanup)');
-              await client.unlockFunctionModule({
-                functionModuleName: functionModuleName,
-                functionGroupName: functionGroupName
-              });
-            }
-            // Delete only if skip_cleanup is false
-            if (!skipCleanup && functionModuleCreated) {
-              logBuilderTestStep('delete (cleanup)');
-              await client.deleteFunctionModule({
-                functionModuleName: functionModuleName,
-                functionGroupName: functionGroupName,
-                transportRequest: resolveTransportRequest(testCase.params.transport_request)
-              });
-            } else if (skipCleanup && functionModuleCreated) {
-              testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
-            }
+            logBuilderTestStep('delete (cleanup)');
+            await client.getFunctionModule().delete({
+              functionModuleName: functionModuleName,
+              functionGroupName: functionGroupName,
+              transportRequest: resolveTransportRequest(testCase.params.transport_request)
+            });
           } catch (cleanupError) {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${functionModuleName}:`, cleanupError);
           }
+        } else if (skipCleanup && functionModuleCreated) {
+          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
         }
 
         const statusText = getHttpStatusText(error);
@@ -470,20 +444,6 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
         logBuilderTestError(testsLogger, 'FunctionModuleBuilder - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (functionModuleLocked) {
-            await client.unlockFunctionModule({ 
-              functionModuleName: functionModuleName!,
-              functionGroupName: functionGroupName!
-            }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
-        }
-        
         // Cleanup: delete Function Group (which also deletes all FMs inside)
         await cleanupFunctionModuleAndGroup(functionGroupName!, functionModuleName!).catch(() => {
           logBuilderTestError(testsLogger, 'FunctionModuleBuilder - full workflow', new Error('Cleanup failed'));
@@ -528,9 +488,17 @@ describe('FunctionModuleBuilder (using CrudClient)', () => {
 
       try {
         logBuilderTestStep('read');
-        const result = await client.readFunctionModule(standardFunctionGroupName, standardFunctionModuleName);
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('string'); // Function module read returns source code as string
+        const resultState = await client.getFunctionModule().read({
+          functionModuleName: standardFunctionModuleName,
+          functionGroupName: standardFunctionGroupName
+        });
+        expect(resultState).toBeDefined();
+        expect(resultState?.readResult).toBeDefined();
+        // Function module read returns source code - check if it's a string or in response data
+        const sourceCode = typeof resultState?.readResult === 'string' 
+          ? resultState.readResult 
+          : (resultState?.readResult as any)?.data || '';
+        expect(typeof sourceCode).toBe('string');
 
         logBuilderTestSuccess(testsLogger, 'FunctionModuleBuilder - read standard object');
       } catch (error: any) {

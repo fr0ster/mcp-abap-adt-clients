@@ -1,6 +1,6 @@
 /**
  * Integration test for ProgramBuilder
- * Tests using CrudClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -13,9 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AxiosResponse } from 'axios';
-import { CrudClient } from '../../../clients/CrudClient';
-import { ProgramBuilder } from '../../../core/program';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getProgramSource } from '../../../core/program/read';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -61,9 +59,9 @@ const builderLogger: IAdtLogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: IAdtLogger = createTestsLogger();
 
-describe('ProgramBuilder (using CrudClient)', () => {
+describe('ProgramBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -72,7 +70,7 @@ describe('ProgramBuilder (using CrudClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
       // Check if this is a cloud system (programs are not supported in cloud)
       isCloudSystem = await isCloudEnvironment(connection);
@@ -208,11 +206,12 @@ describe('ProgramBuilder (using CrudClient)', () => {
       const sourceCode = testCase.params.source_code;
 
       logBuilderTestStep('validate');
-      const validationResponse = await client.validateProgram({
+      const validationState = await client.getProgram().validate({
         programName: config.programName,
         packageName: config.packageName!,
         description: config.description || ''
       });
+      const validationResponse = validationState?.validationResponse;
       if (validationResponse?.status !== 200) {
         const errorData = typeof validationResponse?.data === 'string' 
           ? validationResponse.data 
@@ -222,64 +221,58 @@ describe('ProgramBuilder (using CrudClient)', () => {
       expect(validationResponse?.status).toBe(200);
       
       let programCreated = false;
-      let programLocked = false;
       let currentStep = '';
       
       try {
           currentStep = 'create';
           logBuilderTestStep(currentStep);
-          await client.createProgram({
+          await client.getProgram().create({
             programName: config.programName,
             packageName: config.packageName!,
             description: config.description || '',
             transportRequest: config.transportRequest,
             programType: config.programType
-          });
+          }, { activateOnCreate: false, sourceCode: sourceCode });
           programCreated = true;
           // Wait for SAP to finish create operation
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
           
-          currentStep = 'lock';
-          logBuilderTestStep(currentStep);
-          await client.lockProgram({ programName: config.programName });
-          programLocked = true;
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testCase)));
-          
           currentStep = 'check with source code (before update)';
           logBuilderTestStep(currentStep);
-          const checkBeforeUpdate = await client.checkProgram({ programName: config.programName });
+          const checkBeforeUpdateState = await client.getProgram().check({ 
+            programName: config.programName,
+            sourceCode: sourceCode
+          }, 'inactive');
+          const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
           expect(checkBeforeUpdate?.status).toBeDefined();
           
           currentStep = 'update';
           logBuilderTestStep(currentStep);
-          await client.updateProgram({
-            programName: config.programName,
-            sourceCode: sourceCode || ''
-          });
+          await client.getProgram().update({
+            programName: config.programName
+          }, { sourceCode: sourceCode });
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
         
           currentStep = 'check(inactive)';
           logBuilderTestStep(currentStep);
-          const checkResultInactive = await client.checkProgram({ programName: config.programName });
+          const checkResultInactiveState = await client.getProgram().check({ programName: config.programName }, 'inactive');
+          const checkResultInactive = checkResultInactiveState?.checkResult;
           expect(checkResultInactive?.status).toBeDefined();
-          
-          currentStep = 'unlock';
-          logBuilderTestStep(currentStep);
-          await client.unlockProgram({ programName: config.programName });
-          programLocked = false; // Unlocked successfully
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('unlock', testCase)));
           
           currentStep = 'activate';
           logBuilderTestStep(currentStep);
-          await client.activateProgram({ programName: config.programName });
+          await client.getProgram().activate({ programName: config.programName });
           // Wait for activation to complete (activation is asynchronous)
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
           
           currentStep = 'check(active)';
           logBuilderTestStep(currentStep);
           // Retry check for active version - activation may take time
-          const checkResultActive = await retryCheckAfterActivate(
-            () => client.checkProgram({ programName: config.programName }),
+          const checkResultActiveState = await retryCheckAfterActivate(
+            async () => {
+              const state = await client.getProgram().check({ programName: config.programName }, 'active');
+              return state?.checkResult;
+            },
             {
               maxAttempts: 5,
               delay: 1000,
@@ -287,37 +280,28 @@ describe('ProgramBuilder (using CrudClient)', () => {
               objectName: config.programName
             }
           );
-          expect(checkResultActive?.status).toBeDefined();
+          expect(checkResultActiveState?.status).toBeDefined();
           
           currentStep = 'delete (cleanup)';
           logBuilderTestStep(currentStep);
-          await client.deleteProgram({
+          await client.getProgram().delete({
             programName: config.programName,
             transportRequest: config.transportRequest
           });
-
-          expect(client.getCreateResult()).toBeDefined();
-          expect(client.getActivateResult()).toBeDefined();
 
           logBuilderTestSuccess(testsLogger, 'ProgramBuilder - full workflow');
         } catch (error: any) {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
           
-          // Cleanup: unlock and delete if object was created/locked
-          if (programLocked || programCreated) {
+          // Cleanup: delete if object was created
+          if (programCreated) {
             try {
-              if (programLocked) {
-                logBuilderTestStep('unlock (cleanup)');
-                await client.unlockProgram({ programName: config.programName });
-              }
-              if (programCreated) {
-                logBuilderTestStep('delete (cleanup)');
-                await client.deleteProgram({
-                  programName: config.programName,
-                  transportRequest: config.transportRequest
-                });
-              }
+              logBuilderTestStep('delete (cleanup)');
+              await client.getProgram().delete({
+                programName: config.programName,
+                transportRequest: config.transportRequest
+              });
             } catch (cleanupError) {
               // Log cleanup error but don't fail test - original error is more important
               testsLogger.warn?.(`Cleanup failed for ${config.programName}:`, cleanupError);
@@ -331,16 +315,6 @@ describe('ProgramBuilder (using CrudClient)', () => {
           logBuilderTestError(testsLogger, 'ProgramBuilder - full workflow', enhancedError);
           throw enhancedError;
       } finally {
-        // Final cleanup: ensure unlock even if previous cleanup failed
-        // This is a safety net to prevent objects from being left locked
-        try {
-          if (programLocked) {
-            await client.unlockProgram({ programName: config.programName }).catch(() => {});
-          }
-        } catch (finalCleanupError) {
-          // Ignore final cleanup errors - we've already tried cleanup in catch block
-          testsLogger.warn?.(`Final cleanup failed (ignored):`, finalCleanupError);
-        }
         logBuilderTestEnd(testsLogger, 'ProgramBuilder - full workflow');
       }
     }, getTimeout('test'));
@@ -382,9 +356,14 @@ describe('ProgramBuilder (using CrudClient)', () => {
 
       try {
         logBuilderTestStep('read');
-        const result = await client.readProgram(standardProgramName);
-        expect(result).toBeDefined();
-        expect(typeof result).toBe('string'); // Program read returns source code as string
+        const resultState = await client.getProgram().read({ programName: standardProgramName });
+        expect(resultState).toBeDefined();
+        expect(resultState?.readResult).toBeDefined();
+        // Program read returns source code - check if it's a string or in response data
+        const sourceCode = typeof resultState?.readResult === 'string' 
+          ? resultState.readResult 
+          : (resultState?.readResult as any)?.data || '';
+        expect(typeof sourceCode).toBe('string');
 
         logBuilderTestSuccess(testsLogger, 'ProgramBuilder - read standard object');
       } catch (error) {

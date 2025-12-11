@@ -26,21 +26,29 @@ import { IAdtLogger, logErrorSafely } from '../../utils/logger';
 import { startClassUnitTestRun } from './run';
 import { getClassUnitTestStatus, getClassUnitTestResult } from '../class/run';
 import { IUnitTestConfig, IUnitTestState } from './types';
+import { AdtClass, AdtLocalTestClass } from '../class';
+import { IClassState } from '../class/types';
 
 export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: IAdtLogger;
   public readonly objectType: string = 'UnitTest';
 
   // Internal state for convenience methods
-  private lastRunId?: string;
-  private lastStatusResponse?: AxiosResponse;
-  private lastResultResponse?: AxiosResponse;
-  private state: IUnitTestState = { errors: [] };
+  protected lastRunId?: string;
+  protected lastStatusResponse?: AxiosResponse;
+  protected lastResultResponse?: AxiosResponse;
+  protected state: IUnitTestState = { errors: [] };
+
+  // AdtClass and AdtLocalTestClass for working with test classes
+  protected adtClass: AdtClass;
+  protected adtLocalTestClass: AdtLocalTestClass;
 
   constructor(connection: IAbapConnection, logger?: IAdtLogger) {
     this.connection = connection;
     this.logger = logger;
+    this.adtClass = new AdtClass(connection, logger);
+    this.adtLocalTestClass = new AdtLocalTestClass(connection, logger);
   }
 
   /**
@@ -270,7 +278,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
   /**
    * Extract run ID from unit test run response
    */
-  private extractRunId(response: AxiosResponse): string | undefined {
+  protected extractRunId(response: AxiosResponse): string | undefined {
     // Response is XML with aunit:run element
     // URI format: /sap/bc/adt/abapunit/runs/{runId}
     const data = response.data;
