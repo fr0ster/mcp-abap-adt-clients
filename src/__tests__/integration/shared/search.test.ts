@@ -7,11 +7,11 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../clients/AdtClient';
-import { ILogger } from '../../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import { AdtClient } from '../../../clients/AdtClient';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -24,7 +24,6 @@ const logger: ILogger = {
   info: debugEnabled ? console.log : () => {},
   warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
 };
 
 function getConfig(): SapConfig {
@@ -83,12 +82,14 @@ function getConfig(): SapConfig {
 
 describe('Shared - searchObjects', () => {
   let connection: IAbapConnection;
+  let client: AdtClient;
   let hasConfig = false;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      client = new AdtClient(connection, logger);
       hasConfig = true;
     } catch (error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');

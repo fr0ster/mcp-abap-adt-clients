@@ -8,7 +8,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { ILogger } from '../../../utils/logger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';

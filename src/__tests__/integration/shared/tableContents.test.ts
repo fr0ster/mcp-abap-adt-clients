@@ -10,7 +10,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { ILogger } from '../../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -27,7 +27,6 @@ const logger: ILogger = {
   info: debugEnabled ? console.log : () => {},
   warn: debugEnabled ? console.warn : () => {},
   error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
 };
 
 function getConfig(): SapConfig {

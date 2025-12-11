@@ -10,7 +10,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { ILogger } from '../../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestStart,

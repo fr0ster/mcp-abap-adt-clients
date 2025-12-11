@@ -14,7 +14,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { TransportBuilder } from '../../../core/transport/TransportBuilder';
-import { ILogger } from '../../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
   logBuilderTestError,
@@ -75,10 +75,10 @@ describe('TransportBuilder', () => {
     return getTestCaseDefinition('create_transport', 'builder_transport');
   }
 
-  function buildBuilderConfig(testCase: any) {
+  function buildBuilderConfig(testCase: any): { description: string; transportType?: string; owner?: string; targetSystem?: string } {
     const params = testCase?.params || {};
     return {
-      description: params.description,
+      description: params.description || '',
       transportType: params.transport_type || 'workbench',
       owner: params.owner,
       targetSystem: params.target_system
@@ -134,7 +134,7 @@ describe('TransportBuilder', () => {
         return;
       }
 
-      const builder = new TransportBuilder(connection, builderLogger, buildBuilderConfig(testCase));
+      const builder = new TransportBuilder(connection, buildBuilderConfig(testCase) as any, builderLogger);
       let transportNumber: string | null = null;
 
       try {
