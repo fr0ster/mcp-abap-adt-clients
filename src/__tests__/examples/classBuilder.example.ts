@@ -9,11 +9,10 @@
  * - Chain interruption on error
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { ClassBuilder } from '../../core/class';
-import { IAdtLogger } from '../../utils/logger';
-
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 // Example logger for connection (ILogger interface)
 const connectionLogger: ILogger = {
   debug: (message: string, meta?: any) => console.log(message, meta),
@@ -23,7 +22,7 @@ const connectionLogger: ILogger = {
 };
 
 // Example logger for ClassBuilder (ClassBuilderLogger interface)
-const builderLogger: IAdtLogger = {
+const builderLogger: ILogger = {
   debug: console.log,
   info: console.log,
   warn: console.warn,
@@ -47,11 +46,11 @@ async function example1(
   };
   const connection = createAbapConnection(config, connectionLogger);
 
-  const builder = new ClassBuilder(connection, builderLogger, {
+  const builder = new ClassBuilder(connection, {
     className,
     packageName,
     transportRequest: transportRequest || process.env.SAP_TRANSPORT_REQUEST,
-  });
+  }, builderLogger);
 
   if (sourceCode) {
     builder.setCode(sourceCode);
@@ -128,11 +127,11 @@ async function example2(
   };
   const connection = createAbapConnection(config, connectionLogger);
 
-  const builder = new ClassBuilder(connection, builderLogger, {
+  const builder = new ClassBuilder(connection, {
     className,
     packageName,
     transportRequest: process.env.SAP_TRANSPORT_REQUEST,
-  });
+  }, builderLogger);
 
   if (sourceCode) {
     builder.setCode(sourceCode);
@@ -193,11 +192,11 @@ async function example3(
   };
   const connection = createAbapConnection(config, connectionLogger);
 
-  const builder = new ClassBuilder(connection, builderLogger, {
+  const builder = new ClassBuilder(connection, {
     className,
     packageName,
     transportRequest: process.env.SAP_TRANSPORT_REQUEST,
-  });
+  }, builderLogger);
 
   if (sourceCode) {
     builder.setCode(sourceCode);
@@ -251,11 +250,11 @@ async function example4(
   };
   const connection = createAbapConnection(config, connectionLogger);
 
-  const builder = new ClassBuilder(connection, builderLogger, {
+  const builder = new ClassBuilder(connection, {
     className,
     packageName,
     transportRequest: process.env.SAP_TRANSPORT_REQUEST,
-  });
+  }, builderLogger);
 
   if (sourceCode) {
     builder.setCode(sourceCode);

@@ -11,7 +11,7 @@
  */
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUnitTest } from './AdtUnitTest';
 import { IClassUnitTestRunOptions, IClassUnitTestDefinition } from './types';
 import { validateCdsForUnitTest } from './validateCdsForUnitTest';
@@ -48,7 +48,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
   private className?: string;
   private adtView: AdtView;
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     super(connection, logger);
     // adtClass and adtLocalTestClass are already available from parent class
     // adtView is for working with CDS views
@@ -92,7 +92,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           throw new Error(`CDS view validation failed with HTTP ${response.status}`);
         }
       } catch (error: any) {
-        logErrorSafely(this.logger, 'validate', error);
+        this.logger?.error('validate failed:', error);
         throw error;
       }
     }
@@ -147,7 +147,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           errors: []
         };
       } catch (error: any) {
-        logErrorSafely(this.logger, 'create', error);
+        this.logger?.error('create failed:', error);
         throw error;
       }
     }
@@ -191,7 +191,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           errors: []
         };
       } catch (error: any) {
-        logErrorSafely(this.logger, 'update', error);
+        this.logger?.error('update failed:', error);
         throw error;
       }
     }
@@ -221,7 +221,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           errors: []
         };
       } catch (error: any) {
-        logErrorSafely(this.logger, 'delete', error);
+        this.logger?.error('delete failed:', error);
         throw error;
       }
     }
@@ -260,7 +260,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
         this.logger?.info?.('Unit test run started, runId:', runId);
         return runId;
       } catch (error: any) {
-        logErrorSafely(this.logger, 'run', error);
+        this.logger?.error('run failed:', error);
         throw error;
       }
     }

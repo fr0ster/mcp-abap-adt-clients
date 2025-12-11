@@ -11,7 +11,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { create } from './create';
 import { getDataElement } from './read';
 import { lockDataElement } from './lock';
@@ -28,18 +28,18 @@ import { XMLParser } from 'fast-xml-parser';
 
 export class DataElementBuilder implements IBuilder<IDataElementState> {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IDataElementConfig;
   private lockHandle?: string;
   private state: IDataElementState;
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IDataElementConfig
+    config: IDataElementConfig,
+    logger?: ILogger
   ) {
     this.connection = connection;
-    this.logger = logger;
+    this.logger = logger || (undefined as unknown as ILogger);
     this.config = { ...config };
     this.state = {
       errors: []
@@ -49,19 +49,19 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(dataElementName: string): this {
     this.config.dataElementName = dataElementName;
-    this.logger.debug?.('Data element name set:', dataElementName);
+    this.logger?.debug('Data element name set:', dataElementName);
     return this;
   }
 
@@ -118,7 +118,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating data element name:', this.config.dataElementName);
+      this.logger?.info('Validating data element name:', this.config.dataElementName);
       const result = await validateDataElementName(
         this.connection,
         this.config.dataElementName,
@@ -127,7 +127,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
-      this.logger.info?.('Data element name validation successful');
+      this.logger?.info('Data element name validation successful');
       return result;
     } catch (error: any) {
       // If validation endpoint returns 400 and it's about object existing, that's OK for tests
@@ -137,7 +137,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         if (errorText.toLowerCase().includes('already exists') ||
             errorText.toLowerCase().includes('does already exist') ||
             errorText.toLowerCase().includes('resource') && errorText.toLowerCase().includes('exist')) {
-          this.logger.warn?.('Data element already exists, validation skipped:', this.config.dataElementName);
+          this.logger?.warn(`Data element already exists, validation skipped: ${this.config.dataElementName}`);
           this.state.validationResponse = error.response;
           return error.response;
         }
@@ -150,7 +150,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
       if (errorMsg.toLowerCase().includes('not supported') ||
           errorText.toLowerCase().includes('not supported') ||
           errorMsg.toLowerCase().includes('object type') && errorMsg.toLowerCase().includes('not supported')) {
-        this.logger.warn?.('Validation not supported for DTEL/DE in this SAP system, skipping:', this.config.dataElementName);
+        this.logger?.warn(`'Validation not supported for DTEL/DE in this SAP system  skipping:' ${`this.config.dataElementName`}`);
         if (error.response) {
           this.state.validationResponse = error.response;
           return error.response;
@@ -167,18 +167,18 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         this.state.validationResponse = error.response;
       }
       
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
 
   async read(): Promise<IDataElementConfig | undefined> {
     try {
-      this.logger.info?.('Reading data element:', this.config.dataElementName);
+      this.logger?.info('Reading data element:', this.config.dataElementName);
       const result = await getDataElement(this.connection, this.config.dataElementName);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Data element read successfully:', result.status);
+      this.logger?.info('Data element read successfully:', result.status);
       
       // Parse and return config directly
       const xmlData = typeof result.data === 'string'
@@ -192,7 +192,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -229,7 +229,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         }
       }
 
-      this.logger.info?.('Creating data element:', this.config.dataElementName);
+      this.logger?.info('Creating data element:', this.config.dataElementName);
       const params: ICreateDataElementParams = {
         data_element_name: this.config.dataElementName,
         package_name: this.config.packageName,
@@ -248,7 +248,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
       this.connection.setSessionType("stateful");
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger.info?.('Data element created successfully:', result.status);
+      this.logger?.info('Data element created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -256,14 +256,14 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking data element:', this.config.dataElementName);
+      this.logger?.info('Locking data element:', this.config.dataElementName);
       this.connection.setSessionType("stateful");
       const lockHandle = await lockDataElement(
         this.connection,
@@ -272,7 +272,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Data element locked, handle:', lockHandle);
+      this.logger?.info(`Data element locked, handle: ${lockHandle}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -280,7 +280,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -320,7 +320,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         }
       }
 
-      this.logger.info?.('Updating data element:', this.config.dataElementName);
+      this.logger?.info('Updating data element:', this.config.dataElementName);
 
       const username = process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
@@ -361,7 +361,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
 
       this.state.updateResult = result;
 
-      this.logger.info?.('Data element updated successfully:', result.status);
+      this.logger?.info('Data element updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -369,14 +369,14 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking data element:', this.config.dataElementName, 'version:', version);
+      this.logger?.info(`Checking data element: ${this.config.dataElementName}, version: ${version}`);
       const result = await checkDataElement(
         this.connection,
         this.config.dataElementName,
@@ -384,14 +384,14 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Data element check successful:', result.status);
+      this.logger?.info('Data element check successful:', result.status);
       return result;
     } catch (error: any) {
       // For DDIC objects, check may not be fully supported - log warning but continue
       const errorMsg = error.message || '';
       if (errorMsg.toLowerCase().includes('importing') &&
           errorMsg.toLowerCase().includes('database')) {
-        this.logger.warn?.('Check not fully supported for data element (common for DDIC objects), continuing:', this.config.dataElementName);
+        this.logger?.warn(`'Check not fully supported for data element (common for DDIC objects)  continuing:' ${`this.config.dataElementName`}`);
         // Return error response to allow caller to handle
         if (error.response) {
           this.state.checkResult = error.response;
@@ -404,7 +404,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -414,7 +414,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
       if (!this.lockHandle) {
         throw new Error('Data element is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking data element:', this.config.dataElementName);
+      this.logger?.info('Unlocking data element:', this.config.dataElementName);
       const result = await unlockDataElement(
         this.connection,
         this.config.dataElementName,
@@ -424,7 +424,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.connection.setSessionType("stateless");
-      this.logger.info?.('Data element unlocked successfully');
+      this.logger?.info('Data element unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -432,20 +432,20 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating data element:', this.config.dataElementName);
+      this.logger?.info('Activating data element:', this.config.dataElementName);
       const result = await activateDataElement(
         this.connection,
         this.config.dataElementName
       );
       this.state.activateResult = result;
-      this.logger.info?.('Data element activated successfully:', result.status);
+      this.logger?.info('Data element activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -453,14 +453,14 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting data element:', this.config.dataElementName);
+      this.logger?.info('Deleting data element:', this.config.dataElementName);
       const result = await deleteDataElement(
         this.connection,
         {
@@ -469,7 +469,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Data element deleted successfully:', result.status);
+      this.logger?.info('Data element deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -477,7 +477,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -492,9 +492,9 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         this.config.dataElementName,
         this.lockHandle
       );
-      this.logger.info?.('Force unlock successful for', this.config.dataElementName);
+      this.logger?.info('Force unlock successful for', this.config.dataElementName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
@@ -563,7 +563,7 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
         headingLabel: dtel['dtel:headingFieldLabel']
       };
     } catch (error) {
-      this.logger.error?.('Failed to parse data element XML:', error);
+      this.logger?.error('Failed to parse data element XML:', error);
       return undefined;
     }
   }

@@ -11,7 +11,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { validateProgramName } from './validation';
 import { create } from './create';
 import { lockProgram } from './lock';
@@ -25,7 +25,7 @@ import { IBuilder } from '../shared/IBuilder';
 
 export class ProgramBuilder implements IBuilder<IProgramState> {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IProgramConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -33,8 +33,8 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IProgramConfig
+    config: IProgramConfig,
+    logger?: ILogger
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -48,25 +48,25 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(programName: string): this {
     this.config.programName = programName;
-    this.logger.debug?.('Program name set:', programName);
+    this.logger?.debug('Program name set:', programName);
     return this;
   }
 
   setCode(sourceCode: string): this {
     this.sourceCode = sourceCode;
-    this.logger.debug?.('Source code set, length:', sourceCode.length);
+    this.logger?.debug(`'Source code set  length:' ${`sourceCode.length`}`);
     return this;
   }
 
@@ -88,7 +88,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating program:', this.config.programName);
+      this.logger?.info('Validating program:', this.config.programName);
       const response = await validateProgramName(
         this.connection,
         this.config.programName,
@@ -97,7 +97,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       
       // Store raw response for backward compatibility
       this.state.validationResponse = response;
-      this.logger.info?.('Validation successful');
+      this.logger?.info('Validation successful');
       return response;
     } catch (error: any) {
       this.state.errors.push({
@@ -105,7 +105,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
@@ -115,7 +115,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating program:', this.config.programName);
+      this.logger?.info('Creating program:', this.config.programName);
       const params: ICreateProgramParams = {
         programName: this.config.programName,
         packageName: this.config.packageName,
@@ -128,7 +128,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       };
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger.info?.('Program created successfully:', result.status);
+      this.logger?.info('Program created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -136,14 +136,14 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking program:', this.config.programName);
+      this.logger?.info('Locking program:', this.config.programName);
       const lockHandle = await lockProgram(
         this.connection,
         this.config.programName,
@@ -156,7 +156,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Program locked, handle:', lockHandle);
+      this.logger?.info(`'Program locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -164,7 +164,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -178,7 +178,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       if (!code) {
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
-      this.logger.info?.('Updating program source:', this.config.programName);
+      this.logger?.info('Updating program source:', this.config.programName);
 
       // Direct PUT with existing lockHandle (don't call updateProgramSource which does its own lock/unlock)
       const encodedName = this.config.programName.toLowerCase();
@@ -202,7 +202,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       });
 
       this.state.updateResult = result;
-      this.logger.info?.('Program updated successfully:', result.status);
+      this.logger?.info('Program updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -210,14 +210,14 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking program:', this.config.programName, 'version:', version, sourceCode ? 'with source code' : 'saved version');
+      this.logger?.info(`'Checking program:'  this.config.programName  'version:' ${`version, sourceCode ? 'with source code' : 'saved version'`}`);
       const result = await checkProgram(
         this.connection,
         this.config.programName,
@@ -226,7 +226,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Program check successful:', result.status);
+      this.logger?.info('Program check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -234,7 +234,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -244,7 +244,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       if (!this.lockHandle) {
         throw new Error('Program is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking program:', this.config.programName);
+      this.logger?.info('Unlocking program:', this.config.programName);
       const result = await unlockProgram(
         this.connection,
         this.config.programName,
@@ -253,7 +253,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.logger.info?.('Program unlocked successfully');
+      this.logger?.info('Program unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -261,20 +261,20 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating program:', this.config.programName);
+      this.logger?.info('Activating program:', this.config.programName);
       const result = await activateProgram(
         this.connection,
         this.config.programName
       );
       this.state.activateResult = result;
-      this.logger.info?.('Program activated successfully:', result.status);
+      this.logger?.info('Program activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -282,14 +282,14 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting program:', this.config.programName);
+      this.logger?.info('Deleting program:', this.config.programName);
       const result = await deleteProgram(
         this.connection,
         {
@@ -298,7 +298,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Program deleted successfully:', result.status);
+      this.logger?.info('Program deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -306,18 +306,18 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(version: 'active' | 'inactive' = 'active'): Promise<IProgramConfig | undefined> {
     try {
-      this.logger.info?.('Reading program:', this.config.programName);
+      this.logger?.info('Reading program:', this.config.programName);
       const result = await getProgramSource(this.connection, this.config.programName);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Program read successfully:', result.status);
+      this.logger?.info('Program read successfully:', result.status);
       
       // Parse and return config directly
       const sourceCode = typeof result.data === 'string'
@@ -334,7 +334,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -349,9 +349,9 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         this.config.programName,
         this.lockHandle,
       );
-      this.logger.info?.('Force unlock successful for', this.config.programName);
+      this.logger?.info('Force unlock successful for', this.config.programName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;

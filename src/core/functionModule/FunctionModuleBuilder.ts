@@ -11,7 +11,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { validateFunctionModuleName } from './validation';
 import { create } from './create';
 import { lockFunctionModule } from './lock';
@@ -26,7 +26,7 @@ import { IBuilder } from '../shared/IBuilder';
 
 export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IFunctionModuleConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -34,11 +34,11 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IFunctionModuleConfig
+    config: IFunctionModuleConfig,
+    logger?: ILogger,
   ) {
     this.connection = connection;
-    this.logger = logger;
+    this.logger = logger || (undefined as unknown as ILogger);
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
     this.state = {
@@ -49,31 +49,31 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setFunctionGroup(functionGroupName: string): this {
     this.config.functionGroupName = functionGroupName;
-    this.logger.debug?.('Function group name set:', functionGroupName);
+    this.logger?.debug('Function group name set:', functionGroupName);
     return this;
   }
 
   setName(functionModuleName: string): this {
     this.config.functionModuleName = functionModuleName;
-    this.logger.debug?.('Function module name set:', functionModuleName);
+    this.logger?.debug('Function module name set:', functionModuleName);
     return this;
   }
 
   setCode(sourceCode: string): this {
     this.sourceCode = sourceCode;
-    this.logger.debug?.('Source code set, length:', sourceCode.length);
+    this.logger?.debug(`'Source code set  length:' ${`sourceCode.length`}`);
     return this;
   }
 
@@ -85,7 +85,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating function module:', this.config.functionModuleName);
+      this.logger?.info('Validating function module:', this.config.functionModuleName);
       const result = await validateFunctionModuleName(
         this.connection,
         this.config.functionGroupName,
@@ -94,7 +94,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
-      this.logger.info?.('Validation successful');
+      this.logger?.info('Validation successful');
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -102,14 +102,14 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
 
   async create(): Promise<this> {
     try {
-      this.logger.info?.('Creating function module metadata:', this.config.functionModuleName);
+      this.logger?.info('Creating function module metadata:', this.config.functionModuleName);
       
       // Call low-level create function (metadata only)
       const params = {
@@ -120,7 +120,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       };
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger.info?.('Function module metadata created successfully:', result.status);
+      this.logger?.info('Function module metadata created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -128,14 +128,14 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking function module:', this.config.functionModuleName);
+      this.logger?.info('Locking function module:', this.config.functionModuleName);
       
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
@@ -153,7 +153,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Function module locked, handle:', lockHandle);
+      this.logger?.info(`'Function module locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -161,7 +161,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -175,7 +175,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       if (!code) {
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
-      this.logger.info?.('Updating function module source:', this.config.functionModuleName);
+      this.logger?.info('Updating function module source:', this.config.functionModuleName);
       const params: IUpdateFunctionModuleParams = {
         functionGroupName: this.config.functionGroupName,
         functionModuleName: this.config.functionModuleName,
@@ -185,7 +185,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       };
       const result = await update(this.connection, params);
       this.state.updateResult = result;
-      this.logger.info?.('Function module updated successfully:', result.status);
+      this.logger?.info('Function module updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -193,14 +193,14 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking function module:', this.config.functionModuleName, 'version:', version, sourceCode ? 'with source code' : 'saved version');
+      this.logger?.info(`'Checking function module:'  this.config.functionModuleName  'version:' ${`version, sourceCode ? 'with source code' : 'saved version'`}`);
       const result = await checkFunctionModule(
         this.connection,
         this.config.functionGroupName,
@@ -210,7 +210,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Function module check successful:', result.status);
+      this.logger?.info('Function module check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -218,7 +218,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -228,7 +228,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       if (!this.lockHandle) {
         throw new Error('Function module is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking function module:', this.config.functionModuleName);
+      this.logger?.info('Unlocking function module:', this.config.functionModuleName);
       await unlockFunctionModule(
         this.connection,
         this.config.functionGroupName,
@@ -237,7 +237,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       );
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.logger.info?.('Function module unlocked successfully');
+      this.logger?.info('Function module unlocked successfully');
       
       // Enable stateless session mode
       this.connection.setSessionType("stateless");
@@ -249,21 +249,21 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating function module:', this.config.functionModuleName);
+      this.logger?.info('Activating function module:', this.config.functionModuleName);
       const result = await activateFunctionModule(
         this.connection,
         this.config.functionGroupName,
         this.config.functionModuleName
       );
       this.state.activateResult = result;
-      this.logger.info?.('Function module activated successfully:', result.status);
+      this.logger?.info('Function module activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -271,7 +271,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -279,7 +279,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting functionmodule:', this.config.functionModuleName);
+      this.logger?.info('Deleting functionmodule:', this.config.functionModuleName);
       const result = await deleteFunctionModule(
         this.connection,
         {
@@ -289,7 +289,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('FunctionModule deleted successfully:', result.status);
+      this.logger?.info('FunctionModule deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -297,14 +297,14 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(version: 'active' | 'inactive' = 'active'): Promise<IFunctionModuleConfig | undefined> {
     try {
-      this.logger.info?.('Reading function module:', this.config.functionModuleName);
+      this.logger?.info('Reading function module:', this.config.functionModuleName);
       const result = await getFunctionSource(
         this.connection,
         this.config.functionModuleName,
@@ -313,7 +313,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Function module read successfully:', result.status);
+      this.logger?.info('Function module read successfully:', result.status);
       
       // Parse and return config directly
       const sourceCode = typeof result.data === 'string'
@@ -331,7 +331,7 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -347,9 +347,9 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
         this.config.functionModuleName,
         this.lockHandle,
       );
-      this.logger.info?.('Force unlock successful for', this.config.functionModuleName);
+      this.logger?.info('Force unlock successful for', this.config.functionModuleName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;

@@ -1,4 +1,4 @@
-import { IAdtLogger, logErrorSafely } from "../../utils/logger";
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 
 export interface BuilderTestLogger {
   info?: (...args: any[]) => void;
@@ -91,7 +91,7 @@ function logImmediate(message: string): void {
   process.stdout.write(message + '\n');
 }
 
-export function logBuilderTestStart(logger: IAdtLogger | undefined, testName: string, testCase: any): void {
+export function logBuilderTestStart(logger: ILogger | undefined, testName: string, testCase: any): void {
   if (!testCase) {
     return;
   }

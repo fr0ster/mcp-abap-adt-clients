@@ -8,7 +8,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { IAdtLogger } from '../../../utils/logger';
+import { ILogger } from '../../../utils/logger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -94,7 +94,7 @@ describe('Shared - getWhereUsed', () => {
       client = new AdtClient(connection, logger);
       hasConfig = true;
     } catch (error) {
-      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -107,7 +107,7 @@ describe('Shared - getWhereUsed', () => {
 
   it('should get where-used for class', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
@@ -128,7 +128,7 @@ describe('Shared - getWhereUsed', () => {
 
   it('should get where-used for table', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
@@ -152,7 +152,7 @@ describe('Shared - getWhereUsed', () => {
 
   it('should throw error if object name is missing', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
@@ -166,7 +166,7 @@ describe('Shared - getWhereUsed', () => {
 
   it('should throw error if object type is missing', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 

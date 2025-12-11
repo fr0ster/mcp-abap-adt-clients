@@ -6,7 +6,7 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
-import { IAdtLogger } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { ClassBuilder } from '../class/ClassBuilder';
 import { IClassBuilderConfig } from '../class';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -31,10 +31,10 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IClassBuilderConfig
+    config: IClassBuilderConfig,
+    logger?: ILogger
   ) {
-    super(connection, logger, config);
+    super(connection, config, logger);
     this.unitTestState = {
       errors: []
     };
@@ -45,7 +45,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
    */
   async read(version: 'active' | 'inactive' = 'active'): Promise<IClassBuilderConfig | undefined> {
     try {
-      this.logger.info?.('Reading test class source:', this.config.className, 'version:', version);
+      this.logger?.info(`'Reading test class source:'  this.config.className  'version:' ${`version`}`);
       const encodedName = encodeSapObjectName(this.config.className).toLowerCase();
       const versionParam = version === 'inactive' ? '?version=inactive' : '';
       const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses${versionParam}`;
@@ -61,7 +61,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
 
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Test class source read successfully:', result.status, 'bytes:', result.data?.length || 0);
+      this.logger?.info(`'Test class source read successfully:'  result.status  'bytes:' ${`result.data?.length || 0`}`);
 
       // Parse and return config directly
       const sourceCode = typeof result.data === 'string'
@@ -78,7 +78,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read test class failed:', {
+      this.logger?.error('Read test class failed:', {
         className: this.config.className,
         version,
         status: error.response?.status,
@@ -114,7 +114,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update test class failed:', error);
+      this.logger?.error('Update test class failed:', error);
       throw error;
     }
   }
@@ -136,12 +136,12 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
       }
 
-      this.logger.info?.('Checking test class code:', this.config.className);
+      this.logger?.info('Checking test class code:', this.config.className);
       
       // Use checkTestClass() from ClassBuilder
       await super.checkTestClass(code);
       
-      this.logger.info?.('Test class check passed');
+      this.logger?.info('Test class check passed');
       
       // Return this for compatibility with builder pattern
       return this;
@@ -151,7 +151,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -164,7 +164,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
     options?: ClassUnitTestRunOptions
   ): Promise<this> {
     try {
-      this.logger.info?.('Starting class unit test run');
+      this.logger?.info('Starting class unit test run');
       const response = await startClassUnitTestRun(this.connection, tests, options);
       
       // Extract run ID from response headers
@@ -177,7 +177,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
       }
       
       this.unitTestState.runId = runId;
-      this.logger.info?.('Unit test run started, runId:', runId);
+      this.logger?.info(`'Unit test run started  runId:' ${`runId`}`);
       return this;
     } catch (error: any) {
       this.unitTestState.errors.push({
@@ -185,7 +185,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Run for class failed:', error);
+      this.logger?.error('Run for class failed:', error);
       throw error;
     }
   }
@@ -198,7 +198,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
     options?: ClassUnitTestRunOptions
   ): Promise<this> {
     try {
-      this.logger.info?.('Starting unit test run for object:', className);
+      this.logger?.info('Starting unit test run for object:', className);
       const response = await startClassUnitTestRunByObject(this.connection, className, options);
       
       // Extract run ID from response headers
@@ -211,7 +211,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
       }
       
       this.unitTestState.runId = runId;
-      this.logger.info?.('Unit test run started, runId:', runId);
+      this.logger?.info(`'Unit test run started  runId:' ${`runId`}`);
       return this;
     } catch (error: any) {
       this.unitTestState.errors.push({
@@ -219,7 +219,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Run for object failed:', error);
+      this.logger?.error('Run for object failed:', error);
       throw error;
     }
   }
@@ -232,10 +232,10 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
       throw new Error('Run ID is required. Call runForClass() or runForObject() first.');
     }
     try {
-      this.logger.info?.('Getting unit test status, runId:', this.unitTestState.runId);
+      this.logger?.info(`'Getting unit test status  runId:' ${`this.unitTestState.runId`}`);
       const response = await getClassUnitTestStatus(this.connection, this.unitTestState.runId, withLongPolling);
       this.unitTestState.runStatus = response.data;
-      this.logger.info?.('Unit test status retrieved');
+      this.logger?.info('Unit test status retrieved');
       return this;
     } catch (error: any) {
       this.unitTestState.errors.push({
@@ -243,7 +243,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Get status failed:', error);
+      this.logger?.error('Get status failed:', error);
       throw error;
     }
   }
@@ -256,10 +256,10 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
       throw new Error('Run ID is required. Call runForClass() or runForObject() first.');
     }
     try {
-      this.logger.info?.('Getting unit test result, runId:', this.unitTestState.runId);
+      this.logger?.info(`'Getting unit test result  runId:' ${`this.unitTestState.runId`}`);
       const response = await getClassUnitTestResult(this.connection, this.unitTestState.runId, options);
       this.unitTestState.runResult = response.data;
-      this.logger.info?.('Unit test result retrieved');
+      this.logger?.info('Unit test result retrieved');
       return this;
     } catch (error: any) {
       this.unitTestState.errors.push({
@@ -267,7 +267,7 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Get result failed:', error);
+      this.logger?.error('Get result failed:', error);
       throw error;
     }
   }

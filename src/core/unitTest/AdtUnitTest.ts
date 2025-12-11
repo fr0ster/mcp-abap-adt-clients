@@ -22,7 +22,7 @@
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { IClassUnitTestDefinition, IClassUnitTestRunOptions } from './types';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { startClassUnitTestRun } from './run';
 import { getClassUnitTestStatus, getClassUnitTestResult } from '../class/run';
 import { IUnitTestConfig, IUnitTestState } from './types';
@@ -31,7 +31,7 @@ import { IClassState } from '../class/types';
 
 export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> {
   protected readonly connection: IAbapConnection;
-  protected readonly logger?: IAdtLogger;
+  protected readonly logger?: ILogger;
   public readonly objectType: string = 'UnitTest';
 
   // Internal state for convenience methods
@@ -44,7 +44,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
   protected adtClass: AdtClass;
   protected adtLocalTestClass: AdtLocalTestClass;
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
     this.adtClass = new AdtClass(connection, logger);
@@ -103,7 +103,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
         errors: []
       };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }

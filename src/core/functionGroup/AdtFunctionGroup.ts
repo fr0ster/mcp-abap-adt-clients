@@ -23,7 +23,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { IFunctionGroupConfig, IFunctionGroupState } from './types';
 import { validateFunctionGroupName } from './validation';
 import { create as createFunctionGroup } from './create';
@@ -36,10 +36,10 @@ import { getFunctionGroup, getFunctionGroupTransport } from './read';
 
 export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'FunctionGroup';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -150,7 +150,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -207,7 +207,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('readMetadata', err);
       throw err;
     }
   }
@@ -230,7 +230,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('readTransport', err);
       throw err;
     }
   }
@@ -334,7 +334,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -366,7 +366,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
 
       return { deleteResult: result, errors: [] };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      this.logger?.error('Delete failed:', error);
       throw error;
     }
   }
@@ -384,7 +384,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
       const result = await activateFunctionGroup(this.connection, config.functionGroupName);
       return { activateResult: result, errors: [] };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }

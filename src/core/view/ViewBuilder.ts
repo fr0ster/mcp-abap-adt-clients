@@ -31,7 +31,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { createView } from './create';
 import { updateView } from './update';
 import { lockDDLS } from './lock';
@@ -45,40 +45,39 @@ import { getViewSource } from './read';
 
 export class ViewBuilder {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IViewConfig;
   private lockHandle?: string;
-  private state: IViewState;
+  private state: IViewState = {
+    errors: []
+  };
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IViewConfig
+    config: IViewConfig,
+    logger?: ILogger,
   ) {
     this.connection = connection;
-    this.logger = logger;
     this.config = { ...config };
-    this.state = {
-      errors: []
-    };
+    this.logger = logger || (undefined as unknown as ILogger);
   }
 
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(viewName: string): this {
     this.config.viewName = viewName;
-    this.logger.debug?.('View name set:', viewName);
+    this.logger?.debug('View name set:', viewName);
     return this;
   }
 
@@ -89,7 +88,7 @@ export class ViewBuilder {
 
   setDdlSource(ddlSource: string): this {
     this.config.ddlSource = ddlSource;
-    this.logger.debug?.('DDL source set, length:', ddlSource.length);
+    this.logger?.debug(`DDL source set, length: ${ddlSource.length}`);
     return this;
   }
 
@@ -99,7 +98,7 @@ export class ViewBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required for view validation');
       }
-      this.logger.info?.('Validating view name:', this.config.viewName);
+      this.logger?.info('Validating view name:', this.config.viewName);
       const response = await validateViewName(
         this.connection,
         this.config.viewName,
@@ -109,13 +108,13 @@ export class ViewBuilder {
       
       // Store raw response for backward compatibility
       this.state.validationResponse = response;
-      this.logger.info?.('View name validation successful');
+      this.logger?.info('View name validation successful');
       return response;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger.info?.('View validation returned 400 - object may already exist');
+        this.logger?.info('View validation returned 400 - object may already exist');
         return error.response;
       }
       // Store error response if available
@@ -128,7 +127,7 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
@@ -139,7 +138,7 @@ export class ViewBuilder {
         throw new Error('Package name is required');
       }
       
-      this.logger.info?.('Creating view:', this.config.viewName);
+      this.logger?.info('Creating view:', this.config.viewName);
       
       // Enable stateful session mode for create operation
       this.connection.setSessionType("stateful");
@@ -153,7 +152,7 @@ export class ViewBuilder {
       const result = await createView(this.connection, params);
       this.state.createResult = result;
       
-      this.logger.info?.('View created successfully:', result.status);
+      this.logger?.info('View created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -161,14 +160,14 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking view:', this.config.viewName);
+      this.logger?.info('Locking view:', this.config.viewName);
       
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
@@ -185,7 +184,7 @@ export class ViewBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('View locked, handle:', lockHandle);
+      this.logger?.info(`View locked, handle: ${lockHandle}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -193,7 +192,7 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error;
     }
   }
@@ -207,7 +206,7 @@ export class ViewBuilder {
         throw new Error('DDL source is required');
       }
       
-      this.logger.info?.('Updating view:', this.config.viewName);
+      this.logger?.info('Updating view:', this.config.viewName);
       
       // Upload DDL source with existing lock handle
       const result = await updateView(
@@ -219,7 +218,7 @@ export class ViewBuilder {
       );
       
       this.state.updateResult = result;
-      this.logger.info?.('View updated successfully:', result.status);
+      this.logger?.info('View updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -227,7 +226,7 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -235,7 +234,7 @@ export class ViewBuilder {
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
       const codeToCheck = sourceCode || this.config.ddlSource;
-      this.logger.info?.('Checking view:', this.config.viewName, 'version:', version, codeToCheck ? 'with source code' : 'saved version');
+      this.logger?.info(`Checking view: ${this.config.viewName}, version: ${version}, ${codeToCheck ? 'with source code' : 'saved version'}`);
       const result = await checkView(
         this.connection,
         this.config.viewName,
@@ -244,7 +243,7 @@ export class ViewBuilder {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('View check successful:', result.status);
+      this.logger?.info('View check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -252,7 +251,7 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -262,7 +261,7 @@ export class ViewBuilder {
       if (!this.lockHandle) {
         throw new Error('View is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking view:', this.config.viewName);
+      this.logger?.info('Unlocking view:', this.config.viewName);
       const result = await unlockDDLS(
         this.connection,
         this.config.viewName,
@@ -271,7 +270,7 @@ export class ViewBuilder {
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.logger.info?.('View unlocked successfully');
+      this.logger?.info('View unlocked successfully');
       
       // Enable stateless session mode
       this.connection.setSessionType("stateless");
@@ -283,20 +282,20 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error;
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating view:', this.config.viewName);
+      this.logger?.info('Activating view:', this.config.viewName);
       const result = await activateDDLS(
         this.connection,
         this.config.viewName
       );
       this.state.activateResult = result;
-      this.logger.info?.('View activated successfully:', result.status);
+      this.logger?.info('View activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -304,7 +303,7 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }
@@ -312,7 +311,7 @@ export class ViewBuilder {
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting view:', this.config.viewName);
+      this.logger?.info('Deleting view:', this.config.viewName);
       const result = await deleteView(
         this.connection,
         {
@@ -321,7 +320,7 @@ export class ViewBuilder {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('View deleted successfully:', result.status);
+      this.logger?.info('View deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -329,18 +328,18 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(version: 'active' | 'inactive' = 'active'): Promise<IViewConfig | undefined> {
     try {
-      this.logger.info?.('Reading view:', this.config.viewName);
+      this.logger?.info('Reading view:', this.config.viewName);
       const result = await getViewSource(this.connection, this.config.viewName);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('View read successfully:', result.status);
+      this.logger?.info('View read successfully:', result.status);
       
       // Parse and return config directly
       const ddlSource = typeof result.data === 'string'
@@ -357,7 +356,7 @@ export class ViewBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -372,9 +371,9 @@ export class ViewBuilder {
         this.config.viewName,
         this.lockHandle
       );
-      this.logger.info?.('Force unlock successful for', this.config.viewName);
+      this.logger?.info('Force unlock successful for', this.config.viewName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;

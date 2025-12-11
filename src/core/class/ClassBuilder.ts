@@ -36,7 +36,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { validateClassName } from './validation';
 import { create as createClassObject } from './create';
 import { getClassSource, getClassMetadata, getClassTransport } from './read';
@@ -55,7 +55,7 @@ import { IClassConfig, IClassState } from './types';
 
 export class ClassBuilder {
   protected connection: IAbapConnection;
-  protected logger: IAdtLogger;
+  protected logger?: ILogger;
   protected config: IClassConfig;
   protected sourceCode?: string;
   protected lockHandle?: string;
@@ -64,8 +64,8 @@ export class ClassBuilder {
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IClassConfig
+    config: IClassConfig,
+    logger?: ILogger
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -78,61 +78,61 @@ export class ClassBuilder {
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(className: string): this {
     this.config.className = className;
-    this.logger.debug?.('Class name set:', className);
+    this.logger?.debug('Class name set:', className);
     return this;
   }
 
   setCode(sourceCode: string): this {
     this.sourceCode = sourceCode;
-    this.logger.debug?.('Source code set, length:', sourceCode.length);
+    this.logger?.debug(`Source code set, length: ${sourceCode.length}`);
     return this;
   }
 
   setTestClassCode(sourceCode: string): this {
     this.config.testClassCode = sourceCode;
-    this.logger.debug?.('Test class code set, length:', sourceCode.length);
+    this.logger?.debug(`Test class code set, length: ${sourceCode.length}`);
     return this;
   }
 
   setTestClassName(testClassName: string): this {
     this.config.testClassName = testClassName;
-    this.logger.debug?.('Test class name set:', testClassName);
+    this.logger?.debug('Test class name set:', testClassName);
     return this;
   }
 
   setLocalTypesCode(localTypesCode: string): this {
     this.config.localTypesCode = localTypesCode;
-    this.logger.debug?.('Local types code set, length:', localTypesCode.length);
+    this.logger?.debug(`Local types code set, length: ${localTypesCode.length}`);
     return this;
   }
 
   setDefinitionsCode(definitionsCode: string): this {
     this.config.definitionsCode = definitionsCode;
-    this.logger.debug?.('Definitions code set, length:', definitionsCode.length);
+    this.logger?.debug(`'Definitions code set  length:' ${`definitionsCode.length`}`);
     return this;
   }
 
   setMacrosCode(macrosCode: string): this {
     this.config.macrosCode = macrosCode;
-    this.logger.debug?.('Macros code set, length:', macrosCode.length);
+    this.logger?.debug(`Macros code set, length: ${macrosCode.length}`);
     return this;
   }
 
   setClassTemplate(templateXml: string): this {
     this.config.classTemplate = templateXml;
-    this.logger.debug?.('Class template set, length:', templateXml.length);
+    this.logger?.debug(`Class template set, length: ${templateXml.length}`);
     return this;
   }
 
@@ -165,7 +165,7 @@ export class ClassBuilder {
   // Chain is interrupted on error (standard Promise behavior)
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating class:', this.config.className);
+      this.logger?.info('Validating class:', this.config.className);
       const result = await validateClassName(
         this.connection,
         this.config.className,
@@ -175,13 +175,13 @@ export class ClassBuilder {
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
-      this.logger.info?.('Validation successful');
+      this.logger?.info('Validation successful');
       return result;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists or validation error - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger.info?.('Class validation returned 400 - object may already exist or validation error');
+        this.logger?.info('Class validation returned 400 - object may already exist or validation error');
         return error.response;
       }
       // Store error response if available
@@ -194,7 +194,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
@@ -204,7 +204,7 @@ export class ClassBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating class:', this.config.className);
+      this.logger?.info('Creating class:', this.config.className);
 
       
       const result = await createClassObject(this.connection, {
@@ -221,7 +221,7 @@ export class ClassBuilder {
         template_xml: this.config.classTemplate
       });
       this.state.createResult = result;
-      this.logger.info?.('Class created successfully:', result.status);
+      this.logger?.info('Class created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -229,18 +229,17 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(version: 'active' | 'inactive' = 'active'): Promise<IClassConfig | undefined> {
     try {
-      this.logger.info?.('Reading class source:', this.config.className, 'version:', version);
+      this.logger?.info(`Reading class source: ${this.config.className}, version: ${version}`);
       const result = await getClassSource(this.connection, this.config.className, version);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Class source read successfully:', result.status, 'bytes:', result.data?.length || 0);
+      this.logger?.info(`Class source read successfully: ${result.status}, bytes: ${result.data?.length || 0}`);
       
       // Parse and return config directly
       const sourceCode = typeof result.data === 'string'
@@ -257,7 +256,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', {
+      this.logger?.error('Read failed:', {
         className: this.config.className,
         version,
         status: error.response?.status,
@@ -271,10 +270,10 @@ export class ClassBuilder {
 
   async readMetadata(): Promise<this> {
     try {
-      this.logger.info?.('Reading class metadata:', this.config.className);
+      this.logger?.info('Reading class metadata:', this.config.className);
       const result = await getClassMetadata(this.connection, this.config.className);
       this.state.metadataResult = result;
-      this.logger.info?.('Class metadata read successfully:', result.status);
+      this.logger?.info('Class metadata read successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -282,17 +281,17 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read metadata failed:', error);
+      this.logger?.error('Read metadata failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async readTransport(): Promise<this> {
     try {
-      this.logger.info?.('Reading transport request for class:', this.config.className);
+      this.logger?.info('Reading transport request for class:', this.config.className);
       const result = await getClassTransport(this.connection, this.config.className);
       this.state.transportResult = result;
-      this.logger.info?.('Transport request read successfully:', result.status);
+      this.logger?.info('Transport request read successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -300,14 +299,14 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read transport failed:', error);
+      this.logger?.error('Read transport failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking class:', this.config.className);
+      this.logger?.info('Locking class:', this.config.className);
       
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
@@ -319,7 +318,7 @@ export class ClassBuilder {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Class locked, handle:', lockHandle);
+      this.logger?.info(`'Class locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -327,19 +326,19 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lockTestClasses(): Promise<this> {
     try {
-      this.logger.info?.('Locking test classes for:', this.config.className);
+      this.logger?.info('Locking test classes for:', this.config.className);
       this.connection.setSessionType('stateful');
       const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
       this.testLockHandle = lockHandle;
       this.state.testLockHandle = lockHandle;
-      this.logger.info?.('Test classes locked, handle:', lockHandle);
+      this.logger?.info(`Test classes locked, handle: ${lockHandle}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -347,7 +346,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock test classes failed:', error);
+      this.logger?.error('Lock test classes failed:', error);
       throw error;
     }
   }
@@ -370,10 +369,10 @@ export class ClassBuilder {
         throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Checking test class code:', this.config.className);
+      this.logger?.info('Checking test class code:', this.config.className);
       const { checkClassLocalTestClass } = await import('./check');
       await checkClassLocalTestClass(this.connection, this.config.className, code, 'inactive');
-      this.logger.info?.('Test class code check passed');
+      this.logger?.info('Test class code check passed');
       
       return this;
     } catch (error: any) {
@@ -382,7 +381,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Test class check failed:', error);
+      this.logger?.error('Test class check failed:', error);
       throw error;
     }
   }
@@ -394,10 +393,10 @@ export class ClassBuilder {
         throw new Error('Local types source code is required. Use setLocalTypesCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Checking local types code:', this.config.className);
+      this.logger?.info('Checking local types code:', this.config.className);
       const { checkClassLocalTypes } = await import('./check');
       await checkClassLocalTypes(this.connection, this.config.className, code, 'inactive');
-      this.logger.info?.('Local types code check passed');
+      this.logger?.info('Local types code check passed');
       
       return this;
     } catch (error: any) {
@@ -406,7 +405,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Local types check failed:', error);
+      this.logger?.error('Local types check failed:', error);
       throw error;
     }
   }
@@ -418,10 +417,10 @@ export class ClassBuilder {
         throw new Error('Definitions source code is required. Use setDefinitionsCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Checking definitions code:', this.config.className);
+      this.logger?.info('Checking definitions code:', this.config.className);
       const { checkClassDefinitions } = await import('./check');
       await checkClassDefinitions(this.connection, this.config.className, code, 'inactive');
-      this.logger.info?.('Definitions code check passed');
+      this.logger?.info('Definitions code check passed');
       
       return this;
     } catch (error: any) {
@@ -430,7 +429,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Definitions check failed:', error);
+      this.logger?.error('Definitions check failed:', error);
       throw error;
     }
   }
@@ -442,10 +441,10 @@ export class ClassBuilder {
         throw new Error('Macros source code is required. Use setMacrosCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Checking macros code:', this.config.className);
+      this.logger?.info('Checking macros code:', this.config.className);
       const { checkClassMacros } = await import('./check');
       await checkClassMacros(this.connection, this.config.className, code, 'inactive');
-      this.logger.info?.('Macros code check passed');
+      this.logger?.info('Macros code check passed');
       
       return this;
     } catch (error: any) {
@@ -454,7 +453,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Macros check failed:', error);
+      this.logger?.error('Macros check failed:', error);
       throw error;
     }
   }
@@ -471,7 +470,7 @@ export class ClassBuilder {
         if (!code) {
           throw new Error('Source code is required. Use setCode() or pass as parameter.');
         }
-        this.logger.info?.('Updating class main source:', this.config.className);
+        this.logger?.info('Updating class main source:', this.config.className);
         const result = await updateClass(
           this.connection,
           this.config.className,
@@ -480,13 +479,13 @@ export class ClassBuilder {
           this.config.transportRequest
         );
         this.state.updateResult = result;
-        this.logger.info?.('Class main source updated successfully:', result.status);
+        this.logger?.info('Class main source updated successfully:', result.status);
       }
 
       // Update implementations include if provided
       if (options?.implementations) {
         const { updateClassImplementations } = await import('./update');
-        this.logger.info?.('Updating class implementations include:', this.config.className);
+        this.logger?.info('Updating class implementations include:', this.config.className);
         const result = await updateClassImplementations(
           this.connection,
           this.config.className,
@@ -495,13 +494,13 @@ export class ClassBuilder {
           this.config.transportRequest
         );
         this.state.updateResult = result;
-        this.logger.info?.('Class implementations updated successfully:', result.status);
+        this.logger?.info('Class implementations updated successfully:', result.status);
       }
 
       // Update test classes if provided (uses same lock handle as main source)
       if (options?.testClasses) {
         const { updateClassTestInclude } = await import('./testclasses');
-        this.logger.info?.('Updating class test classes:', this.config.className);
+        this.logger?.info('Updating class test classes:', this.config.className);
         const result = await updateClassTestInclude(
           this.connection,
           this.config.className,
@@ -510,7 +509,7 @@ export class ClassBuilder {
           this.config.transportRequest
         );
         this.state.testClassesResult = result;
-        this.logger.info?.('Class test classes updated successfully:', result.status);
+        this.logger?.info('Class test classes updated successfully:', result.status);
       }
 
       return this;
@@ -520,7 +519,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -541,7 +540,7 @@ export class ClassBuilder {
         throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Updating test class (local class):', this.config.className);
+      this.logger?.info('Updating test class (local class):', this.config.className);
       const result = await updateClassTestInclude(
         this.connection,
         this.config.className,
@@ -550,7 +549,7 @@ export class ClassBuilder {
         this.config.transportRequest
       );
       this.state.testClassesResult = result;
-      this.logger.info?.('Test class updated successfully:', result.status);
+      this.logger?.info('Test class updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -558,7 +557,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update test class failed:', error);
+      this.logger?.error('Update test class failed:', error);
       throw error;
     }
   }
@@ -582,7 +581,7 @@ export class ClassBuilder {
       // Check test class code before update using dedicated method
       await this.checkTestClass(code);
       
-      this.logger.info?.('Updating class test include:', this.config.className);
+      this.logger?.info('Updating class test include:', this.config.className);
       const result = await updateClassTestInclude(
         this.connection,
         this.config.className,
@@ -591,7 +590,7 @@ export class ClassBuilder {
         this.config.transportRequest
       );
       this.state.testClassesResult = result;
-      this.logger.info?.('Class test include updated successfully:', result.status);
+      this.logger?.info('Class test include updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -599,7 +598,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update test classes failed:', error);
+      this.logger?.error('Update test classes failed:', error);
       throw error;
     }
   }
@@ -614,7 +613,7 @@ export class ClassBuilder {
         throw new Error('Local types source code is required. Use setLocalTypesCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Updating local types:', this.config.className);
+      this.logger?.info('Updating local types:', this.config.className);
       const { updateClassLocalTypes } = await import('./includes');
       const result = await updateClassLocalTypes(
         this.connection,
@@ -623,7 +622,7 @@ export class ClassBuilder {
         this.lockHandle,
         this.config.transportRequest
       );
-      this.logger.info?.('Local types updated successfully:', result.status);
+      this.logger?.info('Local types updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -631,7 +630,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update local types failed:', error);
+      this.logger?.error('Update local types failed:', error);
       throw error;
     }
   }
@@ -646,7 +645,7 @@ export class ClassBuilder {
         throw new Error('Definitions source code is required. Use setDefinitionsCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Updating definitions:', this.config.className);
+      this.logger?.info('Updating definitions:', this.config.className);
       const { updateClassDefinitions } = await import('./includes');
       const result = await updateClassDefinitions(
         this.connection,
@@ -655,7 +654,7 @@ export class ClassBuilder {
         this.lockHandle,
         this.config.transportRequest
       );
-      this.logger.info?.('Definitions updated successfully:', result.status);
+      this.logger?.info('Definitions updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -663,7 +662,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update definitions failed:', error);
+      this.logger?.error('Update definitions failed:', error);
       throw error;
     }
   }
@@ -678,7 +677,7 @@ export class ClassBuilder {
         throw new Error('Macros source code is required. Use setMacrosCode() or pass as parameter.');
       }
       
-      this.logger.info?.('Updating macros:', this.config.className);
+      this.logger?.info('Updating macros:', this.config.className);
       const { updateClassMacros } = await import('./includes');
       const result = await updateClassMacros(
         this.connection,
@@ -687,7 +686,7 @@ export class ClassBuilder {
         this.lockHandle,
         this.config.transportRequest
       );
-      this.logger.info?.('Macros updated successfully:', result.status);
+      this.logger?.info('Macros updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -695,14 +694,14 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update macros failed:', error);
+      this.logger?.error('Update macros failed:', error);
       throw error;
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking class:', this.config.className, 'version:', version);
+      this.logger?.info(`Checking class: ${this.config.className}, version: ${version}`);
       
       // Use provided source code or stored source code
       const codeToCheck = sourceCode || this.sourceCode;
@@ -715,7 +714,7 @@ export class ClassBuilder {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Class check successful:', result.status);
+      this.logger?.info('Class check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -723,7 +722,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -733,7 +732,7 @@ export class ClassBuilder {
       if (!this.lockHandle) {
         throw new Error('Class is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking class:', this.config.className);
+      this.logger?.info('Unlocking class:', this.config.className);
       const result = await unlockClass(
         this.connection,
         this.config.className,
@@ -746,7 +745,7 @@ export class ClassBuilder {
       // Disable stateful session mode after unlock
       this.connection.setSessionType("stateless");
       
-      this.logger.info?.('Class unlocked successfully:', result.status);
+      this.logger?.info('Class unlocked successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -754,7 +753,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -762,10 +761,10 @@ export class ClassBuilder {
   async unlockTestClasses(): Promise<this> {
     try {
       if (!this.testLockHandle) {
-        this.logger.warn?.('Test classes are not locked.');
+        this.logger?.warn('Test classes are not locked.');
         return this;
       }
-      this.logger.info?.('Unlocking test classes:', this.config.className);
+      this.logger?.info('Unlocking test classes:', this.config.className);
       const result = await unlockClassTestClasses(
         this.connection,
         this.config.className,
@@ -773,7 +772,7 @@ export class ClassBuilder {
       );
       this.state.testLockHandle = undefined;
       this.testLockHandle = undefined;
-      this.logger.info?.('Test classes unlocked successfully:', result.status);
+      this.logger?.info('Test classes unlocked successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -781,20 +780,20 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock test classes failed:', error);
+      this.logger?.error('Unlock test classes failed:', error);
       throw error;
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating class:', this.config.className);
+      this.logger?.info('Activating class:', this.config.className);
       const result = await activateClass(
         this.connection,
         this.config.className
       );
       this.state.activateResult = result;
-      this.logger.info?.('Class activated successfully:', result.status);
+      this.logger?.info('Class activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -802,20 +801,20 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async activateTestClasses(): Promise<this> {
     try {
-      this.logger.info?.('Activating test classes via class activation:', this.config.className);
+      this.logger?.info('Activating test classes via class activation:', this.config.className);
       const result = await activateClass(
         this.connection,
         this.config.className
       );
       this.state.testActivateResult = result;
-      this.logger.info?.('Test classes activated within class activation:', result.status);
+      this.logger?.info('Test classes activated within class activation:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -823,14 +822,14 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate test classes failed:', error);
+      this.logger?.error('Activate test classes failed:', error);
       throw error;
     }
   }
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting class:', this.config.className);
+      this.logger?.info('Deleting class:', this.config.className);
       const result = await deleteClass(
         this.connection,
         {
@@ -839,7 +838,7 @@ export class ClassBuilder {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Class deleted successfully:', result.status);
+      this.logger?.info('Class deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -847,14 +846,14 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async clearTestClasses(): Promise<this> {
     try {
-      this.logger.info?.('Clearing test classes for:', this.config.className);
+      this.logger?.info('Clearing test classes for:', this.config.className);
       this.connection.setSessionType('stateful');
       
       const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
@@ -876,7 +875,7 @@ export class ClassBuilder {
       this.state.testLockHandle = undefined;
 
       this.connection.setSessionType("stateless");
-      this.logger.info?.('Test classes cleared successfully');
+      this.logger?.info('Test classes cleared successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -884,7 +883,7 @@ export class ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Clear test classes failed:', error);
+      this.logger?.error('Clear test classes failed:', error);
       throw error;
     }
   }
@@ -915,9 +914,9 @@ export class ClassBuilder {
       }
 
       this.connection.setSessionType("stateless");
-      this.logger.info?.('Force unlock successful for', this.config.className);
+      this.logger?.info('Force unlock successful for', this.config.className);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     }
   }
 

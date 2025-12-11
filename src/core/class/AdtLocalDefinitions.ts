@@ -7,7 +7,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { checkClassDefinitions } from './check';
 import { updateClassDefinitions } from './includes';
 import { AdtClass } from './AdtClass';
@@ -22,7 +22,7 @@ export interface ILocalDefinitionsConfig {
 export class AdtLocalDefinitions extends AdtClass {
   public readonly objectType: string = 'LocalDefinitions';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     super(connection, logger);
   }
 
@@ -121,7 +121,7 @@ export class AdtLocalDefinitions extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Create LocalDefinitions', error);
+      this.logger?.error('Create LocalDefinitions failed:', error);
       throw error;
     }
   }
@@ -148,7 +148,7 @@ export class AdtLocalDefinitions extends AdtClass {
       if (error.response?.status === 404) {
         return undefined;
       }
-      logErrorSafely(this.logger, 'Read LocalDefinitions', error);
+      this.logger?.error('Read LocalDefinitions failed:', error);
       throw error;
     }
   }
@@ -224,7 +224,7 @@ export class AdtLocalDefinitions extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Update LocalDefinitions', error);
+      this.logger?.error('Update LocalDefinitions failed:', error);
       throw error;
     }
   }

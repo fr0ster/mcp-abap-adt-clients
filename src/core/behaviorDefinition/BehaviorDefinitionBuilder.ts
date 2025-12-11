@@ -21,11 +21,11 @@ import { checkImplementation, checkAbap } from './check';
 import { activate } from './activation';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
 import { IBehaviorDefinitionValidationParams, IBehaviorDefinitionCreateParams, IUpdateBehaviorDefinitionParams, IBehaviorDefinitionConfig, IBehaviorDefinitionState } from './types';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 
 export class BehaviorDefinitionBuilder {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IBehaviorDefinitionConfig;
   private sourceCode?: string;
   private lockHandle?: string;
@@ -33,41 +33,38 @@ export class BehaviorDefinitionBuilder {
 
   constructor(
     connection: IAbapConnection,
-    logger:     IAdtLogger,
-    config: IBehaviorDefinitionConfig
+    config: IBehaviorDefinitionConfig,
+    logger?: ILogger
   ) {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
-    this.state = {
-      errors: [],
-      checkResults: []
-    };
+    this.state = { errors: [] };
   }
 
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(name: string): this {
     this.config.name = name;
-    this.logger.debug?.('Behavior definition name set:', name);
+    this.logger?.debug('Behavior definition name set:', name);
     return this;
   }
 
   setCode(sourceCode: string): this {
     this.sourceCode = sourceCode;
-    this.logger.debug?.('Source code set, length:', sourceCode.length);
+    this.logger?.debug(`'Source code set  length:' ${`sourceCode.length`}`);
     return this;
   }
 
@@ -96,7 +93,7 @@ export class BehaviorDefinitionBuilder {
         throw new Error('Package name is required for validation');
       }
       
-      this.logger.info?.('Validating behavior definition:', this.config.name);
+      this.logger?.info('Validating behavior definition:', this.config.name);
       
       const params: IBehaviorDefinitionValidationParams = {
         objname: this.config.name,
@@ -110,7 +107,7 @@ export class BehaviorDefinitionBuilder {
       
       // Store raw response - consumer decides how to interpret it
       this.state.validationResponse = response;
-      this.logger.info?.('Validation successful');
+      this.logger?.info('Validation successful');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -118,7 +115,7 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -129,7 +126,7 @@ export class BehaviorDefinitionBuilder {
         throw new Error('Package name is required');
       }
       
-      this.logger.info?.('Creating behavior definition:', this.config.name);
+      this.logger?.info('Creating behavior definition:', this.config.name);
       
       const params: IBehaviorDefinitionCreateParams = {
         name: this.config.name,
@@ -140,7 +137,7 @@ export class BehaviorDefinitionBuilder {
       
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger.info?.('Behavior definition created successfully:', result.status);
+      this.logger?.info('Behavior definition created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -148,14 +145,14 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking behavior definition:', this.config.name);
+      this.logger?.info('Locking behavior definition:', this.config.name);
       
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
@@ -172,7 +169,7 @@ export class BehaviorDefinitionBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Behavior definition locked, handle:', lockHandle);
+      this.logger?.info(`'Behavior definition locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -180,17 +177,17 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async readSource(): Promise<this> {
     try {
-      this.logger.info?.('Reading behavior definition source:', this.config.name);
+      this.logger?.info('Reading behavior definition source:', this.config.name);
       const response = await readSource(this.connection, this.config.name);
       this.sourceCode = response.data;
-      this.logger.info?.('Source code read, length:', response.data?.length || 0);
+      this.logger?.info(`'Source code read  length:' ${`response.data?.length || 0`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -198,7 +195,7 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read source failed:', error);
+      this.logger?.error('Read source failed:', error);
       throw error;
     }
   }
@@ -212,7 +209,7 @@ export class BehaviorDefinitionBuilder {
       if (!code) {
         throw new Error('Source code is required. Use setCode() or pass as parameter.');
       }
-      this.logger.info?.('Updating behavior definition source:', this.config.name);
+      this.logger?.info('Updating behavior definition source:', this.config.name);
 
       const params: IUpdateBehaviorDefinitionParams = {
         name: this.config.name,
@@ -223,7 +220,7 @@ export class BehaviorDefinitionBuilder {
       const result = await update(this.connection, params);
 
       this.state.updateResult = result;
-      this.logger.info?.('Behavior definition updated successfully:', result.status);
+      this.logger?.info('Behavior definition updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -231,14 +228,14 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
     try {
-      this.logger.info?.('Checking behavior definition:', this.config.name, 'version:', version);
+      this.logger?.info(`'Checking behavior definition:'  this.config.name  'version:' ${`version`}`);
       
       // Use provided source code or stored source code
       const codeToCheck = sourceCode || this.sourceCode;
@@ -259,7 +256,7 @@ export class BehaviorDefinitionBuilder {
       );
       
       this.state.checkResults = [implResult, abapResult];
-      this.logger.info?.('Behavior definition check successful');
+      this.logger?.info('Behavior definition check successful');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -267,7 +264,7 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -277,7 +274,7 @@ export class BehaviorDefinitionBuilder {
       if (!this.lockHandle) {
         throw new Error('Behavior definition is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking behavior definition:', this.config.name);
+      this.logger?.info('Unlocking behavior definition:', this.config.name);
       const result = await unlock(
         this.connection,
         this.config.name,
@@ -286,7 +283,7 @@ export class BehaviorDefinitionBuilder {
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.logger.info?.('Behavior definition unlocked successfully');
+      this.logger?.info('Behavior definition unlocked successfully');
       
       // Enable stateless session mode
       this.connection.setSessionType("stateless");
@@ -298,21 +295,21 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async activate(preauditRequested: boolean = false): Promise<this> {
     try {
-      this.logger.info?.('Activating behavior definition:', this.config.name);
+      this.logger?.info('Activating behavior definition:', this.config.name);
       const result = await activate(
         this.connection,
         this.config.name,
         preauditRequested
       );
       this.state.activateResult = result;
-      this.logger.info?.('Behavior definition activated successfully:', result.status);
+      this.logger?.info('Behavior definition activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -320,20 +317,20 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async checkDeletion(): Promise<this> {
     try {
-      this.logger.info?.('Checking deletion for behavior definition:', this.config.name);
+      this.logger?.info('Checking deletion for behavior definition:', this.config.name);
       const result = await checkDeletion(
         this.connection,
         this.config.name,
       );
       this.state.deleteCheckResult = result;
-      this.logger.info?.('Deletion check successful:', result.status);
+      this.logger?.info('Deletion check successful:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -341,21 +338,21 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Deletion check failed:', error);
+      this.logger?.error('Deletion check failed:', error);
       throw error;
     }
   }
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting behavior definition:', this.config.name);
+      this.logger?.info('Deleting behavior definition:', this.config.name);
       const result = await deleteBehaviorDefinition(
         this.connection,
         this.config.name,
         this.config.transportRequest
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Behavior definition deleted successfully:', result.status);
+      this.logger?.info('Behavior definition deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -363,17 +360,17 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
     try {
-      this.logger.info?.('Reading behavior definition metadata:', this.config.name);
+      this.logger?.info('Reading behavior definition metadata:', this.config.name);
       const result = await read(this.connection, this.config.name, version);
       this.state.readResult = result;
-      this.logger.info?.('Behavior definition read successfully:', result.status);
+      this.logger?.info('Behavior definition read successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -381,7 +378,7 @@ export class BehaviorDefinitionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -396,9 +393,9 @@ export class BehaviorDefinitionBuilder {
         this.config.name,
         this.lockHandle,
       );
-      this.logger.info?.('Force unlock successful for', this.config.name);
+      this.logger?.info('Force unlock successful for', this.config.name);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;

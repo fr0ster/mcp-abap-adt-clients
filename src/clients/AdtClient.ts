@@ -15,7 +15,7 @@
  */
 
 import { IAbapConnection, IAdtObject } from '@mcp-abap-adt/interfaces';
-import { ILogger, emptyLogger } from '../utils/logger';
+
 import { 
   IClassConfig,
   IClassState,
@@ -47,6 +47,7 @@ import { AdtRequest } from '../core/transport';
 import { AdtUnitTest, AdtCdsUnitTest, IUnitTestConfig, IUnitTestState, ICdsUnitTestConfig, ICdsUnitTestState } from '../core/unitTest';
 import { ITransportConfig, ITransportState } from '../core/transport/types';
 import { AdtUtils } from '../core/shared/AdtUtils';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 
 export class AdtClient {
   private connection: IAbapConnection;
@@ -57,7 +58,12 @@ export class AdtClient {
     logger?: ILogger
   ) {
     this.connection = connection;
-    this.logger = logger || emptyLogger;
+    this.logger = logger ?? {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    };
   }
 
   /**

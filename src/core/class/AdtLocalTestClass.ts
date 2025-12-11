@@ -7,7 +7,7 @@
 
 import { IAbapConnection, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { checkClassLocalTestClass } from './check';
 import { lockClassTestClasses, unlockClassTestClasses, updateClassTestInclude } from './testclasses';
 import { AdtClass } from './AdtClass';
@@ -23,7 +23,7 @@ export interface ILocalTestClassConfig {
 export class AdtLocalTestClass extends AdtClass {
   public readonly objectType: string = 'LocalTestClass';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     super(connection, logger);
   }
 
@@ -150,7 +150,7 @@ export class AdtLocalTestClass extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Create LocalTestClass', error);
+      this.logger?.error('Create LocalTestClass failed:', error);
       throw error;
     }
   }
@@ -177,7 +177,7 @@ export class AdtLocalTestClass extends AdtClass {
       if (error.response?.status === 404) {
         return undefined;
       }
-      logErrorSafely(this.logger, 'Read LocalTestClass', error);
+      this.logger?.error('Read LocalTestClass failed:', error);
       throw error;
     }
   }
@@ -282,7 +282,7 @@ export class AdtLocalTestClass extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Update LocalTestClass', error);
+      this.logger?.error('Update LocalTestClass failed:', error);
       throw error;
     }
   }

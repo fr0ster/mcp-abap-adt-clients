@@ -23,7 +23,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { IPackageConfig, IPackageState } from './types';
 import { validatePackageBasic } from './validation';
 import { createPackage } from './create';
@@ -37,10 +37,10 @@ import { getSystemInformation } from '../../utils/systemInfo';
 
 export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'Package';
 
-    constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+    constructor(connection: IAbapConnection, logger?: ILogger) {
       this.connection = connection;
       this.logger = logger;
     }
@@ -166,7 +166,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -217,7 +217,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('readMetadata', err);
       throw err;
     }
   }
@@ -240,7 +240,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('readTransport', err);
       throw err;
     }
   }
@@ -354,7 +354,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -386,7 +386,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
 
       return { deleteResult: result, errors: [] };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      this.logger?.error('Delete failed:', error);
       throw error;
     }
   }

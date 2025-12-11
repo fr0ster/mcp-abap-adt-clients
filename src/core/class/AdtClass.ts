@@ -19,7 +19,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions, AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { IClassConfig, IClassState } from './types';
 import { validateClassName } from './validation';
 import { create as createClass } from './create';
@@ -34,10 +34,10 @@ import { lockClassTestClasses, unlockClassTestClasses, updateClassTestInclude, a
 
 export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly connection: IAbapConnection;
-  protected readonly logger?: IAdtLogger;
+  protected readonly logger?: ILogger;
   public readonly objectType: string = 'Class';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -228,7 +228,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -304,7 +304,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('Read metadata failed:', err);
       throw err;
     }
   }
@@ -407,7 +407,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -765,7 +765,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         error: err,
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('Read transport failed:', err);
       throw err;
     }
   }

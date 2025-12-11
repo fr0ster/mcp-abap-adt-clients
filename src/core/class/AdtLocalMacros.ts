@@ -8,7 +8,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { checkClassMacros } from './check';
 import { updateClassMacros } from './includes';
 import { AdtClass } from './AdtClass';
@@ -23,7 +23,7 @@ export interface ILocalMacrosConfig {
 export class AdtLocalMacros extends AdtClass {
   public readonly objectType: string = 'LocalMacros';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     super(connection, logger);
   }
 
@@ -122,7 +122,7 @@ export class AdtLocalMacros extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Create LocalMacros', error);
+      this.logger?.error('Create LocalMacros failed:', error);
       throw error;
     }
   }
@@ -149,7 +149,7 @@ export class AdtLocalMacros extends AdtClass {
       if (error.response?.status === 404) {
         return undefined;
       }
-      logErrorSafely(this.logger, 'Read LocalMacros', error);
+      this.logger?.error('Read LocalMacros failed:', error);
       throw error;
     }
   }
@@ -220,7 +220,7 @@ export class AdtLocalMacros extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Update LocalMacros', error);
+      this.logger?.error('Update LocalMacros failed:', error);
       throw error;
     }
   }

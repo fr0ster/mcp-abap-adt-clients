@@ -33,7 +33,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { create } from './create';
 import { lockDomain, acquireLockHandle } from './lock';
 import { updateDomain } from './update';
@@ -50,40 +50,45 @@ import { XMLParser } from 'fast-xml-parser';
 
 export class DomainBuilder implements IBuilder<IDomainState> {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IDomainConfig;
   private lockHandle?: string;
   private state: IDomainState;
 
-  constructor(
-    connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IDomainConfig
-  ) {
-    this.connection = connection;
-    this.logger = logger;
-    this.config = { ...config };
-    this.state = {
-      errors: []
-    };
-  }
+    constructor(
+      connection: IAbapConnection,
+      config: IDomainConfig,
+      logger?: ILogger
+    ) {
+      this.connection = connection;
+      this.logger = logger ?? {
+        debug: () => {},
+        info: () => {},
+        warn: () => {},
+        error: () => {},
+      };
+      this.config = { ...config };
+      this.state = {
+        errors: []
+      };
+    }
 
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(domainName: string): this {
     this.config.domainName = domainName;
-    this.logger.debug?.('Domain name set:', domainName);
+    this.logger?.debug('Domain name set:', domainName);
     return this;
   }
 
@@ -135,7 +140,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
   // Operation methods that don't modify state - return result directly
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating domain name:', this.config.domainName);
+      this.logger?.info('Validating domain name:', this.config.domainName);
       const result = await validateDomainName(
         this.connection,
         this.config.domainName,
@@ -144,7 +149,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
-      this.logger.info?.('Domain name validation successful');
+      this.logger?.info('Domain name validation successful');
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -152,7 +157,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
@@ -162,7 +167,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating empty domain:', this.config.domainName);
+      this.logger?.info('Creating empty domain:', this.config.domainName);
 
       // Get masterSystem and responsible (only for cloud systems)
       const systemInfo = await getSystemInformation(this.connection);
@@ -195,7 +200,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         masterSystem
       );
       this.state.createResult = result;
-      this.logger.info?.('Empty domain created successfully:', result.status);
+      this.logger?.info('Empty domain created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -203,14 +208,14 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking domain:', this.config.domainName);
+      this.logger?.info('Locking domain:', this.config.domainName);
 
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
@@ -222,7 +227,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Domain locked, handle:', lockHandle);
+      this.logger?.info(`'Domain locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -230,7 +235,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -249,7 +254,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       const masterSystem = systemInfo?.systemID;
       const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
 
-      this.logger.info?.('Updating domain (UPDATE workflow):', this.config.domainName);
+      this.logger?.info('Updating domain (UPDATE workflow):', this.config.domainName);
       const updateParams: IUpdateDomainParams = {
         domain_name: this.config.domainName,
         package_name: this.config.packageName,
@@ -271,7 +276,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       const result = await updateDomain(this.connection, updateParams, this.lockHandle, username, masterSystem);
 
       this.state.updateResult = result;
-      this.logger.info?.('Domain updated successfully:', result.status);
+      this.logger?.info('Domain updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -279,14 +284,14 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking domain:', this.config.domainName, 'version:', version);
+      this.logger?.info(`'Checking domain:'  this.config.domainName  'version:' ${`version`}`);
 
       // Generate XML content to check (same as will be sent in PUT)
       let xmlContent: string | undefined;
@@ -352,7 +357,7 @@ ${fixValuesXml}
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Domain check successful:', result.status);
+      this.logger?.info('Domain check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -360,7 +365,7 @@ ${fixValuesXml}
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -370,7 +375,7 @@ ${fixValuesXml}
       if (!this.lockHandle) {
         throw new Error('Domain is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking domain:', this.config.domainName);
+      this.logger?.info('Unlocking domain:', this.config.domainName);
       const result = await unlockDomain(
         this.connection,
         this.config.domainName,
@@ -380,7 +385,7 @@ ${fixValuesXml}
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.connection.setSessionType("stateless");
-      this.logger.info?.('Domain unlocked successfully');
+      this.logger?.info('Domain unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -388,20 +393,20 @@ ${fixValuesXml}
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating domain:', this.config.domainName);
+      this.logger?.info('Activating domain:', this.config.domainName);
       const result = await activateDomain(
         this.connection,
         this.config.domainName
       );
       this.state.activateResult = result;
-      this.logger.info?.('Domain activated successfully:', result.status);
+      this.logger?.info('Domain activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -409,7 +414,7 @@ ${fixValuesXml}
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -417,7 +422,7 @@ ${fixValuesXml}
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting domain:', this.config.domainName);
+      this.logger?.info('Deleting domain:', this.config.domainName);
       const result = await deleteDomain(
         this.connection,
         {
@@ -426,7 +431,7 @@ ${fixValuesXml}
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Domain deleted successfully:', result.status);
+      this.logger?.info('Domain deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -434,18 +439,18 @@ ${fixValuesXml}
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(): Promise<IDomainConfig | undefined> {
     try {
-      this.logger.info?.('Reading domain:', this.config.domainName);
+      this.logger?.info('Reading domain:', this.config.domainName);
       const result = await getDomain(this.connection, this.config.domainName);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Domain read successfully:', result.status);
+      this.logger?.info('Domain read successfully:', result.status);
 
       // Parse and return config directly
       const xmlData = typeof result.data === 'string'
@@ -459,17 +464,17 @@ ${fixValuesXml}
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
 
   async readTransport(): Promise<this> {
     try {
-      this.logger.info?.('Reading transport request for domain:', this.config.domainName);
+      this.logger?.info('Reading transport request for domain:', this.config.domainName);
       const result = await getDomainTransport(this.connection, this.config.domainName);
       this.state.transportResult = result;
-      this.logger.info?.('Transport request read successfully:', result.status);
+      this.logger?.info('Transport request read successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -477,7 +482,7 @@ ${fixValuesXml}
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read transport failed:', error);
+      this.logger?.error('Read transport failed:', error);
       throw error; // Interrupts chain
     }
   }
@@ -492,9 +497,9 @@ ${fixValuesXml}
         this.config.domainName,
         this.lockHandle
       );
-      this.logger.info?.('Force unlock successful for', this.config.domainName);
+      this.logger?.info('Force unlock successful for', this.config.domainName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
@@ -611,7 +616,7 @@ ${fixValuesXml}
         fixed_values: fixedValues
       };
     } catch (error) {
-      this.logger.error?.('Failed to parse domain XML:', error);
+      this.logger?.error('Failed to parse domain XML:', error);
       return undefined;
     }
   }

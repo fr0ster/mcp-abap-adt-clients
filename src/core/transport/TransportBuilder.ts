@@ -27,24 +27,24 @@
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { ITransportConfig } from './types';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { createTransport } from './create';
 import { getTransport } from './read';
 import { ICreateTransportParams, ITransportState } from './types';
 
 export class TransportBuilder {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: ITransportConfig;
   private state: ITransportState;
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: ITransportConfig
+    config: ITransportConfig,
+    logger?: ILogger
   ) {
     this.connection = connection;
-    this.logger = logger;
+    this.logger = logger || (undefined as unknown as ILogger);
     this.config = { ...config };
     this.state = {
       errors: []
@@ -54,32 +54,32 @@ export class TransportBuilder {
   // Builder methods - return this for chaining
   setDescription(description: string): this {
     this.config.description = description;
-    this.logger.debug?.('Description set:', description);
+    this.logger?.debug('Description set:', description);
     return this;
   }
 
   setType(transportType: 'workbench' | 'customizing'): this {
     this.config.transportType = transportType;
-    this.logger.debug?.('Transport type set:', transportType);
+    this.logger?.debug('Transport type set:', transportType);
     return this;
   }
 
   setTargetSystem(targetSystem: string): this {
     this.config.targetSystem = targetSystem;
-    this.logger.debug?.('Target system set:', targetSystem);
+    this.logger?.debug('Target system set:', targetSystem);
     return this;
   }
 
   setOwner(owner: string): this {
     this.config.owner = owner;
-    this.logger.debug?.('Owner set:', owner);
+    this.logger?.debug('Owner set:', owner);
     return this;
   }
 
   // Operation methods - return Promise<this> for Promise chaining
   async create(): Promise<this> {
     try {
-      this.logger.info?.('Creating transport request:', this.config.description);
+      this.logger?.info('Creating transport request:', this.config.description);
       const params: ICreateTransportParams = {
         description: this.config.description,
         transport_type: this.config.transportType || 'workbench',
@@ -95,9 +95,9 @@ export class TransportBuilder {
         this.state.taskNumber = result.data.task_number;
       }
 
-      this.logger.info?.('Transport request created successfully:', result.status);
+      this.logger?.info('Transport request created successfully:', result.status);
       if (this.state.transportNumber) {
-        this.logger.info?.('Transport number:', this.state.transportNumber);
+        this.logger?.info('Transport number:', this.state.transportNumber);
       }
       return this;
     } catch (error: any) {
@@ -106,7 +106,7 @@ export class TransportBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -120,7 +120,7 @@ export class TransportBuilder {
         throw new Error('Transport number is required. Provide transportNumber parameter or create transport first.');
       }
 
-      this.logger.info?.('Reading transport request:', numberToRead);
+      this.logger?.info('Reading transport request:', numberToRead);
       const result = await getTransport(this.connection, numberToRead);
       this.state.readResult = result;
 
@@ -129,7 +129,7 @@ export class TransportBuilder {
         this.state.transportNumber = transportNumber;
       }
 
-      this.logger.info?.('Transport request read successfully:', result.status);
+      this.logger?.info('Transport request read successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -137,7 +137,7 @@ export class TransportBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }

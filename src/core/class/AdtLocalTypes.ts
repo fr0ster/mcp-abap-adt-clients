@@ -7,7 +7,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
 import { AdtClass } from './AdtClass';
@@ -22,7 +22,7 @@ export interface ILocalTypesConfig {
 export class AdtLocalTypes extends AdtClass {
   public readonly objectType: string = 'LocalTypes';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     super(connection, logger);
   }
 
@@ -121,7 +121,7 @@ export class AdtLocalTypes extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Create LocalTypes', error);
+      this.logger?.error('Create LocalTypes failed:', error);
       throw error;
     }
   }
@@ -148,7 +148,7 @@ export class AdtLocalTypes extends AdtClass {
       if (error.response?.status === 404) {
         return undefined;
       }
-      logErrorSafely(this.logger, 'Read LocalTypes', error);
+      this.logger?.error('Read LocalTypes failed:', error);
       throw error;
     }
   }
@@ -224,7 +224,7 @@ export class AdtLocalTypes extends AdtClass {
         }
       }
 
-      logErrorSafely(this.logger, 'Update LocalTypes', error);
+      this.logger?.error('Update LocalTypes failed:', error);
       throw error;
     }
   }

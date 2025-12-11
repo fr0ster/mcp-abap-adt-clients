@@ -6,7 +6,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { validateMetadataExtension } from './validation';
 import { createMetadataExtension } from './create';
 import { lockMetadataExtension } from './lock';
@@ -20,15 +20,15 @@ import { IMetadataExtensionConfig, IMetadataExtensionState } from './types';
 
 export class MetadataExtensionBuilder {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IMetadataExtensionConfig;
   private lockHandle?: string;
   private state: IMetadataExtensionState;
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IMetadataExtensionConfig
+    config: IMetadataExtensionConfig,
+    logger?: ILogger
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -41,31 +41,31 @@ export class MetadataExtensionBuilder {
   // Setters - return this for chaining
   setName(name: string): this {
     this.config.name = name;
-    this.logger.debug?.('Metadata extension name set:', name);
+    this.logger?.debug('Metadata extension name set:', name);
     return this;
   }
 
   setDescription(description: string): this {
     this.config.description = description;
-    this.logger.debug?.('Description set:', description);
+    this.logger?.debug('Description set:', description);
     return this;
   }
 
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setTransportRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setSourceCode(sourceCode: string): this {
     this.config.sourceCode = sourceCode;
-    this.logger.debug?.('Source code set, length:', sourceCode.length);
+    this.logger?.debug(`'Source code set  length:' ${`sourceCode.length`}`);
     return this;
   }
 
@@ -87,7 +87,7 @@ export class MetadataExtensionBuilder {
   // Operation methods - return Promise<this> for chaining
   async validate(): Promise<this> {
     try {
-      this.logger.info?.('Validating metadata extension parameters');
+      this.logger?.info('Validating metadata extension parameters');
       const response = await validateMetadataExtension(this.connection, {
         name: this.config.name,
         description: this.config.description || '',
@@ -96,7 +96,7 @@ export class MetadataExtensionBuilder {
       
       // Store raw response - consumer decides how to interpret it
       this.state.validationResponse = response;
-      this.logger.info?.('Validation successful');
+      this.logger?.info('Validation successful');
       return this;
     } catch (error: any) {
       // Store error response if available
@@ -109,14 +109,14 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error.message);
+      this.logger?.error('Validation failed:', error.message);
       throw error;
     }
   }
 
   async create(): Promise<this> {
     try {
-      this.logger.info?.('Creating metadata extension:', this.config.name);
+      this.logger?.info('Creating metadata extension:', this.config.name);
       
       if (!this.config.packageName) {
         throw new Error('Package name is required for creation');
@@ -136,7 +136,7 @@ export class MetadataExtensionBuilder {
       );
       
       this.state.createResult = result;
-      this.logger.info?.('Metadata extension created successfully');
+      this.logger?.info('Metadata extension created successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -144,14 +144,14 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Creation failed:', error.message);
+      this.logger?.error('Creation failed:', error.message);
       throw error;
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking metadata extension:', this.config.name);
+      this.logger?.info('Locking metadata extension:', this.config.name);
       
       // Enable stateful session mode
       this.connection.setSessionType("stateful");
@@ -161,7 +161,7 @@ export class MetadataExtensionBuilder {
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
-      this.logger.info?.('Metadata extension locked, handle:', lockHandle);
+      this.logger?.info(`'Metadata extension locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -169,20 +169,20 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error.message);
+      this.logger?.error('Lock failed:', error.message);
       throw error;
     }
   }
 
   async read(): Promise<this> {
     try {
-      this.logger.info?.('Reading metadata extension metadata:', this.config.name);
+      this.logger?.info('Reading metadata extension metadata:', this.config.name);
       const result = await readMetadataExtension(
         this.connection,
         this.config.name
       );
       this.state.readResult = result;
-      this.logger.info?.('Metadata extension metadata read successfully');
+      this.logger?.info('Metadata extension metadata read successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -190,21 +190,21 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error.message);
+      this.logger?.error('Read failed:', error.message);
       throw error;
     }
   }
 
   async readSource(version: 'active' | 'inactive' = 'active'): Promise<this> {
     try {
-      this.logger.info?.('Reading metadata extension source code:', this.config.name, 'version:', version);
+      this.logger?.info(`'Reading metadata extension source code:'  this.config.name  'version:' ${`version`}`);
       const result = await readMetadataExtensionSource(
         this.connection,
         this.config.name,
         version
       );
       this.state.sourceCode = result.data;
-      this.logger.info?.('Source code read successfully, length:', result.data.length);
+      this.logger?.info(`'Source code read successfully  length:' ${`result.data.length`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -212,7 +212,7 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read source failed:', error.message);
+      this.logger?.error('Read source failed:', error.message);
       throw error;
     }
   }
@@ -227,7 +227,7 @@ export class MetadataExtensionBuilder {
         throw new Error('Source code is required for update. Call setSourceCode() first.');
       }
 
-      this.logger.info?.('Updating metadata extension source code:', this.config.name);
+      this.logger?.info('Updating metadata extension source code:', this.config.name);
       const result = await updateMetadataExtension(
         this.connection,
         this.config.name,
@@ -236,7 +236,7 @@ export class MetadataExtensionBuilder {
       );
       
       this.state.updateResult = result;
-      this.logger.info?.('Metadata extension updated successfully');
+      this.logger?.info('Metadata extension updated successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -244,14 +244,14 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error.message);
+      this.logger?.error('Update failed:', error.message);
       throw error;
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
     try {
-      this.logger.info?.('Checking metadata extension:', this.config.name, 'version:', version);
+      this.logger?.info(`'Checking metadata extension:'  this.config.name  'version:' ${`version`}`);
       const result = await checkMetadataExtension(
         this.connection,
         this.config.name,
@@ -259,7 +259,7 @@ export class MetadataExtensionBuilder {
         sourceCode || this.config.sourceCode
       );
       this.state.checkResult = result;
-      this.logger.info?.('Check completed');
+      this.logger?.info('Check completed');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -267,7 +267,7 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error.message);
+      this.logger?.error('Check failed:', error.message);
       throw error;
     }
   }
@@ -278,7 +278,7 @@ export class MetadataExtensionBuilder {
         throw new Error('Lock handle is required for unlock. Call lock() first.');
       }
 
-      this.logger.info?.('Unlocking metadata extension:', this.config.name);
+      this.logger?.info('Unlocking metadata extension:', this.config.name);
       const result = await unlockMetadataExtension(
         this.connection,
         this.config.name,
@@ -288,7 +288,7 @@ export class MetadataExtensionBuilder {
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.logger.info?.('Metadata extension unlocked');
+      this.logger?.info('Metadata extension unlocked');
       
       // Enable stateless session mode
       this.connection.setSessionType("stateless");
@@ -299,20 +299,20 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error.message);
+      this.logger?.error('Unlock failed:', error.message);
       throw error;
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating metadata extension:', this.config.name);
+      this.logger?.info('Activating metadata extension:', this.config.name);
       const result = await activateMetadataExtension(
         this.connection,
         this.config.name
       );
       this.state.activateResult = result;
-      this.logger.info?.('Metadata extension activated successfully');
+      this.logger?.info('Metadata extension activated successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -320,21 +320,21 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activation failed:', error.message);
+      this.logger?.error('Activation failed:', error.message);
       throw error;
     }
   }
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting metadata extension:', this.config.name);
+      this.logger?.info('Deleting metadata extension:', this.config.name);
       const result = await deleteMetadataExtension(
         this.connection,
         this.config.name,
         this.config.transportRequest
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Metadata extension deleted successfully');
+      this.logger?.info('Metadata extension deleted successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -342,7 +342,7 @@ export class MetadataExtensionBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error.message);
+      this.logger?.error('Delete failed:', error.message);
       throw error;
     }
   }

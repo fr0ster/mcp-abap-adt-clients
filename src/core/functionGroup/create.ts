@@ -100,8 +100,8 @@ export async function create(
   // Log request details for debugging authorization issues (same as class/create.ts)
   logger.debug(`[DEBUG] Creating FunctionGroup - URL: ${url}`);
   logger.debug(`[DEBUG] Creating FunctionGroup - Method: POST`);
-  logger.debug(`[DEBUG] Creating FunctionGroup - Headers:`, JSON.stringify(headers, null, 2));
-  logger.debug(`[DEBUG] Creating FunctionGroup - Body (first 500 chars):`, xmlPayload.substring(0, 500));
+  logger.debug(`[DEBUG] Creating FunctionGroup - Headers: ${JSON.stringify(headers, null, 2)}`);
+  logger.debug(`[DEBUG] Creating FunctionGroup - Body (first 500 chars): ${xmlPayload.substring(0, 500)}`);
 
   try {
     const response = await connection.makeAdtRequest({
@@ -137,7 +137,7 @@ export async function create(
     if (error.response) {
       logger.error(`[ERROR] Create FunctionGroup failed - Status: ${error.response.status}`);
       logger.error(`[ERROR] Create FunctionGroup failed - StatusText: ${error.response.statusText}`);
-      logger.error(`[ERROR] Create FunctionGroup failed - Response headers:`, JSON.stringify(error.response.headers, null, 2));
+      logger.error(`[ERROR] Create FunctionGroup failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`);
       logger.error(`[ERROR] Create FunctionGroup failed - Response data (first 1000 chars):`,
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)

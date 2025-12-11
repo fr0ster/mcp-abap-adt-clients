@@ -20,7 +20,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { IBehaviorDefinitionConfig, IBehaviorDefinitionState } from './types';
 import { validate } from './validation';
 import { create as createBehaviorDefinition } from './create';
@@ -34,10 +34,10 @@ import { readSource, read as readBehaviorDefinition, getBehaviorDefinitionTransp
 
 export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'BehaviorDefinition';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -84,7 +84,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'validate', err);
+      this.logger?.error('Validate failed:', err);
       throw err;
     }
   }
@@ -243,7 +243,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
         }
       }
 
-      logErrorSafely(this.logger, 'Create', err);
+      this.logger?.error('Create failed:', err);
       throw err;
     }
   }
@@ -272,7 +272,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
       }
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'read', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'read', err);
+      this.logger?.error('Read failed:', err);
       throw err;
     }
   }
@@ -296,7 +296,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('Read metadata failed:', err);
       throw err;
     }
   }
@@ -319,7 +319,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('Read transport failed:', err);
       throw err;
     }
   }
@@ -433,7 +433,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -465,7 +465,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'Delete', err);
+      this.logger?.error('Delete failed:', err);
       throw err;
     }
   }
@@ -489,7 +489,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'Activate', err);
+      this.logger?.error('Activate failed:', err);
       throw err;
     }
   }
@@ -517,7 +517,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'check', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'check', err);
+      this.logger?.error('Check failed:', err);
       throw err;
     }
   }

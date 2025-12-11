@@ -88,8 +88,8 @@ export async function create(
   // Log request details for debugging authorization issues
   logger.debug(`[DEBUG] Creating class - URL: ${url}`);
   logger.debug(`[DEBUG] Creating class - Method: POST`);
-  logger.debug(`[DEBUG] Creating class - Headers:`, JSON.stringify(headers, null, 2));
-  logger.debug(`[DEBUG] Creating class - Body (first 500 chars):`, metadataXml.substring(0, 500));
+  logger.debug(`[DEBUG] Creating class - Headers: ${JSON.stringify(headers, null, 2)}`);
+  logger.debug(`[DEBUG] Creating class - Body (first 500 chars): ${metadataXml.substring(0, 500)}`);
 
   try {
     const response = await connection.makeAdtRequest({
@@ -105,7 +105,7 @@ export async function create(
     if (error.response) {
       logger.error(`[ERROR] Create class failed - Status: ${error.response.status}`);
       logger.error(`[ERROR] Create class failed - StatusText: ${error.response.statusText}`);
-      logger.error(`[ERROR] Create class failed - Response headers:`, JSON.stringify(error.response.headers, null, 2));
+      logger.error(`[ERROR] Create class failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`);
       logger.error(`[ERROR] Create class failed - Response data (first 1000 chars):`,
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)

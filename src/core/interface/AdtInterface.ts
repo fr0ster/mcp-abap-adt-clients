@@ -20,7 +20,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { validateInterfaceName } from './validation';
 import { create as createInterface } from './create';
 import { upload } from './update';
@@ -34,10 +34,10 @@ import { IInterfaceConfig, IInterfaceState } from './types';
 
 export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'Interface';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -208,7 +208,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -234,7 +234,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       if (error.response?.status === 404) {
         return undefined;
       }
-      logErrorSafely(this.logger, 'Read', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -257,7 +257,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('readMetadata', err);
       throw err;
     }
   }
@@ -370,7 +370,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -409,7 +409,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
 
       return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      this.logger?.error('Delete failed:', error);
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
@@ -434,7 +434,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       state.activateResult = activateResponse;
       return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }
@@ -491,7 +491,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         error: err,
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('readTransport', err);
       throw err;
     }
   }

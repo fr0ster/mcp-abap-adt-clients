@@ -11,11 +11,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from '../../../core/unitTest/types';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from '../../../core/unitTest/types';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { IAdtLogger } from '../../../utils/logger';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -55,10 +54,10 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code (ClassBuilder) uses DEBUG_ADT_LIBS
-const builderLogger: IAdtLogger = createBuilderLogger();
+const builderLogger: ILogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
-const testsLogger: IAdtLogger = createTestsLogger();
+const testsLogger: ILogger = createTestsLogger();
 
 describe('ClassBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
@@ -519,11 +518,6 @@ describe('ClassBuilder (using AdtClient)', () => {
             }
           } else if (!shouldCleanup && classCreated) {
             testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - class left for analysis:`, testClassName);
-          }
-            } catch (cleanupError) {
-              // Log cleanup error but don't fail test - original error is more important
-              testsLogger.warn?.(`Cleanup failed for ${testClassName}:`, cleanupError);
-            }
           }
 
           const statusText = getHttpStatusText(error);

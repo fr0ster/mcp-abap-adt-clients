@@ -63,6 +63,7 @@
   },
   "dependencies": {
     "@mcp-abap-adt/interfaces": "^0.1.13",
+    "@mcp-abap-adt/logger": "^0.1.0",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",
     "yaml": "^2.3.4"

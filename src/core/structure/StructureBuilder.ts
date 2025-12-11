@@ -31,7 +31,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { create } from './create';
 import { lockStructure } from './lock';
 import { upload } from './update';
@@ -46,19 +46,19 @@ import { IBuilder } from '../shared/IBuilder';
 
 export class StructureBuilder implements IBuilder<IStructureState> {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IStructureConfig;
   private lockHandle?: string;
   private state: IStructureState;
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IStructureConfig
+    config: IStructureConfig,
+    logger?: ILogger,
   ) {
     this.connection = connection;
-    this.logger = logger;
     this.config = { ...config };
+    this.logger = logger || (undefined as unknown as ILogger);
     this.state = {
       errors: []
     };
@@ -67,19 +67,19 @@ export class StructureBuilder implements IBuilder<IStructureState> {
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(structureName: string): this {
     this.config.structureName = structureName;
-    this.logger.debug?.('Structure name set:', structureName);
+    this.logger?.debug('Structure name set:', structureName);
     return this;
   }
 
@@ -90,19 +90,19 @@ export class StructureBuilder implements IBuilder<IStructureState> {
 
   setDdlCode(ddlCode: string): this {
     this.config.ddlCode = ddlCode;
-    this.logger.debug?.('DDL code set');
+    this.logger?.debug('DDL code set');
     return this;
   }
 
   setFields(fields: IStructureField[]): this {
     this.config.fields = fields;
-    this.logger.debug?.('Fields set:', fields.length);
+    this.logger?.debug('Fields set:', fields.length);
     return this;
   }
 
   setIncludes(includes: IStructureInclude[]): this {
     this.config.includes = includes;
-    this.logger.debug?.('Includes set:', includes.length);
+    this.logger?.debug('Includes set:', includes.length);
     return this;
   }
 
@@ -125,7 +125,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating structure name:', this.config.structureName);
+      this.logger?.info('Validating structure name:', this.config.structureName);
       const response = await validateStructureName(
         this.connection,
         this.config.structureName,
@@ -134,13 +134,13 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       
       // Store raw response for backward compatibility
       this.state.validationResponse = response;
-      this.logger.info?.('Structure name validation successful');
+      this.logger?.info('Structure name validation successful');
       return response;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger.info?.('Structure validation returned 400 - object may already exist');
+        this.logger?.info('Structure validation returned 400 - object may already exist');
         return error.response;
       }
       // Store error response if available
@@ -152,7 +152,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
@@ -162,7 +162,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating structure metadata:', this.config.structureName);
+      this.logger?.info('Creating structure metadata:', this.config.structureName);
       
       // Call low-level create function (metadata only)
       const params: ICreateStructureParams = {
@@ -173,7 +173,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       };
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger.info?.('Structure metadata created successfully:', result.status);
+      this.logger?.info('Structure metadata created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -181,14 +181,14 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking structure:', this.config.structureName);
+      this.logger?.info('Locking structure:', this.config.structureName);
       
       // Enable stateful mode for lock operation
       this.connection.setSessionType('stateful');
@@ -205,7 +205,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Structure locked, handle:', lockHandle);
+      this.logger?.info(`Structure locked, handle: ${lockHandle}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -213,7 +213,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error;
     }
   }
@@ -227,7 +227,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       if (!code) {
         throw new Error('DDL code is required. Use setDdlCode() or pass as parameter.');
       }
-      this.logger.info?.('Updating structure DDL:', this.config.structureName);
+      this.logger?.info('Updating structure DDL:', this.config.structureName);
       
       const params: IUpdateStructureParams = {
         structureName: this.config.structureName,
@@ -236,7 +236,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       };
       const result = await upload(this.connection, params, this.lockHandle);
       this.state.updateResult = result;
-      this.logger.info?.('Structure updated successfully:', result.status);
+      this.logger?.info('Structure updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -244,7 +244,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -252,7 +252,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
       const codeToCheck = sourceCode || this.config.ddlCode;
-      this.logger.info?.('Checking structure:', this.config.structureName, 'version:', version, codeToCheck ? 'with source code' : 'saved version');
+      this.logger?.info(`Checking structure: ${this.config.structureName}, version: ${version}, ${codeToCheck ? 'with source code' : 'saved version'}`);
       const result = await checkStructure(
         this.connection,
         this.config.structureName,
@@ -261,7 +261,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Structure check successful:', result.status);
+      this.logger?.info('Structure check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -269,7 +269,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -279,7 +279,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       if (!this.lockHandle) {
         throw new Error('Structure is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking structure:', this.config.structureName);
+      this.logger?.info('Unlocking structure:', this.config.structureName);
       const result = await unlockStructure(
         this.connection,
         this.config.structureName,
@@ -292,7 +292,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
       // Disable stateful mode after unlock
       this.connection.setSessionType('stateless');
       
-      this.logger.info?.('Structure unlocked successfully');
+      this.logger?.info('Structure unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -300,20 +300,20 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error;
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating structure:', this.config.structureName);
+      this.logger?.info('Activating structure:', this.config.structureName);
       const result = await activateStructure(
         this.connection,
         this.config.structureName
       );
       this.state.activateResult = result;
-      this.logger.info?.('Structure activated successfully:', result.status);
+      this.logger?.info('Structure activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -321,7 +321,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }
@@ -329,7 +329,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting structure:', this.config.structureName);
+      this.logger?.info('Deleting structure:', this.config.structureName);
       const result = await deleteStructure(
         this.connection,
         {
@@ -338,7 +338,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Structure deleted successfully:', result.status);
+      this.logger?.info('Structure deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -346,18 +346,18 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(version: 'active' | 'inactive' = 'active'): Promise<IStructureConfig | undefined> {
     try {
-      this.logger.info?.('Reading structure:', this.config.structureName);
+      this.logger?.info('Reading structure:', this.config.structureName);
       const result = await getStructureSource(this.connection, this.config.structureName);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Structure read successfully:', result.status);
+      this.logger?.info('Structure read successfully:', result.status);
       
       // Parse and return config directly
       const ddlCode = typeof result.data === 'string'
@@ -374,7 +374,7 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -389,9 +389,9 @@ export class StructureBuilder implements IBuilder<IStructureState> {
         this.config.structureName,
         this.lockHandle,
       );
-      this.logger.info?.('Force unlock successful for', this.config.structureName);
+      this.logger?.info('Force unlock successful for', this.config.structureName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;

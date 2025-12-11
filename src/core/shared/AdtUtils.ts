@@ -29,7 +29,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { ILogger } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 
 // Import utility functions

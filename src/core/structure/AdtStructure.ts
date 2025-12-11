@@ -20,7 +20,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { IStructureConfig, IStructureState } from './types';
 import { validateStructureName } from './validation';
 import { create as createStructure } from './create';
@@ -34,10 +34,10 @@ import { getStructureSource, getStructureMetadata, getStructureTransport } from 
 
 export class AdtStructure implements IAdtObject<IStructureConfig, IStructureState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'Structure';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -61,7 +61,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
     return state;
   } catch (error: any) {
     state.errors.push({ method: 'validate', error: error instanceof Error ? error : new Error(String(error)), timestamp: new Date() });
-    logErrorSafely(this.logger, 'validate', error);
+    this.logger?.error('validate failed:', error);
     throw error;
   }
   }
@@ -204,7 +204,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -252,7 +252,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('readMetadata', err);
       throw err;
     }
   }
@@ -275,7 +275,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('readTransport', err);
       throw err;
     }
   }
@@ -387,7 +387,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -422,7 +422,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         errors: []
       };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      this.logger?.error('Delete failed:', error);
       throw error;
     }
   }
@@ -443,7 +443,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         errors: []
       };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }

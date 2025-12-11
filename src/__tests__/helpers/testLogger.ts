@@ -65,6 +65,10 @@
  * - Works with LOG_LEVEL=warn to show skip reasons without debug spam
  */
 
+
+import { testLogger } from '@mcp-abap-adt/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
+
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
 /**
@@ -216,56 +220,101 @@ export function getCurrentLogLevel(): LogLevel {
 /**
  * Create a connection logger for @mcp-abap-adt/connection package
  * Uses DEBUG_CONNECTORS flag
+ * Returns ILogger compatible logger from @mcp-abap-adt/logger
+ * Note: ILogger from @mcp-abap-adt/interfaces doesn't have csrfToken, but connection package extends it
  */
-export function createConnectionLogger() {
+export function createConnectionLogger(): ILogger {
   const enabled = isDebugEnabled('connectors');
-  return {
-    debug: enabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-    info: enabled ? (message: string, meta?: any) => console.log(message, meta) : () => {},
-    warn: enabled ? (message: string, meta?: any) => console.warn(message, meta) : () => {},
-    error: enabled ? (message: string, meta?: any) => console.error(message, meta) : () => {},
-    csrfToken: enabled ? (action: string, token?: string) => console.log(`CSRF ${action}:`, token) : () => {},
-  };
+  if (!enabled) {
+    // Return empty logger if debug is disabled
+    return emptyLogger;
+  }
+  // Use testLogger from @mcp-abap-adt/logger when debug is enabled
+  // Note: connection package may need csrfToken, but ILogger doesn't have it
+  // This is a compatibility layer - connection package will handle csrfToken separately if needed
+  return testLogger;
 }
 
 /**
  * Create a builder logger for Builder library code
  * Uses DEBUG_ADT_LIBS flag
+ * Returns ILogger compatible logger from @mcp-abap-adt/logger
+ * Logger respects AUTH_LOG_LEVEL environment variable for log level control
  */
-export function createBuilderLogger() {
+export function createBuilderLogger(): ILogger {
   const enabled = isDebugEnabled('libs');
-  return {
-    debug: enabled ? console.log : () => {},
-    info: enabled ? console.log : () => {},
-    warn: enabled ? console.warn : () => {},
-    error: enabled ? console.error : () => {},
-  };
+  if (!enabled) {
+    // Return empty logger if debug is disabled
+    return emptyLogger;
+  }
+  // Use testLogger from @mcp-abap-adt/logger when debug is enabled
+  // Logger will respect AUTH_LOG_LEVEL (error, warn, info, debug) from environment
+  return testLogger;
 }
 
 /**
  * Create a test logger for Builder integration tests
  * Uses DEBUG_ADT_TESTS flag
+ * Returns ILogger compatible logger from @mcp-abap-adt/logger
+ * Logger respects AUTH_LOG_LEVEL environment variable for log level control
  */
-export function createTestsLogger() {
+export function createTestsLogger(): ILogger {
   const enabled = isDebugEnabled('tests');
-  return {
-    debug: enabled ? console.log : () => {},
-    info: enabled ? console.log : () => {},
-    warn: enabled ? console.warn : () => {},
-    error: enabled ? console.error : () => {},
-  };
+  if (!enabled) {
+    // Return empty logger if debug is disabled
+    return emptyLogger;
+  }
+  // Use testLogger from @mcp-abap-adt/logger when debug is enabled
+  // Logger will respect AUTH_LOG_LEVEL (error, warn, info, debug) from environment
+  return testLogger;
 }
 
 /**
  * Create a test logger for E2E integration tests
  * Uses DEBUG_ADT_E2E_TESTS flag
+ * Returns ILogger compatible logger from @mcp-abap-adt/logger
+ * Logger respects AUTH_LOG_LEVEL environment variable for log level control
  */
-export function createE2ETestsLogger() {
+export function createE2ETestsLogger(): ILogger {
   const enabled = isDebugEnabled('e2e');
-  return {
-    debug: enabled ? console.log : () => {},
-    info: enabled ? console.log : () => {},
-    warn: enabled ? console.warn : () => {},
-    error: enabled ? console.error : () => {},
-  };
+  if (!enabled) {
+    // Return empty logger if debug is disabled
+    return emptyLogger;
+  }
+  // Use testLogger from @mcp-abap-adt/logger when debug is enabled
+  // Logger will respect AUTH_LOG_LEVEL (error, warn, info, debug) from environment
+  return testLogger;
+}
+
+
+/**
+ * Empty logger that does nothing (for production use or when logging is disabled)
+ * Implements ILogger interface with all required methods
+ */
+export const emptyLogger: ILogger = {
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+};
+
+/**
+ * Safely log error without exposing credentials from AxiosError.config/request
+ * Only logs status, statusText, and response data (limited to 500 chars)
+ */
+export function logErrorSafely(
+  logger: ILogger | undefined,
+  operation: string,
+  error: any
+): void {
+  if (error?.response) {
+    const status = error.response.status;
+    const statusText = error.response.statusText;
+    const data = typeof error.response.data === 'string' 
+      ? error.response.data.substring(0, 500)
+      : JSON.stringify(error.response.data).substring(0, 500);
+    logger?.error(`${operation} failed: HTTP ${status} ${statusText}`, { status, statusText, data });
+  } else {
+    logger?.error(`${operation} failed:`, error instanceof Error ? error.message : String(error));
+  }
 }

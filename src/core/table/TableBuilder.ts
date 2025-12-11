@@ -31,7 +31,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { createTable } from './create';
 import { acquireTableLockHandle } from './lock';
 import { updateTable } from './update';
@@ -46,59 +46,58 @@ import { IBuilder } from '../shared/IBuilder';
 
 export class TableBuilder implements IBuilder<ITableState> {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: ITableConfig;
   private lockHandle?: string;
-  private state: ITableState;
+  private state: ITableState = {
+    errors: []
+  };
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: ITableConfig
+    config: ITableConfig,
+    logger?: ILogger,
   ) {
     this.connection = connection;
-    this.logger = logger;
     this.config = { ...config };
-    this.state = {
-      errors: []
-    };
+    this.logger = logger || (undefined as unknown as ILogger);
   }
 
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(tableName: string): this {
     this.config.tableName = tableName;
-    this.logger.debug?.('Table name set:', tableName);
+    this.logger?.debug('Table name set:', tableName);
     return this;
   }
 
   setDdlCode(ddlCode: string): this {
     this.config.ddlCode = ddlCode;
-    this.logger.debug?.('DDL code set, length:', ddlCode.length);
+    this.logger?.debug(`'DDL code set  length:' ${`ddlCode.length`}`);
     return this;
   }
 
   setDescription(description: string): this {
     this.config.description = description;
-    this.logger.debug?.('Description set:', description);
+    this.logger?.debug('Description set:', description);
     return this;
   }
 
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating table name:', this.config.tableName);
+      this.logger?.info('Validating table name:', this.config.tableName);
       const response = await validateTableName(
         this.connection,
         this.config.tableName,
@@ -107,13 +106,13 @@ export class TableBuilder implements IBuilder<ITableState> {
       
       // Store raw response for backward compatibility
       this.state.validationResponse = response;
-      this.logger.info?.('Table name validation successful');
+      this.logger?.info('Table name validation successful');
       return response;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger.info?.('Table validation returned 400 - object may already exist');
+        this.logger?.info('Table validation returned 400 - object may already exist');
         return error.response;
       }
       // Store error response if available
@@ -126,7 +125,7 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
@@ -136,7 +135,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating table:', this.config.tableName);
+      this.logger?.info('Creating table:', this.config.tableName);
       this.connection.setSessionType("stateful");
       const params: ICreateTableParams = {
         table_name: this.config.tableName,
@@ -146,7 +145,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       };
       const result = await createTable(this.connection, params);
       this.state.createResult = result;
-      this.logger.info?.('Table created successfully:', result.status);
+      this.logger?.info('Table created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -154,14 +153,14 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking table:', this.config.tableName);
+      this.logger?.info('Locking table:', this.config.tableName);
       this.connection.setSessionType("stateful");
       const lockHandle = await acquireTableLockHandle(
         this.connection,
@@ -170,7 +169,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
-      this.logger.info?.('Table locked, handle:', lockHandle);
+      this.logger?.info(`'Table locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -178,7 +177,7 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error;
     }
   }
@@ -191,7 +190,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       if (!this.config.ddlCode) {
         throw new Error('DDL code is required');
       }
-      this.logger.info?.('Updating table:', this.config.tableName);
+      this.logger?.info('Updating table:', this.config.tableName);
       const params: IUpdateTableParams = {
         table_name: this.config.tableName,
         ddl_code: this.config.ddlCode,
@@ -204,7 +203,7 @@ export class TableBuilder implements IBuilder<ITableState> {
         this.lockHandle
       );
       this.state.updateResult = result;
-      this.logger.info?.('Table updated successfully:', result.status);
+      this.logger?.info('Table updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -212,14 +211,14 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update failed:', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
 
   async check(reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun', sourceCode?: string, version: 'active' | 'inactive' | 'new' = 'new'): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking table:', this.config.tableName, 'reporter:', reporter, sourceCode ? 'with source code' : 'saved version');
+      this.logger?.info(`'Checking table:'  this.config.tableName  'reporter:' ${`reporter, sourceCode ? 'with source code' : 'saved version'`}`);
       const codeToCheck = sourceCode || this.config.ddlCode;
       const result = await runTableCheckRun(
         this.connection,
@@ -230,7 +229,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Table check successful:', result.status);
+      this.logger?.info('Table check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -238,7 +237,7 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -248,7 +247,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       if (!this.lockHandle) {
         throw new Error('Table is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking table:', this.config.tableName);
+      this.logger?.info('Unlocking table:', this.config.tableName);
       const result = await unlockTable(
         this.connection,
         this.config.tableName,
@@ -258,7 +257,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.connection.setSessionType("stateless");
-      this.logger.info?.('Table unlocked successfully');
+      this.logger?.info('Table unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -266,20 +265,20 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error;
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating table:', this.config.tableName);
+      this.logger?.info('Activating table:', this.config.tableName);
       const result = await activateTable(
         this.connection,
         this.config.tableName
       );
       this.state.activateResult = result;
-      this.logger.info?.('Table activated successfully:', result.status);
+      this.logger?.info('Table activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -287,7 +286,7 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }
@@ -295,7 +294,7 @@ export class TableBuilder implements IBuilder<ITableState> {
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting table:', this.config.tableName);
+      this.logger?.info('Deleting table:', this.config.tableName);
       const result = await deleteTable(
         this.connection,
         {
@@ -304,7 +303,7 @@ export class TableBuilder implements IBuilder<ITableState> {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Table deleted successfully:', result.status);
+      this.logger?.info('Table deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -312,18 +311,18 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(version: 'active' | 'inactive' = 'active'): Promise<ITableConfig | undefined> {
     try {
-      this.logger.info?.('Reading table:', this.config.tableName);
+      this.logger?.info('Reading table:', this.config.tableName);
       const result = await getTableSource(this.connection, this.config.tableName);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Table read successfully:', result.status);
+      this.logger?.info('Table read successfully:', result.status);
       
       // Parse and return config directly
       const ddlCode = typeof result.data === 'string'
@@ -340,7 +339,7 @@ export class TableBuilder implements IBuilder<ITableState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -348,7 +347,7 @@ export class TableBuilder implements IBuilder<ITableState> {
   async forceUnlock(): Promise<void> {
     // Try to unlock if we have a lockHandle
     if (!this.lockHandle) {
-      this.logger.warn?.('No lockHandle available for force unlock:', this.config.tableName);
+      this.logger?.warn('No lockHandle available for force unlock:', this.config.tableName);
       this.connection.setSessionType("stateless");
       return;
     }
@@ -359,9 +358,9 @@ export class TableBuilder implements IBuilder<ITableState> {
         this.config.tableName,
         this.lockHandle
       );
-      this.logger.info?.('Force unlock successful for', this.config.tableName);
+      this.logger?.info('Force unlock successful for', this.config.tableName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;

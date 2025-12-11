@@ -11,7 +11,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import { ILogger } from '@mcp-abap-adt/interfaces';
 import { validateFunctionGroupName } from './validation';
 import { create } from './create';
 import { ICreateFunctionGroupParams, IFunctionGroupConfig, IFunctionGroupState } from './types';
@@ -26,18 +26,23 @@ import { XMLParser } from 'fast-xml-parser';
 
 export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
   private connection: IAbapConnection;
-  private logger: IAdtLogger;
+  private logger?: ILogger;
   private config: IFunctionGroupConfig;
   private lockHandle?: string;
   private state: IFunctionGroupState;
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IFunctionGroupConfig
+    config: IFunctionGroupConfig,
+    logger?: ILogger,
   ) {
     this.connection = connection;
-    this.logger = logger;
+    this.logger = logger ?? {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    };
     this.config = { ...config };
     this.state = {
       errors: []
@@ -47,19 +52,19 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
     this.config.packageName = packageName;
-    this.logger.debug?.('Package set:', packageName);
+    this.logger?.debug('Package set:', packageName);
     return this;
   }
 
   setRequest(transportRequest: string): this {
     this.config.transportRequest = transportRequest;
-    this.logger.debug?.('Transport request set:', transportRequest);
+    this.logger?.debug('Transport request set:', transportRequest);
     return this;
   }
 
   setName(functionGroupName: string): this {
     this.config.functionGroupName = functionGroupName;
-    this.logger.debug?.('Function group name set:', functionGroupName);
+    this.logger?.debug('Function group name set:', functionGroupName);
     return this;
   }
 
@@ -71,7 +76,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Validating function group:', this.config.functionGroupName);
+      this.logger?.info('Validating function group:', this.config.functionGroupName);
       const result = await validateFunctionGroupName(
         this.connection,
         this.config.functionGroupName,
@@ -80,13 +85,13 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
-      this.logger.info?.('Validation successful');
+      this.logger?.info('Validation successful');
       return result;
     } catch (error: any) {
       // For validation, HTTP 400 might indicate object exists or validation error - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger.info?.('Function group validation returned 400 - object may already exist or validation error');
+        this.logger?.info('Function group validation returned 400 - object may already exist or validation error');
         return error.response;
       }
       // Store error response if available
@@ -99,7 +104,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Validation failed:', error);
+      this.logger?.error('Validation failed:', error);
       throw error;
     }
   }
@@ -109,7 +114,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger.info?.('Creating function group:', this.config.functionGroupName);
+      this.logger?.info('Creating function group:', this.config.functionGroupName);
       
       // Call low-level create function
       const params: ICreateFunctionGroupParams = {
@@ -120,7 +125,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
       };
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger.info?.('Function group created successfully:', result.status);
+      this.logger?.info('Function group created successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -128,14 +133,14 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async lock(): Promise<this> {
     try {
-      this.logger.info?.('Locking function group:', this.config.functionGroupName);
+      this.logger?.info('Locking function group:', this.config.functionGroupName);
       const lockHandle = await lockFunctionGroup(
         this.connection,
         this.config.functionGroupName,
@@ -148,7 +153,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         this.config.onLock(lockHandle);
       }
 
-      this.logger.info?.('Function group locked, handle:', lockHandle);
+      this.logger?.info(`'Function group locked  handle:' ${`lockHandle`}`);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -156,14 +161,14 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Lock failed:', error);
+      this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
     try {
-      this.logger.info?.('Checking function group:', this.config.functionGroupName, 'version:', version);
+      this.logger?.info(`'Checking function group:'  this.config.functionGroupName  'version:' ${`version`}`);
       const result = await checkFunctionGroup(
         this.connection,
         this.config.functionGroupName,
@@ -172,7 +177,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
-      this.logger.info?.('Function group check successful:', result.status);
+      this.logger?.info('Function group check successful:', result.status);
       return result;
     } catch (error: any) {
       this.state.errors.push({
@@ -180,7 +185,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Check failed:', error);
+      this.logger?.error('Check failed:', error);
       throw error;
     }
   }
@@ -188,7 +193,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
   async update(): Promise<this> {
     // Function groups don't have a direct update endpoint
     // Updates are done through function modules within the group
-    this.logger.warn?.('Update not supported for function groups. Use function module builders instead.');
+    this.logger?.warn('Update not supported for function groups. Use function module builders instead.');
     return this;
   }
 
@@ -197,7 +202,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
       if (!this.lockHandle) {
         throw new Error('Function group is not locked. Call lock() first.');
       }
-      this.logger.info?.('Unlocking function group:', this.config.functionGroupName);
+      this.logger?.info('Unlocking function group:', this.config.functionGroupName);
       const result = await unlockFunctionGroup(
         this.connection,
         this.config.functionGroupName,
@@ -206,7 +211,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.logger.info?.('Function group unlocked successfully:', result.status);
+      this.logger?.info('Function group unlocked successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -214,20 +219,20 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Unlock failed:', error);
+      this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async activate(): Promise<this> {
     try {
-      this.logger.info?.('Activating function group:', this.config.functionGroupName);
+      this.logger?.info('Activating function group:', this.config.functionGroupName);
       const result = await activateFunctionGroup(
         this.connection,
         this.config.functionGroupName
       );
       this.state.activateResult = result;
-      this.logger.info?.('Function group activated successfully:', result.status);
+      this.logger?.info('Function group activated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -235,14 +240,14 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Activate failed:', error);
+      this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async delete(): Promise<this> {
     try {
-      this.logger.info?.('Deleting function group:', this.config.functionGroupName);
+      this.logger?.info('Deleting function group:', this.config.functionGroupName);
       const result = await deleteFunctionGroup(
         this.connection,
         {
@@ -251,7 +256,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         }
       );
       this.state.deleteResult = result;
-      this.logger.info?.('Function group deleted successfully:', result.status);
+      this.logger?.info('Function group deleted successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -259,18 +264,18 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Delete failed:', error);
+      this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
     }
   }
 
   async read(): Promise<IFunctionGroupConfig | undefined> {
     try {
-      this.logger.info?.('Reading function group:', this.config.functionGroupName);
+      this.logger?.info('Reading function group:', this.config.functionGroupName);
       const result = await getFunctionGroup(this.connection, this.config.functionGroupName);
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger.info?.('Function group read successfully:', result.status);
+      this.logger?.info('Function group read successfully:', result.status);
       
       // Parse and return config directly
       const xmlData = typeof result.data === 'string'
@@ -284,7 +289,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Read failed:', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -299,9 +304,9 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         this.config.functionGroupName,
         this.lockHandle
       );
-      this.logger.info?.('Force unlock successful for', this.config.functionGroupName);
+      this.logger?.info('Force unlock successful for', this.config.functionGroupName);
     } catch (error: any) {
-      this.logger.warn?.('Force unlock failed:', error);
+      this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
@@ -375,7 +380,7 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
         description: functionGroup['adtcore:description'] || ''
       };
     } catch (error) {
-      this.logger.error?.('Failed to parse function group XML:', error);
+      this.logger?.error('Failed to parse function group XML:', error);
       return undefined;
     }
   }

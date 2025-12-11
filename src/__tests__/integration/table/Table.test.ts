@@ -14,7 +14,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { IAdtLogger } from '../../../utils/logger';
 import { getTable } from '../../../core/table/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
@@ -58,10 +57,10 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code uses DEBUG_ADT_LIBS
-const builderLogger: IAdtLogger = createBuilderLogger();
+const builderLogger: ILogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
-const testsLogger: IAdtLogger = createTestsLogger();
+const testsLogger: ILogger = createTestsLogger();
 
 describe('TableBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;

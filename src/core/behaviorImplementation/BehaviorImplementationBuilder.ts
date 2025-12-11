@@ -32,7 +32,7 @@
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { ClassBuilder } from '../class/ClassBuilder';
 import { IClassBuilderConfig } from '../class';
 import { updateClass } from '../class/update';
@@ -45,8 +45,8 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: IBehaviorImplementationConfig
+    config: IBehaviorImplementationConfig,
+    logger?: ILogger
   ) {
     // Convert BehaviorImplementationBuilderConfig to ClassBuilderConfig
     const classConfig: IClassBuilderConfig = {
@@ -61,7 +61,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
       responsible: config.responsible
     };
 
-    super(connection, logger, classConfig);
+    super(connection, classConfig, logger);
     this.behaviorDefinition = config.behaviorDefinition;
     this.implementationCode = config.implementationCode || config.sourceCode;
   }
@@ -71,7 +71,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
    */
   setImplementationCode(sourceCode: string): this {
     this.implementationCode = sourceCode;
-    this.logger.debug?.('Implementation code set, length:', sourceCode.length);
+    this.logger?.debug(`'Implementation code set  length:' ${`sourceCode.length`}`);
     return this;
   }
 
@@ -96,12 +96,12 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
         throw new Error('Behavior definition name is required');
       }
 
-      this.logger.info?.('Creating behavior implementation class:', this.config.className);
+      this.logger?.info('Creating behavior implementation class:', this.config.className);
 
       // Create class as regular class (inherits from ClassBuilder)
       await super.create();
 
-      this.logger.info?.('Behavior implementation class created successfully');
+      this.logger?.info('Behavior implementation class created successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -109,7 +109,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'CreateBehaviorImplementation', error);
+      this.logger?.error('Create behavior implementation failed:', error);
       throw error;
     }
   }
@@ -138,7 +138,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
       if (this.implementationCode) {
         await this.updateImplementations();
       } else {
-        this.logger.warn?.('Skipping implementations update: no implementation code provided');
+        this.logger?.warn('Skipping implementations update: no implementation code provided');
       }
 
       // 5. Unlock class
@@ -147,7 +147,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
       // 6. Activate class
       await this.activate();
 
-      this.logger.info?.('Behavior implementation class created and activated successfully');
+      this.logger?.info('Behavior implementation class created and activated successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -155,7 +155,7 @@ export class BehaviorImplementationBuilder extends ClassBuilder {
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'CreateBehaviorImplementation', error);
+      this.logger?.error('Create behavior implementation failed:', error);
       throw error;
     }
   }
@@ -178,7 +178,7 @@ CLASS ${this.config.className} IMPLEMENTATION.
 
 ENDCLASS.`;
 
-      this.logger.info?.('Updating behavior implementation class main source:', this.config.className);
+      this.logger?.info('Updating behavior implementation class main source:', this.config.className);
       const result = await updateClass(
         this.connection,
         this.config.className,
@@ -187,7 +187,7 @@ ENDCLASS.`;
         this.config.transportRequest
       );
       this.state.updateResult = result;
-      this.logger.info?.('Behavior implementation class main source updated successfully:', result.status);
+      this.logger?.info('Behavior implementation class main source updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -195,7 +195,7 @@ ENDCLASS.`;
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update main source failed:', error);
+      this.logger?.error('Update main source failed:', error);
       throw error;
     }
   }
@@ -214,7 +214,7 @@ ENDCLASS.`;
 
       const code = this.implementationCode || this.generateDefaultImplementationCode();
 
-      this.logger.info?.('Updating behavior implementation class implementations:', this.config.className);
+      this.logger?.info('Updating behavior implementation class implementations:', this.config.className);
       const result = await updateBehaviorImplementation(
         this.connection,
         this.config.className,
@@ -223,7 +223,7 @@ ENDCLASS.`;
         this.config.transportRequest
       );
       this.state.updateResult = result;
-      this.logger.info?.('Behavior implementation class implementations updated successfully:', result.status);
+      this.logger?.info('Behavior implementation class implementations updated successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
@@ -231,7 +231,7 @@ ENDCLASS.`;
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date()
       });
-      this.logger.error?.('Update implementations failed:', error);
+      this.logger?.error('Update implementations failed:', error);
       throw error;
     }
   }

@@ -10,7 +10,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { IAdtLogger } from '../../../utils/logger';
+import { ILogger } from '../../../utils/logger';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -22,7 +22,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger: IAdtLogger = {
+const logger: ILogger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
   warn: debugEnabled ? console.warn : () => {},
@@ -100,7 +100,7 @@ describe('Shared - getSqlQuery', () => {
       // Check if this is a cloud system using system information endpoint
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -113,12 +113,12 @@ describe('Shared - getSqlQuery', () => {
 
   it('should execute SQL query', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     if (isCloudSystem) {
-      logger.warn?.('⚠️ Skipping test: SQL queries are not supported on cloud systems');
+      logger.warn('⚠️ Skipping test: SQL queries are not supported on cloud systems');
       return;
     }
 
@@ -132,12 +132,12 @@ describe('Shared - getSqlQuery', () => {
 
   it('should use default row_number if not provided', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     if (isCloudSystem) {
-      logger.warn?.('⚠️ Skipping test: SQL queries are not supported on cloud systems');
+      logger.warn('⚠️ Skipping test: SQL queries are not supported on cloud systems');
       return;
     }
 
@@ -150,7 +150,7 @@ describe('Shared - getSqlQuery', () => {
 
   it('should throw error if SQL query is missing', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 

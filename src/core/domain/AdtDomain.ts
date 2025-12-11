@@ -20,7 +20,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { IDomainConfig, IDomainState } from './types';
 import { validateDomainName } from './validation';
 import { create as createDomain } from './create';
@@ -36,10 +36,10 @@ import { getClassTransport } from '../class/read';
 
 export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'Domain';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -236,7 +236,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -262,7 +262,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       if (error.response?.status === 404) {
         return undefined;
       }
-      logErrorSafely(this.logger, 'Read', error);
+      this.logger?.error('Read failed:', error);
       throw error;
     }
   }
@@ -294,7 +294,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('readMetadata', err);
       throw err;
     }
   }
@@ -425,7 +425,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -463,7 +463,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
 
       return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      this.logger?.error('Delete failed:', error);
       throw error;
     }
   }
@@ -486,7 +486,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       state.activateResult = activateResponse;
       return state;
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }
@@ -543,7 +543,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         error: err,
         timestamp: new Date()
       });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('readTransport', err);
       throw err;
     }
   }

@@ -5,7 +5,7 @@
  */
 
 import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { IAdtLogger } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { IClassBuilderConfig } from '../class';
 import { BaseUnitTestBuilder } from './BaseUnitTestBuilder';
 import { validateCdsForUnitTest } from './validateCdsForUnitTest';
@@ -51,8 +51,8 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
 
   constructor(
     connection: IAbapConnection,
-    logger: IAdtLogger,
-    config: CdsUnitTestBuilderConfig
+    config: CdsUnitTestBuilderConfig,
+    logger?: ILogger
   ) {
     const classConfig: IClassBuilderConfig = {
       className: config.className,
@@ -63,7 +63,7 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
       classTemplate: config.classTemplate,
       final: true
     };
-    super(connection, logger, classConfig);
+    super(connection, classConfig, logger);
     
     this.cdsConfig = config;
   }
@@ -88,24 +88,24 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
       }
 
       // Step 1: Create empty class with CDS template (includes testclasses include)
-      this.logger.info?.('Creating CDS unit test class with template:', this.cdsConfig.className);
+      this.logger?.info('Creating CDS unit test class with template:', this.cdsConfig.className);
       await super.create();
 
       // Step 2: Lock class (required for updating test class)
-      this.logger.info?.('Locking class for test class update:', this.cdsConfig.className);
+      this.logger?.info('Locking class for test class update:', this.cdsConfig.className);
       await this.lock();
 
       // Step 3: Add test class source (uses lock handle from step 2)
-      this.logger.info?.('Adding test class source:', this.cdsConfig.className);
+      this.logger?.info('Adding test class source:', this.cdsConfig.className);
       await this.update(this.cdsConfig.testClassSource);
 
       // Step 4: Unlock class (required before activation can proceed)
-      this.logger.info?.('Unlocking class after test class update:', this.cdsConfig.className);
+      this.logger?.info('Unlocking class after test class update:', this.cdsConfig.className);
       await this.unlock();
 
       return this;
     } catch (error: any) {
-      this.logger.error?.('Create CDS unit test class failed:', error);
+      this.logger?.error('Create CDS unit test class failed:', error);
       throw error;
     }
   }
@@ -116,7 +116,7 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
    */
   async validateCdsForUnitTest(cdsViewName: string): Promise<this> {
     try {
-      this.logger.info?.('Validating CDS view for unit test doubles:', cdsViewName);
+      this.logger?.info('Validating CDS view for unit test doubles:', cdsViewName);
       const response = await validateCdsForUnitTest(this.connection, cdsViewName);
       
       // Check if validation succeeded (SEVERITY=OK)
@@ -133,13 +133,13 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
           throw new Error(`CDS view ${cdsViewName} validation for unit test doubles failed: ${errorMessage}`);
         }
         
-        this.logger.info?.('CDS view validated successfully for unit test doubles');
+        this.logger?.info('CDS view validated successfully for unit test doubles');
         return this;
       } else {
         throw new Error(`CDS view validation failed with HTTP ${response.status}`);
       }
     } catch (error: any) {
-      this.logger.error?.('Validate CDS for unit test failed:', error);
+      this.logger?.error('Validate CDS for unit test failed:', error);
       throw error;
     }
   }
@@ -159,12 +159,12 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
    */
   async deleteTestClass(): Promise<this> {
     try {
-      this.logger.info?.('Deleting test class:', this.cdsConfig.className);
+      this.logger?.info('Deleting test class:', this.cdsConfig.className);
       await this.delete();
-      this.logger.info?.('Test class deleted successfully');
+      this.logger?.info('Test class deleted successfully');
       return this;
     } catch (error: any) {
-      this.logger.error?.('Delete test class failed:', error);
+      this.logger?.error('Delete test class failed:', error);
       throw error;
     }
   }

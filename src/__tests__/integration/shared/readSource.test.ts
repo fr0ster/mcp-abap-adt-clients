@@ -19,7 +19,7 @@ if (fs.existsSync(envPath)) {
 }
 
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
-// Can be used for both connection and AdtClient (ILogger is compatible with IAdtLogger)
+// Can be used for both connection and AdtClient (ILogger is compatible with ILogger)
 const logger: ILogger = createConnectionLogger();
 
 function getConfig(): SapConfig {
@@ -89,7 +89,7 @@ describe('Shared - readSource', () => {
       client = new AdtClient(connection, logger);
       hasConfig = true;
     } catch (error) {
-      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -102,7 +102,7 @@ describe('Shared - readSource', () => {
 
   it('should check if object type supports source code', () => {
     if (!hasConfig || !client) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
     const utils = client.getUtils();
@@ -118,7 +118,7 @@ describe('Shared - readSource', () => {
 
   it('should read class source code', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
@@ -132,7 +132,7 @@ describe('Shared - readSource', () => {
 
   it('should read class source code (inactive version)', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
@@ -144,7 +144,7 @@ describe('Shared - readSource', () => {
 
   it('should throw error for object type without source code', async () => {
     if (!hasConfig) {
-      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 

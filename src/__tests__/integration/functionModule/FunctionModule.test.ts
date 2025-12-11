@@ -14,7 +14,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { IAdtLogger } from '../../../utils/logger';
 import { getFunction } from '../../../core/functionModule/read';
 import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
@@ -35,6 +34,7 @@ import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+
 
 const {
   getEnabledTestCase,
@@ -61,10 +61,10 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code uses DEBUG_ADT_LIBS
-const builderLogger: IAdtLogger = createBuilderLogger();
+const builderLogger: ILogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
-const testsLogger: IAdtLogger = createTestsLogger();
+const testsLogger: ILogger = createTestsLogger();
 
 describe('FunctionModuleBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;

@@ -14,7 +14,6 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { IAdtLogger } from '../../../utils/logger';
 import { getView } from '../../../core/view/read';
 import { getTable } from '../../../core/table/read';
 import { getClass } from '../../../core/class/read';
@@ -63,10 +62,10 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code (View) uses DEBUG_ADT_LIBS
-const builderLogger: IAdtLogger = createBuilderLogger();
+const builderLogger: ILogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
-const testsLogger: IAdtLogger = createTestsLogger();
+const testsLogger: ILogger = createTestsLogger();
 
 function buildCdsUnitTemplate(cdsViewName: string, testMethodName = 'TestMethod_0001'): string {
   const viewNameUpper = cdsViewName.toUpperCase();

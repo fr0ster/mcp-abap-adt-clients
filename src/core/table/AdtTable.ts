@@ -20,7 +20,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { ITableConfig, ITableState } from './types';
 import { validateTableName } from './validation';
 import { createTable } from './create';
@@ -34,10 +34,10 @@ import { getTableSource, getTableMetadata, getTableTransport } from './read';
 
 export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'Table';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -187,7 +187,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -232,7 +232,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('readMetadata', err);
       throw err;
     }
   }
@@ -255,7 +255,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('readTransport', err);
       throw err;
     }
   }
@@ -367,7 +367,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -399,7 +399,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
 
       return { deleteResult: result, errors: [] };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Delete', error);
+      this.logger?.error('Delete failed:', error);
       throw error;
     }
   }
@@ -417,7 +417,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       const result = await activateTable(this.connection, config.tableName);
       return { activateResult: result, errors: [] };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Activate', error);
+      this.logger?.error('Activate failed:', error);
       throw error;
     }
   }

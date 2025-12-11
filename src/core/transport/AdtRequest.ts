@@ -20,7 +20,7 @@
  */
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createTransport } from './create';
 import { getTransport } from './read';
 import { getClassTransport } from '../class/read';
@@ -28,10 +28,10 @@ import { ITransportConfig, ITransportState } from './types';
 
 export class AdtRequest implements IAdtObject<ITransportConfig, ITransportState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'Request';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -85,7 +85,7 @@ export class AdtRequest implements IAdtObject<ITransportConfig, ITransportState>
         errors: []
       };
     } catch (error: any) {
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }

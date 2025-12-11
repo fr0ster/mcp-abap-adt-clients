@@ -6,7 +6,7 @@
  */
 
 import { ReadOnlyClient } from './ReadOnlyClient';
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import { ProgramBuilder, IProgramConfig } from '../core/program';
 import {
@@ -79,9 +79,8 @@ interface CrudClientState {
 
 export class CrudClient extends ReadOnlyClient {
   private crudState: CrudClientState = {};
-  
-  constructor(connection: IAbapConnection) {
-    super(connection);
+  constructor(connection: IAbapConnection, logger?: ILogger) {
+    super(connection, logger);
   }
 
   // State getters (readResult inherited from ReadOnlyClient)
@@ -113,7 +112,7 @@ export class CrudClient extends ReadOnlyClient {
       return this.crudState.programBuilder;
     }
     // Create new builder for new program
-    this.crudState.programBuilder = new ProgramBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.programBuilder = new ProgramBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentProgramName = config.programName;
     return this.crudState.programBuilder;
   }
@@ -198,7 +197,7 @@ export class CrudClient extends ReadOnlyClient {
       return this.crudState.classBuilder;
     }
     // Create new builder for new class
-    this.crudState.classBuilder = new ClassBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.classBuilder = new ClassBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentClassName = config.className;
     return this.crudState.classBuilder;
   }
@@ -418,7 +417,7 @@ export class CrudClient extends ReadOnlyClient {
       return this.crudState.interfaceBuilder;
     }
     // Create new builder for new interface
-    this.crudState.interfaceBuilder = new InterfaceBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.interfaceBuilder = new InterfaceBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentInterfaceName = config.interfaceName;
     return this.crudState.interfaceBuilder;
   }
@@ -505,7 +504,7 @@ export class CrudClient extends ReadOnlyClient {
       return this.crudState.functionModuleBuilder;
     }
     // Create new builder for new function module
-    this.crudState.functionModuleBuilder = new FunctionModuleBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.functionModuleBuilder = new FunctionModuleBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentFunctionModuleName = key;
     return this.crudState.functionModuleBuilder;
   }
@@ -582,21 +581,21 @@ export class CrudClient extends ReadOnlyClient {
   // ==================== FunctionGroup operations ====================
   
   async createFunctionGroup(config: Partial<IFunctionGroupConfig> & Pick<IFunctionGroupConfig, 'functionGroupName' | 'packageName' | 'description'>): Promise<this> {
-    const builder = new FunctionGroupBuilder(this.connection, {}, config);
+    const builder = new FunctionGroupBuilder(this.connection, config, this.logger);
     await builder.create();
     this.crudState.createResult = builder.getState().createResult;
     return this;
   }
 
   async lockFunctionGroup(config: Partial<IFunctionGroupConfig> & Pick<IFunctionGroupConfig, 'functionGroupName'>): Promise<this> {
-    const builder = new FunctionGroupBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new FunctionGroupBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     await builder.lock();
     this.crudState.lockHandle = builder.getState().lockHandle;
     return this;
   }
 
   async unlockFunctionGroup(config: Partial<IFunctionGroupConfig> & Pick<IFunctionGroupConfig, 'functionGroupName'>, lockHandle?: string): Promise<this> {
-    const builder = new FunctionGroupBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new FunctionGroupBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
     await builder.unlock();
     this.crudState.unlockResult = builder.getState().unlockResult;
@@ -605,14 +604,14 @@ export class CrudClient extends ReadOnlyClient {
   }
 
   async activateFunctionGroup(config: Partial<IFunctionGroupConfig> & Pick<IFunctionGroupConfig, 'functionGroupName'>): Promise<this> {
-    const builder = new FunctionGroupBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new FunctionGroupBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     await builder.activate();
     this.crudState.activateResult = builder.getState().activateResult;
     return this;
   }
 
   async checkFunctionGroup(config: Partial<IFunctionGroupConfig> & Pick<IFunctionGroupConfig, 'functionGroupName'>): Promise<AxiosResponse> {
-    const builder = new FunctionGroupBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new FunctionGroupBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     const result = await builder.check();
     this.crudState.checkResult = result;
     return result;
@@ -621,7 +620,7 @@ export class CrudClient extends ReadOnlyClient {
   async validateFunctionGroup(config: Partial<IFunctionGroupConfig> & Pick<IFunctionGroupConfig, 'functionGroupName' | 'description'>): Promise<AxiosResponse> {
     // packageName is required for validation to work correctly
     // Without it, SAP ADT returns "Resource FUGR_MAINPROGRAM: wrong input data"
-    const builder = new FunctionGroupBuilder(this.connection, {}, { 
+    const builder = new FunctionGroupBuilder(this.connection, { 
       ...config, 
       description: config.description,
       packageName: config.packageName // Ensure packageName is passed to builder
@@ -632,7 +631,7 @@ export class CrudClient extends ReadOnlyClient {
   }
 
   async deleteFunctionGroup(config: Partial<IFunctionGroupConfig> & Pick<IFunctionGroupConfig, 'functionGroupName'>): Promise<this> {
-    const builder = new FunctionGroupBuilder(this.connection, {}, { ...config, description: config.description || '', transportRequest: config.transportRequest });
+    const builder = new FunctionGroupBuilder(this.connection, { ...config, description: config.description || '', transportRequest: config.transportRequest }, this.logger);
     await builder.delete();
     this.crudState.deleteResult = builder.getState().deleteResult;
     return this;
@@ -661,7 +660,7 @@ export class CrudClient extends ReadOnlyClient {
       return builder;
     }
     // Create new builder for new data element
-    this.crudState.dataElementBuilder = new DataElementBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.dataElementBuilder = new DataElementBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentDataElementName = config.dataElementName;
     return this.crudState.dataElementBuilder;
   }
@@ -751,7 +750,7 @@ export class CrudClient extends ReadOnlyClient {
       return this.crudState.domainBuilder;
     }
     // Create new builder for new domain
-    this.crudState.domainBuilder = new DomainBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.domainBuilder = new DomainBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentDomainName = config.domainName;
     return this.crudState.domainBuilder;
   }
@@ -835,7 +834,7 @@ export class CrudClient extends ReadOnlyClient {
       return builder;
     }
     // Create new builder for new structure - ensure all config fields are passed including ddlCode
-    this.crudState.structureBuilder = new StructureBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.structureBuilder = new StructureBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentStructureName = config.structureName;
     return this.crudState.structureBuilder;
   }
@@ -926,7 +925,7 @@ export class CrudClient extends ReadOnlyClient {
       return builder;
     }
     // Create new builder for new table - ensure all config fields are passed including ddlCode
-    this.crudState.tableBuilder = new TableBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.tableBuilder = new TableBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentTableName = config.tableName;
     return this.crudState.tableBuilder;
   }
@@ -1015,7 +1014,7 @@ export class CrudClient extends ReadOnlyClient {
       return this.crudState.viewBuilder;
     }
     // Create new builder for new view
-    this.crudState.viewBuilder = new ViewBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.viewBuilder = new ViewBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentViewName = config.viewName;
     return this.crudState.viewBuilder;
   }
@@ -1106,7 +1105,7 @@ export class CrudClient extends ReadOnlyClient {
       return builder;
     }
     // Create new builder for new package - ensure all config fields are passed including softwareComponent
-    this.crudState.packageBuilder = new PackageBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    this.crudState.packageBuilder = new PackageBuilder(this.connection, { ...config, description: config.description || '' }, this.logger);
     this.crudState.currentPackageName = config.packageName;
     return this.crudState.packageBuilder;
   }
@@ -1215,7 +1214,7 @@ export class CrudClient extends ReadOnlyClient {
   // ==================== Transport operations ====================
   
   async createTransport(description: string, transportType?: 'workbench' | 'customizing'): Promise<this> {
-    const builder = new TransportBuilder(this.connection, {}, { description, transportType });
+    const builder = new TransportBuilder(this.connection, { description, transportType }, this.logger);
     await builder.create();
     this.crudState.createResult = builder.getState().createResult;
     return this;
@@ -1224,21 +1223,21 @@ export class CrudClient extends ReadOnlyClient {
   // ==================== BehaviorDefinition operations ====================
   
   async createBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'name' | 'packageName' | 'description' | 'rootEntity' | 'implementationType'>): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, config);
+    const builder = new BehaviorDefinitionBuilder(this.connection, config, this.logger);
     await builder.create();
     this.crudState.createResult = builder.getState().createResult;
     return this;
   }
 
   async lockBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'name'>): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
+    const builder = new BehaviorDefinitionBuilder(this.connection, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
     await builder.lock();
     this.crudState.lockHandle = builder.getLockHandle() || builder.getState().lockHandle;
     return this;
   }
 
   async unlockBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'name'>, lockHandle?: string): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
+    const builder = new BehaviorDefinitionBuilder(this.connection, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
     (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
     await builder.unlock();
     this.crudState.unlockResult = builder.getState().unlockResult;
@@ -1247,7 +1246,7 @@ export class CrudClient extends ReadOnlyClient {
   }
 
   async updateBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'name' | 'sourceCode'>, lockHandle?: string): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
+    const builder = new BehaviorDefinitionBuilder(this.connection, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
     const effectiveLockHandle = lockHandle || this.crudState.lockHandle;
     if (!effectiveLockHandle) {
       throw new Error(`Lock handle is required for update. Call lockBehaviorDefinition() first or provide lockHandle parameter.`);
@@ -1259,28 +1258,28 @@ export class CrudClient extends ReadOnlyClient {
   }
 
   async activateBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'name'>): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
+    const builder = new BehaviorDefinitionBuilder(this.connection, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
     await builder.activate();
     this.crudState.activateResult = builder.getState().activateResult;
     return this;
   }
 
   async checkBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'name'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
+    const builder = new BehaviorDefinitionBuilder(this.connection, { ...config, description: config.description || '', rootEntity: config.rootEntity || '' });
     await builder.check(version, sourceCode);
     this.crudState.checkResult = builder.getState().checkResults?.[0];
     return this;
   }
 
   async validateBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'rootEntity' | 'implementationType' | 'description' | 'packageName'>): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, name: config.name || '', description: config.description, rootEntity: config.rootEntity, implementationType: config.implementationType });
+    const builder = new BehaviorDefinitionBuilder(this.connection, { ...config, name: config.name || '', description: config.description, rootEntity: config.rootEntity, implementationType: config.implementationType });
     await builder.validate();
     this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
   async deleteBehaviorDefinition(config: Partial<IBehaviorDefinitionConfig> & Pick<IBehaviorDefinitionConfig, 'name'>): Promise<this> {
-    const builder = new BehaviorDefinitionBuilder(this.connection, {}, { ...config, description: config.description || '', rootEntity: config.rootEntity || '', transportRequest: config.transportRequest });
+    const builder = new BehaviorDefinitionBuilder(this.connection, { ...config, description: config.description || '', rootEntity: config.rootEntity || '', transportRequest: config.transportRequest });
     await builder.checkDeletion();
     await builder.delete();
     this.crudState.deleteResult = builder.getState().deleteResult;
@@ -1294,7 +1293,7 @@ export class CrudClient extends ReadOnlyClient {
    * Creates class, locks, updates main source and implementations, unlocks and activates.
    */
   async createBehaviorImplementation(config: Partial<IBehaviorImplementationConfig> & Pick<IBehaviorImplementationConfig, 'className' | 'packageName' | 'behaviorDefinition'>): Promise<this> {
-    const builder = new BehaviorImplementationBuilder(this.connection, {}, { 
+    const builder = new BehaviorImplementationBuilder(this.connection, { 
       ...config, 
       description: config.description || `Behavior Implementation for ${config.behaviorDefinition}`,
       behaviorDefinition: config.behaviorDefinition
@@ -1310,7 +1309,7 @@ export class CrudClient extends ReadOnlyClient {
    * Must be called after lockClass()
    */
   async updateBehaviorImplementationMainSource(config: Pick<IBehaviorImplementationConfig, 'className' | 'behaviorDefinition'>, lockHandle?: string): Promise<this> {
-    const builder = new BehaviorImplementationBuilder(this.connection, {}, { 
+    const builder = new BehaviorImplementationBuilder(this.connection, { 
       className: config.className,
       behaviorDefinition: config.behaviorDefinition,
       description: ''
@@ -1336,7 +1335,7 @@ export class CrudClient extends ReadOnlyClient {
     config: Pick<IBehaviorImplementationConfig, 'className' | 'behaviorDefinition' | 'implementationCode'>,
     lockHandle?: string
   ): Promise<this> {
-    const builder = new BehaviorImplementationBuilder(this.connection, {}, { 
+    const builder = new BehaviorImplementationBuilder(this.connection, { 
       className: config.className,
       behaviorDefinition: config.behaviorDefinition,
       description: '',
@@ -1368,7 +1367,7 @@ export class CrudClient extends ReadOnlyClient {
    * Get BehaviorImplementationBuilder instance for advanced operations
    */
   getBehaviorImplementationBuilderInstance(config: Partial<IBehaviorImplementationConfig> & Pick<IBehaviorImplementationConfig, 'className' | 'behaviorDefinition'>): BehaviorImplementationBuilder {
-    return new BehaviorImplementationBuilder(this.connection, {}, {
+    return new BehaviorImplementationBuilder(this.connection, {
       ...config,
       description: config.description || `Behavior Implementation for ${config.behaviorDefinition}`,
       behaviorDefinition: config.behaviorDefinition || ''
@@ -1378,21 +1377,21 @@ export class CrudClient extends ReadOnlyClient {
   // ==================== MetadataExtension operations ====================
   
   async createMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name' | 'packageName' | 'description'>): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, config);
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     await builder.create();
     this.crudState.createResult = builder.getState().createResult;
     return this;
   }
 
   async lockMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name'>): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     await builder.lock();
     this.crudState.lockHandle = builder.getState().lockHandle;
     return this;
   }
 
   async unlockMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name'>, lockHandle?: string): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
     await builder.unlock();
     this.crudState.unlockResult = builder.getState().unlockResult;
@@ -1401,7 +1400,7 @@ export class CrudClient extends ReadOnlyClient {
   }
 
   async updateMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name' | 'sourceCode'>, lockHandle?: string): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     (builder as any).lockHandle = lockHandle || this.crudState.lockHandle;
     await builder.update();
     this.crudState.updateResult = builder.getState().updateResult;
@@ -1409,28 +1408,28 @@ export class CrudClient extends ReadOnlyClient {
   }
 
   async activateMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name'>): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     await builder.activate();
     this.crudState.activateResult = builder.getState().activateResult;
     return this;
   }
 
   async checkMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name'>, sourceCode?: string, version: 'active' | 'inactive' = 'inactive'): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description || '' });
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     await builder.check(version, sourceCode);
     this.crudState.checkResult = builder.getState().checkResult;
     return this;
   }
 
   async validateMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name' | 'description' | 'packageName'>): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description, packageName: config.packageName });
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     await builder.validate();
     this.crudState.validationResponse = builder.getState().validationResponse;
     return this;
   }
 
   async deleteMetadataExtension(config: Partial<IMetadataExtensionConfig> & Pick<IMetadataExtensionConfig, 'name'>): Promise<this> {
-    const builder = new MetadataExtensionBuilder(this.connection, {}, { ...config, description: config.description || '', transportRequest: config.transportRequest });
+    const builder = new MetadataExtensionBuilder(this.connection, { ...config, name: config.name || '' }, this.logger);
     await builder.delete();
     this.crudState.deleteResult = builder.getState().deleteResult;
     return this;
@@ -1520,7 +1519,7 @@ export class CrudClient extends ReadOnlyClient {
       ...(config.description && { description: config.description }),
       ...(config.sourceCode && { sourceCode: config.sourceCode })
     };
-    this.crudState.serviceDefinitionBuilder = new ServiceDefinitionBuilder(this.connection, {}, builderConfig);
+    this.crudState.serviceDefinitionBuilder = new ServiceDefinitionBuilder(this.connection, builderConfig, this.logger);
     this.crudState.currentServiceDefinitionName = config.serviceDefinitionName;
     return this.crudState.serviceDefinitionBuilder;
   }

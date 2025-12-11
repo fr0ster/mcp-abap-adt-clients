@@ -20,7 +20,7 @@
 
 import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
-import { IAdtLogger, logErrorSafely } from '../../utils/logger';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { IMetadataExtensionConfig, IMetadataExtensionState } from './types';
 import { validateMetadataExtension } from './validation';
 import { createMetadataExtension } from './create';
@@ -34,10 +34,10 @@ import { readMetadataExtensionSource, readMetadataExtension, getMetadataExtensio
 
 export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState> {
   private readonly connection: IAbapConnection;
-  private readonly logger?: IAdtLogger;
+  private readonly logger?: ILogger;
   public readonly objectType: string = 'MetadataExtension';
 
-  constructor(connection: IAbapConnection, logger?: IAdtLogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger;
   }
@@ -219,7 +219,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         }
       }
 
-      logErrorSafely(this.logger, 'Create', error);
+      this.logger?.error('Create failed:', error);
       throw error;
     }
   }
@@ -254,7 +254,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       }
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'read', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'read', err);
+      this.logger?.error('read', err);
       throw err;
       throw error;
     }
@@ -278,7 +278,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readMetadata', err);
+      this.logger?.error('readMetadata', err);
       throw err;
     }
   }
@@ -301,7 +301,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'readTransport', err);
+      this.logger?.error('readTransport', err);
       throw err;
     }
   }
@@ -414,7 +414,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         }
       }
 
-      logErrorSafely(this.logger, 'Update', error);
+      this.logger?.error('Update failed:', error);
       throw error;
     }
   }
@@ -443,7 +443,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'Delete', err);
+      this.logger?.error('Delete', err);
       throw err;
       throw error;
     }
@@ -471,7 +471,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
-      logErrorSafely(this.logger, 'Activate', err);
+      this.logger?.error('Activate', err);
       throw err;
       throw error;
     }
