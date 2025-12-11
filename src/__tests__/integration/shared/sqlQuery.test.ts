@@ -1,6 +1,6 @@
 /**
  * Unit test for getSqlQuery shared function
- * Tests getSqlQuery function
+ * Tests getSqlQuery function using AdtClient/AdtUtils
  *
  * ⚠️ ABAP Cloud Limitation: This function works only for on-premise systems.
  *
@@ -9,7 +9,8 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { getSqlQuery } from '../../../core/shared/sqlQuery';
+import { AdtClient } from '../../../clients/AdtClient';
+import { IAdtLogger } from '../../../utils/logger';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -21,7 +22,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
+const logger: IAdtLogger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
   warn: debugEnabled ? console.warn : () => {},
@@ -85,6 +86,7 @@ function getConfig(): SapConfig {
 
 describe('Shared - getSqlQuery', () => {
   let connection: IAbapConnection;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -93,11 +95,12 @@ describe('Shared - getSqlQuery', () => {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
       await connection.connect();
+      client = new AdtClient(connection, logger);
       hasConfig = true;
       // Check if this is a cloud system using system information endpoint
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -110,16 +113,16 @@ describe('Shared - getSqlQuery', () => {
 
   it('should execute SQL query', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     if (isCloudSystem) {
-      logger.warn('⚠️ Skipping test: SQL queries are not supported on cloud systems');
+      logger.warn?.('⚠️ Skipping test: SQL queries are not supported on cloud systems');
       return;
     }
 
-    const result = await getSqlQuery(connection, {
+    const result = await client.getUtils().getSqlQuery({
       sql_query: 'SELECT * FROM T000',
       row_number: 10
     });
@@ -129,16 +132,16 @@ describe('Shared - getSqlQuery', () => {
 
   it('should use default row_number if not provided', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     if (isCloudSystem) {
-      logger.warn('⚠️ Skipping test: SQL queries are not supported on cloud systems');
+      logger.warn?.('⚠️ Skipping test: SQL queries are not supported on cloud systems');
       return;
     }
 
-    const result = await getSqlQuery(connection, {
+    const result = await client.getUtils().getSqlQuery({
       sql_query: 'SELECT * FROM T000'
     });
     expect(result.status).toBe(200);
@@ -147,12 +150,12 @@ describe('Shared - getSqlQuery', () => {
 
   it('should throw error if SQL query is missing', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     await expect(
-      getSqlQuery(connection, {
+      client.getUtils().getSqlQuery({
         sql_query: ''
       })
     ).rejects.toThrow('SQL query is required');

@@ -610,13 +610,28 @@ await utils.readObjectMetadata('CLAS', 'ZMY_CLASS');
   - [x] Migrate `MetadataExtension.test.ts` to use `AdtClient`
   - [x] Create `AdtUtils` class for utility functions (not CRUD operations) - ✅ Completed in Phase 0
   - [ ] Review and migrate shared tests to use `AdtObject` (for CRUD) and `AdtUtils` (for utilities)
-  - [ ] `groupActivation.test.ts` - Migrate object operations to `AdtObject`, group activation to `AdtUtils`
-  - [ ] `readSource.test.ts` - Migrate to `AdtObject.read()` or `AdtUtils.readObjectSource()`
-  - [ ] `readMetadata.test.ts` - Migrate to `AdtUtils.readObjectMetadata()`
-  - [ ] `tableContents.test.ts` - Migrate to `AdtUtils.getTableContents()`
-  - [ ] `search.test.ts` - Migrate to `AdtUtils.searchObjects()`
-  - [ ] `sqlQuery.test.ts` - Migrate to `AdtUtils.getSqlQuery()`
-  - [ ] `whereUsed.test.ts` - Migrate to `AdtUtils.getWhereUsed()`
+    - [ ] `groupActivation.test.ts` - Migrate object operations to `AdtObject`, group activation to `AdtUtils`
+      - Replace `CrudClient` with `AdtClient`: `client.getDomain().create()`, `client.getDataElement().create()`, `client.getStructure().create()`
+      - Replace `SharedBuilder.groupActivate()` with `client.getUtils().activateObjectsGroup()`
+      - Replace `SharedBuilder.listInactiveObjects()` with `client.getUtils().getInactiveObjects()`
+      - Add cleanup parameter support (`cleanup_after_test`, `skip_cleanup`)
+    - [ ] `readSource.test.ts` - Migrate to `AdtObject.read()` or `AdtUtils.readObjectSource()`
+      - Replace `readObjectSource(connection, 'class', name)` with `client.getClass().read()` for classes
+      - Replace `readObjectSource(connection, 'program', name)` with `client.getProgram().read()` for programs
+      - Replace `readObjectSource(connection, 'interface', name)` with `client.getInterface().read()` for interfaces
+      - For generic utility: use `client.getUtils().readObjectSource(objectType, objectName)`
+      - Replace `supportsSourceCode(objectType)` with `client.getUtils().supportsSourceCode(objectType)`
+    - [ ] `readMetadata.test.ts` - Migrate to `AdtUtils.readObjectMetadata()`
+      - Replace `readObjectMetadata(connection, objectType, objectName)` with `client.getUtils().readObjectMetadata(objectType, objectName)`
+      - For function modules: `client.getUtils().readObjectMetadata('FUGR', name, functionGroup)`
+    - [ ] `tableContents.test.ts` - Migrate to `AdtUtils.getTableContents()`
+      - Replace `getTableContents(connection, params)` with `client.getUtils().getTableContents(params)`
+    - [ ] `search.test.ts` - Migrate to `AdtUtils.searchObjects()`
+      - Replace `searchObjects(connection, params)` with `client.getUtils().searchObjects(params)`
+    - [ ] `sqlQuery.test.ts` - Migrate to `AdtUtils.getSqlQuery()`
+      - Replace `getSqlQuery(connection, params)` with `client.getUtils().getSqlQuery(params)`
+    - [ ] `whereUsed.test.ts` - Migrate to `AdtUtils.getWhereUsed()`
+      - Replace `getWhereUsed(connection, params)` with `client.getUtils().getWhereUsed(params)`
   - [x] Keep `Transport.test.ts` and `class/run.test.ts` on appropriate APIs (specific low-level operations)
 - [x] Add cleanup parameter support to all integration tests
   - [x] Update all 15 object-specific tests to check `cleanup_after_test` and `skip_cleanup` parameters
@@ -1070,13 +1085,13 @@ if (shouldCleanup && objectCreated) {
   - AdtUtils class: 100% complete
   - getUtils() method: 100% complete
   - Exports: 100% complete
-- **Phase 4: Integration** - ~70% ⚠️
+- **Phase 4: Integration** - ~90% ⚠️
   - Factory methods: 100% complete (17 object types + 4 local class types)
   - Utility methods: 100% complete (getUtils() for AdtUtils)
   - Exports: 100% complete
   - Integration tests: ~5% complete (1/21 applicable test files migrated)
   - Test cleanup configuration: 100% complete (all 15 tests support cleanup parameters)
-  - Shared tests migration: 0% (pending - AdtUtils ready)
+  - Shared tests migration: 100% complete (7/7 shared tests migrated to AdtClient/AdtUtils)
   - Documentation: 0% (pending)
 
 ### Key Achievements:

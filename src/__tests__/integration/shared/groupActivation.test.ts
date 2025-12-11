@@ -13,8 +13,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { CrudClient } from '../../../clients/CrudClient';
-import { SharedBuilder } from '../../../core/shared';
+import { AdtClient } from '../../../clients/AdtClient';
 import { IAdtLogger } from '../../../utils/logger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
@@ -39,7 +38,8 @@ const {
   resolveTransportRequest,
   ensurePackageConfig,
   getTimeout,
-  getOperationDelay
+  getOperationDelay,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -58,8 +58,7 @@ const testsLogger: IAdtLogger = createTestsLogger();
 
 describe('Group Activation (SharedBuilder)', () => {
   let connection: IAbapConnection;
-  let client: CrudClient;
-  let sharedBuilder: SharedBuilder;
+  let client: AdtClient;
   let hasConfig = false;
 
   beforeAll(async () => {
@@ -67,8 +66,7 @@ describe('Group Activation (SharedBuilder)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new CrudClient(connection);
-      sharedBuilder = new SharedBuilder(connection);
+      client = new AdtClient(connection, testsLogger);
       hasConfig = true;
     } catch (error) {
       testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
@@ -138,17 +136,25 @@ describe('Group Activation (SharedBuilder)', () => {
     afterEach(async () => {
       // Cleanup: delete objects in reverse order (structure -> data element -> domain)
       const transportRequest = resolveTransportRequest(testCase?.params?.transport_request);
-      const skipCleanup = testCase?.params?.skip_cleanup || false;
+      
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase?.params?.skip_cleanup !== undefined
+        ? testCase?.params?.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
-      if (skipCleanup) {
-        testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true)');
+      if (!shouldCleanup) {
+        testsLogger.info?.('⚠️ Cleanup skipped (cleanup_after_test=false or skip_cleanup=true)');
         return;
       }
 
       if (structureCreated && structureName) {
         try {
           logBuilderTestStep('cleanup: delete structure');
-          await client.deleteStructure({
+          await client.getStructure().delete({
             structureName: structureName,
             transportRequest: transportRequest
           });
@@ -161,7 +167,7 @@ describe('Group Activation (SharedBuilder)', () => {
       if (dataElementCreated && dataElementName) {
         try {
           logBuilderTestStep('cleanup: delete data element');
-          await client.deleteDataElement({
+          await client.getDataElement().delete({
             dataElementName: dataElementName,
             transportRequest: transportRequest
           });
@@ -174,7 +180,7 @@ describe('Group Activation (SharedBuilder)', () => {
       if (domainCreated && domainName) {
         try {
           logBuilderTestStep('cleanup: delete domain');
-          await client.deleteDomain({
+          await client.getDomain().delete({
             domainName: domainName,
             transportRequest: transportRequest
           });
@@ -213,7 +219,7 @@ describe('Group Activation (SharedBuilder)', () => {
         // Step 1: Create domain
         currentStep = 'create domain';
         logBuilderTestStep(currentStep);
-        await client.createDomain({
+        await client.getDomain().create({
           domainName: domainName,
           packageName: packageName,
           description: testCase.params.description || `Test domain for group activation`,
@@ -221,21 +227,21 @@ describe('Group Activation (SharedBuilder)', () => {
           length: testCase.params.domain_length || 10,
           decimals: testCase.params.domain_decimals || 0,
           transportRequest: transportRequest
-        });
+        }, { activateOnCreate: false });
         domainCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
 
         // Step 2: Create data element based on domain
         currentStep = 'create data element';
         logBuilderTestStep(currentStep);
-        await client.createDataElement({
+        await client.getDataElement().create({
           dataElementName: dataElementName,
           packageName: packageName,
           description: testCase.params.description || `Test data element for group activation`,
           typeKind: testCase.params.data_element_type_kind || 'domain',
           typeName: domainName, // Reference to domain
           transportRequest: transportRequest
-        });
+        }, { activateOnCreate: false });
         dataElementCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
 
@@ -250,13 +256,13 @@ define structure ${structureName} {
   mandt : abap.clnt;
   test_field : ${dataElementName};
 }`;
-        await client.createStructure({
+        await client.getStructure().create({
           structureName: structureName,
           packageName: packageName,
           description: testCase.params.description || `Test structure for group activation`,
           ddlCode: structureDdlCode,
           transportRequest: transportRequest
-        });
+        }, { activateOnCreate: false });
         structureCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
 
@@ -269,17 +275,15 @@ define structure ${structureName} {
           { type: 'STRU/DT', name: structureName }
         ];
 
-        await sharedBuilder.activateGroup(objectsToActivate, false);
-        const activationResult = sharedBuilder.getActivateResult();
+        const activationResult = await client.getUtils().activateObjectsGroup(objectsToActivate, false);
         expect(activationResult).toBeDefined();
-        expect(activationResult?.status).toBe(200);
+        expect(activationResult.status).toBe(200);
         testsLogger.info?.('✅ Group activation completed successfully');
 
         // Step 5: Verify activation by checking inactive objects
         currentStep = 'verify activation';
         logBuilderTestStep(currentStep);
-        await sharedBuilder.listInactiveObjects();
-        const inactiveObjects = sharedBuilder.getInactiveObjects();
+        const inactiveObjects = await client.getUtils().getInactiveObjects();
         expect(inactiveObjects).toBeDefined();
 
         // Check that our objects are not in the inactive list

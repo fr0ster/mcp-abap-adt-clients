@@ -1,13 +1,14 @@
 /**
  * Unit test for readMetadata shared function
- * Tests readObjectMetadata function for different object types
+ * Tests readObjectMetadata function for different object types using AdtClient/AdtUtils
  *
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/readMetadata.test
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { readObjectMetadata } from '../../../core/shared/readMetadata';
+import { AdtClient } from '../../../clients/AdtClient';
+import { IAdtLogger } from '../../../utils/logger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -82,15 +83,18 @@ function getConfig(): SapConfig {
 
 describe('Shared - readMetadata', () => {
   let connection: IAbapConnection;
+  let client: AdtClient;
   let hasConfig = false;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      await (connection as any).connect();
+      client = new AdtClient(connection, logger);
       hasConfig = true;
     } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -103,14 +107,14 @@ describe('Shared - readMetadata', () => {
 
   it('should read class metadata', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // Use a standard SAP class that should exist
     const className = 'CL_ABAP_CHAR_UTILITIES';
     try {
-      const result = await readObjectMetadata(connection, 'class', className);
+      const result = await client.getUtils().readObjectMetadata('class', className);
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
     } catch (error: any) {
@@ -123,14 +127,14 @@ describe('Shared - readMetadata', () => {
 
   it('should read domain metadata', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // Use a standard SAP domain that should exist
     const domainName = 'MANDT';
     try {
-      const result = await readObjectMetadata(connection, 'domain', domainName);
+      const result = await client.getUtils().readObjectMetadata('domain', domainName);
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
     } catch (error: any) {
@@ -143,14 +147,14 @@ describe('Shared - readMetadata', () => {
 
   it('should read table metadata', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // Use a standard SAP table that should exist
     const tableName = 'T000';
     try {
-      const result = await readObjectMetadata(connection, 'table', tableName);
+      const result = await client.getUtils().readObjectMetadata('table', tableName);
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
     } catch (error: any) {
@@ -163,12 +167,12 @@ describe('Shared - readMetadata', () => {
 
   it('should throw error for unsupported object type', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     await expect(
-      readObjectMetadata(connection, 'unsupported_type', 'TEST')
+      client.getUtils().readObjectMetadata('unsupported_type', 'TEST')
     ).rejects.toThrow('Unsupported object type for metadata');
   });
 });

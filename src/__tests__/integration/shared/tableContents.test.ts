@@ -1,6 +1,6 @@
 /**
  * Unit test for getTableContents shared function
- * Tests getTableContents function
+ * Tests getTableContents function using AdtClient/AdtUtils
  *
  * ⚠️ ABAP Cloud Limitation: This function works only for on-premise systems.
  *
@@ -9,7 +9,8 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { getTableContents } from '../../../core/shared/tableContents';
+import { AdtClient } from '../../../clients/AdtClient';
+import { IAdtLogger } from '../../../utils/logger';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -21,7 +22,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
+const logger: IAdtLogger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
   warn: debugEnabled ? console.warn : () => {},
@@ -85,6 +86,7 @@ function getConfig(): SapConfig {
 
 describe('Shared - getTableContents', () => {
   let connection: IAbapConnection;
+  let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
 
@@ -93,11 +95,12 @@ describe('Shared - getTableContents', () => {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
       await connection.connect();
+      client = new AdtClient(connection, logger);
       hasConfig = true;
       // Check if this is a cloud system using system information endpoint
       isCloudSystem = await isCloudEnvironment(connection);
     } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -110,16 +113,16 @@ describe('Shared - getTableContents', () => {
 
   it('should get table contents', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     if (isCloudSystem) {
-      logger.warn('⚠️ Skipping test: Table contents are not supported on cloud systems');
+      logger.warn?.('⚠️ Skipping test: Table contents are not supported on cloud systems');
       return;
     }
 
-    const result = await getTableContents(connection, {
+    const result = await client.getUtils().getTableContents({
       table_name: 'T000',
       max_rows: 10
     });
@@ -129,16 +132,16 @@ describe('Shared - getTableContents', () => {
 
   it('should use default max_rows if not provided', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     if (isCloudSystem) {
-      logger.warn('⚠️ Skipping test: Table contents are not supported on cloud systems');
+      logger.warn?.('⚠️ Skipping test: Table contents are not supported on cloud systems');
       return;
     }
 
-    const result = await getTableContents(connection, {
+    const result = await client.getUtils().getTableContents({
       table_name: 'T000'
     });
     expect(result.status).toBe(200);
@@ -147,18 +150,18 @@ describe('Shared - getTableContents', () => {
 
   it('should throw error if table name is missing', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // This test doesn't require actual connection, but we skip on cloud for consistency
     if (isCloudSystem) {
-      logger.warn('⚠️ Skipping test: Table contents are not supported on cloud systems');
+      logger.warn?.('⚠️ Skipping test: Table contents are not supported on cloud systems');
       return;
     }
 
     await expect(
-      getTableContents(connection, {
+      client.getUtils().getTableContents({
         table_name: ''
       })
     ).rejects.toThrow('Table name is required');

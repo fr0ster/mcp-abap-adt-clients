@@ -1,13 +1,14 @@
 /**
  * Unit test for getWhereUsed shared function
- * Tests getWhereUsed function
+ * Tests getWhereUsed function using AdtClient/AdtUtils
  *
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/whereUsed.test
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { getWhereUsed } from '../../../core/shared/whereUsed';
+import { AdtClient } from '../../../clients/AdtClient';
+import { IAdtLogger } from '../../../utils/logger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -82,15 +83,18 @@ function getConfig(): SapConfig {
 
 describe('Shared - getWhereUsed', () => {
   let connection: IAbapConnection;
+  let client: AdtClient;
   let hasConfig = false;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, logger);
+      await (connection as any).connect();
+      client = new AdtClient(connection, logger);
       hasConfig = true;
     } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -103,12 +107,12 @@ describe('Shared - getWhereUsed', () => {
 
   it('should get where-used for class', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     try {
-      const result = await getWhereUsed(connection, {
+      const result = await client.getUtils().getWhereUsed({
         object_name: 'CL_ABAP_CHAR_UTILITIES',
         object_type: 'class'
       });
@@ -124,12 +128,12 @@ describe('Shared - getWhereUsed', () => {
 
   it('should get where-used for table', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     try {
-      const result = await getWhereUsed(connection, {
+      const result = await client.getUtils().getWhereUsed({
         object_name: 'T000',
         object_type: 'table'
       });
@@ -148,12 +152,12 @@ describe('Shared - getWhereUsed', () => {
 
   it('should throw error if object name is missing', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     await expect(
-      getWhereUsed(connection, {
+      client.getUtils().getWhereUsed({
         object_name: '',
         object_type: 'class'
       })
@@ -162,12 +166,12 @@ describe('Shared - getWhereUsed', () => {
 
   it('should throw error if object type is missing', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     await expect(
-      getWhereUsed(connection, {
+      client.getUtils().getWhereUsed({
         object_name: 'TEST',
         object_type: ''
       })

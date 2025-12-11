@@ -1,13 +1,14 @@
 /**
  * Unit test for searchObjects shared function
- * Tests searchObjects function
+ * Tests searchObjects function using AdtClient/AdtUtils
  *
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/search.test
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { searchObjects } from '../../../core/shared/search';
+import { AdtClient } from '../../../clients/AdtClient';
+import { IAdtLogger } from '../../../utils/logger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -18,7 +19,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
+const logger: IAdtLogger = {
   debug: debugEnabled ? console.log : () => {},
   info: debugEnabled ? console.log : () => {},
   warn: debugEnabled ? console.warn : () => {},
@@ -103,11 +104,11 @@ describe('Shared - searchObjects', () => {
 
   it('should search objects by name pattern', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const result = await searchObjects(connection, {
+    const result = await client.getUtils().searchObjects({
       query: 'CL_ABAP*',
       maxResults: 10
     });
@@ -117,11 +118,11 @@ describe('Shared - searchObjects', () => {
 
   it('should search objects with object type filter', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const result = await searchObjects(connection, {
+    const result = await client.getUtils().searchObjects({
       query: 'T*',
       objectType: 'TABL',
       maxResults: 10
@@ -132,11 +133,11 @@ describe('Shared - searchObjects', () => {
 
   it('should use default maxResults if not provided', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      logger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
-    const result = await searchObjects(connection, {
+    const result = await client.getUtils().searchObjects({
       query: 'CL_ABAP*'
     });
     expect(result.status).toBe(200);
