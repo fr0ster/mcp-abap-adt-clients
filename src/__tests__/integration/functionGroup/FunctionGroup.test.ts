@@ -27,6 +27,8 @@ import {
   logBuilderTestStepError,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
+import { hasCheckErrorsFromResponse, getCheckErrorMessages } from '../../helpers/checkResultHelper';
+import { parseCheckRunResponse } from '../../../utils/checkRun';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -208,7 +210,13 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
             objectName: config.functionGroupName
           }
         );
-        expect(checkResultState?.status).toBeDefined();
+        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+        // Ignore Kerberos library not loaded (test cloud issue)
+        const hasErrors = checkResultState ? hasCheckErrorsFromResponse(checkResultState, ['kerberos library not loaded']) : false;
+        if (hasErrors) {
+          const errorMessages = checkResultState ? getCheckErrorMessages(parseCheckRunResponse(checkResultState)) : [];
+          throw new Error(`Check failed: ${errorMessages.join('; ')}`);
+        }
         
         logBuilderTestStep('delete (cleanup)');
         await client.getFunctionGroup().delete({

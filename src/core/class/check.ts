@@ -41,19 +41,17 @@ export async function checkClass(
 
   const checkResult = parseCheckRunResponse(response);
 
-  // "has been checked" or "was checked" messages are normal responses, not errors
-  // Check both message and errors array for these messages
-  const hasCheckedMessage = checkResult.message?.toLowerCase().includes('has been checked') ||
-                            checkResult.message?.toLowerCase().includes('was checked') ||
-                            checkResult.errors.some((err: any) => (err.text || '').toLowerCase().includes('has been checked'));
-
-  if (hasCheckedMessage) {
-    return response; // "has been checked" is a normal response, not an error
-  }
-
-  // Only throw error if there are actual problems (ERROR or WARNING)
-  if (!checkResult.success || checkResult.has_errors) {
-    throw new Error(`Class check failed: ${checkResult.message}`);
+  // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+  // Ignore "has been checked" messages (normal response, not an error)
+  if (checkResult.errors.length > 0) {
+    const errorTexts = checkResult.errors.map(err => err.text || '').join(' ').toLowerCase();
+    const isCheckedMessage = errorTexts.includes('has been checked') || errorTexts.includes('was checked');
+    
+    if (!isCheckedMessage) {
+      // Has type E errors that are not "has been checked" - throw error
+      const errorMessages = checkResult.errors.map(err => err.text).join('; ');
+      throw new Error(`Class check failed: ${errorMessages}`);
+    }
   }
 
   return response;

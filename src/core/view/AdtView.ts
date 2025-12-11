@@ -53,18 +53,19 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
     const state: IViewState = { errors: [] };
     try {
       const response = await validateViewName(
-      this.connection,
-      config.viewName,
-      config.packageName,
-      config.description
-    );
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
-    logErrorSafely(this.logger, 'validate', err);
-    throw err;
-  }
-  return state;
+        this.connection,
+        config.viewName,
+        config.packageName,
+        config.description
+      );
+      state.validationResponse = response;
+      return state;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+      logErrorSafely(this.logger, 'validate', err);
+      throw err;
+    }
 }
 
   /**

@@ -28,6 +28,8 @@ import {
   logBuilderTestStepError,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
+import { hasCheckErrorsFromResponse, getCheckErrorMessages } from '../../helpers/checkResultHelper';
+import { parseCheckRunResponse } from '../../../utils/checkRun';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -243,7 +245,12 @@ describe('TableBuilder (using AdtClient)', () => {
             ddlCode: updatedDdlCode
           }, 'inactive');
           const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
-          expect(checkBeforeUpdate?.status).toBeDefined();
+          // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+          const hasErrorsBeforeUpdate = hasCheckErrorsFromResponse(checkBeforeUpdate);
+          if (hasErrorsBeforeUpdate) {
+            const errorMessages = checkBeforeUpdate ? getCheckErrorMessages(parseCheckRunResponse(checkBeforeUpdate)) : [];
+            throw new Error(`Check before update failed: ${errorMessages.join('; ')}`);
+          }
           
           currentStep = 'update';
           logBuilderTestStep(currentStep);
@@ -260,14 +267,24 @@ describe('TableBuilder (using AdtClient)', () => {
             ddlCode: updatedDdlCode
           }, 'inactive');
           const checkResultNewCode = checkResultNewCodeState?.checkResult;
-          expect(checkResultNewCode?.status).toBeDefined();
-          testsLogger.info?.(`✅ Check with new code completed: ${checkResultNewCode?.status === 200 ? 'OK' : 'Has errors/warnings'}`);
+          // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+          const hasErrorsNewCode = hasCheckErrorsFromResponse(checkResultNewCode);
+          if (hasErrorsNewCode) {
+            const errorMessages = checkResultNewCode ? getCheckErrorMessages(parseCheckRunResponse(checkResultNewCode)) : [];
+            throw new Error(`Check with new code failed: ${errorMessages.join('; ')}`);
+          }
+          testsLogger.info?.(`✅ Check with new code completed: OK`);
           
           currentStep = 'check(inactive)';
           logBuilderTestStep(currentStep);
           const checkResultInactiveState = await client.getTable().check({ tableName: config.tableName }, 'inactive');
           const checkResultInactive = checkResultInactiveState?.checkResult;
-          expect(checkResultInactive?.status).toBeDefined();
+          // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+          const hasErrorsInactive = hasCheckErrorsFromResponse(checkResultInactive);
+          if (hasErrorsInactive) {
+            const errorMessages = checkResultInactive ? getCheckErrorMessages(parseCheckRunResponse(checkResultInactive)) : [];
+            throw new Error(`Check inactive failed: ${errorMessages.join('; ')}`);
+          }
           
           currentStep = 'activate';
           logBuilderTestStep(currentStep);
@@ -290,7 +307,12 @@ describe('TableBuilder (using AdtClient)', () => {
               objectName: config.tableName
             }
           );
-          expect(checkResultActiveState?.status).toBeDefined();
+          // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+          const hasErrorsActive = checkResultActiveState ? hasCheckErrorsFromResponse(checkResultActiveState) : false;
+          if (hasErrorsActive) {
+            const errorMessages = checkResultActiveState ? getCheckErrorMessages(parseCheckRunResponse(checkResultActiveState)) : [];
+            throw new Error(`Check active failed: ${errorMessages.join('; ')}`);
+          }
           
           currentStep = 'delete (cleanup)';
           logBuilderTestStep(currentStep);

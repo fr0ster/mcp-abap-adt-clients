@@ -29,6 +29,8 @@ import {
   logBuilderTestStepError,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
+import { hasCheckErrorsFromResponse, getCheckErrorMessages } from '../../helpers/checkResultHelper';
+import { parseCheckRunResponse } from '../../../utils/checkRun';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -375,7 +377,12 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
           sourceCode: sourceCode
         }, 'inactive');
         const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
-        expect(checkBeforeUpdate?.status).toBeDefined();
+        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+        const hasErrorsBeforeUpdate = hasCheckErrorsFromResponse(checkBeforeUpdate);
+        if (hasErrorsBeforeUpdate) {
+          const errorMessages = checkBeforeUpdate ? getCheckErrorMessages(parseCheckRunResponse(checkBeforeUpdate)) : [];
+          throw new Error(`Check before update failed: ${errorMessages.join('; ')}`);
+        }
         
         currentStep = 'update';
         logBuilderTestStep(currentStep);
@@ -392,7 +399,12 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
           functionGroupName: functionGroupName
         });
         const checkResult = checkResultState?.checkResult;
-        expect(checkResult?.status).toBeDefined();
+        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+        const hasErrors = hasCheckErrorsFromResponse(checkResult);
+        if (hasErrors) {
+          const errorMessages = checkResult ? getCheckErrorMessages(parseCheckRunResponse(checkResult)) : [];
+          throw new Error(`Check failed: ${errorMessages.join('; ')}`);
+        }
         
         currentStep = 'activate';
         logBuilderTestStep(currentStep);

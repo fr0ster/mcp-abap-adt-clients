@@ -29,6 +29,8 @@ import {
   logBuilderTestStepError,
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
+import { hasCheckErrorsFromResponse, getCheckErrorMessages } from '../../helpers/checkResultHelper';
+import { parseCheckRunResponse } from '../../../utils/checkRun';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -433,14 +435,24 @@ describe('View (using AdtClient)', () => {
           ddlSource: updatedDdlSource
         }, 'inactive');
         const checkResultNewCode = checkResultNewCodeState?.checkResult;
-        expect(checkResultNewCode?.status).toBeDefined();
-        testsLogger.info?.(`✅ Check with new code completed: ${checkResultNewCode?.status === 200 ? 'OK' : 'Has errors/warnings'}`);
+        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+        const hasErrorsNewCode = hasCheckErrorsFromResponse(checkResultNewCode);
+        if (hasErrorsNewCode) {
+          const errorMessages = checkResultNewCode ? getCheckErrorMessages(parseCheckRunResponse(checkResultNewCode)) : [];
+          throw new Error(`Check with new code failed: ${errorMessages.join('; ')}`);
+        }
+        testsLogger.info?.(`✅ Check with new code completed: OK`);
         
         currentStep = 'check(inactive)';
         logBuilderTestStep(currentStep);
         const checkResultInactiveState = await client.getView().check({ viewName: config.viewName }, 'inactive');
         const checkResultInactive = checkResultInactiveState?.checkResult;
-        expect(checkResultInactive?.status).toBeDefined();
+        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+        const hasErrorsInactive = hasCheckErrorsFromResponse(checkResultInactive);
+        if (hasErrorsInactive) {
+          const errorMessages = checkResultInactive ? getCheckErrorMessages(parseCheckRunResponse(checkResultInactive)) : [];
+          throw new Error(`Check inactive failed: ${errorMessages.join('; ')}`);
+        }
         
         currentStep = 'activate';
         logBuilderTestStep(currentStep);
@@ -463,7 +475,12 @@ describe('View (using AdtClient)', () => {
             objectName: config.viewName
           }
         );
-        expect(checkResultActiveState?.status).toBeDefined();
+        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+        const hasErrorsActive = checkResultActiveState ? hasCheckErrorsFromResponse(checkResultActiveState) : false;
+        if (hasErrorsActive) {
+          const errorMessages = checkResultActiveState ? getCheckErrorMessages(parseCheckRunResponse(checkResultActiveState)) : [];
+          throw new Error(`Check active failed: ${errorMessages.join('; ')}`);
+        }
         
         // Read the created view before cleanup
         if (viewName) {
@@ -660,12 +677,20 @@ describe('View (using AdtClient)', () => {
         try {
           const checkState = await client.getView().check({ viewName }, 'active');
           const checkResult = checkState?.checkResult;
+          // Check only for type E messages - HTTP 200 is normal, errors are in XML response
+          const hasErrors = hasCheckErrorsFromResponse(checkResult);
+          if (hasErrors) {
+            const errorMessages = checkResult ? getCheckErrorMessages(parseCheckRunResponse(checkResult)) : [];
+            logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
+              `CDS view ${viewName} check failed: ${errorMessages.join('; ')}. View must be active before running this test. - environment problem, test skipped`);
+            return;
+          }
           // Additional delay after check to ensure view is fully ready for unit test doubles
           await new Promise(resolve => setTimeout(resolve, getOperationDelay('check', testCase) || 2000));
         } catch (checkError: any) {
-          // If check fails, view might not be active - skip test
+          // If check throws (connection error, not XML error), skip test
           logBuilderTestSkip(testsLogger, 'View - CDS unit test', 
-            `CDS view ${viewName} is not active (HTTP ${checkError.response?.status || '?'}). View must be active before running this test. - environment problem, test skipped`);
+            `CDS view ${viewName} check failed (HTTP ${checkError.response?.status || '?'}): ${checkError.message}. View must be active before running this test. - environment problem, test skipped`);
           return;
         }
 
