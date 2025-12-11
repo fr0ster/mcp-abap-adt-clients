@@ -567,6 +567,11 @@ await domainOps.update(config, { activateOnUpdate: true });
   - [x] Migrate `MetadataExtension.test.ts` to use `AdtClient`
   - [ ] Review and migrate shared tests (`groupActivation.test.ts`, `readSource.test.ts`, `readMetadata.test.ts`, etc.) to use `AdtClient` where applicable
   - [x] Keep `Transport.test.ts` and `class/run.test.ts` on appropriate APIs (specific low-level operations)
+- [x] Add cleanup parameter support to all integration tests
+  - [x] Update all 15 object-specific tests to check `cleanup_after_test` and `skip_cleanup` parameters
+  - [x] Implement cleanup logic: cleanup only if `cleanup_after_test !== false` AND `skip_cleanup !== true`
+  - [x] Add logging when cleanup is skipped
+  - [x] Create `TEST_CLEANUP_STATUS.md` documentation
 - [ ] Update documentation
 - [ ] Add usage examples with clean API
 
@@ -912,11 +917,89 @@ try {
    - Automatic retry for transient failures
    - Configurable retry policies
 
+## Test Cleanup Configuration
+
+### Cleanup Parameters
+
+Integration tests support two cleanup parameters to control object deletion after tests:
+
+1. **`cleanup_after_test`** (global configuration):
+   - Type: `boolean | undefined`
+   - Default: `true` if not set
+   - Location: Global test configuration (e.g., `test-config.yaml`)
+   - Purpose: Enable/disable cleanup globally for all tests
+   - Usage: Set to `false` to disable cleanup globally
+
+2. **`skip_cleanup`** (test-specific or global):
+   - Type: `boolean | undefined`
+   - Default: `false` if not set
+   - Location: Test-specific configuration or global override
+   - Purpose: Skip cleanup for specific test or globally
+   - Usage: Set to `true` to skip cleanup for specific test or globally
+
+### Cleanup Logic
+
+Cleanup is performed only when:
+```typescript
+const shouldCleanup = (cleanup_after_test !== false) && (!skip_cleanup);
+```
+
+**Implementation Pattern:**
+```typescript
+// At the start of test (after config setup)
+const envConfig = getEnvironmentConfig();
+const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+const globalSkipCleanup = envConfig.skip_cleanup === true;
+const skipCleanup = testCase.params.skip_cleanup !== undefined
+  ? testCase.params.skip_cleanup === true
+  : globalSkipCleanup;
+const shouldCleanup = cleanupAfterTest && !skipCleanup;
+
+// In test body (successful completion)
+if (shouldCleanup) {
+  await client.getObject().delete({ ... });
+} else {
+  testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - object left for analysis: ${objectName}`);
+}
+
+// In catch block (error cleanup)
+if (shouldCleanup && objectCreated) {
+  try {
+    await client.getObject().delete({ ... });
+  } catch (cleanupError) {
+    testsLogger.warn?.(`Cleanup failed:`, cleanupError);
+  }
+} else if (!shouldCleanup && objectCreated) {
+  testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - object left for analysis: ${objectName}`);
+}
+```
+
+### Status
+
+**✅ Completed:** All 15 object-specific integration tests now support cleanup parameters:
+- Table.test.ts
+- View.test.ts
+- FunctionModule.test.ts
+- ServiceDefinition.test.ts
+- DataElement.test.ts
+- Class.test.ts
+- Interface.test.ts
+- Domain.test.ts
+- Structure.test.ts
+- BehaviorDefinition.test.ts
+- BehaviorImplementation.test.ts
+- MetadataExtension.test.ts
+- FunctionGroup.test.ts
+- Package.test.ts
+- Program.test.ts
+
+**Documentation:** See `docs/development/TEST_CLEANUP_STATUS.md` for detailed status and implementation patterns.
+
 ## Roadmap Execution Summary
 
-**Last Updated:** 2024-12-19
+**Last Updated:** 2025-12-11
 
-### Overall Progress: ~85% Complete
+### Overall Progress: ~87% Complete
 
 #### ✅ Completed Phases:
 - **Phase 1: Core Infrastructure** - 100% ✅
@@ -928,10 +1011,11 @@ try {
   - Testing: Partially covered (needs comprehensive error scenario tests)
   - Documentation: Patterns documented in roadmap
 
-- **Phase 4: Integration** - ~60% ⚠️
+- **Phase 4: Integration** - ~65% ⚠️
   - Factory methods: 100% complete (17 object types + 4 local class types)
   - Exports: 100% complete
   - Integration tests: ~5% complete (1/21 applicable test files migrated)
+  - Test cleanup configuration: 100% complete (all 15 tests support cleanup parameters)
   - Documentation: 0% (pending)
 
 ### Key Achievements:
@@ -941,9 +1025,10 @@ try {
 4. ✅ Reference implementation (`AdtClass`) fully functional
 5. ✅ All integration test files migrated to demonstrate pattern (renamed from `*Builder.test.ts` to `*.test.ts`)
 6. ✅ Test migration tracking section added to roadmap
+7. ✅ All 15 integration tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
 
 ### Remaining Work:
-1. ⚠️ Migrate 13 remaining object-specific integration test files to `AdtClient`
+1. ⚠️ Migrate 13 remaining object-specific integration test files to `AdtClient` (Note: All tests already migrated, but tracking shows old status)
 2. ⚠️ Review and migrate shared integration tests where applicable (7 files)
 3. ⚠️ Add comprehensive error scenario tests
 4. ⚠️ Create user documentation and usage examples
@@ -952,16 +1037,19 @@ try {
 ### Implementation Statistics:
 - **CRUD Classes:** 17/17 (100%)
 - **Factory Methods:** 21/21 (100%)
-- **Object-Specific Tests Migrated:** 3/14 (21%)
+- **Object-Specific Tests Migrated:** 15/15 (100%)
+- **Test Cleanup Configuration:** 15/15 (100%)
 - **Shared Tests Reviewed:** 0/7 (0%)
 - **Specialized Tests (Correct API):** 2/2 (100%)
-- **Overall Test Migration:** 13/21 applicable tests (62%)
+- **Overall Test Migration:** 15/17 applicable tests (88%)
 - **Documentation:** 0% (pending)
 
 ### Test Migration Status:
 - ✅ **Migrated:** `class/Class.test.ts`, `program/Program.test.ts`, `interface/Interface.test.ts`, `domain/Domain.test.ts`, `dataElement/DataElement.test.ts`, `structure/Structure.test.ts`, `table/Table.test.ts`, `view/View.test.ts`, `functionGroup/FunctionGroup.test.ts`, `functionModule/FunctionModule.test.ts`, `package/Package.test.ts`, `serviceDefinition/ServiceDefinition.test.ts`, `behaviorDefinition/BehaviorDefinition.test.ts`, `behaviorImplementation/BehaviorImplementation.test.ts`, `metadataExtension/MetadataExtension.test.ts`
+- ✅ **Cleanup Configuration:** All 15 migrated tests support `cleanup_after_test` and `skip_cleanup` parameters
 - ✅ **Kept on low-level API:** `transport/Transport.test.ts` (tests Builder API specifically)
 - ⚠️ **Review Needed (7 files):** Shared integration tests
 - ✅ **Correct API (2 files):** Specialized tests using appropriate APIs
 
 See "Test Migration Tracking" section above for detailed test migration status.
+See "Test Cleanup Configuration" section above for cleanup parameter implementation details.
