@@ -3,6 +3,7 @@
  */
 
 export { SharedBuilder } from './SharedBuilder';
+export { AdtUtils } from './AdtUtils';
 export type { 
   IObjectReference as ObjectReference,
   IInactiveObjectsResponse as InactiveObjectsResponse,

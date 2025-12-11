@@ -77,7 +77,14 @@ This roadmap describes the implementation of high-level CRUD operations that enc
 3. **AdtClient** (`src/clients/AdtClient.ts`)
    - High-level client that returns IAdtObject instances
    - Factory methods for each object type (`getClass()`, `getProgram()`, etc.)
+   - Factory method for utility functions (`getUtils()`)
    - Maintains connection and logger context
+
+4. **AdtUtils** (`src/core/shared/AdtUtils.ts`)
+   - Utility functions wrapper (NOT CRUD operations)
+   - Provides access to cross-cutting ADT functionality
+   - Methods: `searchObjects()`, `getWhereUsed()`, `getInactiveObjects()`, `activateObjectsGroup()`, `readObjectSource()`, `readObjectMetadata()`, `getSqlQuery()`, `getTableContents()`, etc.
+   - Stateless utility class (no state management)
 
 ### Session Management Rules
 
@@ -456,6 +463,20 @@ export class AdtClient {
   getMetadataExtension(): IAdtObject<MetadataExtensionBuilderConfig, MetadataExtensionBuilderConfig>;
   getUnitTest(): IAdtObject<IUnitTestBuilderConfig, IUnitTestBuilderConfig>;
   getRequest(): IAdtObject<ITransportBuilderConfig, ITransportBuilderConfig>;
+  
+  /**
+   * Get utility functions (NOT CRUD operations)
+   * Provides access to cross-cutting ADT utility functions:
+   * - Search operations
+   * - Where-used analysis
+   * - Inactive objects management
+   * - Group activation/deletion
+   * - Object metadata and source code reading
+   * - SQL queries and table contents
+   * 
+   * @returns AdtUtils instance for utility operations
+   */
+  getUtils(): AdtUtils;
 }
 ```
 
@@ -465,15 +486,35 @@ export class AdtClient {
 ```typescript
 const client = new AdtClient(connection, logger);
 
-// Clean, readable API
+// CRUD operations via AdtObject
 const classOps = client.getClass();
 await classOps.create(config, { activateOnCreate: true });
 
 const domainOps = client.getDomain();
 await domainOps.update(config, { activateOnUpdate: true });
+
+// Utility functions via AdtUtils (NOT CRUD operations)
+const utils = client.getUtils();
+await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+await utils.getWhereUsed({ objectName: 'ZMY_CLASS', objectType: 'CLAS' });
+await utils.activateObjectsGroup([{ type: 'DOMA', name: 'ZMY_DOMAIN' }]);
+await utils.getInactiveObjects();
+await utils.readObjectSource('CLAS', 'ZMY_CLASS');
+await utils.readObjectMetadata('CLAS', 'ZMY_CLASS');
 ```
 
 ## Implementation Phases
+
+### Phase 0: AdtUtils Infrastructure ✅ COMPLETED
+- [x] Create `AdtUtils` class in `src/core/shared/AdtUtils.ts`
+  - [x] Wrap utility functions from `src/core/shared/*.ts`
+  - [x] Methods: `searchObjects()`, `getWhereUsed()`, `getInactiveObjects()`, `activateObjectsGroup()`, `checkDeletionGroup()`, `deleteObjectsGroup()`, `readObjectSource()`, `readObjectMetadata()`, `supportsSourceCode()`, `getObjectSourceUri()`, `getSqlQuery()`, `getTableContents()`
+  - [x] Stateless utility class (no state management, just wraps low-level functions)
+- [x] Add `getUtils()` method to `AdtClient`
+  - [x] Return `AdtUtils` instance with connection and logger
+- [x] Export `AdtUtils` from `src/core/shared/index.ts`
+
+**Status:** ✅ Completed - Ready for shared tests migration
 
 ### Phase 1: Core Infrastructure ✅ COMPLETED
 - [x] Create `IAdtObject` interface in `@mcp-abap-adt/interfaces/src/adt/IAdtObject.ts`
@@ -541,8 +582,10 @@ await domainOps.update(config, { activateOnUpdate: true });
 - [x] Complete `AdtClient` with factory method for Package (`getPackage()`)
 - [x] Complete `AdtClient` with factory methods for ServiceDefinition, BehaviorDefinition, BehaviorImplementation, MetadataExtension (`getServiceDefinition()`, `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`)
 - [x] Complete `AdtClient` with factory methods for UnitTest and Request (`getUnitTest()`, `getRequest()`)
+- [x] Complete `AdtClient` with factory method for utility functions (`getUtils()`)
 - [x] Export new classes from index files (`src/core/program/index.ts`, `src/core/interface/index.ts`, `src/core/domain/index.ts`, `src/core/dataElement/index.ts`, `src/core/structure/index.ts`, `src/core/table/index.ts`, `src/core/view/index.ts`, `src/core/functionGroup/index.ts`, `src/core/functionModule/index.ts`, `src/core/package/index.ts`, `src/core/serviceDefinition/index.ts`, `src/core/behaviorDefinition/index.ts`, `src/core/behaviorImplementation/index.ts`, `src/core/metadataExtension/index.ts`)
 - [x] Export new classes from index files for UnitTest and Request (`src/core/unitTest/index.ts`, `src/core/transport/index.ts`)
+- [x] Export `AdtUtils` from `src/core/shared/index.ts` and `src/index.ts`
 - [ ] Add integration tests
   - [x] Migrate `Class.test.ts` to use `AdtClient` (all operations including test classes)
     - [x] Removed all Builder classes (`ClassUnitTestBuilder`)
@@ -565,7 +608,15 @@ await domainOps.update(config, { activateOnUpdate: true });
   - [x] Migrate `BehaviorDefinition.test.ts` to use `AdtClient`
   - [x] Migrate `BehaviorImplementation.test.ts` to use `AdtClient`
   - [x] Migrate `MetadataExtension.test.ts` to use `AdtClient`
-  - [ ] Review and migrate shared tests (`groupActivation.test.ts`, `readSource.test.ts`, `readMetadata.test.ts`, etc.) to use `AdtClient` where applicable
+  - [x] Create `AdtUtils` class for utility functions (not CRUD operations) - ✅ Completed in Phase 0
+  - [ ] Review and migrate shared tests to use `AdtObject` (for CRUD) and `AdtUtils` (for utilities)
+  - [ ] `groupActivation.test.ts` - Migrate object operations to `AdtObject`, group activation to `AdtUtils`
+  - [ ] `readSource.test.ts` - Migrate to `AdtObject.read()` or `AdtUtils.readObjectSource()`
+  - [ ] `readMetadata.test.ts` - Migrate to `AdtUtils.readObjectMetadata()`
+  - [ ] `tableContents.test.ts` - Migrate to `AdtUtils.getTableContents()`
+  - [ ] `search.test.ts` - Migrate to `AdtUtils.searchObjects()`
+  - [ ] `sqlQuery.test.ts` - Migrate to `AdtUtils.getSqlQuery()`
+  - [ ] `whereUsed.test.ts` - Migrate to `AdtUtils.getWhereUsed()`
   - [x] Keep `Transport.test.ts` and `class/run.test.ts` on appropriate APIs (specific low-level operations)
 - [x] Add cleanup parameter support to all integration tests
   - [x] Update all 15 object-specific tests to check `cleanup_after_test` and `skip_cleanup` parameters
@@ -577,8 +628,11 @@ await domainOps.update(config, { activateOnUpdate: true });
 
 **Status:** 
 - ✅ All factory methods in `AdtClient` are implemented (17 object types + 4 local class types)
+- ✅ `AdtUtils` class created and `getUtils()` method added to `AdtClient`
 - ✅ All CRUD classes are exported from index files
+- ✅ `AdtUtils` exported from `src/core/shared/index.ts` and `src/index.ts`
 - ✅ All 16 integration test files migrated to `AdtClient` (renamed from `*Builder.test.ts` to `*.test.ts`)
+- ⚠️ Shared tests migration pending (infrastructure ready)
 - ⚠️ Documentation and usage examples still pending
 
 ## Test Migration Tracking
@@ -999,9 +1053,10 @@ if (shouldCleanup && objectCreated) {
 
 **Last Updated:** 2025-12-11
 
-### Overall Progress: ~87% Complete
+### Overall Progress: ~88% Complete
 
 #### ✅ Completed Phases:
+- **Phase 0: AdtUtils Infrastructure** - 100% ✅
 - **Phase 1: Core Infrastructure** - 100% ✅
 - **Phase 3: Object CRUD Classes** - 100% ✅
 
@@ -1011,21 +1066,29 @@ if (shouldCleanup && objectCreated) {
   - Testing: Partially covered (needs comprehensive error scenario tests)
   - Documentation: Patterns documented in roadmap
 
-- **Phase 4: Integration** - ~65% ⚠️
+- **Phase 0: AdtUtils Infrastructure** - 100% ✅
+  - AdtUtils class: 100% complete
+  - getUtils() method: 100% complete
+  - Exports: 100% complete
+- **Phase 4: Integration** - ~70% ⚠️
   - Factory methods: 100% complete (17 object types + 4 local class types)
+  - Utility methods: 100% complete (getUtils() for AdtUtils)
   - Exports: 100% complete
   - Integration tests: ~5% complete (1/21 applicable test files migrated)
   - Test cleanup configuration: 100% complete (all 15 tests support cleanup parameters)
+  - Shared tests migration: 0% (pending - AdtUtils ready)
   - Documentation: 0% (pending)
 
 ### Key Achievements:
 1. ✅ All 17 object types have high-level CRUD operations
 2. ✅ Complete `AdtClient` API with all factory methods
-3. ✅ Consistent error handling and session management across all objects
-4. ✅ Reference implementation (`AdtClass`) fully functional
-5. ✅ All integration test files migrated to demonstrate pattern (renamed from `*Builder.test.ts` to `*.test.ts`)
-6. ✅ Test migration tracking section added to roadmap
-7. ✅ All 15 integration tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
+3. ✅ `AdtUtils` class created for utility functions (NOT CRUD operations)
+4. ✅ `AdtClient.getUtils()` method provides access to utility functions
+5. ✅ Consistent error handling and session management across all objects
+6. ✅ Reference implementation (`AdtClass`) fully functional
+7. ✅ All integration test files migrated to demonstrate pattern (renamed from `*Builder.test.ts` to `*.test.ts`)
+8. ✅ Test migration tracking section added to roadmap
+9. ✅ All 15 integration tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
 
 ### Remaining Work:
 1. ⚠️ Migrate 13 remaining object-specific integration test files to `AdtClient` (Note: All tests already migrated, but tracking shows old status)
@@ -1048,8 +1111,9 @@ if (shouldCleanup && objectCreated) {
 - ✅ **Migrated:** `class/Class.test.ts`, `program/Program.test.ts`, `interface/Interface.test.ts`, `domain/Domain.test.ts`, `dataElement/DataElement.test.ts`, `structure/Structure.test.ts`, `table/Table.test.ts`, `view/View.test.ts`, `functionGroup/FunctionGroup.test.ts`, `functionModule/FunctionModule.test.ts`, `package/Package.test.ts`, `serviceDefinition/ServiceDefinition.test.ts`, `behaviorDefinition/BehaviorDefinition.test.ts`, `behaviorImplementation/BehaviorImplementation.test.ts`, `metadataExtension/MetadataExtension.test.ts`
 - ✅ **Cleanup Configuration:** All 15 migrated tests support `cleanup_after_test` and `skip_cleanup` parameters
 - ✅ **Kept on low-level API:** `transport/Transport.test.ts` (tests Builder API specifically)
-- ⚠️ **Review Needed (7 files):** Shared integration tests
+- ⚠️ **Ready for Migration (7 files):** Shared integration tests - `AdtUtils` infrastructure ready
 - ✅ **Correct API (2 files):** Specialized tests using appropriate APIs
 
 See "Test Migration Tracking" section above for detailed test migration status.
 See "Test Cleanup Configuration" section above for cleanup parameter implementation details.
+See "SHARED_TESTS_MIGRATION_ANALYSIS.md" for shared tests migration plan.

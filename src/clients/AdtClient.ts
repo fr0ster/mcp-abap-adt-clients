@@ -46,6 +46,7 @@ import { IMetadataExtensionConfig, IMetadataExtensionState, AdtMetadataExtension
 import { AdtRequest } from '../core/transport';
 import { AdtUnitTest, AdtCdsUnitTest, IUnitTestConfig, IUnitTestState, ICdsUnitTestConfig, ICdsUnitTestState } from '../core/unitTest';
 import { ITransportConfig, ITransportState } from '../core/transport/types';
+import { AdtUtils } from '../core/shared/AdtUtils';
 
 export class AdtClient {
   private connection: IAbapConnection;
@@ -203,6 +204,21 @@ export class AdtClient {
     return new AdtRequest(this.connection, this.logger);
   }
 
+  /**
+   * Get utility functions (NOT CRUD operations)
+   * Provides access to cross-cutting ADT utility functions:
+   * - Search operations
+   * - Where-used analysis
+   * - Inactive objects management
+   * - Group activation/deletion
+   * - Object metadata and source code reading
+   * - SQL queries and table contents
+   * 
+   * @returns AdtUtils instance for utility operations
+   */
+  getUtils(): AdtUtils {
+    return new AdtUtils(this.connection, this.logger);
+  }
 
   /**
    * Get high-level operations for LocalTestClass objects

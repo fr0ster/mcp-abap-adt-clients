@@ -36,8 +36,8 @@ export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
 export { AdtClient } from './clients/AdtClient';
 
-// Export SharedBuilder
-export { SharedBuilder } from './core/shared';
+// Export SharedBuilder and AdtUtils
+export { SharedBuilder, AdtUtils } from './core/shared';
 
 // Export shared types
 export type {
