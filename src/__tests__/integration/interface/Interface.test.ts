@@ -42,7 +42,8 @@ const {
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate
+  retryCheckAfterActivate,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -201,6 +202,15 @@ describe('InterfaceBuilder (using AdtClient)', () => {
       }
       expect(validationResponse?.status).toBe(200);
 
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+
       let interfaceCreated = false;
       let currentStep = '';
       
@@ -286,20 +296,24 @@ describe('InterfaceBuilder (using AdtClient)', () => {
         );
         expect(checkResultActiveState?.status).toBeDefined();
 
-        currentStep = 'delete (cleanup)';
-        logBuilderTestStep(currentStep);
-        await client.getInterface().delete({
-          interfaceName: config.interfaceName,
-          transportRequest: config.transportRequest
-        });
+        if (shouldCleanup) {
+          currentStep = 'delete (cleanup)';
+          logBuilderTestStep(currentStep);
+          await client.getInterface().delete({
+            interfaceName: config.interfaceName,
+            transportRequest: config.transportRequest
+          });
+        } else {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - interface left for analysis: ${config.interfaceName}`);
+        }
 
         logBuilderTestSuccess(testsLogger, 'Interface - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
         
-        // Cleanup: delete if object was created
-        if (interfaceCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && interfaceCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getInterface().delete({
@@ -310,6 +324,8 @@ describe('InterfaceBuilder (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.interfaceName}:`, cleanupError);
           }
+        } else if (!shouldCleanup && interfaceCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - interface left for analysis: ${config.interfaceName}`);
         }
         
         const statusText = getHttpStatusText(error);

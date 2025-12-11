@@ -229,6 +229,16 @@ extend view ${targetEntity} with "${extName}"
       }
 
       const config = buildBuilderConfig(testCase);
+      
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      
       let metadataExtensionCreated = false;
       let currentStep = '';
 
@@ -327,8 +337,8 @@ extend view ${targetEntity} with "${extName}"
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: delete if object was created
-        if (metadataExtensionCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && metadataExtensionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getMetadataExtension().delete({
@@ -339,6 +349,8 @@ extend view ${targetEntity} with "${extName}"
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.extName}:`, cleanupError);
           }
+        } else if (!shouldCleanup && metadataExtensionCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - metadata extension left for analysis: ${config.extName}`);
         }
 
         const statusText = getHttpStatusText(error);
@@ -348,8 +360,8 @@ extend view ${targetEntity} with "${extName}"
         logBuilderTestError(testsLogger, 'MetadataExtension - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Cleanup: delete metadata extension only if it was created in this test
-        if (extName && metadataExtensionCreated) {
+        // Cleanup: delete metadata extension if cleanup is enabled
+        if (shouldCleanup && extName && metadataExtensionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getMetadataExtension().delete({
@@ -360,6 +372,8 @@ extend view ${targetEntity} with "${extName}"
           } catch (deleteError: any) {
             testsLogger.warn?.('Failed to delete metadata extension during cleanup:', deleteError.message || deleteError);
           }
+        } else if (!shouldCleanup && extName && metadataExtensionCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - metadata extension left for analysis: ${extName}`);
         }
         logBuilderTestEnd(testsLogger, 'MetadataExtension - full workflow');
       }

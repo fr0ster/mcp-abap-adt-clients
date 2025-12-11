@@ -44,7 +44,8 @@ const {
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate
+  retryCheckAfterActivate,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -205,6 +206,15 @@ describe('TableBuilder (using AdtClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+
       logBuilderTestStep('validate');
       const validationState = await client.getTable().validate({
         tableName: config.tableName,
@@ -314,20 +324,24 @@ describe('TableBuilder (using AdtClient)', () => {
             throw new Error(`Check active failed: ${errorMessages.join('; ')}`);
           }
           
-          currentStep = 'delete (cleanup)';
-          logBuilderTestStep(currentStep);
-          await client.getTable().delete({
-            tableName: config.tableName,
-            transportRequest: config.transportRequest
-          });
+          if (shouldCleanup) {
+            currentStep = 'delete (cleanup)';
+            logBuilderTestStep(currentStep);
+            await client.getTable().delete({
+              tableName: config.tableName,
+              transportRequest: config.transportRequest
+            });
+          } else {
+            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - table left for analysis: ${config.tableName}`);
+          }
 
           logBuilderTestSuccess(testsLogger, 'Table - full workflow');
         } catch (error: any) {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
           
-          // Cleanup: delete if object was created
-          if (tableCreated) {
+          // Cleanup: delete if object was created and cleanup is enabled
+          if (shouldCleanup && tableCreated) {
             try {
               logBuilderTestStep('delete (cleanup)');
               await client.getTable().delete({
@@ -338,6 +352,8 @@ describe('TableBuilder (using AdtClient)', () => {
               // Log cleanup error but don't fail test - original error is more important
               testsLogger.warn?.(`Cleanup failed for ${config.tableName}:`, cleanupError);
             }
+          } else if (!shouldCleanup && tableCreated) {
+            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - table left for analysis: ${config.tableName}`);
           }
           
           const statusText = getHttpStatusText(error);

@@ -289,11 +289,13 @@ describe('View (using AdtClient)', () => {
       // Cleanup table if it was created in beforeEach
       // Check test-case specific first (overrides global), then fallback to global
       const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
       const globalSkipCleanup = envConfig.skip_cleanup === true;
       const skipCleanup = testCase?.params?.skip_cleanup !== undefined
         ? testCase.params.skip_cleanup === true
         : globalSkipCleanup;
-      if (!skipCleanup && tableCreated && tableName && connection) {
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      if (shouldCleanup && tableCreated && tableName && connection) {
         try {
           await client.getTable().delete({
             tableName: tableName,
@@ -303,8 +305,8 @@ describe('View (using AdtClient)', () => {
           // Log but don't fail - table cleanup is best effort
           testsLogger.warn?.(`Failed to cleanup table ${tableName}:`, error);
         }
-      } else if (skipCleanup && tableCreated && tableName) {
-        testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - table left for analysis:', tableName);
+      } else if (!shouldCleanup && tableCreated && tableName) {
+        testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - table left for analysis:`, tableName);
       }
     });
 
@@ -324,12 +326,14 @@ describe('View (using AdtClient)', () => {
       }
 
       const config = buildBuilderConfig(testCase);
-      // Check test-case specific first (overrides global), then fallback to global
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
       const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
       const globalSkipCleanup = envConfig.skip_cleanup === true;
       const skipCleanup = testCase.params.skip_cleanup !== undefined 
         ? testCase.params.skip_cleanup === true 
         : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
       // Validate test parameters at the start
       logBuilderTestStep('validate parameters');
@@ -499,7 +503,7 @@ describe('View (using AdtClient)', () => {
           }
         }
         
-        if (!skipCleanup) {
+        if (shouldCleanup) {
           currentStep = 'delete (cleanup)';
           logBuilderTestStep(currentStep);
           // Use group deletion for view and table together
@@ -517,7 +521,7 @@ describe('View (using AdtClient)', () => {
             });
           }
         } else {
-          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - objects left for analysis:', {
+          testsLogger.info?.('⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - objects left for analysis:', {
             view: viewName,
             table: tableName
           });
@@ -528,8 +532,8 @@ describe('View (using AdtClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
         
-        // Cleanup: delete (if skip_cleanup is false)
-        if (!skipCleanup && (viewCreated || shouldCleanupTable)) {
+        // Cleanup: delete if cleanup is enabled
+        if (shouldCleanup && (viewCreated || shouldCleanupTable)) {
           try {
             logBuilderTestStep('delete (cleanup)');
             // Use group deletion for view and table together
@@ -559,8 +563,8 @@ describe('View (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.viewName}:`, cleanupError);
           }
-        } else if (skipCleanup && (viewCreated || shouldCleanupTable)) {
-          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - objects left for analysis:', {
+        } else if (!shouldCleanup && (viewCreated || shouldCleanupTable)) {
+          testsLogger.info?.('⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - objects left for analysis:', {
             view: viewName,
             table: tableName
           });

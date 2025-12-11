@@ -245,6 +245,16 @@ ENDCLASS.`;
       }
 
       const config = buildBuilderConfig(testCase);
+      
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      
       let behaviorImplementationCreated = false;
       let currentStep = '';
 
@@ -359,8 +369,8 @@ ENDCLASS.`;
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: delete if object was created
-        if (behaviorImplementationCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && behaviorImplementationCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getClass().delete({
@@ -371,6 +381,8 @@ ENDCLASS.`;
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.className}:`, cleanupError);
           }
+        } else if (!shouldCleanup && behaviorImplementationCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - behavior implementation left for analysis: ${config.className}`);
         }
 
         const statusText = getHttpStatusText(error);
@@ -380,8 +392,8 @@ ENDCLASS.`;
         logBuilderTestError(testsLogger, 'BehaviorImplementation - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Cleanup: delete behavior implementation class
-        if (className && behaviorImplementationCreated) {
+        // Cleanup: delete behavior implementation class if cleanup is enabled
+        if (shouldCleanup && className && behaviorImplementationCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getClass().delete({
@@ -392,6 +404,8 @@ ENDCLASS.`;
           } catch (deleteError: any) {
             testsLogger.warn?.('Failed to delete behavior implementation class during cleanup:', deleteError.message || deleteError);
           }
+        } else if (!shouldCleanup && className && behaviorImplementationCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - behavior implementation left for analysis: ${className}`);
         }
         logBuilderTestEnd(testsLogger, 'BehaviorImplementation - full workflow');
       }

@@ -34,7 +34,7 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-getEnabledTestCase,
+  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
@@ -42,7 +42,8 @@ getEnabledTestCase,
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate
+  retryCheckAfterActivate,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -209,6 +210,15 @@ describe('DomainBuilder (using AdtClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+
       logBuilderTestStep('validate');
       const validationState = await client.getDomain().validate({
         domainName: config.domainName,
@@ -264,20 +274,24 @@ describe('DomainBuilder (using AdtClient)', () => {
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase)));
         
-        currentStep = 'delete (cleanup)';
-        logBuilderTestStep(currentStep);
-        await client.getDomain().delete({
-          domainName: config.domainName,
-          transportRequest: config.transportRequest
-        });
+        if (shouldCleanup) {
+          currentStep = 'delete (cleanup)';
+          logBuilderTestStep(currentStep);
+          await client.getDomain().delete({
+            domainName: config.domainName,
+            transportRequest: config.transportRequest
+          });
+        } else {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis: ${config.domainName}`);
+        }
 
         logBuilderTestSuccess(testsLogger, 'Domain - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
         
-        // Cleanup: delete if object was created
-        if (domainCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && domainCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getDomain().delete({
@@ -288,6 +302,8 @@ describe('DomainBuilder (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.domainName}:`, cleanupError);
           }
+        } else if (!shouldCleanup && domainCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis: ${config.domainName}`);
         }
         
         const statusText = getHttpStatusText(error);

@@ -44,7 +44,8 @@ const {
   getOperationDelay,
   retryCheckAfterActivate,
   createDependencyDomain,
-  extractValidationErrorMessage
+  extractValidationErrorMessage,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -240,7 +241,16 @@ describe('DataElementBuilder (using AdtClient)', () => {
 
     afterEach(async () => {
       // Cleanup domain if it was created in beforeEach
-      if (domainCreated && domainName) {
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase?.params?.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      
+      if (shouldCleanup && domainCreated && domainName) {
         try {
           await client.getDomain().delete({
             domainName: domainName,
@@ -250,6 +260,8 @@ describe('DataElementBuilder (using AdtClient)', () => {
           // Log but don't fail - cleanup errors are silent
           testsLogger.warn?.(`Cleanup failed for domain ${domainName}:`, cleanupError);
         }
+      } else if (!shouldCleanup && domainCreated && domainName) {
+        testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis:`, domainName);
       }
     });
 
@@ -322,6 +334,15 @@ describe('DataElementBuilder (using AdtClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+
       try {
         // Step 1: Validate
         logBuilderTestStep('validate');
@@ -346,10 +367,14 @@ describe('DataElementBuilder (using AdtClient)', () => {
         // Step 4: Check and Update (may fail - that's OK)
         const updateSucceeded = await tryCheckAndUpdate(config, testCase);
         
-        // If check failed, cleanup and exit
+        // If check failed, cleanup and exit (if cleanup enabled)
         if (!updateSucceeded) {
-          logBuilderTestStep('delete (cleanup after failed check)');
-          await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
+          if (shouldCleanup) {
+            logBuilderTestStep('delete (cleanup after failed check)');
+            await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
+          } else {
+            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - data element left for analysis: ${config.dataElementName}`);
+          }
           logBuilderTestSkip(testsLogger, 'DataElement - full workflow', 'Check failed - test skipped after cleanup');
           return;
         }
@@ -358,8 +383,12 @@ describe('DataElementBuilder (using AdtClient)', () => {
         await activateAndVerify(config, testCase);
         
         // Step 7: Cleanup
-        logBuilderTestStep('delete (cleanup)');
-        await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
+        if (shouldCleanup) {
+          logBuilderTestStep('delete (cleanup)');
+          await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
+        } else {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - data element left for analysis: ${config.dataElementName}`);
+        }
 
         logBuilderTestSuccess(testsLogger, 'DataElement - full workflow');
       } catch (error: any) {

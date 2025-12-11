@@ -284,12 +284,14 @@ describe('ClassBuilder (using AdtClient)', () => {
         logBuilderTestSkip(testsLogger, 'Class - full workflow', 'package_name not configured');
         return;
       }
-      // Check test-case specific first (overrides global), then fallback to global
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
       const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
       const globalSkipCleanup = envConfig.skip_cleanup === true;
       const skipCleanup = testCase.params.skip_cleanup !== undefined
         ? testCase.params.skip_cleanup === true
         : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
       const sourceCode = testCase.params.source_code || `CLASS ${testClassName} DEFINITION PUBLIC FINAL CREATE PUBLIC. ENDCLASS.`;
       const testClassConfig = testCase.params.test_class;
       const shouldUpdateTestClass = Boolean(
@@ -476,7 +478,7 @@ describe('ClassBuilder (using AdtClient)', () => {
             });
           }
 
-          if (!skipCleanup) {
+          if (shouldCleanup) {
             currentStep = 'delete (cleanup)';
             logBuilderTestStep(currentStep);
             await client.getClass().delete({
@@ -484,7 +486,7 @@ describe('ClassBuilder (using AdtClient)', () => {
               transportRequest: resolveTransportRequest(testCase.params.transport_request)
             });
           } else {
-            testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - class left for analysis:', testClassName);
+            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - class left for analysis:`, testClassName);
           }
 
           // Note: AdtClient doesn't store results in state like CrudClient
@@ -503,20 +505,21 @@ describe('ClassBuilder (using AdtClient)', () => {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
 
-          // Cleanup: delete (if skip_cleanup is false)
+          // Cleanup: delete if cleanup is enabled
           // Note: AdtClient automatically handles unlock in update() method, so we only need to delete
-          if (classCreated) {
+          if (shouldCleanup && classCreated) {
             try {
-              // Delete only if skip_cleanup is false
-              if (!skipCleanup) {
-                logBuilderTestStep('delete (cleanup)');
-                await client.getClass().delete({
-                  className: testClassName!,
-                  transportRequest: resolveTransportRequest(testCase.params.transport_request)
-                });
-              } else {
-                testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - class left for analysis:', testClassName);
-              }
+              logBuilderTestStep('delete (cleanup)');
+              await client.getClass().delete({
+                className: testClassName!,
+                transportRequest: resolveTransportRequest(testCase.params.transport_request)
+              });
+            } catch (cleanupError) {
+              testsLogger.warn?.(`Cleanup failed for ${testClassName}:`, cleanupError);
+            }
+          } else if (!shouldCleanup && classCreated) {
+            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - class left for analysis:`, testClassName);
+          }
             } catch (cleanupError) {
               // Log cleanup error but don't fail test - original error is more important
               testsLogger.warn?.(`Cleanup failed for ${testClassName}:`, cleanupError);

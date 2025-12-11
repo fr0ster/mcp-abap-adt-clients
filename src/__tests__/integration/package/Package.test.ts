@@ -246,6 +246,16 @@ describe('PackageBuilder (using AdtClient)', () => {
       }
 
       const config = buildBuilderConfig(testCase);
+      
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      
       let packageCreated = false;
       let currentStep = '';
 
@@ -320,17 +330,21 @@ describe('PackageBuilder (using AdtClient)', () => {
         const checkResult2 = checkResult2State?.checkResult;
         expect(checkResult2?.status).toBeDefined();
 
-        logBuilderTestStep('delete (cleanup)');
-        // Create a new client with fresh session for deletion to avoid lock issues
-        // This is needed because package may still be locked in the current session after unlock
-        const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
-        await (deleteConnection as any).connect();
-        const deleteClient = new AdtClient(deleteConnection, builderLogger);
-        await deleteClient.getPackage().delete({
-          packageName: config.packageName,
-          transportRequest: config.transportRequest
-        });
-        deleteConnection.reset();
+        if (shouldCleanup) {
+          logBuilderTestStep('delete (cleanup)');
+          // Create a new client with fresh session for deletion to avoid lock issues
+          // This is needed because package may still be locked in the current session after unlock
+          const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
+          await (deleteConnection as any).connect();
+          const deleteClient = new AdtClient(deleteConnection, builderLogger);
+          await deleteClient.getPackage().delete({
+            packageName: config.packageName,
+            transportRequest: config.transportRequest
+          });
+          deleteConnection.reset();
+        } else {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - package left for analysis: ${config.packageName}`);
+        }
 
         logBuilderTestSuccess(testsLogger, 'Package - full workflow');
       } catch (error: any) {
@@ -356,8 +370,8 @@ describe('PackageBuilder (using AdtClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: delete if object was created
-        if (packageCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && packageCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             // Create a new client with fresh session for deletion to avoid lock issues
@@ -373,6 +387,8 @@ describe('PackageBuilder (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.packageName}:`, cleanupError);
           }
+        } else if (!shouldCleanup && packageCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - package left for analysis: ${config.packageName}`);
         }
 
         const statusText = getHttpStatusText(error);

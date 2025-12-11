@@ -42,7 +42,8 @@ const {
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate
+  retryCheckAfterActivate,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -220,6 +221,15 @@ describe('ProgramBuilder (using AdtClient)', () => {
       }
       expect(validationResponse?.status).toBe(200);
       
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      
       let programCreated = false;
       let currentStep = '';
       
@@ -282,20 +292,24 @@ describe('ProgramBuilder (using AdtClient)', () => {
           );
           expect(checkResultActiveState?.status).toBeDefined();
           
-          currentStep = 'delete (cleanup)';
-          logBuilderTestStep(currentStep);
-          await client.getProgram().delete({
-            programName: config.programName,
-            transportRequest: config.transportRequest
-          });
+          if (shouldCleanup) {
+            currentStep = 'delete (cleanup)';
+            logBuilderTestStep(currentStep);
+            await client.getProgram().delete({
+              programName: config.programName,
+              transportRequest: config.transportRequest
+            });
+          } else {
+            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - program left for analysis: ${config.programName}`);
+          }
 
           logBuilderTestSuccess(testsLogger, 'Program - full workflow');
         } catch (error: any) {
           // Log step error with details before failing test
           logBuilderTestStepError(currentStep || 'unknown', error);
           
-          // Cleanup: delete if object was created
-          if (programCreated) {
+          // Cleanup: delete if object was created and cleanup is enabled
+          if (shouldCleanup && programCreated) {
             try {
               logBuilderTestStep('delete (cleanup)');
               await client.getProgram().delete({
@@ -306,6 +320,8 @@ describe('ProgramBuilder (using AdtClient)', () => {
               // Log cleanup error but don't fail test - original error is more important
               testsLogger.warn?.(`Cleanup failed for ${config.programName}:`, cleanupError);
             }
+          } else if (!shouldCleanup && programCreated) {
+            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - program left for analysis: ${config.programName}`);
           }
           
           const statusText = getHttpStatusText(error);

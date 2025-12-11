@@ -194,6 +194,16 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
       logBuilderTestStart(testsLogger, 'BehaviorDefinition - full workflow', testCase);
 
       const config = buildBuilderConfig(testCase);
+      
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      
       let behaviorDefinitionCreated = false;
       let currentStep = '';
 
@@ -280,8 +290,8 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: delete if object was created
-        if (behaviorDefinitionCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && behaviorDefinitionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getBehaviorDefinition().delete({
@@ -292,6 +302,8 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.bdefName}:`, cleanupError);
           }
+        } else if (!shouldCleanup && behaviorDefinitionCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - behavior definition left for analysis: ${config.bdefName}`);
         }
 
         const statusText = getHttpStatusText(error);
@@ -301,8 +313,8 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         logBuilderTestError(testsLogger, 'BehaviorDefinition - full workflow', enhancedError);
         throw enhancedError;
       } finally {
-        // Cleanup: delete behavior definition
-        if (config && behaviorDefinitionCreated) {
+        // Cleanup: delete behavior definition if cleanup is enabled
+        if (shouldCleanup && config && behaviorDefinitionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getBehaviorDefinition().delete({
@@ -313,6 +325,8 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
           } catch (deleteError: any) {
             testsLogger.warn?.('Failed to delete behavior definition during cleanup:', deleteError.message || deleteError);
           }
+        } else if (!shouldCleanup && config && behaviorDefinitionCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - behavior definition left for analysis: ${config.bdefName}`);
         }
         logBuilderTestEnd(testsLogger, 'BehaviorDefinition - full workflow');
       }

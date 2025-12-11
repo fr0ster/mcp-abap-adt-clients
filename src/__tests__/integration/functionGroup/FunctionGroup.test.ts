@@ -43,7 +43,8 @@ const {
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate
+  retryCheckAfterActivate,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -160,6 +161,15 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+
       let functionGroupCreated = false;
       let currentStep = '';
 
@@ -218,19 +228,23 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
           throw new Error(`Check failed: ${errorMessages.join('; ')}`);
         }
         
-        logBuilderTestStep('delete (cleanup)');
-        await client.getFunctionGroup().delete({
-          functionGroupName: config.functionGroupName,
-          transportRequest: config.transportRequest
-        });
+        if (shouldCleanup) {
+          logBuilderTestStep('delete (cleanup)');
+          await client.getFunctionGroup().delete({
+            functionGroupName: config.functionGroupName,
+            transportRequest: config.transportRequest
+          });
+        } else {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - function group left for analysis: ${config.functionGroupName}`);
+        }
 
         logBuilderTestSuccess(testsLogger, 'FunctionGroup - full workflow');
       } catch (error: any) {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: delete if object was created
-        if (functionGroupCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && functionGroupCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getFunctionGroup().delete({
@@ -241,6 +255,8 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.functionGroupName}:`, cleanupError);
           }
+        } else if (!shouldCleanup && functionGroupCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - function group left for analysis: ${config.functionGroupName}`);
         }
 
         const statusText = getHttpStatusText(error);

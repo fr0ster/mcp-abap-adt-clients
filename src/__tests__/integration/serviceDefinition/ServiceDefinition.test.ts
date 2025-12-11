@@ -44,7 +44,8 @@ const {
   resolveStandardObject,
   getTimeout,
   getOperationDelay,
-  retryCheckAfterActivate
+  retryCheckAfterActivate,
+  getEnvironmentConfig
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -204,6 +205,16 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
       }
 
       const config = buildBuilderConfig(testCase);
+      
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
+      const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
+      const globalSkipCleanup = envConfig.skip_cleanup === true;
+      const skipCleanup = testCase.params.skip_cleanup !== undefined
+        ? testCase.params.skip_cleanup === true
+        : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      
       let serviceDefinitionCreated = false;
       let currentStep = '';
 
@@ -302,8 +313,8 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: delete if object was created
-        if (serviceDefinitionCreated) {
+        // Cleanup: delete if object was created and cleanup is enabled
+        if (shouldCleanup && serviceDefinitionCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getServiceDefinition().delete({
@@ -314,6 +325,8 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${config.serviceDefinitionName}:`, cleanupError);
           }
+        } else if (!shouldCleanup && serviceDefinitionCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - service definition left for analysis: ${config.serviceDefinitionName}`);
         }
 
         const statusText = getHttpStatusText(error);

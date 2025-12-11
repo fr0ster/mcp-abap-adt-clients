@@ -313,12 +313,14 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
         return;
       }
 
-      // Check test-case specific first (overrides global), then fallback to global
+      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
       const envConfig = getEnvironmentConfig();
+      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
       const globalSkipCleanup = envConfig.skip_cleanup === true;
       const skipCleanup = testCase.params.skip_cleanup !== undefined
         ? testCase.params.skip_cleanup === true
         : globalSkipCleanup;
+      const shouldCleanup = cleanupAfterTest && !skipCleanup;
 
       let functionModuleCreated = false;
       let functionModuleLocked = false;
@@ -415,7 +417,7 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
         // Wait for activation to complete (activation is asynchronous)
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
         
-        if (!skipCleanup) {
+        if (shouldCleanup) {
           currentStep = 'delete (cleanup FM)';
           logBuilderTestStep(currentStep);
           await client.getFunctionModule().delete({
@@ -424,7 +426,7 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
             transportRequest: resolveTransportRequest(testCase.params.transport_request)
           });
         } else {
-          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - function module left for analysis:`, functionModuleName);
         }
 
         logBuilderTestSuccess(testsLogger, 'FunctionModule - full workflow');
@@ -432,8 +434,8 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
         // Log step error with details before failing test
         logBuilderTestStepError(currentStep || 'unknown', error);
 
-        // Cleanup: delete (if skip_cleanup is false)
-        if (!skipCleanup && functionModuleCreated) {
+        // Cleanup: delete if cleanup is enabled
+        if (shouldCleanup && functionModuleCreated) {
           try {
             logBuilderTestStep('delete (cleanup)');
             await client.getFunctionModule().delete({
@@ -445,8 +447,8 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
             // Log cleanup error but don't fail test - original error is more important
             testsLogger.warn?.(`Cleanup failed for ${functionModuleName}:`, cleanupError);
           }
-        } else if (skipCleanup && functionModuleCreated) {
-          testsLogger.info?.('⚠️ Cleanup skipped (skip_cleanup=true) - function module left for analysis:', functionModuleName);
+        } else if (!shouldCleanup && functionModuleCreated) {
+          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - function module left for analysis:`, functionModuleName);
         }
 
         const statusText = getHttpStatusText(error);
