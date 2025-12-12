@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "ADT clients for SAP ABAP systems - Read-only and CRUD operations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
