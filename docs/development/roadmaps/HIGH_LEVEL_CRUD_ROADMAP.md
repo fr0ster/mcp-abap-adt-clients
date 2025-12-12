@@ -609,28 +609,28 @@ await utils.readObjectMetadata('CLAS', 'ZMY_CLASS');
   - [x] Migrate `BehaviorImplementation.test.ts` to use `AdtClient`
   - [x] Migrate `MetadataExtension.test.ts` to use `AdtClient`
   - [x] Create `AdtUtils` class for utility functions (not CRUD operations) - ✅ Completed in Phase 0
-  - [ ] Review and migrate shared tests to use `AdtObject` (for CRUD) and `AdtUtils` (for utilities)
-    - [ ] `groupActivation.test.ts` - Migrate object operations to `AdtObject`, group activation to `AdtUtils`
+  - [x] Review and migrate shared tests to use `AdtObject` (for CRUD) and `AdtUtils` (for utilities)
+    - [x] `groupActivation.test.ts` - Migrate object operations to `AdtObject`, group activation to `AdtUtils`
       - Replace `CrudClient` with `AdtClient`: `client.getDomain().create()`, `client.getDataElement().create()`, `client.getStructure().create()`
       - Replace `SharedBuilder.groupActivate()` with `client.getUtils().activateObjectsGroup()`
       - Replace `SharedBuilder.listInactiveObjects()` with `client.getUtils().getInactiveObjects()`
       - Add cleanup parameter support (`cleanup_after_test`, `skip_cleanup`)
-    - [ ] `readSource.test.ts` - Migrate to `AdtObject.read()` or `AdtUtils.readObjectSource()`
+    - [x] `readSource.test.ts` - Migrate to `AdtObject.read()` or `AdtUtils.readObjectSource()`
       - Replace `readObjectSource(connection, 'class', name)` with `client.getClass().read()` for classes
       - Replace `readObjectSource(connection, 'program', name)` with `client.getProgram().read()` for programs
       - Replace `readObjectSource(connection, 'interface', name)` with `client.getInterface().read()` for interfaces
       - For generic utility: use `client.getUtils().readObjectSource(objectType, objectName)`
       - Replace `supportsSourceCode(objectType)` with `client.getUtils().supportsSourceCode(objectType)`
-    - [ ] `readMetadata.test.ts` - Migrate to `AdtUtils.readObjectMetadata()`
+    - [x] `readMetadata.test.ts` - Migrate to `AdtUtils.readObjectMetadata()`
       - Replace `readObjectMetadata(connection, objectType, objectName)` with `client.getUtils().readObjectMetadata(objectType, objectName)`
       - For function modules: `client.getUtils().readObjectMetadata('FUGR', name, functionGroup)`
-    - [ ] `tableContents.test.ts` - Migrate to `AdtUtils.getTableContents()`
+    - [x] `tableContents.test.ts` - Migrate to `AdtUtils.getTableContents()`
       - Replace `getTableContents(connection, params)` with `client.getUtils().getTableContents(params)`
-    - [ ] `search.test.ts` - Migrate to `AdtUtils.searchObjects()`
+    - [x] `search.test.ts` - Migrate to `AdtUtils.searchObjects()`
       - Replace `searchObjects(connection, params)` with `client.getUtils().searchObjects(params)`
-    - [ ] `sqlQuery.test.ts` - Migrate to `AdtUtils.getSqlQuery()`
+    - [x] `sqlQuery.test.ts` - Migrate to `AdtUtils.getSqlQuery()`
       - Replace `getSqlQuery(connection, params)` with `client.getUtils().getSqlQuery(params)`
-    - [ ] `whereUsed.test.ts` - Migrate to `AdtUtils.getWhereUsed()`
+    - [x] `whereUsed.test.ts` - Migrate to `AdtUtils.getWhereUsed()`
       - Replace `getWhereUsed(connection, params)` with `client.getUtils().getWhereUsed(params)`
   - [x] Keep `Transport.test.ts` and `class/run.test.ts` on appropriate APIs (specific low-level operations)
 - [x] Add cleanup parameter support to all integration tests
@@ -646,8 +646,8 @@ await utils.readObjectMetadata('CLAS', 'ZMY_CLASS');
 - ✅ `AdtUtils` class created and `getUtils()` method added to `AdtClient`
 - ✅ All CRUD classes are exported from index files
 - ✅ `AdtUtils` exported from `src/core/shared/index.ts` and `src/index.ts`
-- ✅ All 16 integration test files migrated to `AdtClient` (renamed from `*Builder.test.ts` to `*.test.ts`)
-- ⚠️ Shared tests migration pending (infrastructure ready)
+- ✅ All 15 object-specific integration test files migrated to `AdtClient` (renamed from `*Builder.test.ts` to `*.test.ts`)
+- ✅ All 7 shared integration test files migrated to `AdtClient`/`AdtUtils`
 - ⚠️ Documentation and usage examples still pending
 
 ## Test Migration Tracking
@@ -681,15 +681,15 @@ This section tracks the migration status of integration tests from `CrudClient`/
 
 | Test File | Purpose | Status | Current API | Target API | Notes |
 |-----------|---------|--------|-------------|------------|-------|
-| `shared/groupActivation.test.ts` | Group activation operations | ⚠️ **REVIEW** | `CrudClient`, `SharedBuilder` | `AdtClient` (where applicable) | May need partial migration or remain on `CrudClient` |
-| `shared/readSource.test.ts` | Read source code operations | ⚠️ **REVIEW** | Low-level functions | `AdtClient.read()` | May need partial migration |
-| `shared/readMetadata.test.ts` | Read metadata operations | ⚠️ **REVIEW** | Low-level functions | `AdtClient.readMetadata()` | May need partial migration |
-| `shared/tableContents.test.ts` | Table contents operations | ⚠️ **REVIEW** | Low-level functions | `AdtClient` (if applicable) | May need partial migration |
-| `shared/sqlQuery.test.ts` | SQL query operations | ⚠️ **REVIEW** | Low-level functions | N/A | Likely remains on low-level API |
-| `shared/search.test.ts` | Search operations | ⚠️ **REVIEW** | Low-level functions | N/A | Likely remains on low-level API |
-| `shared/whereUsed.test.ts` | Where-used operations | ⚠️ **REVIEW** | Low-level functions | N/A | Likely remains on low-level API |
+| `shared/groupActivation.test.ts` | Group activation operations | ✅ **MIGRATED** | `AdtClient`, `AdtUtils` | `AdtClient` | Fully migrated to AdtClient/AdtUtils |
+| `shared/readSource.test.ts` | Read source code operations | ✅ **MIGRATED** | `AdtClient`, `AdtUtils` | `AdtClient` | Fully migrated to AdtClient/AdtUtils |
+| `shared/readMetadata.test.ts` | Read metadata operations | ✅ **MIGRATED** | `AdtClient`, `AdtUtils` | `AdtClient` | Fully migrated to AdtClient/AdtUtils |
+| `shared/tableContents.test.ts` | Table contents operations | ✅ **MIGRATED** | `AdtClient`, `AdtUtils` | `AdtClient` | Fully migrated to AdtClient/AdtUtils |
+| `shared/sqlQuery.test.ts` | SQL query operations | ✅ **MIGRATED** | `AdtClient`, `AdtUtils` | `AdtClient` | Fully migrated to AdtClient/AdtUtils |
+| `shared/search.test.ts` | Search operations | ✅ **MIGRATED** | `AdtClient`, `AdtUtils` | `AdtClient` | Fully migrated to AdtClient/AdtUtils |
+| `shared/whereUsed.test.ts` | Where-used operations | ✅ **MIGRATED** | `AdtClient`, `AdtUtils` | `AdtClient` | Fully migrated to AdtClient/AdtUtils |
 
-**Summary:** 0/7 shared tests reviewed (0%)
+**Summary:** 7/7 shared tests migrated (100%)
 
 ### Specialized Tests (No Migration Required)
 
@@ -702,10 +702,10 @@ This section tracks the migration status of integration tests from `CrudClient`/
 
 ### Migration Progress Summary
 
-- **Object-Specific Tests:** 1/14 migrated (7%)
-- **Shared Tests:** 0/7 reviewed (0%)
+- **Object-Specific Tests:** 15/15 migrated (100%)
+- **Shared Tests:** 7/7 migrated (100%)
 - **Specialized Tests:** 2/2 correctly using appropriate API (100%)
-- **Overall Test Migration:** 1/21 applicable tests migrated (5%)
+- **Overall Test Migration:** 22/24 applicable tests migrated (92%)
 
 ### Migration Checklist Template
 
@@ -1066,9 +1066,9 @@ if (shouldCleanup && objectCreated) {
 
 ## Roadmap Execution Summary
 
-**Last Updated:** 2025-12-11
+**Last Updated:** 2025-12-12
 
-### Overall Progress: ~88% Complete
+### Overall Progress: ~95% Complete
 
 #### ✅ Completed Phases:
 - **Phase 0: AdtUtils Infrastructure** - 100% ✅
@@ -1085,11 +1085,11 @@ if (shouldCleanup && objectCreated) {
   - AdtUtils class: 100% complete
   - getUtils() method: 100% complete
   - Exports: 100% complete
-- **Phase 4: Integration** - ~90% ⚠️
+- **Phase 4: Integration** - ~95% ⚠️
   - Factory methods: 100% complete (17 object types + 4 local class types)
   - Utility methods: 100% complete (getUtils() for AdtUtils)
   - Exports: 100% complete
-  - Integration tests: ~5% complete (1/21 applicable test files migrated)
+  - Integration tests: 100% complete (15/15 object-specific tests migrated, 2 kept on appropriate APIs)
   - Test cleanup configuration: 100% complete (all 15 tests support cleanup parameters)
   - Shared tests migration: 100% complete (7/7 shared tests migrated to AdtClient/AdtUtils)
   - Documentation: 0% (pending)
@@ -1106,9 +1106,9 @@ if (shouldCleanup && objectCreated) {
 9. ✅ All 15 integration tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
 
 ### Remaining Work:
-1. ⚠️ Migrate 13 remaining object-specific integration test files to `AdtClient` (Note: All tests already migrated, but tracking shows old status)
-2. ⚠️ Review and migrate shared integration tests where applicable (7 files)
-3. ⚠️ Add comprehensive error scenario tests
+1. ✅ ~~Migrate object-specific integration test files to `AdtClient`~~ - COMPLETED (15/15 migrated)
+2. ✅ ~~Review and migrate shared integration tests where applicable~~ - COMPLETED (7/7 migrated)
+3. ⚠️ Add comprehensive error scenario tests (optional enhancement)
 4. ⚠️ Create user documentation and usage examples
 5. ⚠️ Update API documentation
 
@@ -1117,16 +1117,16 @@ if (shouldCleanup && objectCreated) {
 - **Factory Methods:** 21/21 (100%)
 - **Object-Specific Tests Migrated:** 15/15 (100%)
 - **Test Cleanup Configuration:** 15/15 (100%)
-- **Shared Tests Reviewed:** 0/7 (0%)
+- **Shared Tests Migrated:** 7/7 (100%)
 - **Specialized Tests (Correct API):** 2/2 (100%)
-- **Overall Test Migration:** 15/17 applicable tests (88%)
+- **Overall Test Migration:** 22/24 applicable tests (92%)
 - **Documentation:** 0% (pending)
 
 ### Test Migration Status:
-- ✅ **Migrated:** `class/Class.test.ts`, `program/Program.test.ts`, `interface/Interface.test.ts`, `domain/Domain.test.ts`, `dataElement/DataElement.test.ts`, `structure/Structure.test.ts`, `table/Table.test.ts`, `view/View.test.ts`, `functionGroup/FunctionGroup.test.ts`, `functionModule/FunctionModule.test.ts`, `package/Package.test.ts`, `serviceDefinition/ServiceDefinition.test.ts`, `behaviorDefinition/BehaviorDefinition.test.ts`, `behaviorImplementation/BehaviorImplementation.test.ts`, `metadataExtension/MetadataExtension.test.ts`
-- ✅ **Cleanup Configuration:** All 15 migrated tests support `cleanup_after_test` and `skip_cleanup` parameters
-- ✅ **Kept on low-level API:** `transport/Transport.test.ts` (tests Builder API specifically)
-- ⚠️ **Ready for Migration (7 files):** Shared integration tests - `AdtUtils` infrastructure ready
+- ✅ **Migrated (Object-Specific):** `class/Class.test.ts`, `program/Program.test.ts`, `interface/Interface.test.ts`, `domain/Domain.test.ts`, `dataElement/DataElement.test.ts`, `structure/Structure.test.ts`, `table/Table.test.ts`, `view/View.test.ts`, `functionGroup/FunctionGroup.test.ts`, `functionModule/FunctionModule.test.ts`, `package/Package.test.ts`, `serviceDefinition/ServiceDefinition.test.ts`, `behaviorDefinition/BehaviorDefinition.test.ts`, `behaviorImplementation/BehaviorImplementation.test.ts`, `metadataExtension/MetadataExtension.test.ts`
+- ✅ **Migrated (Shared):** `shared/groupActivation.test.ts`, `shared/readSource.test.ts`, `shared/readMetadata.test.ts`, `shared/tableContents.test.ts`, `shared/search.test.ts`, `shared/sqlQuery.test.ts`, `shared/whereUsed.test.ts`
+- ✅ **Cleanup Configuration:** All 15 object-specific tests support `cleanup_after_test` and `skip_cleanup` parameters
+- ✅ **Kept on low-level API:** `transport/Transport.test.ts` (tests Builder API specifically), `class/run.test.ts` (tests low-level functionality)
 - ✅ **Correct API (2 files):** Specialized tests using appropriate APIs
 
 See "Test Migration Tracking" section above for detailed test migration status.

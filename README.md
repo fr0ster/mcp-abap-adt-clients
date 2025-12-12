@@ -92,19 +92,26 @@ See [CLI Tools documentation](./bin/README.md) for details.
 
 ### Three-Layer API
 
-1. **Builders** (Low-level, flexible)
+1. **AdtClient** (High-level, recommended)
+   - Simplified CRUD operations with automatic operation chains
+   - Factory pattern: `client.getClass()`, `client.getProgram()`, etc.
+   - Automatic error handling and resource cleanup
+   - Utility functions via `client.getUtils()`
+   - Example: `await client.getClass().create({...}, { activateOnCreate: true })`
+
+2. **Builders** (Low-level, flexible)
    - Direct access to all ADT operations
    - Method chaining with Promise support
    - Fine-grained control over workflow
    - Example: `ProgramBuilder`, `ClassBuilder`, `InterfaceBuilder`
 
-2. **Clients** (High-level, convenient)
+3. **Clients** (Legacy API)
    - **ReadOnlyClient** – simple read operations
    - **CrudClient** – unified CRUD operations with chaining
    - State management with getters
    - Example: `client.createProgram(...).lockProgram(...).updateProgram(...)`
 
-3. **Specialized Clients**
+4. **Specialized Clients**
    - `ManagementClient` – activation, syntax checking
    - `LockClient` – lock/unlock with registry
    - `ValidationClient` – object name validation
@@ -131,7 +138,43 @@ See [CLI Tools documentation](./bin/README.md) for details.
 
 ## Quick Start
 
-### Using CrudClient (Recommended for most cases)
+### Using AdtClient (Recommended - High-Level CRUD API)
+
+```typescript
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const connection = createAbapConnection({
+  url: 'https://your-sap-system.example.com',
+  client: '100',
+  authType: 'basic',
+  username: process.env.SAP_USERNAME!,
+  password: process.env.SAP_PASSWORD!
+}, console);
+
+const client = new AdtClient(connection, console);
+
+// Simple CRUD operations with automatic operation chains
+await client.getClass().create({
+  className: 'ZCL_TEST',
+  packageName: 'ZPACKAGE',
+  description: 'Test class'
+}, { activateOnCreate: true });
+
+// Utility functions
+const utils = client.getUtils();
+await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
+```
+
+**Benefits:**
+- ✅ Simplified API - no manual lock/unlock management
+- ✅ Automatic operation chains (validate → create → check → lock → update → unlock → activate)
+- ✅ Consistent error handling and resource cleanup
+- ✅ Separation of CRUD operations and utility functions
+- ✅ Long polling support for object readiness
+
+### Using CrudClient (Builder-based API)
 
 ```typescript
 import { createAbapConnection } from '@mcp-abap-adt/connection';

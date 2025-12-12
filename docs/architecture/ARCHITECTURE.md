@@ -22,7 +22,89 @@ packages/adt-clients/
 
 ## Classes
 
-### 1. ReadOnlyClient
+### 1. AdtClient (High-Level CRUD API)
+
+**Purpose:** Simplified high-level CRUD operations with automatic operation chains
+
+**Architecture:**
+- Factory pattern: Returns `IAdtObject` instances for each object type
+- Encapsulates complex operation chains (validate → create → check → lock → update → unlock → activate)
+- Automatic error handling and resource cleanup
+- Uses low-level functions directly (not Builder classes internally)
+
+**Factory Methods:**
+- `getClass()` → `IAdtObject<ClassBuilderConfig>`
+- `getProgram()` → `IAdtObject<ProgramBuilderConfig>`
+- `getInterface()` → `IAdtObject<InterfaceBuilderConfig>`
+- `getDomain()` → `IAdtObject<DomainBuilderConfig>`
+- `getDataElement()` → `IAdtObject<DataElementBuilderConfig>`
+- `getStructure()` → `IAdtObject<StructureBuilderConfig>`
+- `getTable()` → `IAdtObject<TableBuilderConfig>`
+- `getView()` → `IAdtObject<ViewBuilderConfig>`
+- `getFunctionGroup()` → `IAdtObject<FunctionGroupBuilderConfig>`
+- `getFunctionModule()` → `IAdtObject<FunctionModuleBuilderConfig>`
+- `getPackage()` → `IAdtObject<PackageBuilderConfig>`
+- `getServiceDefinition()` → `IAdtObject<ServiceDefinitionBuilderConfig>`
+- `getBehaviorDefinition()` → `IAdtObject<BehaviorDefinitionBuilderConfig>`
+- `getBehaviorImplementation()` → `IAdtObject<BehaviorImplementationBuilderConfig>`
+- `getMetadataExtension()` → `IAdtObject<MetadataExtensionBuilderConfig>`
+- `getUnitTest()` → `IAdtObject<IUnitTestBuilderConfig>`
+- `getRequest()` → `IAdtObject<ITransportBuilderConfig>`
+- `getUtils()` → `AdtUtils` (utility functions, NOT CRUD operations)
+
+**Methods (via IAdtObject):**
+- `validate(config)` → `Promise<AxiosResponse>`
+- `create(config, options?)` → `Promise<TReadResult>` (full operation chain)
+- `read(config, version?, options?)` → `Promise<TReadResult | undefined>`
+- `update(config, options?)` → `Promise<TReadResult>` (full operation chain)
+- `delete(config)` → `Promise<AxiosResponse>`
+- `activate(config)` → `Promise<AxiosResponse>`
+- `check(config, status?)` → `Promise<AxiosResponse>`
+- `readMetadata(config, options?)` → `Promise<AxiosResponse>`
+- `readTransport(config)` → `Promise<AxiosResponse>`
+
+**AdtUtils Methods (via getUtils()):**
+- `searchObjects(params)` → `Promise<AxiosResponse>`
+- `getWhereUsed(params)` → `Promise<AxiosResponse>`
+- `getInactiveObjects()` → `Promise<AxiosResponse>`
+- `activateObjectsGroup(objects, force?)` → `Promise<AxiosResponse>`
+- `checkDeletionGroup(objects)` → `Promise<AxiosResponse>`
+- `deleteObjectsGroup(objects)` → `Promise<AxiosResponse>`
+- `readObjectSource(objectType, objectName, functionGroup?, version?)` → `Promise<AxiosResponse>`
+- `readObjectMetadata(objectType, objectName, functionGroup?)` → `Promise<AxiosResponse>`
+- `supportsSourceCode(objectType)` → `boolean`
+- `getObjectSourceUri(objectType, objectName, functionGroup?)` → `string`
+- `getSqlQuery(params)` → `Promise<AxiosResponse>`
+- `getTableContents(params)` → `Promise<AxiosResponse>`
+
+**Usage:**
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new AdtClient(connection, logger);
+
+// CRUD operations
+await client.getClass().create({
+  className: 'ZCL_TEST',
+  packageName: 'ZPACKAGE',
+  description: 'Test class'
+}, { activateOnCreate: true });
+
+// Utility functions
+const utils = client.getUtils();
+await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
+```
+
+**Benefits:**
+- Simplified API for common workflows
+- Automatic operation chains (no manual lock/unlock management)
+- Consistent error handling and resource cleanup
+- Separation of CRUD operations (via `IAdtObject`) and utility functions (via `AdtUtils`)
+
+---
+
+### 2. ReadOnlyClient
 
 **Purpose:** Read-only operations (GET)
 
@@ -104,7 +186,7 @@ packages/adt-clients/
 
 ---
 
-### 2. CrudClient extends ReadOnlyClient
+### 3. CrudClient extends ReadOnlyClient
 
 **Purpose:** Full CRUD functionality (Create, Read, Update, Delete)
 
@@ -198,7 +280,7 @@ packages/adt-clients/
 
 ---
 
-### 3. ManagementClient
+### 4. ManagementClient
 
 **Purpose:** Object management operations (activation, syntax checking)
 
@@ -219,6 +301,9 @@ packages/adt-clients/
 The package allows importing exactly the client variant you need:
 
 ```typescript
+// Import AdtClient (high-level CRUD API - recommended)
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
 // Import only ReadOnlyClient
 import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 
@@ -229,7 +314,28 @@ import { CrudClient } from '@mcp-abap-adt/adt-clients';
 import { ManagementClient } from '@mcp-abap-adt/adt-clients';
 
 // Import all clients
-import { ReadOnlyClient, CrudClient, ManagementClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, ReadOnlyClient, CrudClient, ManagementClient } from '@mcp-abap-adt/adt-clients';
+```
+
+### High-Level CRUD API (Recommended)
+
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+
+const connection = createAbapConnection(config, logger);
+const client = new AdtClient(connection, logger);
+
+// Simple CRUD operations with automatic operation chains
+await client.getClass().create({
+  className: 'ZCL_TEST',
+  packageName: 'ZPACKAGE',
+  description: 'Test class'
+}, { activateOnCreate: true });
+
+// Utility functions
+const utils = client.getUtils();
+await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
 ```
 
 ### Read-Only MCP Server

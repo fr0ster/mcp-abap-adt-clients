@@ -8,12 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [0.2.0] - 2025-12-12
 
 ### Added
+- **High-Level CRUD API (AdtClient)**: Complete implementation of high-level CRUD operations
+  - `AdtClient` class with factory methods for all 17 object types (`getClass()`, `getProgram()`, `getInterface()`, etc.)
+  - `IAdtObject` interface for unified CRUD operations across all object types
+  - Automatic operation chains: validate → create → check → lock → update → unlock → activate
+  - Automatic error handling and resource cleanup (unlock, delete on failure)
+  - Consistent session management (stateful only for lock/update/unlock operations)
+  - All 17 object types supported: Class, Program, Interface, Domain, DataElement, Structure, Table, View, FunctionGroup, FunctionModule, Package, ServiceDefinition, BehaviorDefinition, BehaviorImplementation, MetadataExtension, UnitTest, Request
+  - See [High-Level CRUD Roadmap](docs/development/roadmaps/HIGH_LEVEL_CRUD_ROADMAP.md) for details
+- **AdtUtils Class**: Utility functions wrapper for cross-cutting ADT functionality
+  - `AdtClient.getUtils()` method provides access to utility functions
+  - Methods: `searchObjects()`, `getWhereUsed()`, `getInactiveObjects()`, `activateObjectsGroup()`, `readObjectSource()`, `readObjectMetadata()`, `getSqlQuery()`, `getTableContents()`, etc.
+  - Separation of CRUD operations (via `IAdtObject`) and utility functions (via `AdtUtils`)
+  - Stateless utility class (no state management)
+- **Test Migration**: All integration tests migrated to `AdtClient` API
+  - 15/15 object-specific integration tests migrated to `AdtClient`
+  - 7/7 shared integration tests migrated to `AdtClient`/`AdtUtils`
+  - All tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
+  - Overall test migration: 22/24 applicable tests (92%)
 - **Long Polling Support**: Added `withLongPolling` parameter to all read operations for better reliability and performance
   - `IAdtObject.read()`, `readMetadata()`, and `readTransport()` methods now support `withLongPolling` option
   - `IBuilder.read()` methods now support `withLongPolling` option
   - All `AdtObject` implementations automatically use long polling in `create()` and `update()` methods to wait for object readiness
   - Replaces fixed timeouts with server-driven waiting, providing faster and more reliable operations
-  - See [Migration Guide](docs/development/MIGRATION_TIMEOUT_TO_LONG_POLLING.md) for details
+  - See [Migration Guide](docs/development/archive/roadmaps/MIGRATION_TIMEOUT_TO_LONG_POLLING.md) for details
 - **ADT Discovery Script**: Added `discovery-to-markdown.ts` tool for generating ADT endpoint documentation
   - Fetches ADT discovery endpoint (`/sap/bc/adt/discovery`) and converts XML to readable markdown
   - Usage: `npm run discovery:markdown` or `npm run discovery:markdown -- --output custom-discovery.md`
@@ -33,6 +51,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Added workaround for "REPORT/PROGRAM statement is missing" error (expected for empty function groups)
   - Added workaround for Kerberos library errors in test environments
   - Errors are now properly categorized and documented
+- **Architecture Documentation**: Updated to reflect new `AdtClient` high-level API
+  - Added `AdtClient` as recommended API in architecture documentation
+  - Updated README.md with `AdtClient` usage examples
+  - Clarified separation between CRUD operations and utility functions
+- **Test Infrastructure**: Improved test organization and documentation
+  - All integration tests now use `AdtClient` for consistency
+  - Shared tests use `AdtUtils` for utility functions
+  - Better separation of concerns in test code
 
 ### Fixed
 - **DataElement Check**: Fixed handling of empty data elements after create
@@ -42,11 +68,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Changed from "ProgramBuilder" to "Program" to reflect actual usage of AdtClient.getProgram()
 
 ### Documentation
+- Updated architecture documentation with `AdtClient` and `AdtUtils` details
+- Added `AdtClient` usage examples to README.md
 - Added comprehensive documentation for long polling feature in README.md
-- Added migration guide from timeouts to long polling (archived in `docs/development/`)
-- Updated API reference to document `withLongPolling` parameter
+- Added migration guide from timeouts to long polling (archived in `docs/development/archive/roadmaps/`)
+- Updated API reference to document `withLongPolling` parameter and high-level CRUD operations
 - Added documentation for ADT discovery script in README.md and tools/README.md
 - Updated IAdtOperationOptions documentation to clarify timeout vs withLongPolling usage
+- Roadmap execution summary: ~95% complete (core functionality complete, documentation pending)
 
 ## [0.1.40] - 2025-12-08
 
