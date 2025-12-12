@@ -71,19 +71,31 @@ export function supportsSourceCode(objectType: string): boolean {
 /**
  * Read object source code
  * Only works for objects that have source code (class, program, interface, etc.)
+ * @param connection - ABAP connection
+ * @param objectType - Object type (e.g., 'class', 'program')
+ * @param objectName - Object name
+ * @param functionGroup - Optional function group for function modules
+ * @param version - 'active' or 'inactive'
+ * @param options - Optional read options
+ * @param options.withLongPolling - If true, adds ?withLongPolling=true to wait for object to become available
  */
 export async function readObjectSource(
   connection: IAbapConnection,
   objectType: string,
   objectName: string,
   functionGroup?: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   if (!supportsSourceCode(objectType)) {
     throw new Error(`Object type ${objectType} does not support source code reading`);
   }
 
-  const uri = getObjectSourceUri(objectType, objectName, functionGroup, version);
+  let uri = getObjectSourceUri(objectType, objectName, functionGroup, version);
+  if (options?.withLongPolling) {
+    const separator = uri.includes('?') ? '&' : '?';
+    uri += `${separator}withLongPolling=true`;
+  }
 
   return connection.makeAdtRequest({
     url: uri,

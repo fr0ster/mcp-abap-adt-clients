@@ -246,14 +246,15 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
    */
   async read(
     config: Partial<IDomainConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IDomainState | undefined> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
     }
 
     try {
-      const response = await getDomain(this.connection, config.domainName);
+      const response = await getDomain(this.connection, config.domainName, options);
       return {
         readResult: response,
         errors: []
@@ -271,7 +272,10 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
    * Read domain metadata (object characteristics: package, responsible, description, etc.)
    * For domains, read() already returns metadata since there's no source code.
    */
-  async readMetadata(config: Partial<IDomainConfig>): Promise<IDomainState> {
+  async readMetadata(
+    config: Partial<IDomainConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IDomainState> {
     const state: IDomainState = { errors: [] };
     if (!config.domainName) {
       const error = new Error('Domain name is required');
@@ -280,7 +284,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     }
     try {
       // For objects without source code, read() already returns metadata
-      const readState = await this.read(config);
+      const readState = await this.read(config, 'active', options);
       if (readState) {
         state.metadataResult = readState.readResult;
         state.readResult = readState.readResult;
@@ -516,7 +520,10 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   /**
    * Read transport request information for the domain
    */
-  async readTransport(config: Partial<IDomainConfig>): Promise<IDomainState> {
+  async readTransport(
+    config: Partial<IDomainConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IDomainState> {
     const state: IDomainState = {
       errors: []
     };
@@ -532,7 +539,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     }
 
     try {
-      const response = await getDomainTransport(this.connection, config.domainName);
+      const response = await getDomainTransport(this.connection, config.domainName, options);
       state.transportResult = response;
       this.logger?.info?.('Transport request read successfully');
       return state;

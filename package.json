@@ -47,6 +47,7 @@
     "test:check:integration": "npx tsc --noEmit --project tsconfig.test.integration.json",
     "test:sequential": "node scripts/run-tests-sequential.js",
     "test:module": "node scripts/test-module.js",
+    "test:long-polling-read": "npx ts-node scripts/test-long-polling-read.ts",
     "pretest": "npm run test:check:integration",
     "prepublishOnly": "npm run build"
   },
@@ -54,8 +55,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces": "^0.1.13",
-    "@mcp-abap-adt/logger": "^0.1.0",
+    "@mcp-abap-adt/interfaces": "^0.1.15",
+    "@mcp-abap-adt/logger": "^0.1.2",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",
     "yaml": "^2.3.4"

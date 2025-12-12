@@ -16,9 +16,10 @@ import { readObjectSource } from '../shared/readSource';
  */
 export async function getClassMetadata(
   connection: IAbapConnection,
-  className: string
+  className: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'class', className);
+  return readObjectMetadata(connection, 'class', className, undefined, options);
 }
 
 /**
@@ -30,9 +31,10 @@ export async function getClassMetadata(
 export async function getClassSource(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'class', className, undefined, version);
+  return readObjectSource(connection, 'class', className, undefined, version, options);
 }
 
 /**
@@ -58,10 +60,14 @@ export async function getClass(
  */
 export async function getClassTransport(
   connection: IAbapConnection,
-  className: string
+  className: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/transport`;
+  let url = `/sap/bc/adt/oo/classes/${encodedName}/transport`;
+  if (options?.withLongPolling) {
+    url += '?withLongPolling=true';
+  }
 
   return connection.makeAdtRequest({
     url,

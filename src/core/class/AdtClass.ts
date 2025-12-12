@@ -238,14 +238,15 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
    */
   async read(
     config: Partial<IClassConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
     try {
-      const response = await getClassSource(this.connection, config.className, version);
+      const response = await getClassSource(this.connection, config.className, version, options);
       return {
         readResult: response,
         errors: []
@@ -289,7 +290,10 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   /**
    * Read class metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IClassConfig>): Promise<IClassState> {
+  async readMetadata(
+    config: Partial<IClassConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IClassState> {
     const state: IClassState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required');
@@ -297,7 +301,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       throw error;
     }
     try {
-      const response = await getClassMetadata(this.connection, config.className);
+      const response = await getClassMetadata(this.connection, config.className, options);
       state.metadataResult = response;
       this.logger?.info?.('Class metadata read successfully');
       return state;
@@ -738,7 +742,10 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   /**
    * Read transport request information for the class
    */
-  async readTransport(config: Partial<IClassConfig>): Promise<IClassState> {
+  async readTransport(
+    config: Partial<IClassConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IClassState> {
     const state: IClassState = {
       errors: []
     };
@@ -754,7 +761,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     }
 
     try {
-      const response = await getClassTransport(this.connection, config.className);
+      const response = await getClassTransport(this.connection, config.className, options);
       state.transportResult = response;
       this.logger?.info?.('Transport request read successfully');
       return state;

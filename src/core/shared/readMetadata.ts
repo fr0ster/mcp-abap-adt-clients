@@ -106,14 +106,24 @@ function getAcceptHeader(objectType: string): string {
 
 /**
  * Read object metadata (without source code)
+ * @param connection - ABAP connection
+ * @param objectType - Object type (e.g., 'class', 'domain')
+ * @param objectName - Object name
+ * @param functionGroup - Optional function group for function modules
+ * @param options - Optional read options
+ * @param options.withLongPolling - If true, adds ?withLongPolling=true to wait for object to become available
  */
 export async function readObjectMetadata(
   connection: IAbapConnection,
   objectType: string,
   objectName: string,
-  functionGroup?: string
+  functionGroup?: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  const uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+  let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+  if (options?.withLongPolling) {
+    uri += '?withLongPolling=true';
+  }
   const acceptHeader = getAcceptHeader(objectType);
 
   return connection.makeAdtRequest({

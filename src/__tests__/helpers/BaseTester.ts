@@ -22,9 +22,12 @@
  * - Use createTestsLogger(), createBuilderLogger(), createConnectionLogger() from testLogger.ts
  * - These functions return ILogger from @mcp-abap-adt/logger or undefined based on DEBUG_* flags
  * - All logging uses optional chaining - safe to pass undefined
+ * - Uses LogLevel enum from @mcp-abap-adt/logger for log level constants
+ * - Structured test logging via builderTestLogger functions (logBuilderTestStart, logBuilderTestStep, etc.)
  */
 
 import type { IAdtObject, IAdtOperationOptions, ILogger, IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { LogLevel } from '@mcp-abap-adt/interfaces';
 import { AxiosResponse } from 'axios';
 import {
   logBuilderTestStart,
@@ -55,6 +58,7 @@ export interface IFlowTestOptions {
 export interface IReadTestOptions {
   version?: 'active' | 'inactive';
   timeout?: number;
+  withLongPolling?: boolean;
 }
 
 export interface IBaseTesterSetupOptions {
@@ -96,9 +100,10 @@ export class BaseTester<TConfig, TState> {
    * @param loggerPrefix - Prefix for log messages (e.g., "Class", "DataElement")
    * @param testCaseKey - YAML test case key (e.g., "create_class")
    * @param testCaseName - YAML test case name (e.g., "adt_class")
-   * @param logger - Optional logger (ILogger from @mcp-abap-adt/logger or undefined)
+   * @param logger - Optional logger (ILogger from @mcp-abap-adt/interfaces or undefined)
    *                Use createTestsLogger(), createBuilderLogger(), etc. from testLogger.ts
    *                Logger is undefined when logging is disabled via environment variables
+   *                Uses LogLevel enum from @mcp-abap-adt/logger for log level constants
    */
   constructor(
     adtObject: IAdtObject<TConfig, TState>,
@@ -144,13 +149,29 @@ export class BaseTester<TConfig, TState> {
   /**
    * Log message with prefix
    * Logger can be undefined if logging is disabled via environment variables
+   * Uses LogLevel enum from @mcp-abap-adt/interfaces
    */
-  private log(level: 'debug' | 'info' | 'warn' | 'error', message: string, ...args: any[]): void {
+  private log(level: LogLevel, message: string, ...args: any[]): void {
     if (!this.logger) {
       return; // Logging disabled - logger is undefined
     }
     const prefixedMessage = `[${this.loggerPrefix}] ${message}`;
-    this.logger[level]?.(prefixedMessage, ...args);
+    
+    // Map LogLevel enum to logger methods
+    switch (level) {
+      case LogLevel.DEBUG:
+        this.logger.debug?.(prefixedMessage, ...args);
+        break;
+      case LogLevel.INFO:
+        this.logger.info?.(prefixedMessage, ...args);
+        break;
+      case LogLevel.WARN:
+        this.logger.warn?.(prefixedMessage, ...args);
+        break;
+      case LogLevel.ERROR:
+        this.logger.error?.(prefixedMessage, ...args);
+        break;
+    }
   }
 
   /**
@@ -159,14 +180,14 @@ export class BaseTester<TConfig, TState> {
   private async ensureUnlock(config: Partial<TConfig>): Promise<void> {
     if (this.objectLocked && this.lockHandle) {
       try {
-        this.log('warn', 'Unlocking object during cleanup');
+        this.log(LogLevel.WARN, 'Unlocking object during cleanup');
         // Try to unlock - note: unlock might not be in IAdtObject interface
         // This is a safety measure, actual unlock should be done in update/create methods
         // But we log it for visibility
         this.objectLocked = false;
         this.lockHandle = undefined;
       } catch (error) {
-        this.log('warn', 'Failed to unlock during cleanup:', error);
+        this.log(LogLevel.WARN, 'Failed to unlock during cleanup:', error);
       }
     }
   }
@@ -215,6 +236,23 @@ export class BaseTester<TConfig, TState> {
       await this.adtObject.create(config, createOptions);
       this.objectCreated = true;
 
+      // 2.5. Read with long polling to ensure object is ready (before update)
+      if (options?.updateConfig) {
+        currentStep = 'read (wait for object ready)';
+        logBuilderTestStep(currentStep);
+        try {
+          await this.adtObject.read(
+            config as Partial<TConfig>,
+            'active',
+            { withLongPolling: true }
+          );
+          this.log(LogLevel.DEBUG, 'Object is ready after creation');
+        } catch (readError) {
+          this.log(LogLevel.WARN, 'Read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - update might still work
+        }
+      }
+
       // 3. Update (if updateConfig provided)
       if (options?.updateConfig) {
         currentStep = 'update';
@@ -255,10 +293,10 @@ export class BaseTester<TConfig, TState> {
         try {
           await this.adtObject.delete(config as Partial<TConfig>);
         } catch (cleanupError) {
-          this.log('warn', 'delete failed:', cleanupError);
+          this.log(LogLevel.WARN, 'delete failed:', cleanupError);
         }
       } else if (this.objectCreated) {
-        this.log('info', `⚠️ cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis`);
+        this.log(LogLevel.INFO, `⚠️ cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis`);
       }
 
       return validationState;
@@ -277,10 +315,10 @@ export class BaseTester<TConfig, TState> {
           logBuilderTestStep('delete (cleanup)');
           await this.adtObject.delete(config as Partial<TConfig>);
         } catch (cleanupError) {
-          this.log('warn', 'Cleanup after error failed:', cleanupError);
+          this.log(LogLevel.WARN, 'Cleanup after error failed:', cleanupError);
         }
       } else if (this.objectCreated && !cleanupSettings.shouldCleanup) {
-        this.log('info', `⚠️ Cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis after error`);
+        this.log(LogLevel.INFO, `⚠️ Cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis after error`);
       }
 
       const statusText = getHttpStatusText(error);
@@ -300,16 +338,20 @@ export class BaseTester<TConfig, TState> {
   ): Promise<TState | undefined> {
     try {
       logBuilderTestStep('read');
-      const readState = await this.adtObject.read(config, options?.version || 'active');
+      const readState = await this.adtObject.read(
+        config,
+        options?.version || 'active',
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       
       if (!readState) {
-        this.log('warn', 'read failed: object not found');
+        this.log(LogLevel.WARN, 'read failed: object not found');
         return undefined;
       }
 
       return readState;
     } catch (error: any) {
-      this.log('error', 'read failed:', error);
+      this.log(LogLevel.ERROR, 'read failed:', error);
       throw error;
     }
   }
@@ -353,7 +395,7 @@ export class BaseTester<TConfig, TState> {
   beforeAll(): () => Promise<void> {
     return async () => {
       // Setup is done externally, this is just for consistency
-      this.log('info', 'beforeAll: Setup complete');
+      this.log(LogLevel.INFO, 'beforeAll: Setup complete');
     };
   }
 
@@ -369,14 +411,14 @@ export class BaseTester<TConfig, TState> {
 
       if (!this.hasConfig) {
         this.skipReason = 'No SAP configuration';
-        this.log('warn', 'beforeEach: Skipping - No SAP configuration');
+        this.log(LogLevel.WARN, 'beforeEach: Skipping - No SAP configuration');
         return;
       }
 
       const definition = this.getTestCaseDefinition();
       if (!definition) {
         this.skipReason = 'Test case not defined in test-config.yaml';
-        this.log('warn', 'beforeEach: Skipping - Test case not defined');
+        this.log(LogLevel.WARN, 'beforeEach: Skipping - Test case not defined');
         return;
       }
 
@@ -384,14 +426,14 @@ export class BaseTester<TConfig, TState> {
       const tc = getEnabledTestCase(this.testCaseKey, this.testCaseName);
       if (!tc) {
         this.skipReason = 'Test case disabled or not found';
-        this.log('warn', 'beforeEach: Skipping - Test case disabled or not found');
+        this.log(LogLevel.WARN, 'beforeEach: Skipping - Test case disabled or not found');
         return;
       }
 
       const packageCheck = ensurePackageConfig(tc.params, `${this.loggerPrefix} - ${this.testDescription}`);
       if (!packageCheck.success) {
         this.skipReason = packageCheck.reason || 'Default package is not configured';
-        this.log('warn', `beforeEach: Skipping - ${this.skipReason}`);
+        this.log(LogLevel.WARN, `beforeEach: Skipping - ${this.skipReason}`);
         return;
       }
 
@@ -403,7 +445,7 @@ export class BaseTester<TConfig, TState> {
           this.config = this.buildConfigFn(tc);
         } catch (error: any) {
           this.skipReason = `Failed to build config: ${error.message}`;
-          this.log('error', `beforeEach: ${this.skipReason}`);
+          this.log(LogLevel.ERROR, `beforeEach: ${this.skipReason}`);
           this.testCase = null;
           return;
         }
@@ -418,7 +460,7 @@ export class BaseTester<TConfig, TState> {
           const cleanup = await this.ensureObjectReadyFn(objectName);
           if (!cleanup.success) {
             this.skipReason = cleanup.reason || 'Failed to cleanup object before test';
-            this.log('warn', `beforeEach: ${this.skipReason}`);
+            this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
             this.testCase = null;
             this.config = null;
             return;
@@ -426,7 +468,7 @@ export class BaseTester<TConfig, TState> {
         }
       }
 
-      this.log('info', 'beforeEach: Test case loaded and ready');
+      this.log(LogLevel.INFO, 'beforeEach: Test case loaded and ready');
     };
   }
 
@@ -437,7 +479,7 @@ export class BaseTester<TConfig, TState> {
   afterAll(): () => Promise<void> {
     return async () => {
       if (this.connection) {
-        this.log('info', 'afterAll: Resetting connection');
+        this.log(LogLevel.INFO, 'afterAll: Resetting connection');
         this.connection.reset();
       }
     };
@@ -450,7 +492,7 @@ export class BaseTester<TConfig, TState> {
   afterEach(): () => Promise<void> {
     return async () => {
       // Cleanup is handled in flowTest/readTest
-      this.log('debug', 'afterEach: Cleanup handled by test methods');
+      this.log(LogLevel.DEBUG, 'afterEach: Cleanup handled by test methods');
     };
   }
 

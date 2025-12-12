@@ -444,10 +444,13 @@ ${fixValuesXml}
     }
   }
 
-  async read(): Promise<IDomainConfig | undefined> {
+  async read(
+    version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IDomainConfig | undefined> {
     try {
       this.logger?.info('Reading domain:', this.config.domainName);
-      const result = await getDomain(this.connection, this.config.domainName);
+      const result = await getDomain(this.connection, this.config.domainName, options);
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Domain read successfully:', result.status);

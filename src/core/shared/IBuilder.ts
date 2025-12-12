@@ -117,8 +117,14 @@ export interface IBuilder<TState extends IAdtBaseState = IAdtBaseState> {
    * Note: This method doesn't modify builder state, returns result directly
    * Returns parsed config interface (e.g., DomainBuilderConfig) or source code
    * @param version - Optional version to read ('active', 'inactive')
+   * @param options - Optional read options
+   * @param options.withLongPolling - If true, adds ?withLongPolling=true to wait for object to become available
+   *                                  Useful after create/activate operations to wait until object is ready
    */
-  read(version?: 'active' | 'inactive'): Promise<BuilderConfigUnion>;
+  read(
+    version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean }
+  ): Promise<BuilderConfigUnion>;
 
   /**
    * Force unlock the object (cleanup method)

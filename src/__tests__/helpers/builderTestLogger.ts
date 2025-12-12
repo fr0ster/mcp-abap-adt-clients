@@ -1,9 +1,25 @@
 import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { DefaultLogger } from '@mcp-abap-adt/logger/dist/default-logger';
+import { getLogLevel } from '@mcp-abap-adt/logger/dist/types';
 
 export interface BuilderTestLogger {
   info?: (...args: any[]) => void;
   warn?: (...args: any[]) => void;
   error?: (...args: any[]) => void;
+}
+
+/**
+ * Get logger instance for test logging
+ * Uses DefaultLogger from @mcp-abap-adt/logger if logger is provided
+ * Otherwise returns undefined (logging will use logImmediate only)
+ */
+function getTestLogger(logger: ILogger | undefined): ILogger | undefined {
+  if (!logger) {
+    return undefined;
+  }
+  // If logger is provided, use it (should be DefaultLogger from testLogger.ts)
+  // DefaultLogger uses process.stdout/stderr which is synchronous and ideal for tests
+  return logger;
 }
 
 const debugLogsEnabled = process.env.DEBUG_ADT_TESTS === 'true';
@@ -103,8 +119,11 @@ export function logBuilderTestStart(logger: ILogger | undefined, testName: strin
   const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
   const startMessage = `${progress} ▶ START ${testName} :: ${testCase.name}`;
 
+  // Use logImmediate for synchronous output (Jest buffers console.log)
   logImmediate(startMessage);
-  // Don't duplicate with logger.info - logImmediate already outputs
+  // Also log via logger if provided (uses DefaultLogger which is synchronous)
+  const testLogger = getTestLogger(logger);
+  testLogger?.info?.(startMessage);
 }
 
 export function setTotalTests(count: number): void {
@@ -131,9 +150,14 @@ export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testNa
   const currentCounter = testCounter > 0 ? testCounter : 1;
   const progress = totalTests > 0 ? `[${currentCounter}/${totalTests}]` : `[${currentCounter}]`;
   const message = `${progress} ⏭ SKIP ${testName} – ${reason}`;
+  
+  // Use logImmediate for synchronous output (Jest buffers console.log)
   logImmediate(message);
-  // Don't use warn for skip - it's not an error, just info
-  logger?.info?.(message);
+  // Also log via logger if provided (uses DefaultLogger which is synchronous)
+  if (logger && 'info' in logger) {
+    const testLogger = logger as ILogger;
+    testLogger.info?.(message);
+  }
   testResults.set(testName, 'SKIP');
 }
 
@@ -143,9 +167,14 @@ export function logBuilderTestSuccess(logger: BuilderTestLogger | undefined, tes
     const duration = startTime ? ` (${((Date.now() - startTime) / 1000).toFixed(1)}s)` : '';
     const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
     const message = `${progress} ✓ PASS ${testName}${duration}`;
-    // Ensure immediate output
+    
+    // Use logImmediate for synchronous output (Jest buffers console.log)
     logImmediate(message);
-    // Don't duplicate with logger.info - logImmediate already outputs
+    // Also log via logger if provided (uses DefaultLogger which is synchronous)
+    if (logger && 'info' in logger) {
+      const testLogger = logger as ILogger;
+      testLogger.info?.(message);
+    }
     testStartTimes.delete(testName);
     testResults.set(testName, 'PASS');
   } catch (error) {
@@ -166,6 +195,11 @@ export function logBuilderTestEnd(logger: BuilderTestLogger | undefined, testNam
     logImmediate(message);
     // Add blank line after test completion for better readability
     logImmediate('');
+    // Also log via logger if provided
+    if (logger && 'info' in logger) {
+      const testLogger = logger as ILogger;
+      testLogger.info?.(message);
+    }
     return;
   }
   
@@ -174,6 +208,11 @@ export function logBuilderTestEnd(logger: BuilderTestLogger | undefined, testNam
   logImmediate(message);
   // Add blank line after test completion for better readability
   logImmediate('');
+  // Also log via logger if provided
+  if (logger && 'info' in logger) {
+    const testLogger = logger as ILogger;
+    testLogger.info?.(message);
+  }
 }
 
 export function logBuilderTestError(
@@ -187,6 +226,7 @@ export function logBuilderTestError(
   const errorMessage = extractErrorMessage(error);
   const message = `${progress} ✗ FAIL ${testName}${duration}: ${errorMessage}`;
 
+  // Use logImmediate for synchronous output (Jest buffers console.log)
   logImmediate(message);
 
   if (debugLogsEnabled) {
@@ -202,9 +242,12 @@ export function logBuilderTestError(
     }
   }
 
-  // Don't use logErrorSafely here - it uses logger.error which may be async and causes log interleaving
-  // The main error message is already logged via logImmediate above, which is synchronous
-  // If detailed error logging is needed, it should be done outside of test execution flow
+  // Also log via logger if provided (uses DefaultLogger which is synchronous)
+  if (logger && 'error' in logger) {
+    const testLogger = logger as ILogger;
+    testLogger.error?.(message);
+  }
+
   testStartTimes.delete(testName);
   testResults.set(testName, 'FAIL');
 }
