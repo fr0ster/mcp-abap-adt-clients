@@ -3,6 +3,8 @@
 **Last Updated:** 2025-12-12  
 **Status:** ✅ **COMPLETED** - All 7 shared tests migrated to `AdtClient`/`AdtUtils`
 
+**Archive Note:** This roadmap has been completed and archived in `docs/development/archive/roadmaps/`. All 7 shared integration tests have been successfully migrated to `AdtClient`/`AdtUtils` API. The migration is 100% complete with all utility functions accessible through `AdtClient.getUtils()` method. Shared tests are NOT candidates for BaseTester migration as they test utility functions and cross-object operations, not single-object CRUD flows.
+
 ## Overview
 
 Shared tests verify utility functions (`AdtUtils`) and cross-object operations. They test functionality that is NOT CRUD operations on single objects.
