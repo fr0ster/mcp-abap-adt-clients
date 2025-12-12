@@ -26,6 +26,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - 7/7 shared integration tests migrated to `AdtClient`/`AdtUtils`
   - All tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
   - Overall test migration: 22/24 applicable tests (92%)
+- **BaseTester Migration**: Integration tests refactored to use `BaseTester` for consistency and maintainability
+  - 13/15 object-specific integration tests migrated to `BaseTester` (87%)
+  - Standardized CRUD workflow testing with `BaseTester.flowTestAuto()` and `BaseTester.readTest()`
+  - Reduced boilerplate code and improved test consistency
+  - `Class.test.ts`: Migrated to `BaseTester`, removed ABAP Unit test execution logic (run, getStatus, getResult)
+  - `View.test.ts`: Migrated to `BaseTester`, removed CDS Unit test workflow (validate, create, run, getStatus, getResult)
+  - Unit tests will be handled in separate test files for better separation of concerns
+  - See [BaseTester Migration Roadmap](docs/development/roadmaps/BASE_TESTER_MIGRATION.md) for details
 - **Long Polling Support**: Added `withLongPolling` parameter to all read operations for better reliability and performance
   - `IAdtObject.read()`, `readMetadata()`, and `readTransport()` methods now support `withLongPolling` option
   - `IBuilder.read()` methods now support `withLongPolling` option
@@ -59,6 +67,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - All integration tests now use `AdtClient` for consistency
   - Shared tests use `AdtUtils` for utility functions
   - Better separation of concerns in test code
+  - Introduced `BaseTester` class for standardized integration test workflows
+  - 13/15 object-specific tests now use `BaseTester` for consistent CRUD testing patterns
+  - Separated unit test logic from integration tests (`Class.test.ts`, `View.test.ts`) for better separation of concerns
 
 ### Fixed
 - **DataElement Check**: Fixed handling of empty data elements after create
@@ -66,6 +77,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - These errors are now expected and ignored for newly created empty data elements
 - **Test Naming**: Fixed test names in Program.test.ts
   - Changed from "ProgramBuilder" to "Program" to reflect actual usage of AdtClient.getProgram()
+- **TypeScript Syntax Errors**: Fixed compilation errors in test files
+  - `FunctionGroup.test.ts`: Removed unused `logBuilderTestStep` call
+  - `ServiceDefinition.test.ts`: Removed unused `logBuilderTestStep` call
+  - `FunctionModule.test.ts`: Added null check for `functionGroupName` before passing to `ensureFunctionGroupExists`
 
 ### Documentation
 - Updated architecture documentation with `AdtClient` and `AdtUtils` details
@@ -75,6 +90,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Updated API reference to document `withLongPolling` parameter and high-level CRUD operations
 - Added documentation for ADT discovery script in README.md and tools/README.md
 - Updated IAdtOperationOptions documentation to clarify timeout vs withLongPolling usage
+- Added BaseTester migration roadmap documenting test refactoring progress (13/15 tests migrated, 87%)
 - Roadmap execution summary: ~95% complete (core functionality complete, documentation pending)
 
 ## [0.1.40] - 2025-12-08

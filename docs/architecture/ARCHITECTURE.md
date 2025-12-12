@@ -7,18 +7,79 @@ Separation of ADT endpoint functionality into three classes to enable different 
 ## Package Structure `@mcp-abap-adt/adt-clients`
 
 ```
-packages/adt-clients/
+@mcp-abap-adt/adt-clients/
 ├── src/
-│   ├── clients/
-│   │   ├── ReadOnlyClient.ts      # Read-only operations (GET)
-│   │   ├── CrudClient.ts          # Full CRUD (Create, Read, Update, Delete)
-│   │   └── ManagementClient.ts    # Management operations (Activate, Check, etc.)
-│   ├── utils/
-│   │   └── internalUtils.ts       # Private utilities (encodeSapObjectName, etc.)
-│   └── index.ts                   # Exports
+│   ├── clients/                   # High-level client APIs
+│   │   ├── AdtClient.ts          # High-level CRUD API (recommended)
+│   │   ├── ReadOnlyClient.ts     # Read-only operations (GET)
+│   │   └── CrudClient.ts         # Full CRUD (Create, Read, Update, Delete)
+│   ├── core/                     # Core object implementations
+│   │   ├── class/                # Class operations (Builder, AdtClass, low-level functions)
+│   │   ├── program/              # Program operations
+│   │   ├── interface/            # Interface operations
+│   │   ├── domain/               # Domain operations
+│   │   ├── dataElement/          # Data Element operations
+│   │   ├── structure/            # Structure operations
+│   │   ├── table/                # Table operations
+│   │   ├── view/                 # View (CDS) operations
+│   │   ├── functionGroup/        # Function Group operations
+│   │   ├── functionModule/       # Function Module operations
+│   │   ├── package/              # Package operations
+│   │   ├── serviceDefinition/    # Service Definition operations
+│   │   ├── behaviorDefinition/   # Behavior Definition operations
+│   │   ├── behaviorImplementation/ # Behavior Implementation operations
+│   │   ├── metadataExtension/    # Metadata Extension operations
+│   │   ├── transport/            # Transport Request operations
+│   │   ├── unitTest/             # ABAP Unit Test operations
+│   │   └── shared/               # Shared utilities (AdtUtils, SharedBuilder)
+│   ├── utils/                    # Utility functions
+│   │   ├── activationUtils.ts    # Activation utilities
+│   │   ├── checkRun.ts           # Check run parsing
+│   │   ├── formatters.ts         # Data formatters
+│   │   ├── internalUtils.ts      # Internal utilities (encodeSapObjectName, etc.)
+│   │   ├── managementOperations.ts # Management operations
+│   │   ├── readOperations.ts     # Read operation utilities
+│   │   ├── systemInfo.ts         # System information utilities
+│   │   ├── timeouts.ts           # Timeout utilities
+│   │   └── validation.ts         # Validation utilities
+│   ├── __tests__/                # Test infrastructure
+│   │   ├── helpers/              # Test helpers (BaseTester, test config, etc.)
+│   │   ├── integration/          # Integration tests for all object types
+│   │   └── e2e/                  # End-to-end tests
+│   └── index.ts                  # Main package exports
+├── docs/                         # Documentation
+│   ├── architecture/             # Architecture documentation
+│   └── development/              # Development documentation
 ├── package.json
 └── tsconfig.json
 ```
+
+### Core Module Structure
+
+Each core module (e.g., `class/`, `program/`, `table/`) follows a consistent structure:
+
+```
+core/[objectType]/
+├── [ObjectType]Builder.ts       # Builder class (fluent API with method chaining)
+├── Adt[ObjectType].ts           # High-level AdtObject implementation (for AdtClient)
+├── types.ts                     # Type definitions (Config, State, Params)
+├── create.ts                    # Low-level create function
+├── read.ts                      # Low-level read function
+├── update.ts                    # Low-level update function
+├── delete.ts                    # Low-level delete function
+├── lock.ts                      # Low-level lock function
+├── unlock.ts                    # Low-level unlock function
+├── activate.ts                  # Low-level activate function
+├── check.ts                    # Low-level check function
+├── validation.ts                # Low-level validation function
+└── index.ts                     # Module exports
+```
+
+**Key Components:**
+- **Builder Classes**: Fluent API with method chaining (`builder.create().lock().update().unlock().activate()`)
+- **AdtObject Classes**: High-level implementations for `AdtClient` (implement `IAdtObject<IConfig, IState>`)
+- **Low-level Functions**: Direct ADT endpoint operations (snake_case parameters)
+- **Type Definitions**: Centralized type definitions for each module
 
 ## Classes
 
@@ -106,83 +167,49 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 
 ### 2. ReadOnlyClient
 
-**Purpose:** Read-only operations (GET)
+**Purpose:** Read-only operations (GET requests only)
 
-**Methods:**
-- `getClass(name: string)`
-- `getProgram(name: string)`
-- `getFunction(name: string, group: string)`
-- `getFunctionGroup(name: string)`
-- `getTable(name: string)`
-- `getStructure(name: string)`
-- `getView(name: string)`
-- `getDomain(name: string)`
-- `getDataElement(name: string)`
-- `getPackage(name: string)`
-- `getInterface(name: string)`
-- `getServiceDefinition(name: string)`
-- `getInclude(name: string)`
-- `getIncludesList(name: string, type: string)`
-- `getTypeInfo(name: string, type: string)`
-- `getObjectInfo(parentType: string, parentName: string, maxDepth?: number)`
-- `getObjectStructure(parentType: string, parentName: string, nodeId: string)`
-- `getTransaction(name: string)`
-- `getTableContents(tableName: string, maxRows?: number)`
-- `getObjectsList(parentName: string, parentTechName: string, parentType: string)`
-- `getObjectsByType(parentName: string, parentTechName: string, parentType: string, nodeId: string)`
-- `getProgFullCode(name: string, type: string)`
-- `getObjectNodeFromCache(...)`
-- `getAdtTypes()`
-- `getSqlQuery(sqlQuery: string, rowNumber?: number)`
-- `getWhereUsed(name: string, type: string)`
-- `searchObject(query: string, objectType?: string)`
-- `getEnhancements(packageName?: string)`
-- `getEnhancementImpl(name: string)`
-- `getEnhancementSpot(name: string)`
-- `getBdef(name: string)`
-- `getTransport(transportNumber: string)`
-- `getAbapAST(name: string, type: string)`
-- `getAbapSemanticAnalysis(name: string, type: string)`
-- `getAbapSystemSymbols()`
-- `describeByList(objects: Array<{name: string, type: string}>)`
+**Architecture:**
+- Stateless client (no session management)
+- Direct HTTP GET requests to ADT endpoints
+- No object locking or modification capabilities
+- Perfect for production systems where write access is not needed
 
-**Handlers:**
-- handleGetClass
-- handleGetProgram
-- handleGetFunction
-- handleGetFunctionGroup
-- handleGetTable
-- handleGetStructure
-- handleGetView
-- handleGetDomain
-- handleGetDataElement
-- handleGetPackage
-- handleGetInterface
-- handleGetServiceDefinition
-- handleGetInclude
-- handleGetIncludesList
-- handleGetTypeInfo
-- handleGetObjectInfo
-- handleGetObjectStructure
-- handleGetTransaction
-- handleGetTableContents
-- handleGetObjectsList
-- handleGetObjectsByType
-- handleGetProgFullCode
-- handleGetObjectNodeFromCache
-- handleGetAllTypes
-- handleGetSqlQuery
-- handleGetWhereUsed
-- handleSearchObject
-- handleGetEnhancements
-- handleGetEnhancementImpl
-- handleGetEnhancementSpot
-- handleGetBdef
-- handleGetTransport
-- handleGetAbapAST
-- handleGetAbapSemanticAnalysis
-- handleGetAbapSystemSymbols
-- handleDescribeByList
+**Supported Object Types:**
+- Class, Program, Interface, Domain, DataElement, Structure, Table, View
+- FunctionGroup, FunctionModule, Package, ServiceDefinition
+- Include, Transaction, Enhancement, Behavior Definition
+- Transport Request, ABAP AST, Semantic Analysis, System Symbols
+
+**Key Methods:**
+- `getClass(name)` - Read class metadata
+- `getProgram(name)` - Read program source code
+- `getTable(name)` - Read table definition
+- `getView(name)` - Read CDS view definition
+- `searchObject(query, objectType?)` - Search for objects
+- `getWhereUsed(name, type)` - Find where object is used
+- `getTransport(transportNumber)` - Read transport request
+- `getSqlQuery(sqlQuery, rowNumber?)` - Execute SQL query
+- `getTableContents(tableName, maxRows?)` - Read table contents
+- And 30+ more read operations
+
+**Usage:**
+```typescript
+import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new ReadOnlyClient(connection);
+
+// Read operations only
+const program = await client.getProgram('Z_MY_PROGRAM');
+const table = await client.getTable('Z_MY_TABLE');
+const classes = await client.searchObject('ZCL_*', 'CLAS/OC');
+```
+
+**Benefits:**
+- Reduced context for LLM (only ~30 tools instead of 58)
+- Security: Cannot modify the system
+- Perfect for production systems
+- Smaller bundle size
 
 ---
 
@@ -255,29 +282,6 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 - `deleteClass(config: Pick<ClassBuilderConfig, 'className'>)`
 - Similar methods for all object types
 
-**Handlers:**
-- handleCreateClass
-- handleCreateProgram
-- handleCreateInterface
-- handleCreateFunctionGroup
-- handleCreateFunctionModule
-- handleCreateTable
-- handleCreateStructure
-- handleCreateView
-- handleCreateDomain
-- handleCreateDataElement
-- handleCreateServiceDefinition
-- handleCreatePackage
-- handleCreateTransport
-- handleUpdateClassSource
-- handleUpdateProgramSource
-- handleUpdateInterfaceSource
-- handleUpdateFunctionModuleSource
-- handleUpdateViewSource
-- handleUpdateDomain
-- handleUpdateDataElement
-- handleDeleteObject
-
 ---
 
 ### 4. ManagementClient
@@ -287,10 +291,6 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 **Methods:**
 - `activateObject(objects: Array<{name: string, type: string}>)`
 - `checkObject(name: string, type: string, version?: string)`
-
-**Handlers:**
-- handleActivateObject
-- handleCheckObject
 
 ---
 
@@ -686,6 +686,103 @@ import {
 
 ---
 
+## Test Infrastructure
+
+### BaseTester Class
+
+**Purpose:** Standardized integration test infrastructure for `IAdtObject` implementations
+
+**Location:** `src/__tests__/helpers/BaseTester.ts`
+
+**Architecture:**
+- Generic class that works with any `IAdtObject<IConfig, IState>` implementation
+- Provides standardized CRUD workflow testing patterns
+- Handles test setup, teardown, and cleanup automatically
+- Supports dependency management and custom cleanup callbacks
+
+**Key Methods:**
+- `setup(options)` - Initialize BaseTester with connection, client, and configuration builder
+- `flowTestAuto(options?)` - Execute full CRUD workflow: validate → create → check → update → activate → cleanup
+- `readTest()` - Read standard object test (for existing SAP objects)
+- `beforeEach()` - Setup before each test (cleanup existing objects)
+- `afterEach()` - Cleanup after each test (delete created objects)
+- `afterAll()` - Final cleanup (reset connection)
+
+**Benefits:**
+- **Consistency**: All integration tests follow the same pattern
+- **Reduced Boilerplate**: Eliminates repetitive setup/teardown code
+- **Automatic Cleanup**: Handles object deletion and unlock automatically
+- **Error Handling**: Proper cleanup on test failures
+- **Dependency Management**: Supports creating/deleting dependencies (e.g., FunctionGroup for FunctionModule)
+
+**Migration Status:**
+- 13/15 object-specific integration tests migrated to `BaseTester` (87%)
+- Remaining: `MetadataExtension.test.ts` (requires existing CDS projection in YAML config)
+- See [BaseTester Migration Roadmap](../development/roadmaps/BASE_TESTER_MIGRATION.md) for details
+
+**Example Usage:**
+```typescript
+import { BaseTester } from '../../helpers/BaseTester';
+import { IClassConfig, IClassState } from '../../../core/class';
+
+describe('ClassBuilder (using AdtClient)', () => {
+  let tester: BaseTester<IClassConfig, IClassState>;
+
+  beforeAll(async () => {
+    const connection = createAbapConnection(config, logger);
+    const client = new AdtClient(connection, builderLogger);
+    
+    tester = new BaseTester(
+      client.getClass(),
+      'Class',
+      'create_class',
+      'adt_class',
+      testsLogger
+    );
+
+    tester.setup({
+      connection,
+      client,
+      hasConfig: true,
+      buildConfig: (testCase: any) => ({
+        className: testCase.params.class_name,
+        packageName: resolvePackageName(testCase.params.package_name),
+        // ... other config
+      }),
+      ensureObjectReady: async (className: string) => {
+        // Custom cleanup logic
+        return { success: true };
+      }
+    });
+  });
+
+  afterAll(() => tester?.afterAll()());
+
+  describe('Full workflow', () => {
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
+
+    it('should execute full workflow', async () => {
+      const config = tester.getConfig();
+      if (!config) return;
+
+      await tester.flowTestAuto({
+        sourceCode: config.sourceCode || 'CLASS ... ENDCLASS.',
+        updateConfig: { ...config }
+      });
+    });
+  });
+});
+```
+
+**Test Organization:**
+- Integration tests use `AdtClient` for consistency
+- Shared tests use `AdtUtils` for utility functions
+- Unit test logic separated from integration tests (e.g., `Class.test.ts`, `View.test.ts`)
+- All tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
+
+---
+
 ## Debug Flags
 
 The library uses a **5-tier granular debug flag system**:
@@ -703,28 +800,33 @@ See [DEBUG.md](../DEBUG.md) for detailed usage.
 ## Implementation Plan
 
 1. Create package `@mcp-abap-adt/adt-clients`
-2. Extract handlers into separate modules
-3. Create three classes with methods
+2. Create client classes with methods
+3. Implement core modules for each object type
 4. Implement private utilities
-5. Update MCP server to use classes
-6. Create proxy for combined access
-7. Add tests
-8. Publish package
+5. Add tests
+6. Publish package
+
+**Note:** Handlers are part of the MCP server (`@mcp-abap-adt`), not this client library. This library provides the client APIs that handlers use.
 
 ## Export Structure
 
-The package will export clients individually, allowing tree-shaking and selective imports:
+The package exports clients, utilities, and types individually, allowing tree-shaking and selective imports:
 
 ```typescript
-// packages/adt-clients/src/index.ts
+// Main exports from src/index.ts
+export { AdtClient } from './clients/AdtClient';
 export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
-export { ManagementClient } from './clients/ManagementClient';
+export { AdtUtils, SharedBuilder } from './core/shared';
 
 // Type exports
-export type { ReadOnlyClient as IReadOnlyClient } from './clients/ReadOnlyClient';
-export type { CrudClient as ICrudClient } from './clients/CrudClient';
-export type { ManagementClient as IManagementClient } from './clients/ManagementClient';
+export type { IClassConfig as ClassBuilderConfig } from './core/class';
+export type { IProgramConfig as ProgramBuilderConfig } from './core/program';
+// ... and all other object type configs
+
+// Utility exports
+export { encodeSapObjectName } from './utils/internalUtils';
+export type { ILogger } from '@mcp-abap-adt/interfaces';
 ```
 
 This allows:
