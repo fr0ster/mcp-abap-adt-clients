@@ -22,14 +22,11 @@ import {
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
-  logBuilderTestEnd,
-  logBuilderTestStep,
-  logBuilderTestStepError,
-  getHttpStatusText
+  logBuilderTestEnd
 } from '../../helpers/builderTestLogger';
-import { hasCheckErrorsFromResponse, getCheckErrorMessages } from '../../helpers/checkResultHelper';
-import { parseCheckRunResponse } from '../../../utils/checkRun';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../helpers/testLogger';
+import { BaseTester } from '../../helpers/BaseTester';
+import { IServiceDefinitionConfig, IServiceDefinitionState } from '../../../core/serviceDefinition';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -39,12 +36,8 @@ const {
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  ensurePackageConfig,
   resolveStandardObject,
-  getTimeout,
-  getOperationDelay,
-  retryCheckAfterActivate,
-  getEnvironmentConfig
+  getTimeout
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -70,6 +63,7 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let tester: BaseTester<IServiceDefinitionConfig, IServiceDefinitionState>;
 
   beforeAll(async () => {
     try {
@@ -78,296 +72,74 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
       await (connection as any).connect();
       client = new AdtClient(connection, builderLogger);
       hasConfig = true;
-      // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
+
+      tester = new BaseTester(
+        client.getServiceDefinition(),
+        'ServiceDefinition',
+        'create_service_definition',
+        'adt_service_definition',
+        testsLogger
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any) => {
+          const params = testCase?.params || {};
+          const packageName = resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('package_name not configured');
+          return {
+            serviceDefinitionName: params.service_definition_name,
+            packageName,
+            transportRequest: resolveTransportRequest(params.transport_request),
+            description: params.description,
+            sourceCode: params.source_code
+          };
+        },
+        ensureObjectReady: async (serviceDefinitionName: string) => {
+          if (!connection) return { success: true };
+          try {
+            await getServiceDefinition(connection, serviceDefinitionName);
+            return { success: false, reason: `⚠️ SAFETY: Service Definition ${serviceDefinitionName} already exists!` };
+          } catch (error: any) {
+            if (error.response?.status !== 404) {
+              return { success: false, reason: `Cannot verify service definition existence: ${error.message}` };
+            }
+          }
+          return { success: true };
+        }
+      });
     } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
-  afterAll(async () => {
-    if (connection) {
-      connection.reset();
-    }
-  });
-
-  /**
-   * Pre-check: Verify test service definition doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function ensureServiceDefinitionReady(serviceDefinitionName: string): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if service definition exists
-    try {
-      await getServiceDefinition(connection, serviceDefinitionName);
-      return {
-        success: false,
-        reason: `⚠️ SAFETY: Service Definition ${serviceDefinitionName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
-      };
-    } catch (error: any) {
-      // 404 is expected - object doesn't exist, we can proceed
-      if (error.response?.status !== 404) {
-        return {
-          success: false,
-          reason: `Cannot verify service definition existence: ${error.message}`
-        };
-      }
-    }
-
-    return { success: true };
-  }
-
-  function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_service_definition', 'adt_service_definition');
-  }
-
-  function buildBuilderConfig(testCase: any) {
-    const params = testCase?.params || {};
-    const packageName = resolvePackageName(params.package_name);
-    if (!packageName) {
-      throw new Error('package_name not configured for ServiceDefinitionBuilder test');
-    }
-    return {
-      serviceDefinitionName: params.service_definition_name,
-      packageName,
-      transportRequest: resolveTransportRequest(params.transport_request),
-      description: params.description,
-      sourceCode: params.source_code
-    };
-  }
-
+  afterAll(() => tester?.afterAll()());
 
   describe('Full workflow', () => {
-    let testCase: any = null;
-    let serviceDefinitionName: string | null = null;
-    let skipReason: string | null = null;
-
-    beforeEach(async () => {
-      skipReason = null;
-      testCase = null;
-      serviceDefinitionName = null;
-
-      if (!hasConfig) {
-        skipReason = 'No SAP configuration';
-        return;
-      }
-
-      const definition = getBuilderTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_service_definition', 'adt_service_definition');
-      if (!tc) {
-        skipReason = 'Test case disabled or not found';
-        return;
-      }
-
-      const packageCheck = ensurePackageConfig(tc.params, 'ServiceDefinition - full workflow');
-      if (!packageCheck.success) {
-        skipReason = packageCheck.reason || 'Default package is not configured';
-        return;
-      }
-
-      testCase = tc;
-      serviceDefinitionName = tc.params.service_definition_name;
-
-      // Cleanup before test
-      if (serviceDefinitionName) {
-        const cleanup = await ensureServiceDefinitionReady(serviceDefinitionName);
-        if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup service definition before test';
-          testCase = null;
-          serviceDefinitionName = null;
-        }
-      }
-    });
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
 
     it('should execute full workflow and store all results', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'ServiceDefinition - full workflow', definition);
+      const config = tester.getConfig();
+      if (!config) return;
 
-      if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'ServiceDefinition - full workflow', skipReason);
-        return;
-      }
+      const testCase = tester.getTestCaseDefinition();
+      const sourceCode = testCase?.params?.source_code || config.sourceCode || 
+        `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n  expose ZOK_C_CDS_TEST;\n}`;
 
-      if (!testCase || !serviceDefinitionName) {
-        logBuilderTestSkip(testsLogger, 'ServiceDefinition - full workflow', skipReason || 'Test case not available');
-        return;
-      }
-
-      const config = buildBuilderConfig(testCase);
-      
-      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
-      const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup = testCase.params.skip_cleanup !== undefined
-        ? testCase.params.skip_cleanup === true
-        : globalSkipCleanup;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
-      
-      let serviceDefinitionCreated = false;
-      let currentStep = '';
-
-      try {
-        // Ensure packageName is set
-        if (!config.packageName) {
-          throw new Error('packageName is required but not set in config');
-        }
-
-        currentStep = 'validate';
-        logBuilderTestStep(currentStep);
-        const validationState = await client.getServiceDefinition().validate({
-          serviceDefinitionName: config.serviceDefinitionName,
-          description: config.description || ''
-        });
-        const validationResponse = validationState?.validationResponse;
-        if (validationResponse?.status !== 200) {
-          const errorData = typeof validationResponse?.data === 'string' 
-            ? validationResponse.data 
-            : JSON.stringify(validationResponse?.data);
-          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-        }
-        expect(validationResponse?.status).toBe(200);
-        
-        currentStep = 'create';
-        logBuilderTestStep(currentStep);
-        const sourceCode = config.sourceCode || `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n  expose ZOK_C_CDS_TEST;\n}`;
-        await client.getServiceDefinition().create({
+      await tester.flowTestAuto({
+        sourceCode: sourceCode,
+        updateConfig: {
           serviceDefinitionName: config.serviceDefinitionName,
           packageName: config.packageName,
-          description: config.description || ''
-        }, { activateOnCreate: false, sourceCode: sourceCode });
-        serviceDefinitionCreated = true;
-        // Wait for object to be ready using long polling
-        try {
-          await client.getServiceDefinition().read({ serviceDefinitionName: config.serviceDefinitionName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
-        }
-        
-        currentStep = 'check before update';
-        logBuilderTestStep(currentStep);
-        const checkBeforeUpdateState = await client.getServiceDefinition().check({ 
-          serviceDefinitionName: config.serviceDefinitionName,
+          description: config.description || '',
           sourceCode: sourceCode
-        }, 'inactive');
-        const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
-        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-        const hasErrorsBeforeUpdate = hasCheckErrorsFromResponse(checkBeforeUpdate);
-        if (hasErrorsBeforeUpdate) {
-          const errorMessages = checkBeforeUpdate ? getCheckErrorMessages(parseCheckRunResponse(checkBeforeUpdate)) : [];
-          throw new Error(`Check before update failed: ${errorMessages.join('; ')}`);
         }
-        
-        currentStep = 'update';
-        logBuilderTestStep(currentStep);
-        await client.getServiceDefinition().update({
-          serviceDefinitionName: config.serviceDefinitionName
-        }, { sourceCode: sourceCode });
-        // Wait for object to be ready after update using long polling
-        try {
-          await client.getServiceDefinition().read({ serviceDefinitionName: config.serviceDefinitionName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
-        }
-        
-        logBuilderTestStep('check(inactive)');
-        const checkResultInactiveState = await client.getServiceDefinition().check({ serviceDefinitionName: config.serviceDefinitionName }, 'inactive');
-        const checkResultInactive = checkResultInactiveState?.checkResult;
-        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-        const hasErrorsInactive = hasCheckErrorsFromResponse(checkResultInactive);
-        if (hasErrorsInactive) {
-          const errorMessages = checkResultInactive ? getCheckErrorMessages(parseCheckRunResponse(checkResultInactive)) : [];
-          throw new Error(`Check inactive failed: ${errorMessages.join('; ')}`);
-        }
-        
-        logBuilderTestStep('activate');
-        await client.getServiceDefinition().activate({ serviceDefinitionName: config.serviceDefinitionName });
-        // Wait for object to be ready after activation using long polling
-        try {
-          await client.getServiceDefinition().read({ serviceDefinitionName: config.serviceDefinitionName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
-        }
-        
-        logBuilderTestStep('check(active)');
-        // Retry check for active version - activation may take time
-        const checkResultActiveState = await retryCheckAfterActivate(
-          async () => {
-            const state = await client.getServiceDefinition().check({ serviceDefinitionName: config.serviceDefinitionName }, 'active');
-            return state?.checkResult;
-          },
-          {
-            maxAttempts: 5,
-            delay: 1000,
-            logger: testsLogger,
-            objectName: config.serviceDefinitionName
-          }
-        );
-        // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-        const hasErrors = checkResultActiveState ? hasCheckErrorsFromResponse(checkResultActiveState) : false;
-        if (hasErrors) {
-          const errorMessages = checkResultActiveState ? getCheckErrorMessages(parseCheckRunResponse(checkResultActiveState)) : [];
-          throw new Error(`Check active failed: ${errorMessages.join('; ')}`);
-        }
-
-        logBuilderTestSuccess(testsLogger, 'ServiceDefinition - full workflow');
-      } catch (error: any) {
-        // Log step error with details before failing test
-        logBuilderTestStepError(currentStep || 'unknown', error);
-
-        // Cleanup: delete if object was created and cleanup is enabled
-        if (shouldCleanup && serviceDefinitionCreated) {
-          try {
-            logBuilderTestStep('delete (cleanup)');
-            await client.getServiceDefinition().delete({
-              serviceDefinitionName: config.serviceDefinitionName,
-              transportRequest: config?.transportRequest
-            });
-          } catch (cleanupError) {
-            // Log cleanup error but don't fail test - original error is more important
-            testsLogger.warn?.(`Cleanup failed for ${config.serviceDefinitionName}:`, cleanupError);
-          }
-        } else if (!shouldCleanup && serviceDefinitionCreated) {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - service definition left for analysis: ${config.serviceDefinitionName}`);
-        }
-
-        const statusText = getHttpStatusText(error);
-        const enhancedError = statusText !== 'HTTP ?'
-          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-          : error;
-        logBuilderTestError(testsLogger, 'ServiceDefinition - full workflow', enhancedError);
-        throw enhancedError;
-      } finally {
-        // Cleanup: delete
-        if (serviceDefinitionName && serviceDefinitionCreated) {
-          try {
-            logBuilderTestStep('cleanup: delete');
-            await client.getServiceDefinition().delete({
-              serviceDefinitionName: serviceDefinitionName,
-              transportRequest: config?.transportRequest
-            }).catch((deleteError: any) => {
-              testsLogger.warn?.('Failed to delete service definition during cleanup:', deleteError);
-            });
-          } catch (cleanupError: any) {
-            testsLogger.warn?.('Cleanup error:', cleanupError);
-          }
-        }
-        
-        logBuilderTestEnd(testsLogger, 'ServiceDefinition - full workflow');
-      }
+      });
     }, getTimeout('test'));
   });
 
@@ -429,7 +201,6 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
       }
 
       try {
-        logBuilderTestStep('read');
         const resultState = await client.getServiceDefinition().read({ serviceDefinitionName: serviceDefinitionName });
         expect(resultState).toBeDefined();
         expect(resultState?.readResult).toBeDefined();

@@ -1,5 +1,8 @@
 # BaseTester Migration Analysis
 
+**Last Updated:** 2025-12-12  
+**Status:** ⚠️ **IN PROGRESS** - 13/15 tests migrated (87%)
+
 ## Overview
 This document analyzes which integration tests can be migrated to use `BaseTester` class, which provides standardized test flow and cleanup handling.
 
@@ -34,26 +37,48 @@ describe('Read standard object', () => {
 });
 ```
 
+## Migration Progress
+
+| # | Test File | Object Type | Status | Test Case Key | Test Case Name | Notes |
+|---|-----------|-------------|--------|---------------|----------------|-------|
+| 1 | `domain/Domain.test.ts` | Domain | ✅ **MIGRATED** | `create_domain` | `adt_domain` | Uses BaseTester.flowTest() |
+| 2 | `dataElement/DataElement.test.ts` | DataElement | ✅ **MIGRATED** | `create_data_element` | `adt_data_element` | Uses BaseTester.flowTest() |
+| 3 | `table/Table.test.ts` | Table | ✅ **MIGRATED** | `create_table` | `adt_table` | Uses BaseTester.flowTest() |
+| 4 | `structure/Structure.test.ts` | Structure | ✅ **MIGRATED** | `create_structure` | `adt_structure` | Uses BaseTester.flowTest() |
+| 5 | `program/Program.test.ts` | Program | ✅ **MIGRATED** | `create_program` | `adt_program` | Uses BaseTester.flowTest() |
+| 6 | `interface/Interface.test.ts` | Interface | ✅ **MIGRATED** | `create_interface` | `adt_interface` | Uses BaseTester.flowTest() |
+| 7 | `functionModule/FunctionModule.test.ts` | FunctionModule | ✅ **MIGRATED** | `create_function_module` | `adt_function_module` | Uses BaseTester.flowTest() |
+| 8 | `package/Package.test.ts` | Package | ✅ **MIGRATED** | `create_package` | `adt_package` | Uses BaseTester.flowTest() |
+| 9 | `serviceDefinition/ServiceDefinition.test.ts` | ServiceDefinition | ✅ **MIGRATED** | `create_service_definition` | `adt_service_definition` | Uses BaseTester.flowTest() |
+| 10 | `behaviorDefinition/BehaviorDefinition.test.ts` | BehaviorDefinition | ✅ **MIGRATED** | `create_behavior_definition` | `adt_behavior_definition` | Uses BaseTester.flowTest() |
+| 11 | `behaviorImplementation/BehaviorImplementation.test.ts` | BehaviorImplementation | ✅ **MIGRATED** | `create_behavior_implementation` | `adt_behavior_implementation` | Uses BaseTester.flowTest() (with BehaviorDefinition dependency) |
+| 12 | `functionGroup/FunctionGroup.test.ts` | FunctionGroup | ✅ **MIGRATED** | `create_function_group` | `adt_function_group` | Uses BaseTester.flowTest() (Kerberos workaround already added) |
+| 13 | `class/Class.test.ts` | Class | ✅ **MIGRATED** | `create_class` | `adt_class` | Uses BaseTester.flowTest() (unit test logic removed) |
+| 14 | `view/View.test.ts` | View | ✅ **MIGRATED** | `create_view` | `adt_view` | Uses BaseTester.flowTest() (CDS unit test logic removed) |
+| 15 | `metadataExtension/MetadataExtension.test.ts` | MetadataExtension | ⏳ **PENDING** | `create_metadata_extension` | `adt_metadata_extension` | Requires existing CDS projection in YAML config |
+
+**Overall Status:** ✅ **13/15 tests migrated (87%)**
+
 ## Migration Candidates
 
 ### ✅ Fully Migratable (Standard IAdtObject)
 
 | Test File | Object Type | Test Case Key | Test Case Name | Notes |
 |-----------|-------------|---------------|----------------|-------|
-| `class/Class.test.ts` | Class | `create_class` | `adt_class` | ✅ Simple migration - unit test logic will be moved to separate test file |
-| `dataElement/DataElement.test.ts` | DataElement | `create_data_element` | `adt_data_element` | ✅ Simple migration |
-| `domain/Domain.test.ts` | Domain | `create_domain` | `adt_domain` | ✅ Simple migration |
-| `view/View.test.ts` | View | `create_view` | `adt_view` | ✅ Simple migration - CDS unit test logic will be moved to separate test file |
-| `table/Table.test.ts` | Table | `create_table` | `adt_table` | ✅ Simple migration |
-| `structure/Structure.test.ts` | Structure | `create_structure` | `adt_structure` | ✅ Simple migration |
-| `program/Program.test.ts` | Program | `create_program` | `adt_program` | ✅ Simple migration |
-| `interface/Interface.test.ts` | Interface | `create_interface` | `adt_interface` | ✅ Simple migration |
-| `functionGroup/FunctionGroup.test.ts` | FunctionGroup | `create_function_group` | `adt_function_group` | ✅ Simple migration - Kerberos error handling already supported |
-| `functionModule/FunctionModule.test.ts` | FunctionModule | `create_function_module` | `adt_function_module` | ✅ Simple migration |
-| `package/Package.test.ts` | Package | `create_package` | `adt_package` | ✅ Simple migration |
-| `serviceDefinition/ServiceDefinition.test.ts` | ServiceDefinition | `create_service_definition` | `adt_service_definition` | ✅ Simple migration |
-| `behaviorDefinition/BehaviorDefinition.test.ts` | BehaviorDefinition | `create_behavior_definition` | `adt_behavior_definition` | ✅ Simple migration |
-| `behaviorImplementation/BehaviorImplementation.test.ts` | BehaviorImplementation | `create_behavior_implementation` | `adt_behavior_implementation` | ✅ Simple migration |
+| `class/Class.test.ts` | Class | `create_class` | `adt_class` | ⏳ Unit test logic will be moved to separate test file |
+| `dataElement/DataElement.test.ts` | DataElement | `create_data_element` | `adt_data_element` | ✅ **MIGRATED** |
+| `domain/Domain.test.ts` | Domain | `create_domain` | `adt_domain` | ✅ **MIGRATED** |
+| `table/Table.test.ts` | Table | `create_table` | `adt_table` | ✅ **MIGRATED** |
+| `structure/Structure.test.ts` | Structure | `create_structure` | `adt_structure` | ✅ **MIGRATED** |
+| `view/View.test.ts` | View | `create_view` | `adt_view` | ⏳ CDS unit test logic will be moved to separate test file |
+| `program/Program.test.ts` | Program | `create_program` | `adt_program` | ⏳ Simple migration |
+| `interface/Interface.test.ts` | Interface | `create_interface` | `adt_interface` | ⏳ Simple migration |
+| `functionGroup/FunctionGroup.test.ts` | FunctionGroup | `create_function_group` | `adt_function_group` | ⏳ Kerberos error handling already supported |
+| `functionModule/FunctionModule.test.ts` | FunctionModule | `create_function_module` | `adt_function_module` | ⏳ Simple migration |
+| `package/Package.test.ts` | Package | `create_package` | `adt_package` | ⏳ Simple migration |
+| `serviceDefinition/ServiceDefinition.test.ts` | ServiceDefinition | `create_service_definition` | `adt_service_definition` | ⏳ Simple migration |
+| `behaviorDefinition/BehaviorDefinition.test.ts` | BehaviorDefinition | `create_behavior_definition` | `adt_behavior_definition` | ⏳ Simple migration |
+| `behaviorImplementation/BehaviorImplementation.test.ts` | BehaviorImplementation | `create_behavior_implementation` | `adt_behavior_implementation` | ⏳ Simple migration |
 | `metadataExtension/MetadataExtension.test.ts` | MetadataExtension | `create_metadata_extension` | `adt_metadata_extension` | ⚠️ Requires CDS view dependency setup |
 
 ### ❌ Not Migratable (Not IAdtObject)
@@ -73,26 +98,26 @@ describe('Read standard object', () => {
 ## Migration Priority
 
 ### High Priority (Simple, Standard Flow)
-1. ✅ **DataElement** - Simple, no special logic
-2. ✅ **Domain** - Simple, no special logic
-3. ✅ **Table** - Simple, no special logic
-4. ✅ **Structure** - Simple, no special logic
-5. ✅ **Program** - Simple, no special logic
-6. ✅ **Interface** - Simple, no special logic
-7. ✅ **FunctionModule** - Simple, no special logic
-8. ✅ **Package** - Simple, no special logic
-9. ✅ **ServiceDefinition** - Simple, no special logic
-10. ✅ **BehaviorDefinition** - Simple, no special logic
-11. ✅ **BehaviorImplementation** - Simple, no special logic
-12. ✅ **Class** - Simple migration after unit test logic is moved to separate file
-13. ✅ **View** - Simple migration after CDS unit test logic is moved to separate file
-14. ✅ **FunctionGroup** - Simple migration (Kerberos handling already supported)
+1. ✅ **DataElement** - ✅ **MIGRATED** - Simple, no special logic
+2. ✅ **Domain** - ✅ **MIGRATED** - Simple, no special logic
+3. ✅ **Table** - ✅ **MIGRATED** - Simple, no special logic
+4. ✅ **Structure** - ✅ **MIGRATED** - Simple, no special logic
+5. ✅ **Program** - ✅ **MIGRATED** - Simple, no special logic
+6. ✅ **Interface** - ✅ **MIGRATED** - Simple, no special logic
+7. ✅ **FunctionModule** - ✅ **MIGRATED** - Simple, no special logic
+8. ✅ **Package** - ✅ **MIGRATED** - Simple, no special logic
+9. ✅ **ServiceDefinition** - ✅ **MIGRATED** - Simple, no special logic
+10. ✅ **BehaviorDefinition** - ✅ **MIGRATED** - Simple, no special logic
+11. ✅ **BehaviorImplementation** - ✅ **MIGRATED** - Simple, no special logic (with BehaviorDefinition dependency)
+12. ✅ **Class** - ✅ **MIGRATED** - Unit test logic removed, migrated to BaseTester
+13. ✅ **View** - ✅ **MIGRATED** - CDS unit test logic removed, migrated to BaseTester
+14. ✅ **FunctionGroup** - ✅ **MIGRATED** - Simple migration (Kerberos handling already supported)
 
 ### Medium Priority (Has Special Logic)
-1. ⚠️ **Class** - Has unit test logic, but can migrate main flow
-2. ⚠️ **View** - Has CDS unit test logic, but can migrate main flow
-3. ⚠️ **FunctionGroup** - Has Kerberos handling (already supported)
-4. ⚠️ **MetadataExtension** - Requires CDS view dependency setup
+1. ⏳ **Class** - Has unit test logic, but can migrate main flow
+2. ⏳ **View** - Has CDS unit test logic, but can migrate main flow
+3. ⏳ **FunctionGroup** - Has Kerberos handling (already supported)
+4. ⏳ **MetadataExtension** - Requires CDS view dependency setup
 
 ### Low Priority (Complex or Not Applicable)
 1. ❌ **Transport** - Special transport request logic
@@ -184,13 +209,13 @@ it('should execute full workflow and store all results', async () => {
 6. Remove manual unlock logic (handled by BaseTester)
 
 ### For Class and View Tests (Special):
-1. **Extract unit test logic** to separate files:
-   - `class/ClassUnitTest.test.ts` - All unit test related code
-   - `view/ViewCdsUnitTest.test.ts` - All CDS unit test related code
+1. **Remove unit test logic** from main test files (unit tests will be tested separately):
+   - `class/Class.test.ts` - Remove all unit test related code, keep only CRUD operations
+   - `view/View.test.ts` - Remove all CDS unit test related code, keep only CRUD operations
 2. **Migrate CRUD flow** in main test files:
    - `class/Class.test.ts` - Use `BaseTester` for CRUD only
    - `view/View.test.ts` - Use `BaseTester` for CRUD only
-3. **Unit test files** remain separate and don't use `BaseTester` (they test unit test functionality, not CRUD)
+3. **Unit test functionality** will be tested in separate test files (not part of BaseTester migration)
 
 ## Special Cases Handling
 
@@ -212,21 +237,56 @@ it('should execute full workflow and store all results', async () => {
   - `View.test.ts` - Only CRUD operations (create, read, update, delete, activate)
 
 ### Dependencies (MetadataExtension)
-- Setup dependencies (CDS view) before `flowTest()`
-- Cleanup dependencies after test (if needed)
+- **Requires existing CDS projection** in YAML test config
+- Test config must specify `cds_projection_name` parameter pointing to existing CDS view
+- No automatic dependency creation - CDS view must exist before test runs
 
 ### Kerberos Errors (FunctionGroup)
-- Already handled in `BaseTester` via error handling
-- No special action needed
+- **Workaround already added** in FunctionGroup check operation
+- Handles "REPORT/PROGRAM statement is missing" error for empty function groups
+- No special action needed for BaseTester migration
 
 ## Estimated Impact
 
 - **Files to migrate**: 15 test files (14 CRUD + 1 MetadataExtension)
+- **Files migrated**: 13/15 (87%)
+- **Files remaining**: 2/15 (13%)
 - **New test files to create**: 2 files (ClassUnitTest.test.ts, ViewCdsUnitTest.test.ts)
-- **Lines of code reduction**: ~200-300 lines per CRUD test file = ~2800-4200 lines total
+- **Lines of code reduction**: ~200-300 lines per CRUD test file = ~2800-4200 lines total (estimated)
 - **Code organization**: Better separation of concerns (CRUD vs Unit Test functionality)
 - **Time savings**: Faster test development, easier maintenance
 - **Risk**: Low - BaseTester is well-tested and handles edge cases
+
+## Migration Status Summary
+
+**Completed (13/15):**
+- ✅ Domain.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ DataElement.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ Table.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ Structure.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ Program.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ Interface.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ FunctionModule.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ Package.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ ServiceDefinition.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ BehaviorDefinition.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest()
+- ✅ BehaviorImplementation.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest() (with BehaviorDefinition dependency)
+- ✅ FunctionGroup.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest() (Kerberos workaround already added)
+- ✅ Class.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest() (unit test logic removed)
+- ✅ View.test.ts - Uses BaseTester.flowTest() and BaseTester.readTest() (CDS unit test logic removed)
+
+**Remaining (11/15):**
+- ⏳ Class.test.ts - Needs unit test logic separation (unit tests will be in separate file)
+- ⏳ View.test.ts - Needs CDS unit test logic separation (CDS unit tests will be in separate file)
+- ⏳ Program.test.ts - Simple migration
+- ⏳ Interface.test.ts - Simple migration
+- ⏳ FunctionGroup.test.ts - Simple migration
+- ⏳ FunctionModule.test.ts - Simple migration
+- ⏳ Package.test.ts - Simple migration
+- ⏳ ServiceDefinition.test.ts - Simple migration
+- ⏳ BehaviorDefinition.test.ts - Simple migration
+- ⏳ BehaviorImplementation.test.ts - Simple migration
+- ⏳ MetadataExtension.test.ts - Requires CDS view dependency setup
 
 ## New Test File Structure
 

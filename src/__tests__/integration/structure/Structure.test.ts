@@ -21,27 +21,22 @@ import {
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
-  logBuilderTestEnd,
-  logBuilderTestStep,
-  logBuilderTestStepError,
-  getHttpStatusText
+  logBuilderTestEnd
 } from '../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
+import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../helpers/testLogger';
+import { BaseTester } from '../../helpers/BaseTester';
+import { IStructureConfig, IStructureState } from '../../../core/structure';
+import { getStructure } from '../../../core/structure/read';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  ensurePackageConfig,
   resolveStandardObject,
-  getTimeout,
-  getOperationDelay,
-  retryCheckAfterActivate,
-  getEnvironmentConfig
+  getTimeout
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -64,6 +59,7 @@ describe('StructureBuilder (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let tester: BaseTester<IStructureConfig, IStructureState>;
 
   beforeAll(async () => {
     try {
@@ -72,249 +68,74 @@ describe('StructureBuilder (using AdtClient)', () => {
       await (connection as any).connect();
       client = new AdtClient(connection, builderLogger);
       hasConfig = true;
-      // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
+
+      tester = new BaseTester(
+        client.getStructure(),
+        'Structure',
+        'create_structure',
+        'adt_structure',
+        testsLogger
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any) => {
+          const params = testCase?.params || {};
+          const packageName = resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('package_name not configured');
+          return {
+            structureName: params.structure_name,
+            packageName,
+            transportRequest: resolveTransportRequest(params.transport_request),
+            description: params.description,
+            ddlCode: params.ddl_code
+          };
+        },
+        ensureObjectReady: async (structureName: string) => {
+          if (!connection) return { success: true };
+          try {
+            await getStructure(connection, structureName);
+            return { success: false, reason: `⚠️ SAFETY: Structure ${structureName} already exists!` };
+          } catch (error: any) {
+            if (error.response?.status !== 404) {
+              return { success: false, reason: `Cannot verify structure existence: ${error.message}` };
+            }
+          }
+          return { success: true };
+        }
+      });
     } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
-  afterAll(async () => {
-    if (connection) {
-      connection.reset();
-    }
-  });
+  afterAll(() => tester?.afterAll()());
 
-
-  function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_structure', 'adt_structure');
-  }
-
-  function buildBuilderConfig(testCase: any) {
-    const params = testCase?.params || {};
-    const packageName = resolvePackageName(params.package_name);
-    if (!packageName) {
-      throw new Error('package_name not configured for StructureBuilder test');
-    }
-    return {
-      structureName: params.structure_name,
-      packageName,
-      transportRequest: resolveTransportRequest(params.transport_request),
-      description: params.description,
-      ddlCode: params.ddl_code
-    };
-  }
 
   describe('Full workflow', () => {
-    let testCase: any = null;
-    let structureName: string | null = null;
-    let skipReason: string | null = null;
-
-    beforeEach(async () => {
-      skipReason = null;
-      testCase = null;
-      structureName = null;
-
-      if (!hasConfig) {
-        skipReason = 'No SAP configuration';
-        return;
-      }
-
-      const definition = getBuilderTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_structure', 'adt_structure');
-      if (!tc) {
-        skipReason = 'Test case disabled or not found';
-        return;
-      }
-
-      const packageCheck = ensurePackageConfig(tc.params, 'Structure - full workflow');
-      if (!packageCheck.success) {
-        skipReason = packageCheck.reason || 'Default package is not configured';
-        return;
-      }
-
-      testCase = tc;
-      structureName = tc.params.structure_name;
-    });
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
 
     it('should execute full workflow and store all results', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'Structure - full workflow', definition);
+      const config = tester.getConfig();
+      if (!config) return;
 
-      if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'Structure - full workflow', skipReason);
-        return;
-      }
+      const testCase = tester.getTestCaseDefinition();
+      const updatedDdlCode = testCase?.params?.updated_ddl_code || config.ddlCode || '';
 
-      if (!testCase || !structureName) {
-        logBuilderTestSkip(testsLogger, 'Structure - full workflow', skipReason || 'Test case not available');
-        return;
-      }
-
-      const config = buildBuilderConfig(testCase);
-
-      logBuilderTestStep('validate');
-      const validationState = await client.getStructure().validate({
-        structureName: config.structureName,
-        packageName: config.packageName!,
-        description: config.description || ''
-      });
-      const validationResponse = validationState?.validationResponse;
-      if (validationResponse?.status !== 200) {
-        const errorData = typeof validationResponse?.data === 'string' 
-          ? validationResponse.data 
-          : JSON.stringify(validationResponse?.data);
-        console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-      }
-      expect(validationResponse?.status).toBe(200);
-      
-      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
-      const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup = testCase.params.skip_cleanup !== undefined
-        ? testCase.params.skip_cleanup === true
-        : globalSkipCleanup;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
-      
-      let structureCreated = false;
-      let currentStep = '';
-      
-      try {
-        currentStep = 'create';
-        logBuilderTestStep(currentStep);
-        // Use updated_ddl_code if available, otherwise use ddlCode
-        const updatedDdlCode = testCase.params.updated_ddl_code || config.ddlCode || '';
-        await client.getStructure().create({
+      await tester.flowTestAuto({
+        sourceCode: updatedDdlCode,
+        updateConfig: {
           structureName: config.structureName,
-          packageName: config.packageName!,
+          packageName: config.packageName,
           description: config.description || '',
-          ddlCode: config.ddlCode || '',
-          transportRequest: config.transportRequest
-        }, { activateOnCreate: false, sourceCode: updatedDdlCode });
-        structureCreated = true;
-        // Wait for object to be ready using long polling
-        try {
-          await client.getStructure().read({ structureName: config.structureName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
-        }
-        
-        currentStep = 'check before update';
-        logBuilderTestStep(currentStep);
-        const checkBeforeUpdateState = await client.getStructure().check({ 
-          structureName: config.structureName,
           ddlCode: updatedDdlCode
-        }, 'inactive');
-        const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
-        expect(checkBeforeUpdate?.status).toBeDefined();
-        
-        currentStep = 'update';
-        logBuilderTestStep(currentStep);
-        await client.getStructure().update({
-          structureName: config.structureName
-        }, { sourceCode: updatedDdlCode });
-        // Wait for object to be ready after update using long polling
-        try {
-          await client.getStructure().read({ structureName: config.structureName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
         }
-        
-        // Check with new code (before unlock) - validates unsaved code
-        currentStep = 'check(new_code)';
-        logBuilderTestStep(currentStep);
-        const checkResultNewCodeState = await client.getStructure().check({ 
-          structureName: config.structureName,
-          ddlCode: updatedDdlCode
-        }, 'inactive');
-        const checkResultNewCode = checkResultNewCodeState?.checkResult;
-        expect(checkResultNewCode?.status).toBeDefined();
-        testsLogger.info?.(`✅ Check with new code completed: ${checkResultNewCode?.status === 200 ? 'OK' : 'Has errors/warnings'}`);
-        
-        currentStep = 'check(inactive)';
-        logBuilderTestStep(currentStep);
-        const checkResultInactiveState = await client.getStructure().check({ structureName: config.structureName }, 'inactive');
-        const checkResultInactive = checkResultInactiveState?.checkResult;
-        expect(checkResultInactive?.status).toBeDefined();
-        
-        currentStep = 'activate';
-        logBuilderTestStep(currentStep);
-        await client.getStructure().activate({ structureName: config.structureName });
-        // Wait for object to be ready after activation using long polling
-        try {
-          await client.getStructure().read({ structureName: config.structureName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
-        }
-        
-        currentStep = 'check(active)';
-        logBuilderTestStep(currentStep);
-        // Retry check for active version - activation may take time
-        const checkResultActiveState = await retryCheckAfterActivate(
-          async () => {
-            const state = await client.getStructure().check({ structureName: config.structureName }, 'active');
-            return state?.checkResult;
-          },
-          {
-            maxAttempts: 5,
-            delay: 1000,
-            logger: testsLogger,
-            objectName: config.structureName
-          }
-        );
-        expect(checkResultActiveState?.status).toBeDefined();
-        
-        if (shouldCleanup) {
-          currentStep = 'delete (cleanup)';
-          logBuilderTestStep(currentStep);
-          await client.getStructure().delete({
-            structureName: config.structureName,
-            transportRequest: config.transportRequest
-          });
-        } else {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - structure left for analysis: ${config.structureName}`);
-        }
-
-        logBuilderTestSuccess(testsLogger, 'Structure - full workflow');
-      } catch (error: any) {
-        // Log step error with details before failing test
-        logBuilderTestStepError(currentStep || 'unknown', error);
-        
-        // Cleanup: delete if object was created and cleanup is enabled
-        if (shouldCleanup && structureCreated) {
-          try {
-            logBuilderTestStep('delete (cleanup)');
-            await client.getStructure().delete({
-              structureName: config.structureName,
-              transportRequest: config.transportRequest
-            });
-          } catch (cleanupError) {
-            // Log cleanup error but don't fail test - original error is more important
-            testsLogger.warn?.(`Cleanup failed for ${config.structureName}:`, cleanupError);
-          }
-        } else if (!shouldCleanup && structureCreated) {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - structure left for analysis: ${config.structureName}`);
-        }
-        
-        const statusText = getHttpStatusText(error);
-        const enhancedError = statusText !== 'HTTP ?'
-          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-          : error;
-        logBuilderTestError(testsLogger, 'Structure - full workflow', enhancedError);
-        throw enhancedError;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'Structure - full workflow');
-      }
+      });
     }, getTimeout('test'));
   });
 
@@ -324,43 +145,40 @@ describe('StructureBuilder (using AdtClient)', () => {
       const standardObject = resolveStandardObject('structure', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'StructureBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'Structure - read standard object', {
           name: 'read_standard',
           params: {}
         });
-        logBuilderTestSkip(testsLogger, 'StructureBuilder - read standard object',
+        logBuilderTestSkip(testsLogger, 'Structure - read standard object',
           `Standard structure not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
         return;
       }
 
       const standardStructureName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'StructureBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'Structure - read standard object', {
         name: 'read_standard',
         params: { structure_name: standardStructureName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'StructureBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'Structure - read standard object', 'No SAP configuration');
         return;
       }
 
       try {
-        logBuilderTestStep('read');
-        const resultState = await client.getStructure().read({ structureName: standardStructureName });
-        expect(resultState).toBeDefined();
+        const resultState = await tester.readTest({ structureName: standardStructureName });
         expect(resultState?.readResult).toBeDefined();
-        // Structure read returns structure config - check if structureName is present
         const structureConfig = resultState?.readResult;
         if (structureConfig && typeof structureConfig === 'object' && 'structureName' in structureConfig) {
           expect((structureConfig as any).structureName).toBe(standardStructureName);
         }
 
-        logBuilderTestSuccess(testsLogger, 'StructureBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'Structure - read standard object');
       } catch (error) {
-        logBuilderTestError(testsLogger, 'StructureBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'Structure - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, 'StructureBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'Structure - read standard object');
       }
     }, getTimeout('test'));
   });

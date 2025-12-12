@@ -18,24 +18,20 @@ import {
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
-  logBuilderTestEnd,
-  logBuilderTestStep,
-  logBuilderTestStepError,
-  getHttpStatusText
+  logBuilderTestEnd
 } from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
+import { BaseTester } from '../../helpers/BaseTester';
+import { IPackageConfig, IPackageState } from '../../../core/package';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveStandardObject,
-  getEnvironmentConfig,
-  getTimeout,
-  getOperationDelay
+  getTimeout
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -61,6 +57,7 @@ describe('PackageBuilder (using AdtClient)', () => {
   let connectionConfig: any = null;
   let hasConfig = false;
   let isCloudSystem = false;
+  let tester: BaseTester<IPackageConfig, IPackageState>;
 
   beforeAll(async () => {
     try {
@@ -70,19 +67,58 @@ describe('PackageBuilder (using AdtClient)', () => {
       await (connection as any).connect();
       client = new AdtClient(connection, builderLogger);
       hasConfig = true;
-      // Check if this is a cloud system (for environment-specific standard packages)
       isCloudSystem = await isCloudEnvironment(connection);
+
+      tester = new BaseTester(
+        client.getPackage(),
+        'Package',
+        'create_package',
+        'adt_package',
+        testsLogger
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any) => {
+          const params = testCase?.params || {};
+          const parentPackage = params.package_name || params.super_package || resolvePackageName(undefined);
+          if (!parentPackage) throw new Error('Parent package is not configured');
+          const testPackage = params.test_package || params.test_package_name || params.package_name;
+          if (!testPackage) throw new Error('test_package is not configured');
+          return {
+            packageName: testPackage,
+            superPackage: parentPackage,
+            description: params.description,
+            updatedDescription: params.updated_description,
+            packageType: params.package_type || 'development',
+            softwareComponent: params.software_component,
+            transportLayer: params.transport_layer,
+            transportRequest: params.transport_request,
+            applicationComponent: params.application_component,
+            responsible: params.responsible
+          };
+        },
+        ensureObjectReady: async (packageName: string) => {
+          if (!connection) return { success: true };
+          try {
+            await getPackage(connection, packageName);
+            return { success: false, reason: `⚠️ SAFETY: Package ${packageName} already exists!` };
+          } catch (error: any) {
+            const status = error.response?.status;
+            if (status === 404) return { success: true };
+            return { success: false, reason: `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status})` };
+          }
+        }
+      });
     } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
-  afterAll(async () => {
-    if (connection) {
-      connection.reset();
-    }
-  });
+  afterAll(() => tester?.afterAll()());
 
   /**
    * Pre-check: Verify test package doesn't exist
@@ -125,333 +161,72 @@ describe('PackageBuilder (using AdtClient)', () => {
     }
   }
 
-  function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_package', 'adt_package');
-  }
-
-  function buildBuilderConfig(testCase: any) {
-    const params = testCase?.params || {};
-
-    const parentPackage =
-      params.package_name ||
-      params.super_package ||
-      resolvePackageName(undefined);
-    if (!parentPackage) {
-      throw new Error('Parent package is not configured. Set params.package_name or environment.default_package');
-    }
-
-    const testPackage =
-      params.test_package ||
-      params.test_package_name ||
-      params.package_name;
-
-    if (!testPackage) {
-      throw new Error('test_package is not configured for PackageBuilder test');
-    }
-
-    return {
-      packageName: testPackage,
-      superPackage: parentPackage,
-      description: params.description,
-      updatedDescription: params.updated_description, // Description for update operation
-      packageType: params.package_type || 'development',
-      softwareComponent: params.software_component,
-      transportLayer: params.transport_layer,
-      transportRequest: params.transport_request,
-      applicationComponent: params.application_component,
-      responsible: params.responsible
-    };
-  }
-
-  function isPackageLockedError(error: any): boolean {
-    if (!error) {
-      return false;
-    }
-    const message = String(error.message || '').toLowerCase();
-    const responseData = error.response?.data;
-    const responseText =
-      typeof responseData === 'string'
-        ? responseData.toLowerCase()
-        : JSON.stringify(responseData || '').toLowerCase();
-    return (
-      message.includes('already locked') ||
-      message.includes('is locked') ||
-      responseText.includes('already locked')
-    );
-  }
-
-
-
   describe('Full workflow', () => {
-    let testCase: any = null;
-    let packageName: string | null = null;
-    let skipReason: string | null = null;
-
-    beforeEach(async () => {
-      skipReason = null;
-      testCase = null;
-      packageName = null;
-
-      if (!hasConfig) {
-        skipReason = 'No SAP configuration';
-        return;
-      }
-
-      const definition = getBuilderTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_package', 'adt_package');
-      if (!tc) {
-        skipReason = 'Test case disabled or not found';
-        return;
-      }
-
-      const parentPackage = tc.params.package_name || tc.params.super_package || resolvePackageName(undefined);
-      if (!parentPackage) {
-        skipReason = 'Super package is not configured. Set params.package_name/super_package or environment.default_package';
-        return;
-      }
-      tc.params.super_package = parentPackage;
-
-      testCase = tc;
-      packageName = tc.params.test_package || tc.params.package_name;
-
-      // Pre-check: Verify package doesn't exist before test
-      if (packageName) {
-        const readyCheck = await ensurePackageReady(packageName);
-        if (!readyCheck.success) {
-          skipReason = readyCheck.reason || 'Package pre-check failed';
-          testCase = null;
-          packageName = null;
-        }
-      }
-    });
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
 
     it('should execute full workflow and store all results', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'Package - full workflow', definition);
+      const config = tester.getConfig();
+      if (!config) return;
 
-      if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'Package - full workflow', skipReason);
-        return;
-      }
-
-      if (!testCase || !packageName) {
-        logBuilderTestSkip(testsLogger, 'Package - full workflow', skipReason || 'Test case not available');
-        return;
-      }
-
-      const config = buildBuilderConfig(testCase);
-      
-      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
-      const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup = testCase.params.skip_cleanup !== undefined
-        ? testCase.params.skip_cleanup === true
-        : globalSkipCleanup;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
-      
-      let packageCreated = false;
-      let currentStep = '';
-
-      try {
-        currentStep = 'validate';
-        logBuilderTestStep(currentStep);
-        const validationState = await client.getPackage().validate({
-          packageName: config.packageName,
-          superPackage: config.superPackage,
-          description: config.description || ''
-        });
-        const validationResponse = validationState?.validationResponse;
-        if (validationResponse?.status !== 200) {
-          const errorData = typeof validationResponse?.data === 'string' 
-            ? validationResponse.data 
-            : JSON.stringify(validationResponse?.data);
-          console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-        }
-        expect(validationResponse?.status).toBe(200);
-        
-        currentStep = 'create';
-        logBuilderTestStep(currentStep);
-        await client.getPackage().create({
+      await tester.flowTestAuto({
+        updateConfig: {
           packageName: config.packageName,
           superPackage: config.superPackage,
           description: config.description || '',
+          updatedDescription: config.updatedDescription || config.description || '',
           packageType: config.packageType,
           softwareComponent: config.softwareComponent,
           transportLayer: config.transportLayer,
-          transportRequest: config.transportRequest,
           applicationComponent: config.applicationComponent,
           responsible: config.responsible
-        });
-        packageCreated = true;
-        
-        logBuilderTestStep('check(active)');
-        const checkResult1State = await client.getPackage().check({ packageName: config.packageName, superPackage: config.superPackage });
-        const checkResult1 = checkResult1State?.checkResult;
-        expect(checkResult1?.status).toBeDefined();
-        
-        // Wait for object to be ready using long polling
-        try {
-          await client.getPackage().read({ packageName: config.packageName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
         }
-        
-        currentStep = 'check before update';
-        logBuilderTestStep(currentStep);
-        const checkBeforeUpdateState = await client.getPackage().check({ 
-          packageName: config.packageName, 
-          superPackage: config.superPackage 
-        });
-        const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
-        expect(checkBeforeUpdate?.status).toBeDefined();
-        
-        currentStep = 'update';
-        logBuilderTestStep(currentStep);
-        await client.getPackage().update({
-          packageName: config.packageName,
-          superPackage: config.superPackage,
-          updatedDescription: config.updatedDescription || config.description || ''
-        });
-        
-        // Wait for object to be ready after update using long polling
-        try {
-          await client.getPackage().read({ packageName: config.packageName }, 'active', { withLongPolling: true });
-        } catch (readError) {
-          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - check might still work
-        }
-        
-        logBuilderTestStep('check(active)');
-        const checkResult2State = await client.getPackage().check({ packageName: config.packageName, superPackage: config.superPackage });
-        const checkResult2 = checkResult2State?.checkResult;
-        expect(checkResult2?.status).toBeDefined();
-
-        if (shouldCleanup) {
-          logBuilderTestStep('delete (cleanup)');
-          // Create a new client with fresh session for deletion to avoid lock issues
-          // This is needed because package may still be locked in the current session after unlock
-          const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
-          await (deleteConnection as any).connect();
-          const deleteClient = new AdtClient(deleteConnection, builderLogger);
-          await deleteClient.getPackage().delete({
-            packageName: config.packageName,
-            transportRequest: config.transportRequest
-          });
-          deleteConnection.reset();
-        } else {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - package left for analysis: ${config.packageName}`);
-        }
-
-        logBuilderTestSuccess(testsLogger, 'Package - full workflow');
-      } catch (error: any) {
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
-        const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
-
-        const systemLocked =
-          fullErrorText.includes('system setting does not allow you to change') ||
-          fullErrorText.includes('not modifiable') ||
-          fullErrorText.includes('tr006');
-
-        if (systemLocked) {
-          logBuilderTestSkip(
-            builderLogger,
-            'Package - full workflow',
-            'System change option prevents package creation (software component not modifiable)'
-          );
-          return;
-        }
-
-        // Log step error with details before failing test
-        logBuilderTestStepError(currentStep || 'unknown', error);
-
-        // Cleanup: delete if object was created and cleanup is enabled
-        if (shouldCleanup && packageCreated) {
-          try {
-            logBuilderTestStep('delete (cleanup)');
-            // Create a new client with fresh session for deletion to avoid lock issues
-            const deleteConnection = createAbapConnection(connectionConfig, connectionLogger);
-            await (deleteConnection as any).connect();
-            const deleteClient = new AdtClient(deleteConnection, builderLogger);
-            await deleteClient.getPackage().delete({
-              packageName: config.packageName,
-              transportRequest: config.transportRequest
-            });
-            deleteConnection.reset();
-          } catch (cleanupError) {
-            // Log cleanup error but don't fail test - original error is more important
-            testsLogger.warn?.(`Cleanup failed for ${config.packageName}:`, cleanupError);
-          }
-        } else if (!shouldCleanup && packageCreated) {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - package left for analysis: ${config.packageName}`);
-        }
-
-        const statusText = getHttpStatusText(error);
-        const enhancedError = statusText !== 'HTTP ?'
-          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-          : error;
-        logBuilderTestError(testsLogger, 'Package - full workflow', enhancedError);
-        throw enhancedError;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'Package - full workflow');
-      }
+      });
     }, getTimeout('test'));
   });
 
   describe('Read standard object', () => {
     it('should read standard SAP package', async () => {
-      // Read tests use standard_objects registry, not create_package test case
       const standardObject = resolveStandardObject('package', isCloudSystem, null);
 
       if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'PackageBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'Package - read standard object', {
           name: 'read_standard',
           params: {}
         });
         logBuilderTestSkip(
-          builderLogger,
-          'PackageBuilder - read standard object',
+          testsLogger,
+          'Package - read standard object',
           `Standard package not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`
         );
         return;
       }
 
       const standardPackageName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'PackageBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'Package - read standard object', {
         name: 'read_standard',
         params: { package_name: standardPackageName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'PackageBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'Package - read standard object', 'No SAP configuration');
         return;
       }
 
       try {
-        logBuilderTestStep('read');
-        const resultState = await client.getPackage().read({ packageName: standardPackageName });
-        expect(resultState).toBeDefined();
+        const resultState = await tester.readTest({ packageName: standardPackageName });
         expect(resultState?.readResult).toBeDefined();
-        // Package read returns package config - check if packageName is present
         const packageConfig = resultState?.readResult;
         if (packageConfig && typeof packageConfig === 'object' && 'packageName' in packageConfig) {
           expect((packageConfig as any).packageName).toBe(standardPackageName);
         }
 
-        logBuilderTestSuccess(testsLogger, 'PackageBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'Package - read standard object');
       } catch (error) {
-        logBuilderTestError(testsLogger, 'PackageBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'Package - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, 'PackageBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'Package - read standard object');
       }
     }, getTimeout('test'));
   });

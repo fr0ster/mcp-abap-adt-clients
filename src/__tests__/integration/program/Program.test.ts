@@ -22,27 +22,21 @@ import {
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
-  logBuilderTestEnd,
-  logBuilderTestStep,
-  logBuilderTestStepError,
-  getHttpStatusText
+  logBuilderTestEnd
 } from '../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
+import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../helpers/testLogger';
+import { BaseTester } from '../../helpers/BaseTester';
+import { IProgramConfig, IProgramState } from '../../../core/program';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  ensurePackageConfig,
   resolveStandardObject,
-  getTimeout,
-  getOperationDelay,
-  retryCheckAfterActivate,
-  getEnvironmentConfig
+  getTimeout
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -64,6 +58,7 @@ describe('Program (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let tester: BaseTester<IProgramConfig, IProgramState>;
 
   beforeAll(async () => {
     try {
@@ -72,282 +67,75 @@ describe('Program (using AdtClient)', () => {
       await (connection as any).connect();
       client = new AdtClient(connection, builderLogger);
       hasConfig = true;
-      // Check if this is a cloud system (programs are not supported in cloud)
       isCloudSystem = await isCloudEnvironment(connection);
+
+      tester = new BaseTester(
+        client.getProgram(),
+        'Program',
+        'create_program',
+        'adt_program',
+        testsLogger
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any) => {
+          const params = testCase?.params || {};
+          const packageName = resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('package_name not configured');
+          return {
+            programName: params.program_name,
+            packageName,
+            transportRequest: resolveTransportRequest(params.transport_request),
+            description: params.description,
+            programType: params.program_type,
+            sourceCode: params.source_code
+          };
+        },
+        ensureObjectReady: async (programName: string) => {
+          if (!connection) return { success: true };
+          try {
+            await getProgramSource(connection, programName);
+            return { success: false, reason: `⚠️ SAFETY: Program ${programName} already exists!` };
+          } catch (error: any) {
+            if (error.response?.status !== 404) {
+              return { success: false, reason: `Cannot verify program existence: ${error.message}` };
+            }
+          }
+          return { success: true };
+        }
+      });
     } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
-  afterAll(async () => {
-    if (connection) {
-      connection.reset();
-    }
-  });
-
-  /**
-   * Pre-check: Verify test program doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function ensureProgramReady(programName: string): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if program exists
-    try {
-      await getProgramSource(connection, programName);
-      return {
-        success: false,
-        reason: `⚠️ SAFETY: Program ${programName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
-      };
-    } catch (error: any) {
-      // 404 is expected - object doesn't exist, we can proceed
-      if (error.response?.status !== 404) {
-        return {
-          success: false,
-          reason: `Cannot verify program existence: ${error.message}`
-        };
-      }
-    }
-
-    return { success: true };
-  }
-
-  function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_program', 'adt_program');
-  }
-
-  function buildBuilderConfig(testCase: any) {
-    const params = testCase?.params || {};
-    const packageName = resolvePackageName(params.package_name);
-    if (!packageName) {
-      throw new Error('package_name not configured for ProgramBuilder test');
-    }
-    return {
-      programName: params.program_name,
-      packageName,
-      transportRequest: resolveTransportRequest(params.transport_request),
-      description: params.description,
-      programType: params.program_type,
-      sourceCode: params.source_code
-    };
-  }
+  afterAll(() => tester?.afterAll()());
 
   describe('Full workflow', () => {
-    let testCase: any = null;
-    let programName: string | null = null;
-    let skipReason: string | null = null;
-
-    beforeEach(async () => {
-      skipReason = null;
-      testCase = null;
-      programName = null;
-
-      if (!hasConfig) {
-        skipReason = 'No SAP configuration';
-        return;
-      }
-
-      if (isCloudSystem) {
-        skipReason = 'Programs are not supported in cloud systems (BTP ABAP Environment)';
-        return;
-      }
-
-      const definition = getBuilderTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_program', 'adt_program');
-      if (!tc) {
-        skipReason = 'Test case disabled or not found';
-        return;
-      }
-
-      const packageCheck = ensurePackageConfig(tc.params, 'Program - full workflow');
-      if (!packageCheck.success) {
-        skipReason = packageCheck.reason || 'Default package is not configured';
-        return;
-      }
-
-      testCase = tc;
-      programName = tc.params.program_name;
-
-      // Cleanup before test
-      if (programName) {
-        const cleanup = await ensureProgramReady(programName);
-        if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup program before test';
-          testCase = null;
-          programName = null;
-        }
-      }
-    });
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
 
     it('should execute full workflow and store all results', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'Program - full workflow', definition);
+      const config = tester.getConfig();
+      if (!config) return;
 
-      if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'Program - full workflow', skipReason);
-        return;
-      }
+      const testCase = tester.getTestCaseDefinition();
+      const sourceCode = testCase?.params?.source_code || config.sourceCode || '';
 
-      if (!testCase || !programName) {
-        logBuilderTestSkip(testsLogger, 'Program - full workflow', skipReason || 'Test case not available');
-        return;
-      }
-
-      const config = buildBuilderConfig(testCase);
-      const sourceCode = testCase.params.source_code;
-
-      logBuilderTestStep('validate');
-      const validationState = await client.getProgram().validate({
-        programName: config.programName,
-        packageName: config.packageName!,
-        description: config.description || ''
+      await tester.flowTestAuto({
+        sourceCode: sourceCode,
+        updateConfig: {
+          programName: config.programName,
+          packageName: config.packageName,
+          description: config.description || '',
+          programType: config.programType,
+          sourceCode: sourceCode
+        }
       });
-      const validationResponse = validationState?.validationResponse;
-      if (validationResponse?.status !== 200) {
-        const errorData = typeof validationResponse?.data === 'string' 
-          ? validationResponse.data 
-          : JSON.stringify(validationResponse?.data);
-        console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-      }
-      expect(validationResponse?.status).toBe(200);
-      
-      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
-      const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup = testCase.params.skip_cleanup !== undefined
-        ? testCase.params.skip_cleanup === true
-        : globalSkipCleanup;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
-      
-      let programCreated = false;
-      let currentStep = '';
-      
-      try {
-          currentStep = 'create';
-          logBuilderTestStep(currentStep);
-          await client.getProgram().create({
-            programName: config.programName,
-            packageName: config.packageName!,
-            description: config.description || '',
-            transportRequest: config.transportRequest,
-            programType: config.programType
-          }, { activateOnCreate: false, sourceCode: sourceCode });
-          programCreated = true;
-          // Wait for object to be ready using long polling
-          try {
-            await client.getProgram().read({ programName: config.programName }, 'active', { withLongPolling: true });
-          } catch (readError) {
-            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-            // Continue anyway - check might still work
-          }
-          
-          currentStep = 'check with source code (before update)';
-          logBuilderTestStep(currentStep);
-          const checkBeforeUpdateState = await client.getProgram().check({ 
-            programName: config.programName,
-            sourceCode: sourceCode
-          }, 'inactive');
-          const checkBeforeUpdate = checkBeforeUpdateState?.checkResult;
-          expect(checkBeforeUpdate?.status).toBeDefined();
-          
-          currentStep = 'update';
-          logBuilderTestStep(currentStep);
-          await client.getProgram().update({
-            programName: config.programName
-          }, { sourceCode: sourceCode });
-          // Wait for object to be ready after update using long polling
-          try {
-            await client.getProgram().read({ programName: config.programName }, 'active', { withLongPolling: true });
-          } catch (readError) {
-            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-            // Continue anyway - check might still work
-          }
-        
-          currentStep = 'check(inactive)';
-          logBuilderTestStep(currentStep);
-          const checkResultInactiveState = await client.getProgram().check({ programName: config.programName }, 'inactive');
-          const checkResultInactive = checkResultInactiveState?.checkResult;
-          expect(checkResultInactive?.status).toBeDefined();
-          
-          currentStep = 'activate';
-          logBuilderTestStep(currentStep);
-          await client.getProgram().activate({ programName: config.programName });
-          // Wait for object to be ready after activation using long polling
-          try {
-            await client.getProgram().read({ programName: config.programName }, 'active', { withLongPolling: true });
-          } catch (readError) {
-            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-            // Continue anyway - check might still work
-          }
-          
-          currentStep = 'check(active)';
-          logBuilderTestStep(currentStep);
-          // Retry check for active version - activation may take time
-          const checkResultActiveState = await retryCheckAfterActivate(
-            async () => {
-              const state = await client.getProgram().check({ programName: config.programName }, 'active');
-              return state?.checkResult;
-            },
-            {
-              maxAttempts: 5,
-              delay: 1000,
-              logger: testsLogger,
-              objectName: config.programName
-            }
-          );
-          expect(checkResultActiveState?.status).toBeDefined();
-          
-          if (shouldCleanup) {
-            currentStep = 'delete (cleanup)';
-            logBuilderTestStep(currentStep);
-            await client.getProgram().delete({
-              programName: config.programName,
-              transportRequest: config.transportRequest
-            });
-          } else {
-            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - program left for analysis: ${config.programName}`);
-          }
-
-          logBuilderTestSuccess(testsLogger, 'Program - full workflow');
-        } catch (error: any) {
-          // Log step error with details before failing test
-          logBuilderTestStepError(currentStep || 'unknown', error);
-          
-          // Cleanup: delete if object was created and cleanup is enabled
-          if (shouldCleanup && programCreated) {
-            try {
-              logBuilderTestStep('delete (cleanup)');
-              await client.getProgram().delete({
-                programName: config.programName,
-                transportRequest: config.transportRequest
-              });
-            } catch (cleanupError) {
-              // Log cleanup error but don't fail test - original error is more important
-              testsLogger.warn?.(`Cleanup failed for ${config.programName}:`, cleanupError);
-            }
-          } else if (!shouldCleanup && programCreated) {
-            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - program left for analysis: ${config.programName}`);
-          }
-          
-          const statusText = getHttpStatusText(error);
-          const enhancedError = statusText !== 'HTTP ?'
-            ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-            : error;
-          logBuilderTestError(testsLogger, 'Program - full workflow', enhancedError);
-          throw enhancedError;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'Program - full workflow');
-      }
     }, getTimeout('test'));
   });
 
@@ -386,11 +174,8 @@ describe('Program (using AdtClient)', () => {
       });
 
       try {
-        logBuilderTestStep('read');
-        const resultState = await client.getProgram().read({ programName: standardProgramName });
-        expect(resultState).toBeDefined();
+        const resultState = await tester.readTest({ programName: standardProgramName });
         expect(resultState?.readResult).toBeDefined();
-        // Program read returns source code - check if it's a string or in response data
         const sourceCode = typeof resultState?.readResult === 'string' 
           ? resultState.readResult 
           : (resultState?.readResult as any)?.data || '';
