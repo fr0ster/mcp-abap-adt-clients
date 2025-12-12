@@ -1,13 +1,13 @@
 /**
- * Integration test for ProgramBuilder
+ * Integration test for Program (AdtProgram)
  * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
- *   DEBUG_ADT_LIBS=true        - ProgramBuilder library logs
+ *   DEBUG_ADT_LIBS=true        - Program library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=program/ProgramBuilder
+ * Run: npm test -- --testPathPattern=program/Program
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
@@ -59,7 +59,7 @@ const builderLogger: ILogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-describe('ProgramBuilder (using AdtClient)', () => {
+describe('Program (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
@@ -354,12 +354,12 @@ describe('ProgramBuilder (using AdtClient)', () => {
   describe('Read standard object', () => {
     it('should read standard SAP program', async () => {
       if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'ProgramBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'Program - read standard object', 'No SAP configuration');
         return;
       }
 
       if (isCloudSystem) {
-        logBuilderTestSkip(testsLogger, 'ProgramBuilder - read standard object', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
+        logBuilderTestSkip(testsLogger, 'Program - read standard object', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
         return;
       }
 
@@ -367,20 +367,20 @@ describe('ProgramBuilder (using AdtClient)', () => {
       const standardObject = resolveStandardObject('program', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'ProgramBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'Program - read standard object', {
           name: 'read_standard',
           params: {}
         });
         logBuilderTestSkip(
           testsLogger,
-          'ProgramBuilder - read standard object',
+          'Program - read standard object',
           'Standard program not configured for on-premise environment'
         );
         return;
       }
 
       const standardProgramName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'ProgramBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'Program - read standard object', {
         name: 'read_standard',
         params: { program_name: standardProgramName }
       });
@@ -396,12 +396,12 @@ describe('ProgramBuilder (using AdtClient)', () => {
           : (resultState?.readResult as any)?.data || '';
         expect(typeof sourceCode).toBe('string');
 
-        logBuilderTestSuccess(testsLogger, 'ProgramBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'Program - read standard object');
       } catch (error) {
-        logBuilderTestError(testsLogger, 'ProgramBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'Program - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, 'ProgramBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'Program - read standard object');
       }
     }, getTimeout('test'));
   });
