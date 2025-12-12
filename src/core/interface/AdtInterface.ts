@@ -111,11 +111,12 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       this.logger?.info?.('Interface created');
 
       // 2.5. Read with long polling to ensure object is ready
+      // Read 'inactive' version since object is not yet activated
       this.logger?.info?.('read (wait for object ready)');
       try {
         await this.read(
           { interfaceName: config.interfaceName },
-          'active',
+          'inactive',
           { withLongPolling: true }
         );
         this.logger?.info?.('object is ready after creation');

@@ -108,11 +108,12 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       this.logger?.info?.('Structure created');
 
       // 2.5. Read with long polling to ensure object is ready
+      // Read 'inactive' version since object is not yet activated
       this.logger?.info?.('read (wait for object ready)');
       try {
         await this.read(
           { structureName: config.structureName },
-          'active',
+          'inactive',
           { withLongPolling: true }
         );
         this.logger?.info?.('object is ready after creation');

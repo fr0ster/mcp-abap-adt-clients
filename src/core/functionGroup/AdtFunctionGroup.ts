@@ -119,11 +119,12 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
       this.logger?.info?.('Function group created');
 
       // 2.5. Read with long polling to ensure object is ready
+      // Read 'inactive' version since object is not yet activated
       this.logger?.info?.('read (wait for object ready)');
       try {
         await this.read(
           { functionGroupName: config.functionGroupName },
-          'active',
+          'inactive',
           { withLongPolling: true }
         );
         this.logger?.info?.('object is ready after creation');

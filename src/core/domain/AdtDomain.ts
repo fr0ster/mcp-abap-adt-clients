@@ -129,11 +129,12 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.logger?.info?.('created');
 
       // 2.5. Read with long polling to ensure object is ready
+      // Read 'inactive' version since object is not yet activated
       this.logger?.info?.('read (wait for object ready)');
       try {
         await this.read(
           { domainName: config.domainName },
-          'active',
+          'inactive',
           { withLongPolling: true }
         );
         this.logger?.info?.('object is ready after creation');

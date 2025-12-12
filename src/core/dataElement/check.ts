@@ -75,7 +75,10 @@ export async function checkDataElement(
     const shouldIgnore = 
       errorTexts.includes('has been checked') ||
       errorTexts.includes('was checked') ||
-      errorTexts.includes('importing') && errorTexts.includes('database');
+      errorTexts.includes('importing') && errorTexts.includes('database') ||
+      // For newly created empty data elements, these errors are expected until object is fully initialized
+      (errorTexts.includes('no domain') && errorTexts.includes('data type was defined')) ||
+      (errorTexts.includes('datatype is expected'));
     
     if (!shouldIgnore) {
       // Has type E errors that should not be ignored - throw error

@@ -136,11 +136,12 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
       this.logger?.info?.('Data element created');
 
       // 2.5. Read with long polling to ensure object is ready
+      // Read 'inactive' version since object is not yet activated
       this.logger?.info?.('read (wait for object ready)');
       try {
         await this.read(
           { dataElementName: config.dataElementName },
-          'active',
+          'inactive',
           { withLongPolling: true }
         );
         this.logger?.info?.('object is ready after creation');

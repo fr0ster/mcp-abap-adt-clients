@@ -97,11 +97,12 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       this.logger?.info?.('Table created');
 
       // 2.5. Read with long polling to ensure object is ready
+      // Read 'inactive' version since object is not yet activated
       this.logger?.info?.('read (wait for object ready)');
       try {
         await this.read(
           { tableName: config.tableName },
-          'active',
+          'inactive',
           { withLongPolling: true }
         );
         this.logger?.info?.('object is ready after creation');

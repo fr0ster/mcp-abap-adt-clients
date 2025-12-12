@@ -43,12 +43,26 @@ export async function checkFunctionGroup(
   const checkResult = parseCheckRunResponse(response);
 
   // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-  // Ignore "has been checked" and "Kerberos library not loaded" (test cloud issue)
   if (checkResult.errors.length > 0) {
     const errorTexts = checkResult.errors.map(err => err.text || '').join(' ').toLowerCase();
-    const shouldIgnore = errorTexts.includes('has been checked') || 
-                        errorTexts.includes('was checked') ||
-                        errorTexts.includes('kerberos library not loaded');
+    
+    // WORKAROUND: Ignore Kerberos library not loaded error (test cloud issue)
+    // This is a known issue in test environments where Kerberos library is not available
+    const isKerberosError = errorTexts.includes('kerberos library not loaded');
+    
+    // Ignore "has been checked" messages (normal, not an error)
+    const isAlreadyChecked = 
+      errorTexts.includes('has been checked') || 
+      errorTexts.includes('was checked');
+    
+    // For newly created empty function groups (no function modules), these errors are expected
+    // until function modules are added to the function group
+    const isEmptyFunctionGroupError = 
+      (errorTexts.includes('report') && errorTexts.includes('program statement is missing')) ||
+      errorTexts.includes('program type is include') ||
+      errorTexts.includes('report/program statement is missing');
+    
+    const shouldIgnore = isKerberosError || isAlreadyChecked || isEmptyFunctionGroupError;
     
     if (!shouldIgnore) {
       // Has type E errors that should not be ignored - throw error

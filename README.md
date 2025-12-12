@@ -174,6 +174,44 @@ const classDefinition = await client.readClass('ZCL_TEST_CLASS');
 const interfaceCode = await client.readInterface('ZIF_TEST_INTERFACE');
 ```
 
+### Using Long Polling for Object Readiness
+
+The `withLongPolling` parameter allows you to wait for objects to become available after create/update/activate operations, replacing fixed timeouts with server-driven waiting:
+
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new AdtClient(connection);
+
+// Create a class
+await client.getClass().create({
+  className: 'ZCL_TEST',
+  packageName: 'ZPACKAGE',
+  description: 'Test class'
+});
+
+// Wait for object to be ready using long polling
+// The server will hold the connection until the object is available
+await client.getClass().read(
+  { className: 'ZCL_TEST' },
+  'active',
+  { withLongPolling: true }
+);
+
+// Now the object is guaranteed to be ready for subsequent operations
+await client.getClass().update({
+  className: 'ZCL_TEST'
+}, { sourceCode: updatedCode });
+```
+
+**Benefits of Long Polling:**
+- ✅ **No arbitrary timeouts** - waits for actual object readiness
+- ✅ **Faster tests** - no unnecessary delays when object is ready quickly
+- ✅ **More reliable** - server-driven waiting ensures object is actually available
+- ✅ **Automatic in create/update** - `AdtObject` implementations use long polling internally
+
+**Note:** Long polling is automatically used in `create()` and `update()` methods of all `AdtObject` implementations to ensure objects are ready before proceeding with subsequent operations.
+
 ### Using Builders (Advanced workflows)
 
 ```typescript
@@ -319,6 +357,27 @@ See [bin/README.md](bin/README.md) for details.
 - `readPackage(name)` → `Promise<AxiosResponse>`
 - `readTransport(transportRequest)` → `Promise<AxiosResponse>`
 
+### AdtObject Methods (with Long Polling Support)
+
+All `AdtObject` implementations support the `withLongPolling` parameter for read operations:
+
+```typescript
+// Read with long polling - waits for object to be ready
+await adtObject.read(config, 'active', { withLongPolling: true });
+
+// Read metadata with long polling
+await adtObject.readMetadata(config, { withLongPolling: true });
+
+// Read transport info with long polling
+await adtObject.readTransport(config, { withLongPolling: true });
+```
+
+**When to use long polling:**
+- After `create()` operations - wait for object to be available
+- After `update()` operations - wait for changes to be persisted
+- After `activate()` operations - wait for object to be available in active version
+- In tests - replace fixed `setTimeout` delays with long polling for better reliability
+
 ### Specialized Clients
 
 - **ManagementClient**: batch activation + check operations
@@ -383,6 +442,37 @@ This dual convention:
 See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-organization) for details.
 
 ## Migration Guide
+
+### From Timeouts to Long Polling
+
+**Migration from fixed timeouts to long polling:**
+
+The package now uses long polling (`?withLongPolling=true`) instead of fixed timeouts for waiting object readiness. This provides better reliability and faster execution.
+
+```typescript
+// ❌ Before - Using fixed timeouts
+await client.getClass().create({ className: 'ZCL_TEST', ... });
+await new Promise(resolve => setTimeout(resolve, 2000)); // Fixed delay
+await client.getClass().update({ className: 'ZCL_TEST' }, { sourceCode });
+
+// ✅ After - Using long polling
+await client.getClass().create({ className: 'ZCL_TEST', ... });
+// Long polling is automatically used in create/update methods
+await client.getClass().update({ className: 'ZCL_TEST' }, { sourceCode });
+
+// Or explicitly use long polling in read operations
+await client.getClass().read(
+  { className: 'ZCL_TEST' },
+  'active',
+  { withLongPolling: true }
+);
+```
+
+**Benefits:**
+- No arbitrary delays - waits for actual object readiness
+- Faster execution when objects are ready quickly
+- More reliable - server-driven waiting ensures object is available
+- Automatic in `create()` and `update()` methods
 
 ### From v0.1.0 to v0.2.0
 

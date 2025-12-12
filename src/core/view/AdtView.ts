@@ -112,11 +112,12 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       this.logger?.info?.('View created');
 
       // 2.5. Read with long polling to ensure object is ready
+      // Read 'inactive' version since object is not yet activated
       this.logger?.info?.('read (wait for object ready)');
       try {
         await this.read(
           { viewName: config.viewName },
-          'active',
+          'inactive',
           { withLongPolling: true }
         );
         this.logger?.info?.('object is ready after creation');

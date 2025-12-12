@@ -343,23 +343,29 @@ export async function getXxx(
 - ✅ `readTest()` - passes `withLongPolling` to `adtObject.read()`
 - ✅ `flowTest()` - added read with long polling between create and update
 
-### 4.2. Integration Tests ⏳ TODO
-**Files:**
-- `src/__tests__/integration/domain/Domain.test.ts`
-- `src/__tests__/integration/class/Class.test.ts`
-- `src/__tests__/integration/dataElement/DataElement.test.ts`
-- `src/__tests__/integration/structure/Structure.test.ts`
-- `src/__tests__/integration/table/Table.test.ts`
-- `src/__tests__/integration/view/View.test.ts`
-- `src/__tests__/integration/program/Program.test.ts`
-- `src/__tests__/integration/interface/Interface.test.ts`
-- Other integration test files
+### 4.2. Integration Tests ✅ COMPLETED
+**Files updated:**
+- ✅ `src/__tests__/integration/domain/Domain.test.ts` - uses BaseTester (already has long polling)
+- ✅ `src/__tests__/integration/class/Class.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/program/Program.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/interface/Interface.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/table/Table.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/view/View.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/structure/Structure.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/functionGroup/FunctionGroup.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/functionModule/FunctionModule.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/metadataExtension/MetadataExtension.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/serviceDefinition/ServiceDefinition.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/package/Package.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/behaviorDefinition/BehaviorDefinition.test.ts` - replaced setTimeout with read + long polling
+- ✅ `src/__tests__/integration/behaviorImplementation/BehaviorImplementation.test.ts` - replaced setTimeout with read + long polling
 
-**Changes needed:**
-- [ ] Remove `setTimeout()` calls that wait for object readiness
-- [ ] Remove `timeout` options from test calls (if not needed for operation timeout)
-- [ ] Add `withLongPolling: true` to read operations after create/update/activate
-- [ ] Update test expectations if timing changes
+**Changes made:**
+- ✅ Removed `setTimeout()` calls that wait for object readiness
+- ✅ Added `withLongPolling: true` to read operations after create/update/activate
+- ✅ All tests now use long polling instead of fixed delays
+
+**Note:** `Domain.test.ts` uses `BaseTester` which already includes long polling between create and update steps.
 
 **Example of what to remove:**
 ```typescript
@@ -370,80 +376,85 @@ await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for object to b
 await adtObject.read(config, 'active', { withLongPolling: true });
 ```
 
-### 4.3. Test Helper Functions ⏳ TODO
-**File:** `src/__tests__/helpers/test-helper.ts`
+### 4.3. Test Helper Functions ✅ REVIEWED
+**File:** `src/__tests__/helpers/test-helper.js`
 
-**Changes needed:**
-- [ ] Review helper functions for timeout usage
-- [ ] Replace timeout-based waits with long polling where applicable
+**Status:** Reviewed - Most setTimeout usage is acceptable
+
+**Functions reviewed:**
+- ✅ `getOperationDelay()` - Returns delay values from config (used for configuration, not actual delays)
+- ✅ `retryCheckAfterActivate()` - Uses setTimeout for retry delays between check attempts (acceptable - this is retry logic, not waiting for object readiness)
+- ⚠️ `createDependencyTable()`, `createDependencyCdsView()`, `createDependencyDomain()`, `createDependencyFunctionGroup()`, `createDependencyBehaviorDefinition()` - These helper functions use setTimeout after create/update/activate operations
+
+**Note:** The dependency creation functions (`createDependency*`) are helper functions used to create test dependencies. They use CrudClient directly (not AdtClient), so adding long polling would require significant refactoring. These functions are used infrequently and the delays are acceptable for dependency setup. The main integration tests (which use AdtClient) have already been migrated to use long polling.
+
+**Recommendation:** Leave dependency creation helpers as-is for now. They can be migrated later if needed, but priority is lower since they're not part of the main test flow.
 
 ---
 
 ## 5. Documentation Updates
 
-### 5.1. README ⏳ TODO
+### 5.1. README ✅ COMPLETED
 **File:** `README.md`
 
-**Changes needed:**
-- [ ] Document `withLongPolling` parameter usage
-- [ ] Add examples of using long polling in create/update flows
-- [ ] Update migration notes if needed
+**Changes made:**
+- ✅ Added "Using Long Polling for Object Readiness" section with examples
+- ✅ Documented `withLongPolling` parameter in AdtObject Methods section
+- ✅ Added migration guide from timeouts to long polling
+- ✅ Added link to migration documentation
+- ✅ Explained benefits of long polling (no arbitrary timeouts, faster tests, more reliable)
 
-### 5.2. CHANGELOG ⏳ TODO
+### 5.2. CHANGELOG ✅ COMPLETED
 **File:** `CHANGELOG.md`
 
-**Changes needed:**
-- [ ] Add entry for migration from timeouts to long polling
-- [ ] Document breaking changes (if any)
-- [ ] Document new `withLongPolling` parameter
+**Changes made:**
+- ✅ Added entry for migration from timeouts to long polling in version 0.2.0
+- ✅ Documented new `withLongPolling` parameter in Added section
+- ✅ Documented changes in `create()` and `update()` methods in Changed section
+- ✅ Added link to migration documentation
+- ✅ No breaking changes - `withLongPolling` is optional parameter
 
 ---
 
 ## 6. Code Cleanup
 
-### 6.1. Remove Unused Timeout Variables ✅ IN PROGRESS
+### 6.1. Remove Unused Timeout Variables ✅ COMPLETED
 **Search pattern:** `const timeout = options?.timeout || 1000;`
 
 **Files checked:**
 - [x] `AdtDomain.ts` - removed unused timeout variable
+- [x] All other `AdtObject` implementations - no unused timeout variables found
+- [x] All `Builder` implementations - no unused timeout variables found
+- [x] Test files - no unused timeout variables found
 
-**Files to check:**
-- [ ] Other `AdtObject` implementations (if any)
-- [ ] All `Builder` implementations
-- [ ] Test files
+**Result:** Only one unused timeout variable was found and removed. All other `timeout` usages are for HTTP request timeouts (via `getTimeout()`), which are legitimate and should remain.
 
-**Action:** Remove timeout variable if it's only used for delays (not for operation timeouts).
-
-### 6.2. Remove setTimeout Calls ✅ IN PROGRESS
+### 6.2. Remove setTimeout Calls ✅ COMPLETED
 **Search pattern:** `setTimeout`, `new Promise(resolve => setTimeout`
 
 **Files updated:**
-- [x] `Program.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `Class.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `Interface.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `Table.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `View.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `Structure.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `FunctionGroup.test.ts` - replaced setTimeout with read + long polling after create/activate
-- [x] `FunctionModule.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `MetadataExtension.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `ServiceDefinition.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `Package.test.ts` - replaced setTimeout with read + long polling after create/update
-- [x] `BehaviorDefinition.test.ts` - replaced setTimeout with read + long polling after create/update/activate
-- [x] `BehaviorImplementation.test.ts` - replaced setTimeout with read + long polling after create/update/activate
+- [x] All main integration tests - replaced setTimeout with read + long polling after create/update/activate
+  - `Program.test.ts`, `Class.test.ts`, `Interface.test.ts`, `Table.test.ts`, `View.test.ts`
+  - `Structure.test.ts`, `FunctionGroup.test.ts`, `FunctionModule.test.ts`
+  - `MetadataExtension.test.ts`, `ServiceDefinition.test.ts`, `Package.test.ts`
+  - `BehaviorDefinition.test.ts`, `BehaviorImplementation.test.ts`
 
-**Files to check:**
-- [ ] Other test files (Class, Interface, Table, View, Structure, FunctionGroup, FunctionModule, etc.)
-- [ ] All implementation files (check.ts, groupActivation.ts - these may be for different purposes)
+**Files reviewed (acceptable setTimeout usage):**
+- [x] `test-helper.js` - `retryCheckAfterActivate()` uses setTimeout for retry delays (acceptable - retry logic)
+- [x] `test-helper.js` - `createDependency*` functions use setTimeout (acceptable - helper functions for dependency setup)
+- [x] `check.ts` - `delay()` function uses setTimeout (acceptable - utility function)
+- [x] `groupActivation.ts` - uses setTimeout for polling intervals (acceptable - polling logic)
 
-**Action:** Replace with long polling read operations.
+**Result:** All main integration tests migrated. Remaining setTimeout usage is for legitimate purposes (retry logic, polling, utility delays) and should remain.
 
-### 6.3. Update IAdtOperationOptions Documentation ⏳ TODO
+### 6.3. Update IAdtOperationOptions Documentation ✅ COMPLETED
 **File:** `src/adt/IAdtObject.ts` (in interfaces package)
 
-**Changes needed:**
-- [ ] Update `timeout` field documentation to clarify it's for operation timeout, not readiness waiting
-- [ ] Add note about using `withLongPolling` for waiting object readiness
+**Changes made:**
+- ✅ Updated `timeout` field documentation to clarify it's for HTTP request timeout, not readiness waiting
+- ✅ Added note about using `withLongPolling` for waiting object readiness
+- ✅ Clarified that timeout controls HTTP response waiting, not object readiness
+- ✅ Added reference to `withLongPolling` parameter
 
 ---
 
@@ -489,15 +500,16 @@ await adtObject.read(config, 'active', { withLongPolling: true });
    - ✅ All builder `read()` methods updated to accept `withLongPolling` parameter
    - ✅ All builders pass `withLongPolling` to respective read functions
 
-5. ⏳ **Phase 5: Test Updates**
-   - Remove timeout-based waits
-   - Add long polling where needed
-   - Verify all tests pass
+5. ✅ **Phase 5: Test Updates** (COMPLETED)
+   - ✅ Removed timeout-based waits from all main integration tests
+   - ✅ Added long polling where needed (all tests now use read with long polling)
+   - ⏳ Verify all tests pass (pending test execution)
 
-6. ⏳ **Phase 6: Documentation and Cleanup**
-   - Update documentation
-   - Remove unused timeout code
-   - Final verification
+6. ✅ **Phase 6: Documentation and Cleanup** (COMPLETED)
+   - ✅ Updated documentation (README.md, CHANGELOG.md)
+   - ✅ Removed unused timeout code (AdtDomain.ts)
+   - ✅ Updated IAdtOperationOptions documentation
+   - ✅ Reviewed and documented remaining setTimeout usage
 
 ---
 
@@ -538,13 +550,13 @@ await adtObject.read(config, 'active', { withLongPolling: true });
 - [x] All Builder `read()` methods support `withLongPolling`
 - [x] All AdtObject implementations fully migrated (create/update use long polling)
 - [x] Integration tests updated (all main integration tests completed)
-- [ ] Documentation updated
-- [x] Code cleanup started (removed unused timeout in AdtDomain)
-- [ ] All tests passing
-- [ ] Performance verified
+- [x] Documentation updated (README.md, CHANGELOG.md, IAdtObject.ts)
+- [x] Code cleanup completed (removed unused timeout variables, reviewed setTimeout usage)
+- [ ] All tests passing (pending test execution)
+- [ ] Performance verified (pending performance testing)
 
 ---
 
 **Last Updated:** 2025-01-XX
-**Status:** Phase 3 Complete (All AdtObject Implementations), Phase 4 Complete (Builders), Phase 5 In Progress (Test Updates)
+**Status:** Phase 3 Complete (All AdtObject Implementations), Phase 4 Complete (Builders), Phase 5 Complete (Test Updates), Phase 6 Complete (Documentation and Cleanup), Phase 7 Pending (Verification)
 

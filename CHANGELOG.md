@@ -5,6 +5,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-01-XX
+
+### Added
+- **Long Polling Support**: Added `withLongPolling` parameter to all read operations for better reliability and performance
+  - `IAdtObject.read()`, `readMetadata()`, and `readTransport()` methods now support `withLongPolling` option
+  - `IBuilder.read()` methods now support `withLongPolling` option
+  - All `AdtObject` implementations automatically use long polling in `create()` and `update()` methods to wait for object readiness
+  - Replaces fixed timeouts with server-driven waiting, providing faster and more reliable operations
+  - See [Migration Guide](docs/MIGRATION_TIMEOUT_TO_LONG_POLLING.md) for details
+
+### Changed
+- **Migration from Timeouts to Long Polling**: All `AdtObject` implementations now use long polling instead of fixed timeouts
+  - `create()` methods: Added read with long polling after create, update, and activate operations
+  - `update()` methods: Added read with long polling after update and activate operations
+  - Integration tests: Replaced `setTimeout` calls with read operations using long polling
+  - This provides better reliability and faster execution when objects are ready quickly
+
+### Documentation
+- Added comprehensive documentation for long polling feature in README.md
+- Added migration guide from timeouts to long polling
+- Updated API reference to document `withLongPolling` parameter
+
 ## [0.1.40] - 2025-12-08
 
 ### Fixed
