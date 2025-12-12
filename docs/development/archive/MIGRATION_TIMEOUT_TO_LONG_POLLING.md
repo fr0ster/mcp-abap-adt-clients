@@ -558,5 +558,7 @@ await adtObject.read(config, 'active', { withLongPolling: true });
 ---
 
 **Last Updated:** 2025-12-12
-**Status:** Phase 3 Complete (All AdtObject Implementations), Phase 4 Complete (Builders), Phase 5 Complete (Test Updates), Phase 6 Complete (Documentation and Cleanup), Phase 7 Pending (Verification)
+**Status:** ✅ **COMPLETED** - All phases completed successfully. All tests passing. Performance testing deferred.
+
+**Archive Note:** This roadmap has been completed and archived in `docs/development/archive/`. All migration tasks have been successfully implemented. The migration from timeouts to long polling is complete across all AdtObject implementations, Builder implementations, and integration tests.
 

@@ -307,6 +307,56 @@ adt-manage-sessions cleanup
 
 See [bin/README.md](bin/README.md) for details.
 
+## Developer Tools
+
+### ADT Discovery Script
+
+The package includes a tool for generating documentation from the ADT discovery endpoint, which lists all available ADT API endpoints.
+
+**Purpose:** Explore available ADT API endpoints and generate markdown documentation.
+
+**Usage:**
+```bash
+# Generate discovery documentation (default output: docs/architecture/discovery.md)
+npm run discovery:markdown
+
+# Custom output file
+npm run discovery:markdown -- --output custom-discovery.md
+
+# Custom SAP system URL
+npm run discovery:markdown -- --url https://your-system.com
+
+# Custom .env file
+npm run discovery:markdown -- --env /path/to/.env
+```
+
+**What it does:**
+1. Connects to the SAP system using credentials from `.env` file
+2. Fetches the discovery endpoint: `GET /sap/bc/adt/discovery`
+3. Parses the XML response
+4. Converts it to readable markdown with endpoint categories, HTTP methods, URLs, content types, and descriptions
+
+**Output:** 
+- Default: `docs/architecture/discovery.md`
+- Custom: Path specified via `--output` option
+
+**Environment Variables:**
+The script uses the same environment variables as the main package:
+- `SAP_URL` - SAP system URL (required)
+- `SAP_AUTH_TYPE` - Authentication type: `'basic'` or `'jwt'` (default: `'basic'`)
+- `SAP_USERNAME` - Username for basic auth
+- `SAP_PASSWORD` - Password for basic auth
+- `SAP_JWT_TOKEN` - JWT token for JWT auth
+- `SAP_CLIENT` - Client number (optional)
+
+**When to use:**
+- To explore available ADT API endpoints on your SAP system
+- To generate up-to-date documentation for ADT API
+- To understand the structure of ADT discovery responses
+- To verify endpoint availability on a specific SAP system
+
+See [Tools Documentation](tools/README.md) for complete details and options.
+
 ## API Reference
 
 ### CrudClient Methods
