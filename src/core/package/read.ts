@@ -13,10 +13,12 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function getPackage(
   connection: IAbapConnection,
   packageName: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(packageName);
-  const url = `/sap/bc/adt/packages/${encodedName}?version=${version}`;
+  const longPollingQuery = options?.withLongPolling ? '&withLongPolling=true' : '';
+  const url = `/sap/bc/adt/packages/${encodedName}?version=${version}${longPollingQuery}`;
 
   return connection.makeAdtRequest({
     url,
@@ -36,10 +38,12 @@ export async function getPackage(
  */
 export async function getPackageTransport(
   connection: IAbapConnection,
-  packageName: string
+  packageName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(packageName);
-  const url = `/sap/bc/adt/packages/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/packages/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

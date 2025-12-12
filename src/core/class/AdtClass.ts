@@ -144,6 +144,20 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       objectCreated = true;
       this.logger?.info?.('Class created');
 
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { className: config.className },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (stateful still set from create)
       this.logger?.info?.('Step 3: Checking created class');
       state.checkResult = await checkClass(this.connection, config.className, 'inactive');
@@ -174,6 +188,20 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           config.transportRequest
         );
         this.logger?.info?.('Class updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -195,6 +223,23 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         this.logger?.info?.('Step 9: Activating class');
         state.activateResult = await activateClass(this.connection, config.className);
         this.logger?.info?.('Class activated, status:', state.activateResult.status);
+
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       }
 
       return state;
@@ -357,6 +402,20 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           config.transportRequest
         );
         this.logger?.info?.('Class updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -378,6 +437,23 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         this.logger?.info?.('Step 6: Activating class');
         state.activateResult = await activateClass(this.connection, config.className);
         this.logger?.info?.('Class activated, status:', state.activateResult.status);
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       }
 
       return state;

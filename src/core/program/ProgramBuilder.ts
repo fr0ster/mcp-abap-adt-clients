@@ -311,10 +311,18 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<IProgramConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IProgramConfig | undefined> {
     try {
       this.logger?.info('Reading program:', this.config.programName);
-      const result = await getProgramSource(this.connection, this.config.programName);
+      const result = await getProgramSource(
+        this.connection,
+        this.config.programName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Program read successfully:', result.status);

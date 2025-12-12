@@ -107,6 +107,20 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       objectCreated = true;
       this.logger?.info?.('Structure created');
 
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { structureName: config.structureName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created structure');
       await checkStructure(this.connection, config.structureName, 'inactive');
@@ -139,6 +153,20 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
           lockHandle
         );
         this.logger?.info?.('Structure updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { structureName: config.structureName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -160,9 +188,27 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         this.logger?.info?.('Step 9: Activating structure');
         const activateResponse = await activateStructure(this.connection, config.structureName);
         this.logger?.info?.('Structure activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { structureName: config.structureName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return {
+              createResult: activateResponse,
+              readResult: readState.readResult,
+              errors: []
+            };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return {
           createResult: activateResponse,
           errors: []
@@ -170,7 +216,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getStructureSource(this.connection, config.structureName);
+      const readResponse = await getStructureSource(this.connection, config.structureName, 'inactive');
       return {
         readResult: readResponse,
         errors: []
@@ -214,14 +260,20 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
    */
   async read(
     config: Partial<IStructureConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IStructureState | undefined> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
 
     try {
-      const response = await getStructureSource(this.connection, config.structureName);
+      const response = await getStructureSource(
+        this.connection,
+        config.structureName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -237,7 +289,10 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
   /**
    * Read structure metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IStructureConfig>): Promise<IStructureState> {
+  async readMetadata(
+    config: Partial<IStructureConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IStructureState> {
     const state: IStructureState = { errors: [] };
     if (!config.structureName) {
       const error = new Error('Structure name is required');
@@ -245,7 +300,11 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       throw error;
     }
     try {
-      const response = await getStructureMetadata(this.connection, config.structureName);
+      const response = await getStructureMetadata(
+        this.connection,
+        config.structureName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Structure metadata read successfully');
       return state;
@@ -260,7 +319,10 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
   /**
    * Read transport request information for the structure
    */
-  async readTransport(config: Partial<IStructureConfig>): Promise<IStructureState> {
+  async readTransport(
+    config: Partial<IStructureConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IStructureState> {
     const state: IStructureState = { errors: [] };
     if (!config.structureName) {
       const error = new Error('Structure name is required');
@@ -268,7 +330,11 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       throw error;
     }
     try {
-      const response = await getStructureTransport(this.connection, config.structureName);
+      const response = await getStructureTransport(
+        this.connection,
+        config.structureName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Structure transport request read successfully');
       return state;
@@ -322,6 +388,20 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
           lockHandle
         );
         this.logger?.info?.('Structure updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { structureName: config.structureName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -343,9 +423,27 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         this.logger?.info?.('Step 6: Activating structure');
         const activateResponse = await activateStructure(this.connection, config.structureName);
         this.logger?.info?.('Structure activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { structureName: config.structureName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return {
+              activateResult: activateResponse,
+              readResult: readState.readResult,
+              errors: []
+            };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return {
           activateResult: activateResponse,
           errors: []
@@ -353,7 +451,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getStructureSource(this.connection, config.structureName);
+      const readResponse = await getStructureSource(this.connection, config.structureName, 'inactive');
       return {
         readResult: readResponse,
         errors: []

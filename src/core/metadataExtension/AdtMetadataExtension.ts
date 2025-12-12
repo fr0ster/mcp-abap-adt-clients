@@ -124,6 +124,20 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       objectCreated = true;
       this.logger?.info?.('Metadata extension created');
 
+      // 2.5. Read with long polling (wait for object to be ready)
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { name: config.name },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created metadata extension');
       await checkMetadataExtension(this.connection, config.name, 'inactive');
@@ -153,6 +167,20 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
           lockHandle
         );
         this.logger?.info?.('Metadata extension updated');
+
+        // 6.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -175,8 +203,20 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         const activateResponse = await activateMetadataExtension(this.connection, config.name);
         this.logger?.info?.('Metadata extension activated, status:', activateResponse.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+        // 9.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return activation response
+        }
+        
         return {
           activateResult: activateResponse,
           errors: []
@@ -229,7 +269,8 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
    */
   async read(
     config: Partial<IMetadataExtensionConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IMetadataExtensionState | undefined> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
@@ -239,7 +280,12 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     }
 
     try {
-      const response = await readMetadataExtensionSource(this.connection, config.name, version);
+      const response = await readMetadataExtensionSource(
+        this.connection,
+        config.name,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       const sourceCode = typeof response.data === 'string'
         ? response.data
         : JSON.stringify(response.data);
@@ -256,14 +302,16 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       state.errors.push({ method: 'read', error: err, timestamp: new Date() });
       this.logger?.error('read', err);
       throw err;
-      throw error;
     }
   }
 
   /**
    * Read metadata extension metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+  async readMetadata(
+    config: Partial<IMetadataExtensionConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Metadata extension name is required');
@@ -271,7 +319,11 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       throw error;
     }
     try {
-      const response = await readMetadataExtension(this.connection, config.name);
+      const response = await readMetadataExtension(
+        this.connection,
+        config.name,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Metadata extension metadata read successfully');
       return state;
@@ -286,7 +338,10 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
   /**
    * Read transport request information for the metadata extension
    */
-  async readTransport(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+  async readTransport(
+    config: Partial<IMetadataExtensionConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Metadata extension name is required');
@@ -294,7 +349,11 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       throw error;
     }
     try {
-      const response = await getMetadataExtensionTransport(this.connection, config.name);
+      const response = await getMetadataExtensionTransport(
+        this.connection,
+        config.name,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Metadata extension transport request read successfully');
       return state;
@@ -348,6 +407,20 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
           lockHandle
         );
         this.logger?.info?.('Metadata extension updated');
+
+        // 3.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -370,8 +443,20 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         const activateResponse = await activateMetadataExtension(this.connection, config.name);
         this.logger?.info?.('Metadata extension activated, status:', activateResponse.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+        // 6.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return activation response
+        }
+        
         return {
           activateResult: activateResponse,
           errors: []

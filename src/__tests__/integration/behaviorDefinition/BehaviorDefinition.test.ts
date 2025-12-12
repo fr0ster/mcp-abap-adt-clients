@@ -237,10 +237,12 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         }, { activateOnCreate: false, sourceCode: config.sourceCode });
         behaviorDefinitionCreated = true;
         
-        const createDelay = getOperationDelay('create', testCase);
-        if (createDelay > 0) {
-          logBuilderTestStep(`wait (after create ${createDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, createDelay));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getBehaviorDefinition().read({ name: config.bdefName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('read');
@@ -259,10 +261,12 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
           name: config.bdefName
         }, { sourceCode: config.sourceCode });
         
-        const updateDelay = getOperationDelay('update', testCase);
-        if (updateDelay > 0) {
-          logBuilderTestStep(`wait (after update ${updateDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, updateDelay));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getBehaviorDefinition().read({ name: config.bdefName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('check(inactive)');
@@ -273,10 +277,12 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         logBuilderTestStep('activate');
         await client.getBehaviorDefinition().activate({ name: config.bdefName });
         
-        const activateDelay = getOperationDelay('activate', testCase);
-        if (activateDelay > 0) {
-          logBuilderTestStep(`wait (after activate ${activateDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, activateDelay));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getBehaviorDefinition().read({ name: config.bdefName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('check(active)');

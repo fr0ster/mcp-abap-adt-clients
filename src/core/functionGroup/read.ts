@@ -10,9 +10,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 /**
  * Get ABAP function group
  */
-export async function getFunctionGroup(connection: IAbapConnection, functionGroupName: string): Promise<AxiosResponse> {
+export async function getFunctionGroup(
+  connection: IAbapConnection,
+  functionGroupName: string,
+  options?: { withLongPolling?: boolean }
+): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
-  const url = `/sap/bc/adt/functions/groups/${encodedName}`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/functions/groups/${encodedName}${query}`;
 
   return connection.makeAdtRequest({
     url,
@@ -30,10 +35,12 @@ export async function getFunctionGroup(connection: IAbapConnection, functionGrou
  */
 export async function getFunctionGroupTransport(
   connection: IAbapConnection,
-  functionGroupName: string
+  functionGroupName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
-  const url = `/sap/bc/adt/functions/groups/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/functions/groups/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

@@ -10,9 +10,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 /**
  * Get ABAP data element
  */
-export async function getDataElement(connection: IAbapConnection, dataElementName: string): Promise<AxiosResponse> {
+export async function getDataElement(
+  connection: IAbapConnection,
+  dataElementName: string,
+  options?: { withLongPolling?: boolean }
+): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
-  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}${query}`;
 
   return connection.makeAdtRequest({
     url,
@@ -30,10 +35,12 @@ export async function getDataElement(connection: IAbapConnection, dataElementNam
  */
 export async function getDataElementTransport(
   connection: IAbapConnection,
-  dataElementName: string
+  dataElementName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
-  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/dataelements/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

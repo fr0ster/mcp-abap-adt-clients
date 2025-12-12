@@ -106,6 +106,20 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
       objectCreated = true;
       this.logger?.info?.('Function module created');
 
+      // 2.5. Read with long polling (wait for object to be ready)
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { functionModuleName: config.functionModuleName, functionGroupName: config.functionGroupName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created function module');
       await checkFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, 'inactive');
@@ -139,6 +153,20 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
           }
         );
         this.logger?.info?.('Function module updated');
+
+        // 6.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { functionModuleName: config.functionModuleName, functionGroupName: config.functionGroupName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -161,8 +189,20 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
         const activateResponse = await activateFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
         this.logger?.info?.('Function module activated, status:', activateResponse.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+        // 9.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { functionModuleName: config.functionModuleName, functionGroupName: config.functionGroupName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return activation response
+        }
+        
         return {
           createResult: activateResponse,
           errors: []
@@ -219,7 +259,8 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
    */
   async read(
     config: Partial<IFunctionModuleConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IFunctionModuleState | undefined> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
@@ -229,7 +270,13 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
     }
 
     try {
-      const response = await getFunctionSource(this.connection, config.functionModuleName, config.functionGroupName, version);
+      const response = await getFunctionSource(
+        this.connection,
+        config.functionModuleName,
+        config.functionGroupName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -245,7 +292,10 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
   /**
    * Read function module metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IFunctionModuleConfig>): Promise<IFunctionModuleState> {
+  async readMetadata(
+    config: Partial<IFunctionModuleConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IFunctionModuleState> {
     const state: IFunctionModuleState = { errors: [] };
     if (!config.functionModuleName) {
       const error = new Error('Function module name is required');
@@ -258,7 +308,12 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
       throw error;
     }
     try {
-      const response = await getFunctionMetadata(this.connection, config.functionModuleName, config.functionGroupName);
+      const response = await getFunctionMetadata(
+        this.connection,
+        config.functionModuleName,
+        config.functionGroupName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Function module metadata read successfully');
       return state;
@@ -273,7 +328,10 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
   /**
    * Read transport request information for the function module
    */
-  async readTransport(config: Partial<IFunctionModuleConfig>): Promise<IFunctionModuleState> {
+  async readTransport(
+    config: Partial<IFunctionModuleConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IFunctionModuleState> {
     const state: IFunctionModuleState = { errors: [] };
     if (!config.functionModuleName) {
       const error = new Error('Function module name is required');
@@ -286,7 +344,12 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
       throw error;
     }
     try {
-      const response = await getFunctionModuleTransport(this.connection, config.functionModuleName, config.functionGroupName);
+      const response = await getFunctionModuleTransport(
+        this.connection,
+        config.functionModuleName,
+        config.functionGroupName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Function module transport request read successfully');
       return state;
@@ -344,6 +407,20 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
           }
         );
         this.logger?.info?.('Function module updated');
+
+        // 3.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { functionModuleName: config.functionModuleName, functionGroupName: config.functionGroupName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -366,8 +443,20 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
         const activateResponse = await activateFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
         this.logger?.info?.('Function module activated, status:', activateResponse.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+        // 6.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { functionModuleName: config.functionModuleName, functionGroupName: config.functionGroupName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return activation response
+        }
+        
         return {
           updateResult: activateResponse,
           errors: []

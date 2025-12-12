@@ -368,7 +368,13 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
           transportRequest: resolveTransportRequest(testCase.params.transport_request)
         }, { activateOnCreate: false });
         functionModuleCreated = true;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getFunctionModule().read({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         currentStep = 'check with source code (before update)';
         logBuilderTestStep(currentStep);
@@ -392,7 +398,13 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName
         }, { sourceCode: sourceCode });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getFunctionModule().read({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         currentStep = 'check';
         logBuilderTestStep(currentStep);
@@ -414,8 +426,13 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
           functionModuleName: functionModuleName,
           functionGroupName: functionGroupName
         });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getFunctionModule().read({ functionModuleName: functionModuleName, functionGroupName: functionGroupName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         if (shouldCleanup) {
           currentStep = 'delete (cleanup FM)';

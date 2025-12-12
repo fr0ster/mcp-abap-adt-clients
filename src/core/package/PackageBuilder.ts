@@ -231,10 +231,18 @@ export class PackageBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<IPackageConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IPackageConfig | undefined> {
     try {
       this.logger?.info(`'Reading package:'  this.config.packageName  'version:' ${`version`}`);
-      const result = await getPackage(this.connection, this.config.packageName, version);
+      const result = await getPackage(
+        this.connection,
+        this.config.packageName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Package read successfully:', result.status);

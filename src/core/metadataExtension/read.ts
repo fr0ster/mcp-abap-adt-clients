@@ -23,10 +23,12 @@ import { AxiosResponse } from 'axios';
  */
 export async function readMetadataExtension(
   connection: IAbapConnection,
-  name: string
+  name: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
-  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}${query}`;
 
   const headers = {
     'Accept': 'application/vnd.sap.adt.ddic.ddlx.v1+xml'
@@ -57,10 +59,13 @@ export async function readMetadataExtension(
 export async function readMetadataExtensionSource(
   connection: IAbapConnection,
   name: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
-  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main${version === 'inactive' ? '?version=inactive' : ''}`;
+  const versionQuery = version === 'inactive' ? '?version=inactive' : '';
+  const longPollingQuery = options?.withLongPolling ? (versionQuery ? '&withLongPolling=true' : '?withLongPolling=true') : '';
+  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main${versionQuery}${longPollingQuery}`;
 
   const headers = {
     'Accept': 'text/plain'
@@ -82,10 +87,12 @@ export async function readMetadataExtensionSource(
  */
 export async function getMetadataExtensionTransport(
   connection: IAbapConnection,
-  name: string
+  name: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
-  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/transport${query}`;
 
   const headers = {
     'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'

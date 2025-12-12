@@ -15,9 +15,10 @@ import { readObjectSource } from '../shared/readSource';
 export async function getFunctionMetadata(
   connection: IAbapConnection,
   functionName: string,
-  functionGroup: string
+  functionGroup: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'functionmodule', functionName, functionGroup);
+  return readObjectMetadata(connection, 'functionmodule', functionName, functionGroup, options);
 }
 
 /**
@@ -31,9 +32,10 @@ export async function getFunctionSource(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'functionmodule', functionName, functionGroup, version);
+  return readObjectSource(connection, 'functionmodule', functionName, functionGroup, version, options);
 }
 
 /**
@@ -59,11 +61,13 @@ export async function getFunction(
 export async function getFunctionModuleTransport(
   connection: IAbapConnection,
   functionName: string,
-  functionGroup: string
+  functionGroup: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
-  const url = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

@@ -269,10 +269,17 @@ export class FunctionGroupBuilder implements IBuilder<IFunctionGroupState> {
     }
   }
 
-  async read(): Promise<IFunctionGroupConfig | undefined> {
+  async read(
+    version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IFunctionGroupConfig | undefined> {
     try {
       this.logger?.info('Reading function group:', this.config.functionGroupName);
-      const result = await getFunctionGroup(this.connection, this.config.functionGroupName);
+      const result = await getFunctionGroup(
+        this.connection,
+        this.config.functionGroupName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Function group read successfully:', result.status);

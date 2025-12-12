@@ -98,7 +98,7 @@ export async function updateFunctionGroup(
     }
 
     // Get current XML
-    const currentResponse = await getFunctionGroup(connection, params.function_group_name);
+    const currentResponse = await getFunctionGroup(connection, params.function_group_name, undefined);
     const currentXml = typeof currentResponse.data === 'string'
       ? currentResponse.data
       : JSON.stringify(currentResponse.data);

@@ -285,10 +285,12 @@ extend view ${targetEntity} with "${extName}"
         }, { activateOnCreate: false, sourceCode: config.sourceCode });
         metadataExtensionCreated = true;
         
-        const createDelay = getOperationDelay('create', testCase);
-        if (createDelay > 0) {
-          logBuilderTestStep(`wait (after create ${createDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, createDelay));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getMetadataExtension().read({ name: config.extName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('read');
@@ -307,10 +309,12 @@ extend view ${targetEntity} with "${extName}"
           name: config.extName
         }, { sourceCode: config.sourceCode });
         
-        const updateDelay = getOperationDelay('update', testCase);
-        if (updateDelay > 0) {
-          logBuilderTestStep(`wait (after update ${updateDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, updateDelay));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getMetadataExtension().read({ name: config.extName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('check(inactive)');
@@ -321,10 +325,12 @@ extend view ${targetEntity} with "${extName}"
         logBuilderTestStep('activate');
         await client.getMetadataExtension().activate({ name: config.extName });
         
-        const activateDelay = getOperationDelay('activate', testCase);
-        if (activateDelay > 0) {
-          logBuilderTestStep(`wait (after activate ${activateDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, activateDelay));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getMetadataExtension().read({ name: config.extName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('check(active)');

@@ -135,6 +135,20 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       objectCreated = true;
       this.logger?.info?.('Package created');
 
+      // 2.5. Read with long polling (wait for object to be ready)
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { packageName: config.packageName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created package');
       await checkPackage(this.connection, config.packageName, 'inactive');
@@ -144,7 +158,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       // Note: Packages don't have activate operation
 
       // Read and return result (no stateful needed)
-      const readResponse = await getPackage(this.connection, config.packageName);
+      const readResponse = await getPackage(this.connection, config.packageName, 'active');
       return {
         createResult: readResponse,
         errors: []
@@ -176,14 +190,20 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async read(
     config: Partial<IPackageConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IPackageState | undefined> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
 
     try {
-      const response = await getPackage(this.connection, config.packageName, version);
+      const response = await getPackage(
+        this.connection,
+        config.packageName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -200,7 +220,10 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    * Read package metadata (object characteristics: package, responsible, description, etc.)
    * For packages, read() already returns metadata since there's no source code.
    */
-  async readMetadata(config: Partial<IPackageConfig>): Promise<IPackageState> {
+  async readMetadata(
+    config: Partial<IPackageConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IPackageState> {
     const state: IPackageState = { errors: [] };
     if (!config.packageName) {
       const error = new Error('Package name is required');
@@ -209,7 +232,12 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     }
     try {
       // For objects without source code, read() already returns metadata
-      const response = await getPackage(this.connection, config.packageName);
+      const response = await getPackage(
+        this.connection,
+        config.packageName,
+        'active',
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       state.readResult = response;
       this.logger?.info?.('Package metadata read successfully');
@@ -225,7 +253,10 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   /**
    * Read transport request information for the package
    */
-  async readTransport(config: Partial<IPackageConfig>): Promise<IPackageState> {
+  async readTransport(
+    config: Partial<IPackageConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IPackageState> {
     const state: IPackageState = { errors: [] };
     if (!config.packageName) {
       const error = new Error('Package name is required');
@@ -233,7 +264,11 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       throw error;
     }
     try {
-      const response = await getPackageTransport(this.connection, config.packageName);
+      const response = await getPackageTransport(
+        this.connection,
+        config.packageName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Package transport request read successfully');
       return state;
@@ -301,6 +336,20 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           lockHandle
         );
         this.logger?.info?.('Package updated');
+
+        // 3.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { packageName: config.packageName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)

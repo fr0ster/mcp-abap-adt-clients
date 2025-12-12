@@ -351,10 +351,18 @@ export class StructureBuilder implements IBuilder<IStructureState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<IStructureConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IStructureConfig | undefined> {
     try {
       this.logger?.info('Reading structure:', this.config.structureName);
-      const result = await getStructureSource(this.connection, this.config.structureName);
+      const result = await getStructureSource(
+        this.connection,
+        this.config.structureName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Structure read successfully:', result.status);

@@ -14,9 +14,10 @@ import { readObjectSource } from '../shared/readSource';
  */
 export async function getBehaviorImplementationMetadata(
   connection: IAbapConnection,
-  className: string
+  className: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'class', className);
+  return readObjectMetadata(connection, 'class', className, undefined, options);
 }
 
 /**
@@ -28,9 +29,10 @@ export async function getBehaviorImplementationMetadata(
 export async function getBehaviorImplementationSource(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'class', className, undefined, version);
+  return readObjectSource(connection, 'class', className, undefined, version, options);
 }
 
 /**
@@ -68,10 +70,11 @@ export async function getBehaviorImplementationImplementations(
  */
 export async function getBehaviorImplementationTransport(
   connection: IAbapConnection,
-  className: string
+  className: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   // Behavior implementation is a class, so use class transport endpoint
   const { getClassTransport } = await import('../class/read');
-  return getClassTransport(connection, className);
+  return getClassTransport(connection, className, options);
 }
 

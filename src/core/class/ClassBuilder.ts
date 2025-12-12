@@ -233,10 +233,18 @@ export class ClassBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<IClassConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IClassConfig | undefined> {
     try {
       this.logger?.info(`Reading class source: ${this.config.className}, version: ${version}`);
-      const result = await getClassSource(this.connection, this.config.className, version);
+      const result = await getClassSource(
+        this.connection,
+        this.config.className,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info(`Class source read successfully: ${result.status}, bytes: ${result.data?.length || 0}`);

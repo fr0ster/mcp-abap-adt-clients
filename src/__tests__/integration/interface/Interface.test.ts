@@ -242,8 +242,13 @@ describe('InterfaceBuilder (using AdtClient)', () => {
           console.log(`[InterfaceBuilder test] Create successful - Status: ${createResult.status}`);
         }
         
-        // Wait for SAP to commit the object creation (metadata only)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getInterface().read({ interfaceName: interfaceName! }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         // Wait for interface to be available for lock
         await waitForInterfaceCreation(interfaceName!);
@@ -263,8 +268,13 @@ describe('InterfaceBuilder (using AdtClient)', () => {
           interfaceName: config.interfaceName
         }, { sourceCode: config.sourceCode });
         
-        // Wait for SAP to commit update operation
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getInterface().read({ interfaceName: config.interfaceName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
 
         currentStep = 'check(inactive)';
         logBuilderTestStep(currentStep);
@@ -275,8 +285,13 @@ describe('InterfaceBuilder (using AdtClient)', () => {
         currentStep = 'activate';
         logBuilderTestStep(currentStep);
         await client.getInterface().activate({ interfaceName: config.interfaceName });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getInterface().read({ interfaceName: config.interfaceName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
 
         currentStep = 'check(active)';
         logBuilderTestStep(currentStep);

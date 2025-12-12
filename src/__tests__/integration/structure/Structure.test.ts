@@ -199,7 +199,13 @@ describe('StructureBuilder (using AdtClient)', () => {
           transportRequest: config.transportRequest
         }, { activateOnCreate: false, sourceCode: updatedDdlCode });
         structureCreated = true;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getStructure().read({ structureName: config.structureName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         currentStep = 'check before update';
         logBuilderTestStep(currentStep);
@@ -215,7 +221,13 @@ describe('StructureBuilder (using AdtClient)', () => {
         await client.getStructure().update({
           structureName: config.structureName
         }, { sourceCode: updatedDdlCode });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getStructure().read({ structureName: config.structureName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         // Check with new code (before unlock) - validates unsaved code
         currentStep = 'check(new_code)';
@@ -237,8 +249,13 @@ describe('StructureBuilder (using AdtClient)', () => {
         currentStep = 'activate';
         logBuilderTestStep(currentStep);
         await client.getStructure().activate({ structureName: config.structureName });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getStructure().read({ structureName: config.structureName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         currentStep = 'check(active)';
         logBuilderTestStep(currentStep);

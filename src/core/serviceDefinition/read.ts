@@ -13,10 +13,19 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function getServiceDefinition(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive'
+  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
-  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}${version ? `?version=${version}` : ''}`;
+  const queryParams: string[] = [];
+  if (version) {
+    queryParams.push(`version=${version}`);
+  }
+  if (options?.withLongPolling) {
+    queryParams.push('withLongPolling=true');
+  }
+  const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}${query}`;
 
   return connection.makeAdtRequest({
     url,
@@ -34,10 +43,19 @@ export async function getServiceDefinition(
 export async function getServiceDefinitionSource(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'inactive'
+  version: 'active' | 'inactive' | 'workingArea' = 'inactive',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
-  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/source/main${version ? `?version=${version}` : ''}`;
+  const queryParams: string[] = [];
+  if (version) {
+    queryParams.push(`version=${version}`);
+  }
+  if (options?.withLongPolling) {
+    queryParams.push('withLongPolling=true');
+  }
+  const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/source/main${query}`;
 
   return connection.makeAdtRequest({
     url,
@@ -57,10 +75,12 @@ export async function getServiceDefinitionSource(
  */
 export async function getServiceDefinitionTransport(
   connection: IAbapConnection,
-  serviceDefinitionName: string
+  serviceDefinitionName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
-  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/srvd/sources/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

@@ -245,7 +245,13 @@ describe('TableBuilder (using AdtClient)', () => {
             transportRequest: config.transportRequest
           }, { activateOnCreate: false, sourceCode: updatedDdlCode });
           tableCreated = true;
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+          // Wait for object to be ready using long polling
+          try {
+            await client.getTable().read({ tableName: config.tableName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
           
           currentStep = 'check before update';
           logBuilderTestStep(currentStep);
@@ -266,7 +272,13 @@ describe('TableBuilder (using AdtClient)', () => {
           await client.getTable().update({
             tableName: config.tableName
           }, { sourceCode: updatedDdlCode });
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+          // Wait for object to be ready after update using long polling
+          try {
+            await client.getTable().read({ tableName: config.tableName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
         
           // Check with new code (before unlock) - validates unsaved code
           currentStep = 'check(new_code)';
@@ -298,8 +310,13 @@ describe('TableBuilder (using AdtClient)', () => {
           currentStep = 'activate';
           logBuilderTestStep(currentStep);
           await client.getTable().activate({ tableName: config.tableName });
-          // Wait for activation to complete (activation is asynchronous)
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+          // Wait for object to be ready after activation using long polling
+          try {
+            await client.getTable().read({ tableName: config.tableName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
           
           currentStep = 'check(active)';
           logBuilderTestStep(currentStep);

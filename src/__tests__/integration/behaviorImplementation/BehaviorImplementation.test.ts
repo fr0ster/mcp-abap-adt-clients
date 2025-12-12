@@ -312,10 +312,15 @@ ENDCLASS.`;
         const checkResult1 = checkResult1State?.checkResult;
         expect(checkResult1?.status).toBeDefined();
         
-        const createDelay = getOperationDelay('create', testCase);
-        if (createDelay > 0) {
-          logBuilderTestStep(`wait (after create ${createDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, createDelay));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getBehaviorImplementation().read({ 
+            className: config.className,
+            behaviorDefinition: config.behaviorDefinition
+          }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('read');
@@ -338,10 +343,15 @@ ENDCLASS.`;
           behaviorDefinition: config.behaviorDefinition
         }, { sourceCode: config.sourceCode });
         
-        const updateDelay = getOperationDelay('update', testCase);
-        if (updateDelay > 0) {
-          logBuilderTestStep(`wait (after update ${updateDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, updateDelay));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getBehaviorImplementation().read({ 
+            className: config.className,
+            behaviorDefinition: config.behaviorDefinition
+          }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('check(inactive)');
@@ -352,10 +362,15 @@ ENDCLASS.`;
         logBuilderTestStep('activate');
         await client.getClass().activate({ className: config.className });
         
-        const activateDelay = getOperationDelay('activate', testCase);
-        if (activateDelay > 0) {
-          logBuilderTestStep(`wait (after activate ${activateDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, activateDelay));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getBehaviorImplementation().read({ 
+            className: config.className,
+            behaviorDefinition: config.behaviorDefinition
+          }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('check(active)');

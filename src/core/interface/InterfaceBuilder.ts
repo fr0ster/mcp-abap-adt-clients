@@ -318,10 +318,18 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<IInterfaceConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IInterfaceConfig | undefined> {
     try {
       this.logger?.info('Reading interface:', this.config.interfaceName);
-      const result = await getInterfaceSource(this.connection, this.config.interfaceName);
+      const result = await getInterfaceSource(
+        this.connection,
+        this.config.interfaceName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Interface read successfully:', result.status);

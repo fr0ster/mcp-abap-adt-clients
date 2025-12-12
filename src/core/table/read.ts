@@ -14,9 +14,10 @@ import { readObjectSource } from '../shared/readSource';
  */
 export async function getTableMetadata(
   connection: IAbapConnection,
-  tableName: string
+  tableName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'table', tableName);
+  return readObjectMetadata(connection, 'table', tableName, undefined, options);
 }
 
 /**
@@ -24,9 +25,11 @@ export async function getTableMetadata(
  */
 export async function getTableSource(
   connection: IAbapConnection,
-  tableName: string
+  tableName: string,
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'table', tableName);
+  return readObjectSource(connection, 'table', tableName, undefined, version, options);
 }
 
 /**
@@ -48,10 +51,12 @@ export async function getTable(
  */
 export async function getTableTransport(
   connection: IAbapConnection,
-  tableName: string
+  tableName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableName);
-  const url = `/sap/bc/adt/ddic/tables/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/tables/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

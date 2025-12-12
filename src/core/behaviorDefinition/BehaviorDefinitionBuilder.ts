@@ -365,10 +365,19 @@ export class BehaviorDefinitionBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'inactive'): Promise<this> {
+  async read(
+    version: 'active' | 'inactive' = 'inactive',
+    options?: { withLongPolling?: boolean }
+  ): Promise<this> {
     try {
       this.logger?.info('Reading behavior definition metadata:', this.config.name);
-      const result = await read(this.connection, this.config.name, version);
+      const result = await read(
+        this.connection,
+        this.config.name,
+        '',
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       this.state.readResult = result;
       this.logger?.info('Behavior definition read successfully:', result.status);
       return this;

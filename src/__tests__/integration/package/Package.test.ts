@@ -295,10 +295,12 @@ describe('PackageBuilder (using AdtClient)', () => {
         const checkResult1 = checkResult1State?.checkResult;
         expect(checkResult1?.status).toBeDefined();
         
-        const createDelay = getOperationDelay('create', testCase);
-        if (createDelay > 0) {
-          logBuilderTestStep(`wait (after create ${createDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, createDelay));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getPackage().read({ packageName: config.packageName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         currentStep = 'check before update';
@@ -318,10 +320,12 @@ describe('PackageBuilder (using AdtClient)', () => {
           updatedDescription: config.updatedDescription || config.description || ''
         });
         
-        const updateDelay = getOperationDelay('update', testCase);
-        if (updateDelay > 0) {
-          logBuilderTestStep(`wait (after update ${updateDelay}ms)`);
-          await new Promise(resolve => setTimeout(resolve, updateDelay));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getPackage().read({ packageName: config.packageName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
         }
         
         logBuilderTestStep('check(active)');

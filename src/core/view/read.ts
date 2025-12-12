@@ -14,9 +14,10 @@ import { readObjectSource } from '../shared/readSource';
  */
 export async function getViewMetadata(
   connection: IAbapConnection,
-  viewName: string
+  viewName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'view', viewName);
+  return readObjectMetadata(connection, 'view', viewName, undefined, options);
 }
 
 /**
@@ -24,9 +25,11 @@ export async function getViewMetadata(
  */
 export async function getViewSource(
   connection: IAbapConnection,
-  viewName: string
+  viewName: string,
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'view', viewName);
+  return readObjectSource(connection, 'view', viewName, undefined, version, options);
 }
 
 /**
@@ -48,10 +51,12 @@ export async function getView(
  */
 export async function getViewTransport(
   connection: IAbapConnection,
-  viewName: string
+  viewName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(viewName);
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

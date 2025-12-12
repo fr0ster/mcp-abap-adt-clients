@@ -302,14 +302,18 @@ export class FunctionModuleBuilder implements IBuilder<IFunctionModuleState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<IFunctionModuleConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IFunctionModuleConfig | undefined> {
     try {
       this.logger?.info('Reading function module:', this.config.functionModuleName);
       const result = await getFunctionSource(
         this.connection,
         this.config.functionModuleName,
         this.config.functionGroupName,
-        version
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;

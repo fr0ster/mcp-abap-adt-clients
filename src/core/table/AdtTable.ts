@@ -96,6 +96,20 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       objectCreated = true;
       this.logger?.info?.('Table created');
 
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { tableName: config.tableName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created table');
       await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, 'inactive');
@@ -128,6 +142,20 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
           lockHandle
         );
         this.logger?.info?.('Table updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { tableName: config.tableName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -149,9 +177,23 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.logger?.info?.('Step 9: Activating table');
         const activateResponse = await activateTable(this.connection, config.tableName);
         this.logger?.info?.('Table activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { tableName: config.tableName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return { createResult: activateResponse, readResult: readState.readResult, errors: [] };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return { createResult: activateResponse, errors: [] };
       }
 
@@ -197,14 +239,20 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async read(
     config: Partial<ITableConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
 
     try {
-      const readResult = await getTableSource(this.connection, config.tableName);
+      const readResult = await getTableSource(
+        this.connection,
+        config.tableName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return { readResult, errors: [] };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -217,7 +265,10 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   /**
    * Read table metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<ITableConfig>): Promise<ITableState> {
+  async readMetadata(
+    config: Partial<ITableConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<ITableState> {
     const state: ITableState = { errors: [] };
     if (!config.tableName) {
       const error = new Error('Table name is required');
@@ -225,7 +276,11 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       throw error;
     }
     try {
-      const response = await getTableMetadata(this.connection, config.tableName);
+      const response = await getTableMetadata(
+        this.connection,
+        config.tableName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Table metadata read successfully');
       return state;
@@ -240,7 +295,10 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   /**
    * Read transport request information for the table
    */
-  async readTransport(config: Partial<ITableConfig>): Promise<ITableState> {
+  async readTransport(
+    config: Partial<ITableConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<ITableState> {
     const state: ITableState = { errors: [] };
     if (!config.tableName) {
       const error = new Error('Table name is required');
@@ -248,7 +306,11 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       throw error;
     }
     try {
-      const response = await getTableTransport(this.connection, config.tableName);
+      const response = await getTableTransport(
+        this.connection,
+        config.tableName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Table transport request read successfully');
       return state;
@@ -302,6 +364,20 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
           lockHandle
         );
         this.logger?.info?.('Table updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { tableName: config.tableName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -323,9 +399,27 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.logger?.info?.('Step 6: Activating table');
         const activateResponse = await activateTable(this.connection, config.tableName);
         this.logger?.info?.('Table activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { tableName: config.tableName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return {
+              activateResult: activateResponse,
+              readResult: readState.readResult,
+              errors: []
+            };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return {
           activateResult: activateResponse,
           errors: []

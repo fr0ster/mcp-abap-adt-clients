@@ -129,6 +129,20 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       objectCreated = true;
       this.logger?.info?.('Program created');
 
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { programName: config.programName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (stateful still set from create)
       this.logger?.info?.('Step 3: Checking created program');
       const checkResponse1 = await checkProgram(this.connection, config.programName, 'inactive');
@@ -164,6 +178,20 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         );
         state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { programName: config.programName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -188,6 +216,23 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         const activateResponse = await activateProgram(this.connection, config.programName);
         state.activateResult = activateResponse;
         this.logger?.info?.('Program activated, status:', activateResponse.status);
+
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { programName: config.programName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       }
 
       return state;
@@ -231,14 +276,20 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async read(
     config: Partial<IProgramConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IProgramState | undefined> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
     try {
-      const response = await getProgramSource(this.connection, config.programName);
+      const response = await getProgramSource(
+        this.connection,
+        config.programName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -254,7 +305,10 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   /**
    * Read program metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IProgramConfig>): Promise<IProgramState> {
+  async readMetadata(
+    config: Partial<IProgramConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IProgramState> {
     const state: IProgramState = { errors: [] };
     if (!config.programName) {
       const error = new Error('Program name is required');
@@ -262,7 +316,11 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       throw error;
     }
     try {
-      const response = await getProgramMetadata(this.connection, config.programName);
+      const response = await getProgramMetadata(
+        this.connection,
+        config.programName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Program metadata read successfully');
       return state;
@@ -322,6 +380,20 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         );
         state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { programName: config.programName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -346,6 +418,23 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         const activateResponse = await activateProgram(this.connection, config.programName);
         state.activateResult = activateResponse;
         this.logger?.info?.('Program activated, status:', activateResponse.status);
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { programName: config.programName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       }
 
       return state;
@@ -490,7 +579,10 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   /**
    * Read transport request information for the program
    */
-  async readTransport(config: Partial<IProgramConfig>): Promise<IProgramState> {
+  async readTransport(
+    config: Partial<IProgramConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IProgramState> {
     const state: IProgramState = {
       errors: []
     };
@@ -506,7 +598,11 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     }
 
     try {
-      const response = await getProgramTransport(this.connection, config.programName);
+      const response = await getProgramTransport(
+        this.connection,
+        config.programName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Transport request read successfully');
       return state;

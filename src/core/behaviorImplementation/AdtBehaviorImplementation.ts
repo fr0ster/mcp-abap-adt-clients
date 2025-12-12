@@ -138,6 +138,21 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
       objectCreated = true;
       this.logger?.info?.('Behavior implementation class created');
 
+      // 2.5. Read with long polling (wait for object to be ready)
+      // Note: AdtClass.create() already includes long polling, but we add another read here for consistency
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { className: config.className },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed - AdtClass.create() sets stateless after unlock)
       this.logger?.info?.('Step 3: Checking created behavior implementation class');
       const checkAfterCreateState = await this.class.check({ className: config.className }, 'inactive');
@@ -171,6 +186,20 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         );
         state.updateResult = updateResponse;
         this.logger?.info?.('Behavior implementation updated');
+
+        // 6.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -196,8 +225,20 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         state.activateResult = activateState.activateResult;
         this.logger?.info?.('Behavior implementation class activated, status:', activateState.activateResult?.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return state with activation result
+        // 9.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return state with activation result
+        }
+        
         return state;
       }
 
@@ -246,7 +287,8 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
    */
   async read(
     config: Partial<IBehaviorImplementationConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IBehaviorImplementationState | undefined> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
@@ -256,7 +298,12 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
     }
 
     try {
-      const response = await getBehaviorImplementationSource(this.connection, config.className, version);
+      const response = await getBehaviorImplementationSource(
+        this.connection,
+        config.className,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.readResult = response;
       return state;
     } catch (error: any) {
@@ -273,7 +320,10 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
   /**
    * Read behavior implementation metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+  async readMetadata(
+    config: Partial<IBehaviorImplementationConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required');
@@ -281,7 +331,11 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
       throw error;
     }
     try {
-      const response = await getBehaviorImplementationMetadata(this.connection, config.className);
+      const response = await getBehaviorImplementationMetadata(
+        this.connection,
+        config.className,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Behavior implementation metadata read successfully');
       return state;
@@ -296,7 +350,10 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
   /**
    * Read transport request information for the behavior implementation
    */
-  async readTransport(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+  async readTransport(
+    config: Partial<IBehaviorImplementationConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required');
@@ -304,7 +361,11 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
       throw error;
     }
     try {
-      const response = await getBehaviorImplementationTransport(this.connection, config.className);
+      const response = await getBehaviorImplementationTransport(
+        this.connection,
+        config.className,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Behavior implementation transport request read successfully');
       return state;
@@ -361,6 +422,20 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         );
         state.updateResult = updateResponse;
         this.logger?.info?.('Behavior implementation updated');
+
+        // 3.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -386,8 +461,20 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         state.activateResult = activateState.activateResult;
         this.logger?.info?.('Behavior implementation class activated, status:', activateState.activateResult?.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return state with activation result
+        // 6.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { className: config.className },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return state with activation result
+        }
+        
         return state;
       }
 

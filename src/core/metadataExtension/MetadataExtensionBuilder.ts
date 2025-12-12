@@ -174,12 +174,16 @@ export class MetadataExtensionBuilder {
     }
   }
 
-  async read(): Promise<this> {
+  async read(
+    version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean }
+  ): Promise<this> {
     try {
       this.logger?.info('Reading metadata extension metadata:', this.config.name);
       const result = await readMetadataExtension(
         this.connection,
-        this.config.name
+        this.config.name,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
       );
       this.state.readResult = result;
       this.logger?.info('Metadata extension metadata read successfully');

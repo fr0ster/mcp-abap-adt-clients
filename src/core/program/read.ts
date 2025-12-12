@@ -14,9 +14,10 @@ import { readObjectSource } from '../shared/readSource';
  */
 export async function getProgramMetadata(
   connection: IAbapConnection,
-  programName: string
+  programName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'program', programName);
+  return readObjectMetadata(connection, 'program', programName, undefined, options);
 }
 
 /**
@@ -24,9 +25,11 @@ export async function getProgramMetadata(
  */
 export async function getProgramSource(
   connection: IAbapConnection,
-  programName: string
+  programName: string,
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'program', programName);
+  return readObjectSource(connection, 'program', programName, undefined, version, options);
 }
 
 /**
@@ -48,10 +51,12 @@ export async function getProgram(
  */
 export async function getProgramTransport(
   connection: IAbapConnection,
-  programName: string
+  programName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(programName);
-  const url = `/sap/bc/adt/programs/programs/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/programs/programs/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

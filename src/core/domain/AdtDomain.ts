@@ -87,7 +87,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     const systemInfo = await getSystemInformation(this.connection);
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
-    const timeout = options?.timeout || 1000;
     const state: IDomainState = {
       errors: []
     };
@@ -128,6 +127,20 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('created');
+
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { domainName: config.domainName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('check(inactive)');
@@ -176,6 +189,20 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         );
         // updateDomain returns void, so we don't store it in state
         this.logger?.info?.('updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { domainName: config.domainName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -200,6 +227,23 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         const activateResponse = await activateDomain(this.connection, config.domainName);
         state.activateResult = activateResponse;
         this.logger?.info?.('activated');
+
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { domainName: config.domainName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       } else {
         // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
         const readResponse = await getDomain(this.connection, config.domainName);
@@ -322,7 +366,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     const systemInfo = await getSystemInformation(this.connection);
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
-    const timeout = options?.timeout || 1000;
     const state: IDomainState = {
       errors: []
     };
@@ -369,6 +412,20 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         );
         // updateDomain returns void, so we don't store it in state
         this.logger?.info?.('updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { domainName: config.domainName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -393,6 +450,23 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         const activateResponse = await activateDomain(this.connection, config.domainName);
         state.activateResult = activateResponse;
         this.logger?.info?.('activated');
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { domainName: config.domainName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       } else {
         // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
         const readResponse = await getDomain(this.connection, config.domainName);

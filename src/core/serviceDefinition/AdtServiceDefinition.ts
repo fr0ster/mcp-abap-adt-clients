@@ -114,6 +114,20 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
       objectCreated = true;
       this.logger?.info?.('Service definition created');
 
+      // 2.5. Read with long polling (wait for object to be ready)
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { serviceDefinitionName: config.serviceDefinitionName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created service definition');
       await checkServiceDefinition(this.connection, config.serviceDefinitionName, 'inactive');
@@ -146,6 +160,20 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
           lockHandle
         );
         this.logger?.info?.('Service definition updated');
+
+        // 6.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { serviceDefinitionName: config.serviceDefinitionName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -168,8 +196,20 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
         const activateResponse = await activateServiceDefinition(this.connection, config.serviceDefinitionName);
         this.logger?.info?.('Service definition activated, status:', activateResponse.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+        // 9.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { serviceDefinitionName: config.serviceDefinitionName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return activation response
+        }
+        
         return {
           activateResult: activateResponse,
           errors: []
@@ -225,7 +265,8 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
    */
   async read(
     config: Partial<IServiceDefinitionConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IServiceDefinitionState | undefined> {
     const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
@@ -235,7 +276,12 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
     }
 
     try {
-      const response = await getServiceDefinitionSource(this.connection, config.serviceDefinitionName, version);
+      const response = await getServiceDefinitionSource(
+        this.connection,
+        config.serviceDefinitionName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.readResult = response;
       return state;
     } catch (error: any) {
@@ -249,7 +295,10 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
   /**
    * Read service definition metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IServiceDefinitionConfig>): Promise<IServiceDefinitionState> {
+  async readMetadata(
+    config: Partial<IServiceDefinitionConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IServiceDefinitionState> {
     const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
       const error = new Error('Service definition name is required');
@@ -257,7 +306,12 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
       throw error;
     }
     try {
-      const response = await getServiceDefinition(this.connection, config.serviceDefinitionName);
+      const response = await getServiceDefinition(
+        this.connection,
+        config.serviceDefinitionName,
+        'inactive',
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Service definition metadata read successfully');
       return state;
@@ -272,7 +326,10 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
   /**
    * Read transport request information for the service definition
    */
-  async readTransport(config: Partial<IServiceDefinitionConfig>): Promise<IServiceDefinitionState> {
+  async readTransport(
+    config: Partial<IServiceDefinitionConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IServiceDefinitionState> {
     const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
       const error = new Error('Service definition name is required');
@@ -280,7 +337,11 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
       throw error;
     }
     try {
-      const response = await getServiceDefinitionTransport(this.connection, config.serviceDefinitionName);
+      const response = await getServiceDefinitionTransport(
+        this.connection,
+        config.serviceDefinitionName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Service definition transport request read successfully');
       return state;
@@ -337,6 +398,20 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
           lockHandle
         );
         this.logger?.info?.('Service definition updated');
+
+        // 3.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { serviceDefinitionName: config.serviceDefinitionName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -359,8 +434,20 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
         const activateResponse = await activateServiceDefinition(this.connection, config.serviceDefinitionName);
         this.logger?.info?.('Service definition activated, status:', activateResponse.status);
         
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+        // 6.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { serviceDefinitionName: config.serviceDefinitionName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return activation response
+        }
+        
         return {
           activateResult: activateResponse,
           errors: []

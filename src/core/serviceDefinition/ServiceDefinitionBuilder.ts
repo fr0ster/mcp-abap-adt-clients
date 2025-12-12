@@ -136,10 +136,18 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
     }
   }
 
-  async read(): Promise<IServiceDefinitionConfig | undefined> {
+  async read(
+    version?: 'active' | 'inactive' | 'workingArea',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IServiceDefinitionConfig | undefined> {
     try {
       this.logger?.info('Reading service definition:', this.config.serviceDefinitionName);
-      const result = await getServiceDefinition(this.connection, this.config.serviceDefinitionName);
+      const result = await getServiceDefinition(
+        this.connection,
+        this.config.serviceDefinitionName,
+        version || 'inactive',
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Service definition read successfully:', result.status);

@@ -337,8 +337,13 @@ describe('ClassBuilder (using AdtClient)', () => {
             transportRequest: resolveTransportRequest(testCase.params.transport_request)
           }, { activateOnCreate: false });
           classCreated = true;
-          const createDelay = getOperationDelay('create', testCase);
-          await new Promise(resolve => setTimeout(resolve, createDelay));
+          // Wait for object to be ready using long polling
+          try {
+            await client.getClass().read({ className: testClassName! }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
 
           currentStep = 'check with source code (before update)';
           logBuilderTestStep(currentStep);
@@ -362,7 +367,13 @@ describe('ClassBuilder (using AdtClient)', () => {
           await client.getClass().update({
             className: testClassName
           }, { sourceCode: sourceCode });
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+          // Wait for object to be ready after update using long polling
+          try {
+            await client.getClass().read({ className: testClassName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
 
           currentStep = 'check(inactive)';
           logBuilderTestStep(currentStep);
@@ -373,8 +384,13 @@ describe('ClassBuilder (using AdtClient)', () => {
           currentStep = 'activate';
           logBuilderTestStep(currentStep);
           await client.getClass().activate({ className: testClassName });
-          // Wait for activation to complete (activation is asynchronous)
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+          // Wait for object to be ready after activation using long polling
+          try {
+            await client.getClass().read({ className: testClassName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
 
           currentStep = 'check(active)';
           logBuilderTestStep(currentStep);

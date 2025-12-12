@@ -14,9 +14,10 @@ import { readObjectSource } from '../shared/readSource';
  */
 export async function getStructureMetadata(
   connection: IAbapConnection,
-  structureName: string
+  structureName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'structure', structureName);
+  return readObjectMetadata(connection, 'structure', structureName, undefined, options ? { withLongPolling: options.withLongPolling } : undefined);
 }
 
 /**
@@ -24,9 +25,11 @@ export async function getStructureMetadata(
  */
 export async function getStructureSource(
   connection: IAbapConnection,
-  structureName: string
+  structureName: string,
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'structure', structureName);
+  return readObjectSource(connection, 'structure', structureName, undefined, version, options);
 }
 
 /**
@@ -48,10 +51,12 @@ export async function getStructure(
  */
 export async function getStructureTransport(
   connection: IAbapConnection,
-  structureName: string
+  structureName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(structureName);
-  const url = `/sap/bc/adt/ddic/structures/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/ddic/structures/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

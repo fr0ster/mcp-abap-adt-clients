@@ -143,6 +143,20 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
       objectCreated = true;
       this.logger?.info?.('Behavior definition created');
 
+      // 2.5. Read with long polling (wait for object to be ready)
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { name: config.name },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created behavior definition');
       const checkAfterCreateResponse = await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
@@ -179,6 +193,20 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
         );
         state.updateResult = updateResponse;
         this.logger?.info?.('Behavior definition updated');
+
+        // 6.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -204,8 +232,20 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
         state.activateResult = activateResponse;
         this.logger?.info?.('Behavior definition activated, status:', activateResponse.status);
 
-        // Don't read after activation - object may not be ready yet
-        // Return state with activation result
+        // 9.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return state with activation result
+        }
+        
         return state;
       }
 
@@ -253,7 +293,8 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
    */
   async read(
     config: Partial<IBehaviorDefinitionConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IBehaviorDefinitionState | undefined> {
     const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
@@ -263,7 +304,12 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     }
 
     try {
-      const response = await readSource(this.connection, config.name, version);
+      const response = await readSource(
+        this.connection,
+        config.name,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.readResult = response;
       return state;
     } catch (error: any) {
@@ -280,7 +326,10 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
   /**
    * Read behavior definition metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IBehaviorDefinitionConfig>): Promise<IBehaviorDefinitionState> {
+  async readMetadata(
+    config: Partial<IBehaviorDefinitionConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IBehaviorDefinitionState> {
     const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Behavior definition name is required');
@@ -289,7 +338,13 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     }
     try {
       // Use empty sessionId for metadata read
-      const response = await readBehaviorDefinition(this.connection, config.name, '', 'inactive');
+      const response = await readBehaviorDefinition(
+        this.connection,
+        config.name,
+        '',
+        'inactive',
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Behavior definition metadata read successfully');
       return state;
@@ -304,7 +359,10 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
   /**
    * Read transport request information for the behavior definition
    */
-  async readTransport(config: Partial<IBehaviorDefinitionConfig>): Promise<IBehaviorDefinitionState> {
+  async readTransport(
+    config: Partial<IBehaviorDefinitionConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IBehaviorDefinitionState> {
     const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Behavior definition name is required');
@@ -312,7 +370,11 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
       throw error;
     }
     try {
-      const response = await getBehaviorDefinitionTransport(this.connection, config.name);
+      const response = await getBehaviorDefinitionTransport(
+        this.connection,
+        config.name,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Behavior definition transport request read successfully');
       return state;
@@ -372,6 +434,20 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
         );
         state.updateResult = updateResponse;
         this.logger?.info?.('Behavior definition updated');
+
+        // 3.5. Read with long polling (wait for object to be ready after update)
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -397,8 +473,20 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
         state.activateResult = activateResponse;
         this.logger?.info?.('Behavior definition activated, status:', activateResponse.status);
 
-        // Don't read after activation - object may not be ready yet
-        // Return state with activation result
+        // 6.5. Read with long polling (wait for object to be ready after activation)
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          await this.read(
+            { name: config.name },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - return state with activation result
+        }
+        
         return state;
       }
 

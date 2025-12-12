@@ -243,8 +243,13 @@ describe('ProgramBuilder (using AdtClient)', () => {
             programType: config.programType
           }, { activateOnCreate: false, sourceCode: sourceCode });
           programCreated = true;
-          // Wait for SAP to finish create operation
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+          // Wait for object to be ready using long polling
+          try {
+            await client.getProgram().read({ programName: config.programName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
           
           currentStep = 'check with source code (before update)';
           logBuilderTestStep(currentStep);
@@ -260,7 +265,13 @@ describe('ProgramBuilder (using AdtClient)', () => {
           await client.getProgram().update({
             programName: config.programName
           }, { sourceCode: sourceCode });
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+          // Wait for object to be ready after update using long polling
+          try {
+            await client.getProgram().read({ programName: config.programName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
         
           currentStep = 'check(inactive)';
           logBuilderTestStep(currentStep);
@@ -271,8 +282,13 @@ describe('ProgramBuilder (using AdtClient)', () => {
           currentStep = 'activate';
           logBuilderTestStep(currentStep);
           await client.getProgram().activate({ programName: config.programName });
-          // Wait for activation to complete (activation is asynchronous)
-          await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+          // Wait for object to be ready after activation using long polling
+          try {
+            await client.getProgram().read({ programName: config.programName }, 'active', { withLongPolling: true });
+          } catch (readError) {
+            testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+            // Continue anyway - check might still work
+          }
           
           currentStep = 'check(active)';
           logBuilderTestStep(currentStep);

@@ -118,6 +118,20 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
       objectCreated = true;
       this.logger?.info?.('Function group created');
 
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { functionGroupName: config.functionGroupName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created function group');
       await checkFunctionGroup(this.connection, config.functionGroupName, 'inactive');
@@ -130,9 +144,27 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
         this.logger?.info?.('Step 4: Activating function group');
         const activateResponse = await activateFunctionGroup(this.connection, config.functionGroupName);
         this.logger?.info?.('Function group activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 4.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { functionGroupName: config.functionGroupName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return {
+              createResult: activateResponse,
+              readResult: readState.readResult,
+              errors: []
+            };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return {
           createResult: activateResponse,
           errors: []
@@ -172,14 +204,19 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
    */
   async read(
     config: Partial<IFunctionGroupConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IFunctionGroupState | undefined> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
     }
 
     try {
-      const response = await getFunctionGroup(this.connection, config.functionGroupName);
+      const response = await getFunctionGroup(
+        this.connection,
+        config.functionGroupName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -196,7 +233,10 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
    * Read function group metadata (object characteristics: package, responsible, description, etc.)
    * For function groups, read() already returns metadata since there's no source code.
    */
-  async readMetadata(config: Partial<IFunctionGroupConfig>): Promise<IFunctionGroupState> {
+  async readMetadata(
+    config: Partial<IFunctionGroupConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IFunctionGroupState> {
     const state: IFunctionGroupState = { errors: [] };
     if (!config.functionGroupName) {
       const error = new Error('Function group name is required');
@@ -205,7 +245,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
     }
     try {
       // For objects without source code, read() already returns metadata
-      const readState = await this.read(config);
+      const readState = await this.read(config, 'active', options);
       if (readState) {
         state.metadataResult = readState.readResult;
         state.readResult = readState.readResult;
@@ -227,7 +267,10 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
   /**
    * Read transport request information for the function group
    */
-  async readTransport(config: Partial<IFunctionGroupConfig>): Promise<IFunctionGroupState> {
+  async readTransport(
+    config: Partial<IFunctionGroupConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IFunctionGroupState> {
     const state: IFunctionGroupState = { errors: [] };
     if (!config.functionGroupName) {
       const error = new Error('Function group name is required');
@@ -235,7 +278,11 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
       throw error;
     }
     try {
-      const response = await getFunctionGroupTransport(this.connection, config.functionGroupName);
+      const response = await getFunctionGroupTransport(
+        this.connection,
+        config.functionGroupName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Function group transport request read successfully');
       return state;
@@ -283,6 +330,20 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
       });
       this.logger?.info?.('Function group updated');
 
+      // 2.5. Read with long polling to ensure object is ready after update
+      this.logger?.info?.('read (wait for object ready after update)');
+      try {
+        await this.read(
+          { functionGroupName: config.functionGroupName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after update');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed after update:', readError);
+        // Continue anyway - unlock might still work
+      }
+
       // 3. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 3: Unlocking function group');
@@ -302,9 +363,27 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
         this.logger?.info?.('Step 5: Activating function group');
         const activateResponse = await activateFunctionGroup(this.connection, config.functionGroupName);
         this.logger?.info?.('Function group activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 5.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { functionGroupName: config.functionGroupName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return {
+              updateResult: activateResponse,
+              readResult: readState.readResult,
+              errors: []
+            };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return {
           updateResult: activateResponse,
           errors: []

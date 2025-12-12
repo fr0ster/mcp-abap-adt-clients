@@ -198,12 +198,23 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
           transportRequest: config.transportRequest
         }, { activateOnCreate: false });
         functionGroupCreated = true;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getFunctionGroup().read({ functionGroupName: config.functionGroupName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         logBuilderTestStep('activate');
         await client.getFunctionGroup().activate({ functionGroupName: config.functionGroupName });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getFunctionGroup().read({ functionGroupName: config.functionGroupName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         logBuilderTestStep('check');
         // Retry check - activation may take time

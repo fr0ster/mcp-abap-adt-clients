@@ -111,6 +111,20 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       objectCreated = true;
       this.logger?.info?.('View created');
 
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { viewName: config.viewName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created view');
       await checkView(this.connection, config.viewName, 'inactive');
@@ -141,6 +155,20 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           config.transportRequest
         );
         this.logger?.info?.('View updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { viewName: config.viewName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -162,9 +190,26 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.logger?.info?.('Step 9: Activating view');
         const activateResponse = await activateDDLS(this.connection, config.viewName);
         this.logger?.info?.('View activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { viewName: config.viewName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return {
+              readResult: activateResponse,
+              errors: []
+            };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return {
           readResult: activateResponse,
           errors: []
@@ -172,7 +217,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getViewSource(this.connection, config.viewName);
+      const readResponse = await getViewSource(this.connection, config.viewName, 'inactive');
       const ddlSource = typeof readResponse.data === 'string'
         ? readResponse.data
         : JSON.stringify(readResponse.data);
@@ -220,14 +265,20 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    */
   async read(
     config: Partial<IViewConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IViewState | undefined> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
 
     try {
-      const response = await getViewSource(this.connection, config.viewName);
+      const response = await getViewSource(
+        this.connection,
+        config.viewName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -243,7 +294,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   /**
    * Read view metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IViewConfig>): Promise<IViewState> {
+  async readMetadata(
+    config: Partial<IViewConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IViewState> {
     const state: IViewState = { errors: [] };
     if (!config.viewName) {
       const error = new Error('View name is required');
@@ -251,7 +305,11 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       throw error;
     }
     try {
-      const response = await getViewMetadata(this.connection, config.viewName);
+      const response = await getViewMetadata(
+        this.connection,
+        config.viewName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('View metadata read successfully');
       return state;
@@ -266,7 +324,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   /**
    * Read transport request information for the view
    */
-  async readTransport(config: Partial<IViewConfig>): Promise<IViewState> {
+  async readTransport(
+    config: Partial<IViewConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IViewState> {
     const state: IViewState = { errors: [] };
     if (!config.viewName) {
       const error = new Error('View name is required');
@@ -274,7 +335,11 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       throw error;
     }
     try {
-      const response = await getViewTransport(this.connection, config.viewName);
+      const response = await getViewTransport(
+        this.connection,
+        config.viewName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('View transport request read successfully');
       return state;
@@ -326,6 +391,20 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           config.transportRequest
         );
         this.logger?.info?.('View updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { viewName: config.viewName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -347,9 +426,26 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.logger?.info?.('Step 6: Activating view');
         const activateResponse = await activateDDLS(this.connection, config.viewName);
         this.logger?.info?.('View activated, status:', activateResponse.status);
-        
-        // Don't read after activation - object may not be ready yet
-        // Return basic info (activation returns 201)
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { viewName: config.viewName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            return {
+              readResult: activateResponse,
+              errors: []
+            };
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
         return {
           readResult: activateResponse,
           errors: []
@@ -357,7 +453,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getViewSource(this.connection, config.viewName);
+      const readResponse = await getViewSource(this.connection, config.viewName, 'inactive');
       const ddlSource = typeof readResponse.data === 'string'
         ? readResponse.data
         : JSON.stringify(readResponse.data);

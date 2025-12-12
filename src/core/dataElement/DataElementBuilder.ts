@@ -172,10 +172,17 @@ export class DataElementBuilder implements IBuilder<IDataElementState> {
     }
   }
 
-  async read(): Promise<IDataElementConfig | undefined> {
+  async read(
+    version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IDataElementConfig | undefined> {
     try {
       this.logger?.info('Reading data element:', this.config.dataElementName);
-      const result = await getDataElement(this.connection, this.config.dataElementName);
+      const result = await getDataElement(
+        this.connection,
+        this.config.dataElementName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Data element read successfully:', result.status);

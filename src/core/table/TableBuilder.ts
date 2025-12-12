@@ -316,10 +316,18 @@ export class TableBuilder implements IBuilder<ITableState> {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<ITableConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<ITableConfig | undefined> {
     try {
       this.logger?.info('Reading table:', this.config.tableName);
-      const result = await getTableSource(this.connection, this.config.tableName);
+      const result = await getTableSource(
+        this.connection,
+        this.config.tableName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Table read successfully:', result.status);

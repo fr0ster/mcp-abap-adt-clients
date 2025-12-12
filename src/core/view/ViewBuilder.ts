@@ -333,10 +333,18 @@ export class ViewBuilder {
     }
   }
 
-  async read(version: 'active' | 'inactive' = 'active'): Promise<IViewConfig | undefined> {
+  async read(
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
+  ): Promise<IViewConfig | undefined> {
     try {
       this.logger?.info('Reading view:', this.config.viewName);
-      const result = await getViewSource(this.connection, this.config.viewName);
+      const result = await getViewSource(
+        this.connection,
+        this.config.viewName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('View read successfully:', result.status);

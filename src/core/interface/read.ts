@@ -14,9 +14,10 @@ import { readObjectSource } from '../shared/readSource';
  */
 export async function getInterfaceMetadata(
   connection: IAbapConnection,
-  interfaceName: string
+  interfaceName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'interface', interfaceName);
+  return readObjectMetadata(connection, 'interface', interfaceName, undefined, options);
 }
 
 /**
@@ -26,9 +27,10 @@ export async function getInterfaceMetadata(
 export async function getInterfaceSource(
   connection: IAbapConnection,
   interfaceName: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'interface', interfaceName, undefined, version);
+  return readObjectSource(connection, 'interface', interfaceName, undefined, version, options);
 }
 
 /**
@@ -50,10 +52,12 @@ export async function getInterface(
  */
 export async function getInterfaceTransport(
   connection: IAbapConnection,
-  interfaceName: string
+  interfaceName: string,
+  options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(interfaceName);
-  const url = `/sap/bc/adt/oo/interfaces/${encodedName}/transport`;
+  const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+  const url = `/sap/bc/adt/oo/interfaces/${encodedName}/transport${query}`;
 
   return connection.makeAdtRequest({
     url,

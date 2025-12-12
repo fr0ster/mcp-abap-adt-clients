@@ -92,7 +92,6 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
     const systemInfo = await getSystemInformation(this.connection);
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
-    const timeout = options?.timeout || 1000;
     const state: IDataElementState = {
       errors: []
     };
@@ -135,6 +134,20 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
       state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Data element created');
+
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { dataElementName: config.dataElementName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created data element');
@@ -185,6 +198,20 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
         );
         // updateDataElement returns void, so we don't store it in state
         this.logger?.info?.('Data element updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { dataElementName: config.dataElementName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -209,9 +236,26 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
         const activateResponse = await activateDataElement(this.connection, config.dataElementName);
         state.activateResult = activateResponse;
         this.logger?.info?.('Data element activated, status:', activateResponse.status);
+
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { dataElementName: config.dataElementName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       } else {
         // Read if not activated
-        const readResponse = await getDataElement(this.connection, config.dataElementName);
+        const readResponse = await getDataElement(this.connection, config.dataElementName, undefined);
         state.readResult = readResponse;
       }
 
@@ -255,14 +299,19 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
    */
   async read(
     config: Partial<IDataElementConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IDataElementState | undefined> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
     }
 
     try {
-      const response = await getDataElement(this.connection, config.dataElementName);
+      const response = await getDataElement(
+        this.connection,
+        config.dataElementName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -280,7 +329,10 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
    * Read data element metadata (object characteristics: package, responsible, description, etc.)
    * For data elements, read() already returns metadata since there's no source code.
    */
-  async readMetadata(config: Partial<IDataElementConfig>): Promise<IDataElementState> {
+  async readMetadata(
+    config: Partial<IDataElementConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IDataElementState> {
     const state: IDataElementState = { errors: [] };
     if (!config.dataElementName) {
       const error = new Error('Data element name is required');
@@ -289,7 +341,7 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
     }
     try {
       // For objects without source code, read() already returns metadata
-      const readState = await this.read(config);
+      const readState = await this.read(config, 'active', options);
       if (readState) {
         state.metadataResult = readState.readResult;
         state.readResult = readState.readResult;
@@ -327,7 +379,6 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
     }
 
     let lockHandle: string | undefined;
-    const timeout = options?.timeout || 1000;
     const state: IDataElementState = {
       errors: []
     };
@@ -376,6 +427,20 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
         );
         // updateDataElement returns void, so we don't store it in state
         this.logger?.info?.('Data element updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { dataElementName: config.dataElementName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -400,9 +465,26 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
         const activateResponse = await activateDataElement(this.connection, config.dataElementName);
         state.activateResult = activateResponse;
         this.logger?.info?.('Data element activated, status:', activateResponse.status);
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { dataElementName: config.dataElementName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       } else {
         // Read if not activated
-        const readResponse = await getDataElement(this.connection, config.dataElementName);
+        const readResponse = await getDataElement(this.connection, config.dataElementName, undefined);
         state.readResult = readResponse;
       }
 
@@ -527,7 +609,10 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
   /**
    * Read transport request information for the data element
    */
-  async readTransport(config: Partial<IDataElementConfig>): Promise<IDataElementState> {
+  async readTransport(
+    config: Partial<IDataElementConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IDataElementState> {
     const state: IDataElementState = {
       errors: []
     };
@@ -543,7 +628,11 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
     }
 
     try {
-      const response = await getDataElementTransport(this.connection, config.dataElementName);
+      const response = await getDataElementTransport(
+        this.connection,
+        config.dataElementName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Transport request read successfully');
       return state;

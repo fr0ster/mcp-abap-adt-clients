@@ -110,6 +110,20 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       objectCreated = true;
       this.logger?.info?.('Interface created');
 
+      // 2.5. Read with long polling to ensure object is ready
+      this.logger?.info?.('read (wait for object ready)');
+      try {
+        await this.read(
+          { interfaceName: config.interfaceName },
+          'active',
+          { withLongPolling: true }
+        );
+        this.logger?.info?.('object is ready after creation');
+      } catch (readError) {
+        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        // Continue anyway - check might still work
+      }
+
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created interface');
       const checkResponse1 = await checkInterface(this.connection, config.interfaceName, 'inactive');
@@ -145,6 +159,20 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         );
         // upload() returns void, so we don't store it in state
         this.logger?.info?.('Interface updated');
+
+        // 6.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { interfaceName: config.interfaceName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 7. Unlock (obligatory stateless after unlock)
@@ -169,10 +197,25 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         const activateResponse = await activateInterface(this.connection, config.interfaceName);
         state.activateResult = activateResponse;
         this.logger?.info?.('Interface activated, status:', activateResponse.status);
-      }
 
-      // 10. Read (if not activated, read inactive version)
-      if (!options?.activateOnCreate) {
+        // 9.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { interfaceName: config.interfaceName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
+      } else {
+        // Read inactive version if not activated
         const readResponse = await getInterfaceSource(this.connection, config.interfaceName, 'inactive');
         state.readResult = readResponse;
       }
@@ -218,14 +261,20 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
    */
   async read(
     config: Partial<IInterfaceConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean }
   ): Promise<IInterfaceState | undefined> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
 
     try {
-      const response = await getInterfaceSource(this.connection, config.interfaceName, version);
+      const response = await getInterfaceSource(
+        this.connection,
+        config.interfaceName,
+        version,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       return {
         readResult: response,
         errors: []
@@ -242,7 +291,10 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
   /**
    * Read interface metadata (object characteristics: package, responsible, description, etc.)
    */
-  async readMetadata(config: Partial<IInterfaceConfig>): Promise<IInterfaceState> {
+  async readMetadata(
+    config: Partial<IInterfaceConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IInterfaceState> {
     const state: IInterfaceState = { errors: [] };
     if (!config.interfaceName) {
       const error = new Error('Interface name is required');
@@ -250,7 +302,11 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       throw error;
     }
     try {
-      const response = await getInterfaceMetadata(this.connection, config.interfaceName);
+      const response = await getInterfaceMetadata(
+        this.connection,
+        config.interfaceName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.metadataResult = response;
       this.logger?.info?.('Interface metadata read successfully');
       return state;
@@ -309,6 +365,20 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         );
         // upload() returns void, so we don't store it in state
         this.logger?.info?.('Interface updated');
+
+        // 3.5. Read with long polling to ensure object is ready after update
+        this.logger?.info?.('read (wait for object ready after update)');
+        try {
+          await this.read(
+            { interfaceName: config.interfaceName },
+            'active',
+            { withLongPolling: true }
+          );
+          this.logger?.info?.('object is ready after update');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after update:', readError);
+          // Continue anyway - unlock might still work
+        }
       }
 
       // 4. Unlock (obligatory stateless after unlock)
@@ -333,6 +403,23 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         const activateResponse = await activateInterface(this.connection, config.interfaceName);
         state.activateResult = activateResponse;
         this.logger?.info?.('Interface activated, status:', activateResponse.status);
+
+        // 6.5. Read with long polling to ensure object is ready after activation
+        this.logger?.info?.('read (wait for object ready after activation)');
+        try {
+          const readState = await this.read(
+            { interfaceName: config.interfaceName },
+            'active',
+            { withLongPolling: true }
+          );
+          if (readState) {
+            state.readResult = readState.readResult;
+          }
+          this.logger?.info?.('object is ready after activation');
+        } catch (readError) {
+          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          // Continue anyway - activation was successful
+        }
       } else {
         // Read inactive version if not activated
         const readResponse = await getInterfaceSource(this.connection, config.interfaceName, 'inactive');
@@ -464,7 +551,10 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
   /**
    * Read transport request information for the interface
    */
-  async readTransport(config: Partial<IInterfaceConfig>): Promise<IInterfaceState> {
+  async readTransport(
+    config: Partial<IInterfaceConfig>,
+    options?: { withLongPolling?: boolean }
+  ): Promise<IInterfaceState> {
     const state: IInterfaceState = {
       errors: []
     };
@@ -480,7 +570,11 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
     }
 
     try {
-      const response = await getInterfaceTransport(this.connection, config.interfaceName);
+      const response = await getInterfaceTransport(
+        this.connection,
+        config.interfaceName,
+        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+      );
       state.transportResult = response;
       this.logger?.info?.('Transport request read successfully');
       return state;

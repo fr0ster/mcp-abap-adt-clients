@@ -27,9 +27,11 @@ export async function read(
     connection: IAbapConnection,
     name: string,
     sessionId: string,
-    version: string = 'inactive'
+    version: string = 'inactive',
+    options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?version=${version}`;
+    const query = options?.withLongPolling ? `&withLongPolling=true` : '';
+    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?version=${version}${query}`;
 
     const headers = {
         'Accept': 'application/vnd.sap.adt.blues.v1+xml'
@@ -63,9 +65,11 @@ export async function read(
 export async function readSource(
     connection: IAbapConnection,
     name: string,
-    version: string = 'inactive'
+    version: string = 'inactive',
+    options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main?version=${version}`;
+    const query = options?.withLongPolling ? `&withLongPolling=true` : '';
+    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main?version=${version}${query}`;
 
     const headers = {
         'Accept': 'text/plain'
@@ -87,9 +91,11 @@ export async function readSource(
  */
 export async function getBehaviorDefinitionTransport(
     connection: IAbapConnection,
-    name: string
+    name: string,
+    options?: { withLongPolling?: boolean }
 ): Promise<AxiosResponse> {
-    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/transport`;
+    const query = options?.withLongPolling ? '?withLongPolling=true' : '';
+    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/transport${query}`;
 
     const headers = {
         'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'

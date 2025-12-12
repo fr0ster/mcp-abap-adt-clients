@@ -247,8 +247,13 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
           description: config.description || ''
         }, { activateOnCreate: false, sourceCode: sourceCode });
         serviceDefinitionCreated = true;
-        // Wait for SAP to finish create operation
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
+        // Wait for object to be ready using long polling
+        try {
+          await client.getServiceDefinition().read({ serviceDefinitionName: config.serviceDefinitionName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         currentStep = 'check before update';
         logBuilderTestStep(currentStep);
@@ -269,7 +274,13 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         await client.getServiceDefinition().update({
           serviceDefinitionName: config.serviceDefinitionName
         }, { sourceCode: sourceCode });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+        // Wait for object to be ready after update using long polling
+        try {
+          await client.getServiceDefinition().read({ serviceDefinitionName: config.serviceDefinitionName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         logBuilderTestStep('check(inactive)');
         const checkResultInactiveState = await client.getServiceDefinition().check({ serviceDefinitionName: config.serviceDefinitionName }, 'inactive');
@@ -283,8 +294,13 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         
         logBuilderTestStep('activate');
         await client.getServiceDefinition().activate({ serviceDefinitionName: config.serviceDefinitionName });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+        // Wait for object to be ready after activation using long polling
+        try {
+          await client.getServiceDefinition().read({ serviceDefinitionName: config.serviceDefinitionName }, 'active', { withLongPolling: true });
+        } catch (readError) {
+          testsLogger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          // Continue anyway - check might still work
+        }
         
         logBuilderTestStep('check(active)');
         // Retry check for active version - activation may take time
