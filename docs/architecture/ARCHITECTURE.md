@@ -69,11 +69,14 @@ core/[objectType]/
 ├── delete.ts                    # Low-level delete function
 ├── lock.ts                      # Low-level lock function
 ├── unlock.ts                    # Low-level unlock function
-├── activate.ts                  # Low-level activate function
-├── check.ts                    # Low-level check function
+├── activation.ts                # Low-level activate function
+├── check.ts                     # Low-level check function
 ├── validation.ts                # Low-level validation function
 └── index.ts                     # Module exports
 ```
+
+**Note:** Some modules have additional files:
+- `class/` module includes: `run.ts` (unit test execution), `testclasses.ts` (test class helpers), `includes.ts` (include handling), and `AdtLocalTestClass.ts`, `AdtLocalTypes.ts`, `AdtLocalDefinitions.ts`, `AdtLocalMacros.ts` for local class sections
 
 **Key Components:**
 - **Builder Classes**: Fluent API with method chaining (`builder.create().lock().update().unlock().activate()`)
@@ -94,23 +97,28 @@ core/[objectType]/
 - Uses low-level functions directly (not Builder classes internally)
 
 **Factory Methods:**
-- `getClass()` → `IAdtObject<ClassBuilderConfig>`
-- `getProgram()` → `IAdtObject<ProgramBuilderConfig>`
-- `getInterface()` → `IAdtObject<InterfaceBuilderConfig>`
-- `getDomain()` → `IAdtObject<DomainBuilderConfig>`
-- `getDataElement()` → `IAdtObject<DataElementBuilderConfig>`
-- `getStructure()` → `IAdtObject<StructureBuilderConfig>`
-- `getTable()` → `IAdtObject<TableBuilderConfig>`
-- `getView()` → `IAdtObject<ViewBuilderConfig>`
-- `getFunctionGroup()` → `IAdtObject<FunctionGroupBuilderConfig>`
-- `getFunctionModule()` → `IAdtObject<FunctionModuleBuilderConfig>`
-- `getPackage()` → `IAdtObject<PackageBuilderConfig>`
-- `getServiceDefinition()` → `IAdtObject<ServiceDefinitionBuilderConfig>`
-- `getBehaviorDefinition()` → `IAdtObject<BehaviorDefinitionBuilderConfig>`
-- `getBehaviorImplementation()` → `IAdtObject<BehaviorImplementationBuilderConfig>`
-- `getMetadataExtension()` → `IAdtObject<MetadataExtensionBuilderConfig>`
-- `getUnitTest()` → `IAdtObject<IUnitTestBuilderConfig>`
-- `getRequest()` → `IAdtObject<ITransportBuilderConfig>`
+- `getClass()` → `IAdtObject<IClassConfig, IClassState>` - Class CRUD operations
+- `getProgram()` → `IAdtObject<IProgramConfig, IProgramState>` - Program CRUD operations
+- `getInterface()` → `IAdtObject<IInterfaceConfig, IInterfaceState>` - Interface CRUD operations
+- `getDomain()` → `IAdtObject<IDomainConfig, IDomainState>` - Domain CRUD operations
+- `getDataElement()` → `IAdtObject<IDataElementConfig, IDataElementState>` - Data Element CRUD operations
+- `getStructure()` → `IAdtObject<IStructureConfig, IStructureState>` - Structure CRUD operations
+- `getTable()` → `IAdtObject<ITableConfig, ITableState>` - Table CRUD operations
+- `getView()` → `IAdtObject<IViewConfig, IViewState>` - CDS View CRUD operations
+- `getFunctionGroup()` → `IAdtObject<IFunctionGroupConfig, IFunctionGroupState>` - Function Group CRUD operations
+- `getFunctionModule()` → `IAdtObject<IFunctionModuleConfig, IFunctionModuleState>` - Function Module CRUD operations
+- `getPackage()` → `IAdtObject<IPackageConfig, IPackageState>` - Package CRUD operations
+- `getServiceDefinition()` → `IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState>` - Service Definition CRUD operations
+- `getBehaviorDefinition()` → `IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState>` - Behavior Definition CRUD operations
+- `getBehaviorImplementation()` → `IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState>` - Behavior Implementation CRUD operations
+- `getMetadataExtension()` → `IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState>` - Metadata Extension CRUD operations
+- `getUnitTest()` → `IAdtObject<IUnitTestConfig, IUnitTestState>` - ABAP Unit Test operations
+- `getCdsUnitTest()` → `IAdtObject<ICdsUnitTestConfig, ICdsUnitTestState>` - CDS Unit Test operations
+- `getRequest()` → `IAdtObject<ITransportConfig, ITransportState>` - Transport Request CRUD operations
+- `getLocalTestClass()` → `IAdtObject<ILocalTestClassConfig, IClassState>` - Local Test Class operations
+- `getLocalTypes()` → `IAdtObject<ILocalTypesConfig, IClassState>` - Local Types operations
+- `getLocalDefinitions()` → `IAdtObject<ILocalDefinitionsConfig, IClassState>` - Local Definitions operations
+- `getLocalMacros()` → `IAdtObject<ILocalMacrosConfig, IClassState>` - Local Macros operations
 - `getUtils()` → `AdtUtils` (utility functions, NOT CRUD operations)
 
 **Methods (via IAdtObject):**
@@ -180,16 +188,19 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 - Transport Request, ABAP AST, Semantic Analysis, System Symbols
 
 **Key Methods:**
-- `getClass(name)` - Read class metadata
-- `getProgram(name)` - Read program source code
-- `getTable(name)` - Read table definition
-- `getView(name)` - Read CDS view definition
-- `searchObject(query, objectType?)` - Search for objects
-- `getWhereUsed(name, type)` - Find where object is used
-- `getTransport(transportNumber)` - Read transport request
-- `getSqlQuery(sqlQuery, rowNumber?)` - Execute SQL query
-- `getTableContents(tableName, maxRows?)` - Read table contents
-- And other read operations defined by Builders
+- `readClass(className)` - Read class metadata and source code
+- `readProgram(programName)` - Read program source code
+- `readInterface(interfaceName)` - Read interface source code
+- `readDomain(domainName)` - Read domain definition
+- `readDataElement(dataElementName)` - Read data element definition
+- `readStructure(structureName)` - Read structure definition
+- `readTable(tableName)` - Read table definition
+- `readView(viewName)` - Read CDS view definition
+- `readFunctionGroup(functionGroupName)` - Read function group
+- `readFunctionModule(functionModuleName, functionGroupName)` - Read function module
+- `readPackage(packageName)` - Read package definition
+- `readServiceDefinition(serviceDefinitionName)` - Read service definition
+- `readTransport(transportRequest)` - Read transport request
 
 **Usage:**
 ```typescript
@@ -198,9 +209,9 @@ import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 const client = new ReadOnlyClient(connection);
 
 // Read operations only
-const program = await client.getProgram('Z_MY_PROGRAM');
-const table = await client.getTable('Z_MY_TABLE');
-const classes = await client.searchObject('ZCL_*', 'CLAS/OC');
+const program = await client.readProgram('Z_MY_PROGRAM');
+const table = await client.readTable('Z_MY_TABLE');
+const domain = await client.readDomain('Z_MY_DOMAIN');
 ```
 
 **Benefits:**
@@ -298,11 +309,8 @@ import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 // Import only CrudClient
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
-// Import only ManagementClient
-import { ManagementClient } from '@mcp-abap-adt/adt-clients';
-
 // Import all clients
-import { AdtClient, ReadOnlyClient, CrudClient, ManagementClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, ReadOnlyClient, CrudClient } from '@mcp-abap-adt/adt-clients';
 ```
 
 ### High-Level CRUD API (Recommended)
@@ -336,9 +344,8 @@ const connection = createAbapConnection(config, logger);
 const client = new ReadOnlyClient(connection);
 
 // Read-only operations only
-const program = await client.getProgram('Z_MY_PROGRAM');
-const table = await client.getTable('Z_MY_TABLE');
-const classes = await client.searchObject('ZCL_*', 'CLAS/OC');
+const program = await client.readProgram('Z_MY_PROGRAM');
+const table = await client.readTable('Z_MY_TABLE');
 ```
 
 ### Full CRUD MCP Server
@@ -351,33 +358,38 @@ const connection = createAbapConnection(config, logger);
 const client = new CrudClient(connection);
 
 // Full CRUD functionality
-await client.createProgram({ name: 'Z_NEW_PROG', ... });
-await client.updateProgramSource('Z_NEW_PROG', 'REPORT z_new_prog.');
-await client.deleteObject('Z_NEW_PROG', 'PROG/P');
+await client.createProgram({ programName: 'Z_NEW_PROG', packageName: 'ZPACKAGE', description: 'Test' });
+await client.lockProgram({ programName: 'Z_NEW_PROG' });
+await client.updateProgram({ programName: 'Z_NEW_PROG', sourceCode: 'REPORT z_new_prog.' });
+await client.unlockProgram({ programName: 'Z_NEW_PROG' });
+await client.activateProgram({ programName: 'Z_NEW_PROG' });
+await client.deleteProgram({ programName: 'Z_NEW_PROG' });
 
 // Also has all read-only methods (inherited from ReadOnlyClient)
-const program = await client.getProgram('Z_NEW_PROG');
+const program = await client.readProgram('Z_NEW_PROG');
 ```
 
-### Management Operations Only
+### Utility Operations (via AdtClient)
 
 ```typescript
-import { ManagementClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 
 const connection = createAbapConnection(config, logger);
-const management = new ManagementClient(connection);
+const client = new AdtClient(connection, logger);
 
-// Activation and syntax checking
-await management.activateObject([
+// Get utility functions
+const utils = client.getUtils();
+
+// Search for objects
+await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+
+// Group activation
+await utils.activateObjectsGroup([
   { name: 'Z_CLASS', type: 'CLAS/OC' }
 ]);
-await management.checkObject('Z_CLASS', 'CLAS/OC');
 ```
 
-### Combined Access (Proxy Pattern)
-
-```typescript
 ## Benefits
 
 1. **Reduced Context for LLM:**
@@ -522,8 +534,8 @@ Each core module maintains its own `types.ts` with low-level params and Builder 
 
 **Key Methods:**
 - `setup(options)` - Initialize BaseTester with connection, client, and configuration builder
-- `flowTestAuto(options?)` - Execute full CRUD workflow: validate → create → check → update → activate → cleanup
-- `readTest()` - Read standard object test (for existing SAP objects)
+- `flowTest(config, params, options?)` - Execute full CRUD workflow: validate → create → check → update → activate → cleanup
+- `readTest(objectName, options?)` - Read standard object test (for existing SAP objects)
 - `beforeEach()` - Setup before each test (cleanup existing objects)
 - `afterEach()` - Cleanup after each test (delete created objects)
 - `afterAll()` - Final cleanup (reset connection)
@@ -551,7 +563,7 @@ describe('ClassBuilder (using AdtClient)', () => {
   beforeAll(async () => {
     const connection = createAbapConnection(config, logger);
     const client = new AdtClient(connection, builderLogger);
-    
+
     tester = new BaseTester(
       client.getClass(),
       'Class',
@@ -564,6 +576,7 @@ describe('ClassBuilder (using AdtClient)', () => {
       connection,
       client,
       hasConfig: true,
+      isCloudSystem: false,
       buildConfig: (testCase: any) => ({
         className: testCase.params.class_name,
         packageName: resolvePackageName(testCase.params.package_name),
@@ -584,9 +597,10 @@ describe('ClassBuilder (using AdtClient)', () => {
 
     it('should execute full workflow', async () => {
       const config = tester.getConfig();
-      if (!config) return;
+      const testCase = tester.getTestCase();
+      if (!config || !testCase) return;
 
-      await tester.flowTestAuto({
+      await tester.flowTest(config, testCase.params, {
         sourceCode: config.sourceCode || 'CLASS ... ENDCLASS.',
         updateConfig: { ...config }
       });

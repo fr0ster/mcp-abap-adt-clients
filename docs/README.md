@@ -13,7 +13,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
-- [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `ReadOnlyClient` and `CrudClient`
+- [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `AdtClient`, `ReadOnlyClient`, and `CrudClient`
 - [**STATEFUL_SESSION_GUIDE.md**](usage/STATEFUL_SESSION_GUIDE.md) - Guide for stateful session management
 - [**CHECK_LOCAL_TEST_CLASS.md**](usage/CHECK_LOCAL_TEST_CLASS.md) - Guide for validating ABAP Unit test classes
 - [**DEBUG.md**](usage/DEBUG.md) - Debugging and troubleshooting guide
@@ -24,10 +24,8 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 - [**BUILDER_TEST_PATTERN.md**](development/BUILDER_TEST_PATTERN.md) - Testing patterns for Builder classes
 - [**TEST_CONFIG_SCHEMA.md**](development/TEST_CONFIG_SCHEMA.md) - Test configuration schema and guidelines
-- [**CHECK_METHODS_COVERAGE.md**](development/CHECK_METHODS_COVERAGE.md) - Complete coverage of check methods across all layers
 - [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
-- [**TESTING_READINESS.md**](development/TESTING_READINESS.md) - Testing readiness status for all object types
-- [**ROADMAP.md**](development/ROADMAP.md) - Development roadmap and planned features
+- [**BASE_TESTER_MIGRATION.md**](development/roadmaps/BASE_TESTER_MIGRATION.md) - BaseTester migration status and roadmap
 
 ## Documentation Structure
 
@@ -35,41 +33,53 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 docs/
 ├── README.md                          # This file - documentation index
 ├── architecture/
-│   └── ARCHITECTURE.md               # System architecture and design
+│   ├── ARCHITECTURE.md               # System architecture and design
+│   └── discovery.md                  # ADT Discovery documentation
 ├── usage/
 │   ├── CLIENT_API_REFERENCE.md       # Client API reference
 │   ├── STATEFUL_SESSION_GUIDE.md     # Session management
+│   ├── CHECK_LOCAL_TEST_CLASS.md     # Local test class validation
 │   ├── DEBUG.md                      # Debugging guide
 │   ├── OPERATION_DELAYS.md           # Operation delays (detailed)
 │   └── OPERATION_DELAYS_SUMMARY.md   # Operation delays (summary)
 └── development/
     ├── BUILDER_TEST_PATTERN.md       # Testing patterns
     ├── TEST_CONFIG_SCHEMA.md         # Test configuration
-    ├── CHECK_METHODS_COVERAGE.md     # Check methods coverage (100%)
     ├── UPDATE_CONTENT_TYPES.md       # Update content types reference
-    ├── TESTING_READINESS.md          # Testing readiness status
-    └── ROADMAP.md                    # Development roadmap
+    └── roadmaps/
+        └── BASE_TESTER_MIGRATION.md  # BaseTester migration status
 ```
 
 ## Key Concepts
 
 ### Client Classes
 
-The package provides two main client classes:
+The package provides three main client classes:
 
+- **AdtClient** - High-level CRUD API with automatic operation chains (recommended)
 - **ReadOnlyClient** - For read-only operations (metadata retrieval)
-- **CrudClient** - For full CRUD operations with state management
+- **CrudClient** - For full CRUD operations with state management (extends ReadOnlyClient)
 
 See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method documentation.
 
-### Builder Pattern
+### Usage Examples
 
-All operations use Builder classes for flexible, type-safe configuration:
-
+**Using AdtClient (recommended):**
 ```typescript
-const result = await client.readProgram()
-  .withName('Z_MY_PROGRAM')
-  .execute();
+const client = new AdtClient(connection, logger);
+
+// CRUD operations via IAdtObject
+await client.getClass().create({ className: 'ZCL_TEST', packageName: 'ZPACKAGE', description: 'Test' });
+
+// Utility operations
+const utils = client.getUtils();
+await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
+```
+
+**Using ReadOnlyClient:**
+```typescript
+const client = new ReadOnlyClient(connection);
+const program = await client.readProgram('Z_MY_PROGRAM');
 ```
 
 ### Type System
