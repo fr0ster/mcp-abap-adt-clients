@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.1] - 2025-12-13
+
+### Changed
+- Dependency bumps: `@mcp-abap-adt/interfaces` → `^0.1.16`, `@mcp-abap-adt/logger` → `^0.1.3` (align with latest interfaces/logger releases)
+
 ## [0.2.0] - 2025-12-12
 
 ### Added

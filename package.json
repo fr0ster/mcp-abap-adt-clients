@@ -56,8 +56,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces": "^0.1.15",
-    "@mcp-abap-adt/logger": "^0.1.2",
+    "@mcp-abap-adt/interfaces": "^0.1.16",
+    "@mcp-abap-adt/logger": "^0.1.3",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.2.5",
     "yaml": "^2.3.4"
