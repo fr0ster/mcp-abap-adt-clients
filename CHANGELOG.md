@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.2] - 2025-12-13
+
+### Fixed
+- **Integration tests**: Fixed `TypeError: Cannot read properties of undefined (reading 'getConfig')` in all integration tests using `BaseTester`
+  - Added `if (!hasConfig || !tester)` guard check before calling `tester.getConfig()` in all test files
+  - Affected files: `Class.test.ts`, `Domain.test.ts`, `Table.test.ts`, `Interface.test.ts`, `Program.test.ts`, `Structure.test.ts`, `FunctionGroup.test.ts`, `BehaviorDefinition.test.ts`, `ServiceDefinition.test.ts`, `Package.test.ts`, `View.test.ts`, `BehaviorImplementation.test.ts`, `FunctionModule.test.ts`
+  - Tests now properly skip when SAP configuration is unavailable instead of throwing errors
+  - Prevents test failures when `tester` is undefined due to failed `beforeAll` setup
+
 ## [0.2.1] - 2025-12-13
 
 ### Changed

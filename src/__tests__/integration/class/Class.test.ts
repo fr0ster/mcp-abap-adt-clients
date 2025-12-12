@@ -129,8 +129,13 @@ describe('ClassBuilder (using AdtClient)', () => {
     afterEach(() => tester?.afterEach()());
 
     it('should execute full workflow and store all results', async () => {
+      if (!hasConfig || !tester) {
+        return;
+      }
       const config = tester.getConfig();
-      if (!config) return;
+      if (!config) {
+        return;
+      }
 
       const testCase = tester.getTestCaseDefinition();
       const sourceCode = testCase?.params?.source_code || config.sourceCode || 

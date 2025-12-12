@@ -63,7 +63,7 @@
     "yaml": "^2.3.4"
   },
   "devDependencies": {
-    "@mcp-abap-adt/connection": "^0.2.0",
+    "@mcp-abap-adt/connection": "^0.2.2",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.2.1",
     "dotenv": "^17.2.1",
