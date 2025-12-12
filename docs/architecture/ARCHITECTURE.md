@@ -170,10 +170,8 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 **Purpose:** Read-only operations (GET requests only)
 
 **Architecture:**
-- Stateless client (no session management)
-- Direct HTTP GET requests to ADT endpoints
-- No object locking or modification capabilities
-- Perfect for production systems where write access is not needed
+- Uses Builder read methods under the hood; last-used Builder is stored in internal state for typed getters.
+- No lock/activate/update capabilities exposed; best suited for production-safe reads.
 
 **Supported Object Types:**
 - Class, Program, Interface, Domain, DataElement, Structure, Table, View
@@ -191,7 +189,7 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 - `getTransport(transportNumber)` - Read transport request
 - `getSqlQuery(sqlQuery, rowNumber?)` - Execute SQL query
 - `getTableContents(tableName, maxRows?)` - Read table contents
-- And 30+ more read operations
+- And other read operations defined by Builders
 
 **Usage:**
 ```typescript
@@ -206,10 +204,10 @@ const classes = await client.searchObject('ZCL_*', 'CLAS/OC');
 ```
 
 **Benefits:**
-- Reduced context for LLM (only ~30 tools instead of 58)
+- Reduced context for LLM
 - Security: Cannot modify the system
-- Perfect for production systems
-- Smaller bundle size
+- Suitable for production systems
+- Smaller bundle footprint
 
 ---
 
@@ -281,16 +279,6 @@ const classes = await client.searchObject('ZCL_*', 'CLAS/OC');
 **Delete:**
 - `deleteClass(config: Pick<ClassBuilderConfig, 'className'>)`
 - Similar methods for all object types
-
----
-
-### 4. ManagementClient
-
-**Purpose:** Object management operations (activation, syntax checking)
-
-**Methods:**
-- `activateObject(objects: Array<{name: string, type: string}>)`
-- `checkObject(name: string, type: string, version?: string)`
 
 ---
 
@@ -390,55 +378,6 @@ await management.checkObject('Z_CLASS', 'CLAS/OC');
 ### Combined Access (Proxy Pattern)
 
 ```typescript
-import { ReadOnlyClient, ManagementClient } from '@mcp-abap-adt/adt-clients';
-import { AbapConnection } from '@mcp-abap-adt/connection';
-
-class ReadOnlyWithActivation {
-  private readOnly: ReadOnlyClient;
-  private management: ManagementClient;
-
-  constructor(connection: AbapConnection) {
-    this.readOnly = new ReadOnlyClient(connection);
-    this.management = new ManagementClient(connection);
-  }
-
-  // Delegate to ReadOnlyClient
-  getProgram = this.readOnly.getProgram.bind(this.readOnly);
-  getTable = this.readOnly.getTable.bind(this.readOnly);
-  // ... other read-only methods
-
-  // Delegate to ManagementClient
-  activateObject = this.management.activateObject.bind(this.management);
-  checkObject = this.management.checkObject.bind(this.management);
-}
-```
-
-### Custom Client Composition
-
-```typescript
-import { ReadOnlyClient, CrudClient, ManagementClient } from '@mcp-abap-adt/adt-clients';
-
-// Create a custom client that combines specific functionality
-class CustomAbapClient {
-  private readOnly: ReadOnlyClient;
-  private crud: CrudClient;
-  private management: ManagementClient;
-
-  constructor(connection: AbapConnection) {
-    this.readOnly = new ReadOnlyClient(connection);
-    this.crud = new CrudClient(connection);
-    this.management = new ManagementClient(connection);
-  }
-
-  // Expose only what you need
-  getProgram = this.readOnly.getProgram.bind(this.readOnly);
-  createProgram = this.crud.createProgram.bind(this.crud);
-  activateObject = this.management.activateObject.bind(this.management);
-}
-```
-
----
-
 ## Benefits
 
 1. **Reduced Context for LLM:**
@@ -473,12 +412,21 @@ class CustomAbapClient {
 ```json
 {
   "dependencies": {
-    "@mcp-abap-adt/connection": "workspace:*",
-    "fast-xml-parser": "^5.2.5"
+    "@mcp-abap-adt/interfaces": "^0.1.15",
+    "@mcp-abap-adt/logger": "^0.1.2",
+    "axios": "^1.11.0",
+    "fast-xml-parser": "^5.2.5",
+    "yaml": "^2.3.4"
   },
   "devDependencies": {
+    "@mcp-abap-adt/connection": "^0.2.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.2.1",
-    "typescript": "^5.9.2"
+    "dotenv": "^17.2.1",
+    "jest": "^30.0.5",
+    "ts-jest": "^29.4.1",
+    "typescript": "^5.9.2",
+    "yaml": "^2.8.1"
   }
 }
 ```
@@ -489,54 +437,7 @@ class CustomAbapClient {
 
 ### Logger Interface
 
-All Builders use a unified `IAdtLogger` interface for logging:
-
-```typescript
-// src/utils/logger.ts
-export interface IAdtLogger {
-  debug?(message: string, ...args: unknown[]): void;
-  info?(message: string, ...args: unknown[]): void;
-  warn?(message: string, ...args: unknown[]): void;
-  error?(message: string, ...args: unknown[]): void;
-}
-
-// Empty logger for silent operation
-export const emptyLogger: IAdtLogger = {};
-```
-
-**Features:**
-- All methods are optional (using `?`)
-- Enables silent operation when logging is disabled
-- Unified interface across all Builders
-- Compatible with console, winston, pino, and other loggers
-
-**Usage in Builders:**
-
-```typescript
-import { IAdtLogger, emptyLogger } from '../../utils/logger';
-
-export class ClassBuilder {
-  private logger: IAdtLogger;
-
-  constructor(
-    connection: AbapConnection,
-    config: ClassBuilderConfig,
-    logger?: IAdtLogger
-  ) {
-    this.connection = connection;
-    this.config = config;
-    this.logger = logger || emptyLogger;
-  }
-
-  async lock(name: string): Promise<string> {
-    const lockHandle = await lockObject(/* ... */);
-    this.logger.info?.('Class locked, handle:', lockHandle);
-    return lockHandle;
-  }
-}
-```
-
-**Note:** Lock handles are always logged in **full** (not truncated), making debugging easier.
+Builders and clients rely on the `ILogger` interface from `@mcp-abap-adt/interfaces`; callers inject their own logger or fall back to no-op defaults in clients.
 
 ### Builder Return Types
 
@@ -601,88 +502,7 @@ interface UpdateDomainParams {
 
 ### Type Definition Structure
 
-Each core module (class, program, interface, domain, dataElement, structure, table, view, functionGroup, functionModule, package, transport, behaviorDefinition, metadataExtension, shared) maintains its own `types.ts` file with centralized type definitions.
-
-### Naming Conventions
-
-The package uses **dual naming conventions** to distinguish between low-level operations and high-level Builder API:
-
-#### Low-Level Function Parameters (snake_case)
-
-Used by internal ADT API functions that directly interact with SAP backend:
-
-```typescript
-// Low-level function parameters use snake_case
-export interface CreateClassParams {
-  class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_system?: string;
-  responsible?: string;
-  superclass?: string;
-  final?: boolean;
-  abstract?: boolean;
-  create_protected?: boolean;
-}
-```
-
-#### Builder Configuration (camelCase)
-
-Used by Builder classes that provide fluent API:
-
-```typescript
-// Builder configuration uses camelCase
-export interface ClassBuilderConfig {
-  className: string;
-  description: string;
-  packageName?: string;
-  transportRequest?: string;
-  sourceCode?: string;
-  superclass?: string;
-  final?: boolean;
-  abstract?: boolean;
-  createProtected?: boolean;
-  masterSystem?: string;
-  responsible?: string;
-}
-```
-
-### Type Organization Pattern
-
-Each module's `types.ts` file follows this structure:
-
-```typescript
-// 1. Low-level function parameters (snake_case)
-export interface CreateXxxParams { ... }
-export interface UpdateXxxParams { ... }
-export interface DeleteXxxParams { ... }
-
-// 2. Builder configuration (camelCase)
-export interface XxxBuilderConfig { ... }
-export interface XxxBuilderState { ... }
-```
-
-### Module Exports
-
-Type definitions are exported through module index files:
-
-```typescript
-// src/core/class/index.ts
-export * from './types';           // All type definitions
-export { ClassBuilder } from './ClassBuilder';  // Builder class
-```
-
-This allows consumers to import types directly:
-
-```typescript
-import { 
-  CreateClassParams,      // Low-level parameters
-  ClassBuilderConfig,     // Builder configuration
-  ClassBuilderState,      // Builder state
-  ClassBuilder            // Builder class
-} from '@mcp-abap-adt/adt-clients';
-```
+Each core module maintains its own `types.ts` with low-level params and Builder configs. Low-level casing is mixed in the current codebase: some modules use snake_case (e.g., Domain), others use camelCase (e.g., Program), while Builder configs stay camelCase for fluent APIs. Update conventions per module before relying on a single casing rule.
 
 ---
 
@@ -834,4 +654,3 @@ This allows:
 - Selective imports: Import only what you need
 - Type safety: Full TypeScript support
 - Clear API: Explicit client selection
-
