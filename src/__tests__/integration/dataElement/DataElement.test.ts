@@ -28,6 +28,7 @@ import {
   getHttpStatusText
 } from '../../helpers/builderTestLogger';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
+import { BaseTester } from '../../helpers/BaseTester';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -264,59 +265,6 @@ describe('DataElementBuilder (using AdtClient)', () => {
       }
     });
 
-    /**
-     * Helper: Try to check and update data element
-     * Returns true if update succeeded, false if check failed
-     */
-    async function tryCheckAndUpdate(config: any, testCase: any): Promise<boolean> {
-      try {
-        logBuilderTestStep('check before update');
-        await client.getDataElement().check({ dataElementName: config.dataElementName });
-        
-        logBuilderTestStep('update');
-        await client.getDataElement().update({
-          dataElementName: config.dataElementName,
-          packageName: config.packageName!,
-          description: config.description || '',
-          dataType: config.dataType,
-          length: config.length,
-          decimals: config.decimals,
-          shortLabel: config.shortLabel,
-          mediumLabel: config.mediumLabel,
-          longLabel: config.longLabel,
-          headingLabel: config.headingLabel,
-          typeKind: config.typeKind,
-          typeName: config.typeName
-        });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-        return true;
-      } catch (checkError: any) {
-        testsLogger.error?.('❌ Check failed - skipping update:', checkError.message);
-        return false;
-      }
-    }
-
-    /**
-     * Helper: Activate and verify data element
-     */
-    async function activateAndVerify(config: any, testCase: any): Promise<void> {
-      logBuilderTestStep('check(inactive)');
-      await client.getDataElement().check({ dataElementName: config.dataElementName }, 'inactive');
-      
-      logBuilderTestStep('activate');
-      await client.getDataElement().activate({ dataElementName: config.dataElementName });
-      await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
-      
-      logBuilderTestStep('check(active)');
-      await retryCheckAfterActivate(
-        async () => {
-          const state = await client.getDataElement().check({ dataElementName: config.dataElementName }, 'active');
-          return state?.checkResult;
-        },
-        { maxAttempts: 5, delay: 1000, logger: testsLogger, objectName: config.dataElementName }
-      );
-    }
-
     it('should execute full workflow and store all results', async () => {
       const definition = getBuilderTestDefinition();
       logBuilderTestStart(testsLogger, 'DataElement - full workflow', definition);
@@ -333,61 +281,33 @@ describe('DataElementBuilder (using AdtClient)', () => {
 
       const config = buildBuilderConfig(testCase);
 
-      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
-      const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup = testCase.params.skip_cleanup !== undefined
-        ? testCase.params.skip_cleanup === true
-        : globalSkipCleanup;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
+      // Create BaseTester instance
+      const tester = new BaseTester(
+        client.getDataElement(),
+        'DataElement',
+        'create_data_element',
+        'adt_data_element',
+        testsLogger
+      );
 
       try {
-        // Step 1: Validate
-        logBuilderTestStep('validate');
-        const validationState = await client.getDataElement().validate({
-          dataElementName: config.dataElementName,
-          packageName: config.packageName!,
-          description: config.description || ''
-        });
-        const validationResponse = validationState?.validationResponse;
-        if (validationResponse?.status !== 200) {
-          const errorMessage = extractValidationErrorMessage(validationResponse);
-          logBuilderTestStepError('validate', { response: { status: validationResponse?.status, data: validationResponse?.data } });
-          logBuilderTestSkip(testsLogger, 'DataElement - full workflow', `Validation failed: ${errorMessage} - environment problem, test skipped`);
-          return;
-        }
-        
-        // Step 2: Create
-        logBuilderTestStep('create');
-        await client.getDataElement().create(config, { activateOnCreate: false });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-        
-        // Step 4: Check and Update (may fail - that's OK)
-        const updateSucceeded = await tryCheckAndUpdate(config, testCase);
-        
-        // If check failed, cleanup and exit (if cleanup enabled)
-        if (!updateSucceeded) {
-          if (shouldCleanup) {
-            logBuilderTestStep('delete (cleanup after failed check)');
-            await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
-          } else {
-            testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - data element left for analysis: ${config.dataElementName}`);
+        // Use BaseTester.flowTest() for standardized CRUD flow
+        await tester.flowTest(config, testCase.params, {
+          updateConfig: {
+            dataElementName: config.dataElementName,
+            packageName: config.packageName!,
+            description: config.description || '',
+            dataType: config.dataType,
+            length: config.length,
+            decimals: config.decimals,
+            shortLabel: config.shortLabel,
+            mediumLabel: config.mediumLabel,
+            longLabel: config.longLabel,
+            headingLabel: config.headingLabel,
+            typeKind: config.typeKind,
+            typeName: config.typeName
           }
-          logBuilderTestSkip(testsLogger, 'DataElement - full workflow', 'Check failed - test skipped after cleanup');
-          return;
-        }
-        
-        // Step 6: Activate and verify (only if update succeeded)
-        await activateAndVerify(config, testCase);
-        
-        // Step 7: Cleanup
-        if (shouldCleanup) {
-          logBuilderTestStep('delete (cleanup)');
-          await client.getDataElement().delete({ dataElementName: config.dataElementName, transportRequest: config.transportRequest });
-        } else {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - data element left for analysis: ${config.dataElementName}`);
-        }
+        });
 
         logBuilderTestSuccess(testsLogger, 'DataElement - full workflow');
       } catch (error: any) {
@@ -426,8 +346,18 @@ describe('DataElementBuilder (using AdtClient)', () => {
       }
 
       try {
-        logBuilderTestStep('read');
-        const resultState = await client.getDataElement().read({ dataElementName: standardDataElementName });
+        // Create BaseTester instance
+        const tester = new BaseTester(
+          client.getDataElement(),
+          'DataElement',
+          'create_data_element',
+          'adt_data_element',
+          testsLogger
+        );
+
+        // Use BaseTester.readTest() for standardized read operation
+        const resultState = await tester.readTest({ dataElementName: standardDataElementName });
+        
         expect(resultState).toBeDefined();
         expect(resultState?.readResult).toBeDefined();
         // DataElement read returns data element config - check if dataElementName is present

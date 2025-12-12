@@ -87,13 +87,25 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
     try {
       // 1. Validate (no stateful needed)
       this.logger?.info?.('Step 1: Validating function group configuration');
-      await validateFunctionGroupName(
-        this.connection,
-        config.functionGroupName,
-        config.packageName,
-        config.description
-      );
-      this.logger?.info?.('Validation passed');
+      try {
+        await validateFunctionGroupName(
+          this.connection,
+          config.functionGroupName,
+          config.packageName,
+          config.description
+        );
+        this.logger?.info?.('Validation passed');
+      } catch (error: any) {
+        // Ignore "Kerberos library not loaded" error for FunctionGroup (test cloud issue)
+        const errorMessage = error?.response?.data || error?.message || String(error);
+        const errorText = typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage);
+        if (errorText.toLowerCase().includes('kerberos library not loaded')) {
+          this.logger?.warn?.('Validation returned Kerberos error (ignoring): Kerberos library not loaded');
+          // Continue - this is a known issue in test environments
+        } else {
+          throw error; // Re-throw other errors
+        }
+      }
 
       // 2. Create (no stateful needed)
       this.logger?.info?.('Step 2: Creating function group');

@@ -94,7 +94,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
 
     try {
       // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating domain configuration');
+      this.logger?.info?.('validate');
       const validationResponse = await validateDomainName(
         this.connection,
         config.domainName,
@@ -102,10 +102,10 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         config.description
       );
       state.validationResponse = validationResponse;
-      this.logger?.info?.('Validation passed');
+      this.logger?.info?.('validated');
 
       // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating domain');
+      this.logger?.info?.('create');
       const createResponse = await createDomain(
         this.connection,
         {
@@ -127,33 +127,33 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       );
       state.createResult = createResponse;
       objectCreated = true;
-      this.logger?.info?.('Domain created');
+      this.logger?.info?.('created');
 
       // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created domain');
+      this.logger?.info?.('check(inactive)');
       const checkResponse1 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
       state.checkResult = checkResponse1;
-      this.logger?.info?.('Check after create passed');
+      this.logger?.info?.('checked(inactive)');
 
       // 4. Lock (stateful ONLY before lock)
-      this.logger?.info?.('Step 4: Locking domain');
+      this.logger?.info?.('lock');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
       state.lockHandle = lockHandle;
-      this.logger?.info?.('Domain locked, handle:', lockHandle);
+      this.logger?.info?.('locked');
 
       // 5. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
+        this.logger?.info?.('check(inactive)');
         const checkResponse2 = await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
         state.checkResult = checkResponse2;
-        this.logger?.info?.('Check inactive with update content passed');
+        this.logger?.info?.('checked(inactive)');
       }
 
       // 6. Update (if XML provided)
       if (xmlToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating domain with XML');
+        this.logger?.info?.('update');
         await updateDomain(
           this.connection,
           {
@@ -175,31 +175,31 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
           masterSystem
         );
         // updateDomain returns void, so we don't store it in state
-        this.logger?.info?.('Domain updated');
+        this.logger?.info?.('updated');
       }
 
       // 7. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking domain');
+        this.logger?.info?.('unlock');
         const unlockResponse = await unlockDomain(this.connection, config.domainName, lockHandle);
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger?.info?.('Domain unlocked');
+        this.logger?.info?.('unlocked');
       }
 
       // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
+      this.logger?.info?.('check(inactive)');
       const checkResponse3 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
       state.checkResult = checkResponse3;
-      this.logger?.info?.('Final check passed');
+      this.logger?.info?.('checked(inactive)');
 
       // 9. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating domain');
+        this.logger?.info?.('activate');
         const activateResponse = await activateDomain(this.connection, config.domainName);
         state.activateResult = activateResponse;
-        this.logger?.info?.('Domain activated, status:', activateResponse.status);
+        this.logger?.info?.('activated');
       } else {
         // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
         const readResponse = await getDomain(this.connection, config.domainName);
@@ -325,24 +325,24 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
-      this.logger?.info?.('Step 1: Locking domain');
+      this.logger?.info?.('lock');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
       state.lockHandle = lockHandle;
-      this.logger?.info?.('Domain locked, handle:', lockHandle);
+      this.logger?.info?.('locked');
 
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.('check(inactive)');
         const checkResponse = await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
         state.checkResult = checkResponse;
-        this.logger?.info?.('Check inactive with update content passed');
+        this.logger?.info?.('checked(inactive)');
       }
 
       // 3. Update
       if (lockHandle) {
-        this.logger?.info?.('Step 3: Updating domain');
+        this.logger?.info?.('update');
         await updateDomain(
           this.connection,
           {
@@ -364,31 +364,31 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
           masterSystem
         );
         // updateDomain returns void, so we don't store it in state
-        this.logger?.info?.('Domain updated');
+        this.logger?.info?.('updated');
       }
 
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
-        this.logger?.info?.('Step 4: Unlocking domain');
+        this.logger?.info?.('unlock');
         const unlockResponse = await unlockDomain(this.connection, config.domainName, lockHandle);
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
-        this.logger?.info?.('Domain unlocked');
+        this.logger?.info?.('unlocked');
       }
 
       // 5. Final check (no stateful needed)
-      this.logger?.info?.('Step 5: Final check');
+      this.logger?.info?.('check(inactive)');
       const checkResponse2 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
       state.checkResult = checkResponse2;
-      this.logger?.info?.('Final check passed');
+      this.logger?.info?.('checked(inactive)');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
-        this.logger?.info?.('Step 6: Activating domain');
+        this.logger?.info?.('activate');
         const activateResponse = await activateDomain(this.connection, config.domainName);
         state.activateResult = activateResponse;
-        this.logger?.info?.('Domain activated, status:', activateResponse.status);
+        this.logger?.info?.('activated');
       } else {
         // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
         const readResponse = await getDomain(this.connection, config.domainName);

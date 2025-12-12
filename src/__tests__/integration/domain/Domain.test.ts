@@ -1,6 +1,6 @@
 /**
  * Integration test for DomainBuilder
- * Tests using AdtClient for unified CRUD operations
+ * Tests using AdtClient for unified CRUD operations with BaseTester
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
@@ -14,35 +14,29 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
+import { IDomainConfig, IDomainState } from '../../../core/domain';
 import { getDomain } from '../../../core/domain/read';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { getConfig } from '../../helpers/sessionConfig';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
-  logBuilderTestEnd,
-  logBuilderTestStep,
-  logBuilderTestStepError,
-  getHttpStatusText
+  logBuilderTestEnd
 } from '../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../helpers/testLogger';
+import { BaseTester } from '../../helpers/BaseTester';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getEnabledTestCase,
   getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  ensurePackageConfig,
   resolveStandardObject,
-  getTimeout,
-  getOperationDelay,
-  retryCheckAfterActivate,
-  getEnvironmentConfig
+  getTimeout
 } = require('../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -50,14 +44,10 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-// E2E tests use DEBUG_ADT_E2E_TESTS for test code
-// Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
-// Library code (DomainBuilder) uses DEBUG_ADT_LIBS
-
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
 const connectionLogger: ILogger = createConnectionLogger();
 
-// Library code uses DEBUG_ADT_LIBS
+// Library code (DomainBuilder) uses DEBUG_ADT_LIBS
 const builderLogger: ILogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
@@ -68,6 +58,7 @@ describe('DomainBuilder (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let tester: BaseTester<IDomainConfig, IDomainState>;
 
   beforeAll(async () => {
     try {
@@ -76,244 +67,78 @@ describe('DomainBuilder (using AdtClient)', () => {
       await (connection as any).connect();
       client = new AdtClient(connection, builderLogger);
       hasConfig = true;
-      // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
+
+      tester = new BaseTester(
+        client.getDomain(),
+        'Domain',
+        'create_domain',
+        'adt_domain',
+        testsLogger
+      );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any) => {
+          const params = testCase?.params || {};
+          const packageName = resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('package_name not configured');
+          return {
+            domainName: params.domain_name,
+            packageName,
+            transportRequest: resolveTransportRequest(params.transport_request),
+            description: params.description,
+            datatype: params.datatype || 'CHAR',
+            length: params.length || 10,
+            decimals: params.decimals,
+            conversion_exit: params.conversion_exit,
+            lowercase: params.lowercase,
+            sign_exists: params.sign_exists,
+            value_table: params.value_table,
+            fixed_values: params.fixed_values
+          };
+        },
+        ensureObjectReady: async (domainName: string) => {
+          if (!connection) return { success: true };
+          try {
+            await getDomain(connection, domainName);
+            return { success: false, reason: `⚠️ SAFETY: Domain ${domainName} already exists!` };
+          } catch (error: any) {
+            if (error.response?.status !== 404) {
+              return { success: false, reason: `Cannot verify domain existence: ${error.message}` };
+            }
+          }
+          return { success: true };
+        }
+      });
     } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
 
-  afterAll(async () => {
-    if (connection) {
-      connection.reset();
-    }
-  });
-
-  /**
-   * Pre-check: Verify test domain doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   */
-  async function ensureDomainReady(domainName: string): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if domain exists
-    try {
-      await getDomain(connection, domainName);
-      return {
-        success: false,
-        reason: `⚠️ SAFETY: Domain ${domainName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
-      };
-    } catch (error: any) {
-      // 404 is expected - object doesn't exist, we can proceed
-      if (error.response?.status !== 404) {
-        return {
-          success: false,
-          reason: `Cannot verify domain existence: ${error.message}`
-        };
-      }
-    }
-
-    return { success: true };
-  }
-
-  function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_domain', 'adt_domain');
-  }
-
-  function buildBuilderConfig(testCase: any) {
-    const params = testCase?.params || {};
-    const packageName = resolvePackageName(params.package_name);
-    if (!packageName) {
-      throw new Error('package_name not configured for DomainBuilder test');
-    }
-    return {
-      domainName: params.domain_name,
-      packageName,
-      transportRequest: resolveTransportRequest(params.transport_request),
-      description: params.description,
-      datatype: params.datatype || 'CHAR',
-      length: params.length || 10,
-      decimals: params.decimals,
-      conversion_exit: params.conversion_exit,
-      lowercase: params.lowercase,
-      sign_exists: params.sign_exists,
-      value_table: params.value_table,
-      fixed_values: params.fixed_values
-    };
-  }
+  afterAll(() => tester?.afterAll()());
 
   describe('Full workflow', () => {
-    let testCase: any = null;
-    let domainName: string | null = null;
-    let skipReason: string | null = null;
-
-    beforeEach(async () => {
-      skipReason = null;
-      testCase = null;
-      domainName = null;
-
-      if (!hasConfig) {
-        skipReason = 'No SAP configuration';
-        return;
-      }
-
-      const definition = getBuilderTestDefinition();
-      if (!definition) {
-        skipReason = 'Test case not defined in test-config.yaml';
-        return;
-      }
-
-      const tc = getEnabledTestCase('create_domain', 'adt_domain');
-      if (!tc) {
-        skipReason = 'Test case disabled or not found';
-        return;
-      }
-
-      const packageCheck = ensurePackageConfig(tc.params, 'Domain - full workflow');
-      if (!packageCheck.success) {
-        skipReason = packageCheck.reason || 'Default package is not configured';
-        return;
-      }
-
-      testCase = tc;
-      domainName = tc.params.domain_name;
-
-      // Cleanup before test
-      if (domainName) {
-        const cleanup = await ensureDomainReady(domainName);
-        if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup domain before test';
-          testCase = null;
-          domainName = null;
-        }
-      }
-    });
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
 
     it('should execute full workflow and store all results', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'Domain - full workflow', definition);
-
-      if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'Domain - full workflow', skipReason);
-        return;
-      }
-
-      if (!testCase || !domainName) {
-        logBuilderTestSkip(testsLogger, 'Domain - full workflow', skipReason || 'Test case not available');
-        return;
-      }
-
-      const config = buildBuilderConfig(testCase);
-
-      // Check cleanup settings: cleanup_after_test (global) and skip_cleanup (test-specific or global)
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
-      const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup = testCase.params.skip_cleanup !== undefined
-        ? testCase.params.skip_cleanup === true
-        : globalSkipCleanup;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
-
-      logBuilderTestStep('validate');
-      const validationState = await client.getDomain().validate({
-        domainName: config.domainName,
-        packageName: config.packageName!,
-        description: config.description || ''
-      });
-      const validationResponse = validationState?.validationResponse;
-      if (validationResponse?.status !== 200) {
-        const errorData = typeof validationResponse?.data === 'string' 
-          ? validationResponse.data 
-          : JSON.stringify(validationResponse?.data);
-        console.error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
-      }
-      expect(validationResponse?.status).toBe(200);
+      const config = tester.getConfig();
+      if (!config) return;
       
-      let domainCreated = false;
-      let currentStep = '';
-      
-      try {
-        currentStep = 'create';
-        logBuilderTestStep(currentStep);
-        await client.getDomain().create(config, { activateOnCreate: false });
-        domainCreated = true;
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
-        
-        currentStep = 'check(active)';
-        logBuilderTestStep(currentStep);
-        const checkResultActiveState = await client.getDomain().check({ domainName: config.domainName });
-        const checkResultActive = checkResultActiveState?.checkResult;
-        expect(checkResultActive?.status).toBeDefined();
-        
-        currentStep = 'update';
-        logBuilderTestStep(currentStep);
-        await client.getDomain().update({
+      await tester.flowTestAuto({
+        updateConfig: {
           domainName: config.domainName,
-          packageName: config.packageName!,
+          packageName: config.packageName,
           description: config.description || '',
           datatype: config.datatype,
           length: config.length,
           decimals: config.decimals
-        });
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
-        
-        currentStep = 'check(inactive)';
-        logBuilderTestStep(currentStep);
-        const checkResultInactiveState = await client.getDomain().check({ domainName: config.domainName }, 'inactive');
-        const checkResultInactive = checkResultInactiveState?.checkResult;
-        expect(checkResultInactive?.status).toBeDefined();
-        
-        currentStep = 'activate';
-        logBuilderTestStep(currentStep);
-        await client.getDomain().activate({ domainName: config.domainName });
-        // Wait for activation to complete (activation is asynchronous)
-        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase)));
-        
-        if (shouldCleanup) {
-          currentStep = 'delete (cleanup)';
-          logBuilderTestStep(currentStep);
-          await client.getDomain().delete({
-            domainName: config.domainName,
-            transportRequest: config.transportRequest
-          });
-        } else {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis: ${config.domainName}`);
         }
-
-        logBuilderTestSuccess(testsLogger, 'Domain - full workflow');
-      } catch (error: any) {
-        // Log step error with details before failing test
-        logBuilderTestStepError(currentStep || 'unknown', error);
-        
-        // Cleanup: delete if object was created and cleanup is enabled
-        if (shouldCleanup && domainCreated) {
-          try {
-            logBuilderTestStep('delete (cleanup)');
-            await client.getDomain().delete({
-              domainName: config.domainName,
-              transportRequest: config.transportRequest
-            });
-          } catch (cleanupError) {
-            // Log cleanup error but don't fail test - original error is more important
-            testsLogger.warn?.(`Cleanup failed for ${config.domainName}:`, cleanupError);
-          }
-        } else if (!shouldCleanup && domainCreated) {
-          testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis: ${config.domainName}`);
-        }
-        
-        const statusText = getHttpStatusText(error);
-        const enhancedError = statusText !== 'HTTP ?'
-          ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-          : error;
-        logBuilderTestError(testsLogger, 'Domain - full workflow', enhancedError);
-        throw enhancedError;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'Domain - full workflow');
-      }
+      });
     }, getTimeout('test'));
   });
 
@@ -323,44 +148,41 @@ describe('DomainBuilder (using AdtClient)', () => {
       const standardObject = resolveStandardObject('domain', isCloudSystem, testCase);
 
       if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'DomainBuilder - read standard object', {
+        logBuilderTestStart(testsLogger, 'Domain - read standard object', {
           name: 'read_standard',
           params: {}
         });
-        logBuilderTestSkip(testsLogger, 'DomainBuilder - read standard object',
+        logBuilderTestSkip(testsLogger, 'Domain - read standard object',
           `Standard domain not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
         return;
       }
 
       const standardDomainName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'DomainBuilder - read standard object', {
+      logBuilderTestStart(testsLogger, 'Domain - read standard object', {
         name: 'read_standard',
         params: { domain_name: standardDomainName }
       });
 
       if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'DomainBuilder - read standard object', 'No SAP configuration');
+        logBuilderTestSkip(testsLogger, 'Domain - read standard object', 'No SAP configuration');
         return;
       }
 
       try {
-        logBuilderTestStep('read');
-        const resultState = await client.getDomain().read({ domainName: standardDomainName });
-        expect(resultState).toBeDefined();
+        const resultState = await tester.readTest({ domainName: standardDomainName });
         expect(resultState?.readResult).toBeDefined();
-        // Domain read returns domain config - check if domainName is present
         const domainConfig = resultState?.readResult;
         if (domainConfig && typeof domainConfig === 'object' && 'domainName' in domainConfig) {
           expect((domainConfig as any).domainName).toBe(standardDomainName);
           expect((domainConfig as any).description).toBeDefined();
         }
 
-        logBuilderTestSuccess(testsLogger, 'DomainBuilder - read standard object');
+        logBuilderTestSuccess(testsLogger, 'Domain - read standard object');
       } catch (error) {
-        logBuilderTestError(testsLogger, 'DomainBuilder - read standard object', error);
+        logBuilderTestError(testsLogger, 'Domain - read standard object', error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, 'DomainBuilder - read standard object');
+        logBuilderTestEnd(testsLogger, 'Domain - read standard object');
       }
     }, getTimeout('test'));
   });
