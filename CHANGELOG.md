@@ -45,6 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Usage: `npm run discovery:markdown` or `npm run discovery:markdown -- --output custom-discovery.md`
   - See [Tools Documentation](tools/README.md) for details
   - Output: `docs/architecture/discovery.md` (default) or custom path
+- **Long-polling test helper**: `scripts/test-long-polling-read.ts` for targeted validation of long-polling read flows
 
 ### Changed
 - **Migration from Timeouts to Long Polling**: All `AdtObject` implementations now use long polling instead of fixed timeouts
@@ -70,6 +71,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Introduced `BaseTester` class for standardized integration test workflows
   - 13/15 object-specific tests now use `BaseTester` for consistent CRUD testing patterns
   - Separated unit test logic from integration tests (`Class.test.ts`, `View.test.ts`) for better separation of concerns
+- **Logging utilities**: `ILogger` now comes from `@mcp-abap-adt/interfaces`; legacy `src/utils/logger.ts` removed in favor of package-provided types and no-op defaults in clients
 
 ### Fixed
 - **DataElement Check**: Fixed handling of empty data elements after create
@@ -92,6 +94,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Updated IAdtOperationOptions documentation to clarify timeout vs withLongPolling usage
 - Added BaseTester migration roadmap documenting test refactoring progress (13/15 tests migrated, 87%)
 - Roadmap execution summary: ~95% complete (core functionality complete, documentation pending)
+
+### Removed
+- **CLI tools**: Removed legacy bin scripts (`lock-object`, `unlock-object`, `manage-locks`, `manage-sessions`, `unlock-test-objects`) and their README; repository now ships only the TypeScript/JS client APIs
+- **Lock state helper**: Removed unused `src/utils/lockStateManager.ts` in favor of explicit lock handling inside builders and high-level clients
 
 ## [0.1.40] - 2025-12-08
 
