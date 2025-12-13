@@ -3,7 +3,7 @@
 This guide explains how the `@mcp-abap-adt/adt-clients` package manages **stateful ADT sessions** when Builders or high-level clients execute workflows such as `lock → update → unlock`.  
 Use it together with:
 
-- [`../../doc/architecture/STATEFUL_SESSION_GUIDE.md`](../../doc/architecture/STATEFUL_SESSION_GUIDE.md) – server/handler orchestration guide
+- [`../../docs/architecture/STATEFUL_SESSION_GUIDE.md`](../../docs/architecture/STATEFUL_SESSION_GUIDE.md) – server/handler orchestration guide
 - [`../../connection/docs/STATEFUL_SESSION_GUIDE.md`](../../connection/docs/STATEFUL_SESSION_GUIDE.md) – connection-layer session storage
 
 ---
@@ -101,7 +101,7 @@ await lockClient.unlock({
 
 ## See Also
 
-- [`../../doc/architecture/STATEFUL_SESSION_GUIDE.md`](../../doc/architecture/STATEFUL_SESSION_GUIDE.md) – Handler/server view.
+- [`../../docs/architecture/STATEFUL_SESSION_GUIDE.md`](../../docs/architecture/STATEFUL_SESSION_GUIDE.md) – Handler/server view.
 - [`../../connection/docs/STATEFUL_SESSION_GUIDE.md`](../../connection/docs/STATEFUL_SESSION_GUIDE.md) – Connection/session storage view.
 - `packages/adt-clients/src/utils/lockStateManager.ts` – Persistent lock registry implementation.
 
