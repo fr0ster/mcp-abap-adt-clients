@@ -47,13 +47,13 @@ if (fs.existsSync(envPath)) {
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
 const connectionLogger: ILogger = createConnectionLogger();
 
-// Library code (InterfaceBuilder) uses DEBUG_ADT_LIBS
+// Library code (AdtClient) uses DEBUG_ADT_LIBS
 const builderLogger: ILogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-describe('InterfaceBuilder (using AdtClient)', () => {
+describe('Interface (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;

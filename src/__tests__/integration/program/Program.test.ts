@@ -47,7 +47,7 @@ if (fs.existsSync(envPath)) {
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
 const connectionLogger: ILogger = createConnectionLogger();
 
-// Library code (ClassBuilder) uses DEBUG_ADT_LIBS
+// Library code (AdtClient) uses DEBUG_ADT_LIBS
 const builderLogger: ILogger = createBuilderLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
@@ -123,6 +123,12 @@ describe('Program (using AdtClient)', () => {
       if (!hasConfig || !tester) {
         return;
       }
+
+      if (isCloudSystem) {
+        logBuilderTestSkip(testsLogger, 'Program - full workflow', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
+        return;
+      }
+
       const config = tester.getConfig();
       if (!config) {
         return;

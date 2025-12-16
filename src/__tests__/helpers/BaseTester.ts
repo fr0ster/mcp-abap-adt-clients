@@ -236,20 +236,33 @@ export class BaseTester<TConfig, TState> {
       await this.adtObject.create(config, createOptions);
       this.objectCreated = true;
 
-      // 2.5. Read with long polling to ensure object is ready (before update)
+      // 2.5. Wait for object to be ready before update (read with long polling or delay)
       if (options?.updateConfig) {
+        const { getEnvironmentConfig } = require('./test-helper');
+        const envConfig = getEnvironmentConfig();
+        const testCase = this.testCase || { name: this.testCaseName, params: testCaseParams || {} };
+        const operationDelays = testCase?.params?.operation_delays || envConfig.operation_delays || {};
+        const createDelay = operationDelays.create || operationDelays.default || 3000; // Default 3 seconds
+
         currentStep = 'read (wait for object ready)';
         logBuilderTestStep(currentStep);
+        let objectReady = false;
+        
+        // Try read with long polling first (preferred method)
         try {
           await this.adtObject.read(
             config as Partial<TConfig>,
-            'active',
+            'inactive', // Use 'inactive' since object is not yet activated after create
             { withLongPolling: true }
           );
-          this.log(LogLevel.DEBUG, 'Object is ready after creation');
+          this.log(LogLevel.DEBUG, 'Object is ready after creation (read with long polling succeeded)');
+          objectReady = true;
         } catch (readError) {
           this.log(LogLevel.WARN, 'Read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - update might still work
+          // Fallback to delay if read failed
+          this.log(LogLevel.INFO, `Waiting ${createDelay}ms for object to be ready (fallback delay)`);
+          await new Promise(resolve => setTimeout(resolve, createDelay));
+          objectReady = true; // Assume ready after delay
         }
       }
 
