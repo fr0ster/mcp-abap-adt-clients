@@ -81,25 +81,13 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
     const state: IInterfaceState = {
       errors: []
     };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating interface configuration');
-      const validationResponse = await validateInterfaceName(
-        this.connection,
-        config.interfaceName,
-        config.packageName,
-        config.description
-      );
-      state.validationResponse = validationResponse;
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating interface');
+      // Create interface
+      this.logger?.info?.('Creating interface');
       const createResponse = await createInterface(this.connection, {
         interfaceName: config.interfaceName,
         packageName: config.packageName,
@@ -107,136 +95,13 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         description: config.description
       });
       state.createResult = createResponse;
-      this.logger?.info?.('Interface created');
-
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { interfaceName: config.interfaceName },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
       objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created interface');
-      const checkResponse1 = await checkInterface(this.connection, config.interfaceName, 'inactive');
-      state.checkResult = checkResponse1;
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful ТІЛЬКИ перед lock)
-      this.logger?.info?.('Step 4: Locking interface');
-      this.connection.setSessionType('stateful');
-      const lockResult = await lockInterface(this.connection, config.interfaceName);
-      lockHandle = lockResult.lockHandle;
-      state.lockHandle = lockHandle;
-      this.logger?.info?.('Interface locked, handle:', lockHandle);
-
-      // 5. Check inactive with code for update
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        const checkResponse2 = await checkInterface(this.connection, config.interfaceName, 'inactive', codeToCheck);
-        state.checkResult = checkResponse2;
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating interface with source code');
-        await upload(
-          this.connection,
-          config.interfaceName,
-          codeToCheck,
-          lockHandle,
-          config.transportRequest
-        );
-        // upload() returns void, so we don't store it in state
-        this.logger?.info?.('Interface updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { interfaceName: config.interfaceName },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking interface');
-        const unlockResponse = await unlockInterface(this.connection, config.interfaceName, lockHandle);
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('Interface unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      const checkResponse3 = await checkInterface(this.connection, config.interfaceName, 'inactive');
-      state.checkResult = checkResponse3;
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating interface');
-        const activateResponse = await activateInterface(this.connection, config.interfaceName);
-        state.activateResult = activateResponse;
-        this.logger?.info?.('Interface activated, status:', activateResponse.status);
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { interfaceName: config.interfaceName },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-      } else {
-        // Read inactive version if not activated
-        const readResponse = await getInterfaceSource(this.connection, config.interfaceName, 'inactive');
-        state.readResult = readResponse;
-      }
+      this.logger?.info?.('Interface created');
 
       return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking interface during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockInterface(this.connection, config.interfaceName, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {

@@ -84,159 +84,26 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
+    const state: IStructureState = {
+      errors: []
+    };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating structure configuration');
-      await validateStructureName(
-        this.connection,
-        config.structureName,
-        config.description
-      );
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating structure');
+      // Create structure
+      this.logger?.info?.('Creating structure');
       await createStructure(this.connection, {
         structureName: config.structureName,
         packageName: config.packageName,
         transportRequest: config.transportRequest,
         description: config.description
       });
+      objectCreated = true;
       this.logger?.info?.('Structure created');
 
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { structureName: config.structureName },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
-      objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created structure');
-      await checkStructure(this.connection, config.structureName, 'inactive');
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful ONLY before lock)
-      this.logger?.info?.('Step 4: Locking structure');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockStructure(this.connection, config.structureName);
-      this.logger?.info?.('Structure locked, handle:', lockHandle);
-
-      // 5. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.ddlCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await checkStructure(this.connection, config.structureName, 'inactive', codeToCheck);
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating structure with DDL code');
-        await upload(
-          this.connection,
-          {
-            structureName: config.structureName,
-            ddlCode: codeToCheck,
-            transportRequest: config.transportRequest
-          },
-          lockHandle
-        );
-        this.logger?.info?.('Structure updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { structureName: config.structureName },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking structure');
-        await unlockStructure(this.connection, config.structureName, lockHandle);
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('Structure unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      await checkStructure(this.connection, config.structureName, 'inactive');
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating structure');
-        const activateResponse = await activateStructure(this.connection, config.structureName);
-        this.logger?.info?.('Structure activated, status:', activateResponse.status);
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { structureName: config.structureName },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            return {
-              createResult: activateResponse,
-              readResult: readState.readResult,
-              errors: []
-            };
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-        return {
-          createResult: activateResponse,
-          errors: []
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getStructureSource(this.connection, config.structureName, 'inactive');
-      return {
-        readResult: readResponse,
-        errors: []
-      };
+      return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking structure during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockStructure(this.connection, config.structureName, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {

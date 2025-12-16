@@ -11,13 +11,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
 import { getConfig } from '../../helpers/sessionConfig';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd
-} from '../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
 import { BaseTester } from '../../helpers/BaseTester';
 import { IBehaviorImplementationConfig, IBehaviorImplementationState } from '../../../core/behaviorImplementation';
@@ -28,7 +21,6 @@ import * as dotenv from 'dotenv';
 const {
   getTestCaseDefinition,
   resolvePackageName,
-  resolveStandardObject,
   getEnvironmentConfig,
   getTimeout,
   resolveTransportRequest,
@@ -40,8 +32,6 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_ADT_TESTS === 'true' || process.env.DEBUG_ADT === 'true';
-const debugConnection = process.env.DEBUG_CONNECTORS === 'true'; // Connection uses DEBUG_CONNECTORS
 
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
 const connectionLogger: ILogger = createConnectionLogger();
@@ -107,49 +97,7 @@ describe('BehaviorImplementationBuilder (using AdtClient)', () => {
 
   afterAll(() => tester?.afterAll()());
 
-  function getBuilderTestDefinition() {
-    return getTestCaseDefinition('create_behavior_implementation', 'adt_behavior_implementation');
-  }
 
-  function buildBuilderConfig(testCase: any) {
-    const params = testCase?.params || {};
-
-    const packageName =
-      params.package_name ||
-      resolvePackageName(undefined);
-    if (!packageName) {
-      throw new Error('Package name is not configured. Set params.package_name or environment.default_package');
-    }
-
-    const className =
-      params.class_name ||
-      params.test_class_name;
-
-    if (!className) {
-      throw new Error('class_name is not configured for BehaviorImplementationBuilder test');
-    }
-
-    const behaviorDefinition = (
-      params.behavior_definition ||
-      params.bdef_name ||
-      params.root_entity
-    )?.trim();
-
-    if (!behaviorDefinition) {
-      throw new Error('behavior_definition is not configured for BehaviorImplementationBuilder test');
-    }
-
-    const description = params.description || `Behavior Implementation for ${behaviorDefinition}`;
-
-    return {
-      className,
-      packageName,
-      behaviorDefinition,
-      description,
-      transportRequest: params.transport_request || getEnvironmentConfig().default_transport || '',
-      sourceCode: params.source_code || generateDefaultImplementationCode(className, behaviorDefinition)
-    };
-  }
 
   function generateDefaultImplementationCode(className: string, behaviorDefinition: string): string {
     const localHandlerName = `lhc_${behaviorDefinition}`;

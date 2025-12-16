@@ -73,154 +73,30 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
+    const state: ITableState = {
+      errors: []
+    };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating table configuration');
-      await validateTableName(
-        this.connection,
-        config.tableName,
-        config.description
-      );
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating table');
+      // Create table
+      this.logger?.info?.('Creating table');
       await createTable(this.connection, {
         table_name: config.tableName,
         package_name: config.packageName,
         transport_request: config.transportRequest,
         ddl_code: options?.sourceCode || config.ddlCode
       });
+      objectCreated = true;
       this.logger?.info?.('Table created');
 
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { tableName: config.tableName },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
-      objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created table');
-      await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, 'inactive');
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful ONLY before lock)
-      this.logger?.info?.('Step 4: Locking table');
-      this.connection.setSessionType('stateful');
-      lockHandle = await acquireTableLockHandle(this.connection, config.tableName);
-      this.logger?.info?.('Table locked, handle:', lockHandle);
-
-      // 5. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.ddlCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, codeToCheck, 'inactive');
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating table with DDL code');
-        await updateTable(
-          this.connection,
-          {
-            table_name: config.tableName,
-            ddl_code: codeToCheck,
-            transport_request: config.transportRequest
-          },
-          lockHandle
-        );
-        this.logger?.info?.('Table updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { tableName: config.tableName },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking table');
-        await unlockTable(this.connection, config.tableName, lockHandle);
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('Table unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, 'inactive');
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating table');
-        const activateResponse = await activateTable(this.connection, config.tableName);
-        this.logger?.info?.('Table activated, status:', activateResponse.status);
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { tableName: config.tableName },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            return { createResult: activateResponse, readResult: readState.readResult, errors: [] };
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-        return { createResult: activateResponse, errors: [] };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getTableSource(this.connection, config.tableName);
-      return { createResult: readResponse, errors: [] };
+      return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking table during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockTable(this.connection, config.tableName, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
           this.logger?.warn?.('Deleting table after failure');
-          // No stateful needed - delete doesn't use lock/unlock
           await deleteTable(this.connection, {
             table_name: config.tableName,
             transport_request: config.transportRequest

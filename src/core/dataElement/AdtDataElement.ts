@@ -88,28 +88,13 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
-    const systemInfo = await getSystemInformation(this.connection);
-    const username = systemInfo?.userName || '';
-    const masterSystem = systemInfo?.systemID;
     const state: IDataElementState = {
       errors: []
     };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating data element configuration');
-      const validationResponse = await validateDataElementName(
-        this.connection,
-        config.dataElementName,
-        config.packageName,
-        config.description
-      );
-      state.validationResponse = validationResponse;
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating data element');
+      // Create data element
+      this.logger?.info?.('Creating data element');
       const createResponse = await createDataElement(
         this.connection,
         {
@@ -132,150 +117,13 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
         }
       );
       state.createResult = createResponse;
-      this.logger?.info?.('Data element created');
-
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { dataElementName: config.dataElementName },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
       objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created data element');
-      const checkResponse1 = await checkDataElement(this.connection, config.dataElementName, 'inactive');
-      state.checkResult = checkResponse1;
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful ONLY before lock)
-      this.logger?.info?.('Step 4: Locking data element');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockDataElement(this.connection, config.dataElementName);
-      state.lockHandle = lockHandle;
-      this.logger?.info?.('Data element locked, handle:', lockHandle);
-
-      // 5. Check inactive with XML for update (if provided)
-      const xmlToCheck = options?.xmlContent;
-      if (xmlToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        const checkResponse2 = await checkDataElement(this.connection, config.dataElementName, 'inactive', xmlToCheck);
-        state.checkResult = checkResponse2;
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update (if XML provided)
-      if (xmlToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating data element with XML');
-        await updateDataElement(
-          this.connection,
-          {
-            data_element_name: config.dataElementName,
-            package_name: config.packageName,
-            transport_request: config.transportRequest,
-            description: config.description,
-            type_kind: config.typeKind,
-            type_name: config.typeName,
-            data_type: config.dataType,
-            length: config.length,
-            decimals: config.decimals,
-            short_label: config.shortLabel,
-            medium_label: config.mediumLabel,
-            long_label: config.longLabel,
-            heading_label: config.headingLabel,
-            search_help: config.searchHelp,
-            search_help_parameter: config.searchHelpParameter,
-            set_get_parameter: config.setGetParameter
-          },
-          lockHandle
-        );
-        // updateDataElement returns void, so we don't store it in state
-        this.logger?.info?.('Data element updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { dataElementName: config.dataElementName },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking data element');
-        const unlockResponse = await unlockDataElement(this.connection, config.dataElementName, lockHandle);
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('Data element unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      const checkResponse3 = await checkDataElement(this.connection, config.dataElementName, 'inactive');
-      state.checkResult = checkResponse3;
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating data element');
-        const activateResponse = await activateDataElement(this.connection, config.dataElementName);
-        state.activateResult = activateResponse;
-        this.logger?.info?.('Data element activated, status:', activateResponse.status);
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { dataElementName: config.dataElementName },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-      } else {
-        // Read if not activated
-        const readResponse = await getDataElement(this.connection, config.dataElementName, undefined);
-        state.readResult = readResponse;
-      }
+      this.logger?.info?.('Data element created');
 
       return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking data element during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockDataElement(this.connection, config.dataElementName, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {

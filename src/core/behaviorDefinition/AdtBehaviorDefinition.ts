@@ -114,25 +114,10 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating behavior definition configuration');
-      await validate(
-        this.connection,
-        {
-          objname: config.name,
-          rootEntity: config.rootEntity,
-          description: config.description,
-          package: config.packageName,
-          implementationType: config.implementationType
-        }
-      );
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating behavior definition');
+      // Create behavior definition
+      this.logger?.info?.('Creating behavior definition');
       const createResponse = await createBehaviorDefinition(this.connection, {
         name: config.name,
         package: config.packageName,
@@ -140,138 +125,16 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
         implementationType: config.implementationType,
       });
       state.createResult = createResponse;
-      this.logger?.info?.('Behavior definition created');
-
-      // 2.5. Read with long polling (wait for object to be ready)
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { name: config.name },
-          'active',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
       objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created behavior definition');
-      const checkAfterCreateResponse = await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
-      state.checkResult = checkAfterCreateResponse;
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful ONLY before lock)
-      this.logger?.info?.('Step 4: Locking behavior definition');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lock(this.connection, config.name);
-      state.lockHandle = lockHandle;
-      this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
-
-      // 5. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        const checkInactiveResponse = await checkBehaviorDefinition(this.connection, config.name, 'abapCheckRun', '', 'inactive', codeToCheck);
-        state.checkResult = checkInactiveResponse;
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating behavior definition with source code');
-        const updateResponse = await update(
-          this.connection,
-          {
-            name: config.name,
-            sourceCode: codeToCheck,
-            lockHandle,
-            transportRequest: config.transportRequest
-          }
-        );
-        state.updateResult = updateResponse;
-        this.logger?.info?.('Behavior definition updated');
-
-        // 6.5. Read with long polling (wait for object to be ready after update)
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { name: config.name },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking behavior definition');
-        const unlockResponse = await unlock(this.connection, config.name, lockHandle);
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('Behavior definition unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      const finalCheckResponse = await checkBehaviorDefinition(this.connection, config.name, 'bdefImplementationCheck', '', 'inactive');
-      state.checkResult = finalCheckResponse;
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating behavior definition');
-        const activateResponse = await activate(this.connection, config.name);
-        state.activateResult = activateResponse;
-        this.logger?.info?.('Behavior definition activated, status:', activateResponse.status);
-
-        // 9.5. Read with long polling (wait for object to be ready after activation)
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          await this.read(
-            { name: config.name },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-          // Continue anyway - return state with activation result
-        }
-        
-        return state;
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await readSource(this.connection, config.name);
-      state.readResult = readResponse;
+      this.logger?.info?.('Behavior definition created');
 
       return state;
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'create', error: err, timestamp: new Date() });
       
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking behavior definition during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlock(this.connection, config.name, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {

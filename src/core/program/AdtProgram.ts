@@ -97,25 +97,15 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
     const sessionId = this.connection.getSessionId?.() || '';
     const state: IProgramState = {
       errors: []
     };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating program configuration');
-      const validationResponse = await validateProgramName(
-        this.connection,
-        config.programName,
-        config.description
-      );
-      state.validationResponse = validationResponse;
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (requires stateful)
-      this.logger?.info?.('Step 2: Creating program');
+      // Create program (requires stateful)
+      this.logger?.info?.('Creating program');
+      this.connection.setSessionType('stateful');
       const createResponse = await createProgram(this.connection, {
         programName: config.programName,
         packageName: config.packageName,
@@ -126,132 +116,14 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         sourceCode: options?.sourceCode || config.sourceCode
       });
       state.createResult = createResponse;
-      this.logger?.info?.('Program created');
-
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { programName: config.programName },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
       objectCreated = true;
-
-      // 3. Check after create (stateful still set from create)
-      this.logger?.info?.('Step 3: Checking created program');
-      const checkResponse1 = await checkProgram(this.connection, config.programName, 'inactive');
-      state.checkResult = checkResponse1;
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful already set, keep it)
-      this.logger?.info?.('Step 4: Locking program');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockProgram(this.connection, config.programName);
-      state.lockHandle = lockHandle;
-      this.logger?.info?.('Program locked, handle:', lockHandle);
-
-      // 5. Check inactive with code for update
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        const checkResponse2 = await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
-        state.checkResult = checkResponse2;
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating program with source code');
-        const updateResponse = await uploadProgramSource(
-          this.connection,
-          config.programName,
-          codeToCheck,
-          lockHandle,
-          sessionId,
-          config.transportRequest
-        );
-        state.updateResult = updateResponse;
-        this.logger?.info?.('Program updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { programName: config.programName },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking program');
-        const unlockResponse = await unlockProgram(this.connection, config.programName, lockHandle);
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('Program unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      const checkResponse3 = await checkProgram(this.connection, config.programName, 'inactive');
-      state.checkResult = checkResponse3;
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating program');
-        const activateResponse = await activateProgram(this.connection, config.programName);
-        state.activateResult = activateResponse;
-        this.logger?.info?.('Program activated, status:', activateResponse.status);
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { programName: config.programName },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-      }
+      this.connection.setSessionType('stateless');
+      this.logger?.info?.('Program created');
 
       return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking program during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockProgram(this.connection, config.programName, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {

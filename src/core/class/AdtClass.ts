@@ -107,26 +107,13 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
     const state: IClassState = {
       errors: []
     };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating class configuration');
-      const validationResponse = await validateClassName(
-        this.connection,
-        config.className,
-        config.packageName,
-        config.description,
-        config.superclass
-      );
-      state.validationResponse = validationResponse;
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (requires stateful)
-      this.logger?.info?.('Step 2: Creating class');
+      // Create class (requires stateful)
+      this.logger?.info?.('Creating class');
       this.connection.setSessionType('stateful');
       state.createResult = await createClass(this.connection, {
         class_name: config.className,
@@ -141,124 +128,14 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         responsible: config.responsible,
         template_xml: config.classTemplate
       });
-      this.logger?.info?.('Class created');
-
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { className: config.className },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
       objectCreated = true;
-
-      // 3. Check after create (stateful still set from create)
-      this.logger?.info?.('Step 3: Checking created class');
-      state.checkResult = await checkClass(this.connection, config.className, 'inactive');
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful already set, keep it)
-      this.logger?.info?.('Step 4: Locking class');
-      lockHandle = await lockClass(this.connection, config.className);
-      state.lockHandle = lockHandle;
-      this.logger?.info?.('Class locked, handle:', lockHandle);
-
-      // 5. Check inactive with code/xml for update
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        state.checkResult = await checkClass(this.connection, config.className, 'inactive', codeToCheck);
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating class with source code');
-        state.updateResult = await updateClass(
-          this.connection,
-          config.className,
-          codeToCheck,
-          lockHandle,
-          config.transportRequest
-        );
-        this.logger?.info?.('Class updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { className: config.className },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking class');
-        state.unlockResult = await unlockClass(this.connection, config.className, lockHandle);
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('Class unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      state.checkResult = await checkClass(this.connection, config.className, 'inactive');
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating class');
-        state.activateResult = await activateClass(this.connection, config.className);
-        this.logger?.info?.('Class activated, status:', state.activateResult.status);
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { className: config.className },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-      }
+      this.connection.setSessionType('stateless');
+      this.logger?.info?.('Class created');
 
       return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking class during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockClass(this.connection, config.className, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {

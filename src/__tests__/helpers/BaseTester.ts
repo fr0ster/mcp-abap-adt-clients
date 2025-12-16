@@ -193,6 +193,32 @@ export class BaseTester<TConfig, TState> {
   }
 
   /**
+   * Get operation delay from YAML configuration
+   * @param operation - Operation name (create, update, activate, delete, etc.)
+   * @param testCaseParams - Test case parameters (may contain operation_delays)
+   * @returns Delay in milliseconds
+   */
+  private getOperationDelay(operation: string, testCaseParams?: ITestCaseParams): number {
+    const { getEnvironmentConfig } = require('./test-helper');
+    const envConfig = getEnvironmentConfig();
+    const testCase = this.testCase || { name: this.testCaseName, params: testCaseParams || {} };
+    const operationDelays = testCase?.params?.operation_delays || envConfig.operation_delays || {};
+    return operationDelays[operation] || operationDelays.default || 3000; // Default 3 seconds
+  }
+
+  /**
+   * Wait for specified delay
+   * @param delay - Delay in milliseconds
+   * @param operation - Operation name for logging
+   */
+  private async waitDelay(delay: number, operation: string): Promise<void> {
+    if (delay > 0) {
+      this.log(LogLevel.INFO, `Waiting ${delay}ms after ${operation} operation`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+
+  /**
    * Flow test: validation->create->lock->check(inactive, source/xml)->update->unlock->activate
    */
   async flowTest(
@@ -223,6 +249,8 @@ export class BaseTester<TConfig, TState> {
         logBuilderTestStepError(currentStep, error);
         throw error;
       }
+      // Delay after validate
+      await this.waitDelay(this.getOperationDelay('validate', testCaseParams), 'validate');
 
       // 2. Create
       currentStep = 'create';
@@ -235,35 +263,17 @@ export class BaseTester<TConfig, TState> {
       };
       await this.adtObject.create(config, createOptions);
       this.objectCreated = true;
+      // Delay after create
+      await this.waitDelay(this.getOperationDelay('create', testCaseParams), 'create');
 
       // 2.5. Wait for object to be ready before update (read with long polling or delay)
       if (options?.updateConfig) {
-        const { getEnvironmentConfig } = require('./test-helper');
-        const envConfig = getEnvironmentConfig();
-        const testCase = this.testCase || { name: this.testCaseName, params: testCaseParams || {} };
-        const operationDelays = testCase?.params?.operation_delays || envConfig.operation_delays || {};
-        const createDelay = operationDelays.create || operationDelays.default || 3000; // Default 3 seconds
-
         currentStep = 'read (wait for object ready)';
         logBuilderTestStep(currentStep);
-        let objectReady = false;
-        
-        // Try read with long polling first (preferred method)
-        try {
-          await this.adtObject.read(
-            config as Partial<TConfig>,
-            'inactive', // Use 'inactive' since object is not yet activated after create
-            { withLongPolling: true }
-          );
-          this.log(LogLevel.DEBUG, 'Object is ready after creation (read with long polling succeeded)');
-          objectReady = true;
-        } catch (readError) {
-          this.log(LogLevel.WARN, 'Read with long polling failed (object may not be ready yet):', readError);
-          // Fallback to delay if read failed
-          this.log(LogLevel.INFO, `Waiting ${createDelay}ms for object to be ready (fallback delay)`);
-          await new Promise(resolve => setTimeout(resolve, createDelay));
-          objectReady = true; // Assume ready after delay
-        }
+        // Additional delay before update (already waited after create, but this is for object readiness)
+        const createDelay = this.getOperationDelay('create', testCaseParams);
+        this.log(LogLevel.INFO, `Waiting ${createDelay}ms for object to be ready (fallback delay)`);
+        await new Promise(resolve => setTimeout(resolve, createDelay));
       }
 
       // 3. Update (if updateConfig provided)
@@ -280,6 +290,8 @@ export class BaseTester<TConfig, TState> {
           { ...config, ...options.updateConfig } as Partial<TConfig>,
           updateOptions
         );
+        // Delay after update
+        await this.waitDelay(this.getOperationDelay('update', testCaseParams), 'update');
       }
 
       // 4. Activate (if not activated during create/update)
@@ -297,6 +309,8 @@ export class BaseTester<TConfig, TState> {
           logBuilderTestStepError(currentStep, error);
           throw error;
         }
+        // Delay after activate
+        await this.waitDelay(this.getOperationDelay('activate', testCaseParams), 'activate');
       }
 
       // 5. Cleanup (if enabled)
@@ -305,6 +319,8 @@ export class BaseTester<TConfig, TState> {
         logBuilderTestStep(currentStep);
         try {
           await this.adtObject.delete(config as Partial<TConfig>);
+          // Delay after delete
+          await this.waitDelay(this.getOperationDelay('delete', testCaseParams), 'delete');
         } catch (cleanupError) {
           this.log(LogLevel.WARN, 'delete failed:', cleanupError);
         }
@@ -327,6 +343,8 @@ export class BaseTester<TConfig, TState> {
         try {
           logBuilderTestStep('delete (cleanup)');
           await this.adtObject.delete(config as Partial<TConfig>);
+          // Delay after delete (cleanup on error)
+          await this.waitDelay(this.getOperationDelay('delete', testCaseParams), 'delete');
         } catch (cleanupError) {
           this.log(LogLevel.WARN, 'Cleanup after error failed:', cleanupError);
         }

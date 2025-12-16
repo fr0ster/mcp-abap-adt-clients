@@ -86,21 +86,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
+    const state: IViewState = {
+      errors: []
+    };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('Step 1: Validating view configuration');
-      await validateViewName(
-        this.connection,
-        config.viewName,
-        config.packageName,
-        config.description
-      );
-      this.logger?.info?.('Validation passed');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('Step 2: Creating view');
+      // Create view
+      this.logger?.info?.('Creating view');
       await createView(this.connection, {
         view_name: config.viewName,
         package_name: config.packageName,
@@ -108,140 +100,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         description: config.description,
         ddl_source: options?.sourceCode || config.ddlSource
       });
+      objectCreated = true;
       this.logger?.info?.('View created');
 
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { viewName: config.viewName },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
-      objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created view');
-      await checkView(this.connection, config.viewName, 'inactive');
-      this.logger?.info?.('Check after create passed');
-
-      // 4. Lock (stateful ONLY before lock)
-      this.logger?.info?.('Step 4: Locking view');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockDDLS(this.connection, config.viewName);
-      this.logger?.info?.('View locked, handle:', lockHandle);
-
-      // 5. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.ddlSource;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 5: Checking inactive version with update content');
-        await checkView(this.connection, config.viewName, 'inactive', codeToCheck);
-        this.logger?.info?.('Check inactive with update content passed');
-      }
-
-      // 6. Update
-      if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 6: Updating view with DDL source');
-        await updateView(
-          this.connection,
-          config.viewName,
-          codeToCheck,
-          lockHandle,
-          config.transportRequest
-        );
-        this.logger?.info?.('View updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { viewName: config.viewName },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('Step 7: Unlocking view');
-        await unlockDDLS(this.connection, config.viewName, lockHandle);
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('View unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('Step 8: Final check');
-      await checkView(this.connection, config.viewName, 'inactive');
-      this.logger?.info?.('Final check passed');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('Step 9: Activating view');
-        const activateResponse = await activateDDLS(this.connection, config.viewName);
-        this.logger?.info?.('View activated, status:', activateResponse.status);
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { viewName: config.viewName },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            return {
-              readResult: activateResponse,
-              errors: []
-            };
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-        return {
-          readResult: activateResponse,
-          errors: []
-        };
-      }
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getViewSource(this.connection, config.viewName, 'inactive');
-      const ddlSource = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
-
-      return {
-        readResult: readResponse,
-        errors: []
-      };
+      return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking view during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockDDLS(this.connection, config.viewName, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {

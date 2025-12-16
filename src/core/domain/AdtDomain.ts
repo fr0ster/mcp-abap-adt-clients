@@ -83,7 +83,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     }
 
     let objectCreated = false;
-    let lockHandle: string | undefined;
     const systemInfo = await getSystemInformation(this.connection);
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
@@ -92,19 +91,8 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     };
 
     try {
-      // 1. Validate (no stateful needed)
-      this.logger?.info?.('validate');
-      const validationResponse = await validateDomainName(
-        this.connection,
-        config.domainName,
-        config.packageName,
-        config.description
-      );
-      state.validationResponse = validationResponse;
-      this.logger?.info?.('validated');
-
-      // 2. Create (no stateful needed)
-      this.logger?.info?.('create');
+      // Create domain
+      this.logger?.info?.('Creating domain');
       const createResponse = await createDomain(
         this.connection,
         {
@@ -125,148 +113,13 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         masterSystem
       );
       state.createResult = createResponse;
-      this.logger?.info?.('created');
-
-      // 2.5. Read with long polling to ensure object is ready
-      // Read 'inactive' version since object is not yet activated
-      this.logger?.info?.('read (wait for object ready)');
-      try {
-        await this.read(
-          { domainName: config.domainName },
-          'inactive',
-          { withLongPolling: true }
-        );
-        this.logger?.info?.('object is ready after creation');
-      } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
-        // Continue anyway - check might still work
-      }
       objectCreated = true;
-
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('check(inactive)');
-      const checkResponse1 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
-      state.checkResult = checkResponse1;
-      this.logger?.info?.('checked(inactive)');
-
-      // 4. Lock (stateful ONLY before lock)
-      this.logger?.info?.('lock');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockDomain(this.connection, config.domainName);
-      state.lockHandle = lockHandle;
-      this.logger?.info?.('locked');
-
-      // 5. Check inactive with XML for update (if provided)
-      const xmlToCheck = options?.xmlContent;
-      if (xmlToCheck) {
-        this.logger?.info?.('check(inactive)');
-        const checkResponse2 = await checkDomainSyntax(this.connection, config.domainName, 'inactive', xmlToCheck);
-        state.checkResult = checkResponse2;
-        this.logger?.info?.('checked(inactive)');
-      }
-
-      // 6. Update (if XML provided)
-      if (xmlToCheck && lockHandle) {
-        this.logger?.info?.('update');
-        await updateDomain(
-          this.connection,
-          {
-            domain_name: config.domainName,
-            package_name: config.packageName,
-            transport_request: config.transportRequest,
-            description: config.description,
-            datatype: config.datatype,
-            length: config.length,
-            decimals: config.decimals,
-            conversion_exit: config.conversion_exit,
-            lowercase: config.lowercase,
-            sign_exists: config.sign_exists,
-            value_table: config.value_table,
-            fixed_values: config.fixed_values
-          },
-          lockHandle,
-          username,
-          masterSystem
-        );
-        // updateDomain returns void, so we don't store it in state
-        this.logger?.info?.('updated');
-
-        // 6.5. Read with long polling to ensure object is ready after update
-        this.logger?.info?.('read (wait for object ready after update)');
-        try {
-          await this.read(
-            { domainName: config.domainName },
-            'active',
-            { withLongPolling: true }
-          );
-          this.logger?.info?.('object is ready after update');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
-          // Continue anyway - unlock might still work
-        }
-      }
-
-      // 7. Unlock (obligatory stateless after unlock)
-      if (lockHandle) {
-        this.logger?.info?.('unlock');
-        const unlockResponse = await unlockDomain(this.connection, config.domainName, lockHandle);
-        state.unlockResult = unlockResponse;
-        this.connection.setSessionType('stateless');
-        lockHandle = undefined;
-        this.logger?.info?.('unlocked');
-      }
-
-      // 8. Final check (no stateful needed)
-      this.logger?.info?.('check(inactive)');
-      const checkResponse3 = await checkDomainSyntax(this.connection, config.domainName, 'inactive');
-      state.checkResult = checkResponse3;
-      this.logger?.info?.('checked(inactive)');
-
-      // 9. Activate (if requested, no stateful needed - uses same session/cookies)
-      if (options?.activateOnCreate) {
-        this.logger?.info?.('activate');
-        const activateResponse = await activateDomain(this.connection, config.domainName);
-        state.activateResult = activateResponse;
-        this.logger?.info?.('activated');
-
-        // 9.5. Read with long polling to ensure object is ready after activation
-        this.logger?.info?.('read (wait for object ready after activation)');
-        try {
-          const readState = await this.read(
-            { domainName: config.domainName },
-            'active',
-            { withLongPolling: true }
-          );
-          if (readState) {
-            state.readResult = readState.readResult;
-          }
-          this.logger?.info?.('object is ready after activation');
-        } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
-          // Continue anyway - activation was successful
-        }
-      } else {
-        // Read inactive version if not activated (metadata endpoint may return inactive version if active doesn't exist)
-        const readResponse = await getDomain(this.connection, config.domainName);
-        state.readResult = readResponse;
-      }
+      this.logger?.info?.('Domain created');
 
       return state;
     } catch (error: any) {
-      // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking domain during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
-          await unlockDomain(this.connection, config.domainName, lockHandle);
-          this.connection.setSessionType('stateless');
-        } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
-        }
-      } else {
-        // Ensure stateless if no lock was acquired
-        this.connection.setSessionType('stateless');
-      }
+      // Cleanup on error - ensure stateless
+      this.connection.setSessionType('stateless');
 
       if (objectCreated && options?.deleteOnFailure) {
         try {
