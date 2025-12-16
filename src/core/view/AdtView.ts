@@ -108,7 +108,6 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         description: config.description,
         ddl_source: options?.sourceCode || config.ddlSource
       });
-      objectCreated = true;
       this.logger?.info?.('View created');
 
       // 2.5. Read with long polling to ensure object is ready
@@ -125,6 +124,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created view');

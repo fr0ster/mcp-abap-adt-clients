@@ -107,7 +107,6 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         description: config.description
       });
       state.createResult = createResponse;
-      objectCreated = true;
       this.logger?.info?.('Interface created');
 
       // 2.5. Read with long polling to ensure object is ready
@@ -124,6 +123,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created interface');

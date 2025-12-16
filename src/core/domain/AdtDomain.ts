@@ -125,7 +125,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         masterSystem
       );
       state.createResult = createResponse;
-      objectCreated = true;
       this.logger?.info?.('created');
 
       // 2.5. Read with long polling to ensure object is ready
@@ -142,6 +141,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('check(inactive)');

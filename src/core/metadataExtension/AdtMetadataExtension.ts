@@ -121,7 +121,6 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         masterSystem: config.masterSystem,
         responsible: config.responsible
       });
-      objectCreated = true;
       this.logger?.info?.('Metadata extension created');
 
       // 2.5. Read with long polling (wait for object to be ready)
@@ -137,6 +136,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created metadata extension');

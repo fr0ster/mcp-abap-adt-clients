@@ -135,7 +135,6 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
       );
       state.createResult = createState.createResult;
       state.lockHandle = createState.lockHandle;
-      objectCreated = true;
       this.logger?.info?.('Behavior implementation class created');
 
       // 2.5. Read with long polling (wait for object to be ready)
@@ -152,6 +151,7 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed - AdtClass.create() sets stateless after unlock)
       this.logger?.info?.('Step 3: Checking created behavior implementation class');

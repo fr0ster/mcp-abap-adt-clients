@@ -115,7 +115,6 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
         transportRequest: config.transportRequest,
         description: config.description
       });
-      objectCreated = true;
       this.logger?.info?.('Function group created');
 
       // 2.5. Read with long polling to ensure object is ready
@@ -132,6 +131,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created function group');

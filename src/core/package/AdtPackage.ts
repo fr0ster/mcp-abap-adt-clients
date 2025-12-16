@@ -132,7 +132,6 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         application_component: config.applicationComponent,
         responsible: config.responsible
       });
-      objectCreated = true;
       this.logger?.info?.('Package created');
 
       // 2.5. Read with long polling (wait for object to be ready)
@@ -148,6 +147,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created package');

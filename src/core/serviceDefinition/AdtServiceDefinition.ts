@@ -111,7 +111,6 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
         description: config.description,
         source_code: options?.sourceCode || config.sourceCode
       });
-      objectCreated = true;
       this.logger?.info?.('Service definition created');
 
       // 2.5. Read with long polling (wait for object to be ready)
@@ -127,6 +126,7 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created service definition');

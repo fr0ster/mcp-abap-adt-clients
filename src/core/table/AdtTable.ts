@@ -93,7 +93,6 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         transport_request: config.transportRequest,
         ddl_code: options?.sourceCode || config.ddlCode
       });
-      objectCreated = true;
       this.logger?.info?.('Table created');
 
       // 2.5. Read with long polling to ensure object is ready
@@ -110,6 +109,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
         // Continue anyway - check might still work
       }
+      objectCreated = true;
 
       // 3. Check after create (no stateful needed)
       this.logger?.info?.('Step 3: Checking created table');
