@@ -53,6 +53,7 @@ import { getInclude as getIncludeUtil } from './include';
 import { getTypeInfo as getTypeInfoUtil } from './typeInfo';
 import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
 import { getEnhancementMetadata } from '../enhancement/read';
+import { getAllTypes as getAllTypesUtil } from './allTypes';
 
 // Import types
 import type {
@@ -460,5 +461,29 @@ export class AdtUtils {
    */
   async getEnhancementSpot(enhancementSpot: string): Promise<AxiosResponse> {
     return getEnhancementMetadata(this.connection, 'enhsxsb', enhancementSpot);
+  }
+
+  /**
+   * Get all valid ADT object types
+   * 
+   * Retrieves list of all valid ADT object types from the repository.
+   * 
+   * @param maxItemCount - Maximum number of items to return (default: 999)
+   * @param name - Name filter pattern (default: '*')
+   * @param data - Data filter (default: 'usedByProvider')
+   * @returns Axios response with XML containing all object types
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getAllTypes();
+   * // Response contains XML with all ADT object types
+   * ```
+   */
+  async getAllTypes(
+    maxItemCount: number = 999,
+    name: string = '*',
+    data: string = 'usedByProvider'
+  ): Promise<AxiosResponse> {
+    return getAllTypesUtil(this.connection, maxItemCount, name, data);
   }
 }

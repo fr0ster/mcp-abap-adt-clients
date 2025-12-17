@@ -131,16 +131,18 @@ Methods can be located in:
 ### 1.6 GetAllTypes
 **Handler:** `system/readonly/handleGetAllTypes.ts`  
 **Endpoint:** `/sap/bc/adt/repository/informationsystem/objecttypes` (GET)  
-**Status:** ❌ **Missing**  
+**Status:** ✅ **Exists**  
 **Location:**
 - ❌ ReadOnlyClient - missing
 - ❌ CrudClient - missing
-- ❌ AdtClient - missing
-- ❌ Shared/Infrastructure - missing
+- ❌ AdtClient - missing (no direct method)
+- ✅ **Shared/Infrastructure** - `AdtClient.getUtils().getAllTypes()`
+  - `core/shared/allTypes.ts` → `getAllTypes()`
+  - `core/shared/AdtUtils.ts` → `getAllTypes()`
+  - Supports query parameters: maxItemCount, name, data
 
 **Action:**
-- Create `core/infrastructure/system/allTypes.ts` → `getAllTypes()`
-- Add to `AdtUtils` → `getAllTypes()`
+- ✅ Implementation completed
 - Update handler to use `AdtClient.getUtils().getAllTypes()`
 
 ---
@@ -406,7 +408,7 @@ Methods can be located in:
 
 ## Summary
 
-### ✅ Already Implemented (16)
+### ✅ Already Implemented (17)
 1. GetWhereUsed - `AdtClient.getUtils().getWhereUsed()`
 2. GetSqlQuery - `AdtClient.getUtils().getSqlQuery()`
 3. GetInactiveObjects - `AdtClient.getUtils().getInactiveObjects()` / `CrudClient.getInactiveObjects()`
@@ -423,6 +425,7 @@ Methods can be located in:
 14. GetTypeInfo - `AdtClient.getUtils().getTypeInfo(typeName)` / `core/shared/typeInfo.ts` → `getTypeInfo()` (with fallback chain)
 15. GetEnhancementImpl - `AdtClient.getUtils().getEnhancementImpl(spot, name)` / `core/shared/enhancementImpl.ts` → `getEnhancementImpl()` (uses spot in URL)
 16. GetEnhancementSpot - `AdtClient.getUtils().getEnhancementSpot(spotName)` / `core/enhancement/read.ts` → `getEnhancementMetadata()` (convenience wrapper with type 'enhsxsb')
+17. GetAllTypes - `AdtClient.getUtils().getAllTypes(maxItemCount?, name?, data?)` / `core/shared/allTypes.ts` → `getAllTypes()`
 
 ### ⚠️ Partially Implemented (2)
 1. GetEnhancementImpl - has `getEnhancementSource()`, but handler uses different URL format (spot in URL instead of type), needs `getEnhancementImplBySpot()`
@@ -431,8 +434,8 @@ Methods can be located in:
 ### ✅ Can Use Existing (1)
 1. GetEnhancementSpot - can use `AdtEnhancement.readMetadata()` with `type='enhsxsb'`, needs convenience wrapper `getEnhancementSpot()`
 
-### ❌ Implementation Needed (1)
-1. GetAllTypes - object types listing
+### ❌ Implementation Needed (0)
+- All high, medium, and low priority methods have been implemented! ✅
 
 ### 🚫 Not Planned (1)
 1. GetObjectNodeFromCache - MCP server-specific (uses in-memory cache, not suitable for adt-clients library)
@@ -482,7 +485,7 @@ All new methods will be added to `AdtClient` via `getUtils()` for easier method 
 9. ✅ **GetEnhancementSpot** - ✅ implemented via `AdtUtils.getEnhancementSpot()` (convenience wrapper)
 
 ### Low Priority
-10. **GetAllTypes** - object types listing
+10. ✅ **GetAllTypes** - ✅ implemented via `AdtUtils.getAllTypes()`
 
 ### ✅ Already Implemented (not in priorities)
 - **GetBdef** - ✅ implemented via `AdtUtils.getBdef()` (wraps `readSource()`)
