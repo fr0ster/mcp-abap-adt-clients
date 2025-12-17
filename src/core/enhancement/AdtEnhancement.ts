@@ -573,4 +573,33 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       throw err;
     }
   }
+
+  /**
+   * Lock enhancement for modification
+   */
+  async lock(config: Partial<IEnhancementConfig>): Promise<string> {
+    if (!config.enhancementName || !config.enhancementType) {
+      throw new Error('Enhancement name and type are required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockEnhancement(this.connection, config.enhancementType, config.enhancementName);
+  }
+
+  /**
+   * Unlock enhancement
+   */
+  async unlock(config: Partial<IEnhancementConfig>, lockHandle: string): Promise<IEnhancementState> {
+    if (!config.enhancementName || !config.enhancementType) {
+      throw new Error('Enhancement name and type are required');
+    }
+
+    const result = await unlockEnhancement(this.connection, config.enhancementType, config.enhancementName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: [],
+      enhancementType: config.enhancementType
+    };
+  }
 }

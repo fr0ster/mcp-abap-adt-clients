@@ -411,4 +411,32 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       errors: []
     };
   }
+
+  /**
+   * Lock table for modification
+   */
+  async lock(config: Partial<ITableConfig>): Promise<string> {
+    if (!config.tableName) {
+      throw new Error('Table name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await acquireTableLockHandle(this.connection, config.tableName);
+  }
+
+  /**
+   * Unlock table
+   */
+  async unlock(config: Partial<ITableConfig>, lockHandle: string): Promise<ITableState> {
+    if (!config.tableName) {
+      throw new Error('Table name is required');
+    }
+
+    const result = await unlockTable(this.connection, config.tableName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

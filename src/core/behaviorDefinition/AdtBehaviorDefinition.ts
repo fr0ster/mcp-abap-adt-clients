@@ -472,4 +472,32 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
       throw err;
     }
   }
+
+  /**
+   * Lock behavior definition for modification
+   */
+  async lock(config: Partial<IBehaviorDefinitionConfig>): Promise<string> {
+    if (!config.name) {
+      throw new Error('Behavior definition name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lock(this.connection, config.name);
+  }
+
+  /**
+   * Unlock behavior definition
+   */
+  async unlock(config: Partial<IBehaviorDefinitionConfig>, lockHandle: string): Promise<IBehaviorDefinitionState> {
+    if (!config.name) {
+      throw new Error('Behavior definition name is required');
+    }
+
+    const result = await unlock(this.connection, config.name, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

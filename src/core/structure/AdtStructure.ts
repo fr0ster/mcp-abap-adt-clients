@@ -429,4 +429,32 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       errors: []
     };
   }
+
+  /**
+   * Lock structure for modification
+   */
+  async lock(config: Partial<IStructureConfig>): Promise<string> {
+    if (!config.structureName) {
+      throw new Error('Structure name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockStructure(this.connection, config.structureName);
+  }
+
+  /**
+   * Unlock structure
+   */
+  async unlock(config: Partial<IStructureConfig>, lockHandle: string): Promise<IStructureState> {
+    if (!config.structureName) {
+      throw new Error('Structure name is required');
+    }
+
+    const result = await unlockStructure(this.connection, config.structureName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

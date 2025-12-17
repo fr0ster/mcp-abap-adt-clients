@@ -499,4 +499,32 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
       errors: []
     };
   }
+
+  /**
+   * Lock function group for modification
+   */
+  async lock(config: Partial<IFunctionGroupConfig>): Promise<string> {
+    if (!config.functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockFunctionGroup(this.connection, config.functionGroupName);
+  }
+
+  /**
+   * Unlock function group
+   */
+  async unlock(config: Partial<IFunctionGroupConfig>, lockHandle: string): Promise<IFunctionGroupState> {
+    if (!config.functionGroupName) {
+      throw new Error('Function group name is required');
+    }
+
+    const result = await unlockFunctionGroup(this.connection, config.functionGroupName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

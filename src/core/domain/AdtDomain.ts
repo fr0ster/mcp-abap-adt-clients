@@ -482,4 +482,32 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       throw err;
     }
   }
+
+  /**
+   * Lock domain for modification
+   */
+  async lock(config: Partial<IDomainConfig>): Promise<string> {
+    if (!config.domainName) {
+      throw new Error('Domain name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockDomain(this.connection, config.domainName);
+  }
+
+  /**
+   * Unlock domain
+   */
+  async unlock(config: Partial<IDomainConfig>, lockHandle: string): Promise<IDomainState> {
+    if (!config.domainName) {
+      throw new Error('Domain name is required');
+    }
+
+    const result = await unlockDomain(this.connection, config.domainName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

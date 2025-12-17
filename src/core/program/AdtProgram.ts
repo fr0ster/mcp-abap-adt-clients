@@ -490,4 +490,32 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       throw err;
     }
   }
+
+  /**
+   * Lock program for modification
+   */
+  async lock(config: Partial<IProgramConfig>): Promise<string> {
+    if (!config.programName) {
+      throw new Error('Program name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockProgram(this.connection, config.programName);
+  }
+
+  /**
+   * Unlock program
+   */
+  async unlock(config: Partial<IProgramConfig>, lockHandle: string): Promise<IProgramState> {
+    if (!config.programName) {
+      throw new Error('Program name is required');
+    }
+
+    const result = await unlockProgram(this.connection, config.programName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

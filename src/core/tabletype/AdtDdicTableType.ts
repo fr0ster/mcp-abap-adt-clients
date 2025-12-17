@@ -437,4 +437,32 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
       errors: []
     };
   }
+
+  /**
+   * Lock table type for modification
+   */
+  async lock(config: Partial<ITableTypeConfig>): Promise<string> {
+    if (!config.tableTypeName) {
+      throw new Error('Table type name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await acquireTableTypeLockHandle(this.connection, config.tableTypeName);
+  }
+
+  /**
+   * Unlock table type
+   */
+  async unlock(config: Partial<ITableTypeConfig>, lockHandle: string): Promise<ITableTypeState> {
+    if (!config.tableTypeName) {
+      throw new Error('Table type name is required');
+    }
+
+    const result = await unlockTableType(this.connection, config.tableTypeName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

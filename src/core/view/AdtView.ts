@@ -438,4 +438,32 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       errors: []
     };
   }
+
+  /**
+   * Lock view for modification
+   */
+  async lock(config: Partial<IViewConfig>): Promise<string> {
+    if (!config.viewName) {
+      throw new Error('View name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockDDLS(this.connection, config.viewName);
+  }
+
+  /**
+   * Unlock view
+   */
+  async unlock(config: Partial<IViewConfig>, lockHandle: string): Promise<IViewState> {
+    if (!config.viewName) {
+      throw new Error('View name is required');
+    }
+
+    const result = await unlockDDLS(this.connection, config.viewName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

@@ -467,4 +467,32 @@ ENDCLASS.`;
       throw err;
     }
   }
+
+  /**
+   * Lock behavior implementation for modification
+   * Delegates to AdtClass since behavior implementation is a class
+   */
+  async lock(config: Partial<IBehaviorImplementationConfig>): Promise<string> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+
+    return await this.class.lock({ className: config.className });
+  }
+
+  /**
+   * Unlock behavior implementation
+   * Delegates to AdtClass since behavior implementation is a class
+   */
+  async unlock(config: Partial<IBehaviorImplementationConfig>, lockHandle: string): Promise<IBehaviorImplementationState> {
+    if (!config.className) {
+      throw new Error('Class name is required');
+    }
+
+    const result = await this.class.unlock({ className: config.className }, lockHandle);
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

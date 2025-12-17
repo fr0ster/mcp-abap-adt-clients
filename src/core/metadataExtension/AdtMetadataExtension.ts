@@ -433,4 +433,32 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     state.checkResult = result;
     return state;
   }
+
+  /**
+   * Lock metadata extension for modification
+   */
+  async lock(config: Partial<IMetadataExtensionConfig>): Promise<string> {
+    if (!config.name) {
+      throw new Error('Metadata extension name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockMetadataExtension(this.connection, config.name);
+  }
+
+  /**
+   * Unlock metadata extension
+   */
+  async unlock(config: Partial<IMetadataExtensionConfig>, lockHandle: string): Promise<IMetadataExtensionState> {
+    if (!config.name) {
+      throw new Error('Metadata extension name is required');
+    }
+
+    const result = await unlockMetadataExtension(this.connection, config.name, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

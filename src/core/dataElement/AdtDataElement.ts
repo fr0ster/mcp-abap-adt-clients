@@ -496,4 +496,32 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
       throw err;
     }
   }
+
+  /**
+   * Lock data element for modification
+   */
+  async lock(config: Partial<IDataElementConfig>): Promise<string> {
+    if (!config.dataElementName) {
+      throw new Error('Data element name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockDataElement(this.connection, config.dataElementName);
+  }
+
+  /**
+   * Unlock data element
+   */
+  async unlock(config: Partial<IDataElementConfig>, lockHandle: string): Promise<IDataElementState> {
+    if (!config.dataElementName) {
+      throw new Error('Data element name is required');
+    }
+
+    const result = await unlockDataElement(this.connection, config.dataElementName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

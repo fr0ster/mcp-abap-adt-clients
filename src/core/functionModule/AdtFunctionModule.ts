@@ -455,4 +455,32 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
       errors: []
     };
   }
+
+  /**
+   * Lock function module for modification
+   */
+  async lock(config: Partial<IFunctionModuleConfig>): Promise<string> {
+    if (!config.functionModuleName || !config.functionGroupName) {
+      throw new Error('Function module name and function group name are required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName);
+  }
+
+  /**
+   * Unlock function module
+   */
+  async unlock(config: Partial<IFunctionModuleConfig>, lockHandle: string): Promise<IFunctionModuleState> {
+    if (!config.functionModuleName || !config.functionGroupName) {
+      throw new Error('Function module name and function group name are required');
+    }
+
+    const result = await unlockFunctionModule(this.connection, config.functionGroupName, config.functionModuleName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

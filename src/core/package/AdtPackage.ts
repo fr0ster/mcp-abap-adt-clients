@@ -466,4 +466,32 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       errors: []
     };
   }
+
+  /**
+   * Lock package for modification
+   */
+  async lock(config: Partial<IPackageConfig>): Promise<string> {
+    if (!config.packageName) {
+      throw new Error('Package name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockPackage(this.connection, config.packageName);
+  }
+
+  /**
+   * Unlock package
+   */
+  async unlock(config: Partial<IPackageConfig>, lockHandle: string): Promise<IPackageState> {
+    if (!config.packageName) {
+      throw new Error('Package name is required');
+    }
+
+    const result = await unlockPackage(this.connection, config.packageName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

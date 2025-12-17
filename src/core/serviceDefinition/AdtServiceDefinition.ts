@@ -425,4 +425,32 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
     state.checkResult = await checkServiceDefinition(this.connection, config.serviceDefinitionName, version);
     return state;
   }
+
+  /**
+   * Lock service definition for modification
+   */
+  async lock(config: Partial<IServiceDefinitionConfig>): Promise<string> {
+    if (!config.serviceDefinitionName) {
+      throw new Error('Service definition name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    return await lockServiceDefinition(this.connection, config.serviceDefinitionName);
+  }
+
+  /**
+   * Unlock service definition
+   */
+  async unlock(config: Partial<IServiceDefinitionConfig>, lockHandle: string): Promise<IServiceDefinitionState> {
+    if (!config.serviceDefinitionName) {
+      throw new Error('Service definition name is required');
+    }
+
+    const result = await unlockServiceDefinition(this.connection, config.serviceDefinitionName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }

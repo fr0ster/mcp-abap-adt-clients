@@ -455,4 +455,33 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       throw err;
     }
   }
+
+  /**
+   * Lock interface for modification
+   */
+  async lock(config: Partial<IInterfaceConfig>): Promise<string> {
+    if (!config.interfaceName) {
+      throw new Error('Interface name is required');
+    }
+
+    this.connection.setSessionType('stateful');
+    const result = await lockInterface(this.connection, config.interfaceName);
+    return result.lockHandle;
+  }
+
+  /**
+   * Unlock interface
+   */
+  async unlock(config: Partial<IInterfaceConfig>, lockHandle: string): Promise<IInterfaceState> {
+    if (!config.interfaceName) {
+      throw new Error('Interface name is required');
+    }
+
+    const result = await unlockInterface(this.connection, config.interfaceName, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
+  }
 }
