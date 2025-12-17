@@ -48,6 +48,11 @@ import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getEnhancements } from './enhancements';
 import { getIncludesList } from './includesList';
 import { getPackageContents } from '../package/read';
+import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
+import { getInclude as getIncludeUtil } from './include';
+import { getTypeInfo as getTypeInfoUtil } from './typeInfo';
+import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
+import { getEnhancementMetadata } from '../enhancement/read';
 
 // Import types
 import type {
@@ -365,5 +370,95 @@ export class AdtUtils {
    */
   async getPackageContents(packageName: string): Promise<AxiosResponse> {
     return getPackageContents(this.connection, packageName);
+  }
+
+  /**
+   * Get object structure from ADT repository
+   * 
+   * Retrieves ADT object structure as compact JSON tree.
+   * 
+   * @param objectType - Object type (e.g., 'CLAS/OC', 'PROG/P', 'DEVC/K')
+   * @param objectName - Object name
+   * @returns Axios response with XML containing object structure tree
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getObjectStructure('CLAS/OC', 'ZMY_CLASS');
+   * ```
+   */
+  async getObjectStructure(objectType: string, objectName: string): Promise<AxiosResponse> {
+    return getObjectStructureUtil(this.connection, objectType, objectName);
+  }
+
+  /**
+   * Get include source code
+   * 
+   * Retrieves source code of specific ABAP include file.
+   * 
+   * @param includeName - Include name
+   * @returns Axios response with source code (plain text)
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getInclude('ZMY_INCLUDE');
+   * const sourceCode = response.data; // Include source code
+   * ```
+   */
+  async getInclude(includeName: string): Promise<AxiosResponse> {
+    return getIncludeUtil(this.connection, includeName);
+  }
+
+  /**
+   * Get type information with fallback chain
+   * 
+   * Tries multiple endpoints in order: domain, data element, table type, object properties.
+   * 
+   * @param typeName - Type name to look up
+   * @returns Axios response with type information (XML)
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getTypeInfo('ZMY_TYPE');
+   * ```
+   */
+  async getTypeInfo(typeName: string): Promise<AxiosResponse> {
+    return getTypeInfoUtil(this.connection, typeName);
+  }
+
+  /**
+   * Get enhancement implementation source code
+   * 
+   * Uses different URL format: /sap/bc/adt/enhancements/{spot}/{name}/source/main
+   * where spot is the enhancement spot name (not type).
+   * 
+   * @param enhancementSpot - Enhancement spot name (e.g., 'enhoxhh')
+   * @param enhancementName - Enhancement implementation name
+   * @returns Axios response with XML containing enhancement source code
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getEnhancementImpl('enhoxhh', 'zpartner_update_pai');
+   * ```
+   */
+  async getEnhancementImpl(enhancementSpot: string, enhancementName: string): Promise<AxiosResponse> {
+    return getEnhancementImplUtil(this.connection, enhancementSpot, enhancementName);
+  }
+
+  /**
+   * Get enhancement spot metadata
+   * 
+   * Convenience wrapper for reading enhancement spot metadata.
+   * Uses type 'enhsxsb' (BAdI Enhancement Spot).
+   * 
+   * @param enhancementSpot - Enhancement spot name
+   * @returns Axios response with XML containing enhancement spot metadata
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getEnhancementSpot('enhoxhh');
+   * ```
+   */
+  async getEnhancementSpot(enhancementSpot: string): Promise<AxiosResponse> {
+    return getEnhancementMetadata(this.connection, 'enhsxsb', enhancementSpot);
   }
 }

@@ -97,6 +97,7 @@
       "objectname",
       "objectproperties",
       "objectstructure",
+      "objecttype",
       "objecttypes",
       "objname",
       "objtype",
@@ -136,6 +137,7 @@
       "ZCDS",
       "ZLOCAL",
       "ZPACKAGE",
+      "zpartner",
       "ZPLACEHOLDER",
       "ZTEST"
     ]

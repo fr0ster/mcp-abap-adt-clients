@@ -47,16 +47,17 @@ Methods can be located in:
 ### 1.2 GetObjectStructure
 **Handler:** `system/readonly/handleGetObjectStructure.ts`  
 **Endpoint:** `/sap/bc/adt/repository/objectstructure` (GET)  
-**Status:** ❌ **Missing**  
+**Status:** ✅ **Exists**  
 **Location:**
 - ❌ ReadOnlyClient - missing
 - ❌ CrudClient - missing
-- ❌ AdtClient - missing
-- ❌ Shared/Infrastructure - missing
+- ❌ AdtClient - missing (no direct method)
+- ✅ **Shared/Infrastructure** - `AdtClient.getUtils().getObjectStructure()`
+  - `core/shared/objectStructure.ts` → `getObjectStructure()`
+  - `core/shared/AdtUtils.ts` → `getObjectStructure()`
 
-**Action:** 
-- Create `core/infrastructure/system/objectStructure.ts` → `getObjectStructure()`
-- Add to `AdtUtils` → `getObjectStructure()`
+**Action:**
+- ✅ Implementation completed
 - Update handler to use `AdtClient.getUtils().getObjectStructure()`
 
 ---
@@ -109,20 +110,21 @@ Methods can be located in:
 - `/sap/bc/adt/ddic/domains/{name}/source/main`
 - `/sap/bc/adt/ddic/dataelements/{name}`
 - `/sap/bc/adt/ddic/tabletypes/{name}`
-- `/sap/bc/adt/repository/informationsystem/objectproperties/values`
+- `/sap/bc/adt/repository/informationsystem/objectproperties/values` (fallback)
 
-**Status:** ❌ **Missing**  
+**Status:** ✅ **Exists**  
 **Location:**
 - ❌ ReadOnlyClient - missing
 - ❌ CrudClient - missing
-- ❌ AdtClient - missing
-- ❌ Shared/Infrastructure - missing
+- ❌ AdtClient - missing (no direct method)
+- ✅ **Shared/Infrastructure** - `AdtClient.getUtils().getTypeInfo()`
+  - `core/shared/typeInfo.ts` → `getTypeInfo()`
+  - `core/shared/AdtUtils.ts` → `getTypeInfo()`
+  - Implements fallback chain: domain → data element → table type → object properties
 
 **Action:**
-- Create `core/infrastructure/system/typeInfo.ts` → `getTypeInfo()`
-- Add to `AdtUtils` → `getTypeInfo()`
+- ✅ Implementation completed
 - Update handler to use `AdtClient.getUtils().getTypeInfo()`
-  Use `/sap/bc/adt/repository/informationsystem/objectproperties/values` only
 
 ---
 
@@ -203,43 +205,38 @@ Methods can be located in:
 ### 2.1 GetEnhancementImpl
 **Handler:** `enhancement/readonly/handleGetEnhancementImpl.ts`  
 **Endpoint:** `/sap/bc/adt/enhancements/{spot}/{name}/source/main` (GET)  
-**Status:** ⚠️ **Partial**  
+**Status:** ✅ **Exists**  
 **Location:**
 - ❌ ReadOnlyClient - missing
 - ❌ CrudClient - missing
-- ✅ **AdtClient** - has `getEnhancement()` method (access to `AdtEnhancement`)
-- ⚠️ **Core** - has `AdtEnhancement.read()` / `getEnhancementSource()` but uses different URL format
-  - Current: `/sap/bc/adt/enhancements/{type}/{name}/source/main` (type in URL)
-  - Handler: `/sap/bc/adt/enhancements/{spot}/{name}/source/main` (spot in URL, not type)
-  - **Difference:** Handler uses spot name as URL segment instead of enhancement type
+- ❌ AdtClient - missing (no direct method)
+- ✅ **Shared/Infrastructure** - `AdtClient.getUtils().getEnhancementImpl()`
+  - `core/shared/enhancementImpl.ts` → `getEnhancementImpl()`
+  - `core/shared/AdtUtils.ts` → `getEnhancementImpl()`
+  - **Note:** Uses spot name in URL instead of enhancement type (different from standard enhancement operations)
 
 **Action:**
-- ✅ `getEnhancement()` method already exists in `AdtClient`
-- Create `core/infrastructure/enhancement/enhancementImpl.ts` → `getEnhancementImplBySpot(spot, name)`
-  - **Note:** Method name includes "BySpot" to indicate it uses spot in URL instead of type
-- Add to `AdtUtils` → `getEnhancementImplBySpot()` with comment explaining URL format difference
-- Update handler to use `AdtClient.getUtils().getEnhancementImplBySpot()`
+- ✅ Implementation completed
+- Update handler to use `AdtClient.getUtils().getEnhancementImpl(spot, name)`
 
 ---
 
 ### 2.2 GetEnhancementSpot
 **Handler:** `enhancement/readonly/handleGetEnhancementSpot.ts`  
 **Endpoint:** `/sap/bc/adt/enhancements/enhsxsb/{spot_name}` (GET)  
-**Status:** ✅ **Can use existing**  
+**Status:** ✅ **Exists**  
 **Location:**
 - ❌ ReadOnlyClient - missing
 - ❌ CrudClient - missing
 - ✅ **AdtClient** - has `getEnhancement()` method (access to `AdtEnhancement`)
-- ✅ **Core** - `AdtEnhancement.readMetadata()` can be used with `enhancementType: 'enhsxsb'`
-  - Current: `/sap/bc/adt/enhancements/{type}/{name}` where type='enhsxsb'
-  - Handler: `/sap/bc/adt/enhancements/enhsxsb/{spot_name}`
-  - **Same format:** Can use existing `getEnhancementMetadata()` method
+- ✅ **Shared/Infrastructure** - `AdtClient.getUtils().getEnhancementSpot()`
+  - `core/shared/AdtUtils.ts` → `getEnhancementSpot()` (convenience wrapper)
+  - Uses `core/enhancement/read.ts` → `getEnhancementMetadata()` with type 'enhsxsb'
+  - **Note:** Convenience wrapper for consistency, uses existing `getEnhancementMetadata()` internally
 
 **Action:**
-- ✅ `getEnhancement()` method already exists in `AdtClient`
-- Create convenience method `AdtUtils.getEnhancementSpot(spotName)` that wraps `AdtEnhancement.readMetadata({ enhancementName: spotName, enhancementType: 'enhsxsb' })`
-  - **Note:** Convenience method for consistency, uses existing `readMetadata()` internally
-- Update handler to use `AdtClient.getUtils().getEnhancementSpot()`
+- ✅ Implementation completed
+- Update handler to use `AdtClient.getUtils().getEnhancementSpot(spotName)`
 
 ---
 
@@ -271,16 +268,17 @@ Methods can be located in:
 ### 3.1 GetInclude
 **Handler:** `include/readonly/handleGetInclude.ts`  
 **Endpoint:** `/sap/bc/adt/programs/includes/{name}/source/main` (GET)  
-**Status:** ❌ **Missing**  
+**Status:** ✅ **Exists**  
 **Location:**
 - ❌ ReadOnlyClient - missing
 - ❌ CrudClient - missing
-- ❌ AdtClient - missing
-- ❌ Shared/Infrastructure - missing
+- ❌ AdtClient - missing (no direct method)
+- ✅ **Shared/Infrastructure** - `AdtClient.getUtils().getInclude()`
+  - `core/shared/include.ts` → `getInclude()`
+  - `core/shared/AdtUtils.ts` → `getInclude()`
 
 **Action:**
-- Create `core/infrastructure/include/include.ts` → `getInclude()`
-- Add to `AdtUtils` → `getInclude()`
+- ✅ Implementation completed
 - Update handler to use `AdtClient.getUtils().getInclude()`
 
 ---
@@ -408,7 +406,7 @@ Methods can be located in:
 
 ## Summary
 
-### ✅ Already Implemented (11)
+### ✅ Already Implemented (16)
 1. GetWhereUsed - `AdtClient.getUtils().getWhereUsed()`
 2. GetSqlQuery - `AdtClient.getUtils().getSqlQuery()`
 3. GetInactiveObjects - `AdtClient.getUtils().getInactiveObjects()` / `CrudClient.getInactiveObjects()`
@@ -420,6 +418,11 @@ Methods can be located in:
 9. GetIncludesList - `AdtClient.getUtils().getIncludesList(objectName, objectType, timeout?)` / `core/shared/includesList.ts` → `getIncludesList()`
 10. GetPackageContents - `AdtClient.getUtils().getPackageContents(packageName)` / `core/package/read.ts` → `getPackageContents()`
 11. FetchNodeStructure - `AdtClient.getUtils().fetchNodeStructure(parentType, parentName, nodeId?, withShortDescriptions?)` / `core/shared/nodeStructure.ts` → `fetchNodeStructure()` (base function for GetObjectInfo)
+12. GetObjectStructure - `AdtClient.getUtils().getObjectStructure(objectType, objectName)` / `core/shared/objectStructure.ts` → `getObjectStructure()`
+13. GetInclude - `AdtClient.getUtils().getInclude(includeName)` / `core/shared/include.ts` → `getInclude()`
+14. GetTypeInfo - `AdtClient.getUtils().getTypeInfo(typeName)` / `core/shared/typeInfo.ts` → `getTypeInfo()` (with fallback chain)
+15. GetEnhancementImpl - `AdtClient.getUtils().getEnhancementImpl(spot, name)` / `core/shared/enhancementImpl.ts` → `getEnhancementImpl()` (uses spot in URL)
+16. GetEnhancementSpot - `AdtClient.getUtils().getEnhancementSpot(spotName)` / `core/enhancement/read.ts` → `getEnhancementMetadata()` (convenience wrapper with type 'enhsxsb')
 
 ### ⚠️ Partially Implemented (2)
 1. GetEnhancementImpl - has `getEnhancementSource()`, but handler uses different URL format (spot in URL instead of type), needs `getEnhancementImplBySpot()`
@@ -428,11 +431,8 @@ Methods can be located in:
 ### ✅ Can Use Existing (1)
 1. GetEnhancementSpot - can use `AdtEnhancement.readMetadata()` with `type='enhsxsb'`, needs convenience wrapper `getEnhancementSpot()`
 
-### ❌ Implementation Needed (4)
-1. GetObjectStructure
-2. GetTypeInfo
-3. GetAllTypes
-4. GetInclude
+### ❌ Implementation Needed (1)
+1. GetAllTypes - object types listing
 
 ### 🚫 Not Planned (1)
 1. GetObjectNodeFromCache - MCP server-specific (uses in-memory cache, not suitable for adt-clients library)
@@ -475,11 +475,11 @@ All new methods will be added to `AdtClient` via `getUtils()` for easier method 
 4. ⚠️ **GetObjectInfo** - ⚠️ base function `fetchNodeStructure()` implemented, full tree building logic remains in handler
 
 ### Medium Priority
-5. **GetObjectStructure** - object structure tree
-6. **GetTypeInfo** - type information lookup
-7. **GetInclude** - include source code reading
-8. **GetEnhancementImpl** - different URL format (spot in URL instead of type)
-9. **GetEnhancementSpot** - convenience wrapper for existing `readMetadata()` method
+5. ✅ **GetObjectStructure** - ✅ implemented via `AdtUtils.getObjectStructure()`
+6. ✅ **GetTypeInfo** - ✅ implemented via `AdtUtils.getTypeInfo()` (with fallback chain)
+7. ✅ **GetInclude** - ✅ implemented via `AdtUtils.getInclude()`
+8. ✅ **GetEnhancementImpl** - ✅ implemented via `AdtUtils.getEnhancementImpl()` (uses spot in URL)
+9. ✅ **GetEnhancementSpot** - ✅ implemented via `AdtUtils.getEnhancementSpot()` (convenience wrapper)
 
 ### Low Priority
 10. **GetAllTypes** - object types listing
