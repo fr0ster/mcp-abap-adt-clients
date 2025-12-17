@@ -603,7 +603,7 @@ await client.getClass().read(
 
 - **[Stateful Session Guide](docs/STATEFUL_SESSION_GUIDE.md)** – how Builders and clients manage `sessionId`, `lockHandle`, and the lock registry
 - **[Operation Delays](docs/OPERATION_DELAYS.md)** – configurable delays for SAP operations in tests (sequential execution, timing issues)
-- **[Architecture](docs/reference/ARCHITECTURE.md)** – package structure and design decisions
+- **[Architecture](docs/architecture/ARCHITECTURE.md)** – package structure and design decisions
 - **[Builder Test Pattern](docs/BUILDER_TEST_PATTERN.md)** – test structure and patterns for contributors
 - **[Test Configuration Schema](docs/TEST_CONFIG_SCHEMA.md)** – YAML test configuration reference
 

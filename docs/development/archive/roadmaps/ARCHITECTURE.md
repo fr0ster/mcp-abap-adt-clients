@@ -145,18 +145,6 @@ core/[objectType]/
 - `getObjectSourceUri(objectType, objectName, functionGroup?)` → `string`
 - `getSqlQuery(params)` → `Promise<AxiosResponse>`
 - `getTableContents(params)` → `Promise<AxiosResponse>`
-- `getTransaction(transactionName)` → `Promise<AxiosResponse>`
-- `getBdef(name, version?)` → `Promise<AxiosResponse>`
-- `getEnhancements(objectName, objectType, context?)` → `Promise<AxiosResponse>`
-- `getIncludesList(objectName, objectType, timeout?)` → `Promise<AxiosResponse>`
-- `getPackageContents(packageName)` → `Promise<AxiosResponse>`
-- `fetchNodeStructure(parentType, parentName, nodeId?, withShortDescriptions?)` → `Promise<AxiosResponse>`
-- `getObjectStructure(objectType, objectName)` → `Promise<AxiosResponse>`
-- `getInclude(includeName)` → `Promise<AxiosResponse>`
-- `getTypeInfo(typeName)` → `Promise<AxiosResponse>`
-- `getEnhancementImpl(spot, name)` → `Promise<AxiosResponse>`
-- `getEnhancementSpot(spotName)` → `Promise<AxiosResponse>`
-- `getAllTypes(maxItemCount?, name?, data?)` → `Promise<AxiosResponse>`
 
 **Usage:**
 ```typescript
@@ -559,6 +547,10 @@ Each core module maintains its own `types.ts` with low-level params and Builder 
 - **Error Handling**: Proper cleanup on test failures
 - **Dependency Management**: Supports creating/deleting dependencies (e.g., FunctionGroup for FunctionModule)
 
+**Migration Status:**
+- ✅ 15/15 object-specific integration tests migrated to `BaseTester` (100% - completed)
+- See [BaseTester Migration Roadmap](../development/archive/roadmaps/BASE_TESTER_MIGRATION.md) for details (archived)
+
 **Example Usage:**
 ```typescript
 import { BaseTester } from '../../helpers/BaseTester';
@@ -634,9 +626,26 @@ The library uses a **5-tier granular debug flag system**:
 4. **`DEBUG_ADT_E2E_TESTS`** - E2E integration test logs
 5. **`DEBUG_ADT_HELPER_TESTS`** - Test helper function logs
 
-See [DEBUG.md](../usage/DEBUG.md) for detailed usage.
+See [DEBUG.md](../DEBUG.md) for detailed usage.
 
 ---
+
+## Implementation Plan
+
+**Status:** ✅ **COMPLETED**
+
+**Completion Date:** 2025-01-27
+
+1. ✅ Create package `@mcp-abap-adt/adt-clients`
+2. ✅ Create client classes with methods
+3. ✅ Implement core modules for each object type
+4. ✅ Implement private utilities
+5. ✅ Add tests
+6. ✅ Publish package
+
+**Note:** Handlers are part of the MCP server (`@mcp-abap-adt`), not this client library. This library provides the client APIs that handlers use.
+
+**Note:** This implementation plan is now archived as all planned implementations are complete.
 
 ## Export Structure
 
