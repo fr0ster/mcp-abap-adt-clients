@@ -56,6 +56,63 @@ import {
   listProcessTypes as listProcessTypesUtil
 } from './traces/profiler';
 
+// Import ABAP debugger functions
+import {
+  launchDebugger as launchDebuggerUtil,
+  stopDebugger as stopDebuggerUtil,
+  getDebugger as getDebuggerUtil,
+  getMemorySizes as getMemorySizesUtil,
+  getSystemArea as getSystemAreaUtil,
+  synchronizeBreakpoints as synchronizeBreakpointsUtil,
+  getBreakpointStatements as getBreakpointStatementsUtil,
+  getBreakpointMessageTypes as getBreakpointMessageTypesUtil,
+  getBreakpointConditions as getBreakpointConditionsUtil,
+  validateBreakpoints as validateBreakpointsUtil,
+  getVitBreakpoints as getVitBreakpointsUtil,
+  getVariableMaxLength as getVariableMaxLengthUtil,
+  getVariableSubcomponents as getVariableSubcomponentsUtil,
+  getVariableAsCsv as getVariableAsCsvUtil,
+  getVariableAsJson as getVariableAsJsonUtil,
+  getVariableValueStatement as getVariableValueStatementUtil,
+  executeDebuggerAction as executeDebuggerActionUtil,
+  getCallStack as getCallStackUtil,
+  insertWatchpoint as insertWatchpointUtil,
+  getWatchpoints as getWatchpointsUtil,
+  executeBatchRequest as executeBatchRequestUtil,
+  type ILaunchDebuggerOptions,
+  type IStopDebuggerOptions,
+  type IGetDebuggerOptions,
+  type IGetSystemAreaOptions,
+  type IGetVariableAsCsvOptions,
+  type IGetVariableAsJsonOptions,
+  type IGetVariableValueStatementOptions
+} from './debugger/abap';
+
+// Import AMDP debugger functions
+import {
+  startAmdpDebugger as startAmdpDebuggerUtil,
+  resumeAmdpDebugger as resumeAmdpDebuggerUtil,
+  terminateAmdpDebugger as terminateAmdpDebuggerUtil,
+  getAmdpDebuggee as getAmdpDebuggeeUtil,
+  getAmdpVariable as getAmdpVariableUtil,
+  setAmdpVariable as setAmdpVariableUtil,
+  lookupAmdp as lookupAmdpUtil,
+  stepOverAmdp as stepOverAmdpUtil,
+  stepContinueAmdp as stepContinueAmdpUtil,
+  getAmdpBreakpoints as getAmdpBreakpointsUtil,
+  getAmdpBreakpointsLlang as getAmdpBreakpointsLlangUtil,
+  getAmdpBreakpointsTableFunctions as getAmdpBreakpointsTableFunctionsUtil,
+  type IStartAmdpDebuggerOptions
+} from './debugger/amdp';
+
+// Import AMDP data preview functions
+import {
+  getAmdpDataPreview as getAmdpDataPreviewUtil,
+  getAmdpCellSubstring as getAmdpCellSubstringUtil,
+  type IGetAmdpDataPreviewOptions,
+  type IGetAmdpCellSubstringOptions
+} from './debugger/amdpDataPreview';
+
 export class AdtRuntime {
   private connection: IAbapConnection;
   private logger: ILogger;
@@ -513,6 +570,174 @@ export class AdtRuntime {
    */
   async executeBatchRequest(requests: string): Promise<AxiosResponse> {
     return executeBatchRequestUtil(this.connection, requests);
+  }
+
+  // ============================================================================
+  // AMDP Debugger
+  // ============================================================================
+
+  /**
+   * Start AMDP debugger session
+   * 
+   * @param options - Debugger start options
+   * @returns Axios response with debugger session
+   */
+  async startAmdpDebugger(options?: IStartAmdpDebuggerOptions): Promise<AxiosResponse> {
+    return startAmdpDebuggerUtil(this.connection, options);
+  }
+
+  /**
+   * Resume AMDP debugger session
+   * 
+   * @param mainId - Main debugger session ID
+   * @returns Axios response with debugger session
+   */
+  async resumeAmdpDebugger(mainId: string): Promise<AxiosResponse> {
+    return resumeAmdpDebuggerUtil(this.connection, mainId);
+  }
+
+  /**
+   * Terminate AMDP debugger session
+   * 
+   * @param mainId - Main debugger session ID
+   * @param hardStop - Whether to perform hard stop
+   * @returns Axios response
+   */
+  async terminateAmdpDebugger(mainId: string, hardStop?: boolean): Promise<AxiosResponse> {
+    return terminateAmdpDebuggerUtil(this.connection, mainId, hardStop);
+  }
+
+  /**
+   * Get AMDP debuggee information
+   * 
+   * @param mainId - Main debugger session ID
+   * @param debuggeeId - Debuggee ID
+   * @returns Axios response with debuggee information
+   */
+  async getAmdpDebuggee(mainId: string, debuggeeId: string): Promise<AxiosResponse> {
+    return getAmdpDebuggeeUtil(this.connection, mainId, debuggeeId);
+  }
+
+  /**
+   * Get AMDP variable value
+   * 
+   * @param mainId - Main debugger session ID
+   * @param debuggeeId - Debuggee ID
+   * @param varname - Variable name
+   * @param offset - Offset for variable value
+   * @param length - Length of variable value to retrieve
+   * @returns Axios response with variable value
+   */
+  async getAmdpVariable(
+    mainId: string,
+    debuggeeId: string,
+    varname: string,
+    offset?: number,
+    length?: number
+  ): Promise<AxiosResponse> {
+    return getAmdpVariableUtil(this.connection, mainId, debuggeeId, varname, offset, length);
+  }
+
+  /**
+   * Set AMDP variable value
+   * 
+   * @param mainId - Main debugger session ID
+   * @param debuggeeId - Debuggee ID
+   * @param varname - Variable name
+   * @param setNull - Whether to set variable to null
+   * @returns Axios response
+   */
+  async setAmdpVariable(
+    mainId: string,
+    debuggeeId: string,
+    varname: string,
+    setNull?: boolean
+  ): Promise<AxiosResponse> {
+    return setAmdpVariableUtil(this.connection, mainId, debuggeeId, varname, setNull);
+  }
+
+  /**
+   * Lookup objects/variables in AMDP debugger
+   * 
+   * @param mainId - Main debugger session ID
+   * @param debuggeeId - Debuggee ID
+   * @param name - Name to lookup
+   * @returns Axios response with lookup results
+   */
+  async lookupAmdp(mainId: string, debuggeeId: string, name?: string): Promise<AxiosResponse> {
+    return lookupAmdpUtil(this.connection, mainId, debuggeeId, name);
+  }
+
+  /**
+   * Step over in AMDP debugger
+   * 
+   * @param mainId - Main debugger session ID
+   * @param debuggeeId - Debuggee ID
+   * @returns Axios response
+   */
+  async stepOverAmdp(mainId: string, debuggeeId: string): Promise<AxiosResponse> {
+    return stepOverAmdpUtil(this.connection, mainId, debuggeeId);
+  }
+
+  /**
+   * Continue execution in AMDP debugger
+   * 
+   * @param mainId - Main debugger session ID
+   * @param debuggeeId - Debuggee ID
+   * @returns Axios response
+   */
+  async stepContinueAmdp(mainId: string, debuggeeId: string): Promise<AxiosResponse> {
+    return stepContinueAmdpUtil(this.connection, mainId, debuggeeId);
+  }
+
+  /**
+   * Get AMDP breakpoints
+   * 
+   * @param mainId - Main debugger session ID
+   * @returns Axios response with breakpoints
+   */
+  async getAmdpBreakpoints(mainId: string): Promise<AxiosResponse> {
+    return getAmdpBreakpointsUtil(this.connection, mainId);
+  }
+
+  /**
+   * Get AMDP breakpoints for LLang
+   * 
+   * @param mainId - Main debugger session ID
+   * @returns Axios response with LLang breakpoints
+   */
+  async getAmdpBreakpointsLlang(mainId: string): Promise<AxiosResponse> {
+    return getAmdpBreakpointsLlangUtil(this.connection, mainId);
+  }
+
+  /**
+   * Get AMDP breakpoints for table functions
+   * 
+   * @param mainId - Main debugger session ID
+   * @returns Axios response with table function breakpoints
+   */
+  async getAmdpBreakpointsTableFunctions(mainId: string): Promise<AxiosResponse> {
+    return getAmdpBreakpointsTableFunctionsUtil(this.connection, mainId);
+  }
+
+  /**
+   * Get AMDP debugger data preview
+   * 
+   * @param options - Data preview options
+   * @returns Axios response with data preview
+   */
+  async getAmdpDataPreview(options?: IGetAmdpDataPreviewOptions): Promise<AxiosResponse> {
+    return getAmdpDataPreviewUtil(this.connection, options);
+  }
+
+  /**
+   * Get cell substring from AMDP debugger data preview
+   * 
+   * @param options - Cell substring options
+   * @returns Axios response with cell substring
+   */
+  async getAmdpCellSubstring(options?: IGetAmdpCellSubstringOptions): Promise<AxiosResponse> {
+    return getAmdpCellSubstringUtil(this.connection, options);
   }
 }
 

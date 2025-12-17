@@ -630,25 +630,27 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 - [ ] Add integration tests
 
 #### 4. AMDP Debugger Module
-**Status:** ❌ Not Started
+**Status:** ✅ **Completed**
 
 **Tasks:**
-- [ ] Create `runtime/debugger/amdp.ts` with low-level functions:
-  - [ ] `startDebugger(options?)` → GET `/sap/bc/adt/amdp/debugger/main` (start relation)
-  - [ ] `resumeDebugger(mainId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}` (resume relation)
-  - [ ] `terminateDebugger(mainId, hardStop?)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}` (terminate relation)
-  - [ ] `getDebuggee(mainId, debuggeeId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}`
-  - [ ] `getVariable(mainId, debuggeeId, varname, offset?, length?)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}/variables/{varname}`
-  - [ ] `setVariable(mainId, debuggeeId, varname, setNull?)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}/variables/{varname}` (setvars relation)
-  - [ ] `lookup(mainId, debuggeeId, name)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}/lookup`
-  - [ ] `stepOver(mainId, debuggeeId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}?step=over`
-  - [ ] `stepContinue(mainId, debuggeeId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}?step=continue`
-  - [ ] `getBreakpoints(mainId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/breakpoints`
-- [ ] Create `runtime/debugger/amdpDataPreview.ts`:
-  - [ ] `getDataPreview(options)` → GET `/sap/bc/adt/datapreview/amdpdebugger`
-  - [ ] `getCellSubstring(options)` → GET `/sap/bc/adt/datapreview/amdpdebugger/cellsubstring`
-- [ ] Add to `AdtRuntime` → `getAmdpDebugger*()` methods
-- [ ] Create types for debugger session and state
+- [x] Create `runtime/debugger/amdp.ts` with low-level functions:
+  - [x] `startAmdpDebugger(options?)` → GET `/sap/bc/adt/amdp/debugger/main` (start relation)
+  - [x] `resumeAmdpDebugger(mainId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}` (resume relation)
+  - [x] `terminateAmdpDebugger(mainId, hardStop?)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}` (terminate relation)
+  - [x] `getAmdpDebuggee(mainId, debuggeeId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}`
+  - [x] `getAmdpVariable(mainId, debuggeeId, varname, offset?, length?)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}/variables/{varname}`
+  - [x] `setAmdpVariable(mainId, debuggeeId, varname, setNull?)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}/variables/{varname}` (setvars relation)
+  - [x] `lookupAmdp(mainId, debuggeeId, name)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}/lookup`
+  - [x] `stepOverAmdp(mainId, debuggeeId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}?step=over`
+  - [x] `stepContinueAmdp(mainId, debuggeeId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/debuggees/{debuggeeId}?step=continue`
+  - [x] `getAmdpBreakpoints(mainId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/breakpoints`
+  - [x] `getAmdpBreakpointsLlang(mainId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/breakpoints` (llang relation)
+  - [x] `getAmdpBreakpointsTableFunctions(mainId)` → GET `/sap/bc/adt/amdp/debugger/main/{mainId}/breakpoints` (tablefunctions relation)
+- [x] Create `runtime/debugger/amdpDataPreview.ts`:
+  - [x] `getAmdpDataPreview(options)` → GET `/sap/bc/adt/datapreview/amdpdebugger`
+  - [x] `getAmdpCellSubstring(options)` → GET `/sap/bc/adt/datapreview/amdpdebugger/cellsubstring`
+- [x] Add to `AdtRuntime` → `getAmdpDebugger*()` methods (15 methods)
+- [x] Create types for debugger session and state
 - [ ] Add integration tests
 
 ### Priority 2: Medium Value Modules
@@ -733,7 +735,7 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 | Memory Snapshots | 1 | ✅ Completed | 90% (tests pending) |
 | ABAP Profiler Traces | 1 | ✅ Completed | 90% (tests pending) |
 | ABAP Debugger (Standard) | 1 | ✅ Completed | 90% (tests pending) |
-| AMDP Debugger | 1 | ❌ Not Started | 0% |
+| AMDP Debugger | 1 | ✅ Completed | 90% (tests pending) |
 | Cross Trace | 2 | ❌ Not Started | 0% |
 | Application Logs | 2 | ❌ Not Started | 0% |
 | ATC Logs | 2 | ❌ Not Started | 0% |
@@ -741,5 +743,5 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 | Performance Trace (ST05) | 3 | ❌ Not Started | 0% |
 | DDIC Activation Graph | 3 | ❌ Not Started | 0% |
 
-**Total Progress:** 3/10 modules (30% - Memory Snapshots, ABAP Profiler Traces, and ABAP Debugger (Standard) completed, tests pending)
+**Total Progress:** 4/10 modules (40% - Memory Snapshots, ABAP Profiler Traces, ABAP Debugger (Standard), and AMDP Debugger completed, tests pending)
 

@@ -33,3 +33,26 @@ export {
   type IGetVariableValueStatementOptions
 } from './abap';
 
+export {
+  startAmdpDebugger,
+  resumeAmdpDebugger,
+  terminateAmdpDebugger,
+  getAmdpDebuggee,
+  getAmdpVariable,
+  setAmdpVariable,
+  lookupAmdp,
+  stepOverAmdp,
+  stepContinueAmdp,
+  getAmdpBreakpoints,
+  getAmdpBreakpointsLlang,
+  getAmdpBreakpointsTableFunctions,
+  type IStartAmdpDebuggerOptions
+} from './amdp';
+
+export {
+  getAmdpDataPreview,
+  getAmdpCellSubstring,
+  type IGetAmdpDataPreviewOptions,
+  type IGetAmdpCellSubstringOptions
+} from './amdpDataPreview';
+
