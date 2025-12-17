@@ -8,6 +8,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
+import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -17,14 +19,7 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
+const testsLogger = createTestsLogger();
 
 function getConfig(): SapConfig {
   const rawUrl = process.env.SAP_URL;
@@ -88,12 +83,12 @@ describe('Shared - readMetadata', () => {
   beforeEach(async () => {
     try {
       const config = getConfig();
-      connection = createAbapConnection(config, logger);
+      connection = createAbapConnection(config, testsLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, logger);
+      client = new AdtClient(connection, testsLogger);
       hasConfig = true;
     } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -106,13 +101,14 @@ describe('Shared - readMetadata', () => {
 
   it('should read class metadata', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // Use a standard SAP class that should exist
     const className = 'CL_ABAP_CHAR_UTILITIES';
     try {
+      logBuilderTestStep('read class metadata', testsLogger);
       const result = await client.getUtils().readObjectMetadata('class', className);
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
@@ -126,13 +122,14 @@ describe('Shared - readMetadata', () => {
 
   it('should read domain metadata', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // Use a standard SAP domain that should exist
     const domainName = 'MANDT';
     try {
+      logBuilderTestStep('read domain metadata', testsLogger);
       const result = await client.getUtils().readObjectMetadata('domain', domainName);
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
@@ -146,13 +143,14 @@ describe('Shared - readMetadata', () => {
 
   it('should read table metadata', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // Use a standard SAP table that should exist
     const tableName = 'T000';
     try {
+      logBuilderTestStep('read table metadata', testsLogger);
       const result = await client.getUtils().readObjectMetadata('table', tableName);
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
@@ -166,10 +164,11 @@ describe('Shared - readMetadata', () => {
 
   it('should throw error for unsupported object type', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
+    logBuilderTestStep('validate error for unsupported object type', testsLogger);
     await expect(
       client.getUtils().readObjectMetadata('unsupported_type', 'TEST')
     ).rejects.toThrow('Unsupported object type for metadata');

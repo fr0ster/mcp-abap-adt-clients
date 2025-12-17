@@ -67,7 +67,8 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
   }
 
   /**
-   * Create structure with full operation chain
+   * Create structure metadata only
+   * Use update() to upload DDL code after creation
    */
   async create(
     config: IStructureConfig,
@@ -102,13 +103,9 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
 
       return state;
     } catch (error: any) {
-      // Cleanup on error - ensure stateless
-      this.connection.setSessionType('stateless');
-
       if (objectCreated && options?.deleteOnFailure) {
         try {
           this.logger?.warn?.('Deleting structure after failure');
-          // No stateful needed - delete doesn't use lock/unlock
           await deleteStructure(this.connection, {
             structure_name: config.structureName,
             transport_request: config.transportRequest

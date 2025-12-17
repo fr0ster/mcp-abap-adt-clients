@@ -34,7 +34,7 @@ export async function create(
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
 
-  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${params.structureName.toUpperCase()}" adtcore:type="STRU/DT" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  const structureXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${params.structureName.toUpperCase()}" adtcore:type="TABL/DS" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${params.packageName.toUpperCase()}"/>
 </blue:blueSource>`;
 

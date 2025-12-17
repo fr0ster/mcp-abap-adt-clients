@@ -238,7 +238,7 @@ export class BaseTester<TConfig, TState> {
     try {
       // 1. Validate
       currentStep = 'validate';
-      logBuilderTestStep(currentStep);
+      logBuilderTestStep(currentStep, this.logger);
       const validationState = await this.adtObject.validate(config as Partial<TConfig>);
       const validationResponse = (validationState as any)?.validationResponse || validationState;
       
@@ -313,7 +313,7 @@ export class BaseTester<TConfig, TState> {
 
       // 2. Create
       currentStep = 'create';
-      logBuilderTestStep(currentStep);
+      logBuilderTestStep(currentStep, this.logger);
       const createOptions: IAdtOperationOptions = {
         activateOnCreate: options?.activateOnCreate || false,
         timeout: options?.timeout,
@@ -328,7 +328,7 @@ export class BaseTester<TConfig, TState> {
       // 2.5. Wait for object to be ready before update (read with long polling or delay)
       if (options?.updateConfig) {
         currentStep = 'read (wait for object ready)';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, this.logger);
         // Additional delay before update (already waited after create, but this is for object readiness)
         const createDelay = this.getOperationDelay('create', testCaseParams);
         this.log(LogLevel.INFO, `Waiting ${createDelay}ms for object to be ready (fallback delay)`);
@@ -338,7 +338,7 @@ export class BaseTester<TConfig, TState> {
       // 3. Update (if updateConfig provided)
       if (options?.updateConfig) {
         currentStep = 'update';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
           activateOnUpdate: options?.activateOnUpdate || false,
           sourceCode: options?.sourceCode,
@@ -356,7 +356,7 @@ export class BaseTester<TConfig, TState> {
       // 4. Activate (if not activated during create/update)
       if (!options?.activateOnCreate && !options?.activateOnUpdate) {
         currentStep = 'activate';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, this.logger);
         const activateState = await this.adtObject.activate(config as Partial<TConfig>);
         // activate returns state object, check for errors
         const activateResponse = (activateState as any)?.activateResponse || activateState;
@@ -375,7 +375,7 @@ export class BaseTester<TConfig, TState> {
       // 5. Cleanup (if enabled)
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         currentStep = 'delete (cleanup)';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, this.logger);
         try {
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete
@@ -400,7 +400,7 @@ export class BaseTester<TConfig, TState> {
       // Cleanup on error if enabled
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         try {
-          logBuilderTestStep('delete (cleanup)');
+          logBuilderTestStep('delete (cleanup)', this.logger);
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete (cleanup on error)
           await this.waitDelay(this.getOperationDelay('delete', testCaseParams), 'delete');
@@ -427,7 +427,7 @@ export class BaseTester<TConfig, TState> {
     options?: IReadTestOptions
   ): Promise<TState | undefined> {
     try {
-      logBuilderTestStep('read');
+      logBuilderTestStep('read', this.logger);
       const readState = await this.adtObject.read(
         config,
         options?.version || 'active',

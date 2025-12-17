@@ -102,6 +102,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Update operation uses proper XML format with `rowType`, `packageRef`, `description`, and `valueHelps` sections
   - Enhanced error logging in `getTableTypeMetadata` and `updateTableType` to output full server response details for debugging HTTP 406 errors
 
+- **Test Logging**: Enhanced test step logging in shared integration tests
+  - Added `logBuilderTestStep` calls with `testsLogger` to all shared integration tests for better visibility
+  - Updated `logBuilderTestStep` function to accept optional logger parameter for consistent logging
+  - All shared tests (`search.test.ts`, `whereUsed.test.ts`, `readMetadata.test.ts`, `readSource.test.ts`, `sqlQuery.test.ts`, `tableContents.test.ts`, `groupActivation.test.ts`) now log execution steps
+  - Tests now use `createTestsLogger()` for consistent logging via `DEBUG_ADT_TESTS` environment variable
+  - Improved test output visibility when running integration tests in shared folder
+
 ### Documentation
 - Updated `ARCHITECTURE.md` with complete `AdtRuntimeClient` class documentation
 - Added runtime modules structure and method descriptions

@@ -12,19 +12,15 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
+import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { createTestsLogger } from '../../helpers/testLogger';
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger: ILogger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
+const testsLogger: ILogger = createTestsLogger();
 
 function getConfig(): SapConfig {
   const rawUrl = process.env.SAP_URL;
@@ -88,11 +84,11 @@ describe('Shared - searchObjects', () => {
   beforeEach(async () => {
     try {
       const config = getConfig();
-      connection = createAbapConnection(config, logger);
-      client = new AdtClient(connection, logger);
+      connection = createAbapConnection(config, testsLogger);
+      client = new AdtClient(connection, testsLogger);
       hasConfig = true;
     } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -105,10 +101,11 @@ describe('Shared - searchObjects', () => {
 
   it('should search objects by name pattern', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
+    logBuilderTestStep('search objects by name pattern', testsLogger);
     const result = await client.getUtils().searchObjects({
       query: 'CL_ABAP*',
       maxResults: 10
@@ -119,10 +116,11 @@ describe('Shared - searchObjects', () => {
 
   it('should search objects with object type filter', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
+    logBuilderTestStep('search objects with object type filter', testsLogger);
     const result = await client.getUtils().searchObjects({
       query: 'T*',
       objectType: 'TABL',
@@ -134,10 +132,11 @@ describe('Shared - searchObjects', () => {
 
   it('should use default maxResults if not provided', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
+    logBuilderTestStep('search objects with default maxResults', testsLogger);
     const result = await client.getUtils().searchObjects({
       query: 'CL_ABAP*'
     });

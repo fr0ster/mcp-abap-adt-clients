@@ -8,7 +8,8 @@
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
-import { createConnectionLogger } from '../../helpers/testLogger';
+import { createConnectionLogger, createTestsLogger } from '../../helpers/testLogger';
+import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -19,8 +20,9 @@ if (fs.existsSync(envPath)) {
 }
 
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
-// Can be used for both connection and AdtClient (ILogger is compatible with ILogger)
-const logger: ILogger = createConnectionLogger();
+const connectionLogger: ILogger = createConnectionLogger();
+// Test execution logs use DEBUG_ADT_TESTS
+const testsLogger: ILogger = createTestsLogger();
 
 function getConfig(): SapConfig {
   const rawUrl = process.env.SAP_URL;
@@ -84,12 +86,12 @@ describe('Shared - readSource', () => {
   beforeEach(async () => {
     try {
       const config = getConfig();
-      connection = createAbapConnection(config, logger);
+      connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, logger);
+      client = new AdtClient(connection, connectionLogger);
       hasConfig = true;
     } catch (error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
   });
@@ -102,9 +104,10 @@ describe('Shared - readSource', () => {
 
   it('should check if object type supports source code', () => {
     if (!hasConfig || !client) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
+    logBuilderTestStep('check if object type supports source code', testsLogger);
     const utils = client.getUtils();
     expect(utils.supportsSourceCode('class')).toBe(true);
     expect(utils.supportsSourceCode('program')).toBe(true);
@@ -118,12 +121,13 @@ describe('Shared - readSource', () => {
 
   it('should read class source code', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     // Use a standard SAP class that should exist
     const className = 'CL_ABAP_CHAR_UTILITIES';
+    logBuilderTestStep('read class source code', testsLogger);
     const result = await client.getUtils().readObjectSource('class', className);
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -132,11 +136,12 @@ describe('Shared - readSource', () => {
 
   it('should read class source code (inactive version)', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     const className = 'CL_ABAP_CHAR_UTILITIES';
+    logBuilderTestStep('read class source code (inactive version)', testsLogger);
     const result = await client.getUtils().readObjectSource('class', className, undefined, 'inactive');
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -144,10 +149,11 @@ describe('Shared - readSource', () => {
 
   it('should throw error for object type without source code', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
+    logBuilderTestStep('validate error for object type without source code', testsLogger);
     await expect(
       client.getUtils().readObjectSource('domain', 'MANDT')
     ).rejects.toThrow('does not support source code reading');

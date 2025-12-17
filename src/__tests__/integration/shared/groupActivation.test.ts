@@ -80,7 +80,7 @@ describe('Group Activation (SharedBuilder)', () => {
   });
 
   function getTestDefinition() {
-    return getTestCaseDefinition('group_activation', 'builder_group_activation');
+    return getTestCaseDefinition('group_activation', 'adt_group_activation');
   }
 
   describe('Group activation workflow', () => {
@@ -114,7 +114,7 @@ describe('Group Activation (SharedBuilder)', () => {
         return;
       }
 
-      const tc = getEnabledTestCase('group_activation', 'builder_group_activation');
+      const tc = getEnabledTestCase('group_activation', 'adt_group_activation');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
         return;
@@ -152,7 +152,7 @@ describe('Group Activation (SharedBuilder)', () => {
 
       if (structureCreated && structureName) {
         try {
-          logBuilderTestStep('cleanup: delete structure');
+          logBuilderTestStep('cleanup: delete structure', testsLogger);
           await client.getStructure().delete({
             structureName: structureName,
             transportRequest: transportRequest
@@ -165,7 +165,7 @@ describe('Group Activation (SharedBuilder)', () => {
 
       if (dataElementCreated && dataElementName) {
         try {
-          logBuilderTestStep('cleanup: delete data element');
+          logBuilderTestStep('cleanup: delete data element', testsLogger);
           await client.getDataElement().delete({
             dataElementName: dataElementName,
             transportRequest: transportRequest
@@ -178,7 +178,7 @@ describe('Group Activation (SharedBuilder)', () => {
 
       if (domainCreated && domainName) {
         try {
-          logBuilderTestStep('cleanup: delete domain');
+          logBuilderTestStep('cleanup: delete domain', testsLogger);
           await client.getDomain().delete({
             domainName: domainName,
             transportRequest: transportRequest
@@ -217,7 +217,7 @@ describe('Group Activation (SharedBuilder)', () => {
       try {
         // Step 1: Create domain
         currentStep = 'create domain';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, testsLogger);
         await client.getDomain().create({
           domainName: domainName,
           packageName: packageName,
@@ -232,7 +232,7 @@ describe('Group Activation (SharedBuilder)', () => {
 
         // Step 2: Create data element based on domain
         currentStep = 'create data element';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, testsLogger);
         await client.getDataElement().create({
           dataElementName: dataElementName,
           packageName: packageName,
@@ -246,7 +246,7 @@ describe('Group Activation (SharedBuilder)', () => {
 
         // Step 3: Create structure based on data element
         currentStep = 'create structure';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, testsLogger);
         // Use provided DDL code or generate one with data element reference
         const structureDdlCode = testCase.params.structure_ddl_code || 
           `@EndUserText.label: 'Group activation test structure'
@@ -259,19 +259,28 @@ define structure ${structureName} {
           structureName: structureName,
           packageName: packageName,
           description: testCase.params.description || `Test structure for group activation`,
-          ddlCode: structureDdlCode,
           transportRequest: transportRequest
         }, { activateOnCreate: false });
         structureCreated = true;
         await new Promise(resolve => setTimeout(resolve, getOperationDelay('create', testCase)));
 
+        // Step 3.5: Update structure with DDL code
+        currentStep = 'update structure';
+        logBuilderTestStep(currentStep, testsLogger);
+        await client.getStructure().update({
+          structureName: structureName,
+          ddlCode: structureDdlCode,
+          transportRequest: transportRequest
+        }, { activateOnUpdate: false });
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('update', testCase)));
+
         // Step 4: Group activation - activate all objects together
         currentStep = 'group activation';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, testsLogger);
         const objectsToActivate = [
           { type: 'DOMA', name: domainName },
           { type: 'DTEL', name: dataElementName },
-          { type: 'STRU/DT', name: structureName }
+          { type: 'TABL/DS', name: structureName }
         ];
 
         const activationResult = await client.getUtils().activateObjectsGroup(objectsToActivate, false);
@@ -279,9 +288,12 @@ define structure ${structureName} {
         expect(activationResult.status).toBe(200);
         testsLogger.info?.('✅ Group activation completed successfully');
 
+        // Wait a bit for activation to fully complete
+        await new Promise(resolve => setTimeout(resolve, getOperationDelay('activate', testCase) || 2000));
+
         // Step 5: Verify activation by checking inactive objects
         currentStep = 'verify activation';
-        logBuilderTestStep(currentStep);
+        logBuilderTestStep(currentStep, testsLogger);
         const inactiveObjects = await client.getUtils().getInactiveObjects();
         expect(inactiveObjects).toBeDefined();
 

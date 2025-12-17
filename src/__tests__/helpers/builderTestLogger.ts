@@ -252,8 +252,15 @@ export function logBuilderTestError(
   testResults.set(testName, 'FAIL');
 }
 
-export function logBuilderTestStep(step: string): void {
-  logImmediate(`  → ${step}`);
+export function logBuilderTestStep(step: string, logger?: BuilderTestLogger | undefined): void {
+  const message = `  → ${step}`;
+  // Use logImmediate for synchronous output (Jest buffers console.log)
+  logImmediate(message);
+  // Also log via logger if provided (uses DefaultLogger which is synchronous)
+  if (logger && 'info' in logger) {
+    const testLogger = logger as ILogger;
+    testLogger.info?.(message);
+  }
 }
 
 export function logBuilderTestStepError(step: string, error: any): void {
