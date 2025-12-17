@@ -84,6 +84,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `runtime/atc/` - ATC log operations
   - `runtime/feeds/` - Feed reader operations
 
+### Fixed
+- **Test Paths**: Fixed import paths in integration tests after refactoring test structure
+  - Updated paths from `../../../` to `../../../../` for `clients/`, `core/`, and `utils/` imports in `integration/core/` tests
+  - Updated paths from `../../helpers/` to `../../../helpers/` for helper imports in `integration/core/` tests
+  - Updated paths from `../../helpers/test-helper` to `../../../helpers/test-helper` for test helper imports
+  - Fixed `.env` file path resolution in `test-helper.js` to correctly find project root using `package.json` lookup
+  - All integration tests now correctly locate YAML configuration files and environment variables
+
 ### Documentation
 - Updated `ARCHITECTURE.md` with complete `AdtRuntime` class documentation
 - Added runtime modules structure and method descriptions
