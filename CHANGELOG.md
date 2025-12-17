@@ -8,73 +8,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [0.2.3] - 2025-01-27
 
 ### Added
-- **AdtRuntime Class**: New runtime operations wrapper for debugging, tracing, memory analysis, and logs
-  - Factory method: `AdtClient.getRuntime()` → `AdtRuntime`
+- **AdtRuntimeClient**: New standalone runtime operations client for debugging, tracing, memory analysis, and logs
+  - Standalone client class (similar to `ReadOnlyClient` and `CrudClient`)
+  - Independent from `AdtClient` - can be used separately
   - Centralized access to all runtime-related ADT operations
   - Clear separation from CRUD operations (via `IAdtObject`) and utility functions (via `AdtUtils`)
+  - Located in `clients/AdtRuntimeClient.ts` (not in `runtime/`)
   - See [Architecture Documentation](docs/architecture/ARCHITECTURE.md) for details
 
 - **Memory Snapshots Module** (`runtime/memory/`): Complete memory dump analysis functionality
   - 10 functions: `listSnapshots`, `getSnapshot`, `getSnapshotRankingList`, `getSnapshotDeltaRankingList`, `getSnapshotChildren`, `getSnapshotDeltaChildren`, `getSnapshotReferences`, `getSnapshotDeltaReferences`, `getSnapshotOverview`, `getSnapshotDeltaOverview`
   - Support for ranking lists, children, references, and overview with delta comparison
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **ABAP Profiler Traces Module** (`runtime/traces/profiler.ts`): ABAP profiler trace management
   - 8 functions: `listTraceFiles`, `getTraceParameters`, `getTraceParametersForCallstack`, `getTraceParametersForAmdp`, `listTraceRequests`, `getTraceRequestsByUri`, `listObjectTypes`, `listProcessTypes`
   - Support for trace files, parameters (general, callstack aggregation, AMDP), requests, and metadata
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **ABAP Debugger (Standard) Module** (`runtime/debugger/abap.ts`): Standard ABAP debugger for classes, programs, function modules
   - 20 functions covering session management, memory/system areas, breakpoints, variables, actions, stack, watchpoints, batch requests
   - Functions: `launchDebugger`, `stopDebugger`, `getDebugger`, `getMemorySizes`, `getSystemArea`, `synchronizeBreakpoints`, `getBreakpointStatements`, `getBreakpointMessageTypes`, `getBreakpointConditions`, `validateBreakpoints`, `getVitBreakpoints`, `getVariableMaxLength`, `getVariableSubcomponents`, `getVariableAsCsv`, `getVariableAsJson`, `getVariableValueStatement`, `executeDebuggerAction`, `getCallStack`, `insertWatchpoint`, `getWatchpoints`, `executeBatchRequest`
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **AMDP Debugger Module** (`runtime/debugger/amdp.ts`): AMDP (ABAP Managed Database Procedures) debugger
   - 12 functions: `startAmdpDebugger`, `resumeAmdpDebugger`, `terminateAmdpDebugger`, `getAmdpDebuggee`, `getAmdpVariable`, `setAmdpVariable`, `lookupAmdp`, `stepOverAmdp`, `stepContinueAmdp`, `getAmdpBreakpoints`, `getAmdpBreakpointsLlang`, `getAmdpBreakpointsTableFunctions`
   - Support for debugger session management, debuggee operations, variable operations, lookup, step operations, breakpoints
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **AMDP Data Preview Module** (`runtime/debugger/amdpDataPreview.ts`): Data preview during AMDP debugging
   - 2 functions: `getAmdpDataPreview`, `getAmdpCellSubstring`
   - Support for data preview and cell substring retrieval during AMDP debugging
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **Cross Trace Module** (`runtime/traces/crossTrace.ts`): Cross-system trace analysis
   - 5 functions: `listCrossTraces`, `getCrossTrace`, `getCrossTraceRecords`, `getCrossTraceRecordContent`, `getCrossTraceActivations`
   - Support for listing traces with filters, getting trace details (with optional sensitive data), records, record content, and activations
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **Application Logs Module** (`runtime/applicationLog/`): Application log object operations
   - 3 functions: `getApplicationLogObject`, `getApplicationLogSource`, `validateApplicationLogName`
   - Support for reading application log object properties, source code, and validation
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **ATC Logs Module** (`runtime/atc/`): ATC (ABAP Test Cockpit) log operations
   - 2 functions: `getCheckFailureLogs`, `getExecutionLog`
   - Support for reading ATC check failure logs and execution logs
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **Feed Reader Module** (`runtime/feeds/`): Feed repository access
   - 2 functions: `getFeeds`, `getFeedVariants`
   - Support for accessing feed repository and feed variants
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
 - **ST05 Performance Trace Module** (`runtime/traces/st05.ts`): Performance trace (ST05) operations
   - 2 functions: `getSt05TraceState`, `getSt05TraceDirectory`
   - Support for getting trace state and trace directory information
-  - All functions accessible via `AdtRuntime` class methods
+  - All functions accessible via `AdtRuntimeClient` class methods
 
-- **DDIC Activation Graph Module** (`core/ddic/logs.ts`): DDIC activation dependency graph with logs
+- **DDIC Activation Graph Module** (`runtime/ddic/activationGraph.ts`): DDIC activation dependency graph with logs
   - 1 function: `getActivationGraph`
   - Support for getting activation dependency graph with logs
-  - Accessible via `AdtUtils.getActivationGraph()` method
+  - Accessible via `AdtRuntimeClient.getDdicActivationGraph()` method
 
 ### Changed
 - **Architecture Refactoring**: Separated runtime operations from utility functions
-  - Runtime operations (debugging, tracing, memory analysis, logs) moved to `AdtRuntime` class
+  - Runtime operations (debugging, tracing, memory analysis, logs) moved to standalone `AdtRuntimeClient` class
   - Utility functions (search, where-used, includes, enhancements) remain in `AdtUtils` class
-  - Clear separation of concerns: CRUD operations (`IAdtObject`), utility functions (`AdtUtils`), runtime operations (`AdtRuntime`)
-  - `AdtClient` now provides three factory methods: `getClass()`, `getUtils()`, `getRuntime()`
+  - Clear separation of concerns: CRUD operations (`IAdtObject`), utility functions (`AdtUtils`), runtime operations (`AdtRuntimeClient`)
+  - `AdtRuntimeClient` is now an independent client (like `ReadOnlyClient` and `CrudClient`), not a factory method of `AdtClient`
+  - `AdtClient` now provides two factory methods: `getClass()`, `getUtils()` (runtime operations via separate `AdtRuntimeClient`)
 
 - **Module Organization**: Reorganized runtime modules into logical structure
   - `runtime/memory/` - Memory snapshots analysis
@@ -92,10 +95,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Fixed `.env` file path resolution in `test-helper.js` to correctly find project root using `package.json` lookup
   - All integration tests now correctly locate YAML configuration files and environment variables
 
+- **TableType Implementation**: Fixed TableType operations to correctly handle XML-based entity
+  - Fixed `getTableTypeMetadata` Accept header from `application/vnd.sap.adt.tabletypes.v2+xml` to `application/vnd.sap.adt.tabletype.v1+xml` (removed 's' suffix, matching create/update headers)
+  - TableType is now correctly implemented as XML-based entity (like Domain and DataElement), not DDL-based
+  - Create operation creates empty TableType; `rowType` is added via update operation
+  - Update operation uses proper XML format with `rowType`, `packageRef`, `description`, and `valueHelps` sections
+  - Enhanced error logging in `getTableTypeMetadata` and `updateTableType` to output full server response details for debugging HTTP 406 errors
+
 ### Documentation
-- Updated `ARCHITECTURE.md` with complete `AdtRuntime` class documentation
+- Updated `ARCHITECTURE.md` with complete `AdtRuntimeClient` class documentation
 - Added runtime modules structure and method descriptions
-- Updated usage examples to include runtime operations
+- Updated usage examples to show `AdtRuntimeClient` as standalone client
 - See [DEBUG_TRACE_DUMP_FEED_ENDPOINTS Roadmap](docs/development/roadmaps/DEBUG_TRACE_DUMP_FEED_ENDPOINTS.md) for implementation details
 
 ## [0.2.2] - 2025-12-16

@@ -12,16 +12,18 @@ Separation of ADT endpoint functionality into three classes to enable different 
 │   ├── clients/                   # High-level client APIs
 │   │   ├── AdtClient.ts          # High-level CRUD API (recommended)
 │   │   ├── ReadOnlyClient.ts     # Read-only operations (GET)
-│   │   └── CrudClient.ts         # Full CRUD (Create, Read, Update, Delete)
+│   │   ├── CrudClient.ts         # Full CRUD (Create, Read, Update, Delete)
+│   │   └── AdtRuntimeClient.ts   # Runtime operations client (standalone)
 │   ├── core/                     # Core object implementations (CRUD operations)
 │   │   ├── class/                # Class operations (Builder, AdtClass, low-level functions)
 │   │   ├── program/              # Program operations
 │   │   ├── interface/            # Interface operations
-│   │   ├── domain/               # Domain operations
-│   │   ├── dataElement/          # Data Element operations
-│   │   ├── structure/            # Structure operations
-│   │   ├── table/                # Table operations
-│   │   ├── view/                 # View (CDS) operations
+│   │   ├── domain/               # Domain operations (XML-based)
+│   │   ├── dataElement/          # Data Element operations (XML-based)
+│   │   ├── tabletype/            # Table Type operations (XML-based)
+│   │   ├── structure/            # Structure operations (DDL-based)
+│   │   ├── table/                # Table operations (DDL-based)
+│   │   ├── view/                 # View (CDS) operations (DDL-based)
 │   │   ├── functionGroup/        # Function Group operations
 │   │   ├── functionModule/       # Function Module operations
 │   │   ├── package/              # Package operations
@@ -31,16 +33,16 @@ Separation of ADT endpoint functionality into three classes to enable different 
 │   │   ├── metadataExtension/    # Metadata Extension operations
 │   │   ├── transport/            # Transport Request operations
 │   │   ├── unitTest/             # ABAP Unit Test operations
-│   │   ├── ddic/                 # DDIC operations (activation graph logs)
 │   │   └── shared/               # Shared utilities (AdtUtils, SharedBuilder)
-│   ├── runtime/                  # Runtime operations (non-CRUD)
-│   │   ├── AdtRuntime.ts         # Runtime operations wrapper class
-│   │   ├── memory/               # Memory analysis (snapshots)
-│   │   ├── traces/               # Tracing operations (profiler, cross-trace, ST05)
-│   │   ├── debugger/             # Debugging operations (ABAP debugger, AMDP debugger)
-│   │   ├── applicationLog/       # Application log operations
-│   │   ├── atc/                  # ATC (ABAP Test Cockpit) log operations
-│   │   └── feeds/                # Feed reader operations
+│   ├── runtime/                  # Runtime operations (non-CRUD, low-level functions)
+│   │   ├── memory/               # Memory analysis (snapshots.ts, index.ts)
+│   │   ├── traces/               # Tracing operations (profiler.ts, crossTrace.ts, st05.ts, index.ts)
+│   │   ├── debugger/             # Debugging operations (abap.ts, amdp.ts, amdpDataPreview.ts, index.ts)
+│   │   ├── applicationLog/       # Application log operations (read.ts, index.ts)
+│   │   ├── atc/                  # ATC (ABAP Test Cockpit) log operations (logs.ts, index.ts)
+│   │   ├── ddic/                 # DDIC activation graph operations (activationGraph.ts, index.ts)
+│   │   ├── feeds/                # Feed reader operations (read.ts, index.ts)
+│   │   └── index.ts              # Runtime module exports
 │   ├── utils/                    # Utility functions
 │   │   ├── activationUtils.ts    # Activation utilities
 │   │   ├── checkRun.ts           # Check run parsing
@@ -52,8 +54,12 @@ Separation of ADT endpoint functionality into three classes to enable different 
 │   │   ├── timeouts.ts           # Timeout utilities
 │   │   └── validation.ts         # Validation utilities
 │   ├── __tests__/                # Test infrastructure
-│   │   ├── helpers/              # Test helpers (BaseTester, test config, etc.)
-│   │   ├── integration/          # Integration tests for all object types
+│   │   ├── helpers/              # Test helpers (BaseTester, test config, test-helper.js, etc.)
+│   │   ├── integration/          # Integration tests
+│   │   │   ├── core/             # Core object type tests (class, program, domain, table, etc.)
+│   │   │   ├── runtime/          # Runtime module tests (debugger, traces, memory, logs, feeds)
+│   │   │   └── shared/            # Shared utility tests (search, whereUsed, groupActivation, etc.)
+│   │   ├── examples/             # Example usage code
 │   │   └── e2e/                  # End-to-end tests
 │   └── index.ts                  # Main package exports
 ├── docs/                         # Documentation
@@ -86,6 +92,11 @@ core/[objectType]/
 
 **Note:** Some modules have additional files:
 - `class/` module includes: `run.ts` (unit test execution), `testclasses.ts` (test class helpers), `includes.ts` (include handling), and `AdtLocalTestClass.ts`, `AdtLocalTypes.ts`, `AdtLocalDefinitions.ts`, `AdtLocalMacros.ts` for local class sections
+
+**Note on Entity Formats:**
+- **XML-based entities**: Domain, DataElement, TableType use XML format for create/update operations (like classic DDIC objects)
+- **DDL-based entities**: Table, Structure, View use DDL code format for create/update operations (CDS-based)
+- **Source code entities**: Class, Program, Interface, FunctionModule use ABAP source code format
 
 **Key Components:**
 - **Builder Classes**: Fluent API with method chaining (`builder.create().lock().update().unlock().activate()`)
@@ -166,7 +177,6 @@ core/[objectType]/
 - `getEnhancementImpl(spot, name)` → `Promise<AxiosResponse>`
 - `getEnhancementSpot(spotName)` → `Promise<AxiosResponse>`
 - `getAllTypes(maxItemCount?, name?, data?)` → `Promise<AxiosResponse>`
-- `getActivationGraph(options?)` → `Promise<AxiosResponse>`
 
 **Usage:**
 ```typescript
@@ -197,19 +207,20 @@ await runtime.launchDebugger();
 - Simplified API for common workflows
 - Automatic operation chains (no manual lock/unlock management)
 - Consistent error handling and resource cleanup
-- Separation of CRUD operations (via `IAdtObject`), utility functions (via `AdtUtils`), and runtime operations (via `AdtRuntime`)
+- Separation of CRUD operations (via `IAdtObject`), utility functions (via `AdtUtils`), and runtime operations (via `AdtRuntimeClient`)
 
 ---
 
-### 2. AdtRuntime (Runtime Operations Wrapper)
+### 2. AdtRuntimeClient (Runtime Operations Client)
 
-**Purpose:** Provides access to runtime-related ADT operations that are not CRUD operations on objects
+**Purpose:** Standalone client for runtime-related ADT operations that are not CRUD operations on objects
 
 **Architecture:**
-- Factory pattern: Returns `AdtRuntime` instance via `AdtClient.getRuntime()`
+- Standalone client class (similar to `ReadOnlyClient` and `CrudClient`)
 - Encapsulates runtime operations: debugging, tracing, memory analysis, logs, feeds
 - Stateless wrapper around low-level runtime functions
 - Uses low-level functions directly from `runtime/` modules
+- Independent from `AdtClient` - can be used separately
 
 **Key Modules:**
 - **Memory Snapshots** (`runtime/memory/`): Memory dump analysis with ranking, children, references, overview
@@ -306,32 +317,34 @@ await runtime.launchDebugger();
 - `getAtcCheckFailureLogs(options?)` → `Promise<AxiosResponse>`
 - `getAtcExecutionLog(executionId)` → `Promise<AxiosResponse>`
 
+**DDIC Activation Graph Logs:**
+- `getDdicActivationGraph(options?)` → `Promise<AxiosResponse>`
+
 **Feed Reader:**
 - `getFeeds()` → `Promise<AxiosResponse>`
 - `getFeedVariants()` → `Promise<AxiosResponse>`
 
 **Usage:**
 ```typescript
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 
-const client = new AdtClient(connection, logger);
-const runtime = client.getRuntime();
+const client = new AdtRuntimeClient(connection, logger);
 
 // Memory snapshots
-const snapshots = await runtime.listMemorySnapshots();
-const snapshot = await runtime.getMemorySnapshot('snapshot-id');
+const snapshots = await client.listMemorySnapshots();
+const snapshot = await client.getMemorySnapshot('snapshot-id');
 
 // Profiler traces
-const traceFiles = await runtime.listProfilerTraceFiles();
-const traceParams = await runtime.getProfilerTraceParameters();
+const traceFiles = await client.listProfilerTraceFiles();
+const traceParams = await client.getProfilerTraceParameters();
 
 // Debugging
-await runtime.launchDebugger({ debuggingMode: 'external' });
-const callStack = await runtime.getCallStack();
+await client.launchDebugger({ debuggingMode: 'external' });
+const callStack = await client.getCallStack();
 
 // Logs
-const appLog = await runtime.getApplicationLogObject('Z_MY_LOG');
-const atcLogs = await runtime.getAtcCheckFailureLogs();
+const appLog = await client.getApplicationLogObject('Z_MY_LOG');
+const atcLogs = await client.getAtcCheckFailureLogs();
 ```
 
 **Benefits:**
@@ -339,10 +352,12 @@ const atcLogs = await runtime.getAtcCheckFailureLogs();
 - Clear separation from CRUD operations
 - Consistent API for all runtime modules
 - Type-safe access to runtime functionality
+- Independent client - can be used without `AdtClient`
+- Reduced context for LLM (only runtime operations)
 
 ---
 
-### 2. ReadOnlyClient
+### 3. ReadOnlyClient
 
 **Purpose:** Read-only operations (GET requests only)
 
@@ -391,7 +406,7 @@ const domain = await client.readDomain('Z_MY_DOMAIN');
 
 ---
 
-### 5. CrudClient extends ReadOnlyClient
+### 4. CrudClient extends ReadOnlyClient
 
 **Purpose:** Full CRUD functionality (Create, Read, Update, Delete)
 
@@ -478,8 +493,11 @@ import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
 // Import only CrudClient
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
 
+// Import only AdtRuntimeClient
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+
 // Import all clients
-import { AdtClient, ReadOnlyClient, CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, ReadOnlyClient, CrudClient, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 ```
 
 ### High-Level CRUD API (Recommended)
@@ -804,6 +822,7 @@ The package exports clients, utilities, and types individually, allowing tree-sh
 export { AdtClient } from './clients/AdtClient';
 export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
+export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export { AdtUtils, SharedBuilder } from './core/shared';
 
 // Type exports

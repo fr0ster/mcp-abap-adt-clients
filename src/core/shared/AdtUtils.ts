@@ -57,11 +57,8 @@ import { getAllTypes as getAllTypesUtil } from './allTypes';
 // Note: Application Logs and ATC Logs are in runtime/, not core
 // They are accessed via AdtRuntime, not AdtUtils
 
-// Import DDIC activation graph function
-import {
-  getActivationGraph as getActivationGraphUtil,
-  type IGetActivationGraphOptions
-} from '../ddic/logs';
+// Note: DDIC Activation Graph is in runtime/logs/ddic.ts
+// It is accessed via AdtRuntime.getDdicActivationGraph(), not AdtUtils
 
 // Import types
 import type {
@@ -495,17 +492,4 @@ export class AdtUtils {
     return getAllTypesUtil(this.connection, maxItemCount, name, data);
   }
 
-  // ============================================================================
-  // DDIC Activation Graph
-  // ============================================================================
-
-  /**
-   * Get DDIC activation graph with logs
-   * 
-   * @param options - Optional parameters
-   * @returns Axios response with activation graph
-   */
-  async getActivationGraph(options?: IGetActivationGraphOptions): Promise<AxiosResponse> {
-    return getActivationGraphUtil(this.connection, options);
-  }
 }

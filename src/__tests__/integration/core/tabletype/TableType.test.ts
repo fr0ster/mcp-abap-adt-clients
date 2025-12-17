@@ -92,7 +92,12 @@ describe('TableType (using AdtClient)', () => {
             packageName,
             transportRequest: resolveTransportRequest(params.transport_request),
             description: params.description,
-            ddlCode: params.ddl_code
+            // TableType is XML-based (like Domain/DataElement), uses structure as rowType
+            rowTypeName: params.row_type_name,
+            rowTypeKind: params.row_type_kind || 'dictionaryType',
+            accessType: params.access_type || 'standard',
+            primaryKeyDefinition: params.primary_key_definition || 'standard',
+            primaryKeyKind: params.primary_key_kind || 'nonUnique'
           };
         },
         ensureObjectReady: async (tableTypeName: string) => {
@@ -123,22 +128,23 @@ describe('TableType (using AdtClient)', () => {
       if (!hasConfig || !tester) {
         return;
       }
-      const config = tester.getConfig();
-      if (!config) {
-        return;
-      }
 
       const testCase = tester.getTestCaseDefinition();
-      const updatedDdlCode = testCase?.params?.updated_ddl_code || config.ddlCode || '';
+      const config = tester.getConfig();
 
+      // TableType is XML-based, no sourceCode needed
+      // Update config contains XML parameters (rowTypeName, etc.)
       await tester.flowTestAuto({
-        sourceCode: updatedDdlCode,
-        updateConfig: {
+        updateConfig: config ? {
           tableTypeName: config.tableTypeName,
           packageName: config.packageName,
           description: config.description || '',
-          ddlCode: updatedDdlCode
-        }
+          rowTypeName: config.rowTypeName,
+          rowTypeKind: config.rowTypeKind,
+          accessType: config.accessType,
+          primaryKeyDefinition: config.primaryKeyDefinition,
+          primaryKeyKind: config.primaryKeyKind
+        } : undefined
       });
     }, getTimeout('test'));
   });

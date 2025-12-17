@@ -14,17 +14,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../../clients/AdtClient';
-import { getView } from '../../../../core/view/read';
-import { getTable } from '../../../../core/table/read';
-import { getClass } from '../../../../core/class/read';
 import { getConfig } from '../../../helpers/sessionConfig';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd
-} from '../../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { IViewConfig, IViewState } from '../../../../core/view';
@@ -33,7 +23,6 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
   checkDefaultTestEnvironment,
@@ -75,7 +64,8 @@ describe('View (using AdtClient)', () => {
 
       const envCheck = await checkDefaultTestEnvironment(connection);
       if (!envCheck.success) {
-        testsLogger.error?.(`${envCheck.reason}. All tests will be skipped.`);
+        const reason = envCheck.reason || 'Unknown reason';
+        testsLogger.error?.(`Environment check failed: ${reason}. All tests will be skipped.`);
         hasConfig = false;
         return;
       }
@@ -112,6 +102,25 @@ describe('View (using AdtClient)', () => {
         ensureObjectReady: async () => ({ success: true })
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorDetails = error instanceof Error && error.stack ? error.stack : errorMessage;
+      
+      // Log error with full details using the provided logger
+      testsLogger.error?.('Failed to setup test environment:', {
+        message: errorMessage,
+        details: errorDetails,
+        error: error
+      });
+      
+      // Check for specific error types
+      if (errorMessage.includes('JWT token has expired') || errorMessage.includes('token has expired')) {
+        testsLogger.error?.('JWT token has expired. Please re-authenticate and update your .env file with fresh tokens.');
+      } else if (errorMessage.includes('authentication') || errorMessage.includes('unauthorized')) {
+        testsLogger.error?.('Authentication failed. Please check your credentials in .env file.');
+      } else if (errorMessage.includes('connection') || errorMessage.includes('ECONNREFUSED')) {
+        testsLogger.error?.('Connection failed. Please check your SAP system URL and network connectivity.');
+      }
+      
       hasConfig = false;
     }
   });
@@ -123,8 +132,19 @@ describe('View (using AdtClient)', () => {
     let tableName: string | null = null;
 
     beforeEach(async () => {
-      // Create table before test if needed
+      if (!hasConfig || !tester) {
+        if (!hasConfig) {
+          testsLogger.warn?.('Skipping test setup: hasConfig=false (check beforeAll errors above)');
+        }
+        if (!tester) {
+          testsLogger.warn?.('Skipping test setup: tester is undefined (check beforeAll errors above)');
+        }
+        return;
+      }
+      // Create table before test if needed (after tester.beforeEach() has loaded testCase)
       const testCase = tester.getTestCaseDefinition();
+      // Call tester.beforeEach() first to load test case and config
+      await tester.beforeEach()();
       if (testCase?.params?.table_name && testCase?.params?.table_source) {
         const packageName = resolvePackageName(testCase.params.package_name);
         if (packageName) {
@@ -137,16 +157,19 @@ describe('View (using AdtClient)', () => {
             transportRequest: resolveTransportRequest(testCase.params.transport_request)
           };
 
-          const tempCrudClient = new (require('../../../clients/CrudClient').CrudClient)(connection);
-          const tableResult = await createDependencyTable(tempCrudClient, tableConfig, testCase);
+          // Use AdtClient for dependency table creation
+          const tempAdtClient = new AdtClient(connection, builderLogger);
+          const tableResult = await createDependencyTable(tempAdtClient, tableConfig, testCase);
           tableCreated = tableResult.created || false;
         }
       }
-      tester?.beforeEach()();
     });
 
     afterEach(async () => {
-      tester?.afterEach()();
+      if (!hasConfig || !tester) {
+        return;
+      }
+      await tester.afterEach()();
       // Cleanup table if it was created in beforeEach
       const envConfig = getEnvironmentConfig();
       const cleanupAfterTest = envConfig.cleanup_after_test !== false;
@@ -170,14 +193,23 @@ describe('View (using AdtClient)', () => {
 
     it('should execute full workflow and store all results', async () => {
       if (!hasConfig || !tester) {
+        testsLogger.warn?.('Skipping test: hasConfig=false or tester is undefined (check beforeAll errors above)');
         return;
       }
+      
       const config = tester.getConfig();
       if (!config) {
+        const skipReason = tester.getSkipReason() || 'Config is null';
+        testsLogger.warn?.(`Skipping test: ${skipReason}`);
         return;
       }
 
       const testCase = tester.getTestCaseDefinition();
+      if (!testCase) {
+        testsLogger.warn?.('Skipping test: Test case not found in test-config.yaml');
+        return;
+      }
+
       const ddlSource = testCase?.params?.ddl_source || config.ddlSource || '';
       const updatedDdlSource = testCase?.params?.updated_ddl_source || ddlSource;
 

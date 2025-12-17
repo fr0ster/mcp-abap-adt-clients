@@ -241,6 +241,8 @@ export class BaseTester<TConfig, TState> {
       logBuilderTestStep(currentStep);
       const validationState = await this.adtObject.validate(config as Partial<TConfig>);
       const validationResponse = (validationState as any)?.validationResponse || validationState;
+      
+      // Check HTTP status
       if (validationResponse?.status !== 200) {
         const errorData = typeof validationResponse?.data === 'string'
           ? validationResponse.data
@@ -249,6 +251,63 @@ export class BaseTester<TConfig, TState> {
         logBuilderTestStepError(currentStep, error);
         throw error;
       }
+      
+      // Check for error tables in validation response (even if HTTP 200)
+      // Validation can return HTTP 200 but with error/warning tables in XML
+      if (validationResponse?.data && typeof validationResponse.data === 'string') {
+        try {
+          const { XMLParser } = require('fast-xml-parser');
+          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+          const parsed = parser.parse(validationResponse.data);
+          
+          // Check for error table (adtcore:errorTable or similar)
+          const errorTable = parsed['adtcore:errorTable'] || parsed['errorTable'] || 
+                            parsed['adtcore:messageTable']?.['adtcore:message'] || 
+                            parsed['messageTable']?.['message'];
+          
+          // Check if there are error messages (type="E" or severity="ERROR")
+          const messages = Array.isArray(errorTable) ? errorTable : (errorTable ? [errorTable] : []);
+          const errorMessages = messages.filter((msg: any) => {
+            const type = msg['@_adtcore:type'] || msg['@_type'] || msg['type'] || '';
+            const severity = msg['@_adtcore:severity'] || msg['@_severity'] || msg['severity'] || '';
+            return type === 'E' || severity === 'ERROR' || type === 'ERROR';
+          });
+          
+          if (errorMessages.length > 0) {
+            const errorTexts = errorMessages.map((msg: any) => {
+              return msg['@_adtcore:text'] || msg['@_text'] || msg['text'] || 
+                     msg['adtcore:text'] || msg['text'] || 
+                     msg['#text'] || JSON.stringify(msg);
+            }).filter(Boolean).join('; ');
+            
+            const error = new Error(`Validation failed with errors: ${errorTexts}`);
+            this.log(LogLevel.ERROR, `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`);
+            logBuilderTestStepError(currentStep, error);
+            throw error;
+          }
+          
+          // Log warnings if present (but don't fail)
+          const warningMessages = messages.filter((msg: any) => {
+            const type = msg['@_adtcore:type'] || msg['@_type'] || msg['type'] || '';
+            const severity = msg['@_adtcore:severity'] || msg['@_severity'] || msg['severity'] || '';
+            return type === 'W' || severity === 'WARNING' || type === 'WARNING';
+          });
+          
+          if (warningMessages.length > 0) {
+            const warningTexts = warningMessages.map((msg: any) => {
+              return msg['@_adtcore:text'] || msg['@_text'] || msg['text'] || 
+                     msg['adtcore:text'] || msg['text'] || 
+                     msg['#text'] || JSON.stringify(msg);
+            }).filter(Boolean).join('; ');
+            this.log(LogLevel.WARN, `Validation returned warning table with ${warningMessages.length} warning(s): ${warningTexts}`);
+          }
+        } catch (parseError) {
+          // If parsing fails, continue - validation might be in different format
+          // But log the parse error for debugging
+          this.log(LogLevel.DEBUG, `Could not parse validation response for error tables: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        }
+      }
+      
       // Delay after validate
       await this.waitDelay(this.getOperationDelay('validate', testCaseParams), 'validate');
 

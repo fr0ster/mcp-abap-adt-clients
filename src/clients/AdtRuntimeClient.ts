@@ -1,5 +1,5 @@
 /**
- * AdtRuntime - Runtime Operations Wrapper
+ * AdtRuntimeClient - Runtime Operations Client
  * 
  * Provides access to runtime-related ADT operations:
  * - Memory snapshots analysis
@@ -8,18 +8,29 @@
  * - Logs analysis
  * - Feed reader operations
  * 
+ * This is a standalone client for runtime operations, similar to ReadOnlyClient and CrudClient.
+ * 
  * Usage:
  * ```typescript
- * const client = new AdtClient(connection, logger);
- * const runtime = client.getRuntime();
+ * import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+ * 
+ * const client = new AdtRuntimeClient(connection, logger);
  * 
  * // Memory snapshots
- * const snapshots = await runtime.listMemorySnapshots();
- * const snapshot = await runtime.getMemorySnapshot('snapshot-id');
+ * const snapshots = await client.listMemorySnapshots();
+ * const snapshot = await client.getMemorySnapshot('snapshot-id');
  * 
  * // Profiler traces
- * const traceFiles = await runtime.listProfilerTraceFiles();
- * const traceParams = await runtime.getProfilerTraceParameters();
+ * const traceFiles = await client.listProfilerTraceFiles();
+ * const traceParams = await client.getProfilerTraceParameters();
+ * 
+ * // Debugging
+ * await client.launchDebugger({ debuggingMode: 'external' });
+ * const callStack = await client.getCallStack();
+ * 
+ * // Logs
+ * const appLog = await client.getApplicationLogObject('Z_MY_LOG');
+ * const atcLogs = await client.getAtcCheckFailureLogs();
  * ```
  */
 
@@ -42,7 +53,7 @@ import {
   type ISnapshotRankingListOptions,
   type ISnapshotChildrenOptions,
   type ISnapshotReferencesOptions
-} from './memory';
+} from '../runtime/memory';
 
 // Import profiler trace functions
 import {
@@ -54,7 +65,7 @@ import {
   getTraceRequestsByUri as getTraceRequestsByUriUtil,
   listObjectTypes as listObjectTypesUtil,
   listProcessTypes as listProcessTypesUtil
-} from './traces/profiler';
+} from '../runtime/traces/profiler';
 
 // Import cross trace functions
 import {
@@ -64,19 +75,19 @@ import {
   getCrossTraceRecordContent as getCrossTraceRecordContentUtil,
   getCrossTraceActivations as getCrossTraceActivationsUtil,
   type IListCrossTracesOptions
-} from './traces/crossTrace';
+} from '../runtime/traces/crossTrace';
 
 // Import ST05 trace functions
 import {
   getSt05TraceState as getSt05TraceStateUtil,
   getSt05TraceDirectory as getSt05TraceDirectoryUtil
-} from './traces/st05';
+} from '../runtime/traces/st05';
 
 // Import feed functions
 import {
   getFeeds as getFeedsUtil,
   getFeedVariants as getFeedVariantsUtil
-} from './feeds';
+} from '../runtime/feeds';
 
 // Import ABAP debugger functions
 import {
@@ -108,7 +119,7 @@ import {
   type IGetVariableAsCsvOptions,
   type IGetVariableAsJsonOptions,
   type IGetVariableValueStatementOptions
-} from './debugger/abap';
+} from '../runtime/debugger/abap';
 
 // Import AMDP debugger functions
 import {
@@ -125,7 +136,7 @@ import {
   getAmdpBreakpointsLlang as getAmdpBreakpointsLlangUtil,
   getAmdpBreakpointsTableFunctions as getAmdpBreakpointsTableFunctionsUtil,
   type IStartAmdpDebuggerOptions
-} from './debugger/amdp';
+} from '../runtime/debugger/amdp';
 
 // Import AMDP data preview functions
 import {
@@ -133,7 +144,7 @@ import {
   getAmdpCellSubstring as getAmdpCellSubstringUtil,
   type IGetAmdpDataPreviewOptions,
   type IGetAmdpCellSubstringOptions
-} from './debugger/amdpDataPreview';
+} from '../runtime/debugger/amdpDataPreview';
 
 // Import log functions
 import {
@@ -142,14 +153,18 @@ import {
   validateApplicationLogName as validateApplicationLogNameUtil,
   type IGetApplicationLogObjectOptions,
   type IGetApplicationLogSourceOptions
-} from './applicationLog/read';
+} from '../runtime/applicationLog/read';
 import {
   getCheckFailureLogs as getCheckFailureLogsUtil,
   getExecutionLog as getExecutionLogUtil,
   type IGetCheckFailureLogsOptions
-} from './atc/logs';
+} from '../runtime/atc/logs';
+import {
+  getActivationGraph as getActivationGraphUtil,
+  type IGetActivationGraphOptions
+} from '../runtime/ddic/activationGraph';
 
-export class AdtRuntime {
+export class AdtRuntimeClient {
   private connection: IAbapConnection;
   private logger: ILogger;
 
@@ -891,6 +906,20 @@ export class AdtRuntime {
    */
   async getAtcExecutionLog(executionId: string): Promise<AxiosResponse> {
     return getExecutionLogUtil(this.connection, executionId);
+  }
+
+  // ============================================================================
+  // DDIC Activation Graph Logs
+  // ============================================================================
+
+  /**
+   * Get DDIC activation graph with logs
+   * 
+   * @param options - Optional parameters
+   * @returns Axios response with activation graph
+   */
+  async getDdicActivationGraph(options?: IGetActivationGraphOptions): Promise<AxiosResponse> {
+    return getActivationGraphUtil(this.connection, options);
   }
 
   // ============================================================================

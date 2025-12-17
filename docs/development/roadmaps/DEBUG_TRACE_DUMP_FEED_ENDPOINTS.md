@@ -720,7 +720,7 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 **Status:** ✅ **Completed**
 
 **Tasks:**
-- [x] Create `core/ddic/logs.ts` with low-level function:
+- [x] Create `runtime/logs/ddic.ts` with low-level function:
   - [x] `getActivationGraph(options?)` → GET `/sap/bc/adt/ddic/logs/activationgraph`
 - [x] Add to `AdtUtils` → `getActivationGraph()` method
 - [x] Create types for activation graph data

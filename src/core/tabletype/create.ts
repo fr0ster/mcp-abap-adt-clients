@@ -10,9 +10,9 @@ import { ICreateTableTypeParams } from './types';
 import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
- * Create empty ABAP table type
- * Low-level function: only creates empty table type via POST endpoint
- * DDL code should be added via update() method
+ * Create empty ABAP table type (XML-based entity like Domain/DataElement)
+ * Low-level function: creates empty table type via POST endpoint
+ * rowType should be added via update() method
  */
 export async function createTableType(
   connection: IAbapConnection,
@@ -35,22 +35,23 @@ export async function createTableType(
   const responsible = systemInfo ? username : '';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(params.tabletype_name);
+  const description = limitDescription(params.description || params.tabletype_name);
   const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
   const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
 
-  // Create empty table type with POST
+  // Create empty table type with POST using XML format (ttyp:tableType)
   const createUrl = `/sap/bc/adt/ddic/tabletypes${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
 
-  const tableTypeXml = `<?xml version="1.0" encoding="UTF-8"?><blue:blueSource xmlns:blue="http://www.sap.com/wbobj/blue" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.tabletype_name.toUpperCase()}" adtcore:type="TTYP/DF" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
-
+  // Empty table type XML (rowType added via update)
+  const tableTypeXml = `<?xml version="1.0" encoding="UTF-8"?><ttyp:tableType xmlns:ttyp="http://www.sap.com/dictionary/tabletype" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.tabletype_name.toUpperCase()}" adtcore:type="TTYP/DA" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+    
   <adtcore:packageRef adtcore:name="${params.package_name.toUpperCase()}"/>
-
-</blue:blueSource>`;
+  
+</ttyp:tableType>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tabletypes.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.tabletypes.v2+xml'
+    'Accept': 'application/vnd.sap.adt.tabletype.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml'
   };
 
   try {

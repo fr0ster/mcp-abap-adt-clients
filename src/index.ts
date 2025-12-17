@@ -35,12 +35,12 @@
 export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export { CrudClient } from './clients/CrudClient';
 export { AdtClient } from './clients/AdtClient';
+export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 
 // Export SharedBuilder and AdtUtils
 export { SharedBuilder, AdtUtils } from './core/shared';
 
-// Export AdtRuntime for runtime operations
-export { AdtRuntime } from './runtime';
+// AdtRuntimeClient is exported from clients above
 
 // Export shared types
 export type {

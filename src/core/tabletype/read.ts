@@ -19,14 +19,41 @@ export async function getTableTypeMetadata(
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${query}`;
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      'Accept': 'application/vnd.sap.adt.tabletypes.v2+xml, application/vnd.sap.adt.tabletypes.v1+xml, application/vnd.sap.adt.blues.v1+xml'
-    }
-  });
+  try {
+    return await connection.makeAdtRequest({
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        'Accept': 'application/vnd.sap.adt.tabletype.v1+xml'
+      }
+    });
+  } catch (error: any) {
+    // Output full error response as-is for debugging
+    const status = error.response?.status || 'unknown';
+    const statusText = error.response?.statusText || '';
+    const responseHeaders = JSON.stringify(error.response?.headers || {}, null, 2);
+    const responseData = error.response?.data 
+      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data, null, 2))
+      : error.message || 'No response data';
+    
+    const fullError = `getTableTypeMetadata failed for ${tableTypeName}
+HTTP Status: ${status} ${statusText}
+Response Headers: ${responseHeaders}
+Response Data: ${responseData}
+Request URL: ${url}
+Request Headers: ${JSON.stringify({ 'Accept': 'application/vnd.sap.adt.tabletype.v1+xml' }, null, 2)}`;
+    
+    process.stderr.write('\n=== getTableTypeMetadata Error ===\n');
+    process.stderr.write(fullError);
+    process.stderr.write('\n=== End Error ===\n\n');
+    
+    console.error('\n=== getTableTypeMetadata Error ===');
+    console.error(fullError);
+    console.error('=== End Error ===\n');
+    
+    throw error;
+  }
 }
 
 /**

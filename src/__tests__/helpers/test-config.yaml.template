@@ -484,6 +484,8 @@ create_table:
           }
 
 # Create TableType (DDIC Table Type)
+# TableType is XML-based entity (like Domain/DataElement)
+# Create: creates empty TableType (rowType added via update)
 create_tabletype:
   test_cases:
     - name: "adt_tabletype"
@@ -494,21 +496,12 @@ create_tabletype:
         description: "TableType workflow table type"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
-        ddl_code: |
-          @EndUserText.label: 'Builder test table type'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define table type ZADT_BLD_TTYP01 {
-            field1 : abap.char(10);
-            field2 : abap.char(40);
-          }
-        updated_ddl_code: |
-          @EndUserText.label: 'Builder test table type - updated'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define table type ZADT_BLD_TTYP01 {
-            field1 : abap.char(10);
-            field2 : abap.char(40);
-            field3 : abap.char(20);
-          }
+        # XML format parameters (for update - rowType added after create)
+        row_type_name: "ZADT_BLD_STRU01"  # Structure name (must exist)
+        row_type_kind: "dictionaryType"   # Type kind: dictionaryType, predefinedAbapType, etc.
+        access_type: "standard"           # standard, sorted, hashed, index
+        primary_key_definition: "standard"  # standard, rowType, keyComponents, empty
+        primary_key_kind: "nonUnique"    # unique, nonUnique
 
 # Create Structure
 create_structure:

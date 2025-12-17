@@ -30,7 +30,7 @@ import { updateTableType } from './update';
 import { unlockTableType } from './unlock';
 import { activateTableType } from './activation';
 import { checkDeletion, deleteTableType } from './delete';
-import { getTableTypeSource, getTableTypeMetadata, getTableTypeTransport } from './read';
+import { getTableTypeMetadata, getTableTypeTransport } from './read';
 
 export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableTypeState> {
   private readonly connection: IAbapConnection;
@@ -78,13 +78,14 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
     };
 
     try {
-      // Create table type
+      // Create empty table type (XML-based entity like Domain/DataElement)
+      // rowType is added via update() method
       this.logger?.info?.('Creating table type');
       await createTableType(this.connection, {
         tabletype_name: config.tableTypeName,
         package_name: config.packageName,
-        transport_request: config.transportRequest,
-        ddl_code: options?.sourceCode || config.ddlCode
+        description: config.description,
+        transport_request: config.transportRequest
       });
       objectCreated = true;
       this.logger?.info?.('Table type created');
@@ -112,7 +113,7 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
   }
 
   /**
-   * Read table type
+   * Read table type metadata (TableType is XML-based entity like Domain/DataElement)
    */
   async read(
     config: Partial<ITableTypeConfig>,
@@ -123,15 +124,16 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
       throw new Error('Table type name is required');
     }
 
+    // TableType is XML-based, read metadata
     try {
-      const readResult = await getTableTypeSource(
+      const readResult = await getTableTypeMetadata(
         this.connection,
         config.tableTypeName,
-        version,
         options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
       );
       return { readResult, errors: [] };
     } catch (error: any) {
+      // If metadata read fails with 404, return empty result
       if (error.response?.status === 404) {
         return { readResult: undefined, errors: [] };
       }
@@ -220,27 +222,39 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
       lockHandle = await acquireTableTypeLockHandle(this.connection, config.tableTypeName);
       this.logger?.info?.('Table type locked, handle:', lockHandle);
 
-      // 2. Check inactive with code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.ddlCode;
-      if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await runTableTypeCheckRun(this.connection, 'abapCheckRun', config.tableTypeName, codeToCheck, 'inactive');
-        this.logger?.info?.('Check inactive with update content passed');
-      }
+      // 2. Check inactive (TableType is XML-based, no source code check needed)
+      // Skip check step for XML-based TableType
 
       // 3. Update
-      if (codeToCheck && lockHandle) {
+      // TableType is XML-based entity (like Domain/DataElement)
+      const hasRowType = config.rowTypeName && config.rowTypeName.trim().length > 0;
+      
+      if (hasRowType && lockHandle && config.rowTypeName) {
         this.logger?.info?.('Step 3: Updating table type');
-        await updateTableType(
-          this.connection,
-          {
-            tabletype_name: config.tableTypeName,
-            ddl_code: codeToCheck,
-            transport_request: config.transportRequest
-          },
-          lockHandle
-        );
-        this.logger?.info?.('Table type updated');
+        try {
+          await updateTableType(
+            this.connection,
+            {
+              tabletype_name: config.tableTypeName,
+              description: config.description,
+              row_type_name: config.rowTypeName, // TypeScript now knows this is defined
+              row_type_kind: config.rowTypeKind || 'dictionaryType',
+              access_type: config.accessType || 'standard',
+              primary_key_definition: config.primaryKeyDefinition || 'standard',
+              primary_key_kind: config.primaryKeyKind || 'nonUnique',
+              transport_request: config.transportRequest
+            },
+            lockHandle
+          );
+          this.logger?.info?.('Table type updated');
+        } catch (updateError: any) {
+          // Log update error details before rethrowing
+          this.logger?.error?.('Update failed with error:', updateError);
+          if (updateError.message) {
+            this.logger?.error?.('Error message:', updateError.message);
+          }
+          throw updateError;
+        }
 
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
@@ -304,11 +318,23 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getTableTypeSource(this.connection, config.tableTypeName);
-      return {
-        readResult: readResponse,
-        errors: []
-      };
+      // TableType is XML-based, read metadata
+      try {
+        const readResponse = await getTableTypeMetadata(this.connection, config.tableTypeName);
+        return {
+          readResult: readResponse,
+          errors: []
+        };
+      } catch (error: any) {
+        // If metadata read fails with 404, return empty result
+        if (error.response?.status === 404) {
+          return {
+            readResult: undefined,
+            errors: []
+          };
+        }
+        throw error;
+      }
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {

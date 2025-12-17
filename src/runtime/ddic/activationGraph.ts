@@ -1,5 +1,5 @@
 /**
- * DDIC Activation Graph Logs
+ * DDIC Activation Graph
  * 
  * Provides functions for reading DDIC activation dependency graph with logs:
  * - Get activation graph
