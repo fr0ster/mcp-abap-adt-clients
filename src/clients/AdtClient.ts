@@ -49,6 +49,7 @@ import { AdtRequest } from '../core/transport';
 import { AdtUnitTest, AdtCdsUnitTest, IUnitTestConfig, IUnitTestState, ICdsUnitTestConfig, ICdsUnitTestState } from '../core/unitTest';
 import { ITransportConfig, ITransportState } from '../core/transport/types';
 import { AdtUtils } from '../core/shared/AdtUtils';
+import { AdtRuntime } from '../runtime/AdtRuntime';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 
 export class AdtClient {
@@ -248,6 +249,21 @@ export class AdtClient {
    */
   getUtils(): AdtUtils {
     return new AdtUtils(this.connection, this.logger);
+  }
+
+  /**
+   * Get runtime operations
+   * Provides access to runtime-related ADT operations:
+   * - Memory snapshots analysis
+   * - Profiler traces
+   * - Debugger operations
+   * - Logs analysis
+   * - Feed reader operations
+   * 
+   * @returns AdtRuntime instance for runtime operations
+   */
+  getRuntime(): AdtRuntime {
+    return new AdtRuntime(this.connection, this.logger);
   }
 
   /**

@@ -39,6 +39,9 @@ export { AdtClient } from './clients/AdtClient';
 // Export SharedBuilder and AdtUtils
 export { SharedBuilder, AdtUtils } from './core/shared';
 
+// Export AdtRuntime for runtime operations
+export { AdtRuntime } from './runtime';
+
 // Export shared types
 export type {
   InactiveObjectsResponse,

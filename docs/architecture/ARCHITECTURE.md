@@ -13,7 +13,7 @@ Separation of ADT endpoint functionality into three classes to enable different 
 │   │   ├── AdtClient.ts          # High-level CRUD API (recommended)
 │   │   ├── ReadOnlyClient.ts     # Read-only operations (GET)
 │   │   └── CrudClient.ts         # Full CRUD (Create, Read, Update, Delete)
-│   ├── core/                     # Core object implementations
+│   ├── core/                     # Core object implementations (CRUD operations)
 │   │   ├── class/                # Class operations (Builder, AdtClass, low-level functions)
 │   │   ├── program/              # Program operations
 │   │   ├── interface/            # Interface operations
@@ -32,6 +32,12 @@ Separation of ADT endpoint functionality into three classes to enable different 
 │   │   ├── transport/            # Transport Request operations
 │   │   ├── unitTest/             # ABAP Unit Test operations
 │   │   └── shared/               # Shared utilities (AdtUtils, SharedBuilder)
+│   ├── runtime/                  # Runtime operations (non-CRUD)
+│   │   ├── memory/               # Memory analysis (snapshots)
+│   │   ├── traces/               # Tracing operations (profiler, cross-trace, ST05)
+│   │   ├── debugger/             # Debugging operations (ABAP debugger, AMDP debugger)
+│   │   ├── logs/                 # Log analysis (application logs, ATC logs)
+│   │   └── feeds/                # Feed reader operations
 │   ├── utils/                    # Utility functions
 │   │   ├── activationUtils.ts    # Activation utilities
 │   │   ├── checkRun.ts           # Check run parsing
@@ -157,6 +163,16 @@ core/[objectType]/
 - `getEnhancementImpl(spot, name)` → `Promise<AxiosResponse>`
 - `getEnhancementSpot(spotName)` → `Promise<AxiosResponse>`
 - `getAllTypes(maxItemCount?, name?, data?)` → `Promise<AxiosResponse>`
+- `listMemorySnapshots(user?, originalUser?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshot(snapshotId)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotRankingList(snapshotId, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaRankingList(uri1, uri2, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotChildren(snapshotId, parentKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaChildren(uri1, uri2, parentKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotReferences(snapshotId, objectKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaReferences(uri1, uri2, objectKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotOverview(snapshotId)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaOverview(uri1, uri2)` → `Promise<AxiosResponse>`
 
 **Usage:**
 ```typescript

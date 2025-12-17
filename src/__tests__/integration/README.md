@@ -8,6 +8,14 @@ These tests verify individual operations (create, read, update, delete, lock, un
 
 **Note:** Despite being in the `integration/` folder, these tests connect to a real SAP system and are true integration tests, not unit tests. For complete workflow tests, see `../e2e/`.
 
+## Test Organization
+
+Tests are organized by module type:
+
+- **`core/`** - Tests for CRUD operations on main ABAP objects (class, program, table, view, etc.)
+- **`runtime/`** - Tests for runtime operations (memory snapshots, traces, debugger, logs, feeds)
+- **`shared/`** - Tests for shared utility functions (search, whereUsed, readMetadata, etc.)
+
 ## Features
 
 - ✅ **Separate test cases** - each operation tested independently
