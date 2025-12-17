@@ -656,40 +656,40 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 ### Priority 2: Medium Value Modules
 
 #### 5. Cross Trace Module
-**Status:** ❌ Not Started
+**Status:** ✅ **Completed**
 
 **Tasks:**
-- [ ] Create `runtime/traces/crossTrace.ts` with low-level functions:
-  - [ ] `listTraces(filters?)` → GET `/sap/bc/adt/crosstrace/traces`
-  - [ ] `getTrace(traceId, includeSensitiveData?)` → GET `/sap/bc/adt/crosstrace/traces/{traceId}`
-  - [ ] `getTraceRecords(traceId)` → GET `/sap/bc/adt/crosstrace/traces/{traceId}/records`
-  - [ ] `getTraceRecordContent(traceId, recordNumber)` → GET `/sap/bc/adt/crosstrace/traces/{traceId}/records/{recordNumber}/content`
-  - [ ] `getTraceActivations()` → GET `/sap/bc/adt/crosstrace/activations`
-- [ ] Add to `AdtRuntime` → `getCrossTrace*()` methods
-- [ ] Create types for cross trace data
+- [x] Create `runtime/traces/crossTrace.ts` with low-level functions:
+  - [x] `listCrossTraces(filters?)` → GET `/sap/bc/adt/crosstrace/traces`
+  - [x] `getCrossTrace(traceId, includeSensitiveData?)` → GET `/sap/bc/adt/crosstrace/traces/{traceId}`
+  - [x] `getCrossTraceRecords(traceId)` → GET `/sap/bc/adt/crosstrace/traces/{traceId}/records`
+  - [x] `getCrossTraceRecordContent(traceId, recordNumber)` → GET `/sap/bc/adt/crosstrace/traces/{traceId}/records/{recordNumber}/content`
+  - [x] `getCrossTraceActivations()` → GET `/sap/bc/adt/crosstrace/activations`
+- [x] Add to `AdtRuntime` → `getCrossTrace*()` methods (5 methods)
+- [x] Create types for cross trace data
 - [ ] Add integration tests
 
 #### 6. Application Logs Module
-**Status:** ❌ Not Started
+**Status:** ✅ **Completed**
 
 **Tasks:**
-- [ ] Create `core/applicationLog/read.ts` with low-level functions:
-  - [ ] `getApplicationLogObject(objectName, options?)` → GET `/sap/bc/adt/applicationlog/objects/{object_name}`
-  - [ ] `getApplicationLogSource(objectName, options?)` → GET `/sap/bc/adt/applicationlog/objects/{object_name}/source/main`
-  - [ ] `validateApplicationLogName(objectName)` → GET `/sap/bc/adt/applicationlog/objects/validation`
-- [ ] Add to `AdtUtils` → `getApplicationLog*()` methods
-- [ ] Create types for application log data
+- [x] Create `core/applicationLog/read.ts` with low-level functions:
+  - [x] `getApplicationLogObject(objectName, options?)` → GET `/sap/bc/adt/applicationlog/objects/{object_name}`
+  - [x] `getApplicationLogSource(objectName, options?)` → GET `/sap/bc/adt/applicationlog/objects/{object_name}/source/main`
+  - [x] `validateApplicationLogName(objectName)` → GET `/sap/bc/adt/applicationlog/objects/validation`
+- [x] Add to `AdtUtils` → `getApplicationLog*()` methods (3 methods)
+- [x] Create types for application log data
 - [ ] Add integration tests
 
 #### 7. ATC Logs Module
-**Status:** ❌ Not Started
+**Status:** ✅ **Completed**
 
 **Tasks:**
-- [ ] Create `core/atc/logs.ts` with low-level functions:
-  - [ ] `getCheckFailureLogs(filters?)` → GET `/sap/bc/adt/atc/checkfailures/logs`
-  - [ ] `getExecutionLog(executionId)` → GET `/sap/bc/adt/atc/results/{executionId}/log`
-- [ ] Add to `AdtUtils` → `getAtcLogs()` methods
-- [ ] Create types for ATC log data
+- [x] Create `core/atc/logs.ts` with low-level functions:
+  - [x] `getCheckFailureLogs(filters?)` → GET `/sap/bc/adt/atc/checkfailures/logs`
+  - [x] `getExecutionLog(executionId)` → GET `/sap/bc/adt/atc/results/{executionId}/log`
+- [x] Add to `AdtUtils` → `getAtc*()` methods (2 methods)
+- [x] Create types for ATC log data
 - [ ] Add integration tests
 
 ### Priority 3: Lower Priority Modules
@@ -736,12 +736,12 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 | ABAP Profiler Traces | 1 | ✅ Completed | 90% (tests pending) |
 | ABAP Debugger (Standard) | 1 | ✅ Completed | 90% (tests pending) |
 | AMDP Debugger | 1 | ✅ Completed | 90% (tests pending) |
-| Cross Trace | 2 | ❌ Not Started | 0% |
-| Application Logs | 2 | ❌ Not Started | 0% |
-| ATC Logs | 2 | ❌ Not Started | 0% |
+| Cross Trace | 2 | ✅ Completed | 90% (tests pending) |
+| Application Logs | 2 | ✅ Completed | 90% (tests pending) |
+| ATC Logs | 2 | ✅ Completed | 90% (tests pending) |
 | Feed Reader | 3 | ❌ Not Started | 0% |
 | Performance Trace (ST05) | 3 | ❌ Not Started | 0% |
 | DDIC Activation Graph | 3 | ❌ Not Started | 0% |
 
-**Total Progress:** 4/10 modules (40% - Memory Snapshots, ABAP Profiler Traces, ABAP Debugger (Standard), and AMDP Debugger completed, tests pending)
+**Total Progress:** 7/10 modules (70% - Memory Snapshots, ABAP Profiler Traces, ABAP Debugger (Standard), AMDP Debugger, Cross Trace, Application Logs, and ATC Logs completed, tests pending)
 

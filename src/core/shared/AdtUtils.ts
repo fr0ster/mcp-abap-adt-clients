@@ -54,6 +54,8 @@ import { getTypeInfo as getTypeInfoUtil } from './typeInfo';
 import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
 import { getEnhancementMetadata } from '../enhancement/read';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
+// Note: Application Logs and ATC Logs are in runtime/logs, not core
+// They are accessed via AdtRuntime, not AdtUtils
 
 // Import types
 import type {
@@ -486,4 +488,5 @@ export class AdtUtils {
   ): Promise<AxiosResponse> {
     return getAllTypesUtil(this.connection, maxItemCount, name, data);
   }
+
 }

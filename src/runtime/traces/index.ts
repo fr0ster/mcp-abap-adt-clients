@@ -13,3 +13,12 @@ export {
   listProcessTypes
 } from './profiler';
 
+export {
+  listCrossTraces,
+  getCrossTrace,
+  getCrossTraceRecords,
+  getCrossTraceRecordContent,
+  getCrossTraceActivations,
+  type IListCrossTracesOptions
+} from './crossTrace';
+

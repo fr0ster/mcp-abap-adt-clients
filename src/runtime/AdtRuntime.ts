@@ -56,6 +56,16 @@ import {
   listProcessTypes as listProcessTypesUtil
 } from './traces/profiler';
 
+// Import cross trace functions
+import {
+  listCrossTraces as listCrossTracesUtil,
+  getCrossTrace as getCrossTraceUtil,
+  getCrossTraceRecords as getCrossTraceRecordsUtil,
+  getCrossTraceRecordContent as getCrossTraceRecordContentUtil,
+  getCrossTraceActivations as getCrossTraceActivationsUtil,
+  type IListCrossTracesOptions
+} from './traces/crossTrace';
+
 // Import ABAP debugger functions
 import {
   launchDebugger as launchDebuggerUtil,
@@ -112,6 +122,20 @@ import {
   type IGetAmdpDataPreviewOptions,
   type IGetAmdpCellSubstringOptions
 } from './debugger/amdpDataPreview';
+
+// Import log functions
+import {
+  getApplicationLogObject as getApplicationLogObjectUtil,
+  getApplicationLogSource as getApplicationLogSourceUtil,
+  validateApplicationLogName as validateApplicationLogNameUtil,
+  type IGetApplicationLogObjectOptions,
+  type IGetApplicationLogSourceOptions
+} from './applicationLog/read';
+import {
+  getCheckFailureLogs as getCheckFailureLogsUtil,
+  getExecutionLog as getExecutionLogUtil,
+  type IGetCheckFailureLogsOptions
+} from './atc/logs';
 
 export class AdtRuntime {
   private connection: IAbapConnection;
@@ -349,6 +373,61 @@ export class AdtRuntime {
    */
   async listProfilerProcessTypes(): Promise<AxiosResponse> {
     return listProcessTypesUtil(this.connection);
+  }
+
+  // ============================================================================
+  // Cross Trace
+  // ============================================================================
+
+  /**
+   * List cross traces
+   * 
+   * @param options - Optional filters
+   * @returns Axios response with list of traces
+   */
+  async listCrossTraces(options?: IListCrossTracesOptions): Promise<AxiosResponse> {
+    return listCrossTracesUtil(this.connection, options);
+  }
+
+  /**
+   * Get cross trace details
+   * 
+   * @param traceId - Trace ID
+   * @param includeSensitiveData - Whether to include sensitive data
+   * @returns Axios response with trace details
+   */
+  async getCrossTrace(traceId: string, includeSensitiveData?: boolean): Promise<AxiosResponse> {
+    return getCrossTraceUtil(this.connection, traceId, includeSensitiveData);
+  }
+
+  /**
+   * Get cross trace records
+   * 
+   * @param traceId - Trace ID
+   * @returns Axios response with trace records
+   */
+  async getCrossTraceRecords(traceId: string): Promise<AxiosResponse> {
+    return getCrossTraceRecordsUtil(this.connection, traceId);
+  }
+
+  /**
+   * Get cross trace record content
+   * 
+   * @param traceId - Trace ID
+   * @param recordNumber - Record number
+   * @returns Axios response with record content
+   */
+  async getCrossTraceRecordContent(traceId: string, recordNumber: number): Promise<AxiosResponse> {
+    return getCrossTraceRecordContentUtil(this.connection, traceId, recordNumber);
+  }
+
+  /**
+   * Get cross trace activations
+   * 
+   * @returns Axios response with trace activations
+   */
+  async getCrossTraceActivations(): Promise<AxiosResponse> {
+    return getCrossTraceActivationsUtil(this.connection);
   }
 
   // ============================================================================
@@ -738,6 +817,68 @@ export class AdtRuntime {
    */
   async getAmdpCellSubstring(options?: IGetAmdpCellSubstringOptions): Promise<AxiosResponse> {
     return getAmdpCellSubstringUtil(this.connection, options);
+  }
+
+  // ============================================================================
+  // Logs
+  // ============================================================================
+
+  /**
+   * Get application log object properties
+   * 
+   * @param objectName - Application log object name
+   * @param options - Optional parameters
+   * @returns Axios response with application log object properties
+   */
+  async getApplicationLogObject(
+    objectName: string,
+    options?: IGetApplicationLogObjectOptions
+  ): Promise<AxiosResponse> {
+    return getApplicationLogObjectUtil(this.connection, objectName, options);
+  }
+
+  /**
+   * Get application log object source
+   * 
+   * @param objectName - Application log object name
+   * @param options - Optional parameters
+   * @returns Axios response with application log object source
+   */
+  async getApplicationLogSource(
+    objectName: string,
+    options?: IGetApplicationLogSourceOptions
+  ): Promise<AxiosResponse> {
+    return getApplicationLogSourceUtil(this.connection, objectName, options);
+  }
+
+  /**
+   * Validate application log object name
+   * 
+   * @param objectName - Application log object name to validate
+   * @returns Axios response with validation result
+   */
+  async validateApplicationLogName(objectName: string): Promise<AxiosResponse> {
+    return validateApplicationLogNameUtil(this.connection, objectName);
+  }
+
+  /**
+   * Get ATC check failure logs
+   * 
+   * @param options - Optional filters
+   * @returns Axios response with check failure logs
+   */
+  async getAtcCheckFailureLogs(options?: IGetCheckFailureLogsOptions): Promise<AxiosResponse> {
+    return getCheckFailureLogsUtil(this.connection, options);
+  }
+
+  /**
+   * Get ATC execution log
+   * 
+   * @param executionId - Execution ID
+   * @returns Axios response with execution log
+   */
+  async getAtcExecutionLog(executionId: string): Promise<AxiosResponse> {
+    return getExecutionLogUtil(this.connection, executionId);
   }
 }
 
