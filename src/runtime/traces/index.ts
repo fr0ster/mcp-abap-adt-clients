@@ -22,3 +22,8 @@ export {
   type IListCrossTracesOptions
 } from './crossTrace';
 
+export {
+  getSt05TraceState,
+  getSt05TraceDirectory
+} from './st05';
+

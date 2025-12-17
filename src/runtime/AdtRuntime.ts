@@ -66,6 +66,18 @@ import {
   type IListCrossTracesOptions
 } from './traces/crossTrace';
 
+// Import ST05 trace functions
+import {
+  getSt05TraceState as getSt05TraceStateUtil,
+  getSt05TraceDirectory as getSt05TraceDirectoryUtil
+} from './traces/st05';
+
+// Import feed functions
+import {
+  getFeeds as getFeedsUtil,
+  getFeedVariants as getFeedVariantsUtil
+} from './feeds';
+
 // Import ABAP debugger functions
 import {
   launchDebugger as launchDebuggerUtil,
@@ -879,6 +891,50 @@ export class AdtRuntime {
    */
   async getAtcExecutionLog(executionId: string): Promise<AxiosResponse> {
     return getExecutionLogUtil(this.connection, executionId);
+  }
+
+  // ============================================================================
+  // ST05 Performance Trace
+  // ============================================================================
+
+  /**
+   * Get ST05 trace state
+   * 
+   * @returns Axios response with trace state
+   */
+  async getSt05TraceState(): Promise<AxiosResponse> {
+    return getSt05TraceStateUtil(this.connection);
+  }
+
+  /**
+   * Get ST05 trace directory
+   * 
+   * @returns Axios response with trace directory information
+   */
+  async getSt05TraceDirectory(): Promise<AxiosResponse> {
+    return getSt05TraceDirectoryUtil(this.connection);
+  }
+
+  // ============================================================================
+  // Feed Reader
+  // ============================================================================
+
+  /**
+   * Get feeds
+   * 
+   * @returns Axios response with feeds
+   */
+  async getFeeds(): Promise<AxiosResponse> {
+    return getFeedsUtil(this.connection);
+  }
+
+  /**
+   * Get feed variants
+   * 
+   * @returns Axios response with feed variants
+   */
+  async getFeedVariants(): Promise<AxiosResponse> {
+    return getFeedVariantsUtil(this.connection);
   }
 }
 
