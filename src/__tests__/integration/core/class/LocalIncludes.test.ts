@@ -10,16 +10,16 @@
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../clients/AdtClient';
-import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { getConfig } from '../../helpers/sessionConfig';
-import { BaseTester } from '../../helpers/BaseTester';
+import { AdtClient } from '../../../../clients/AdtClient';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { getConfig } from '../../../helpers/sessionConfig';
+import { BaseTester } from '../../../helpers/BaseTester';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
   logBuilderTestEnd
-} from '../../helpers/builderTestLogger';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
+} from '../../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -29,7 +29,7 @@ const {
   resolvePackageName,
   resolveTransportRequest,
   getTimeout
-} = require('../../helpers/test-helper');
+} = require('../../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
@@ -178,7 +178,7 @@ describe('Class local includes (using BaseTester)', () => {
       // Cleanup parent class if it was created in ensureObjectReady
       const parentInfo = parentClassCreatedMap.get(definitionsTester);
       if (parentInfo?.created && parentInfo.className) {
-        const { getEnvironmentConfig } = require('../../helpers/test-helper');
+        const { getEnvironmentConfig } = require('../../../helpers/test-helper');
         const envConfig = getEnvironmentConfig();
         const cleanupAfterTest = envConfig.cleanup_after_test !== false;
         const globalSkipCleanup = envConfig.skip_cleanup === true;
@@ -233,7 +233,7 @@ describe('Class local includes (using BaseTester)', () => {
       // Cleanup parent class if it was created in ensureObjectReady
       const parentInfo = parentClassCreatedMap.get(localTypesTester);
       if (parentInfo?.created && parentInfo.className) {
-        const { getEnvironmentConfig } = require('../../helpers/test-helper');
+        const { getEnvironmentConfig } = require('../../../helpers/test-helper');
         const envConfig = getEnvironmentConfig();
         const cleanupAfterTest = envConfig.cleanup_after_test !== false;
         const globalSkipCleanup = envConfig.skip_cleanup === true;
@@ -288,7 +288,7 @@ describe('Class local includes (using BaseTester)', () => {
       // Cleanup parent class if it was created in ensureObjectReady
       const parentInfo = parentClassCreatedMap.get(localTestClassTester);
       if (parentInfo?.created && parentInfo.className) {
-        const { getEnvironmentConfig } = require('../../helpers/test-helper');
+        const { getEnvironmentConfig } = require('../../../helpers/test-helper');
         const envConfig = getEnvironmentConfig();
         const cleanupAfterTest = envConfig.cleanup_after_test !== false;
         const globalSkipCleanup = envConfig.skip_cleanup === true;
@@ -343,7 +343,7 @@ describe('Class local includes (using BaseTester)', () => {
       // Cleanup parent class if it was created in ensureObjectReady
       const parentInfo = parentClassCreatedMap.get(localMacrosTester);
       if (parentInfo?.created && parentInfo.className) {
-        const { getEnvironmentConfig } = require('../../helpers/test-helper');
+        const { getEnvironmentConfig } = require('../../../helpers/test-helper');
         const envConfig = getEnvironmentConfig();
         const cleanupAfterTest = envConfig.cleanup_after_test !== false;
         const globalSkipCleanup = envConfig.skip_cleanup === true;

@@ -13,9 +13,9 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { TransportBuilder } from '../../../core/transport/TransportBuilder';
+import { TransportBuilder } from '../../../../core/transport/TransportBuilder';
 import { ILogger } from '@mcp-abap-adt/interfaces';
-import { getConfig } from '../../helpers/sessionConfig';
+import { getConfig } from '../../../helpers/sessionConfig';
 import {
   logBuilderTestError,
   logBuilderTestSkip,
@@ -23,8 +23,8 @@ import {
   logBuilderTestSuccess,
   logBuilderTestEnd,
   logBuilderTestStep
-} from '../../helpers/builderTestLogger';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
+} from '../../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -32,8 +32,8 @@ import * as dotenv from 'dotenv';
 const {
   getEnabledTestCase,
   getTestCaseDefinition
-} = require('../../helpers/test-helper');
-const { getTimeout } = require('../../helpers/test-helper');
+} = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {

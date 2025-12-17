@@ -5,14 +5,92 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-### Added
-- **BaseTester Migration Completed**: All integration tests migrated to `BaseTester` (15/15 tests, 100%)
-  - `MetadataExtension.test.ts`: Migrated to `BaseTester.flowTestAuto()`, removed CDS view dependency creation logic
-  - Uses existing CDS view from test parameters (`target_entity` or `cds_view_name`) instead of creating dependencies
-  - Simplified code (~240 lines reduced), fewer timeout issues, clearer test failures
-  - See [BaseTester Migration Roadmap](docs/development/archive/roadmaps/BASE_TESTER_MIGRATION.md) for details (completed, archived)
+## [0.2.3] - 2025-01-27
 
-## [0.2.3] - 2025-12-16
+### Added
+- **AdtRuntime Class**: New runtime operations wrapper for debugging, tracing, memory analysis, and logs
+  - Factory method: `AdtClient.getRuntime()` → `AdtRuntime`
+  - Centralized access to all runtime-related ADT operations
+  - Clear separation from CRUD operations (via `IAdtObject`) and utility functions (via `AdtUtils`)
+  - See [Architecture Documentation](docs/architecture/ARCHITECTURE.md) for details
+
+- **Memory Snapshots Module** (`runtime/memory/`): Complete memory dump analysis functionality
+  - 10 functions: `listSnapshots`, `getSnapshot`, `getSnapshotRankingList`, `getSnapshotDeltaRankingList`, `getSnapshotChildren`, `getSnapshotDeltaChildren`, `getSnapshotReferences`, `getSnapshotDeltaReferences`, `getSnapshotOverview`, `getSnapshotDeltaOverview`
+  - Support for ranking lists, children, references, and overview with delta comparison
+  - All functions accessible via `AdtRuntime` class methods
+
+- **ABAP Profiler Traces Module** (`runtime/traces/profiler.ts`): ABAP profiler trace management
+  - 8 functions: `listTraceFiles`, `getTraceParameters`, `getTraceParametersForCallstack`, `getTraceParametersForAmdp`, `listTraceRequests`, `getTraceRequestsByUri`, `listObjectTypes`, `listProcessTypes`
+  - Support for trace files, parameters (general, callstack aggregation, AMDP), requests, and metadata
+  - All functions accessible via `AdtRuntime` class methods
+
+- **ABAP Debugger (Standard) Module** (`runtime/debugger/abap.ts`): Standard ABAP debugger for classes, programs, function modules
+  - 20 functions covering session management, memory/system areas, breakpoints, variables, actions, stack, watchpoints, batch requests
+  - Functions: `launchDebugger`, `stopDebugger`, `getDebugger`, `getMemorySizes`, `getSystemArea`, `synchronizeBreakpoints`, `getBreakpointStatements`, `getBreakpointMessageTypes`, `getBreakpointConditions`, `validateBreakpoints`, `getVitBreakpoints`, `getVariableMaxLength`, `getVariableSubcomponents`, `getVariableAsCsv`, `getVariableAsJson`, `getVariableValueStatement`, `executeDebuggerAction`, `getCallStack`, `insertWatchpoint`, `getWatchpoints`, `executeBatchRequest`
+  - All functions accessible via `AdtRuntime` class methods
+
+- **AMDP Debugger Module** (`runtime/debugger/amdp.ts`): AMDP (ABAP Managed Database Procedures) debugger
+  - 12 functions: `startAmdpDebugger`, `resumeAmdpDebugger`, `terminateAmdpDebugger`, `getAmdpDebuggee`, `getAmdpVariable`, `setAmdpVariable`, `lookupAmdp`, `stepOverAmdp`, `stepContinueAmdp`, `getAmdpBreakpoints`, `getAmdpBreakpointsLlang`, `getAmdpBreakpointsTableFunctions`
+  - Support for debugger session management, debuggee operations, variable operations, lookup, step operations, breakpoints
+  - All functions accessible via `AdtRuntime` class methods
+
+- **AMDP Data Preview Module** (`runtime/debugger/amdpDataPreview.ts`): Data preview during AMDP debugging
+  - 2 functions: `getAmdpDataPreview`, `getAmdpCellSubstring`
+  - Support for data preview and cell substring retrieval during AMDP debugging
+  - All functions accessible via `AdtRuntime` class methods
+
+- **Cross Trace Module** (`runtime/traces/crossTrace.ts`): Cross-system trace analysis
+  - 5 functions: `listCrossTraces`, `getCrossTrace`, `getCrossTraceRecords`, `getCrossTraceRecordContent`, `getCrossTraceActivations`
+  - Support for listing traces with filters, getting trace details (with optional sensitive data), records, record content, and activations
+  - All functions accessible via `AdtRuntime` class methods
+
+- **Application Logs Module** (`runtime/applicationLog/`): Application log object operations
+  - 3 functions: `getApplicationLogObject`, `getApplicationLogSource`, `validateApplicationLogName`
+  - Support for reading application log object properties, source code, and validation
+  - All functions accessible via `AdtRuntime` class methods
+
+- **ATC Logs Module** (`runtime/atc/`): ATC (ABAP Test Cockpit) log operations
+  - 2 functions: `getCheckFailureLogs`, `getExecutionLog`
+  - Support for reading ATC check failure logs and execution logs
+  - All functions accessible via `AdtRuntime` class methods
+
+- **Feed Reader Module** (`runtime/feeds/`): Feed repository access
+  - 2 functions: `getFeeds`, `getFeedVariants`
+  - Support for accessing feed repository and feed variants
+  - All functions accessible via `AdtRuntime` class methods
+
+- **ST05 Performance Trace Module** (`runtime/traces/st05.ts`): Performance trace (ST05) operations
+  - 2 functions: `getSt05TraceState`, `getSt05TraceDirectory`
+  - Support for getting trace state and trace directory information
+  - All functions accessible via `AdtRuntime` class methods
+
+- **DDIC Activation Graph Module** (`core/ddic/logs.ts`): DDIC activation dependency graph with logs
+  - 1 function: `getActivationGraph`
+  - Support for getting activation dependency graph with logs
+  - Accessible via `AdtUtils.getActivationGraph()` method
+
+### Changed
+- **Architecture Refactoring**: Separated runtime operations from utility functions
+  - Runtime operations (debugging, tracing, memory analysis, logs) moved to `AdtRuntime` class
+  - Utility functions (search, where-used, includes, enhancements) remain in `AdtUtils` class
+  - Clear separation of concerns: CRUD operations (`IAdtObject`), utility functions (`AdtUtils`), runtime operations (`AdtRuntime`)
+  - `AdtClient` now provides three factory methods: `getClass()`, `getUtils()`, `getRuntime()`
+
+- **Module Organization**: Reorganized runtime modules into logical structure
+  - `runtime/memory/` - Memory snapshots analysis
+  - `runtime/traces/` - Tracing operations (profiler, cross-trace, ST05)
+  - `runtime/debugger/` - Debugging operations (ABAP debugger, AMDP debugger)
+  - `runtime/applicationLog/` - Application log operations
+  - `runtime/atc/` - ATC log operations
+  - `runtime/feeds/` - Feed reader operations
+
+### Documentation
+- Updated `ARCHITECTURE.md` with complete `AdtRuntime` class documentation
+- Added runtime modules structure and method descriptions
+- Updated usage examples to include runtime operations
+- See [DEBUG_TRACE_DUMP_FEED_ENDPOINTS Roadmap](docs/development/roadmaps/DEBUG_TRACE_DUMP_FEED_ENDPOINTS.md) for implementation details
+
+## [0.2.2] - 2025-12-16
 
 ### Changed
 - Dependency bump: `@mcp-abap-adt/interfaces` to `^0.1.17` for basic auth support in IConnectionConfig

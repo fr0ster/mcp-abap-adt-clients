@@ -7,14 +7,14 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { runClass } from '../../../core/class/run';
-import { getConfig } from '../../helpers/sessionConfig';
+import { runClass } from '../../../../core/class/run';
+import { getConfig } from '../../../helpers/sessionConfig';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-const { getEnabledTestCase } = require('../../helpers/test-helper');
-const { getTimeout } = require('../../helpers/test-helper');
+const { getEnabledTestCase } = require('../../../helpers/test-helper');
+const { getTimeout } = require('../../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {

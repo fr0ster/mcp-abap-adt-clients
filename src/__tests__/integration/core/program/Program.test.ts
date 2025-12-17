@@ -13,20 +13,20 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../clients/AdtClient';
-import { getProgramSource } from '../../../core/program/read';
-import { getConfig } from '../../helpers/sessionConfig';
-import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { AdtClient } from '../../../../clients/AdtClient';
+import { getProgramSource } from '../../../../core/program/read';
+import { getConfig } from '../../../helpers/sessionConfig';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd
-} from '../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../helpers/testLogger';
-import { BaseTester } from '../../helpers/BaseTester';
-import { IProgramConfig, IProgramState } from '../../../core/program';
+} from '../../../helpers/builderTestLogger';
+import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../../helpers/testLogger';
+import { BaseTester } from '../../../helpers/BaseTester';
+import { IProgramConfig, IProgramState } from '../../../../core/program';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -37,7 +37,7 @@ const {
   resolveTransportRequest,
   resolveStandardObject,
   getTimeout
-} = require('../../helpers/test-helper');
+} = require('../../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {

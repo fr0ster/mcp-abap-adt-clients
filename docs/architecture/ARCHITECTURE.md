@@ -31,12 +31,15 @@ Separation of ADT endpoint functionality into three classes to enable different 
 │   │   ├── metadataExtension/    # Metadata Extension operations
 │   │   ├── transport/            # Transport Request operations
 │   │   ├── unitTest/             # ABAP Unit Test operations
+│   │   ├── ddic/                 # DDIC operations (activation graph logs)
 │   │   └── shared/               # Shared utilities (AdtUtils, SharedBuilder)
 │   ├── runtime/                  # Runtime operations (non-CRUD)
+│   │   ├── AdtRuntime.ts         # Runtime operations wrapper class
 │   │   ├── memory/               # Memory analysis (snapshots)
 │   │   ├── traces/               # Tracing operations (profiler, cross-trace, ST05)
 │   │   ├── debugger/             # Debugging operations (ABAP debugger, AMDP debugger)
-│   │   ├── logs/                 # Log analysis (application logs, ATC logs)
+│   │   ├── applicationLog/       # Application log operations
+│   │   ├── atc/                  # ATC (ABAP Test Cockpit) log operations
 │   │   └── feeds/                # Feed reader operations
 │   ├── utils/                    # Utility functions
 │   │   ├── activationUtils.ts    # Activation utilities
@@ -163,16 +166,7 @@ core/[objectType]/
 - `getEnhancementImpl(spot, name)` → `Promise<AxiosResponse>`
 - `getEnhancementSpot(spotName)` → `Promise<AxiosResponse>`
 - `getAllTypes(maxItemCount?, name?, data?)` → `Promise<AxiosResponse>`
-- `listMemorySnapshots(user?, originalUser?)` → `Promise<AxiosResponse>`
-- `getMemorySnapshot(snapshotId)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotRankingList(snapshotId, options?)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotDeltaRankingList(uri1, uri2, options?)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotChildren(snapshotId, parentKey, options?)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotDeltaChildren(uri1, uri2, parentKey, options?)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotReferences(snapshotId, objectKey, options?)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotDeltaReferences(uri1, uri2, objectKey, options?)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotOverview(snapshotId)` → `Promise<AxiosResponse>`
-- `getMemorySnapshotDeltaOverview(uri1, uri2)` → `Promise<AxiosResponse>`
+- `getActivationGraph(options?)` → `Promise<AxiosResponse>`
 
 **Usage:**
 ```typescript
@@ -191,13 +185,160 @@ await client.getClass().create({
 const utils = client.getUtils();
 await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
 await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
+
+// Runtime operations
+const runtime = client.getRuntime();
+await runtime.listMemorySnapshots();
+await runtime.listProfilerTraceFiles();
+await runtime.launchDebugger();
 ```
 
 **Benefits:**
 - Simplified API for common workflows
 - Automatic operation chains (no manual lock/unlock management)
 - Consistent error handling and resource cleanup
-- Separation of CRUD operations (via `IAdtObject`) and utility functions (via `AdtUtils`)
+- Separation of CRUD operations (via `IAdtObject`), utility functions (via `AdtUtils`), and runtime operations (via `AdtRuntime`)
+
+---
+
+### 2. AdtRuntime (Runtime Operations Wrapper)
+
+**Purpose:** Provides access to runtime-related ADT operations that are not CRUD operations on objects
+
+**Architecture:**
+- Factory pattern: Returns `AdtRuntime` instance via `AdtClient.getRuntime()`
+- Encapsulates runtime operations: debugging, tracing, memory analysis, logs, feeds
+- Stateless wrapper around low-level runtime functions
+- Uses low-level functions directly from `runtime/` modules
+
+**Key Modules:**
+- **Memory Snapshots** (`runtime/memory/`): Memory dump analysis with ranking, children, references, overview
+- **Profiler Traces** (`runtime/traces/profiler.ts`): ABAP profiler trace files, parameters, requests
+- **Cross Trace** (`runtime/traces/crossTrace.ts`): Cross-system trace analysis
+- **ST05 Performance Trace** (`runtime/traces/st05.ts`): Performance trace state and directory
+- **ABAP Debugger** (`runtime/debugger/abap.ts`): Standard ABAP debugger for classes, programs, function modules
+- **AMDP Debugger** (`runtime/debugger/amdp.ts`): AMDP (ABAP Managed Database Procedures) debugger
+- **AMDP Data Preview** (`runtime/debugger/amdpDataPreview.ts`): Data preview during AMDP debugging
+- **Application Logs** (`runtime/applicationLog/`): Application log object properties, source, validation
+- **ATC Logs** (`runtime/atc/`): ATC check failure logs and execution logs
+- **Feed Reader** (`runtime/feeds/`): Feed repository access and feed variants
+
+**Methods:**
+
+**Memory Snapshots:**
+- `listMemorySnapshots(user?, originalUser?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshot(snapshotId)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotRankingList(snapshotId, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaRankingList(uri1, uri2, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotChildren(snapshotId, parentKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaChildren(uri1, uri2, parentKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotReferences(snapshotId, objectKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaReferences(uri1, uri2, objectKey, options?)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotOverview(snapshotId)` → `Promise<AxiosResponse>`
+- `getMemorySnapshotDeltaOverview(uri1, uri2)` → `Promise<AxiosResponse>`
+
+**Profiler Traces:**
+- `listProfilerTraceFiles()` → `Promise<AxiosResponse>`
+- `getProfilerTraceParameters()` → `Promise<AxiosResponse>`
+- `getProfilerTraceParametersForCallstack()` → `Promise<AxiosResponse>`
+- `getProfilerTraceParametersForAmdp()` → `Promise<AxiosResponse>`
+- `listProfilerTraceRequests()` → `Promise<AxiosResponse>`
+- `getProfilerTraceRequestsByUri(uri)` → `Promise<AxiosResponse>`
+- `listProfilerObjectTypes()` → `Promise<AxiosResponse>`
+- `listProfilerProcessTypes()` → `Promise<AxiosResponse>`
+
+**Cross Trace:**
+- `listCrossTraces(options?)` → `Promise<AxiosResponse>`
+- `getCrossTrace(traceId, includeSensitiveData?)` → `Promise<AxiosResponse>`
+- `getCrossTraceRecords(traceId)` → `Promise<AxiosResponse>`
+- `getCrossTraceRecordContent(traceId, recordNumber)` → `Promise<AxiosResponse>`
+- `getCrossTraceActivations()` → `Promise<AxiosResponse>`
+
+**ST05 Performance Trace:**
+- `getSt05TraceState()` → `Promise<AxiosResponse>`
+- `getSt05TraceDirectory()` → `Promise<AxiosResponse>`
+
+**ABAP Debugger (Standard):**
+- `launchDebugger(options?)` → `Promise<AxiosResponse>`
+- `stopDebugger(options?)` → `Promise<AxiosResponse>`
+- `getDebugger(options?)` → `Promise<AxiosResponse>`
+- `getDebuggerMemorySizes(includeAbap?)` → `Promise<AxiosResponse>`
+- `getDebuggerSystemArea(systemarea, options?)` → `Promise<AxiosResponse>`
+- `synchronizeBreakpoints(checkConflict?)` → `Promise<AxiosResponse>`
+- `getBreakpointStatements()` → `Promise<AxiosResponse>`
+- `getBreakpointMessageTypes()` → `Promise<AxiosResponse>`
+- `getBreakpointConditions()` → `Promise<AxiosResponse>`
+- `validateBreakpoints()` → `Promise<AxiosResponse>`
+- `getVitBreakpoints()` → `Promise<AxiosResponse>`
+- `getVariableMaxLength(variableName, part, maxLength?)` → `Promise<AxiosResponse>`
+- `getVariableSubcomponents(variableName, part, component?, line?)` → `Promise<AxiosResponse>`
+- `getVariableAsCsv(variableName, part, options?)` → `Promise<AxiosResponse>`
+- `getVariableAsJson(variableName, part, options?)` → `Promise<AxiosResponse>`
+- `getVariableValueStatement(variableName, part, options?)` → `Promise<AxiosResponse>`
+- `executeDebuggerAction(action, value?)` → `Promise<AxiosResponse>`
+- `getCallStack()` → `Promise<AxiosResponse>`
+- `insertWatchpoint(variableName, condition?)` → `Promise<AxiosResponse>`
+- `getWatchpoints()` → `Promise<AxiosResponse>`
+- `executeBatchRequest(requests)` → `Promise<AxiosResponse>`
+
+**AMDP Debugger:**
+- `startAmdpDebugger(options?)` → `Promise<AxiosResponse>`
+- `resumeAmdpDebugger(mainId)` → `Promise<AxiosResponse>`
+- `terminateAmdpDebugger(mainId, hardStop?)` → `Promise<AxiosResponse>`
+- `getAmdpDebuggee(mainId, debuggeeId)` → `Promise<AxiosResponse>`
+- `getAmdpVariable(mainId, debuggeeId, varname, offset?, length?)` → `Promise<AxiosResponse>`
+- `setAmdpVariable(mainId, debuggeeId, varname, setNull?)` → `Promise<AxiosResponse>`
+- `lookupAmdp(mainId, debuggeeId, name?)` → `Promise<AxiosResponse>`
+- `stepOverAmdp(mainId, debuggeeId)` → `Promise<AxiosResponse>`
+- `stepContinueAmdp(mainId, debuggeeId)` → `Promise<AxiosResponse>`
+- `getAmdpBreakpoints(mainId)` → `Promise<AxiosResponse>`
+- `getAmdpBreakpointsLlang(mainId)` → `Promise<AxiosResponse>`
+- `getAmdpBreakpointsTableFunctions(mainId)` → `Promise<AxiosResponse>`
+- `getAmdpDataPreview(options?)` → `Promise<AxiosResponse>`
+- `getAmdpCellSubstring(options?)` → `Promise<AxiosResponse>`
+
+**Application Logs:**
+- `getApplicationLogObject(objectName, options?)` → `Promise<AxiosResponse>`
+- `getApplicationLogSource(objectName, options?)` → `Promise<AxiosResponse>`
+- `validateApplicationLogName(objectName)` → `Promise<AxiosResponse>`
+
+**ATC Logs:**
+- `getAtcCheckFailureLogs(options?)` → `Promise<AxiosResponse>`
+- `getAtcExecutionLog(executionId)` → `Promise<AxiosResponse>`
+
+**Feed Reader:**
+- `getFeeds()` → `Promise<AxiosResponse>`
+- `getFeedVariants()` → `Promise<AxiosResponse>`
+
+**Usage:**
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new AdtClient(connection, logger);
+const runtime = client.getRuntime();
+
+// Memory snapshots
+const snapshots = await runtime.listMemorySnapshots();
+const snapshot = await runtime.getMemorySnapshot('snapshot-id');
+
+// Profiler traces
+const traceFiles = await runtime.listProfilerTraceFiles();
+const traceParams = await runtime.getProfilerTraceParameters();
+
+// Debugging
+await runtime.launchDebugger({ debuggingMode: 'external' });
+const callStack = await runtime.getCallStack();
+
+// Logs
+const appLog = await runtime.getApplicationLogObject('Z_MY_LOG');
+const atcLogs = await runtime.getAtcCheckFailureLogs();
+```
+
+**Benefits:**
+- Centralized access to runtime operations
+- Clear separation from CRUD operations
+- Consistent API for all runtime modules
+- Type-safe access to runtime functionality
 
 ---
 
@@ -250,7 +391,7 @@ const domain = await client.readDomain('Z_MY_DOMAIN');
 
 ---
 
-### 3. CrudClient extends ReadOnlyClient
+### 5. CrudClient extends ReadOnlyClient
 
 **Purpose:** Full CRUD functionality (Create, Read, Update, Delete)
 

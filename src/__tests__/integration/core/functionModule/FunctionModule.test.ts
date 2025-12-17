@@ -13,21 +13,21 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../clients/AdtClient';
-import { getFunction } from '../../../core/functionModule/read';
-import { deleteFunctionGroup } from '../../../core/functionGroup/delete';
-import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { getConfig } from '../../helpers/sessionConfig';
+import { AdtClient } from '../../../../clients/AdtClient';
+import { getFunction } from '../../../../core/functionModule/read';
+import { deleteFunctionGroup } from '../../../../core/functionGroup/delete';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { getConfig } from '../../../helpers/sessionConfig';
 import {
   logBuilderTestStart,
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
   logBuilderTestEnd
-} from '../../helpers/builderTestLogger';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../helpers/testLogger';
-import { BaseTester } from '../../helpers/BaseTester';
-import { IFunctionModuleConfig, IFunctionModuleState } from '../../../core/functionModule';
+} from '../../../helpers/builderTestLogger';
+import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
+import { BaseTester } from '../../../helpers/BaseTester';
+import { IFunctionModuleConfig, IFunctionModuleState } from '../../../../core/functionModule';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -39,7 +39,7 @@ const {
   resolveTransportRequest,
   resolveStandardObject,
   getTimeout
-} = require('../../helpers/test-helper');
+} = require('../../../helpers/test-helper');
 
 const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
