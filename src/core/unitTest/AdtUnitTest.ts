@@ -86,11 +86,21 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
         config.options
       );
 
+      // Log response for debugging
+      this.logger?.debug?.('Unit test run response status:', response.status);
+      this.logger?.debug?.('Unit test run response data type:', typeof response.data);
+      if (typeof response.data === 'string') {
+        this.logger?.debug?.('Unit test run response data (first 500 chars):', response.data.substring(0, 500));
+      } else {
+        this.logger?.debug?.('Unit test run response data:', JSON.stringify(response.data));
+      }
+
       // Extract run ID from response
       // Response format: XML with aunit:run element containing uri attribute
       const runId = this.extractRunId(response);
 
       if (!runId) {
+        this.logger?.error?.('Failed to extract run ID from response. Response data:', response.data);
         throw new Error('Failed to start unit test run: run ID not returned');
       }
 
@@ -279,6 +289,18 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    * Extract run ID from unit test run response
    */
   protected extractRunId(response: AxiosResponse): string | undefined {
+    // First, try to extract from response headers (most reliable)
+    const locationHeader = response.headers?.['location'] || 
+                          response.headers?.['content-location'] || 
+                          response.headers?.['sap-adt-location'];
+    if (locationHeader) {
+      const runIdMatch = locationHeader.match(/\/runs\/([^\/]+)/);
+      if (runIdMatch) {
+        return runIdMatch[1];
+      }
+    }
+
+    // Fallback: parse from response body (XML)
     // Response is XML with aunit:run element
     // URI format: /sap/bc/adt/abapunit/runs/{runId}
     const data = response.data;
@@ -287,6 +309,15 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
       const uriMatch = data.match(/uri="([^"]+)"/);
       if (uriMatch) {
         const uri = uriMatch[1];
+        const runIdMatch = uri.match(/\/runs\/([^\/]+)/);
+        if (runIdMatch) {
+          return runIdMatch[1];
+        }
+      }
+      // Try alternative XML format
+      const runMatch = data.match(/<aunit:run[^>]*uri="([^"]+)"/);
+      if (runMatch) {
+        const uri = runMatch[1];
         const runIdMatch = uri.match(/\/runs\/([^\/]+)/);
         if (runIdMatch) {
           return runIdMatch[1];

@@ -64,6 +64,7 @@ export type { IDataElementConfig as DataElementBuilderConfig, IDataElementState 
 export type { IDomainConfig as DomainBuilderConfig, IDomainState as DomainBuilderState } from './core/domain';
 export type { IStructureConfig as StructureBuilderConfig, IStructureState as StructureBuilderState } from './core/structure';
 export type { ITableConfig as TableBuilderConfig, ITableState as TableBuilderState } from './core/table';
+export type { ITableTypeConfig as TableTypeBuilderConfig, ITableTypeState as TableTypeBuilderState } from './core/tabletype';
 export type { IViewConfig as ViewBuilderConfig, IViewState as ViewBuilderState } from './core/view';
 export type { IFunctionGroupConfig as FunctionGroupBuilderConfig, IFunctionGroupState as FunctionGroupBuilderState } from './core/functionGroup';
 export type { IFunctionModuleConfig as FunctionModuleBuilderConfig, IFunctionModuleState as FunctionModuleBuilderState } from './core/functionModule';
@@ -91,6 +92,13 @@ export type {
   IMetadataExtensionValidationParams as MetadataExtensionValidationParams,
   IMetadataExtensionCreateParams as MetadataExtensionCreateParams
 } from './core/metadataExtension';
+export type {
+  EnhancementType,
+  IEnhancementConfig as EnhancementBuilderConfig,
+  IEnhancementState as EnhancementBuilderState,
+  ICreateEnhancementParams as CreateEnhancementParams,
+  IEnhancementMetadata
+} from './core/enhancement';
 
 // Re-export types from interfaces package for convenience
 export type { IAbapConnection, IAbapRequestOptions } from '@mcp-abap-adt/interfaces';
@@ -103,6 +111,8 @@ export type { AdtDomainType } from './core/domain';
 export type { AdtDataElementType } from './core/dataElement';
 export type { AdtStructureType } from './core/structure';
 export type { AdtTableType } from './core/table';
+export type { AdtDdicTableTypeAlias } from './core/tabletype';
+export { AdtDdicTableType } from './core/tabletype';
 export type { AdtViewType } from './core/view';
 export type { AdtFunctionGroupType } from './core/functionGroup';
 export type { AdtFunctionModuleType } from './core/functionModule';
@@ -113,6 +123,7 @@ export type { AdtBehaviorImplementationType } from './core/behaviorImplementatio
 export type { AdtMetadataExtensionType } from './core/metadataExtension';
 export type { AdtUnitTestType } from './core/unitTest';
 export type { AdtRequestType } from './core/transport';
+export type { AdtEnhancement as AdtEnhancementType } from './core/enhancement';
 
 // Export utilities
 export { encodeSapObjectName } from './utils/internalUtils';

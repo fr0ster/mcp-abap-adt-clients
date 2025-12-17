@@ -55,3 +55,41 @@ export async function getPackageTransport(
   });
 }
 
+/**
+ * Get package contents (list of objects in package)
+ * 
+ * Uses node structure endpoint to get all objects in a package.
+ * 
+ * @param connection - ABAP connection instance
+ * @param packageName - Package name
+ * @returns Axios response with XML containing package contents
+ * 
+ * @example
+ * ```typescript
+ * const response = await getPackageContents(connection, 'ZMY_PACKAGE');
+ * // Response contains XML with objects in the package
+ * ```
+ */
+export async function getPackageContents(
+  connection: IAbapConnection,
+  packageName: string
+): Promise<AxiosResponse> {
+  const url = `/sap/bc/adt/repository/nodestructure`;
+  
+  const params = {
+    parent_type: 'DEVC/K',
+    parent_name: packageName,
+    withShortDescriptions: true
+  };
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    params,
+    headers: {
+      'Accept': 'application/xml'
+    }
+  });
+}
+

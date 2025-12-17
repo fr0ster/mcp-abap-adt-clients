@@ -548,9 +548,8 @@ Each core module maintains its own `types.ts` with low-level params and Builder 
 - **Dependency Management**: Supports creating/deleting dependencies (e.g., FunctionGroup for FunctionModule)
 
 **Migration Status:**
-- 13/15 object-specific integration tests migrated to `BaseTester` (87%)
-- Remaining: `MetadataExtension.test.ts` (requires existing CDS projection in YAML config)
-- See [BaseTester Migration Roadmap](../development/roadmaps/BASE_TESTER_MIGRATION.md) for details
+- ✅ 15/15 object-specific integration tests migrated to `BaseTester` (100% - completed)
+- See [BaseTester Migration Roadmap](../development/archive/roadmaps/BASE_TESTER_MIGRATION.md) for details (archived)
 
 **Example Usage:**
 ```typescript

@@ -562,7 +562,7 @@ export class BaseTester<TConfig, TState> {
    */
   async flowTestAuto(options?: IFlowTestOptions): Promise<TState | undefined> {
     const testName = `${this.loggerPrefix} - ${this.testDescription}`;
-    const definition = this.getTestCaseDefinition();
+    const definition = this.getTestCaseDefinition() || { name: this.testCaseKey, params: {} };
 
     if (this.shouldSkip()) {
       logBuilderTestStart(this.logger, testName, definition);
@@ -598,7 +598,7 @@ export class BaseTester<TConfig, TState> {
    */
   async readTestAuto(options?: IReadTestOptions): Promise<TState | undefined> {
     const testName = `${this.loggerPrefix} - read standard object`;
-    const definition = this.getTestCaseDefinition();
+    const definition = this.getTestCaseDefinition() || { name: this.testCaseKey, params: {} };
 
     if (this.shouldSkip()) {
       logBuilderTestStart(this.logger, testName, definition);

@@ -41,6 +41,9 @@ export function getObjectMetadataUri(objectType: string, objectName: string, fun
     case 'table':
     case 'tabl/dt':
       return `/sap/bc/adt/ddic/tables/${encodedName}`;
+    case 'tabletype':
+    case 'ttyp/df':
+      return `/sap/bc/adt/ddic/tabletypes/${encodedName}`;
     case 'domain':
     case 'doma/dd':
       return `/sap/bc/adt/ddic/domains/${encodedName}`;
@@ -74,6 +77,9 @@ function getAcceptHeader(objectType: string): string {
     case 'table':
     case 'tabl/dt':
       return 'application/vnd.sap.adt.tables.v2+xml, application/vnd.sap.adt.tables.v1+xml, application/vnd.sap.adt.blues.v1+xml';
+    case 'tabletype':
+    case 'ttyp/df':
+      return 'application/vnd.sap.adt.tabletypes.v2+xml, application/vnd.sap.adt.tabletypes.v1+xml, application/vnd.sap.adt.blues.v1+xml';
     case 'domain':
     case 'doma/dd':
       return 'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml';

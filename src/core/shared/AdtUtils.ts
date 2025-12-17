@@ -42,6 +42,12 @@ import { readObjectMetadata } from './readMetadata';
 import { readObjectSource, supportsSourceCode, getObjectSourceUri } from './readSource';
 import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
+import { getTransaction } from './transaction';
+import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinition/read';
+import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
+import { getEnhancements } from './enhancements';
+import { getIncludesList } from './includesList';
+import { getPackageContents } from '../package/read';
 
 // Import types
 import type {
@@ -218,5 +224,146 @@ export class AdtUtils {
    */
   async getTableContents(params: IGetTableContentsParams): Promise<AxiosResponse> {
     return getTableContents(this.connection, params);
+  }
+
+  /**
+   * Get transaction properties (metadata) for ABAP transaction
+   * 
+   * Retrieves transaction information using ADT object properties endpoint:
+   * - Transaction name
+   * - Description
+   * - Package (if applicable)
+   * - Transaction type
+   * 
+   * @param transactionName - Transaction code (e.g., 'SE80', 'SE11', 'SM30')
+   * @returns Axios response with XML containing transaction properties
+   *          Response format: opr:objectProperties with opr:object containing
+   *          name, text (description), package, type
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getTransaction('SE80');
+   * // Response contains XML with transaction properties
+   * ```
+   */
+  async getTransaction(transactionName: string): Promise<AxiosResponse> {
+    return getTransaction(this.connection, transactionName);
+  }
+
+  /**
+   * Get behavior definition source code (BDEF)
+   * 
+   * Convenience wrapper for reading behavior definition source code.
+   * Uses the same endpoint as `AdtClient.getBehaviorDefinition().read()`.
+   * 
+   * @param bdefName - Behavior definition name (e.g., 'Z_I_MYENTITY')
+   * @param version - Version to read: 'active' or 'inactive' (default: 'active')
+   * @returns Axios response with source code (plain text)
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getBdef('Z_I_MYENTITY');
+   * const sourceCode = response.data; // BDEF source code
+   * ```
+   */
+  async getBdef(bdefName: string, version: 'active' | 'inactive' = 'active'): Promise<AxiosResponse> {
+    return readBehaviorDefinitionSource(this.connection, bdefName, version);
+  }
+
+  /**
+   * Fetch node structure from ADT repository
+   * 
+   * Used for object tree navigation and structure discovery.
+   * 
+   * @param parentType - Parent object type (e.g., 'CLAS/OC', 'PROG/P', 'DEVC/K')
+   * @param parentName - Parent object name
+   * @param nodeId - Optional node ID (default: '0000' for root)
+   * @param withShortDescriptions - Include short descriptions (default: true)
+   * @returns Axios response with XML containing node structure
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.fetchNodeStructure('CLAS/OC', 'ZMY_CLASS', '0000');
+   * ```
+   */
+  async fetchNodeStructure(
+    parentType: string,
+    parentName: string,
+    nodeId?: string,
+    withShortDescriptions: boolean = true
+  ): Promise<AxiosResponse> {
+    return fetchNodeStructureUtil(this.connection, parentType, parentName, nodeId, withShortDescriptions);
+  }
+
+  /**
+   * Get enhancement implementations for ABAP object
+   * 
+   * Retrieves enhancement implementations for programs, includes, or classes.
+   * 
+   * @param objectName - Object name (program, include, or class)
+   * @param objectType - Object type: 'program' | 'include' | 'class'
+   * @param context - Optional program context for includes (required when objectType is 'include')
+   * @returns Axios response with XML containing enhancement implementations
+   * 
+   * @example
+   * ```typescript
+   * // For a program
+   * const response = await utils.getEnhancements('ZMY_PROGRAM', 'program');
+   * 
+   * // For an include
+   * const response = await utils.getEnhancements('ZMY_INCLUDE', 'include', 'ZMY_PROGRAM');
+   * 
+   * // For a class
+   * const response = await utils.getEnhancements('ZMY_CLASS', 'class');
+   * ```
+   */
+  async getEnhancements(
+    objectName: string,
+    objectType: 'program' | 'include' | 'class',
+    context?: string
+  ): Promise<AxiosResponse> {
+    return getEnhancements(this.connection, objectName, objectType, context);
+  }
+
+  /**
+   * Get list of includes for ABAP object
+   * 
+   * Recursively discovers and lists all include files within an ABAP program or include.
+   * 
+   * @param objectName - Object name (program or include)
+   * @param objectType - Object type: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC'
+   * @param timeout - Optional timeout in milliseconds (default: 30000)
+   * @returns Array of include names
+   * 
+   * @example
+   * ```typescript
+   * const includes = await utils.getIncludesList('ZMY_PROGRAM', 'PROG/P');
+   * // Returns: ['ZMY_INCLUDE1', 'ZMY_INCLUDE2', ...]
+   * ```
+   */
+  async getIncludesList(
+    objectName: string,
+    objectType: 'PROG/P' | 'PROG/I' | 'FUGR' | 'CLAS/OC',
+    timeout: number = 30000
+  ): Promise<string[]> {
+    return getIncludesList(this.connection, objectName, objectType, timeout);
+  }
+
+  /**
+   * Get package contents (list of objects in package)
+   * 
+   * Retrieves all objects contained in an ABAP package.
+   * 
+   * @param packageName - Package name
+   * @returns Axios response with XML containing package contents
+   * 
+   * @example
+   * ```typescript
+   * const response = await utils.getPackageContents('ZMY_PACKAGE');
+   * // Response contains XML with objects in the package
+   * ```
+   */
+  async getPackageContents(packageName: string): Promise<AxiosResponse> {
+    return getPackageContents(this.connection, packageName);
   }
 }

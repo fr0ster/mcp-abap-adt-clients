@@ -17,6 +17,7 @@
 # - Interfaces: ZADT_BLD_IF01, ZADT_BLD_IF02, etc.
 # - Programs: ZADT_BLD_PROG01, ZADT_BLD_PROG02, etc.
 # - Tables: ZADT_BLD_TAB01, ZADT_BLD_TAB02, etc.
+# - TableTypes: ZADT_BLD_TTYP01, ZADT_BLD_TTYP02, etc.
 # - Structures: ZADT_BLD_STRU01, ZADT_BLD_STRU02, etc.
 # - Views: ZADT_BLD_VIEW01, ZADT_BLD_VIEW02, etc.
 # - Service Definitions: ZADT_BLD_SRVD01, ZADT_BLD_SRVD02, etc.
@@ -108,6 +109,11 @@ standard_objects:
     - name: "T000"
       description: "Clients"
       available_in: ["cloud"]
+
+  tabletypes:
+    - name: "STRING_TABLE"
+      description: "Standard string table type"
+      available_in: ["onprem", "cloud"]
 
   structures:
     - name: "SYST"
@@ -226,6 +232,112 @@ create_class:
             PRIVATE SECTION.
           ENDCLASS.
 
+# Update Class LocalDefinitions (definitions include: private types/data)
+update_class_local_definitions:
+  test_cases:
+    - name: "local_definitions"
+      enabled: false
+      description: "Update class definitions include (local types/data in class private section)"
+      params:
+        class_name: "ZADT_BLD_CLS10"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        definitionsCode_create: |
+          TYPES: BEGIN OF ty_local_dummy,
+                   value TYPE i,
+                 END OF ty_local_dummy.
+          CONSTANTS gc_local_dummy TYPE string VALUE 'X'.
+        definitionsCode_update: |
+          TYPES: BEGIN OF ty_local_dummy,
+                   value TYPE i,
+                 END OF ty_local_dummy.
+          CONSTANTS gc_local_dummy TYPE string VALUE 'Y'.
+
+# Update Class LocalTypes (implementations include: local helper class)
+update_class_local_types:
+  test_cases:
+    - name: "local_types"
+      enabled: false
+      description: "Update class implementations include (local helper class/types)"
+      params:
+        class_name: "ZADT_BLD_CLS11"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        localTypesCode_create: |
+          CLASS lcl_helper DEFINITION FINAL.
+            PUBLIC SECTION.
+              CLASS-METHODS get_value RETURNING VALUE(rv_value) TYPE i.
+          ENDCLASS.
+
+          CLASS lcl_helper IMPLEMENTATION.
+            METHOD get_value.
+              rv_value = 1.
+            ENDMETHOD.
+          ENDCLASS.
+        localTypesCode_update: |
+          CLASS lcl_helper DEFINITION FINAL.
+            PUBLIC SECTION.
+              CLASS-METHODS get_value RETURNING VALUE(rv_value) TYPE i.
+          ENDCLASS.
+
+          CLASS lcl_helper IMPLEMENTATION.
+            METHOD get_value.
+              rv_value = 2.
+            ENDMETHOD.
+          ENDCLASS.
+
+# Update Class LocalTestClass (testclasses include: local ABAP Unit tests)
+update_class_local_testclass:
+  test_cases:
+    - name: "local_testclass"
+      enabled: false
+      description: "Update class testclasses include (local ABAP Unit test class)"
+      params:
+        class_name: "ZADT_BLD_CLS12"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        testClassCode_create: |
+          CLASS ltcl_local_test DEFINITION FINAL FOR TESTING DURATION SHORT RISK LEVEL HARMLESS.
+            PRIVATE SECTION.
+              METHODS test_basic FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltcl_local_test IMPLEMENTATION.
+            METHOD test_basic.
+              cl_abap_unit_assert=>assert_equals( exp = 1 act = 1 ).
+            ENDMETHOD.
+          ENDCLASS.
+        testClassCode_update: |
+          CLASS ltcl_local_test DEFINITION FINAL FOR TESTING DURATION SHORT RISK LEVEL HARMLESS.
+            PRIVATE SECTION.
+              METHODS test_basic FOR TESTING.
+          ENDCLASS.
+
+          CLASS ltcl_local_test IMPLEMENTATION.
+            METHOD test_basic.
+              cl_abap_unit_assert=>assert_equals( exp = 2 act = 2 ).
+            ENDMETHOD.
+          ENDCLASS.
+
+# Update Class LocalMacros (macros include: on-premise only)
+update_class_local_macros:
+  test_cases:
+    - name: "local_macros"
+      enabled: false
+      description: "Update class macros include (on-premise only; not available in ABAP Cloud)"
+      params:
+        class_name: "ZADT_BLD_CLS13"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        macrosCode_create: |
+          DEFINE _local_noop.
+            ASSERT 1 = 1.
+          END-OF-DEFINITION.
+        macrosCode_update: |
+          DEFINE _local_noop.
+            ASSERT 2 = 2.
+          END-OF-DEFINITION.
+
           CLASS ZADT_BLD_CLS01 IMPLEMENTATION.
             METHOD get_text.
               rv_text = |Parents: { lines( build_parent_data( ) ) }|.
@@ -245,90 +357,7 @@ create_class:
                 ( parent_id = '0000000002' chld_id = 'C03' )
               ).
             ENDMETHOD.
-          ENDCLASS.
-
-        # Optional ABAP Unit test configuration.
-        # Remove the entire block below if you don't want to generate test classes or run ABAP Unit tests.
-        test_class:
-          enabled: true
-          run_unit_test: true
-          name: "LTCL_ZADT_BLD_CLS01"
-          container_class: "ZADT_BLD_CLS01"
-          source_code: |
-            CLASS ltcl_zadt_bld_cls01 DEFINITION
-              FOR TESTING
-              DURATION SHORT
-              RISK LEVEL HARMLESS
-              FINAL.
-
-              PRIVATE SECTION.
-                METHODS parent_data_two_rows FOR TESTING.
-                METHODS child_data_relations FOR TESTING.
             ENDCLASS.
-
-            CLASS ltcl_zadt_bld_cls01 IMPLEMENTATION.
-              METHOD parent_data_two_rows.
-                DATA lt_parent TYPE zadt_bld_cls01=>ty_parent_tab.
-                lt_parent = zadt_bld_cls01=>build_parent_data( ).
-
-                cl_abap_unit_assert=>assert_equals(
-                  act = lines( lt_parent )
-                  exp = 2
-                  msg = 'Expected 2 parent rows'
-                ).
-
-                DATA(ls_first) = lt_parent[ 1 ].
-                cl_abap_unit_assert=>assert_equals(
-                  act = ls_first-fld1
-                  exp = '0000000001'
-                  msg = 'Incorrect key for first parent'
-                ).
-              ENDMETHOD.
-
-              METHOD child_data_relations.
-                DATA lt_parent TYPE zadt_bld_cls01=>ty_parent_tab.
-                DATA lt_child  TYPE zadt_bld_cls01=>ty_child_tab.
-
-                lt_parent = zadt_bld_cls01=>build_parent_data( ).
-                lt_child  = zadt_bld_cls01=>build_child_data( ).
-
-                cl_abap_unit_assert=>assert_equals(
-                  act = lines( lt_child )
-                  exp = 3
-                  msg = 'Expected 3 child rows'
-                ).
-
-                LOOP AT lt_child ASSIGNING FIELD-SYMBOL(<ls_child>).
-                  READ TABLE lt_parent WITH KEY fld1 = <ls_child>-parent_id TRANSPORTING NO FIELDS.
-                  cl_abap_unit_assert=>assert_equals(
-                    act = sy-subrc
-                    exp = 0
-                    msg = |Invalid parent reference { <ls_child>-parent_id }|
-                  ).
-                ENDLOOP.
-              ENDMETHOD.
-            ENDCLASS.
-
-          unit_test_options:
-            title: "LTCL_ZADT_BLD_CLS01"
-            context: "Builder Class ABAP Unit"
-            scope:
-              own_tests: true
-              foreign_tests: false
-              add_foreign_tests_as_preview: true
-            risk_level:
-              harmless: true
-              dangerous: true
-              critical: true
-            duration:
-              short: true
-              medium: true
-              long: true
-          unit_test_status:
-            with_long_polling: true
-          unit_test_result:
-            with_navigation_uris: false
-            format: "abapunit"   # or "junit"
 
 # Create Package
 create_package:
@@ -454,6 +483,33 @@ create_table:
             last_changed_on    : abap.dats;
           }
 
+# Create TableType (DDIC Table Type)
+create_tabletype:
+  test_cases:
+    - name: "adt_tabletype"
+      enabled: true
+      description: "TableType reserved for TableType tests"
+      params:
+        tabletype_name: "ZADT_BLD_TTYP01"
+        description: "TableType workflow table type"
+        # package_name: "ZADT_BLD_PKG01"
+        # transport_request: ""
+        ddl_code: |
+          @EndUserText.label: 'Builder test table type'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define table type ZADT_BLD_TTYP01 {
+            field1 : abap.char(10);
+            field2 : abap.char(40);
+          }
+        updated_ddl_code: |
+          @EndUserText.label: 'Builder test table type - updated'
+          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
+          define table type ZADT_BLD_TTYP01 {
+            field1 : abap.char(10);
+            field2 : abap.char(40);
+            field3 : abap.char(20);
+          }
+
 # Create Structure
 create_structure:
   test_cases:
@@ -510,121 +566,6 @@ create_view:
             value,
             created_at
           }
-
-    - name: "cds_unit_test"
-      enabled: true
-      description: "CDS view with ABAP Unit verification (CDS view must be created manually before test)"
-      params:
-        package_name: "ZADT_BLD_PKG03"
-        # view_name: CDS view name that must exist and be active (created manually)
-        view_name: "ZOK_I_CDS_TEST"
-        # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
-        description: "ViewBuilder CDS unit test view"
-        transport_request: ""
-        # Note: table_name, table_source, and ddl_source are not used anymore
-        # CDS view and table must be created manually before running this test
-        cds_unit_test:
-          class_name: "ZADT_BLD_CDS_UT02"
-          test_class_name: "LTC_ZOK_I_CDS_TEST"
-          description: "CDS unit test class"
-          transport_request: ""
-          template_xml: |
-            <abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
-              <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-            &lt;cds:cdstobetested xmlns:cds="http://www.sap.com/adt/cdsfrwk/cds"&gt;
-              &lt;cds:cdsundertest api_doc="true" cds_name="ZOK_I_CDS_TEST" cds_test_type="UNIT_TEST"&gt;
-                &lt;cds:testmethods&gt;
-                  &lt;cds:testmethod test_method_name="AUNIT_FOR_CDS_METHOD"/&gt;
-                &lt;/cds:testmethods&gt;
-              &lt;/cds:cdsundertest&gt;
-            &lt;/cds:cdstobetested&gt;
-            </abapsource:property>
-              <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
-            </abapsource:template>
-          test_class_source: |
-            "!@testing ZADT_BLD_CDS_UT02
-            CLASS LTC_ZOK_I_CDS_TEST DEFINITION FINAL
-              FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
-
-              PRIVATE SECTION.
-                CLASS-DATA environment TYPE REF TO if_cds_test_environment.
-
-                DATA td_zok_t_cds_test TYPE STANDARD TABLE OF zok_t_cds_test WITH EMPTY KEY.
-                DATA act_results TYPE STANDARD TABLE OF zok_i_cds_test WITH EMPTY KEY.
-
-                "! In CLASS_SETUP, corresponding doubles and clone(s) for the CDS view under test and its dependencies are created.
-                CLASS-METHODS class_setup RAISING cx_static_check.
-                "! In CLASS_TEARDOWN, Generated database entities (doubles & clones) should be deleted at the end of test class execution.
-                CLASS-METHODS class_teardown.
-
-                "! SETUP method creates a common start state for each test method,
-                "! clear_doubles clears the test data for all the doubles used in the test method before each test method execution.
-                METHODS setup RAISING cx_static_check.
-                METHODS prepare_testdata.
-                "! In this method test data is inserted into the generated double(s) and the test is executed and
-                "! the results should be asserted with the actuals.
-                METHODS aunit_for_cds_method FOR TESTING RAISING cx_static_check.
-            ENDCLASS.
-
-            CLASS LTC_ZOK_I_CDS_TEST IMPLEMENTATION.
-
-              METHOD class_setup.
-                environment = cl_cds_test_environment=>create( i_for_entity = 'ZOK_I_CDS_TEST' ).
-              ENDMETHOD.
-
-              METHOD setup.
-                environment->clear_doubles( ).
-              ENDMETHOD.
-
-              METHOD class_teardown.
-                environment->destroy( ).
-              ENDMETHOD.
-
-              METHOD aunit_for_cds_method.
-                prepare_testdata( ).
-                SELECT * FROM zok_i_cds_test INTO TABLE @act_results.
-                cl_abap_unit_assert=>fail( msg = 'Place your assertions here' ).
-              ENDMETHOD.
-
-              METHOD prepare_testdata.
-                " Prepare test data for 'zok_t_cds_test'
-                td_zok_t_cds_test = VALUE #(
-                  (
-                    client = '100'
-                    fld1 = '100'
-                    fld2 = '2222'
-                    fld3 = '20251205'
-                  )
-                  (
-                    client = '100'
-                    fld1 = '200'
-                    fld2 = '4444'
-                    fld3 = '20251206'
-                  ) ).
-                environment->insert_test_data( i_data = td_zok_t_cds_test ).
-              ENDMETHOD.
-
-            ENDCLASS.
-          unit_test_options:
-            title: "LTC_ZOK_I_CDS_TEST"
-            context: "ViewBuilder CDS Unit"
-            scope:
-              own_tests: true
-              foreign_tests: false
-              add_foreign_tests_as_preview: true
-            risk_level:
-              harmless: true
-              dangerous: true
-              critical: true
-            duration:
-              short: true
-              medium: true
-              long: true
-          unit_test_status:
-            with_long_polling: true
-          unit_test_result:
-            with_navigation_uris: false
-            format: "abapunit"
 
 # Create Service Definition
 create_service_definition:
@@ -765,6 +706,169 @@ create_behavior_implementation:
             ENDMETHOD.
 
           ENDCLASS.
+
+# Run Unit Test
+run_unit_test:
+  test_cases:
+    - name: "adt_unit_test"
+      enabled: true
+      description: "Run unit test for class test class"
+      params:
+        package_name: "<YOUR_PACKAGE_NAME>"  # e.g., ZADT_BLD_PKG01
+        transport_request: ""
+        source_code: |
+          CLASS <YOUR_CONTAINER_CLASS_NAME> DEFINITION PUBLIC FINAL CREATE PUBLIC.
+            PUBLIC SECTION.
+              METHODS test_method.
+          ENDCLASS.
+          CLASS <YOUR_CONTAINER_CLASS_NAME> IMPLEMENTATION.
+            METHOD test_method.
+              " Test method implementation
+            ENDMETHOD.
+          ENDCLASS.
+        test_class_source: |
+          CLASS <YOUR_TEST_CLASS_NAME> DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS test_method FOR TESTING.
+          ENDCLASS.
+          CLASS <YOUR_TEST_CLASS_NAME> IMPLEMENTATION.
+            METHOD test_method.
+              cl_abap_unit_assert=>assert_true( abap_true ).
+            ENDMETHOD.
+          ENDCLASS.
+        test_class:
+          enabled: true
+          run_unit_test: true
+          container_class: "<YOUR_CONTAINER_CLASS_NAME>"  # e.g., ZADT_BLD_CLS01
+          name: "<YOUR_TEST_CLASS_NAME>"  # e.g., LTCL_ZADT_BLD_CLS01
+        # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
+        unit_test_options:
+          title: "<YOUR_TEST_CLASS_NAME>"
+          context: "Builder Class ABAP Unit"
+          scope:
+            own_tests: true
+            foreign_tests: false
+            add_foreign_tests_as_preview: true
+          risk_level:
+            harmless: true
+            dangerous: true
+            critical: true
+          duration:
+            short: true
+            medium: true
+            long: true
+        unit_test_status:
+          with_long_polling: true
+        unit_test_result:
+          with_navigation_uris: false
+          format: "abapunit"  # or "junit"
+
+# Create CDS Unit Test
+create_cds_unit_test:
+  test_cases:
+    - name: "cds_unit_test"
+      enabled: true
+      description: "CDS view with ABAP Unit verification (CDS view must be created manually before test)"
+      params:
+        package_name: "ZADT_BLD_PKG01"
+        # view_name: CDS view name that must exist and be active (created manually)
+        view_name: "<YOUR_CDS_VIEW_NAME>"  # e.g., ZOK_I_CDS_TEST
+        description: "ViewBuilder CDS unit test view"
+        transport_request: ""
+        # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
+        # Note: CDS view and table must be created manually before running this test
+        unit_test_options:
+          scope:
+            ownTests: true
+            foreignTests: false
+          riskLevel:
+            harmless: true
+            dangerous: true
+            critical: true
+          duration:
+            short: true
+            medium: true
+            long: true
+        unit_test_status:
+          with_long_polling: true
+        unit_test_result:
+          with_navigation_uris: false
+          format: "abapunit"
+        cds_unit_test:
+          class_name: "<YOUR_CDS_UNIT_TEST_CLASS_NAME>"  # e.g., ZADT_BLD_CDS_UT01
+          test_class_name: "<YOUR_TEST_CLASS_NAME>"  # e.g., LTC_<YOUR_CDS_VIEW_NAME>
+          description: "CDS unit test class"
+          transport_request: ""
+          template_xml: |
+            <abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
+              <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+            &lt;cds:cdstobetested xmlns:cds="http://www.sap.com/adt/cdsfrwk/cds"&gt;
+              &lt;cds:cdsundertest api_doc="true" cds_name="<YOUR_CDS_VIEW_NAME>" cds_test_type="UNIT_TEST"&gt;
+                &lt;cds:testmethods&gt;
+                  &lt;cds:testmethod test_method_name="AUNIT_FOR_CDS_METHOD"/&gt;
+                &lt;/cds:testmethods&gt;
+              &lt;/cds:cdsundertest&gt;
+            &lt;/cds:cdstobetested&gt;
+            </abapsource:property>
+              <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
+            </abapsource:template>
+          test_class_source: |
+            "!@testing <YOUR_CDS_UNIT_TEST_CLASS_NAME>
+            CLASS <YOUR_TEST_CLASS_NAME> DEFINITION FINAL
+              FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+
+              PRIVATE SECTION.
+                CLASS-DATA environment TYPE REF TO if_cds_test_environment.
+
+                DATA td_<your_table_name> TYPE STANDARD TABLE OF <your_table_name> WITH EMPTY KEY.
+                DATA act_results TYPE STANDARD TABLE OF <your_cds_view_name> WITH EMPTY KEY.
+
+                "! In CLASS_SETUP, corresponding doubles and clone(s) for the CDS view under test and its dependencies are created.
+                CLASS-METHODS class_setup RAISING cx_static_check.
+                "! In CLASS_TEARDOWN, Generated database entities (doubles & clones) should be deleted at the end of test class execution.
+                CLASS-METHODS class_teardown.
+
+                "! SETUP method creates a common start state for each test method,
+                "! clear_doubles clears the test data for all the doubles used in the test method before each test method execution.
+                METHODS setup RAISING cx_static_check.
+                METHODS prepare_testdata.
+                "! In this method test data is inserted into the generated double(s) and the test is executed and
+                "! the results should be asserted with the actuals.
+                METHODS aunit_for_cds_method FOR TESTING RAISING cx_static_check.
+            ENDCLASS.
+
+            CLASS <YOUR_TEST_CLASS_NAME> IMPLEMENTATION.
+
+              METHOD class_setup.
+                environment = cl_cds_test_environment=>create( i_for_entity = '<YOUR_CDS_VIEW_NAME>' ).
+              ENDMETHOD.
+
+              METHOD setup.
+                environment->clear_doubles( ).
+              ENDMETHOD.
+
+              METHOD class_teardown.
+                environment->destroy( ).
+              ENDMETHOD.
+
+              METHOD aunit_for_cds_method.
+                prepare_testdata( ).
+                SELECT * FROM <your_cds_view_name> INTO TABLE @act_results.
+                cl_abap_unit_assert=>fail( msg = 'Place your assertions here' ).
+              ENDMETHOD.
+
+              METHOD prepare_testdata.
+                " Prepare test data for '<your_table_name>'
+                td_<your_table_name> = VALUE #(
+                  (
+                    client = '100'
+                    " Add your test data fields here
+                  )
+                ).
+                environment->insert_test_data( i_data = td_<your_table_name> ).
+              ENDMETHOD.
+
+            ENDCLASS.
 
 # Group Activation Test
 group_activation:

@@ -25,7 +25,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 - [**BUILDER_TEST_PATTERN.md**](development/BUILDER_TEST_PATTERN.md) - Testing patterns for Builder classes
 - [**TEST_CONFIG_SCHEMA.md**](development/TEST_CONFIG_SCHEMA.md) - Test configuration schema and guidelines
 - [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
-- [**BASE_TESTER_MIGRATION.md**](development/roadmaps/BASE_TESTER_MIGRATION.md) - BaseTester migration status and roadmap
+- [**BASE_TESTER_MIGRATION.md**](development/archive/roadmaps/BASE_TESTER_MIGRATION.md) - BaseTester migration status and roadmap (completed, archived)
 
 ## Documentation Structure
 
@@ -46,8 +46,9 @@ docs/
     ├── BUILDER_TEST_PATTERN.md       # Testing patterns
     ├── TEST_CONFIG_SCHEMA.md         # Test configuration
     ├── UPDATE_CONTENT_TYPES.md       # Update content types reference
-    └── roadmaps/
-        └── BASE_TESTER_MIGRATION.md  # BaseTester migration status
+    └── archive/
+        └── roadmaps/
+            └── BASE_TESTER_MIGRATION.md  # BaseTester migration status (completed)
 ```
 
 ## Key Concepts

@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+- **BaseTester Migration Completed**: All integration tests migrated to `BaseTester` (15/15 tests, 100%)
+  - `MetadataExtension.test.ts`: Migrated to `BaseTester.flowTestAuto()`, removed CDS view dependency creation logic
+  - Uses existing CDS view from test parameters (`target_entity` or `cds_view_name`) instead of creating dependencies
+  - Simplified code (~240 lines reduced), fewer timeout issues, clearer test failures
+  - See [BaseTester Migration Roadmap](docs/development/archive/roadmaps/BASE_TESTER_MIGRATION.md) for details (completed, archived)
+
 ## [0.2.3] - 2025-12-16
 
 ### Changed

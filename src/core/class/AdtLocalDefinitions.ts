@@ -45,7 +45,7 @@ export class AdtLocalDefinitions extends AdtClass {
     );
 
     return {
-      checkResult: checkResponse,
+      validationResponse: checkResponse,
       errors: []
     };
   }

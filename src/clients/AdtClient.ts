@@ -35,6 +35,7 @@ import { IDomainConfig, IDomainState, AdtDomain } from '../core/domain';
 import { IDataElementConfig, IDataElementState, AdtDataElement } from '../core/dataElement';
 import { IStructureConfig, IStructureState, AdtStructure } from '../core/structure';
 import { ITableConfig, ITableState, AdtTable } from '../core/table';
+import { ITableTypeConfig, ITableTypeState, AdtDdicTableType } from '../core/tabletype';
 import { IViewConfig, IViewState, AdtView } from '../core/view';
 import { IFunctionGroupConfig, IFunctionGroupState, AdtFunctionGroup } from '../core/functionGroup';
 import { IFunctionModuleConfig, IFunctionModuleState, AdtFunctionModule } from '../core/functionModule';
@@ -43,6 +44,7 @@ import { IServiceDefinitionConfig, IServiceDefinitionState, AdtServiceDefinition
 import { IBehaviorDefinitionConfig, IBehaviorDefinitionState, AdtBehaviorDefinition } from '../core/behaviorDefinition';
 import { IBehaviorImplementationConfig, IBehaviorImplementationState, AdtBehaviorImplementation } from '../core/behaviorImplementation';
 import { IMetadataExtensionConfig, IMetadataExtensionState, AdtMetadataExtension } from '../core/metadataExtension';
+import { IEnhancementConfig, IEnhancementState, AdtEnhancement } from '../core/enhancement';
 import { AdtRequest } from '../core/transport';
 import { AdtUnitTest, AdtCdsUnitTest, IUnitTestConfig, IUnitTestState, ICdsUnitTestConfig, ICdsUnitTestState } from '../core/unitTest';
 import { ITransportConfig, ITransportState } from '../core/transport/types';
@@ -123,6 +125,14 @@ export class AdtClient {
   }
 
   /**
+   * Get high-level operations for TableType (DDIC Table Type) objects
+   * @returns IAdtObject instance for TableType operations
+   */
+  getTableType(): IAdtObject<ITableTypeConfig, ITableTypeState> {
+    return new AdtDdicTableType(this.connection, this.logger);
+  }
+
+  /**
    * Get high-level operations for View objects
    * @returns IAdtObject instance for View operations
    */
@@ -184,6 +194,20 @@ export class AdtClient {
    */
   getMetadataExtension(): IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState> {
     return new AdtMetadataExtension(this.connection, this.logger);
+  }
+
+  /**
+   * Get high-level operations for Enhancement objects
+   * Supports multiple enhancement types:
+   * - Enhancement Implementation (ENHO)
+   * - BAdI Implementation
+   * - Source Code Plugin (with source code)
+   * - Enhancement Spot (ENHS)
+   * - BAdI Enhancement Spot
+   * @returns IAdtObject instance for Enhancement operations
+   */
+  getEnhancement(): IAdtObject<IEnhancementConfig, IEnhancementState> {
+    return new AdtEnhancement(this.connection, this.logger);
   }
 
   /**

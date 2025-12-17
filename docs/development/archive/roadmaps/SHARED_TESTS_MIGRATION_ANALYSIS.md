@@ -90,4 +90,4 @@ Shared tests verify utility functions (`AdtUtils`) and cross-object operations. 
   - `AdtUtils` (via `AdtClient.getUtils()`) is for utility functions
   - This separation keeps the API clean and follows single responsibility principle
 
-- **BaseTester:** Shared tests are NOT candidates for BaseTester migration. See `BASE_TESTER_MIGRATION.md` for object-specific test migration plan.
+- **BaseTester:** Shared tests are NOT candidates for BaseTester migration. See `BASE_TESTER_MIGRATION.md` (in same archive directory) for object-specific test migration plan (completed, 15/15 tests migrated).

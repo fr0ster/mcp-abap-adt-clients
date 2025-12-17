@@ -47,6 +47,9 @@ export function getObjectSourceUri(
     case 'table':
     case 'tabl/dt':
       return `/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
+    case 'tabletype':
+    case 'ttyp/df':
+      return `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main`;
     default:
       throw new Error(`Object type ${objectType} does not support source code reading`);
   }
@@ -63,7 +66,8 @@ export function supportsSourceCode(objectType: string): boolean {
     'functionmodule', 'fugr/ff',
     'view', 'ddls/df',
     'structure', 'stru/dt',
-    'table', 'tabl/dt'
+    'table', 'tabl/dt',
+    'tabletype', 'ttyp/df'
   ];
   return supportedTypes.includes(objectType.toLowerCase());
 }

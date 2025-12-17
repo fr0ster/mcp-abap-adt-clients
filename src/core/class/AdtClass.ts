@@ -30,7 +30,7 @@ import { unlockClass } from './unlock';
 import { activateClass } from './activation';
 import { checkDeletion, deleteClass } from './delete';
 import { getClassSource, getClassTransport, getClassMetadata } from './read';
-import { lockClassTestClasses, unlockClassTestClasses, updateClassTestInclude, activateClassTestClasses } from './testclasses';
+import { updateClassTestInclude, activateClassTestClasses } from './testclasses';
 
 export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly connection: IAbapConnection;
@@ -578,23 +578,25 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
 
   /**
    * Lock test classes (local classes) for modification
+   * Uses parent class lock - sufficient for updating testclasses include
    */
   async lockTestClasses(config: Partial<IClassConfig>): Promise<string> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
     this.connection.setSessionType('stateful');
-    return await lockClassTestClasses(this.connection, config.className);
+    return await lockClass(this.connection, config.className);
   }
 
   /**
    * Unlock test classes (local classes)
+   * Uses parent class unlock
    */
   async unlockTestClasses(config: Partial<IClassConfig>, lockHandle: string): Promise<AxiosResponse> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    const result = await unlockClassTestClasses(this.connection, config.className, lockHandle);
+    const result = await unlockClass(this.connection, config.className, lockHandle);
     this.connection.setSessionType('stateless');
     return result;
   }
@@ -622,7 +624,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
 
   /**
    * Update test classes (local classes) with full operation chain
-   * Always starts with lock
+   * Always starts with lock of parent class
    */
   async updateTestClasses(
     config: Partial<IClassConfig> & { testClassCode: string }
@@ -637,13 +639,14 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     let lockHandle: string | undefined;
 
     try {
-      // 1. Lock test classes (stateful only for lock)
-      this.logger?.info?.('Step 1: Locking test classes');
+      // 1. Lock parent class (stateful only for lock)
+      // Lock handle from parent class is sufficient for updating testclasses include
+      this.logger?.info?.('Step 1: Locking parent class');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockClassTestClasses(this.connection, config.className);
-      this.logger?.info?.('Test classes locked, handle:', lockHandle);
+      lockHandle = await lockClass(this.connection, config.className);
+      this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
-      // 2. Update test classes
+      // 2. Update test classes (uses parent class lock handle)
       this.logger?.info?.('Step 2: Updating test classes');
       const response = await updateClassTestInclude(
         this.connection,
@@ -653,22 +656,22 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         config.transportRequest
       );
 
-      // 3. Unlock test classes (switch to stateless after unlock)
-      this.logger?.info?.('Step 3: Unlocking test classes');
-      await unlockClassTestClasses(this.connection, config.className, lockHandle);
+      // 3. Unlock parent class (switch to stateless after unlock)
+      this.logger?.info?.('Step 3: Unlocking parent class');
+      await unlockClass(this.connection, config.className, lockHandle);
       this.connection.setSessionType('stateless');
-      lockHandle = undefined; // Clear lockHandle after successful unlock to prevent double unlock
+      lockHandle = undefined;
 
       return response;
     } catch (error) {
       // Cleanup: unlock on error
       if (lockHandle) {
         try {
-          this.logger?.warn?.('Unlocking test classes after error');
-          await unlockClassTestClasses(this.connection, config.className, lockHandle);
+          this.logger?.warn?.('Unlocking parent class after error');
+          await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock test classes after error:', unlockError);
+          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
         }
       }
       throw error;

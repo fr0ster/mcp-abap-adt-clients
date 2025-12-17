@@ -128,6 +128,13 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           final: true
         });
 
+        // Step 1.5: Activate the class after creation (required before lock test classes)
+        this.logger?.info?.('Step 1.5: Activating global class');
+        const activateState = await this.adtClass.activate({
+          className: config.className
+        });
+        this.logger?.info?.('Global class activated');
+
         // Step 2: Create local test class in the global class's testclasses include
         // Uses parent's adtLocalTestClass which handles locking/unlocking internally
         this.logger?.info?.('Step 2: Creating local test class in global class');

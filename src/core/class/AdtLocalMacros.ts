@@ -46,7 +46,7 @@ export class AdtLocalMacros extends AdtClass {
     );
 
     return {
-      checkResult: checkResponse,
+      validationResponse: checkResponse,
       errors: []
     };
   }

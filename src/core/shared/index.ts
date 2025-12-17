@@ -4,6 +4,7 @@
 
 export { SharedBuilder } from './SharedBuilder';
 export { AdtUtils } from './AdtUtils';
+export { getTransaction } from './transaction';
 export type { 
   IObjectReference as ObjectReference,
   IInactiveObjectsResponse as InactiveObjectsResponse,
