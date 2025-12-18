@@ -12,7 +12,12 @@ import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../clients/AdtClient';
 import { ILogger } from '@mcp-abap-adt/interfaces';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
+import {
+  logBuilderTestStart,
+  logBuilderTestSkip,
+  logBuilderTestStep
+} from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -108,19 +113,47 @@ describe('Shared - getSqlQuery', () => {
 
   it('should execute SQL query', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'No SAP configuration');
       return;
     }
 
-    if (isCloudSystem) {
-      testsLogger.warn?.('⚠️ Skipping test: SQL queries are not supported on cloud systems');
+    // Get test case from YAML configuration
+    const resolver = new TestConfigResolver({ 
+      isCloud: isCloudSystem, 
+      logger: testsLogger,
+      handlerName: 'sql_query',
+      testCaseName: 'execute_sql_query'
+    });
+
+    const testCase = resolver.getTestCase();
+    if (!testCase || !resolver.isEnabled()) {
+      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'Test case not found or disabled');
       return;
     }
+
+    if (!resolver.isAvailableForEnvironment()) {
+      logBuilderTestStart(testsLogger, 'Shared - getSqlQuery', {
+        name: 'execute_sql_query',
+        params: {}
+      });
+      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery',
+        `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
+        `SQL queries are only supported on on-premise systems.`);
+      return;
+    }
+
+    // Get SQL query from params or build from standard_objects.tables
+    let sqlQuery = resolver.getParam('sql_query');
+    if (!sqlQuery) {
+      const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
+      sqlQuery = `SELECT * FROM ${tableName}`;
+    }
+    const rowNumber = resolver.getParam('row_number', 10);
 
     logBuilderTestStep('execute SQL query', testsLogger);
     const result = await client.getUtils().getSqlQuery({
-      sql_query: 'SELECT * FROM T000',
-      row_number: 10
+      sql_query: sqlQuery,
+      row_number: rowNumber
     });
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -128,18 +161,41 @@ describe('Shared - getSqlQuery', () => {
 
   it('should use default row_number if not provided', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'No SAP configuration');
       return;
     }
 
-    if (isCloudSystem) {
-      testsLogger.warn?.('⚠️ Skipping test: SQL queries are not supported on cloud systems');
+    // Get test case from YAML configuration
+    const resolver = new TestConfigResolver({ 
+      isCloud: isCloudSystem, 
+      logger: testsLogger,
+      handlerName: 'sql_query',
+      testCaseName: 'execute_sql_query_default_row_number'
+    });
+
+    const testCase = resolver.getTestCase();
+    if (!testCase || !resolver.isEnabled()) {
+      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'Test case not found or disabled');
       return;
+    }
+
+    if (!resolver.isAvailableForEnvironment()) {
+      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery',
+        `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
+        `SQL queries are only supported on on-premise systems.`);
+      return;
+    }
+
+    // Get SQL query from params or build from standard_objects.tables
+    let sqlQuery = resolver.getParam('sql_query');
+    if (!sqlQuery) {
+      const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
+      sqlQuery = `SELECT * FROM ${tableName}`;
     }
 
     logBuilderTestStep('execute SQL query with default row_number', testsLogger);
     const result = await client.getUtils().getSqlQuery({
-      sql_query: 'SELECT * FROM T000'
+      sql_query: sqlQuery
     });
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();

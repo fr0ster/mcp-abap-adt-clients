@@ -609,6 +609,16 @@ export class BaseTester<TConfig, TState> {
         logger: this.logger
       });
 
+      // Check if test is available for current environment
+      if (!this.configResolver.isAvailableForEnvironment()) {
+        const envName = this.isCloudSystem ? 'cloud' : 'on-premise';
+        this.skipReason = `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
+        this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
+        this.testCase = null;
+        this.configResolver = null;
+        return;
+      }
+
       // Build config - pass resolver so buildConfig can use resolved parameters
       if (this.buildConfigFn) {
         try {

@@ -162,6 +162,26 @@ export class TestConfigResolver {
   }
 
   /**
+   * Check if test case is available for current environment (cloud/on-premise)
+   * @returns true if test is available for current environment, false otherwise
+   */
+  isAvailableForEnvironment(): boolean {
+    if (!this.testCase) {
+      return false;
+    }
+
+    // If available_in is not specified, test is available for all environments
+    const availableIn = this.testCase.available_in;
+    if (!availableIn || !Array.isArray(availableIn) || availableIn.length === 0) {
+      return true;
+    }
+
+    // Check if current environment is in the list
+    const currentEnv = this.isCloud ? 'cloud' : 'onprem';
+    return availableIn.includes(currentEnv);
+  }
+
+  /**
    * Get test case name
    */
   getTestCaseName(): string | null {

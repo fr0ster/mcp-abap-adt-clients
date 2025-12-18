@@ -85,7 +85,9 @@ describe('ReadOnlyClient', () => {
     readFn: (name: string, group?: string) => Promise<any>,
     getReadResultFn: () => any,
     paramName: string,
-    groupParamName?: string
+    groupParamName?: string,
+    handlerName?: string,
+    testCaseName?: string
   ) {
     return async () => {
       if (!hasConfig || !client) {
@@ -94,7 +96,24 @@ describe('ReadOnlyClient', () => {
       }
 
       // Use TestConfigResolver for consistent parameter resolution
-      const resolver = new TestConfigResolver({ isCloud, logger: testsLogger });
+      const resolver = new TestConfigResolver({ 
+        isCloud, 
+        logger: testsLogger,
+        handlerName: handlerName || `read_${objectType}`,
+        testCaseName: testCaseName || `readonly_read_${objectType}`
+      });
+
+      // Check if test is available for current environment
+      if (!resolver.isAvailableForEnvironment()) {
+        logBuilderTestStart(testsLogger, `ReadOnlyClient - ${testName}`, {
+          name: `readonly_read_${objectType}`,
+          params: {}
+        });
+        logBuilderTestSkip(testsLogger, `ReadOnlyClient - ${testName}`,
+          `Test not available for ${isCloud ? 'cloud' : 'on-premise'} environment (check available_in in test-config.yaml)`);
+        return;
+      }
+
       const standardObject = resolver.getStandardObject(objectType);
       
       if (!standardObject) {
@@ -148,7 +167,10 @@ describe('ReadOnlyClient', () => {
       'program',
       (name) => client!.readProgram(name),
       () => client!.getProgramReadResult(),
-      'programName'
+      'programName',
+      undefined,
+      'read_program',
+      'readonly_read_program'
     ), getTimeout('test'));
   });
 
@@ -158,7 +180,10 @@ describe('ReadOnlyClient', () => {
       'class',
       (name) => client!.readClass(name),
       () => client!.getClassReadResult(),
-      'className'
+      'className',
+      undefined,
+      'read_class',
+      'readonly_read_class'
     ), getTimeout('test'));
   });
 
@@ -168,7 +193,10 @@ describe('ReadOnlyClient', () => {
       'interface',
       (name) => client!.readInterface(name),
       () => client!.getInterfaceReadResult(),
-      'interfaceName'
+      'interfaceName',
+      undefined,
+      'read_interface',
+      'readonly_read_interface'
     ), getTimeout('test'));
   });
 
@@ -178,7 +206,10 @@ describe('ReadOnlyClient', () => {
       'domain',
       (name) => client!.readDomain(name),
       () => client!.getDomainReadResult(),
-      'domainName'
+      'domainName',
+      undefined,
+      'read_domain',
+      'readonly_read_domain'
     ), getTimeout('test'));
   });
 
@@ -188,7 +219,10 @@ describe('ReadOnlyClient', () => {
       'dataElement',
       (name) => client!.readDataElement(name),
       () => client!.getDataElementReadResult(),
-      'dataElementName'
+      'dataElementName',
+      undefined,
+      'read_data_element',
+      'readonly_read_data_element'
     ), getTimeout('test'));
   });
 
@@ -198,18 +232,117 @@ describe('ReadOnlyClient', () => {
       'structure',
       (name) => client!.readStructure(name),
       () => client!.getStructureReadResult(),
-      'structureName'
+      'structureName',
+      undefined,
+      'read_structure',
+      'readonly_read_structure'
     ), getTimeout('test'));
   });
 
   describe('readTable', () => {
-    it('should read existing table', createReadTest(
-      'readTable',
-      'table',
-      (name) => client!.readTable(name),
-      () => client!.getTableReadResult(),
-      'tableName'
-    ), getTimeout('test'));
+    it('should read existing table', async () => {
+      if (!hasConfig || !client) {
+        logBuilderTestSkip(testsLogger, 'ReadOnlyClient - readTable', 'No SAP configuration');
+        return;
+      }
+
+      // Use TestConfigResolver to check if test is available for current environment
+      const resolver = new TestConfigResolver({ 
+        isCloud, 
+        logger: testsLogger,
+        handlerName: 'read_table',
+        testCaseName: 'readonly_read_table'
+      });
+
+      // Check if test is available for current environment
+      if (!resolver.isAvailableForEnvironment()) {
+        logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+          name: 'readonly_read_table',
+          params: {}
+        });
+        logBuilderTestSkip(testsLogger, 'ReadOnlyClient - readTable',
+          `Test not available for ${isCloud ? 'cloud' : 'on-premise'} environment. ` +
+          `Note: On cloud systems, 99% of tables are not readable via ADT. ` +
+          `Set available_in: ["onprem"] in test-config.yaml to skip on cloud.`);
+        return;
+      }
+
+      // Cloud systems: 99% of tables are not readable via ADT, endpoint cannot read tables
+      // On-premise: most tables are readable via ADT
+      if (isCloud) {
+        // On cloud, use CDS view instead of table (tables endpoint cannot read tables)
+        const standardView = resolver.getStandardObject('view');
+        
+        if (!standardView) {
+          logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+            name: 'readonly_read_table',
+            params: {}
+          });
+          logBuilderTestSkip(testsLogger, 'ReadOnlyClient - readTable',
+            'Standard CDS view not configured for cloud environment. ' +
+            'Note: On cloud systems, 99% of tables are not readable via ADT, use CDS views instead.');
+          return;
+        }
+
+        const viewName = standardView.name;
+        logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+          name: 'readonly_read_table',
+          params: { 
+            viewName,
+            note: 'On cloud: using CDS view instead of table (99% of tables are not readable via ADT)'
+          }
+        });
+
+        try {
+          const result = await client.readView(viewName);
+          expect(result).toBeDefined();
+          expect(result?.viewName).toBe(viewName);
+          expect(client.getViewReadResult()).toBeDefined();
+          expect(client.getReadResult()).toBeDefined();
+
+          logBuilderTestSuccess(testsLogger, 'ReadOnlyClient - readTable (CDS view on cloud)');
+        } catch (error) {
+          logBuilderTestError(testsLogger, 'ReadOnlyClient - readTable', error);
+          throw error;
+        } finally {
+          logBuilderTestEnd(testsLogger, 'ReadOnlyClient - readTable');
+        }
+      } else {
+        // On-premise: use standard table
+        const standardTable = resolver.getStandardObject('table');
+        
+        if (!standardTable) {
+          logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+            name: 'readonly_read_table',
+            params: {}
+          });
+          logBuilderTestSkip(testsLogger, 'ReadOnlyClient - readTable',
+            'Standard table not configured for on-premise environment');
+          return;
+        }
+
+        const tableName = standardTable.name;
+        logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+          name: 'readonly_read_table',
+          params: { tableName }
+        });
+
+        try {
+          const result = await client.readTable(tableName);
+          expect(result).toBeDefined();
+          expect(result?.tableName).toBe(tableName);
+          expect(client.getTableReadResult()).toBeDefined();
+          expect(client.getReadResult()).toBeDefined();
+
+          logBuilderTestSuccess(testsLogger, 'ReadOnlyClient - readTable');
+        } catch (error) {
+          logBuilderTestError(testsLogger, 'ReadOnlyClient - readTable', error);
+          throw error;
+        } finally {
+          logBuilderTestEnd(testsLogger, 'ReadOnlyClient - readTable');
+        }
+      }
+    }, getTimeout('test'));
   });
 
   describe('readView', () => {
@@ -218,7 +351,10 @@ describe('ReadOnlyClient', () => {
       'view',
       (name) => client!.readView(name),
       () => client!.getViewReadResult(),
-      'viewName'
+      'viewName',
+      undefined,
+      'read_view',
+      'readonly_read_view'
     ), getTimeout('test'));
   });
 
@@ -228,7 +364,10 @@ describe('ReadOnlyClient', () => {
       'function_group',
       (name) => client!.readFunctionGroup(name),
       () => client!.getFunctionGroupReadResult(),
-      'functionGroupName'
+      'functionGroupName',
+      undefined,
+      'read_function_group',
+      'readonly_read_function_group'
     ), getTimeout('test'));
   });
 
@@ -239,7 +378,9 @@ describe('ReadOnlyClient', () => {
       (name, group) => client!.readFunctionModule(name, group!),
       () => client!.getFunctionModuleReadResult(),
       'functionModuleName',
-      'functionGroupName'
+      'functionGroupName',
+      'read_function_module',
+      'readonly_read_function_module'
     ), getTimeout('test'));
   });
 
@@ -249,7 +390,10 @@ describe('ReadOnlyClient', () => {
       'package',
       (name) => client!.readPackage(name),
       () => client!.getPackageReadResult(),
-      'packageName'
+      'packageName',
+      undefined,
+      'read_package',
+      'readonly_read_package'
     ), getTimeout('test'));
   });
 
@@ -259,7 +403,10 @@ describe('ReadOnlyClient', () => {
       'serviceDefinition',
       (name) => client!.readServiceDefinition(name),
       () => client!.getServiceDefinitionReadResult(),
-      'serviceDefinitionName'
+      'serviceDefinitionName',
+      undefined,
+      'read_service_definition',
+      'readonly_read_service_definition'
     ), getTimeout('test'));
   });
 

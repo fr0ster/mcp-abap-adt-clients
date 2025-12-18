@@ -166,6 +166,19 @@ standard_objects:
 # ============================================================================
 # READ TESTS (Read-only operations on existing objects)
 # ============================================================================
+# 
+# Each test case can specify `available_in` parameter to conditionally enable/disable
+# tests for specific environments:
+#   - available_in: ["cloud"] - only run on cloud systems
+#   - available_in: ["onprem"] - only run on on-premise systems  
+#   - available_in: ["cloud", "onprem"] or omit - run on both environments
+#
+# Example:
+#   - name: "my_test"
+#     enabled: true
+#     available_in: ["onprem"]  # Skip this test on cloud systems
+#     params: {}
+# ============================================================================
 
 # Read Program (ReadOnlyClient)
 # Uses standard_objects.programs with available_in filter
@@ -173,7 +186,8 @@ read_program:
   test_cases:
     - name: "readonly_read_program"
       enabled: false  # Set to true to enable read test
-      description: "Read existing program using ReadOnlyClient (uses standard_objects.programs)"
+      available_in: ["onprem"]  # Programs are not supported in cloud systems (BTP ABAP Environment)
+      description: "Read existing program using ReadOnlyClient (uses standard_objects.programs). Programs are not supported in cloud systems."
       params: {}  # No params needed - automatically uses standard_objects.programs filtered by available_in
 
 # Read Class (ReadOnlyClient)
@@ -223,11 +237,13 @@ read_structure:
 
 # Read Table (ReadOnlyClient)
 # Uses standard_objects.tables with available_in filter
+# Note: On cloud systems, 99% of tables are not readable via ADT endpoint
 read_table:
   test_cases:
     - name: "readonly_read_table"
       enabled: false  # Set to true to enable read test
-      description: "Read existing table using ReadOnlyClient (uses standard_objects.tables)"
+      available_in: ["onprem"]  # Only available on on-premise (tables endpoint cannot read tables on cloud)
+      description: "Read existing table using ReadOnlyClient (uses standard_objects.tables). On cloud, 99% of tables are not readable via ADT."
       params: {}  # No params needed - automatically uses standard_objects.tables filtered by available_in
 
 # Read View (ReadOnlyClient)
@@ -295,6 +311,19 @@ read_transport:
 
 # ============================================================================
 # FLOW TESTS (Create/Update/Delete operations - Builder tests)
+# ============================================================================
+#
+# Flow tests support available_in parameter to conditionally enable/disable tests
+# based on environment (cloud/on-premise):
+#   - available_in: ["cloud"] - only run on cloud systems
+#   - available_in: ["onprem"] - only run on on-premise systems  
+#   - available_in: ["cloud", "onprem"] or omit - run on both environments
+#
+# Example:
+#   - name: "my_test"
+#     enabled: true
+#     available_in: ["onprem"]  # Skip this test on cloud systems
+#     params: {}
 # ============================================================================
 
 # Create Class
@@ -554,11 +583,13 @@ create_interface:
         unlock: 3000
 
 # Create Program
+# ⚠️ ABAP Cloud Limitation: Programs are not supported in cloud systems (BTP ABAP Environment)
 create_program:
   test_cases:
     - name: "adt_program"
       enabled: true
-      description: "Program reserved for ProgramBuilder tests"
+      available_in: ["onprem"]  # Programs are not supported in cloud systems
+      description: "Program reserved for ProgramBuilder tests. Only available on on-premise systems."
       params:
         program_name: "ZADT_BLD_PROG01"
         description: "ProgramBuilder workflow report"
@@ -1000,3 +1031,49 @@ group_activation:
             mandt : abap.clnt;
             test_field : ZADT_BLD_DTEL_GRP;
           }
+
+# ============================================================================
+# SHARED TESTS (Utility functions - AdtUtils)
+# ============================================================================
+
+# Table Contents (getTableContents)
+# ⚠️ ABAP Cloud Limitation: Table contents reading is only available on on-premise systems
+# On cloud systems, 99% of tables are not readable via ADT Data Preview endpoint
+# Uses standard_objects.tables with available_in filter
+table_contents:
+  test_cases:
+    - name: "get_table_contents"
+      enabled: false  # Set to true to enable test
+      available_in: ["onprem"]  # Only available on on-premise systems
+      description: "Test getTableContents function - reads table data via Data Preview API. Uses standard_objects.tables filtered by available_in."
+      params:
+        # table_name: Uses standard_objects.tables (T000 for onprem) if not specified
+        max_rows: 10  # Maximum number of rows to retrieve
+
+    - name: "get_table_contents_default_max_rows"
+      enabled: false  # Set to true to enable test
+      available_in: ["onprem"]  # Only available on on-premise systems
+      description: "Test getTableContents with default max_rows parameter. Uses standard_objects.tables filtered by available_in."
+      params:
+        # table_name: Uses standard_objects.tables (T000 for onprem) if not specified
+
+# SQL Query (getSqlQuery)
+# ⚠️ ABAP Cloud Limitation: SQL queries are only available on on-premise systems
+# On cloud systems, direct SQL queries via ADT Data Preview endpoint are not supported
+# Uses standard_objects.tables with available_in filter for table name in SQL query
+sql_query:
+  test_cases:
+    - name: "execute_sql_query"
+      enabled: false  # Set to true to enable test
+      available_in: ["onprem"]  # Only available on on-premise systems
+      description: "Test getSqlQuery function - executes SQL query via Data Preview API. Uses standard_objects.tables filtered by available_in."
+      params:
+        # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
+        row_number: 10  # Maximum number of rows to retrieve
+
+    - name: "execute_sql_query_default_row_number"
+      enabled: false  # Set to true to enable test
+      available_in: ["onprem"]  # Only available on on-premise systems
+      description: "Test getSqlQuery with default row_number parameter. Uses standard_objects.tables filtered by available_in."
+      params:
+        # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
