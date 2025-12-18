@@ -568,5 +568,6 @@ Use `scripts/verify-builder-tests.js` to validate:
 ---
 
 **Related Documentation:**
-- [BUILDER_TEST_PATTERN.md](./BUILDER_TEST_PATTERN.md) - Test pattern documentation
+- [BUILDER_TEST_PATTERN.md](./BUILDER_TEST_PATTERN.md) - Integration test pattern documentation (BaseTester with AdtClient)
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md#test-infrastructure) - Test infrastructure overview
 

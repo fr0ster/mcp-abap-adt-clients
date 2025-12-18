@@ -24,14 +24,10 @@ Implemented configurable operation delays with 3-tier override system:
 3. `src/__tests__/helpers/test-config.yaml.template` - Added template with examples
 4. `jest.config.js` - Added `maxConcurrency: 1` for strict sequential execution
 
-**Builder Tests (7):**
-5. `ClassBuilder.test.ts` - Replaced hardcoded delays with `getOperationDelay()`
-6. `InterfaceBuilder.test.ts` - Replaced hardcoded delays with `getOperationDelay()`
-7. `ViewBuilder.test.ts` - Replaced hardcoded delays with `getOperationDelay()`
-8. `ProgramBuilder.test.ts` - Replaced hardcoded delays with `getOperationDelay()`
-9. `TableBuilder.test.ts` - Replaced hardcoded delays with `getOperationDelay()`
-10. `StructureBuilder.test.ts` - Replaced hardcoded delays with `getOperationDelay()`
-11. `DomainBuilder.test.ts` - Replaced hardcoded delays with `getOperationDelay()`
+**Integration Tests (All core object tests):**
+- All core object tests (`Class.test.ts`, `Interface.test.ts`, `View.test.ts`, etc.) - Use `BaseTester` which automatically handles operation delays via `TestConfigResolver`
+- `BaseTester` uses `getOperationDelay()` internally for all operations
+- Operation delays are resolved from YAML configuration with proper priority
 
 ### Configuration Format
 
@@ -134,8 +130,8 @@ await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testC
 - **Mitigation**: Can reduce delays for fast systems
 
 ### Example Test Times
-- **Before**: ~8-10 seconds per Builder test (with 2s delays)
-- **After**: ~12-14 seconds per Builder test (with 3s delays)
+- **Before**: ~8-10 seconds per integration test (with 2s delays)
+- **After**: ~12-14 seconds per integration test (with 3s delays)
 - **Full suite**: ~2-3 minutes additional time (acceptable for integration tests)
 
 ## Future Improvements

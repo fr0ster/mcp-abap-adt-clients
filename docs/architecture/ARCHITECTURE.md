@@ -2,7 +2,11 @@
 
 ## Overview
 
-Separation of ADT endpoint functionality into three classes to enable different access levels and reduce context for LLM.
+Separation of ADT endpoint functionality into four main client classes to enable different access levels and reduce context for LLM:
+- **AdtClient**: High-level CRUD API with automatic operation chains (recommended)
+- **ReadOnlyClient**: Read-only operations (GET requests only)
+- **CrudClient**: Full CRUD operations with manual lock/unlock management
+- **AdtRuntimeClient**: Runtime operations (debugging, tracing, memory analysis, logs, feeds)
 
 ## Package Structure `@mcp-abap-adt/adt-clients`
 
@@ -58,7 +62,8 @@ Separation of ADT endpoint functionality into three classes to enable different 
 │   │   ├── integration/          # Integration tests
 │   │   │   ├── core/             # Core object type tests (class, program, domain, table, etc.)
 │   │   │   ├── runtime/          # Runtime module tests (debugger, traces, memory, logs, feeds)
-│   │   │   └── shared/            # Shared utility tests (search, whereUsed, groupActivation, etc.)
+│   │   │   ├── readonly/         # ReadOnlyClient tests
+│   │   │   └── shared/           # Shared utility tests (search, whereUsed, groupActivation, tableContents, sqlQuery, etc.)
 │   │   ├── examples/             # Example usage code
 │   │   └── e2e/                  # End-to-end tests
 │   └── index.ts                  # Main package exports
@@ -145,10 +150,14 @@ core/[objectType]/
 - `validate(config)` → `Promise<AxiosResponse>`
 - `create(config, options?)` → `Promise<TReadResult>` (full operation chain)
 - `read(config, version?, options?)` → `Promise<TReadResult | undefined>`
-- `update(config, options?)` → `Promise<TReadResult>` (full operation chain)
+- `update(config, options?)` → `Promise<TReadResult>` (full operation chain, or low-level update if `options.lockHandle` is provided)
+  - If `options.lockHandle` is provided: performs only low-level update without lock/check/unlock chain
+  - Otherwise: performs full chain (lock → check → update → unlock → check)
 - `delete(config)` → `Promise<AxiosResponse>`
 - `activate(config)` → `Promise<AxiosResponse>`
 - `check(config, status?)` → `Promise<AxiosResponse>`
+- `lock(config)` → `Promise<string>` (returns lockHandle)
+- `unlock(config, lockHandle)` → `Promise<TState>`
 - `readMetadata(config, options?)` → `Promise<AxiosResponse>`
 - `readTransport(config)` → `Promise<AxiosResponse>`
 
@@ -196,11 +205,10 @@ const utils = client.getUtils();
 await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
 await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 
-// Runtime operations
-const runtime = client.getRuntime();
-await runtime.listMemorySnapshots();
-await runtime.listProfilerTraceFiles();
-await runtime.launchDebugger();
+// Lock/unlock operations
+const lockHandle = await client.getClass().lock({ className: 'ZCL_TEST' });
+await client.getClass().update({ className: 'ZCL_TEST', sourceCode: '...' }, { lockHandle });
+await client.getClass().unlock({ className: 'ZCL_TEST' }, lockHandle);
 ```
 
 **Benefits:**
@@ -794,8 +802,91 @@ describe('ClassBuilder (using AdtClient)', () => {
 **Test Organization:**
 - Integration tests use `AdtClient` for consistency
 - Shared tests use `AdtUtils` for utility functions
+- ReadOnlyClient tests are in `integration/readonly/` directory
 - Unit test logic separated from integration tests (e.g., `Class.test.ts`, `View.test.ts`)
 - All tests support cleanup parameters (`cleanup_after_test`, `skip_cleanup`)
+
+**Test Configuration:**
+- Tests use YAML configuration (`test-config.yaml`) for parameters
+- `TestConfigResolver` centralizes parameter resolution with priority:
+  1. Test case specific params (`testCase.params.*`)
+  2. Global environment defaults (`environment.default_*`)
+  3. Environment variables (`process.env.SAP_*`)
+  4. Standard objects registry (`standard_objects.*`)
+- Tests support `available_in` parameter to conditionally enable/disable based on environment:
+  - `available_in: ["cloud"]` - only run on cloud systems
+  - `available_in: ["onprem"]` - only run on on-premise systems
+  - `available_in: ["cloud", "onprem"]` or omit - run on both environments
+- Flow tests (CRUD operations) automatically skip if `available_in` doesn't match current environment
+- Read tests use `standard_objects` registry with `available_in` filter for environment-specific object names
+
+### TestConfigResolver Class
+
+**Purpose:** Centralized YAML configuration resolver for tests
+
+**Location:** `src/__tests__/helpers/TestConfigResolver.ts`
+
+**Architecture:**
+- Centralizes parameter resolution logic for all tests
+- Supports parameter overrides at test case level
+- Handles environment-specific parameters (cloud/on-premise)
+- Integrates with `standard_objects` registry for read tests
+- Provides environment availability checking via `available_in` parameter
+
+**Key Methods:**
+- `getParam(paramName, defaultValue?)` - Get parameter with fallback chain
+- `getPackageName()` - Get package name (resolved with priority)
+- `getTransportRequest()` - Get transport request (resolved with priority)
+- `getStandardObject(objectType)` - Get standard object from registry
+- `getObjectName(paramName, standardObjectType?)` - Get object name with fallback to standard object
+- `isAvailableForEnvironment()` - Check if test is available for current environment
+- `isEnabled()` - Check if test case is enabled
+- `getTestCase()` - Get test case definition
+- `createForTestCase(handlerName, testCaseName?)` - Create resolver for different test case
+- `tryMultipleHandlers(handlers)` - Try multiple handlers (fallback chain)
+
+**Parameter Resolution Priority:**
+1. Test case specific params (`testCase.params.*`)
+2. Environment-specific params (`paramName_cloud` or `paramName_onprem`)
+3. Global environment defaults (`environment.default_*`)
+4. Environment variables (`process.env.SAP_*`)
+5. Standard objects registry (`standard_objects.*` with `available_in` filter)
+6. Default value (if provided)
+
+**Usage:**
+```typescript
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
+
+// Create resolver for specific test case
+const resolver = new TestConfigResolver({
+  handlerName: 'create_class',
+  testCaseName: 'adt_class',
+  isCloud: false,
+  logger: testsLogger
+});
+
+// Get parameters
+const className = resolver.getParam('class_name');
+const packageName = resolver.getPackageName();
+const transportRequest = resolver.getTransportRequest();
+
+// Check environment availability
+if (!resolver.isAvailableForEnvironment()) {
+  // Skip test - not available for current environment
+  return;
+}
+
+// Get standard object (for read tests)
+const standardTable = resolver.getStandardObject('table');
+const tableName = resolver.getObjectName('table_name', 'table');
+```
+
+**Benefits:**
+- **Consistency**: All tests use the same parameter resolution logic
+- **Flexibility**: Supports parameter overrides at any level
+- **Environment Awareness**: Handles cloud/on-premise differences automatically
+- **Standard Objects**: Integrates with `standard_objects` registry for read tests
+- **Conditional Execution**: Supports `available_in` for environment-specific tests
 
 ---
 

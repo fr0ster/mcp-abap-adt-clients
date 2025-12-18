@@ -1,8 +1,10 @@
-# Operation Delays in Builder Tests
+# Operation Delays in Integration Tests
 
 ## Overview
 
-Builder integration tests use configurable delays between SAP operations to ensure the system has time to commit state changes. Without these delays, tests may fail with 404 errors or lock handle errors due to SAP's asynchronous processing.
+Integration tests use configurable delays between SAP operations to ensure the system has time to commit state changes. Without these delays, tests may fail with 404 errors or lock handle errors due to SAP's asynchronous processing.
+
+**Note:** Current tests use `BaseTester` with `AdtClient` (not Builders directly). Operation delays are handled automatically by `BaseTester` via `TestConfigResolver`.
 
 ## Configuration
 
@@ -157,18 +159,14 @@ create_class:
 - ✅ `src/__tests__/helpers/test-config.yaml.template` - Added configuration template with examples
 - ✅ `jest.config.js` - Configured for sequential test execution (`maxWorkers: 1`, `maxConcurrency: 1`)
 
-**Builder Tests (All Updated):**
-- ✅ `ClassBuilder.test.ts` - Uses `getOperationDelay()` for lock, update, unlock
-- ✅ `InterfaceBuilder.test.ts` - Uses `getOperationDelay()` for create, lock, update, unlock  
-- ✅ `ViewBuilder.test.ts` - Uses `getOperationDelay()` for create, lock, update, unlock
-- ✅ `ProgramBuilder.test.ts` - Uses `getOperationDelay()` for create, lock, update, unlock
-- ✅ `TableBuilder.test.ts` - Uses `getOperationDelay()` for create, lock, update, unlock
-- ✅ `StructureBuilder.test.ts` - Uses `getOperationDelay()` for create, lock, update, unlock
-- ✅ `DomainBuilder.test.ts` - Uses `getOperationDelay()` for create, lock, update, unlock
+**Integration Tests (All Updated):**
+- ✅ All core object tests (`Class.test.ts`, `Interface.test.ts`, `View.test.ts`, etc.) - Use `BaseTester` which automatically handles operation delays via `TestConfigResolver`
+- ✅ `BaseTester` uses `getOperationDelay()` internally for all operations
+- ✅ Operation delays are resolved from YAML configuration with proper priority (test case → global → default)
 
 **Tests Not Requiring Delays:**
-- ❌ `TransportBuilder.test.ts` - No lock/unlock workflow
-- ❌ `PackageBuilder.test.ts` - Has hardcoded 2s delays (different workflow)
+- ❌ `Transport.test.ts` - No lock/unlock workflow
+- ❌ `Package.test.ts` - Has hardcoded 2s delays (different workflow)
 
 **Documentation:**
 - ✅ `docs/OPERATION_DELAYS.md` - Comprehensive guide (this file)
@@ -260,14 +258,15 @@ await new Promise(resolve => setTimeout(resolve, getOperationDelay('lock', testC
 3. `src/__tests__/helpers/test-config.yaml.template` - Added template with examples
 4. `jest.config.js` - Added `maxConcurrency: 1` for strict sequential execution
 
-**Test Files (7 Builder tests):**
-5. `src/__tests__/integration/class/ClassBuilder.test.ts`
-6. `src/__tests__/integration/interface/InterfaceBuilder.test.ts`
-7. `src/__tests__/integration/view/ViewBuilder.test.ts`
-8. `src/__tests__/integration/program/ProgramBuilder.test.ts`
-9. `src/__tests__/integration/table/TableBuilder.test.ts`
-10. `src/__tests__/integration/structure/StructureBuilder.test.ts`
-11. `src/__tests__/integration/domain/DomainBuilder.test.ts`
+**Test Files (All core object tests):**
+- `src/__tests__/integration/core/class/Class.test.ts`
+- `src/__tests__/integration/core/interface/Interface.test.ts`
+- `src/__tests__/integration/core/view/View.test.ts`
+- `src/__tests__/integration/core/program/Program.test.ts`
+- `src/__tests__/integration/core/table/Table.test.ts`
+- `src/__tests__/integration/core/structure/Structure.test.ts`
+- `src/__tests__/integration/core/domain/Domain.test.ts`
+- And all other core object tests using `BaseTester`
 
 **Each test file updated:**
 - Imported `getOperationDelay` from test-helper

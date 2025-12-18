@@ -1,26 +1,40 @@
 # Check Local Test Class
 
-## Питання
-Чи можна звичайним check для класу перевірити локальний тест-клас?
+## Question
+Can a regular `check` for a class validate a local test class?
 
-## Відповідь
-**НІ**, звичайний check класу НЕ МОЖЕ перевірити локальний тест-клас.
+## Answer
+**NO**, a regular class `check` **CANNOT** validate a local test class.
 
-## Причини
+## Reasons
 
-1. **Різні URI артефактів**:
+1. **Different artifact URIs**:
    - Main class code: `/sap/bc/adt/oo/classes/zadt_bld_cls444/source/main`
    - Test class code: `/sap/bc/adt/oo/classes/zadt_bld_cls444/includes/testclasses`
 
-2. **Окремий include файл**: Локальні тест-класи зберігаються в окремому include файлі (`testclasses`), а не в основному коді класу
+2. **Separate include file**: Local test classes are stored in a separate include file (`testclasses`), not in the main class code
 
-## Рішення
+## Solution
 
-Для перевірки локального тест-класу потрібно використовувати спеціальний checkRun з артефактом для `testclasses` include.
+To check a local test class, you need to use a special `checkRun` with an artifact for the `testclasses` include.
 
 ### API
 
-#### Через CrudClient (рекомендовано)
+#### Using AdtClient (Recommended)
+
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new AdtClient(connection, logger);
+
+// Use getLocalTestClass() for local test class operations
+await client.getLocalTestClass().check({
+  className: 'ZCL_MY_CLASS',
+  testClassCode: testClassSource
+});
+```
+
+#### Using CrudClient
 
 ```typescript
 import { CrudClient } from '@mcp-abap-adt/adt-clients';
@@ -33,7 +47,7 @@ await client.checkClassTestClass({
 });
 ```
 
-#### Через ClassBuilder
+#### Using ClassBuilder (Low-Level)
 
 ```typescript
 import { ClassBuilder } from '@mcp-abap-adt/adt-clients';
@@ -45,16 +59,16 @@ await builder
   .checkTestClass();
 ```
 
-#### Низькорівнева функція (для спеціальних випадків)
+#### Low-Level Function (For Special Cases)
 
 ```typescript
 import { checkClassLocalTestClass } from '@mcp-abap-adt/adt-clients';
 
 await checkClassLocalTestClass(
   connection,
-  className,      // Ім'я класу-контейнера
-  testClassSource, // Код тест-класу
-  'inactive'      // Версія: 'active' або 'inactive'
+  className,      // Container class name
+  testClassSource, // Test class code
+  'inactive'      // Version: 'active' or 'inactive'
 );
 ```
 
@@ -77,7 +91,7 @@ Content-Type: application/vnd.sap.adt.checkobjects+xml
 </chkrun:checkObjectList>
 ```
 
-### Response з помилкою
+### Error Response
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -90,9 +104,9 @@ Content-Type: application/vnd.sap.adt.checkobjects+xml
 </chkrun:checkRunReports>
 ```
 
-**Важливо**: `chkrun:type="E"` означає помилку (Error), функція кине виключення.
+**Important**: `chkrun:type="E"` means Error - the function will throw an exception.
 
-### Response без помилок
+### Success Response
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -103,9 +117,9 @@ Content-Type: application/vnd.sap.adt.checkobjects+xml
 </chkrun:checkRunReports>
 ```
 
-## Використання в ClassBuilder
+## Usage in ClassBuilder
 
-Функція автоматично викликається перед оновленням тест-класу:
+The function is automatically called before updating the test class:
 
 ```typescript
 const builder = new ClassBuilder(connection, { className: 'ZADT_BLD_CLS01' });
@@ -113,30 +127,30 @@ const builder = new ClassBuilder(connection, { className: 'ZADT_BLD_CLS01' });
 await builder
   .lock()
   .setTestClassCode(testClassSource)
-  .updateTestClass(); // ← Автоматично викликає checkTestClass() перед оновленням
+  .updateTestClass(); // ← Automatically calls checkTestClass() before update
 ```
 
-Або можна викликати окремо:
+Or it can be called separately:
 
 ```typescript
 await builder
   .setTestClassCode(testClassSource)
-  .checkTestClass(); // ← Перевіряє код без оновлення
+  .checkTestClass(); // ← Validates code without updating
 ```
 
-## Переваги перевірки
+## Benefits of Validation
 
-1. **Валідація до збереження**: Виявляє помилки в коді до того, як SAP спробує зберегти зміни
-2. **Економія часу**: Не потрібно чекати unlock/rollback при помилках
-3. **Чіткі повідомлення**: SAP повертає детальний опис помилок з номерами рядків
-4. **Безпека**: Об'єкт не залишається в некоректному стані
+1. **Pre-save validation**: Detects errors in code before SAP attempts to save changes
+2. **Time savings**: No need to wait for unlock/rollback on errors
+3. **Clear messages**: SAP returns detailed error descriptions with line numbers
+4. **Safety**: Object does not remain in an incorrect state
 
-## Типи повідомлень
+## Message Types
 
-- `chkrun:type="E"` - **Error** (помилка, блокує update)
-- `chkrun:type="W"` - **Warning** (попередження, дозволено)
-- `chkrun:type="I"` - **Info** (інформація, дозволено)
+- `chkrun:type="E"` - **Error** (blocks update)
+- `chkrun:type="W"` - **Warning** (allowed)
+- `chkrun:type="I"` - **Info** (allowed)
 
-## Приклад
+## Example
 
-Дивіться [examples/check-test-class.js](../examples/check-test-class.js)
+See [examples/check-test-class.js](../examples/check-test-class.js)

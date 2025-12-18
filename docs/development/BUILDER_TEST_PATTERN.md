@@ -1,13 +1,15 @@
-# Builder Test Pattern
+# Integration Test Pattern
 
-**Last Updated:** 2025-11-30  
-**Status:** Active Pattern
+**Last Updated:** 2025-12-17  
+**Status:** Active Pattern (Updated to use BaseTester with AdtClient)
 
 ---
 
 ## Overview
 
-All Builder tests in `@mcp-abap-adt/adt-clients` follow a consistent **two-test structure** with unified logging architecture that ensures complete coverage while maintaining test independence.
+All integration tests in `@mcp-abap-adt/adt-clients` use `BaseTester` class with `AdtClient` for unified CRUD operations. Tests follow a consistent pattern with unified logging architecture that ensures complete coverage while maintaining test independence.
+
+**Note:** This document describes the current test pattern. For historical Builder test patterns, see archived documentation.
 
 ## Logging Architecture
 
@@ -79,9 +81,53 @@ describe('ClassBuilder', () => {
 
 **Note:** Setting `DEBUG_ADT_TESTS=true` enables ALL ADT scopes (libs, tests, e2e, helpers) for backward compatibility.
 
-## Test Structure
+## Current Test Structure (BaseTester with AdtClient)
 
-Each Builder test file contains exactly **2 tests** (or 1 for special cases like `TransportBuilder`):
+**Current Pattern:** Integration tests use `BaseTester` class with `AdtClient` for unified CRUD operations.
+
+**Example:**
+```typescript
+import { BaseTester } from '../../helpers/BaseTester';
+import { AdtClient } from '../../../clients/AdtClient';
+
+const tester = new BaseTester(
+  client.getClass(),
+  'Class',
+  'create_class',
+  'adt_class',
+  testsLogger
+);
+
+tester.setup({
+  connection,
+  client,
+  hasConfig: true,
+  isCloudSystem: false,
+  buildConfig: (testCase, resolver) => ({
+    className: testCase.params.class_name,
+    packageName: resolver?.getPackageName() || resolvePackageName(testCase.params.package_name),
+    // ...
+  })
+});
+
+// In test:
+await tester.flowTest(config, testCase.params);
+```
+
+**Benefits:**
+- Unified test infrastructure via `BaseTester`
+- Uses `AdtClient` (high-level CRUD API) instead of Builders directly
+- Automatic parameter resolution via `TestConfigResolver`
+- Environment-aware testing via `available_in` parameter
+- Consistent logging and error handling
+
+---
+
+## Legacy Builder Test Structure (Deprecated)
+
+**Note:** The following describes the legacy Builder test pattern. Current tests use `BaseTester` with `AdtClient` as shown above.
+
+Each Builder test file contained exactly **2 tests** (or 1 for special cases like `TransportBuilder`):
 
 ### Test 1: Full Workflow Test
 

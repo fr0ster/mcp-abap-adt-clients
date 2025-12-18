@@ -1,6 +1,8 @@
 # Client API Reference
 
-Complete reference for `ReadOnlyClient` and `CrudClient` classes.
+Complete reference for ADT client classes: `AdtClient` (recommended), `ReadOnlyClient`, `CrudClient`, and `AdtRuntimeClient`.
+
+**Note:** This document focuses on `ReadOnlyClient` and `CrudClient`. For `AdtClient` (high-level CRUD API with automatic operation chains), see [ARCHITECTURE.md](../architecture/ARCHITECTURE.md#1-adtclient-high-level-crud-api). For `AdtRuntimeClient` (runtime operations), see [ARCHITECTURE.md](../architecture/ARCHITECTURE.md#2-adtruntimeclient-runtime-operations-client).
 
 ## Table of Contents
 

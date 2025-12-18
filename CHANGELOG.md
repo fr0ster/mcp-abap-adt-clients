@@ -71,6 +71,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - Support for getting activation dependency graph with logs
   - Accessible via `AdtRuntimeClient.getDdicActivationGraph()` method
 
+- **Lock/Unlock Methods in IAdtObject Interface**: Added `lock()` and `unlock()` methods to `IAdtObject` interface
+  - All `Adt*` classes now implement `lock()` and `unlock()` methods for explicit lock management
+  - `lock()` returns lock handle that can be reused for multiple operations
+  - `unlock()` accepts lock handle and releases the lock
+  - Enables consumers to manage locks explicitly without going through full CRUD workflow
+  - See [Architecture Documentation](docs/architecture/ARCHITECTURE.md) for usage examples
+
+- **Lock Handle Support in Update Operations**: Added `lockHandle` parameter to `IAdtOperationOptions` interface
+  - When `lockHandle` is provided in `update()` options, the full lock-check-update-unlock chain is bypassed
+  - Only the low-level update operation is performed, allowing for more flexible update scenarios
+  - Enables consumers to manage locks externally and perform multiple updates with the same lock handle
+  - Prevents unnecessary lock/unlock operations when lock is already held
+
+- **TestConfigResolver**: New centralized parameter resolution system for test configuration
+  - Centralizes logic for resolving test parameters from `test-config.yaml`
+  - Supports parameter overrides at test case level, global environment defaults, and environment variables
+  - Handles `standard_objects` registry lookup with environment-specific fallbacks
+  - Integrated into `BaseTester` to ensure all tests benefit from robust parameter resolution
+  - Provides consistent parameter resolution across all integration tests
+
+- **Conditional Test Execution**: Added `available_in` parameter for environment-specific test execution
+  - Test cases can specify `available_in: ["cloud"]` or `available_in: ["onprem"]` to conditionally enable/disable tests
+  - `BaseTester` automatically skips tests that are not available for the current environment
+  - Enables tests to adapt to environment-specific limitations (e.g., table reading on cloud vs on-premise)
+  - Applied to `table_contents`, `sql_query`, and `read_table` tests to handle cloud/on-premise differences
+
+- **ReadOnlyClient Integration Tests**: Added comprehensive integration tests for `ReadOnlyClient` methods
+  - Tests use `standard_objects` registry from `test-config.yaml` for environment-specific object names
+  - Tests conditionally adapt to cloud/on-premise environments (e.g., CDS views for cloud, tables for on-premise)
+  - Proper logging of test stages using `logBuilderTestStart`, `logBuilderTestSuccess`, `logBuilderTestError`
+  - Tests located in `src/__tests__/integration/readonly/ReadOnlyClient.test.ts`
+
 ### Changed
 - **Architecture Refactoring**: Separated runtime operations from utility functions
   - Runtime operations (debugging, tracing, memory analysis, logs) moved to standalone `AdtRuntimeClient` class
@@ -86,6 +118,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - `runtime/applicationLog/` - Application log operations
   - `runtime/atc/` - ATC log operations
   - `runtime/feeds/` - Feed reader operations
+
+- **Update Method Behavior**: Enhanced `update()` methods in all `Adt*` classes to support `lockHandle` parameter
+  - When `lockHandle` is provided, `setSessionType('stateful')` is not called (session already stateful)
+  - Lock-check-unlock chain is bypassed, only low-level update is performed
+  - Enables more flexible update scenarios where locks are managed externally
+  - Applied to all `Adt*` classes: `AdtClass`, `AdtProgram`, `AdtInterface`, `AdtLocalTypes`, `AdtLocalTestClass`, `AdtLocalMacros`, `AdtLocalDefinitions`, `AdtBehaviorImplementation`, etc.
+
+- **Test Parameter Resolution**: Migrated all integration tests to use `TestConfigResolver` for parameter resolution
+  - Tests now use centralized parameter resolution instead of manual YAML parsing
+  - Consistent parameter resolution priority: test case → global environment → default values
+  - Better support for environment-specific parameters and standard objects lookup
+  - Improved test maintainability and consistency
+
+- **Documentation Updates**: Comprehensive documentation review and updates
+  - Translated `CHECK_LOCAL_TEST_CLASS.md` from Ukrainian to English (project language is English)
+  - Updated `ARCHITECTURE.md` to reflect `lock()`/`unlock()` methods and `lockHandle` parameter
+  - Updated `CLIENT_API_REFERENCE.md` to reflect current client architecture
+  - Updated `BUILDER_TEST_PATTERN.md` to reflect `BaseTester` and `AdtClient` usage
+  - Updated `TEST_CONFIG_SCHEMA.md` to document `TestConfigResolver` and `available_in` parameter
+  - Updated `OPERATION_DELAYS.md` and `OPERATION_DELAYS_SUMMARY.md` to reflect current test structure
 
 ### Fixed
 - **Test Paths**: Fixed import paths in integration tests after refactoring test structure
@@ -108,6 +160,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
   - All shared tests (`search.test.ts`, `whereUsed.test.ts`, `readMetadata.test.ts`, `readSource.test.ts`, `sqlQuery.test.ts`, `tableContents.test.ts`, `groupActivation.test.ts`) now log execution steps
   - Tests now use `createTestsLogger()` for consistent logging via `DEBUG_ADT_TESTS` environment variable
   - Improved test output visibility when running integration tests in shared folder
+
+- **Circular Dependency**: Fixed circular dependency in `ReadOnlyClient` and `CrudClient`
+  - Changed import in `src/core/interface/update.ts` from `import { encodeSapObjectName } from "../.."` to `import { encodeSapObjectName } from '../../utils/internalUtils'`
+  - Prevents `TypeError: Class extends value undefined is not a constructor or null` errors
+  - Resolves dependency cycle: `src/index.ts` → `ReadOnlyClient` → `CrudClient` → `core/interface/update.ts` → `src/index.ts`
+
+- **Session Management**: Fixed incorrect `setSessionType('stateful')` calls in low-level update paths
+  - `setSessionType('stateful')` is now only called immediately before lock operations
+  - Not called in low-level update paths where `lockHandle` is already provided
+  - Ensures proper session management and prevents unnecessary session state changes
+
+- **Test Logging**: Improved test logging for `ReadOnlyClient` integration tests
+  - Added explicit logging of test stages (`logBuilderTestStart`, `logBuilderTestSuccess`, `logBuilderTestError`)
+  - Tests now properly log execution steps instead of silently skipping
+  - Better visibility into test execution and failures
 
 ### Documentation
 - Updated `ARCHITECTURE.md` with complete `AdtRuntimeClient` class documentation
