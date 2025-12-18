@@ -26,16 +26,15 @@ import {
 } from '../../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import { ITableConfig, ITableState } from '../../../../core/table';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  resolveStandardObject,
   getTimeout
 } = require('../../../helpers/test-helper');
 
@@ -83,14 +82,16 @@ describe('TableBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
+          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
           return {
             tableName: params.table_name,
             packageName,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             description: params.description,
             ddlCode: params.ddl_code
           };
@@ -145,8 +146,9 @@ describe('TableBuilder (using AdtClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP table', async () => {
-      const testCase = getTestCaseDefinition('create_table', 'adt_table');
-      const standardObject = resolveStandardObject('table', isCloudSystem, testCase);
+      // Use TestConfigResolver for consistent parameter resolution
+      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
+      const standardObject = resolver.getStandardObject('table');
 
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'Table - read standard object', {

@@ -216,6 +216,40 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       throw new Error('Package name is required for update');
     }
 
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const systemInfo = await getSystemInformation(this.connection);
+      const masterSystem = systemInfo?.systemID;
+      const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+      const updateResponse = await updateDomain(
+        this.connection,
+        {
+          domain_name: config.domainName,
+          package_name: config.packageName,
+          transport_request: config.transportRequest,
+          description: config.description,
+          datatype: config.datatype,
+          length: config.length,
+          decimals: config.decimals,
+          conversion_exit: config.conversion_exit,
+          lowercase: config.lowercase,
+          sign_exists: config.sign_exists,
+          value_table: config.value_table,
+          fixed_values: config.fixed_values
+        },
+        options.lockHandle,
+        username,
+        masterSystem
+      );
+      this.logger?.info?.('Domain updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
+    }
+
     let lockHandle: string | undefined;
     const systemInfo = await getSystemInformation(this.connection);
     const username = systemInfo?.userName || '';

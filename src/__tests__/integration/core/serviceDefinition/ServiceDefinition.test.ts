@@ -26,6 +26,7 @@ import {
 } from '../../../helpers/builderTestLogger';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import { IServiceDefinitionConfig, IServiceDefinitionState } from '../../../../core/serviceDefinition';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -33,10 +34,8 @@ import * as dotenv from 'dotenv';
 
 const {
   getEnabledTestCase,
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  resolveStandardObject,
   getTimeout
 } = require('../../../helpers/test-helper');
 
@@ -87,14 +86,16 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
+          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
           return {
             serviceDefinitionName: params.service_definition_name,
             packageName,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             description: params.description,
             sourceCode: params.source_code
           };
@@ -150,6 +151,7 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP service definition', async () => {
+      const { getTestCaseDefinition } = require('../../../helpers/test-helper');
       const testCase = getTestCaseDefinition('read_service_definition', 'read_standard_service_definition');
       
       if (!testCase) {
@@ -181,8 +183,9 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         : enabledTestCase.params?.service_definition_name;
 
       if (!serviceDefinitionName) {
-        // Fallback to standard_objects registry
-        const standardObject = resolveStandardObject('serviceDefinition', isCloudSystem, testCase);
+        // Fallback to standard_objects registry using TestConfigResolver
+        const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
+        const standardObject = resolver.getStandardObject('serviceDefinition');
         if (!standardObject) {
           logBuilderTestStart(testsLogger, 'ServiceDefinitionBuilder - read standard object', {
             name: 'read_standard',

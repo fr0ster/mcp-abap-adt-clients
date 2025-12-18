@@ -30,7 +30,7 @@ export async function update(
     'Accept': 'text/plain'
   };
 
-  await connection.makeAdtRequest({
+  const response = await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
@@ -38,20 +38,6 @@ export async function update(
     headers
   });
 
-  return {
-    data: {
-      success: true,
-      function_module_name: params.functionModuleName.toUpperCase(),
-      function_group_name: params.functionGroupName,
-      type: 'FUGR/FF',
-      message: `Function module ${params.functionModuleName.toUpperCase()} source updated successfully`,
-      uri: `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}`,
-      source_size_bytes: params.sourceCode.length
-    },
-    status: 200,
-    statusText: 'OK',
-    headers: {},
-    config: {} as any
-  } as AxiosResponse;
+  return response;
 }
 

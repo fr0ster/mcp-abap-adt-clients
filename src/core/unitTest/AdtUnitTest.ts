@@ -344,4 +344,18 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
       errors: []
     };
   }
+
+  /**
+   * Lock unit test (not supported)
+   */
+  async lock(config: Partial<IUnitTestConfig>): Promise<string> {
+    throw new Error('Lock operation is not supported for unit tests');
+  }
+
+  /**
+   * Unlock unit test (not supported)
+   */
+  async unlock(config: Partial<IUnitTestConfig>, lockHandle: string): Promise<IUnitTestState> {
+    throw new Error('Unlock operation is not supported for unit tests');
+  }
 }

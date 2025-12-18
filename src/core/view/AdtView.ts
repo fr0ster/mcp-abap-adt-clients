@@ -220,6 +220,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   /**
    * Update view with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IViewConfig>,
@@ -227,6 +228,28 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.ddlSource;
+      if (!codeToUpdate) {
+        throw new Error('Source code (ddlSource) is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateView(
+        this.connection,
+        config.viewName,
+        codeToUpdate,
+        options.lockHandle,
+        config.transportRequest
+      );
+      this.logger?.info?.('View updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

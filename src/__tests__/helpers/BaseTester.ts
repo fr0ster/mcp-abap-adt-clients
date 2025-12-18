@@ -39,6 +39,7 @@ import {
   logBuilderTestStepError,
   getHttpStatusText
 } from './builderTestLogger';
+import { TestConfigResolver } from './TestConfigResolver';
 
 export interface ITestCaseParams {
   skip_cleanup?: boolean;
@@ -66,7 +67,7 @@ export interface IBaseTesterSetupOptions {
   client: any; // AdtClient
   hasConfig: boolean;
   isCloudSystem: boolean;
-  buildConfig: (testCase: any) => any;
+  buildConfig: (testCase: any, resolver?: TestConfigResolver) => any;
   ensureObjectReady?: (objectName: string) => Promise<{ success: boolean; reason?: string }>;
   testDescription?: string;
 }
@@ -86,7 +87,7 @@ export class BaseTester<TConfig, TState> {
   private client?: any;
   private hasConfig: boolean = false;
   private isCloudSystem: boolean = false;
-  private buildConfigFn?: (testCase: any) => TConfig;
+  private buildConfigFn?: (testCase: any, resolver?: TestConfigResolver) => TConfig;
   private ensureObjectReadyFn?: (objectName: string) => Promise<{ success: boolean; reason?: string }>;
   private testDescription: string = 'Full workflow';
   
@@ -94,6 +95,7 @@ export class BaseTester<TConfig, TState> {
   private testCase: any = null;
   private config: TConfig | null = null;
   private skipReason: string | null = null;
+  private configResolver: TestConfigResolver | null = null;
 
   /**
    * @param adtObject - IAdtObject implementation to test
@@ -463,6 +465,76 @@ export class BaseTester<TConfig, TState> {
   }
 
   /**
+   * Get TestConfigResolver instance for this test case
+   * Provides centralized access to resolved YAML parameters
+   */
+  getConfigResolver(): TestConfigResolver | null {
+    if (!this.configResolver && this.testCase) {
+      this.configResolver = new TestConfigResolver({
+        testCase: this.testCase,
+        isCloud: this.isCloudSystem,
+        logger: this.logger
+      });
+    }
+    return this.configResolver;
+  }
+
+  /**
+   * Get resolved package name (from test case params or global defaults)
+   */
+  getPackageName(): string {
+    const resolver = this.getConfigResolver();
+    return resolver?.getPackageName() || '';
+  }
+
+  /**
+   * Get resolved transport request (from test case params or global defaults)
+   */
+  getTransportRequest(): string {
+    const resolver = this.getConfigResolver();
+    return resolver?.getTransportRequest() || '';
+  }
+
+  /**
+   * Get resolved parameter value (from test case params or global defaults)
+   */
+  getParam(paramName: string, defaultValue?: any): any {
+    const resolver = this.getConfigResolver();
+    return resolver?.getParam(paramName, defaultValue);
+  }
+
+  /**
+   * Get standard object from registry (prioritizes standard_objects over test case params)
+   * @param objectType - Type of object ('class', 'domain', 'table', etc.)
+   * @returns Object with name (and optional group for function modules) or null
+   */
+  getStandardObject(objectType: string): { name: string; group?: string } | null {
+    const resolver = this.getConfigResolver();
+    if (!resolver) {
+      // Fallback to direct call if resolver not initialized
+      const { resolveStandardObject } = require('./test-helper');
+      return resolveStandardObject(objectType, this.isCloudSystem, this.testCase);
+    }
+    // Use null testCase to prioritize standard_objects registry
+    const { resolveStandardObject } = require('./test-helper');
+    return resolveStandardObject(objectType, this.isCloudSystem, null);
+  }
+
+  /**
+   * Get object name with fallback to standard object
+   * @param paramName - Parameter name for object name (e.g., 'class_name', 'domain_name')
+   * @param standardObjectType - Type for standard_objects registry lookup (e.g., 'class', 'domain')
+   * @returns Object name or null
+   */
+  getObjectName(paramName: string, standardObjectType?: string): string | null {
+    const resolver = this.getConfigResolver();
+    if (!resolver) {
+      return null;
+    }
+    return resolver.getObjectName(paramName, standardObjectType);
+  }
+
+  /**
    * Setup BaseTester with connection, client, and config builder
    * Call this once before using beforeAll/beforeEach
    */
@@ -498,6 +570,7 @@ export class BaseTester<TConfig, TState> {
       this.skipReason = null;
       this.testCase = null;
       this.config = null;
+      this.configResolver = null;
 
       if (!this.hasConfig) {
         this.skipReason = 'No SAP configuration';
@@ -529,14 +602,22 @@ export class BaseTester<TConfig, TState> {
 
       this.testCase = tc;
 
-      // Build config
+      // Initialize config resolver with test case
+      this.configResolver = new TestConfigResolver({
+        testCase: tc,
+        isCloud: this.isCloudSystem,
+        logger: this.logger
+      });
+
+      // Build config - pass resolver so buildConfig can use resolved parameters
       if (this.buildConfigFn) {
         try {
-          this.config = this.buildConfigFn(tc);
+          this.config = this.buildConfigFn(tc, this.configResolver);
         } catch (error: any) {
           this.skipReason = `Failed to build config: ${error.message}`;
           this.log(LogLevel.ERROR, `beforeEach: ${this.skipReason}`);
           this.testCase = null;
+          this.configResolver = null;
           return;
         }
       }

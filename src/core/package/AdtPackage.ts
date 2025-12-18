@@ -284,6 +284,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    * Update package with full operation chain
    * Always starts with lock
    * Note: Packages only support metadata updates (description, superPackage, etc.)
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IPackageConfig>,
@@ -297,6 +298,30 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     }
     if (!config.softwareComponent) {
       throw new Error('Software component is required for update');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const systemInfo = await getSystemInformation(this.connection);
+      const updateResponse = await updatePackage(
+        this.connection,
+        {
+          package_name: config.packageName,
+          super_package: config.superPackage,
+          software_component: config.softwareComponent,
+          transport_layer: config.transportLayer,
+          description: config.description,
+          package_type: config.packageType,
+          responsible: config.responsible
+        },
+        options.lockHandle
+      );
+      this.logger?.info?.('Package updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

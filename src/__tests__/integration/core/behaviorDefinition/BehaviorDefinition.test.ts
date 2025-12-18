@@ -79,9 +79,10 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem: false,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = params.package_name || resolvePackageName(undefined);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) throw new Error('Package name is not configured');
           return {
             name: params.bdef_name,

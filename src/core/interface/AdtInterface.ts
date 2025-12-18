@@ -187,6 +187,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
   /**
    * Update interface with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IInterfaceConfig>,
@@ -194,6 +195,27 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
   ): Promise<IInterfaceState> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      await upload(
+        this.connection,
+        config.interfaceName,
+        codeToUpdate,
+        options.lockHandle,
+        config.transportRequest
+      );
+      this.logger?.info?.('Interface updated (low-level)');
+      return {
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

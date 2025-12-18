@@ -82,9 +82,11 @@ describe('PackageBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const parentPackage = params.package_name || params.super_package || resolvePackageName(undefined);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          // Priority: super_package > package_name (from resolver) > global default
+          const parentPackage = params.super_package || resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!parentPackage) throw new Error('Parent package is not configured');
           const testPackage = params.test_package || params.test_package_name || params.package_name;
           if (!testPackage) throw new Error('test_package is not configured');

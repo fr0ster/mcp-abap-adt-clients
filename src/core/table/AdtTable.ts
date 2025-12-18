@@ -202,6 +202,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   /**
    * Update table with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<ITableConfig>,
@@ -209,6 +210,30 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.ddlCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code (ddlCode) is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateTable(
+        this.connection,
+        {
+          table_name: config.tableName,
+          ddl_code: codeToUpdate,
+          transport_request: config.transportRequest
+        },
+        options.lockHandle
+      );
+      this.logger?.info?.('Table updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

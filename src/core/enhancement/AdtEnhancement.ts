@@ -287,6 +287,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
    * Update enhancement with full operation chain
    * Always starts with lock
    * Only available for enhoxhh (Source Code Plugin) type
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IEnhancementConfig>,
@@ -309,6 +310,32 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       const error = new Error(`Enhancement type '${config.enhancementType}' does not support source code update. Only 'enhoxhh' supports source code.`);
       state.errors.push({ method: 'update', error, timestamp: new Date() });
       throw error;
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await update(
+        this.connection,
+        {
+          enhancement_name: config.enhancementName,
+          enhancement_type: config.enhancementType,
+          source_code: codeToUpdate,
+          lock_handle: options.lockHandle,
+          transport_request: config.transportRequest
+        }
+      );
+      this.logger?.info?.('Enhancement updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: [],
+        enhancementType: config.enhancementType
+      };
     }
 
     let lockHandle: string | undefined;

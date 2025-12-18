@@ -252,6 +252,7 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
   /**
    * Update behavior definition with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IBehaviorDefinitionConfig>,
@@ -262,6 +263,30 @@ export class AdtBehaviorDefinition implements IAdtObject<IBehaviorDefinitionConf
       const error = new Error('Behavior definition name is required');
       state.errors.push({ method: 'update', error, timestamp: new Date() });
       throw error;
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await update(
+        this.connection,
+        {
+          name: config.name,
+          sourceCode: codeToUpdate,
+          lockHandle: options.lockHandle,
+          transportRequest: config.transportRequest
+        }
+      );
+      this.logger?.info?.('Behavior definition updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

@@ -299,6 +299,7 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
    * Update function group with full operation chain
    * Always starts with lock
    * Note: Function groups only support metadata updates (description)
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IFunctionGroupConfig>,
@@ -309,6 +310,25 @@ export class AdtFunctionGroup implements IAdtObject<IFunctionGroupConfig, IFunct
     }
     if (!config.description) {
       throw new Error('Description is required for update');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateFunctionGroup(
+        this.connection,
+        {
+          function_group_name: config.functionGroupName,
+          description: config.description,
+          lock_handle: options.lockHandle,
+          transport_request: config.transportRequest
+        }
+      );
+      this.logger?.info?.('Function group updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

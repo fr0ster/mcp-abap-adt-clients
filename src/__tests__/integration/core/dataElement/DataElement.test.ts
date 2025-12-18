@@ -22,13 +22,10 @@ import {
   logBuilderTestSkip,
   logBuilderTestSuccess,
   logBuilderTestError,
-  logBuilderTestEnd,
-  logBuilderTestStep,
-  logBuilderTestStepError,
-  getHttpStatusText
-} from '../../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger, isDebugEnabled } from '../../../helpers/testLogger';
+  logBuilderTestEnd} from '../../../helpers/builderTestLogger';
+import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
@@ -127,16 +124,18 @@ describe('DataElementBuilder (using AdtClient)', () => {
     return getTestCaseDefinition('create_data_element', 'adt_data_element');
   }
 
-  function buildBuilderConfig(testCase: any) {
+  function buildBuilderConfig(testCase: any, resolver?: any) {
     const params = testCase?.params || {};
-    const packageName = resolvePackageName(params.package_name);
+    // Use resolver to get resolved parameters (from test case params or global defaults)
+    const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
     if (!packageName) {
       throw new Error('package_name not configured for DataElementBuilder test');
     }
+    const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
     return {
       dataElementName: params.data_element_name,
       packageName,
-      transportRequest: resolveTransportRequest(params.transport_request),
+      transportRequest,
       description: params.description,
       dataType: params.data_type,
       length: params.length,
@@ -194,7 +193,14 @@ describe('DataElementBuilder (using AdtClient)', () => {
       // Create domain before test if type_kind is 'domain' and type_name (domain name) is provided
       if (tc.params.type_kind === 'domain' && (tc.params.type_name || tc.params.domain_name)) {
         const domainNameToUse = tc.params.type_name || tc.params.domain_name;
-        const packageName = resolvePackageName(tc.params.package_name);
+        // Use resolver for consistent parameter resolution
+        const { TestConfigResolver } = require('../../../helpers/TestConfigResolver');
+        const domainResolver = new TestConfigResolver({
+          testCase: tc,
+          isCloud: isCloudSystem,
+          logger: testsLogger
+        });
+        const packageName = domainResolver.getPackageName();
         if (!packageName) {
           skipReason = 'environment problem, test skipped: package_name not configured for domain creation';
           testCase = null;
@@ -209,7 +215,7 @@ describe('DataElementBuilder (using AdtClient)', () => {
           dataType: tc.params.domain_data_type || 'CHAR',
           length: tc.params.domain_length || 10,
           decimals: tc.params.domain_decimals || 0,
-          transportRequest: resolveTransportRequest(tc.params.transport_request)
+          transportRequest: domainResolver.getTransportRequest()
         };
 
         // Create domain using AdtClient
@@ -252,9 +258,16 @@ describe('DataElementBuilder (using AdtClient)', () => {
       
       if (shouldCleanup && domainCreated && domainName) {
         try {
+          // Use resolver for consistent parameter resolution
+          const { TestConfigResolver } = require('../../../helpers/TestConfigResolver');
+          const cleanupResolver = new TestConfigResolver({
+            testCase,
+            isCloud: isCloudSystem,
+            logger: testsLogger
+          });
           await client.getDomain().delete({
             domainName: domainName,
-            transportRequest: resolveTransportRequest(testCase?.params?.transport_request)
+            transportRequest: cleanupResolver.getTransportRequest()
           });
         } catch (cleanupError) {
           // Log but don't fail - cleanup errors are silent
@@ -279,7 +292,14 @@ describe('DataElementBuilder (using AdtClient)', () => {
         return;
       }
 
-      const config = buildBuilderConfig(testCase);
+      // Create resolver for consistent parameter resolution
+      const { TestConfigResolver } = require('../../../helpers/TestConfigResolver');
+      const resolver = new TestConfigResolver({
+        testCase,
+        isCloud: isCloudSystem,
+        logger: testsLogger
+      });
+      const config = buildBuilderConfig(testCase, resolver);
 
       // Create BaseTester instance
       const tester = new BaseTester(
@@ -321,8 +341,9 @@ describe('DataElementBuilder (using AdtClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP data element', async () => {
-      const testCase = getTestCaseDefinition('create_data_element', 'adt_data_element');
-      const standardObject = resolveStandardObject('dataElement', isCloudSystem, testCase);
+      // Use TestConfigResolver for consistent parameter resolution
+      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
+      const standardObject = resolver.getStandardObject('dataElement');
 
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'DataElementBuilder - read standard object', {

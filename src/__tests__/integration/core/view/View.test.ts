@@ -87,14 +87,16 @@ describe('View (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem: false,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
+          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
           return {
             viewName: params.view_name,
             packageName,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             description: params.description,
             ddlSource: params.ddl_source
           };

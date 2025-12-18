@@ -107,8 +107,8 @@ export class AdtLocalTestClass extends AdtClass {
       // 4. Unlock parent class (obligatory stateless after unlock)
       if (parentLockHandle) {
         this.logger?.info?.('Step 4: Unlocking parent class');
-        const unlockResponse = await super.unlock({ className: config.className }, parentLockHandle);
-        state.unlockResult = unlockResponse;
+        const unlockState = await super.unlock({ className: config.className }, parentLockHandle);
+        state.unlockResult = unlockState.unlockResult;
         parentLockHandle = undefined;
       }
 
@@ -167,6 +167,7 @@ export class AdtLocalTestClass extends AdtClass {
   /**
    * Update local test class with full operation chain
    * Requires parent class to be locked
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<ILocalTestClassConfig>,
@@ -177,6 +178,28 @@ export class AdtLocalTestClass extends AdtClass {
     }
     if (!config.testClassCode) {
       throw new Error('Test class code is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.testClassCode;
+      if (!codeToUpdate) {
+        throw new Error('Test class code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateClassTestInclude(
+        this.connection,
+        config.className,
+        codeToUpdate,
+        options.lockHandle,
+        config.transportRequest
+      );
+      this.logger?.info?.('Test class updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let parentLockHandle: string | undefined;
@@ -221,8 +244,8 @@ export class AdtLocalTestClass extends AdtClass {
       // 4. Unlock parent class (obligatory stateless after unlock)
       if (parentLockHandle) {
         this.logger?.info?.('Step 4: Unlocking parent class');
-        const unlockResponse = await super.unlock({ className: config.className }, parentLockHandle);
-        state.unlockResult = unlockResponse;
+        const unlockState = await super.unlock({ className: config.className }, parentLockHandle);
+        state.unlockResult = unlockState.unlockResult;
         parentLockHandle = undefined;
       }
 

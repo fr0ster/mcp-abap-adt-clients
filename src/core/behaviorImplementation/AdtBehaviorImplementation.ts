@@ -228,6 +228,7 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
   /**
    * Update behavior implementation with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IBehaviorImplementationConfig>,
@@ -238,6 +239,49 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
       const error = new Error('Class name is required');
       state.errors.push({ method: 'update', error, timestamp: new Date() });
       throw error;
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.implementationCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Implementation code is required for update');
+      }
+      if (!config.behaviorDefinition) {
+        throw new Error('behaviorDefinition is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      
+      // Update main source with "FOR BEHAVIOR OF" clause
+      const mainSource = `CLASS ${config.className} DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF ${config.behaviorDefinition}.
+
+ENDCLASS.
+
+CLASS ${config.className} IMPLEMENTATION.
+
+ENDCLASS.`;
+      await updateClass(
+        this.connection,
+        config.className,
+        mainSource,
+        options.lockHandle,
+        config.transportRequest
+      );
+
+      // Update implementations include
+      const updateResponse = await updateBehaviorImplementation(
+        this.connection,
+        config.className,
+        codeToUpdate,
+        options.lockHandle,
+        config.transportRequest
+      );
+      this.logger?.info?.('Behavior implementation updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;
@@ -314,8 +358,8 @@ ENDCLASS.`;
       // 6. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 5: Unlocking behavior implementation class');
-        const unlockResponse = await this.class.unlock({ className: config.className }, lockHandle);
-        state.unlockResult = unlockResponse;
+        const unlockState = await this.class.unlock({ className: config.className }, lockHandle);
+        state.unlockResult = unlockState.unlockResult;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Behavior implementation class unlocked');
@@ -489,9 +533,9 @@ ENDCLASS.`;
       throw new Error('Class name is required');
     }
 
-    const result = await this.class.unlock({ className: config.className }, lockHandle);
+    const unlockState = await this.class.unlock({ className: config.className }, lockHandle);
     return {
-      unlockResult: result,
+      unlockResult: unlockState.unlockResult,
       errors: []
     };
   }

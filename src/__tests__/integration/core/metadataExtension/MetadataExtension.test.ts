@@ -80,9 +80,10 @@ extend view ${targetEntity} with "${extName}"
         client,
         hasConfig,
         isCloudSystem: false, // Not used for MetadataExtension
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) {
             throw new Error('Package name is not configured. Set params.package_name or environment.default_package');
           }
@@ -108,12 +109,13 @@ extend view ${targetEntity} with "${extName}"
 
           const description = params.description || `Metadata Extension for ${targetEntity}`;
 
+          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
           return {
             name: extName,
             packageName,
             targetEntity,
             description,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             sourceCode: params.source_code || generateDefaultSourceCode(extName, targetEntity)
           };
         }

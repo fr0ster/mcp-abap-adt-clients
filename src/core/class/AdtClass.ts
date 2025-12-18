@@ -239,6 +239,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   /**
    * Update class with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IClassConfig>,
@@ -246,6 +247,28 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateClass(
+        this.connection,
+        config.className,
+        codeToUpdate,
+        options.lockHandle,
+        config.transportRequest
+      );
+      this.logger?.info?.('Class updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;
@@ -569,11 +592,16 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   /**
    * Unlock class
    */
-  async unlock(config: Partial<IClassConfig>, lockHandle: string): Promise<AxiosResponse> {
+  async unlock(config: Partial<IClassConfig>, lockHandle: string): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
-    return await unlockClass(this.connection, config.className, lockHandle);
+    const result = await unlockClass(this.connection, config.className, lockHandle);
+    this.connection.setSessionType('stateless');
+    return {
+      unlockResult: result,
+      errors: []
+    };
   }
 
   /**

@@ -106,8 +106,8 @@ export class AdtLocalMacros extends AdtClass {
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockResponse = await super.unlock({ className: config.className }, lockHandle);
-      state.unlockResult = unlockResponse;
+      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
       return state;
@@ -153,6 +153,11 @@ export class AdtLocalMacros extends AdtClass {
       throw error;
     }
   }
+  /**
+   * Update local macros with full operation chain
+   * Requires parent class to be locked
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
+   */
   async update(
     config: Partial<ILocalMacrosConfig>,
     options?: IAdtOperationOptions
@@ -162,6 +167,28 @@ export class AdtLocalMacros extends AdtClass {
     }
     if (!config.macrosCode) {
       throw new Error('Macros code is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.macrosCode;
+      if (!codeToUpdate) {
+        throw new Error('Macros code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateClassMacros(
+        this.connection,
+        config.className,
+        codeToUpdate,
+        options.lockHandle,
+        config.transportRequest
+      );
+      this.logger?.info?.('Local macros updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;
@@ -204,8 +231,8 @@ export class AdtLocalMacros extends AdtClass {
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockResponse = await super.unlock({ className: config.className }, lockHandle);
-      state.unlockResult = unlockResponse;
+      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
       return state;

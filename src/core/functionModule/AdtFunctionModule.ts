@@ -232,6 +232,7 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
   /**
    * Update function module with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IFunctionModuleConfig>,
@@ -242,6 +243,31 @@ export class AdtFunctionModule implements IAdtObject<IFunctionModuleConfig, IFun
     }
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await update(
+        this.connection,
+        {
+          functionModuleName: config.functionModuleName,
+          functionGroupName: config.functionGroupName,
+          sourceCode: codeToUpdate,
+          lockHandle: options.lockHandle,
+          transportRequest: config.transportRequest
+        }
+      );
+      this.logger?.info?.('Function module updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

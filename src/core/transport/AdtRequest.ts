@@ -178,4 +178,18 @@ export class AdtRequest implements IAdtObject<ITransportConfig, ITransportState>
   async readTransport(config: Partial<ITransportConfig>): Promise<ITransportState> {
     throw new Error('readTransport operation is not supported for Transport Request objects in ADT');
   }
+
+  /**
+   * Lock transport request (not supported)
+   */
+  async lock(config: Partial<ITransportConfig>): Promise<string> {
+    throw new Error('Lock operation is not supported for transport requests');
+  }
+
+  /**
+   * Unlock transport request (not supported)
+   */
+  async unlock(config: Partial<ITransportConfig>, lockHandle: string): Promise<ITransportState> {
+    throw new Error('Unlock operation is not supported for transport requests');
+  }
 }

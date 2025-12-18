@@ -27,15 +27,14 @@ import {
   logBuilderTestEnd
 } from '../../../helpers/builderTestLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  resolveStandardObject,
   getTimeout
 } = require('../../../helpers/test-helper');
 
@@ -82,14 +81,16 @@ describe('DomainBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
+          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
           return {
             domainName: params.domain_name,
             packageName,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             description: params.description,
             datatype: params.datatype || 'CHAR',
             length: params.length || 10,
@@ -149,8 +150,9 @@ describe('DomainBuilder (using AdtClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP domain', async () => {
-      const testCase = getTestCaseDefinition('create_domain', 'adt_domain');
-      const standardObject = resolveStandardObject('domain', isCloudSystem, testCase);
+      // Use TestConfigResolver for consistent parameter resolution
+      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
+      const standardObject = resolver.getStandardObject('domain');
 
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'Domain - read standard object', {

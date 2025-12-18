@@ -204,6 +204,7 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
   /**
    * Update table type with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<ITableTypeConfig>,
@@ -211,6 +212,35 @@ export class AdtDdicTableType implements IAdtObject<ITableTypeConfig, ITableType
   ): Promise<ITableTypeState> {
     if (!config.tableTypeName) {
       throw new Error('Table type name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const hasRowType = config.rowTypeName && config.rowTypeName.trim().length > 0;
+      if (!hasRowType || !config.rowTypeName) {
+        throw new Error('rowTypeName is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateTableType(
+        this.connection,
+        {
+          tabletype_name: config.tableTypeName,
+          description: config.description,
+          row_type_name: config.rowTypeName,
+          row_type_kind: config.rowTypeKind || 'dictionaryType',
+          access_type: config.accessType || 'standard',
+          primary_key_definition: config.primaryKeyDefinition || 'standard',
+          primary_key_kind: config.primaryKeyKind || 'nonUnique',
+          transport_request: config.transportRequest
+        },
+        options.lockHandle
+      );
+      this.logger?.info?.('Table type updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

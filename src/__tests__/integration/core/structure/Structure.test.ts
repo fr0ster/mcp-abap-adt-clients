@@ -25,6 +25,7 @@ import {
 } from '../../../helpers/builderTestLogger';
 import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import { IStructureConfig, IStructureState } from '../../../../core/structure';
 import { getStructure } from '../../../../core/structure/read';
 import * as path from 'path';
@@ -32,10 +33,8 @@ import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  resolveStandardObject,
   getTimeout
 } = require('../../../helpers/test-helper');
 
@@ -83,14 +82,16 @@ describe('StructureBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
+          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
           return {
             structureName: params.structure_name,
             packageName,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             description: params.description,
             ddlCode: params.ddl_code
           };
@@ -146,8 +147,9 @@ describe('StructureBuilder (using AdtClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP structure', async () => {
-      const testCase = getTestCaseDefinition('create_structure', 'adt_structure');
-      const standardObject = resolveStandardObject('structure', isCloudSystem, testCase);
+      // Use TestConfigResolver for consistent parameter resolution
+      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
+      const standardObject = resolver.getStandardObject('structure');
 
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'Structure - read standard object', {

@@ -15,7 +15,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { getFunction } from '../../../../core/functionModule/read';
-import { deleteFunctionGroup } from '../../../../core/functionGroup/delete';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
@@ -27,17 +26,15 @@ import {
 } from '../../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import { IFunctionModuleConfig, IFunctionModuleState } from '../../../../core/functionModule';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
-
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  resolveStandardObject,
   getTimeout
 } = require('../../../helpers/test-helper');
 
@@ -85,15 +82,17 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any) => {
+        buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
+          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
           return {
             functionGroupName: params.function_group_name,
             functionModuleName: params.function_module_name,
             packageName,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             description: params.description,
             sourceCode: params.source_code
           };
@@ -212,9 +211,11 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
     // Note: FM is already deleted in test chain if test succeeded
     try {
       const tempClient = new AdtClient(connection, builderLogger);
+      // Use BaseTester's config resolver for consistent parameter resolution
+      const transportRequest = tester.getTransportRequest() || undefined;
       await tempClient.getFunctionGroup().delete({
         functionGroupName: functionGroupName,
-        transportRequest: resolveTransportRequest(undefined) || undefined
+        transportRequest
       });
     } catch (error) {
       // Ignore all errors (404, locked, etc.)
@@ -224,6 +225,7 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
   }
 
   function getBuilderTestDefinition() {
+    const { getTestCaseDefinition } = require('../../../helpers/test-helper');
     return getTestCaseDefinition('create_function_module', 'adt_function_module');
   }
 
@@ -291,8 +293,9 @@ describe('FunctionModuleBuilder (using AdtClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP function module', async () => {
-      const testCase = getTestCaseDefinition('create_function_module', 'adt_function_module');
-      const standardObject = resolveStandardObject('function_module', isCloudSystem, testCase);
+      // Use TestConfigResolver for consistent parameter resolution
+      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
+      const standardObject = resolver.getStandardObject('function_module');
 
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'FunctionModule - read standard object', {

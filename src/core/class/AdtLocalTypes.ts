@@ -105,8 +105,8 @@ export class AdtLocalTypes extends AdtClass {
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockResponse = await super.unlock({ className: config.className }, lockHandle);
-      state.unlockResult = unlockResponse;
+      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
       return state;
@@ -156,6 +156,7 @@ export class AdtLocalTypes extends AdtClass {
   /**
    * Update local types with full operation chain
    * Requires parent class to be locked
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<ILocalTypesConfig>,
@@ -166,6 +167,28 @@ export class AdtLocalTypes extends AdtClass {
     }
     if (!config.localTypesCode) {
       throw new Error('Local types code is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.localTypesCode;
+      if (!codeToUpdate) {
+        throw new Error('Local types code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateClassLocalTypes(
+        this.connection,
+        config.className,
+        codeToUpdate,
+        options.lockHandle,
+        config.transportRequest
+      );
+      this.logger?.info?.('Local types updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;
@@ -208,8 +231,8 @@ export class AdtLocalTypes extends AdtClass {
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockResponse = await super.unlock({ className: config.className }, lockHandle);
-      state.unlockResult = unlockResponse;
+      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
       return state;

@@ -167,9 +167,113 @@ standard_objects:
 # READ TESTS (Read-only operations on existing objects)
 # ============================================================================
 
-# Read Service Definition
+# Read Program (ReadOnlyClient)
+# Uses standard_objects.programs with available_in filter
+read_program:
+  test_cases:
+    - name: "readonly_read_program"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing program using ReadOnlyClient (uses standard_objects.programs)"
+      params: {}  # No params needed - automatically uses standard_objects.programs filtered by available_in
+
+# Read Class (ReadOnlyClient)
+# Uses standard_objects.classes with available_in filter
+read_class:
+  test_cases:
+    - name: "readonly_read_class"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing class using ReadOnlyClient (uses standard_objects.classes)"
+      params: {}  # No params needed - automatically uses standard_objects.classes filtered by available_in
+
+# Read Interface (ReadOnlyClient)
+# Uses standard_objects.interfaces with available_in filter
+read_interface:
+  test_cases:
+    - name: "readonly_read_interface"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing interface using ReadOnlyClient (uses standard_objects.interfaces)"
+      params: {}  # No params needed - automatically uses standard_objects.interfaces filtered by available_in
+
+# Read Domain (ReadOnlyClient)
+# Uses standard_objects.domains with available_in filter
+read_domain:
+  test_cases:
+    - name: "readonly_read_domain"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing domain using ReadOnlyClient (uses standard_objects.domains)"
+      params: {}  # No params needed - automatically uses standard_objects.domains filtered by available_in
+
+# Read Data Element (ReadOnlyClient)
+# Uses standard_objects.data_elements with available_in filter
+read_data_element:
+  test_cases:
+    - name: "readonly_read_data_element"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing data element using ReadOnlyClient (uses standard_objects.data_elements)"
+      params: {}  # No params needed - automatically uses standard_objects.data_elements filtered by available_in
+
+# Read Structure (ReadOnlyClient)
+# Uses standard_objects.structures with available_in filter
+read_structure:
+  test_cases:
+    - name: "readonly_read_structure"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing structure using ReadOnlyClient (uses standard_objects.structures)"
+      params: {}  # No params needed - automatically uses standard_objects.structures filtered by available_in
+
+# Read Table (ReadOnlyClient)
+# Uses standard_objects.tables with available_in filter
+read_table:
+  test_cases:
+    - name: "readonly_read_table"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing table using ReadOnlyClient (uses standard_objects.tables)"
+      params: {}  # No params needed - automatically uses standard_objects.tables filtered by available_in
+
+# Read View (ReadOnlyClient)
+# Uses standard_objects.views with available_in filter
+read_view:
+  test_cases:
+    - name: "readonly_read_view"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing view using ReadOnlyClient (uses standard_objects.views)"
+      params: {}  # No params needed - automatically uses standard_objects.views filtered by available_in
+
+# Read Function Group (ReadOnlyClient)
+# Uses standard_objects.function_groups with available_in filter
+read_function_group:
+  test_cases:
+    - name: "readonly_read_function_group"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing function group using ReadOnlyClient (uses standard_objects.function_groups)"
+      params: {}  # No params needed - automatically uses standard_objects.function_groups filtered by available_in
+
+# Read Function Module (ReadOnlyClient)
+# Uses standard_objects.function_modules with available_in filter
+read_function_module:
+  test_cases:
+    - name: "readonly_read_function_module"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing function module using ReadOnlyClient (uses standard_objects.function_modules)"
+      params: {}  # No params needed - automatically uses standard_objects.function_modules filtered by available_in
+
+# Read Package (ReadOnlyClient)
+# Uses standard_objects.packages with available_in filter
+read_package:
+  test_cases:
+    - name: "readonly_read_package"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing package using ReadOnlyClient (uses standard_objects.packages)"
+      params: {}  # No params needed - automatically uses standard_objects.packages filtered by available_in
+
+# Read Service Definition (ReadOnlyClient)
+# Uses standard_objects.service_definitions with available_in filter
 read_service_definition:
   test_cases:
+    - name: "readonly_read_service_definition"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing service definition using ReadOnlyClient (uses standard_objects.service_definitions)"
+      params: {}  # No params needed - automatically uses standard_objects.service_definitions filtered by available_in
     - name: "read_standard_service_definition"
       enabled: false  # Set to true and configure params below to enable read test
       description: "Read standard SAP service definition"
@@ -179,6 +283,15 @@ read_service_definition:
         # Or use environment-specific parameters:
         # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
         # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
+
+# Read Transport Request (ReadOnlyClient)
+read_transport:
+  test_cases:
+    - name: "readonly_read_transport"
+      enabled: false  # Set to true and configure params below to enable read test
+      description: "Read existing transport request using ReadOnlyClient"
+      params:
+        transport_request: ""  # Replace with existing transport request in your system
 
 # ============================================================================
 # FLOW TESTS (Create/Update/Delete operations - Builder tests)

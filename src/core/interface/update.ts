@@ -1,9 +1,9 @@
 /**
- * Interface update operations - DEPRECATED
- * Use InterfaceBuilder.update() instead
+ * Interface update operations - Low-level function
+ * Use AdtInterface.update() for high-level operations
  */
 
-import { encodeSapObjectName } from "../..";
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 

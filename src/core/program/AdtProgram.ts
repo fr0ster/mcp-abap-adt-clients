@@ -208,6 +208,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   /**
    * Update program with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IProgramConfig>,
@@ -215,6 +216,30 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const sessionId = this.connection.getSessionId?.() || '';
+      const updateResponse = await uploadProgramSource(
+        this.connection,
+        config.programName,
+        codeToUpdate,
+        options.lockHandle,
+        sessionId,
+        config.transportRequest
+      );
+      this.logger?.info?.('Program updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

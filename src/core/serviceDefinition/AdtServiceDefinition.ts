@@ -204,6 +204,7 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
   /**
    * Update service definition with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IServiceDefinitionConfig>,
@@ -214,6 +215,30 @@ export class AdtServiceDefinition implements IAdtObject<IServiceDefinitionConfig
       const error = new Error('Service definition name is required');
       state.errors.push({ method: 'update', error, timestamp: new Date() });
       throw error;
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateServiceDefinition(
+        this.connection,
+        {
+          service_definition_name: config.serviceDefinitionName,
+          source_code: codeToUpdate,
+          transport_request: config.transportRequest
+        },
+        options.lockHandle
+      );
+      this.logger?.info?.('Service definition updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

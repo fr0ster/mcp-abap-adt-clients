@@ -214,6 +214,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
   /**
    * Update structure with full operation chain
    * Always starts with lock
+   * If options.low is true, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IStructureConfig>,
@@ -221,6 +222,30 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
   ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.ddlCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code (ddlCode) is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await upload(
+        this.connection,
+        {
+          structureName: config.structureName,
+          ddlCode: codeToUpdate,
+          transportRequest: config.transportRequest
+        },
+        options.lockHandle
+      );
+      this.logger?.info?.('Structure updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

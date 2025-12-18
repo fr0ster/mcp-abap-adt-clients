@@ -219,6 +219,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
   /**
    * Update metadata extension with full operation chain
    * Always starts with lock
+   * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IMetadataExtensionConfig>,
@@ -229,6 +230,27 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       const error = new Error('Metadata extension name is required');
       state.errors.push({ method: 'update', error, timestamp: new Date() });
       throw error;
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      const codeToUpdate = options?.sourceCode || config.sourceCode;
+      if (!codeToUpdate) {
+        throw new Error('Source code is required for update');
+      }
+
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const updateResponse = await updateMetadataExtension(
+        this.connection,
+        config.name,
+        codeToUpdate,
+        options.lockHandle
+      );
+      this.logger?.info?.('Metadata extension updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;

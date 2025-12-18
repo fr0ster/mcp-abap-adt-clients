@@ -25,16 +25,15 @@ import {
 } from '../../../helpers/builderTestLogger';
 import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import { IClassConfig, IClassState } from '../../../../core/class';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
 const {
-  getTestCaseDefinition,
   resolvePackageName,
   resolveTransportRequest,
-  resolveStandardObject,
   getTimeout
 } = require('../../../helpers/test-helper');
 
@@ -81,14 +80,16 @@ describe('ClassBuilder (using AdtClient)', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any) => {
-          const params = testCase?.params || {};
-          const packageName = resolvePackageName(params.package_name);
+        buildConfig: (testCase: any, resolver?: TestConfigResolver) => {
+          // Use resolver to get resolved parameters (from test case params or global defaults)
+          const packageName = resolver?.getPackageName() || resolvePackageName(testCase?.params?.package_name);
           if (!packageName) throw new Error('package_name not configured');
+          const transportRequest = resolver?.getTransportRequest() || resolveTransportRequest(testCase?.params?.transport_request);
+          const params = testCase?.params || {};
           return {
             className: params.class_name,
             packageName,
-            transportRequest: resolveTransportRequest(params.transport_request),
+            transportRequest,
             description: params.description || `Test class ${params.class_name}`,
             sourceCode: params.source_code
           };
@@ -100,9 +101,11 @@ describe('ClassBuilder (using AdtClient)', () => {
             const existingClass = await cleanupClient.getClass().read({ className });
             if (existingClass) {
               try {
+                // Use BaseTester's config resolver to get transport request (allows overriding global params)
+                const transportRequest = tester.getTransportRequest();
                 await cleanupClient.getClass().delete({
                   className,
-                  transportRequest: resolveTransportRequest(undefined)
+                  transportRequest
                 });
                 await new Promise(resolve => setTimeout(resolve, 3000));
               } catch (cleanupError: any) {
@@ -155,8 +158,13 @@ describe('ClassBuilder (using AdtClient)', () => {
 
   describe('Read standard object', () => {
     it('should read standard SAP class', async () => {
-      const testCase = getTestCaseDefinition('create_class', 'adt_class');
-      const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
+      if (!hasConfig || !tester) {
+        logBuilderTestSkip(testsLogger, 'Class - read standard object', 'No SAP configuration or tester not initialized');
+        return;
+      }
+
+      // Use BaseTester's method to get standard object (prioritizes standard_objects registry)
+      const standardObject = tester.getStandardObject('class');
 
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'Class - read standard object', {
@@ -197,9 +205,13 @@ describe('ClassBuilder (using AdtClient)', () => {
 
   describe('Read transport request', () => {
     it('should read transport request for class', async () => {
-      const testCase = getTestCaseDefinition('create_class', 'adt_class');
-      const standardObject = resolveStandardObject('class', isCloudSystem, testCase);
+      if (!hasConfig || !tester) {
+        logBuilderTestSkip(testsLogger, 'Class - read transport request', 'No SAP configuration or tester not initialized');
+        return;
+      }
 
+      // Use BaseTester's method to get standard object (prioritizes standard_objects registry)
+      const standardObject = tester.getStandardObject('class');
       if (!standardObject) {
         logBuilderTestStart(testsLogger, 'Class - read transport request', {
           name: 'read_transport',
@@ -212,15 +224,23 @@ describe('ClassBuilder (using AdtClient)', () => {
 
       const standardClassName = standardObject.name;
 
-      // Check if transport_request is configured in YAML
-      const transportRequest = resolveTransportRequest(testCase?.params?.transport_request);
+      // Try to get resolver for read_transport test case, fallback to create_class
+      // Use BaseTester's config resolver if available, otherwise create new one
+      let transportRequest = '';
+      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger })
+        .tryMultipleHandlers([
+          { handlerName: 'read_transport', testCaseName: 'read_transport' },
+          { handlerName: 'create_class', testCaseName: 'adt_class' }
+        ]);
+      transportRequest = resolver?.getTransportRequest() || tester.getTransportRequest() || '';
+      
       if (!transportRequest) {
-      logBuilderTestStart(testsLogger, 'Class - read transport request', {
-        name: 'read_transport',
-        params: { class_name: standardClassName }
-      });
-      logBuilderTestSkip(testsLogger, 'Class - read transport request',
-        'transport_request not configured in test-config.yaml (required for transport read test)');
+        logBuilderTestStart(testsLogger, 'Class - read transport request', {
+          name: 'read_transport',
+          params: { class_name: standardClassName }
+        });
+        logBuilderTestSkip(testsLogger, 'Class - read transport request',
+          'transport_request not configured in test-config.yaml (required for transport read test)');
         return;
       }
 

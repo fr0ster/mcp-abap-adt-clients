@@ -212,6 +212,7 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
   /**
    * Update data element with full operation chain
    * Always starts with lock
+   * If options.low is true, performs only low-level update without lock/check/unlock chain
    */
   async update(
     config: Partial<IDataElementConfig>,
@@ -225,6 +226,47 @@ export class AdtDataElement implements IAdtObject<IDataElementConfig, IDataEleme
     }
     if (!config.typeKind) {
       throw new Error('Type kind is required for update');
+    }
+
+    // Low-level mode: if lockHandle is provided, perform only update operation
+    if (options?.lockHandle) {
+      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      const systemInfo = await getSystemInformation(this.connection);
+      const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+
+      const domainInfo = {
+        dataType: config.dataType || '',
+        length: config.length || 0,
+        decimals: config.decimals || 0
+      };
+
+      const updateResponse = await updateDataElement(
+        this.connection,
+        {
+          data_element_name: config.dataElementName,
+          package_name: config.packageName,
+          transport_request: config.transportRequest,
+          description: config.description,
+          type_kind: config.typeKind,
+          type_name: config.typeName,
+          data_type: config.dataType,
+          length: config.length,
+          decimals: config.decimals,
+          short_label: config.shortLabel,
+          medium_label: config.mediumLabel,
+          long_label: config.longLabel,
+          heading_label: config.headingLabel,
+          search_help: config.searchHelp,
+          search_help_parameter: config.searchHelpParameter,
+          set_get_parameter: config.setGetParameter
+        },
+        options.lockHandle
+      );
+      this.logger?.info?.('Data element updated (low-level)');
+      return {
+        updateResult: updateResponse,
+        errors: []
+      };
     }
 
     let lockHandle: string | undefined;
