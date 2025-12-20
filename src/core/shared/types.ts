@@ -55,10 +55,22 @@ export interface IGetTableContentsParams {
 }
 
 /**
- * Where-used parameters
+ * Where-used scope parameters (Step 1: get available object types)
+ */
+export interface IGetWhereUsedScopeParams {
+  object_name: string;
+  object_type: string;
+}
+
+/**
+ * Where-used parameters (Step 2: execute search)
  */
 export interface IGetWhereUsedParams {
   object_name: string;
   object_type: string;
-  detailed?: boolean;
+  /**
+   * Optional: scope XML from getWhereUsedScope() with user-modified selections
+   * If not provided, will fetch default scope automatically
+   */
+  scopeXml?: string;
 }

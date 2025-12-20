@@ -106,12 +106,24 @@ describe('Shared - searchObjects', () => {
     }
 
     logBuilderTestStep('search objects by name pattern', testsLogger);
+    testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
+    
     const result = await client.getUtils().searchObjects({
       query: 'CL_ABAP*',
       maxResults: 10
     });
+    
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
+    
+    testsLogger.info?.('✅ Search completed');
+    testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
+    
+    // Parse and log number of results
+    const matches = result.data?.match(/<objectReference/g);
+    if (matches) {
+      testsLogger.info?.(`🎯 Found ${matches.length} objects`);
+    }
   }, 15000);
 
   it('should search objects with object type filter', async () => {
@@ -121,13 +133,25 @@ describe('Shared - searchObjects', () => {
     }
 
     logBuilderTestStep('search objects with object type filter', testsLogger);
+    testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
+    
     const result = await client.getUtils().searchObjects({
       query: 'T*',
       objectType: 'TABL',
       maxResults: 10
     });
+    
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
+    
+    testsLogger.info?.('✅ Search completed');
+    testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
+    
+    // Parse and log number of results
+    const matches = result.data?.match(/<objectReference/g);
+    if (matches) {
+      testsLogger.info?.(`🎯 Found ${matches.length} tables`);
+    }
   }, 15000);
 
   it('should use default maxResults if not provided', async () => {

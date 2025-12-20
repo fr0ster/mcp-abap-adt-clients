@@ -109,9 +109,16 @@ describe('Shared - readMetadata', () => {
     const className = 'CL_ABAP_CHAR_UTILITIES';
     try {
       logBuilderTestStep('read class metadata', testsLogger);
+      testsLogger.info?.(`📋 Object: ${className} (class)`);
+      testsLogger.info?.('📖 Reading metadata...');
+      
       const result = await client.getUtils().readObjectMetadata('class', className);
+      
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
+      
+      testsLogger.info?.('✅ Metadata retrieved');
+      testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
     } catch (error: any) {
       if (error.response?.status === 406) {
         throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);
@@ -130,9 +137,16 @@ describe('Shared - readMetadata', () => {
     const domainName = 'MANDT';
     try {
       logBuilderTestStep('read domain metadata', testsLogger);
+      testsLogger.info?.(`📋 Object: ${domainName} (domain)`);
+      testsLogger.info?.('📖 Reading metadata...');
+      
       const result = await client.getUtils().readObjectMetadata('domain', domainName);
+      
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
+      
+      testsLogger.info?.('✅ Metadata retrieved');
+      testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
     } catch (error: any) {
       if (error.response?.status === 406) {
         throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);

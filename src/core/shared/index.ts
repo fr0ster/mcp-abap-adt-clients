@@ -11,7 +11,8 @@ export type {
   ISearchObjectsParams as SearchObjectsParams,
   IGetSqlQueryParams as GetSqlQueryParams,
   IGetTableContentsParams as GetTableContentsParams,
-  IGetWhereUsedParams as GetWhereUsedParams
+  IGetWhereUsedParams as GetWhereUsedParams,
+  IGetWhereUsedScopeParams as GetWhereUsedScopeParams
 } from './types';
 
 // Error classes for unsupported operations

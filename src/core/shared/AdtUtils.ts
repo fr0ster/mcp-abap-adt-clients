@@ -34,7 +34,7 @@ import { AxiosResponse } from 'axios';
 
 // Import utility functions
 import { searchObjects } from './search';
-import { getWhereUsed } from './whereUsed';
+import { getWhereUsed, getWhereUsedScope, modifyWhereUsedScope } from './whereUsed';
 import { getInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
@@ -64,6 +64,7 @@ import { getAllTypes as getAllTypesUtil } from './allTypes';
 import type {
   ISearchObjectsParams,
   IGetWhereUsedParams,
+  IGetWhereUsedScopeParams,
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IObjectReference,
@@ -92,11 +93,107 @@ export class AdtUtils {
     return searchObjects(this.connection, params);
   }
 
+  /**scope configuration (Step 1: prepare search)
+   * 
+   * Returns available object types that can be searched for where-used references.
+   * Consumer can parse the XML response, present options to user, and modify selections.
+   * 
+   * @param params - Scope parameters
+   * @returns Scope XML with available object types (isSelected, isDefault attributes)
+   * 
+   * @example
+   * // Get scope for a class
+   * const scopeResponse = await utils.getWhereUsedScope({
+   *   object_name: 'ZMY_CLASS',
+   *   object_type: 'class'
+   * });
+   * 
+   * // Parse and display types to user, then modify XML
+   * let scopeXml = scopeResponse.data;
+   * // Enable function modules in search
+   * scopeXml = scopeXml.replace(/name="FUGR\/FF" isSelected="false"/, 'name="FUGR/FF" isSelected="true"');
+   * 
+   * // Execute search with modified scope
+   * const result = await utils.getWhereUsed({
+   *   object_name: 'ZMY_CLASS',
+   *   object_type: 'class',
+   *   scopeXml: scopeXml
+   * });
+   */
+  async getWhereUsedScope(params: IGetWhereUsedScopeParams): Promise<AxiosResponse> {
+    return getWhereUsedScope(this.connection, params);
+  }
+
   /**
-   * Get where-used references for ABAP object
+   * Modify where-used scope to enable/disable object types
+   * 
+   * Helper function to modify isSelected flags in scope XML before executing search.
+   * 
+   * @param scopeXml - Scope XML from getWhereUsedScope()
+   * @param options - Modification options
+   * @returns Modified scope XML
+   * 
+   * @example
+   * const scopeResponse = await utils.getWhereUsedScope({ object_name: 'ZMY_CLASS', object_type: 'class' });
+   * let scopeXml = scopeResponse.data;
+   * 
+   * // Enable function modules in search
+   * scopeXml = utils.modifyWhereUsedScope(scopeXml, { enable: ['FUGR/FF'] });
+   * 
+   * // Search only in classes and interfaces
+   * scopeXml = utils.modifyWhereUsedScope(scopeXml, { enableOnly: ['CLAS/OC', 'INTF/OI'] });
+   * 
+   * const result = await utils.getWhereUsed({
+   *   object_name: 'ZMY_CLASS',
+   *   object_type: 'class',
+   *   scopeXml: scopeXml
+   * });
+   */
+  modifyWhereUsedScope(
+    scopeXml: string,
+    options: {
+      enableAll?: boolean;
+      enableOnly?: string[];
+      enable?: string[];
+      disable?: string[];
+    }
+  ): string {
+    return modifyWhereUsedScope(scopeXml, options);
+  }
+
+  /**
+   * Get where-used references for ABAP object (Step 2: execute search)
+   * 
+   * This function performs a two-step ADT operation:
+   * 1. Fetches scope configuration (if not provided)
+   * 2. Executes where-used search with the scope
    * 
    * @param params - Where-used parameters
-   * @returns Where-used references
+   * @param params.object_name - Name of the object to search
+   * @param params.object_type - Type of the object (class, table, etc.)
+   * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). If not provided, uses default SAP selection.
+   * @returns Where-used references in XML format
+   * 
+   * @example
+   * // Simple usage with default scope
+   * const result = await utils.getWhereUsed({ 
+   *   object_name: 'ZMY_CLASS', 
+   *   object_type: 'class' 
+   * });
+   * 
+   * // Advanced: use custom scope from getWhereUsedScope()
+   * const scopeResponse = await utils.getWhereUsedScope({
+   *   object_name: 'ZMY_CLASS',
+   *   object_type: 'class'
+   * });
+   * let scopeXml = scopeResponse.data;
+   * // Modify selections...
+   * const result = await utils.getWhereUsed({
+   *   object_name: 'ZMY_CLASS',
+   *   object_type: 'class',
+   *   scopeXml: scopeXml
+   *   searchInAllTypes: ['CLAS/OC', 'INTF/OI'] 
+   * });
    */
   async getWhereUsed(params: IGetWhereUsedParams): Promise<AxiosResponse> {
     return getWhereUsed(this.connection, params);

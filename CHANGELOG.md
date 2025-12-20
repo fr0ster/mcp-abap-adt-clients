@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.4] - 2025-01-27
+
+### Changed
+- **WhereUsed (Breaking Change)**: Refactored to match Eclipse ADT two-step workflow
+  - **Step 1**: `getWhereUsedScope()` - Fetches scope configuration with payload (POST `/scope`)
+  - **Step 2**: `getWhereUsed()` - Executes search with scope XML (POST `/usageReferences`)
+  - Payload is now transmitted between requests for accurate results
+  - `scopeXml` parameter is optional in `getWhereUsed()` - auto-fetches default scope if not provided
+
+### Added
+- **WhereUsed Scope Modification**: New `modifyWhereUsedScope()` helper function
+  - `enableAll` - Select all object types (simulates Eclipse "select all")
+  - `enableOnly` - Enable only specific types, disable others
+  - `enable` / `disable` - Modify individual type selections
+  - Allows fine-grained control over which object types to search
+
+### Implementation Details
+- Two usage patterns supported:
+  1. **Simple**: Call `getWhereUsed()` alone - automatically fetches default scope
+  2. **Advanced**: Fetch scope with `getWhereUsedScope()`, modify with `modifyWhereUsedScope()`, pass to `getWhereUsed()`
+- SAP systems may return different default scope selections - this is expected behavior
+- Comprehensive test coverage with 5 integration tests validating both usage patterns
+
 ## [0.2.3] - 2025-01-27
 
 ### Added

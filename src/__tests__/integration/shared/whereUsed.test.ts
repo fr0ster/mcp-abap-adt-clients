@@ -99,27 +99,105 @@ describe('Shared - getWhereUsed', () => {
     }
   });
 
-  it('should get where-used for class', async () => {
+  it('should use default scope without modifications (Eclipse default behavior)', async () => {
     if (!hasConfig) {
       testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
       return;
     }
 
     try {
-      logBuilderTestStep('get where-used for class', testsLogger);
-      const result = await client.getUtils().getWhereUsed({
+      logBuilderTestStep('where-used with default scope', testsLogger);
+      testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+      testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
+      
+      const utils = client.getUtils();
+      const scopeResponse = await utils.getWhereUsedScope({
         object_name: 'CL_ABAP_CHAR_UTILITIES',
         object_type: 'class'
       });
+      
+      expect(scopeResponse.status).toBe(200);
+      expect(scopeResponse.data).toBeDefined();
+      
+      // Step 2: Use scope WITHOUT modifications (exactly as SAP returned it)
+      testsLogger.info?.('🔍 Step 2: Executing where-used search with UNMODIFIED scope...');
+      const result = await utils.getWhereUsed({
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class',
+        scopeXml: scopeResponse.data  // Pass scope as-is, no modifications
+      });
+      
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
-    } catch (error: any) {
-      if (error.response?.status === 415) {
-        throw new Error(`415 Unsupported Media Type: The server cannot process the request Content-Type. This may indicate an issue with the Content-Type header format. Error: ${error.message}`);
+      
+      const match = result.data?.match(/numberOfResults="(\d+)"/);
+      if (match) {
+        testsLogger.info?.(`🎯 Found ${match[1]} usage references with default scope`);
       }
+      
+      testsLogger.info?.('✅ Test complete: scope used without modifications');
+    } catch (error: any) {
       throw error;
     }
-  }, 15000);
+  }, 30000);
+
+  it('should search with all types enabled (Eclipse "select all" behavior)', async () => {
+    if (!hasConfig) {
+      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      return;
+    }
+
+    try {
+      logBuilderTestStep('where-used with ALL types enabled', testsLogger);
+      testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+      testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
+      
+      const utils = client.getUtils();
+      const scopeResponse = await utils.getWhereUsedScope({
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class'
+      });
+      
+      expect(scopeResponse.status).toBe(200);
+      
+      // Parse initial state
+      const allTypes = (scopeResponse.data.match(/<usagereferences:type/g) || []).length;
+      const initialSelected = (scopeResponse.data.match(/isSelected="true"/g) || []).length;
+      
+      testsLogger.info?.(`📊 Initial scope: ${initialSelected}/${allTypes} types selected`);
+      
+      // Step 2: Enable ALL types (like Eclipse "Select All" checkbox)
+      testsLogger.info?.('🔧 Modifying scope - enabling ALL types...');
+      const modifiedScope = utils.modifyWhereUsedScope(scopeResponse.data, {
+        enableAll: true
+      });
+      
+      // Verify all types are now selected
+      const finalSelected = (modifiedScope.match(/isSelected="true"/g) || []).length;
+      testsLogger.info?.(`📊 Modified scope: ${finalSelected}/${allTypes} types selected`);
+      expect(finalSelected).toBe(allTypes);
+      
+      // Step 3: Execute search with all types
+      testsLogger.info?.('🔍 Step 3: Executing where-used search with ALL types...');
+      const result = await utils.getWhereUsed({
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class',
+        scopeXml: modifiedScope
+      });
+      
+      expect(result.status).toBe(200);
+      expect(result.data).toBeDefined();
+      
+      const match = result.data?.match(/numberOfResults="(\d+)"/);
+      if (match) {
+        testsLogger.info?.(`🎯 Found ${match[1]} usage references with ALL types enabled`);
+      }
+      
+      testsLogger.info?.('✅ Test complete: all types enabled successfully');
+    } catch (error: any) {
+      throw error;
+    }
+  }, 30000);
 
   it('should get where-used for table', async () => {
     if (!hasConfig) {
@@ -129,12 +207,41 @@ describe('Shared - getWhereUsed', () => {
 
     try {
       logBuilderTestStep('get where-used for table', testsLogger);
+      testsLogger.info?.('📋 Object: T000 (table)');
+      testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
+      
       const result = await client.getUtils().getWhereUsed({
         object_name: 'T000',
         object_type: 'table'
       });
+      
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
+      
+      testsLogger.info?.('✅ Where-used query completed (default types)');
+      testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
+      
+      // Parse and log number of results
+      const match = result.data?.match(/numberOfResults="(\d+)"/);
+      if (match) {
+        testsLogger.info?.(`🎯 Found ${match[1]} usage references`);
+        
+        // Parse objectTypes to see which types were searched
+        const typeMatches = result.data?.matchAll(/<usagereferences:type name="([^"]+)" isSelected="true"/g);
+        const searchedTypes: string[] = [];
+        if (typeMatches) {
+          for (const tm of typeMatches) {
+            searchedTypes.push(tm[1]);
+          }
+          testsLogger.info?.(`🔍 Searched in types: ${searchedTypes.join(', ')}`);
+        }
+        
+        // Log result description if available
+        const descMatch = result.data?.match(/resultDescription="([^"]+)"/);
+        if (descMatch) {
+          testsLogger.info?.(`📝 Result: ${descMatch[1]}`);
+        }
+      }
     } catch (error: any) {
       if (error.response?.status === 415) {
         throw new Error(`415 Unsupported Media Type: The server cannot process the request Content-Type. This may indicate an issue with the Content-Type header format. Error: ${error.message}`);

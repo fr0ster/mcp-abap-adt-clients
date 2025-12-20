@@ -128,10 +128,17 @@ describe('Shared - readSource', () => {
     // Use a standard SAP class that should exist
     const className = 'CL_ABAP_CHAR_UTILITIES';
     logBuilderTestStep('read class source code', testsLogger);
+    testsLogger.info?.(`📋 Object: ${className} (class)`);
+    testsLogger.info?.('📖 Reading source code...');
+    
     const result = await client.getUtils().readObjectSource('class', className);
+    
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
     expect(typeof result.data).toBe('string');
+    
+    testsLogger.info?.('✅ Source code retrieved');
+    testsLogger.info?.(`📊 Source length: ${result.data?.length || 0} characters`);
   }, 15000);
 
   it('should read class source code (inactive version)', async () => {
