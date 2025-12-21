@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.5] - 2025-12-21
+
+### Changed
+- **Dependencies**: Updated `@mcp-abap-adt/interfaces` to `^0.2.5`
+  - Compatible with simplified `IAbapConnection` interface
+  - No breaking changes for adt-clients consumers
+
 ## [0.2.4] - 2025-01-27
 
 ### Changed
