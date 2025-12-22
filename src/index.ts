@@ -31,103 +31,137 @@
  * ```
  */
 
-// Client APIs (Public API)
-export { ReadOnlyClient } from './clients/ReadOnlyClient';
-export { CrudClient } from './clients/CrudClient';
 export { AdtClient } from './clients/AdtClient';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
+export { CrudClient } from './clients/CrudClient';
+// Client APIs (Public API)
+export { ReadOnlyClient } from './clients/ReadOnlyClient';
 
 // Export SharedBuilder and AdtUtils
-export { SharedBuilder, AdtUtils } from './core/shared';
+export { AdtUtils, SharedBuilder } from './core/shared';
 
 // AdtRuntimeClient is exported from clients above
 
+// Re-export types from interfaces package for convenience
+export type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+export type {
+  AdtBehaviorDefinitionType,
+  BehaviorDefinitionImplementationType,
+  CheckReporter,
+  IBehaviorDefinitionConfig as BehaviorDefinitionBuilderConfig,
+  IBehaviorDefinitionCreateParams as BehaviorDefinitionCreateParams,
+  IBehaviorDefinitionState as BehaviorDefinitionBuilderState,
+  IBehaviorDefinitionValidationParams as BehaviorDefinitionValidationParams,
+  ICheckMessage as CheckMessage,
+  ICheckRunResult as CheckRunResult,
+  ILockResult as LockResult,
+  IValidationResult as ValidationResult,
+} from './core/behaviorDefinition';
+export type {
+  AdtBehaviorImplementationType,
+  IBehaviorImplementationConfig as BehaviorImplementationBuilderConfig,
+  IBehaviorImplementationState as BehaviorImplementationBuilderState,
+  ICreateBehaviorImplementationParams as CreateBehaviorImplementationParams,
+} from './core/behaviorImplementation';
+// Export all BuilderConfig types used in client methods
+// Export type aliases for high-level Adt classes
+export type {
+  AdtClassType,
+  IClassConfig as ClassBuilderConfig,
+  IClassState as ClassBuilderState,
+} from './core/class';
+export type {
+  AdtDataElementType,
+  IDataElementConfig as DataElementBuilderConfig,
+  IDataElementState as DataElementBuilderState,
+} from './core/dataElement';
+export type {
+  AdtDomainType,
+  IDomainConfig as DomainBuilderConfig,
+  IDomainState as DomainBuilderState,
+} from './core/domain';
+export type {
+  AdtEnhancement as AdtEnhancementType,
+  EnhancementType,
+  ICreateEnhancementParams as CreateEnhancementParams,
+  IEnhancementConfig as EnhancementBuilderConfig,
+  IEnhancementMetadata,
+  IEnhancementState as EnhancementBuilderState,
+} from './core/enhancement';
+export type {
+  AdtFunctionGroupType,
+  IFunctionGroupConfig as FunctionGroupBuilderConfig,
+  IFunctionGroupState as FunctionGroupBuilderState,
+} from './core/functionGroup';
+export type {
+  AdtFunctionModuleType,
+  IFunctionModuleConfig as FunctionModuleBuilderConfig,
+  IFunctionModuleState as FunctionModuleBuilderState,
+} from './core/functionModule';
+export type {
+  AdtInterfaceType,
+  IInterfaceConfig as InterfaceBuilderConfig,
+  IInterfaceState as InterfaceBuilderState,
+} from './core/interface';
+export type {
+  AdtMetadataExtensionType,
+  IMetadataExtensionConfig as MetadataExtensionBuilderConfig,
+  IMetadataExtensionCreateParams as MetadataExtensionCreateParams,
+  IMetadataExtensionState as MetadataExtensionBuilderState,
+  IMetadataExtensionValidationParams as MetadataExtensionValidationParams,
+} from './core/metadataExtension';
+// Export package types
+export type {
+  AdtPackageType,
+  ICreatePackageParams as CreatePackageParams,
+  IPackageConfig as PackageBuilderConfig,
+  IPackageState as PackageBuilderState,
+} from './core/package';
+export type {
+  AdtProgramType,
+  IProgramConfig as ProgramBuilderConfig,
+  IProgramState as ProgramBuilderState,
+} from './core/program';
+export type {
+  AdtServiceDefinitionType,
+  IServiceDefinitionConfig as ServiceDefinitionBuilderConfig,
+  IServiceDefinitionState as ServiceDefinitionBuilderState,
+} from './core/serviceDefinition';
 // Export shared types
 export type {
+  GetSqlQueryParams,
+  GetTableContentsParams,
+  GetWhereUsedParams,
   InactiveObjectsResponse,
   ObjectReference,
   SearchObjectsParams,
-  GetSqlQueryParams,
-  GetTableContentsParams,
-  GetWhereUsedParams
 } from './core/shared';
-
-// Export package types
 export type {
-  ICreatePackageParams as CreatePackageParams,
-  IPackageConfig as PackageBuilderConfig,
-  IPackageState as PackageBuilderState
-} from './core/package';
-
-// Export all BuilderConfig types used in client methods
-export type { IClassConfig as ClassBuilderConfig, IClassState as ClassBuilderState } from './core/class';
-export type { IProgramConfig as ProgramBuilderConfig, IProgramState as ProgramBuilderState } from './core/program';
-export type { IInterfaceConfig as InterfaceBuilderConfig, IInterfaceState as InterfaceBuilderState } from './core/interface';
-export type { IDataElementConfig as DataElementBuilderConfig, IDataElementState as DataElementBuilderState } from './core/dataElement';
-export type { IDomainConfig as DomainBuilderConfig, IDomainState as DomainBuilderState } from './core/domain';
-export type { IStructureConfig as StructureBuilderConfig, IStructureState as StructureBuilderState } from './core/structure';
-export type { ITableConfig as TableBuilderConfig, ITableState as TableBuilderState } from './core/table';
-export type { ITableTypeConfig as TableTypeBuilderConfig, ITableTypeState as TableTypeBuilderState } from './core/tabletype';
-export type { IViewConfig as ViewBuilderConfig, IViewState as ViewBuilderState } from './core/view';
-export type { IFunctionGroupConfig as FunctionGroupBuilderConfig, IFunctionGroupState as FunctionGroupBuilderState } from './core/functionGroup';
-export type { IFunctionModuleConfig as FunctionModuleBuilderConfig, IFunctionModuleState as FunctionModuleBuilderState } from './core/functionModule';
-export type { IServiceDefinitionConfig as ServiceDefinitionBuilderConfig, IServiceDefinitionState as ServiceDefinitionBuilderState } from './core/serviceDefinition';
+  AdtStructureType,
+  IStructureConfig as StructureBuilderConfig,
+  IStructureState as StructureBuilderState,
+} from './core/structure';
 export type {
-  IBehaviorDefinitionConfig as BehaviorDefinitionBuilderConfig,
-  IBehaviorDefinitionState as BehaviorDefinitionBuilderState,
-  IBehaviorDefinitionValidationParams as BehaviorDefinitionValidationParams,
-  BehaviorDefinitionImplementationType,
-  IValidationResult as ValidationResult,
-  IBehaviorDefinitionCreateParams as BehaviorDefinitionCreateParams,
-  ILockResult as LockResult,
-  CheckReporter,
-  ICheckMessage as CheckMessage,
-  ICheckRunResult as CheckRunResult
-} from './core/behaviorDefinition';
+  AdtTableType,
+  ITableConfig as TableBuilderConfig,
+  ITableState as TableBuilderState,
+} from './core/table';
 export type {
-  IBehaviorImplementationConfig as BehaviorImplementationBuilderConfig,
-  IBehaviorImplementationState as BehaviorImplementationBuilderState,
-  ICreateBehaviorImplementationParams as CreateBehaviorImplementationParams
-} from './core/behaviorImplementation';
-export type {
-  IMetadataExtensionConfig as MetadataExtensionBuilderConfig,
-  IMetadataExtensionState as MetadataExtensionBuilderState,
-  IMetadataExtensionValidationParams as MetadataExtensionValidationParams,
-  IMetadataExtensionCreateParams as MetadataExtensionCreateParams
-} from './core/metadataExtension';
-export type {
-  EnhancementType,
-  IEnhancementConfig as EnhancementBuilderConfig,
-  IEnhancementState as EnhancementBuilderState,
-  ICreateEnhancementParams as CreateEnhancementParams,
-  IEnhancementMetadata
-} from './core/enhancement';
-
-// Re-export types from interfaces package for convenience
-export type { IAbapConnection, IAbapRequestOptions } from '@mcp-abap-adt/interfaces';
-
-// Export type aliases for high-level Adt classes
-export type { AdtClassType } from './core/class';
-export type { AdtProgramType } from './core/program';
-export type { AdtInterfaceType } from './core/interface';
-export type { AdtDomainType } from './core/domain';
-export type { AdtDataElementType } from './core/dataElement';
-export type { AdtStructureType } from './core/structure';
-export type { AdtTableType } from './core/table';
-export type { AdtDdicTableTypeAlias } from './core/tabletype';
+  AdtDdicTableTypeAlias,
+  ITableTypeConfig as TableTypeBuilderConfig,
+  ITableTypeState as TableTypeBuilderState,
+} from './core/tabletype';
 export { AdtDdicTableType } from './core/tabletype';
-export type { AdtViewType } from './core/view';
-export type { AdtFunctionGroupType } from './core/functionGroup';
-export type { AdtFunctionModuleType } from './core/functionModule';
-export type { AdtPackageType } from './core/package';
-export type { AdtServiceDefinitionType } from './core/serviceDefinition';
-export type { AdtBehaviorDefinitionType } from './core/behaviorDefinition';
-export type { AdtBehaviorImplementationType } from './core/behaviorImplementation';
-export type { AdtMetadataExtensionType } from './core/metadataExtension';
-export type { AdtUnitTestType } from './core/unitTest';
 export type { AdtRequestType } from './core/transport';
-export type { AdtEnhancement as AdtEnhancementType } from './core/enhancement';
-
+export type { AdtUnitTestType } from './core/unitTest';
+export type {
+  AdtViewType,
+  IViewConfig as ViewBuilderConfig,
+  IViewState as ViewBuilderState,
+} from './core/view';
 // Export utilities
 export { encodeSapObjectName } from './utils/internalUtils';
-export type { ILogger } from '@mcp-abap-adt/interfaces';

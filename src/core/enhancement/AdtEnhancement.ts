@@ -25,26 +25,34 @@
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import {
-  IEnhancementConfig,
-  IEnhancementState,
-  EnhancementType,
-  supportsSourceCode
-} from './types';
-import { validate } from './validation';
-import { create as createEnhancement } from './create';
-import { check as checkEnhancement } from './check';
-import { lockEnhancement } from './lock';
-import { update } from './update';
-import { unlockEnhancement } from './unlock';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateEnhancement } from './activation';
+import { check as checkEnhancement } from './check';
+import { create as createEnhancement } from './create';
 import { checkDeletion, deleteEnhancement } from './delete';
-import { getEnhancementSource, getEnhancementMetadata, getEnhancementTransport } from './read';
+import { lockEnhancement } from './lock';
+import {
+  getEnhancementMetadata,
+  getEnhancementSource,
+  getEnhancementTransport,
+} from './read';
+import {
+  type IEnhancementConfig,
+  type IEnhancementState,
+  supportsSourceCode,
+} from './types';
+import { unlockEnhancement } from './unlock';
+import { update } from './update';
+import { validate } from './validation';
 
-export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhancementState> {
+export class AdtEnhancement
+  implements IAdtObject<IEnhancementConfig, IEnhancementState>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   public readonly objectType: string = 'Enhancement';
@@ -57,7 +65,9 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
   /**
    * Validate enhancement configuration before creation
    */
-  async validate(config: Partial<IEnhancementConfig>): Promise<IEnhancementState> {
+  async validate(
+    config: Partial<IEnhancementConfig>,
+  ): Promise<IEnhancementState> {
     const state: IEnhancementState = { errors: [] };
 
     if (!config.enhancementName) {
@@ -77,14 +87,18 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         config.enhancementType,
         config.enhancementName,
         config.packageName,
-        config.description
+        config.description,
       );
       state.validationResponse = response;
       state.enhancementType = config.enhancementType;
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'validate',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Validate failed:', err);
       throw err;
     }
@@ -95,9 +109,12 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
    */
   async create(
     config: IEnhancementConfig,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       throw new Error('Enhancement name is required');
@@ -121,7 +138,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         description: config.description,
         transport_request: config.transportRequest,
         enhancement_spot: config.enhancementSpot,
-        badi_definition: config.badiDefinition
+        badi_definition: config.badiDefinition,
       });
       state.createResult = createResponse;
       objectCreated = true;
@@ -130,7 +147,11 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       return state;
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'create', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'create',
+        error: err,
+        timestamp: new Date(),
+      });
 
       // Cleanup on error - ensure stateless
       this.connection.setSessionType('stateless');
@@ -141,10 +162,13 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
           await deleteEnhancement(this.connection, {
             enhancement_name: config.enhancementName,
             enhancement_type: config.enhancementType,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete enhancement after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete enhancement after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -159,9 +183,12 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
   async read(
     config: Partial<IEnhancementConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IEnhancementState | undefined> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       const error = new Error('Enhancement name is required');
@@ -182,7 +209,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
           config.enhancementType,
           config.enhancementName,
           version,
-          options
+          options,
         );
         state.readResult = response;
         state.sourceCode = response.data;
@@ -191,7 +218,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
           this.connection,
           config.enhancementType,
           config.enhancementName,
-          options
+          options,
         );
         state.readResult = response;
       }
@@ -212,18 +239,29 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
    */
   async readMetadata(
     config: Partial<IEnhancementConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       const error = new Error('Enhancement name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     if (!config.enhancementType) {
       const error = new Error('Enhancement type is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
 
@@ -232,14 +270,18 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         this.connection,
         config.enhancementType,
         config.enhancementName,
-        options
+        options,
       );
       state.metadataResult = response;
       this.logger?.info?.('Enhancement metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Read metadata failed:', err);
       throw err;
     }
@@ -250,18 +292,29 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
    */
   async readTransport(
     config: Partial<IEnhancementConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       const error = new Error('Enhancement name is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     if (!config.enhancementType) {
       const error = new Error('Enhancement type is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
 
@@ -270,14 +323,18 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         this.connection,
         config.enhancementType,
         config.enhancementName,
-        options
+        options,
       );
       state.transportResult = response;
       this.logger?.info?.('Enhancement transport request read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Read transport failed:', err);
       throw err;
     }
@@ -291,9 +348,12 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
    */
   async update(
     config: Partial<IEnhancementConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       const error = new Error('Enhancement name is required');
@@ -307,7 +367,9 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
     }
 
     if (!supportsSourceCode(config.enhancementType)) {
-      const error = new Error(`Enhancement type '${config.enhancementType}' does not support source code update. Only 'enhoxhh' supports source code.`);
+      const error = new Error(
+        `Enhancement type '${config.enhancementType}' does not support source code update. Only 'enhoxhh' supports source code.`,
+      );
       state.errors.push({ method: 'update', error, timestamp: new Date() });
       throw error;
     }
@@ -319,22 +381,21 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         throw new Error('Source code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
-      const updateResponse = await update(
-        this.connection,
-        {
-          enhancement_name: config.enhancementName,
-          enhancement_type: config.enhancementType,
-          source_code: codeToUpdate,
-          lock_handle: options.lockHandle,
-          transport_request: config.transportRequest
-        }
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
       );
+      const updateResponse = await update(this.connection, {
+        enhancement_name: config.enhancementName,
+        enhancement_type: config.enhancementType,
+        source_code: codeToUpdate,
+        lock_handle: options.lockHandle,
+        transport_request: config.transportRequest,
+      });
       this.logger?.info?.('Enhancement updated (low-level)');
       return {
         updateResult: updateResponse,
         errors: [],
-        enhancementType: config.enhancementType
+        enhancementType: config.enhancementType,
       };
     }
 
@@ -344,20 +405,26 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking enhancement');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockEnhancement(this.connection, config.enhancementType, config.enhancementName);
+      lockHandle = await lockEnhancement(
+        this.connection,
+        config.enhancementType,
+        config.enhancementName,
+      );
       state.lockHandle = lockHandle;
       this.logger?.info?.('Enhancement locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
         const checkInactiveResponse = await checkEnhancement(
           this.connection,
           config.enhancementType,
           config.enhancementName,
           'inactive',
-          codeToCheck
+          codeToCheck,
         );
         state.checkResult = checkInactiveResponse;
         this.logger?.info?.('Check inactive with update content passed');
@@ -371,7 +438,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
           enhancement_type: config.enhancementType,
           source_code: codeToCheck,
           lock_handle: lockHandle,
-          transport_request: config.transportRequest
+          transport_request: config.transportRequest,
         });
         state.updateResult = updateResponse;
         this.logger?.info?.('Enhancement updated');
@@ -380,13 +447,19 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         this.logger?.info?.('read (wait for object ready after update)');
         try {
           await this.read(
-            { enhancementName: config.enhancementName, enhancementType: config.enhancementType },
+            {
+              enhancementName: config.enhancementName,
+              enhancementType: config.enhancementType,
+            },
             'active',
-            { withLongPolling: true }
+            { withLongPolling: true },
           );
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            readError,
+          );
         }
       }
 
@@ -397,7 +470,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
           this.connection,
           config.enhancementType,
           config.enhancementName,
-          lockHandle
+          lockHandle,
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
@@ -411,7 +484,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         this.connection,
         config.enhancementType,
         config.enhancementName,
-        'inactive'
+        'inactive',
       );
       state.checkResult = finalCheckResponse;
       this.logger?.info?.('Final check passed');
@@ -422,22 +495,31 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         const activateResponse = await activateEnhancement(
           this.connection,
           config.enhancementType,
-          config.enhancementName
+          config.enhancementName,
         );
         state.activateResult = activateResponse;
-        this.logger?.info?.('Enhancement activated, status:', activateResponse.status);
+        this.logger?.info?.(
+          'Enhancement activated, status:',
+          activateResponse.status,
+        );
 
         // 6.5. Read with long polling (wait for object to be ready after activation)
         this.logger?.info?.('read (wait for object ready after activation)');
         try {
           await this.read(
-            { enhancementName: config.enhancementName, enhancementType: config.enhancementType },
+            {
+              enhancementName: config.enhancementName,
+              enhancementType: config.enhancementType,
+            },
             'active',
-            { withLongPolling: true }
+            { withLongPolling: true },
           );
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            readError,
+          );
         }
 
         return state;
@@ -447,7 +529,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       const readResponse = await getEnhancementSource(
         this.connection,
         config.enhancementType,
-        config.enhancementName
+        config.enhancementName,
       );
       state.readResult = readResponse;
 
@@ -457,7 +539,12 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       if (lockHandle && config.enhancementType && config.enhancementName) {
         try {
           this.logger?.warn?.('Unlocking enhancement during error cleanup');
-          await unlockEnhancement(this.connection, config.enhancementType, config.enhancementName, lockHandle);
+          await unlockEnhancement(
+            this.connection,
+            config.enhancementType,
+            config.enhancementName,
+            lockHandle,
+          );
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
           this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
@@ -466,16 +553,23 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
         this.connection.setSessionType('stateless');
       }
 
-      if (options?.deleteOnFailure && config.enhancementName && config.enhancementType) {
+      if (
+        options?.deleteOnFailure &&
+        config.enhancementName &&
+        config.enhancementType
+      ) {
         try {
           this.logger?.warn?.('Deleting enhancement after failure');
           await deleteEnhancement(this.connection, {
             enhancement_name: config.enhancementName,
             enhancement_type: config.enhancementType,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete enhancement after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete enhancement after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -487,8 +581,13 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
   /**
    * Delete enhancement
    */
-  async delete(config: Partial<IEnhancementConfig>): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+  async delete(
+    config: Partial<IEnhancementConfig>,
+  ): Promise<IEnhancementState> {
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       const error = new Error('Enhancement name is required');
@@ -506,7 +605,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       this.logger?.info?.('Checking enhancement for deletion');
       await checkDeletion(this.connection, {
         enhancement_name: config.enhancementName,
-        enhancement_type: config.enhancementType
+        enhancement_type: config.enhancementType,
       });
       this.logger?.info?.('Deletion check passed');
 
@@ -515,7 +614,7 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       const result = await deleteEnhancement(this.connection, {
         enhancement_name: config.enhancementName,
         enhancement_type: config.enhancementType,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       state.deleteResult = result;
       this.logger?.info?.('Enhancement deleted');
@@ -523,7 +622,11 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       return state;
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'delete',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Delete failed:', err);
       throw err;
     }
@@ -533,8 +636,13 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
    * Activate enhancement
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<IEnhancementConfig>): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+  async activate(
+    config: Partial<IEnhancementConfig>,
+  ): Promise<IEnhancementState> {
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       const error = new Error('Enhancement name is required');
@@ -551,13 +659,17 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
       const result = await activateEnhancement(
         this.connection,
         config.enhancementType,
-        config.enhancementName
+        config.enhancementName,
       );
       state.activateResult = result;
       return state;
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'activate',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Activate failed:', err);
       throw err;
     }
@@ -568,9 +680,12 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
    */
   async check(
     config: Partial<IEnhancementConfig>,
-    status?: string
+    status?: string,
   ): Promise<IEnhancementState> {
-    const state: IEnhancementState = { errors: [], enhancementType: config.enhancementType };
+    const state: IEnhancementState = {
+      errors: [],
+      enhancementType: config.enhancementType,
+    };
 
     if (!config.enhancementName) {
       const error = new Error('Enhancement name is required');
@@ -584,12 +699,13 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
     }
 
     try {
-      const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
+      const version: 'active' | 'inactive' =
+        status === 'active' ? 'active' : 'inactive';
       const response = await checkEnhancement(
         this.connection,
         config.enhancementType,
         config.enhancementName,
-        version
+        version,
       );
       state.checkResult = response;
       return state;
@@ -610,23 +726,35 @@ export class AdtEnhancement implements IAdtObject<IEnhancementConfig, IEnhanceme
     }
 
     this.connection.setSessionType('stateful');
-    return await lockEnhancement(this.connection, config.enhancementType, config.enhancementName);
+    return await lockEnhancement(
+      this.connection,
+      config.enhancementType,
+      config.enhancementName,
+    );
   }
 
   /**
    * Unlock enhancement
    */
-  async unlock(config: Partial<IEnhancementConfig>, lockHandle: string): Promise<IEnhancementState> {
+  async unlock(
+    config: Partial<IEnhancementConfig>,
+    lockHandle: string,
+  ): Promise<IEnhancementState> {
     if (!config.enhancementName || !config.enhancementType) {
       throw new Error('Enhancement name and type are required');
     }
 
-    const result = await unlockEnhancement(this.connection, config.enhancementType, config.enhancementName, lockHandle);
+    const result = await unlockEnhancement(
+      this.connection,
+      config.enhancementType,
+      config.enhancementName,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
       errors: [],
-      enhancementType: config.enhancementType
+      enhancementType: config.enhancementType,
     };
   }
 }

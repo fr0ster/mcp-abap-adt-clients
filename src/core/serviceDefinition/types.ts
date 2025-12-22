@@ -2,7 +2,7 @@
  * ServiceDefinition module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
 export interface ICreateServiceDefinitionParams {
@@ -39,4 +39,3 @@ export interface IServiceDefinitionState extends IAdtObjectState {
   // validationResponse, createResult, lockHandle, updateResult, checkResult,
   // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
 }
-

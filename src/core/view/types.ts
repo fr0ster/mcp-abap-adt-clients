@@ -2,7 +2,7 @@
  * View module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
 export interface ICreateViewParams {
@@ -39,5 +39,4 @@ export interface IViewConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface IViewState extends IAdtObjectState {
-}
+export interface IViewState extends IAdtObjectState {}

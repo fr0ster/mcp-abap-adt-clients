@@ -1,6 +1,6 @@
 /**
  * Error classes for unsupported ADT operations
- * 
+ *
  * These errors are thrown when an operation is not implemented
  * in ADT for a specific object type.
  */
@@ -12,11 +12,11 @@ export class UnsupportedAdtOperationError extends Error {
   constructor(
     public readonly operation: string,
     public readonly objectType: string,
-    message?: string
+    message?: string,
   ) {
     super(
       message ||
-        `${operation} operation is not implemented in ADT for ${objectType} objects`
+        `${operation} operation is not implemented in ADT for ${objectType} objects`,
     );
     this.name = 'UnsupportedAdtOperationError';
     // Maintains proper stack trace for where our error was thrown (only available on V8)

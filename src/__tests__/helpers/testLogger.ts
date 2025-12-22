@@ -12,19 +12,24 @@
  *   DEBUG_ADT_E2E_TESTS=true               - Enable E2E test logging
  */
 
-
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 // Import only what we need to avoid side effects from pinoLogger initialization
 // When importing from '@mcp-abap-adt/logger', it executes: export const pinoLogger = new PinoLogger()
 // This causes an error if 'pino' is not installed, even though we don't use pinoLogger
 // Solution: Import classes and functions directly from dist files to avoid side effects
 import { DefaultLogger } from '@mcp-abap-adt/logger/dist/default-logger';
 import { getLogLevel } from '@mcp-abap-adt/logger/dist/types';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
 
 /**
  * Debug scope for granular control over logging
  */
-export type DebugScope = 'connectors' | 'libs' | 'helpers' | 'e2e' | 'tests' | 'none';
+export type DebugScope =
+  | 'connectors'
+  | 'libs'
+  | 'helpers'
+  | 'e2e'
+  | 'tests'
+  | 'none';
 
 /**
  * Check if debug is enabled for a specific scope
@@ -45,7 +50,6 @@ export function isDebugEnabled(scope: DebugScope): boolean {
       return false;
   }
 }
-
 
 /**
  * Get current log level (for debugging)
@@ -119,7 +123,6 @@ export function createE2ETestsLogger(): ILogger {
   return new DefaultLogger(getLogLevel());
 }
 
-
 /**
  * Empty logger that does nothing (for production use or when logging is disabled)
  * Implements ILogger interface with all required methods
@@ -138,16 +141,24 @@ export const emptyLogger: ILogger = {
 export function logErrorSafely(
   logger: ILogger | undefined,
   operation: string,
-  error: any
+  error: any,
 ): void {
   if (error?.response) {
     const status = error.response.status;
     const statusText = error.response.statusText;
-    const data = typeof error.response.data === 'string' 
-      ? error.response.data.substring(0, 500)
-      : JSON.stringify(error.response.data).substring(0, 500);
-    logger?.error(`${operation} failed: HTTP ${status} ${statusText}`, { status, statusText, data });
+    const data =
+      typeof error.response.data === 'string'
+        ? error.response.data.substring(0, 500)
+        : JSON.stringify(error.response.data).substring(0, 500);
+    logger?.error(`${operation} failed: HTTP ${status} ${statusText}`, {
+      status,
+      statusText,
+      data,
+    });
   } else {
-    logger?.error(`${operation} failed:`, error instanceof Error ? error.message : String(error));
+    logger?.error(
+      `${operation} failed:`,
+      error instanceof Error ? error.message : String(error),
+    );
   }
 }

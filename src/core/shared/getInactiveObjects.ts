@@ -3,30 +3,30 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { XMLParser } from 'fast-xml-parser';
 import { getTimeout } from '../../utils/timeouts';
-import { XMLParser } from "fast-xml-parser";
-import { IObjectReference, IInactiveObjectsResponse } from "./types";
+import type { IInactiveObjectsResponse, IObjectReference } from './types';
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
-  attributeNamePrefix: "@_",
+  attributeNamePrefix: '@_',
   parseAttributeValue: false,
 });
 
 /**
  * Get list of inactive objects (objects that are not yet activated)
- * 
+ *
  * Endpoint: GET /sap/bc/adt/activation/inactiveobjects
- * 
+ *
  * @param connection - ABAP connection instance
  * @param options - Optional parameters
  * @returns List of inactive objects with their metadata
- * 
+ *
  * @example
  * ```typescript
  * const result = await getInactiveObjects(connection);
  * console.log(`Found ${result.objects.length} inactive objects`);
- * 
+ *
  * // Objects can be directly passed to activateObjectsGroup
  * await activateObjectsGroup(connection, result.objects);
  * ```
@@ -35,15 +35,15 @@ export async function getInactiveObjects(
   connection: IAbapConnection,
   options?: {
     includeRawXml?: boolean;
-  }
+  },
 ): Promise<IInactiveObjectsResponse> {
-
   const response = await connection.makeAdtRequest({
-    method: "GET",
+    method: 'GET',
     url: `/sap/bc/adt/activation/inactiveobjects`,
     timeout: getTimeout('default'),
     headers: {
-      Accept: "application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8",
+      Accept:
+        'application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8',
     },
   });
 
@@ -53,27 +53,27 @@ export async function getInactiveObjects(
   const objects: IObjectReference[] = [];
 
   // Parse XML response
-  const root = parsed["ioc:inactiveObjects"];
+  const root = parsed['ioc:inactiveObjects'];
   if (!root) {
     return { objects, xmlStr: options?.includeRawXml ? xml : undefined };
   }
 
-  const entries = Array.isArray(root["ioc:entry"]) 
-    ? root["ioc:entry"] 
-    : root["ioc:entry"] 
-      ? [root["ioc:entry"]] 
+  const entries = Array.isArray(root['ioc:entry'])
+    ? root['ioc:entry']
+    : root['ioc:entry']
+      ? [root['ioc:entry']]
       : [];
 
   for (const entry of entries) {
-    const objectData = entry["ioc:object"];
+    const objectData = entry['ioc:object'];
     if (!objectData) continue;
 
-    const ref = objectData["ioc:ref"];
+    const ref = objectData['ioc:ref'];
     if (!ref) continue;
 
     objects.push({
-      type: ref["@_adtcore:type"] || "",
-      name: ref["@_adtcore:name"] || "",
+      type: ref['@_adtcore:type'] || '',
+      name: ref['@_adtcore:name'] || '',
     });
   }
 

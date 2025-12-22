@@ -2,22 +2,20 @@
  * Runtime Memory Analysis - Exports
  */
 
+export type {
+  ISnapshotChildrenOptions,
+  ISnapshotRankingListOptions,
+  ISnapshotReferencesOptions,
+} from './snapshots';
 export {
-  listSnapshots,
   getSnapshot,
-  getSnapshotRankingList,
-  getSnapshotDeltaRankingList,
   getSnapshotChildren,
   getSnapshotDeltaChildren,
-  getSnapshotReferences,
+  getSnapshotDeltaOverview,
+  getSnapshotDeltaRankingList,
   getSnapshotDeltaReferences,
   getSnapshotOverview,
-  getSnapshotDeltaOverview
+  getSnapshotRankingList,
+  getSnapshotReferences,
+  listSnapshots,
 } from './snapshots';
-
-export type {
-  ISnapshotRankingListOptions,
-  ISnapshotChildrenOptions,
-  ISnapshotReferencesOptions
-} from './snapshots';
-

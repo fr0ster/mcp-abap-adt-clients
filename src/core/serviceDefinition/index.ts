@@ -2,13 +2,18 @@
  * ServiceDefinition operations - exports
  */
 
-import { IAdtObject } from '@mcp-abap-adt/interfaces';
-import { IServiceDefinitionConfig, IServiceDefinitionState } from './types';
+import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type {
+  IServiceDefinitionConfig,
+  IServiceDefinitionState,
+} from './types';
 
-export * from './types';
-export { ServiceDefinitionBuilder } from './ServiceDefinitionBuilder';
 export { AdtServiceDefinition } from './AdtServiceDefinition';
+export { ServiceDefinitionBuilder } from './ServiceDefinitionBuilder';
+export * from './types';
 
 // Type alias for AdtServiceDefinition
-export type AdtServiceDefinitionType = IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState>;
-
+export type AdtServiceDefinitionType = IAdtObject<
+  IServiceDefinitionConfig,
+  IServiceDefinitionState
+>;

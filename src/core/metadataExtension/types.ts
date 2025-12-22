@@ -2,8 +2,7 @@
  * MetadataExtension module type definitions
  */
 
-import { AxiosResponse } from 'axios';
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Validation parameters
 export interface IMetadataExtensionValidationParams {

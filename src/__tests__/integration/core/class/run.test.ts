@@ -5,18 +5,19 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/class/run.test
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import * as dotenv from 'dotenv';
 import { runClass } from '../../../../core/class/run';
 import { getConfig } from '../../../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 
 const { getEnabledTestCase } = require('../../../helpers/test-helper');
 const { getTimeout } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -40,7 +41,7 @@ describe('Class - Run', () => {
       connection = createAbapConnection(config, logger);
       await (connection as any).connect();
       hasConfig = true;
-    } catch (error) {
+    } catch (_error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }

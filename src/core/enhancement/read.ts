@@ -3,10 +3,14 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { EnhancementType, getEnhancementUri, supportsSourceCode } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import {
+  type EnhancementType,
+  getEnhancementUri,
+  supportsSourceCode,
+} from './types';
 
 /**
  * Get enhancement metadata (without source code)
@@ -21,7 +25,7 @@ export async function getEnhancementMetadata(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   let url = getEnhancementUri(enhancementType, encodedName);
@@ -35,8 +39,8 @@ export async function getEnhancementMetadata(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.enhancements.v1+xml, application/xml'
-    }
+      Accept: 'application/vnd.sap.adt.enhancements.v1+xml, application/xml',
+    },
   });
 }
 
@@ -56,10 +60,12 @@ export async function getEnhancementSource(
   enhancementType: EnhancementType,
   enhancementName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   if (!supportsSourceCode(enhancementType)) {
-    throw new Error(`Enhancement type '${enhancementType}' does not support source code operations. Only 'enhoxhh' supports source code.`);
+    throw new Error(
+      `Enhancement type '${enhancementType}' does not support source code operations. Only 'enhoxhh' supports source code.`,
+    );
   }
 
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
@@ -75,8 +81,8 @@ export async function getEnhancementSource(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain; charset=utf-8'
-    }
+      Accept: 'text/plain; charset=utf-8',
+    },
   });
 }
 
@@ -93,7 +99,7 @@ export async function getEnhancementTransport(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   let url = `${getEnhancementUri(enhancementType, encodedName)}/transport`;
@@ -107,7 +113,7 @@ export async function getEnhancementTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }

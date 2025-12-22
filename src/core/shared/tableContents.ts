@@ -7,10 +7,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { IGetTableContentsParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { IGetTableContentsParams } from './types';
 
 /**
  * Get table contents via ADT Data Preview API
@@ -21,7 +21,7 @@ import { IGetTableContentsParams } from './types';
  */
 export async function getTableContents(
   connection: IAbapConnection,
-  params: IGetTableContentsParams
+  params: IGetTableContentsParams,
 ): Promise<AxiosResponse> {
   if (!params.table_name) {
     throw new Error('Table name is required');
@@ -38,7 +38,7 @@ export async function getTableContents(
     url: structureUrl,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: {}
+    headers: {},
   });
 
   // Parse table structure to extract field names
@@ -52,7 +52,9 @@ export async function getTableContents(
     const lines = structureText.split('\n');
     for (const line of lines) {
       const trimmedLine = line.trim();
-      const fieldMatch = trimmedLine.match(/^(key\s+)?([a-z0-9_]+)\s*:\s*[a-z0-9_]+/i);
+      const fieldMatch = trimmedLine.match(
+        /^(key\s+)?([a-z0-9_]+)\s*:\s*[a-z0-9_]+/i,
+      );
       if (fieldMatch) {
         const fieldName = fieldMatch[2].trim().toUpperCase();
         if (fieldName && fieldName.length > 0) {
@@ -63,18 +65,23 @@ export async function getTableContents(
   } else {
     // Old ABAP syntax
     const patterns = [
-      /^\s+([A-Z0-9_]+)\s*:\s*(TYPE|LIKE)/gmi,
-      /^\s+([A-Z0-9_]+)\s+(TYPE|LIKE)/gmi,
-      /^\s+([A-Z0-9_]+)\s*:\s*[A-Z0-9_]+/gmi
+      /^\s+([A-Z0-9_]+)\s*:\s*(TYPE|LIKE)/gim,
+      /^\s+([A-Z0-9_]+)\s+(TYPE|LIKE)/gim,
+      /^\s+([A-Z0-9_]+)\s*:\s*[A-Z0-9_]+/gim,
     ];
 
     for (const pattern of patterns) {
-      let match;
-      while ((match = pattern.exec(structureText)) !== null) {
+      let match: RegExpExecArray | null = pattern.exec(structureText);
+      while (match !== null) {
         const fieldName = match[1].trim().toUpperCase();
-        if (fieldName && fieldName.length > 0 && !fields.includes(`${params.table_name}~${fieldName}`)) {
+        if (
+          fieldName &&
+          fieldName.length > 0 &&
+          !fields.includes(`${params.table_name}~${fieldName}`)
+        ) {
           fields.push(`${params.table_name}~${fieldName}`);
         }
+        match = pattern.exec(structureText);
       }
     }
   }
@@ -96,8 +103,7 @@ export async function getTableContents(
     data: sqlQuery,
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
-

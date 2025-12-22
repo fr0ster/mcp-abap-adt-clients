@@ -2,8 +2,8 @@
  * FunctionGroup activation operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
@@ -11,7 +11,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  */
 export async function activateFunctionGroup(
   connection: IAbapConnection,
-  functionGroupName: string
+  functionGroupName: string,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName).toLowerCase();
   const objectUri = `/sap/bc/adt/functions/groups/${encodedName}`;
@@ -30,8 +30,7 @@ export async function activateFunctionGroup(
     data: xmlPayload,
     headers: {
       'Content-Type': 'application/xml',
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
-

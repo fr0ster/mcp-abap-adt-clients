@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ABAP package
@@ -14,10 +14,12 @@ export async function getPackage(
   connection: IAbapConnection,
   packageName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(packageName);
-  const longPollingQuery = options?.withLongPolling ? '&withLongPolling=true' : '';
+  const longPollingQuery = options?.withLongPolling
+    ? '&withLongPolling=true'
+    : '';
   const url = `/sap/bc/adt/packages/${encodedName}?version=${version}${longPollingQuery}`;
 
   return connection.makeAdtRequest({
@@ -25,8 +27,9 @@ export async function getPackage(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml'
-    }
+      Accept:
+        'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
+    },
   });
 }
 
@@ -39,7 +42,7 @@ export async function getPackage(
 export async function getPackageTransport(
   connection: IAbapConnection,
   packageName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(packageName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -50,20 +53,20 @@ export async function getPackageTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
 
 /**
  * Get package contents (list of objects in package)
- * 
+ *
  * Uses node structure endpoint to get all objects in a package.
- * 
+ *
  * @param connection - ABAP connection instance
  * @param packageName - Package name
  * @returns Axios response with XML containing package contents
- * 
+ *
  * @example
  * ```typescript
  * const response = await getPackageContents(connection, 'ZMY_PACKAGE');
@@ -72,14 +75,14 @@ export async function getPackageTransport(
  */
 export async function getPackageContents(
   connection: IAbapConnection,
-  packageName: string
+  packageName: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/repository/nodestructure`;
-  
+
   const params = {
     parent_type: 'DEVC/K',
     parent_name: packageName,
-    withShortDescriptions: true
+    withShortDescriptions: true,
   };
 
   return connection.makeAdtRequest({
@@ -88,8 +91,7 @@ export async function getPackageContents(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
-

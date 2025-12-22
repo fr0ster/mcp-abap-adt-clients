@@ -4,9 +4,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock service definition
@@ -15,15 +15,16 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function unlockServiceDefinition(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
-  const serviceDefinitionNameEncoded = encodeSapObjectName(serviceDefinitionName.toLowerCase());
+  const serviceDefinitionNameEncoded = encodeSapObjectName(
+    serviceDefinitionName.toLowerCase(),
+  );
   const url = `/sap/bc/adt/ddic/srvd/sources/${serviceDefinitionNameEncoded}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default')
+    timeout: getTimeout('default'),
   });
 }
-

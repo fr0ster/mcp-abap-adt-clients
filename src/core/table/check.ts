@@ -3,10 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { XMLParser } from 'fast-xml-parser';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Build check run XML payload
@@ -14,10 +13,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * @param sourceCode - Optional DDL source code to validate (will be base64 encoded in artifacts)
  * @param version - Version to check ('active', 'inactive', or 'new')
  */
-function buildCheckRunPayload(tableName: string, sourceCode?: string, version: string = 'new'): string {
+function buildCheckRunPayload(
+  tableName: string,
+  sourceCode?: string,
+  version: string = 'new',
+): string {
   const uriName = encodeSapObjectName(tableName).toLowerCase();
   const objectUri = `/sap/bc/adt/ddic/tables/${uriName}`;
-  
+
   if (sourceCode) {
     // Check with source code content (for unsaved changes or new code validation)
     const base64Source = Buffer.from(sourceCode, 'utf-8').toString('base64');
@@ -32,7 +35,7 @@ function buildCheckRunPayload(tableName: string, sourceCode?: string, version: s
   </chkrun:checkObject>
 </chkrun:checkObjectList>`;
   }
-  
+
   // Check saved version (without source code)
   return `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
     <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}"/>
@@ -42,7 +45,7 @@ function buildCheckRunPayload(tableName: string, sourceCode?: string, version: s
 /**
  * Run check run for table
  * Note: This is a table-specific check function. For generic check, use runCheckRun from shared/checkRun
- * 
+ *
  * @param connection - ABAP connection
  * @param reporter - Check reporter type
  * @param tableName - Table name to check
@@ -55,14 +58,19 @@ export async function runTableCheckRun(
   reporter: 'tableStatusCheck' | 'abapCheckRun',
   tableName: string,
   sourceCode?: string,
-  version: string = 'new'
+  version: string = 'new',
 ): Promise<AxiosResponse> {
   const payload = buildCheckRunPayload(tableName, sourceCode, version);
   const headers = {
-    'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+    Accept: 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
   };
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
-  return connection.makeAdtRequest({ url, method: 'POST', timeout: getTimeout('default'), data: payload, headers });
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: payload,
+    headers,
+  });
 }
-

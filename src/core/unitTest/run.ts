@@ -3,10 +3,13 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { IClassUnitTestDefinition, IClassUnitTestRunOptions } from './types';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
+import type {
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
+} from './types';
 
 function boolAttr(value: boolean | undefined, fallback: boolean) {
   return (value ?? fallback) ? 'true' : 'false';
@@ -19,19 +22,32 @@ function boolAttr(value: boolean | undefined, fallback: boolean) {
 export async function startClassUnitTestRun(
   connection: IAbapConnection,
   tests: IClassUnitTestDefinition[],
-  options?: IClassUnitTestRunOptions
+  options?: IClassUnitTestRunOptions,
 ): Promise<AxiosResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
   }
 
-  const scope = options?.scope ?? { ownTests: true, foreignTests: false, addForeignTestsAsPreview: true };
-  const risk = options?.riskLevel ?? { harmless: true, dangerous: true, critical: true };
-  const duration = options?.duration ?? { short: true, medium: true, long: true };
+  const scope = options?.scope ?? {
+    ownTests: true,
+    foreignTests: false,
+    addForeignTestsAsPreview: true,
+  };
+  const risk = options?.riskLevel ?? {
+    harmless: true,
+    dangerous: true,
+    critical: true,
+  };
+  const duration = options?.duration ?? {
+    short: true,
+    medium: true,
+    long: true,
+  };
 
   const testsXml = tests
     .map(
-      test => `<aunit:test containerClass="${encodeSapObjectName(test.containerClass).toUpperCase()}" class="${test.testClass}"/>`
+      (test) =>
+        `<aunit:test containerClass="${encodeSapObjectName(test.containerClass).toUpperCase()}" class="${test.testClass}"/>`,
     )
     .join('');
 
@@ -52,8 +68,8 @@ export async function startClassUnitTestRun(
     timeout: getTimeout('default'),
     data: xml,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.api.abapunit.run.v2+xml'
-    }
+      'Content-Type': 'application/vnd.sap.adt.api.abapunit.run.v2+xml',
+    },
   });
 }
 
@@ -64,15 +80,27 @@ export async function startClassUnitTestRun(
 export async function startClassUnitTestRunByObject(
   connection: IAbapConnection,
   className: string,
-  options?: IClassUnitTestRunOptions
+  options?: IClassUnitTestRunOptions,
 ): Promise<AxiosResponse> {
   if (!className) {
     throw new Error('className is required');
   }
 
-  const scope = options?.scope ?? { ownTests: true, foreignTests: false, addForeignTestsAsPreview: true };
-  const risk = options?.riskLevel ?? { harmless: true, dangerous: true, critical: true };
-  const duration = options?.duration ?? { short: true, medium: true, long: true };
+  const scope = options?.scope ?? {
+    ownTests: true,
+    foreignTests: false,
+    addForeignTestsAsPreview: true,
+  };
+  const risk = options?.riskLevel ?? {
+    harmless: true,
+    dangerous: true,
+    critical: true,
+  };
+  const duration = options?.duration ?? {
+    short: true,
+    medium: true,
+    long: true,
+  };
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:osl="http://www.sap.com/api/osl" title="${options?.title || className}" context="${options?.context || 'MCP ABAP ADT Client'}">
   <aunit:options>
@@ -91,15 +119,15 @@ export async function startClassUnitTestRunByObject(
     timeout: getTimeout('default'),
     data: xml,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.api.abapunit.run.v2+xml'
-    }
+      'Content-Type': 'application/vnd.sap.adt.api.abapunit.run.v2+xml',
+    },
   });
 }
 
 export async function getClassUnitTestStatus(
   connection: IAbapConnection,
   runId: string,
-  withLongPolling: boolean = true
+  withLongPolling: boolean = true,
 ): Promise<AxiosResponse> {
   if (!runId) {
     throw new Error('runId is required');
@@ -110,15 +138,15 @@ export async function getClassUnitTestStatus(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.api.abapunit.run-status.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.api.abapunit.run-status.v1+xml',
+    },
   });
 }
 
 export async function getClassUnitTestResult(
   connection: IAbapConnection,
   runId: string,
-  options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' }
+  options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
 ): Promise<AxiosResponse> {
   if (!runId) {
     throw new Error('runId is required');
@@ -139,8 +167,7 @@ export async function getClassUnitTestResult(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: accept
-    }
+      Accept: accept,
+    },
   });
 }
-

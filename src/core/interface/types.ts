@@ -2,7 +2,10 @@
  * Interface module type definitions
  */
 
-import { IAdtObjectConfig, IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtObjectConfig,
+  IAdtObjectState,
+} from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (camelCase)
 export interface ICreateInterfaceParams {

@@ -1,17 +1,15 @@
 /**
  * AdtLocalDefinitions - High-level CRUD operations for Local Definitions (definitions include)
- * 
+ *
  * Local definitions are type declarations needed for components in the private section.
  * All operations require the parent class to be locked.
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { AdtClass } from './AdtClass';
 import { checkClassDefinitions } from './check';
 import { updateClassDefinitions } from './includes';
-import { AdtClass } from './AdtClass';
-import { IClassState } from './types';
+import type { IClassState } from './types';
 
 export interface ILocalDefinitionsConfig {
   className: string;
@@ -22,14 +20,12 @@ export interface ILocalDefinitionsConfig {
 export class AdtLocalDefinitions extends AdtClass {
   public readonly objectType: string = 'LocalDefinitions';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
-    super(connection, logger);
-  }
-
   /**
    * Validate local definitions code
    */
-  async validate(config: Partial<ILocalDefinitionsConfig>): Promise<IClassState> {
+  async validate(
+    config: Partial<ILocalDefinitionsConfig>,
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required for validation');
     }
@@ -41,12 +37,12 @@ export class AdtLocalDefinitions extends AdtClass {
       this.connection,
       config.className,
       config.definitionsCode,
-      'inactive'
+      'inactive',
     );
 
     return {
       validationResponse: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 
@@ -56,7 +52,7 @@ export class AdtLocalDefinitions extends AdtClass {
    */
   async create(
     config: Partial<ILocalDefinitionsConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -67,7 +63,7 @@ export class AdtLocalDefinitions extends AdtClass {
 
     let lockHandle: string | undefined;
     const state: IClassState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -85,7 +81,7 @@ export class AdtLocalDefinitions extends AdtClass {
           this.connection,
           config.className,
           codeToCheck,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local definitions check passed');
@@ -98,14 +94,17 @@ export class AdtLocalDefinitions extends AdtClass {
         config.className,
         codeToCheck!,
         lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local definitions created');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      const unlockState = await super.unlock(
+        { className: config.className },
+        lockHandle,
+      );
       state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
@@ -117,7 +116,10 @@ export class AdtLocalDefinitions extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -131,7 +133,7 @@ export class AdtLocalDefinitions extends AdtClass {
    */
   async read(
     config: Partial<ILocalDefinitionsConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
   ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -139,10 +141,14 @@ export class AdtLocalDefinitions extends AdtClass {
 
     try {
       const { getClassDefinitionsInclude } = await import('./read');
-      const response = await getClassDefinitionsInclude(this.connection, config.className, version);
+      const response = await getClassDefinitionsInclude(
+        this.connection,
+        config.className,
+        version,
+      );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -160,7 +166,7 @@ export class AdtLocalDefinitions extends AdtClass {
    */
   async update(
     config: Partial<ILocalDefinitionsConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -176,24 +182,26 @@ export class AdtLocalDefinitions extends AdtClass {
         throw new Error('Definitions code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await updateClassDefinitions(
         this.connection,
         config.className,
         codeToUpdate,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('Local definitions updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
     let lockHandle: string | undefined;
     const state: IClassState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -211,7 +219,7 @@ export class AdtLocalDefinitions extends AdtClass {
           this.connection,
           config.className,
           codeToCheck,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local definitions check passed');
@@ -224,14 +232,17 @@ export class AdtLocalDefinitions extends AdtClass {
         config.className,
         codeToCheck!,
         lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local definitions updated');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      const unlockState = await super.unlock(
+        { className: config.className },
+        lockHandle,
+      );
       state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
@@ -243,7 +254,10 @@ export class AdtLocalDefinitions extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -264,14 +278,16 @@ export class AdtLocalDefinitions extends AdtClass {
     // Delete by updating with empty code
     return await this.update({
       ...config,
-      definitionsCode: ''
+      definitionsCode: '',
     });
   }
 
   /**
    * Activate parent class (local definitions are activated with parent class)
    */
-  async activate(config: Partial<ILocalDefinitionsConfig>): Promise<IClassState> {
+  async activate(
+    config: Partial<ILocalDefinitionsConfig>,
+  ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -284,7 +300,7 @@ export class AdtLocalDefinitions extends AdtClass {
    */
   async check(
     config: Partial<ILocalDefinitionsConfig>,
-    version: 'active' | 'inactive' = 'inactive'
+    version: 'active' | 'inactive' = 'inactive',
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -297,12 +313,12 @@ export class AdtLocalDefinitions extends AdtClass {
       this.connection,
       config.className,
       config.definitionsCode,
-      version
+      version,
     );
 
     return {
       checkResult: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 }

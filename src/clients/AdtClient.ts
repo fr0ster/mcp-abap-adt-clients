@@ -1,64 +1,129 @@
 /**
  * AdtClient - High-level ADT Object Operations Client
- * 
+ *
  * Provides simplified CRUD operations with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Unlike CrudClient which provides low-level operations, AdtClient provides
  * high-level methods that encapsulate complex operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
- * 
+ *
  * Each factory method returns an IAdtObject instance that can be used
  * to perform operations on a specific object type.
  */
 
-import { IAbapConnection, IAdtObject } from '@mcp-abap-adt/interfaces';
-
-import { 
-  IClassConfig,
-  IClassState,
+import type {
+  IAbapConnection,
+  IAdtObject,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import {
+  AdtBehaviorDefinition,
+  type IBehaviorDefinitionConfig,
+  type IBehaviorDefinitionState,
+} from '../core/behaviorDefinition';
+import {
+  AdtBehaviorImplementation,
+  type IBehaviorImplementationConfig,
+  type IBehaviorImplementationState,
+} from '../core/behaviorImplementation';
+import {
   AdtClass,
-  AdtLocalTestClass,
-  AdtLocalTypes,
   AdtLocalDefinitions,
   AdtLocalMacros,
-  ILocalTestClassConfig,
-  ILocalTypesConfig,
-  ILocalDefinitionsConfig,
-  ILocalMacrosConfig
+  AdtLocalTestClass,
+  AdtLocalTypes,
+  type IClassConfig,
+  type IClassState,
+  type ILocalDefinitionsConfig,
+  type ILocalMacrosConfig,
+  type ILocalTestClassConfig,
+  type ILocalTypesConfig,
 } from '../core/class';
-import { IProgramConfig, IProgramState, AdtProgram } from '../core/program';
-import { IInterfaceConfig, IInterfaceState, AdtInterface } from '../core/interface';
-import { IDomainConfig, IDomainState, AdtDomain } from '../core/domain';
-import { IDataElementConfig, IDataElementState, AdtDataElement } from '../core/dataElement';
-import { IStructureConfig, IStructureState, AdtStructure } from '../core/structure';
-import { ITableConfig, ITableState, AdtTable } from '../core/table';
-import { ITableTypeConfig, ITableTypeState, AdtDdicTableType } from '../core/tabletype';
-import { IViewConfig, IViewState, AdtView } from '../core/view';
-import { IFunctionGroupConfig, IFunctionGroupState, AdtFunctionGroup } from '../core/functionGroup';
-import { IFunctionModuleConfig, IFunctionModuleState, AdtFunctionModule } from '../core/functionModule';
-import { IPackageConfig, IPackageState, AdtPackage } from '../core/package';
-import { IServiceDefinitionConfig, IServiceDefinitionState, AdtServiceDefinition } from '../core/serviceDefinition';
-import { IBehaviorDefinitionConfig, IBehaviorDefinitionState, AdtBehaviorDefinition } from '../core/behaviorDefinition';
-import { IBehaviorImplementationConfig, IBehaviorImplementationState, AdtBehaviorImplementation } from '../core/behaviorImplementation';
-import { IMetadataExtensionConfig, IMetadataExtensionState, AdtMetadataExtension } from '../core/metadataExtension';
-import { IEnhancementConfig, IEnhancementState, AdtEnhancement } from '../core/enhancement';
-import { AdtRequest } from '../core/transport';
-import { AdtUnitTest, AdtCdsUnitTest, IUnitTestConfig, IUnitTestState, ICdsUnitTestConfig, ICdsUnitTestState } from '../core/unitTest';
-import { ITransportConfig, ITransportState } from '../core/transport/types';
+import {
+  AdtDataElement,
+  type IDataElementConfig,
+  type IDataElementState,
+} from '../core/dataElement';
+import {
+  AdtDomain,
+  type IDomainConfig,
+  type IDomainState,
+} from '../core/domain';
+import {
+  AdtEnhancement,
+  type IEnhancementConfig,
+  type IEnhancementState,
+} from '../core/enhancement';
+import {
+  AdtFunctionGroup,
+  type IFunctionGroupConfig,
+  type IFunctionGroupState,
+} from '../core/functionGroup';
+import {
+  AdtFunctionModule,
+  type IFunctionModuleConfig,
+  type IFunctionModuleState,
+} from '../core/functionModule';
+import {
+  AdtInterface,
+  type IInterfaceConfig,
+  type IInterfaceState,
+} from '../core/interface';
+import {
+  AdtMetadataExtension,
+  type IMetadataExtensionConfig,
+  type IMetadataExtensionState,
+} from '../core/metadataExtension';
+import {
+  AdtPackage,
+  type IPackageConfig,
+  type IPackageState,
+} from '../core/package';
+import {
+  AdtProgram,
+  type IProgramConfig,
+  type IProgramState,
+} from '../core/program';
+import {
+  AdtServiceDefinition,
+  type IServiceDefinitionConfig,
+  type IServiceDefinitionState,
+} from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import {
+  AdtStructure,
+  type IStructureConfig,
+  type IStructureState,
+} from '../core/structure';
+import { AdtTable, type ITableConfig, type ITableState } from '../core/table';
+import {
+  AdtDdicTableType,
+  type ITableTypeConfig,
+  type ITableTypeState,
+} from '../core/tabletype';
+import { AdtRequest } from '../core/transport';
+import type {
+  ITransportConfig,
+  ITransportState,
+} from '../core/transport/types';
+import {
+  AdtCdsUnitTest,
+  AdtUnitTest,
+  type ICdsUnitTestConfig,
+  type ICdsUnitTestState,
+  type IUnitTestConfig,
+  type IUnitTestState,
+} from '../core/unitTest';
+import { AdtView, type IViewConfig, type IViewState } from '../core/view';
 
 export class AdtClient {
   private connection: IAbapConnection;
   private logger: ILogger;
 
-  constructor(
-    connection: IAbapConnection,
-    logger?: ILogger
-  ) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger ?? {
       debug: () => {},
@@ -168,7 +233,10 @@ export class AdtClient {
    * Get high-level operations for ServiceDefinition objects
    * @returns IAdtObject instance for ServiceDefinition operations
    */
-  getServiceDefinition(): IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState> {
+  getServiceDefinition(): IAdtObject<
+    IServiceDefinitionConfig,
+    IServiceDefinitionState
+  > {
     return new AdtServiceDefinition(this.connection, this.logger);
   }
 
@@ -176,7 +244,10 @@ export class AdtClient {
    * Get high-level operations for BehaviorDefinition objects
    * @returns IAdtObject instance for BehaviorDefinition operations
    */
-  getBehaviorDefinition(): IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState> {
+  getBehaviorDefinition(): IAdtObject<
+    IBehaviorDefinitionConfig,
+    IBehaviorDefinitionState
+  > {
     return new AdtBehaviorDefinition(this.connection, this.logger);
   }
 
@@ -184,7 +255,10 @@ export class AdtClient {
    * Get high-level operations for BehaviorImplementation objects
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
-  getBehaviorImplementation(): IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState> {
+  getBehaviorImplementation(): IAdtObject<
+    IBehaviorImplementationConfig,
+    IBehaviorImplementationState
+  > {
     return new AdtBehaviorImplementation(this.connection, this.logger);
   }
 
@@ -192,7 +266,10 @@ export class AdtClient {
    * Get high-level operations for MetadataExtension objects
    * @returns IAdtObject instance for MetadataExtension operations
    */
-  getMetadataExtension(): IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState> {
+  getMetadataExtension(): IAdtObject<
+    IMetadataExtensionConfig,
+    IMetadataExtensionState
+  > {
     return new AdtMetadataExtension(this.connection, this.logger);
   }
 
@@ -243,7 +320,7 @@ export class AdtClient {
    * - Group activation/deletion
    * - Object metadata and source code reading
    * - SQL queries and table contents
-   * 
+   *
    * @returns AdtUtils instance for utility operations
    */
   getUtils(): AdtUtils {

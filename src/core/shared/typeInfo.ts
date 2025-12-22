@@ -1,27 +1,27 @@
 /**
  * Type information operations for ABAP objects
- * 
+ *
  * Retrieves type information (domain, data element, table type) with fallback chain.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get type information with fallback chain
- * 
+ *
  * Tries multiple endpoints in order:
  * 1. Domain: `/sap/bc/adt/ddic/domains/{name}/source/main`
  * 2. Data Element: `/sap/bc/adt/ddic/dataelements/{name}`
  * 3. Table Type: `/sap/bc/adt/ddic/tabletypes/{name}`
  * 4. Fallback: `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri={uri}`
- * 
+ *
  * @param connection - ABAP connection instance
  * @param typeName - Type name to look up
  * @returns Axios response with type information (XML)
- * 
+ *
  * @example
  * ```typescript
  * const response = await getTypeInfo(connection, 'ZMY_TYPE');
@@ -30,7 +30,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  */
 export async function getTypeInfo(
   connection: IAbapConnection,
-  typeName: string
+  typeName: string,
 ): Promise<AxiosResponse> {
   if (!typeName) {
     throw new Error('Type name is required');
@@ -46,13 +46,13 @@ export async function getTypeInfo(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        'Accept': 'text/plain, application/xml'
-      }
+        Accept: 'text/plain, application/xml',
+      },
     });
     if (domainResponse.status === 200) {
       return domainResponse;
     }
-  } catch (error) {
+  } catch (_error) {
     // Continue to next attempt
   }
 
@@ -64,13 +64,13 @@ export async function getTypeInfo(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        'Accept': 'application/vnd.sap.adt.dataelements.v2+xml, application/xml'
-      }
+        Accept: 'application/vnd.sap.adt.dataelements.v2+xml, application/xml',
+      },
     });
     if (dataElementResponse.status === 200) {
       return dataElementResponse;
     }
-  } catch (error) {
+  } catch (_error) {
     // Continue to next attempt
   }
 
@@ -82,27 +82,28 @@ export async function getTypeInfo(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        'Accept': 'application/vnd.sap.adt.tabletypes.v2+xml, application/xml'
-      }
+        Accept: 'application/vnd.sap.adt.tabletypes.v2+xml, application/xml',
+      },
     });
     if (tableTypeResponse.status === 200) {
       return tableTypeResponse;
     }
-  } catch (error) {
+  } catch (_error) {
     // Continue to fallback
   }
 
   // Fallback: use object properties endpoint
-  const domainUri = encodeURIComponent(`/sap/bc/adt/ddic/domains/${encodedName}`);
+  const domainUri = encodeURIComponent(
+    `/sap/bc/adt/ddic/domains/${encodedName}`,
+  );
   const fallbackUrl = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${domainUri}`;
-  
+
   return connection.makeAdtRequest({
     url: fallbackUrl,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.objectproperties+xml, application/xml'
-    }
+      Accept: 'application/vnd.sap.adt.objectproperties+xml, application/xml',
+    },
   });
 }
-

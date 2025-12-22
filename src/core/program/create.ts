@@ -3,26 +3,26 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { lockProgram } from './lock';
-import { unlockProgram } from './unlock';
-import { activateProgram } from './activation';
+import type { AxiosResponse } from 'axios';
+import {
+  encodeSapObjectName,
+  limitDescription,
+} from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { ICreateProgramParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreateProgramParams } from './types';
 
 /**
  * Convert readable program type to SAP internal code
  */
 function convertProgramType(programType?: string): string {
   const typeMap: Record<string, string> = {
-    'executable': '1',
-    'include': 'I',
-    'module_pool': 'M',
-    'function_group': 'F',
-    'class_pool': 'K',
-    'interface_pool': 'J'
+    executable: '1',
+    include: 'I',
+    module_pool: 'M',
+    function_group: 'F',
+    class_pool: 'K',
+    interface_pool: 'J',
   };
 
   return typeMap[programType || 'executable'] || '1';
@@ -31,7 +31,11 @@ function convertProgramType(programType?: string): string {
 /**
  * Generate minimal program source code if not provided
  */
-function generateProgramTemplate(programName: string, programType: string, description: string): string {
+function _generateProgramTemplate(
+  programName: string,
+  programType: string,
+  description: string,
+): string {
   const upperName = programName.toUpperCase();
 
   switch (programType) {
@@ -52,8 +56,6 @@ function generateProgramTemplate(programName: string, programType: string, descr
 
 PROGRAM ${upperName}.
 `;
-
-    case '1': // Executable (Report)
     default:
       return `*&---------------------------------------------------------------------*
 *& Report ${upperName}
@@ -73,7 +75,7 @@ START-OF-SELECTION.
  */
 export async function create(
   connection: IAbapConnection,
-  args: ICreateProgramParams
+  args: ICreateProgramParams,
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.programName);
@@ -97,7 +99,9 @@ export async function create(
   // username can fallback to env if not provided
   username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
 
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
 
   const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.programName}" adtcore:type="PROG/P" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
@@ -105,31 +109,43 @@ export async function create(
 </program:abapProgram>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.programs.programs.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.programs.programs.v2+xml'
+    Accept: 'application/vnd.sap.adt.programs.programs.v2+xml',
+    'Content-Type': 'application/vnd.sap.adt.programs.programs.v2+xml',
   };
 
-  return connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: metadataXml, headers});
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: metadataXml,
+    headers,
+  });
 }
 
 /**
  * Upload program source code
  */
-async function uploadProgramSource(
+async function _uploadProgramSource(
   connection: IAbapConnection,
   programName: string,
   sourceCode: string,
   lockHandle: string,
-  sessionId: string,
-  transportRequest?: string
+  _sessionId: string,
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {
-    'Accept': 'text/plain',
-    'Content-Type': 'text/plain; charset=utf-8'
+    Accept: 'text/plain',
+    'Content-Type': 'text/plain; charset=utf-8',
   };
 
-  return connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: sourceCode, headers});
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: sourceCode,
+    headers,
+  });
 }

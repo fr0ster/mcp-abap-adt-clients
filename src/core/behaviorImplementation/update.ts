@@ -3,14 +3,14 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Update behavior implementation class implementations include source code (low-level function)
  * Requires class to be locked first
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateBehaviorImplementation(
@@ -18,7 +18,7 @@ export async function updateBehaviorImplementation(
   className: string,
   sourceCode: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   if (!sourceCode) {
     throw new Error('sourceCode is required');
@@ -36,7 +36,7 @@ export async function updateBehaviorImplementation(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Accept': 'text/plain'
+    Accept: 'text/plain',
   };
 
   return await connection.makeAdtRequest({
@@ -44,7 +44,6 @@ export async function updateBehaviorImplementation(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: sourceCode,
-    headers
+    headers,
   });
 }
-

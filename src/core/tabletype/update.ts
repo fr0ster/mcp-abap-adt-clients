@@ -1,17 +1,20 @@
 /**
  * TableType update operations
- * 
+ *
  * Supports two formats:
  * 1. DDL TableType (CDS) - via /source/main endpoint with DDL code
  * 2. Classic DDIC TableType - via XML format with rowType and typeName (like Domain/DataElement)
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { IUpdateTableTypeParams } from './types';
+import type { AxiosResponse } from 'axios';
+import {
+  encodeSapObjectName,
+  limitDescription,
+} from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { getTimeout } from '../../utils/timeouts';
+import type { IUpdateTableTypeParams } from './types';
 
 /**
  * Update table type using existing lock/session (Builder workflow)
@@ -20,7 +23,7 @@ import { getSystemInformation } from '../../utils/systemInfo';
 export async function updateTableType(
   connection: IAbapConnection,
   params: IUpdateTableTypeParams,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   if (!params.tabletype_name) {
     throw new Error('tabletype_name is required');
@@ -49,15 +52,21 @@ export async function updateTableType(
     const masterSystem = systemInfo ? systemId : '';
     const responsible = systemInfo ? username : '';
 
-    const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
-    const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
+    const masterSystemAttr = masterSystem
+      ? ` adtcore:masterSystem="${masterSystem}"`
+      : '';
+    const responsibleAttr = responsible
+      ? ` adtcore:responsible="${responsible}"`
+      : '';
 
     // Description is required for XML format update
     const description = limitDescription(params.description || tableTypeName);
 
     // Build rowType XML
     const typeKind = params.row_type_kind || 'dictionaryType';
-    const typeName = params.row_type_name ? params.row_type_name.toUpperCase() : '';
+    const typeName = params.row_type_name
+      ? params.row_type_name.toUpperCase()
+      : '';
     const accessType = params.access_type || 'standard';
     const primaryKeyDefinition = params.primary_key_definition || 'standard';
     const primaryKeyKind = params.primary_key_kind || 'nonUnique';
@@ -66,14 +75,18 @@ export async function updateTableType(
     const { getTableTypeMetadata } = await import('./read');
     let packageRefXml = '';
     try {
-      const metadataResponse = await getTableTypeMetadata(connection, tableTypeName);
-      const metadataXml = typeof metadataResponse.data === 'string' ? metadataResponse.data : '';
+      const metadataResponse = await getTableTypeMetadata(
+        connection,
+        tableTypeName,
+      );
+      const metadataXml =
+        typeof metadataResponse.data === 'string' ? metadataResponse.data : '';
       // Extract packageRef from metadata
       const packageRefMatch = metadataXml.match(/<adtcore:packageRef[^>]*>/);
       if (packageRefMatch) {
         packageRefXml = `\n  ${packageRefMatch[0]}`;
       }
-    } catch (error) {
+    } catch (_error) {
       // If reading metadata fails, continue without packageRef
       // Server might accept update without it
     }
@@ -155,8 +168,8 @@ export async function updateTableType(
 </ttyp:tableType>`;
 
     const headers = {
-      'Accept': 'application/vnd.sap.adt.tabletype.v1+xml',
-      'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml'
+      Accept: 'application/vnd.sap.adt.tabletype.v1+xml',
+      'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml',
     };
 
     try {
@@ -165,17 +178,23 @@ export async function updateTableType(
         method: 'PUT',
         timeout: getTimeout('default'),
         data: xmlBody,
-        headers
+        headers,
       });
     } catch (error: any) {
       // Extract full response data
       const status = error.response?.status || 'unknown';
       const statusText = error.response?.statusText || '';
-      const responseHeaders = JSON.stringify(error.response?.headers || {}, null, 2);
-      const responseData = error.response?.data 
-        ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data, null, 2))
+      const responseHeaders = JSON.stringify(
+        error.response?.headers || {},
+        null,
+        2,
+      );
+      const responseData = error.response?.data
+        ? typeof error.response.data === 'string'
+          ? error.response.data
+          : JSON.stringify(error.response.data, null, 2)
         : error.message || 'No response data';
-      
+
       // Build full error message with all details
       const fullError = `Failed to update table type ${params.tabletype_name}
 HTTP Status: ${status} ${statusText}
@@ -185,17 +204,17 @@ Request URL: ${url}
 Request Headers: ${JSON.stringify(headers, null, 2)}
 Request Body:
 ${xmlBody}`;
-      
+
       // Output to stderr (always visible)
       process.stderr.write('\n=== TableType Update Error ===\n');
       process.stderr.write(fullError);
       process.stderr.write('\n=== End Error ===\n\n');
-      
+
       // Also output via console (for Jest)
       console.error('\n=== TableType Update Error ===');
       console.error(fullError);
       console.error('=== End Error ===\n');
-      
+
       throw new Error(fullError);
     }
   }

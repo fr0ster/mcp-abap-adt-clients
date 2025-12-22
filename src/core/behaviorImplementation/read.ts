@@ -2,8 +2,8 @@
  * Behavior Implementation read operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -15,7 +15,7 @@ import { readObjectSource } from '../shared/readSource';
 export async function getBehaviorImplementationMetadata(
   connection: IAbapConnection,
   className: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'class', className, undefined, options);
 }
@@ -30,9 +30,16 @@ export async function getBehaviorImplementationSource(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'class', className, undefined, version, options);
+  return readObjectSource(
+    connection,
+    'class',
+    className,
+    undefined,
+    version,
+    options,
+  );
 }
 
 /**
@@ -44,11 +51,11 @@ export async function getBehaviorImplementationSource(
 export async function getBehaviorImplementationImplementations(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' | 'workingArea' = 'active'
+  version: 'active' | 'inactive' | 'workingArea' = 'active',
 ): Promise<AxiosResponse> {
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
   const { getTimeout } = await import('../../utils/timeouts');
-  
+
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations${version !== 'active' ? `?version=${version}` : ''}`;
 
@@ -57,8 +64,8 @@ export async function getBehaviorImplementationImplementations(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain'
-    }
+      Accept: 'text/plain',
+    },
   });
 }
 
@@ -71,10 +78,9 @@ export async function getBehaviorImplementationImplementations(
 export async function getBehaviorImplementationTransport(
   connection: IAbapConnection,
   className: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   // Behavior implementation is a class, so use class transport endpoint
   const { getClassTransport } = await import('../class/read');
   return getClassTransport(connection, className, options);
 }
-

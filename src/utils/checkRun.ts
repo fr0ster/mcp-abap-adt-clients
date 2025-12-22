@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from './timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from './internalUtils';
+import { getTimeout } from './timeouts';
 
 /**
  * Get ADT URI for object type
@@ -25,15 +25,18 @@ export function getObjectUri(objectType: string, objectName: string): string {
     case 'fugr':
       return `/sap/bc/adt/functions/groups/${encodedName}`;
     case 'function_module':
-    case 'fugr/ff':
+    case 'fugr/ff': {
       // Function module needs function group in format: "FUGR_NAME/FM_NAME"
       if (!objectName.includes('/')) {
-        throw new Error('Function module requires function group. Use format: "functionGroupName/functionModuleName"');
+        throw new Error(
+          'Function module requires function group. Use format: "functionGroupName/functionModuleName"',
+        );
       }
       const [fugrName, fmName] = objectName.split('/');
       const encodedFugr = encodeSapObjectName(fugrName.toLowerCase());
       const encodedFm = encodeSapObjectName(fmName.toLowerCase());
       return `/sap/bc/adt/functions/groups/${encodedFugr}/fmodules/${encodedFm}`;
+    }
     case 'table':
     case 'tabl/dt':
       return `/sap/bc/adt/ddic/tables/${encodedName}`;
@@ -74,7 +77,10 @@ export function getObjectUri(objectType: string, objectName: string): string {
  *
  * SAP reads the code from system itself.
  */
-export function buildCheckRunXml(objectUri: string, version: string = 'active'): string {
+export function buildCheckRunXml(
+  objectUri: string,
+  version: string = 'active',
+): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}"/>
@@ -94,7 +100,7 @@ export function buildCheckRunXml(objectUri: string, version: string = 'active'):
 export function buildCheckRunXmlWithSource(
   objectUri: string,
   sourceCode: string,
-  version: string = 'active'
+  version: string = 'active',
 ): string {
   // Encode source code to base64
   const base64Source = Buffer.from(sourceCode, 'utf-8').toString('base64');
@@ -127,7 +133,7 @@ export function parseCheckRunResponse(response: AxiosResponse): {
 } {
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: '@_'
+    attributeNamePrefix: '@_',
   });
 
   try {
@@ -136,7 +142,7 @@ export function parseCheckRunResponse(response: AxiosResponse): {
     let checkReport = result['chkrun:checkRunReports']?.['chkrun:checkReport'];
 
     if (!checkReport) {
-      checkReport = result['checkRunReports']?.['checkReport'];
+      checkReport = result.checkRunReports?.checkReport;
     }
 
     if (!checkReport) {
@@ -153,22 +159,36 @@ export function parseCheckRunResponse(response: AxiosResponse): {
         info: [],
         total_messages: 0,
         has_errors: false,
-        has_warnings: false
+        has_warnings: false,
       };
     }
 
-    const status = checkReport['@_chkrun:status'] || checkReport['chkrun:status'] || checkReport['@_status'] || checkReport['status'];
-    const statusText = checkReport['chkrun:statusText'] || checkReport['@_chkrun:statusText'] || checkReport['statusText'] || checkReport['@_statusText'] || '';
+    const status =
+      checkReport['@_chkrun:status'] ||
+      checkReport['chkrun:status'] ||
+      checkReport['@_status'] ||
+      checkReport.status;
+    const statusText =
+      checkReport['chkrun:statusText'] ||
+      checkReport['@_chkrun:statusText'] ||
+      checkReport.statusText ||
+      checkReport['@_statusText'] ||
+      '';
 
-    const messages = checkReport['chkrun:checkMessageList']?.['chkrun:checkMessage']
-      || checkReport['checkMessageList']?.['checkMessage']
-      || checkReport['chkrun:messages']?.['msg']
-      || checkReport['messages']?.['msg']
-      || checkReport['chkrun:messages']
-      || checkReport['messages']
-      || [];
+    const messages =
+      checkReport['chkrun:checkMessageList']?.['chkrun:checkMessage'] ||
+      checkReport.checkMessageList?.checkMessage ||
+      checkReport['chkrun:messages']?.msg ||
+      checkReport.messages?.msg ||
+      checkReport['chkrun:messages'] ||
+      checkReport.messages ||
+      [];
 
-    const messageArray = Array.isArray(messages) ? messages : (messages ? [messages] : []);
+    const messageArray = Array.isArray(messages)
+      ? messages
+      : messages
+        ? [messages]
+        : [];
 
     const errors: any[] = [];
     const warnings: any[] = [];
@@ -177,16 +197,21 @@ export function parseCheckRunResponse(response: AxiosResponse): {
     messageArray.forEach((msg: any) => {
       if (!msg || typeof msg !== 'object') return;
 
-      const msgType = msg['@_chkrun:type'] || msg['@_type'] || msg['type'];
-      const shortText = msg['@_chkrun:shortText'] || msg['shortText']?.['#text'] || msg['shortText'] || msg['shortText']?.['txt'] || '';
-      const line = msg['@_line'] || msg['line'];
-      const href = msg['@_chkrun:uri'] || msg['@_href'] || msg['href'];
+      const msgType = msg['@_chkrun:type'] || msg['@_type'] || msg.type;
+      const shortText =
+        msg['@_chkrun:shortText'] ||
+        msg.shortText?.['#text'] ||
+        msg.shortText ||
+        msg.shortText?.txt ||
+        '';
+      const line = msg['@_line'] || msg.line;
+      const href = msg['@_chkrun:uri'] || msg['@_href'] || msg.href;
 
       const msgObj = {
         type: msgType,
         text: shortText,
         line: line || '',
-        href: href || ''
+        href: href || '',
       };
 
       if (msgType === 'E') {
@@ -211,7 +236,7 @@ export function parseCheckRunResponse(response: AxiosResponse): {
       info,
       total_messages: messageArray.length,
       has_errors: hasErrors,
-      has_warnings: warnings.length > 0
+      has_warnings: warnings.length > 0,
     };
   } catch (error) {
     return {
@@ -223,7 +248,7 @@ export function parseCheckRunResponse(response: AxiosResponse): {
       info: [],
       total_messages: 0,
       has_errors: false,
-      has_warnings: false
+      has_warnings: false,
     };
   }
 }
@@ -237,7 +262,7 @@ export async function runCheckRun(
   objectName: string,
   version: string = 'active',
   reporter: string = 'abapCheckRun',
-  sourceCode?: string
+  sourceCode?: string,
 ): Promise<AxiosResponse> {
   const objectUri = getObjectUri(objectType, objectName);
   const xmlBody = sourceCode
@@ -245,8 +270,8 @@ export async function runCheckRun(
     : buildCheckRunXml(objectUri, version);
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+    Accept: 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
@@ -256,7 +281,7 @@ export async function runCheckRun(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 }
 
@@ -281,13 +306,13 @@ export async function runCheckRunWithSource(
   objectName: string,
   sourceCode: string,
   version: string = 'active',
-  reporter: string = 'abapCheckRun'
+  reporter: string = 'abapCheckRun',
 ): Promise<AxiosResponse> {
   const objectUri = await getObjectUri(objectType, objectName);
   const xmlBody = buildCheckRunXmlWithSource(objectUri, sourceCode, version);
 
   const headers = {
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
@@ -297,7 +322,6 @@ export async function runCheckRunWithSource(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 }
-

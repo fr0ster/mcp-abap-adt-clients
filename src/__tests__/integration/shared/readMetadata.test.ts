@@ -5,16 +5,17 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/readMetadata.test
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -56,8 +57,10 @@ function getConfig(): SapConfig {
     }
 
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
 
     if (uaaUrl) config.uaaUrl = uaaUrl;
     if (uaaClientId) config.uaaClientId = uaaClientId;
@@ -66,7 +69,9 @@ function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username;
     config.password = password;
@@ -87,8 +92,10 @@ describe('Shared - readMetadata', () => {
       await (connection as any).connect();
       client = new AdtClient(connection, testsLogger);
       hasConfig = true;
-    } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (_error) {
+      testsLogger.warn?.(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -101,7 +108,9 @@ describe('Shared - readMetadata', () => {
 
   it('should read class metadata', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
@@ -111,17 +120,21 @@ describe('Shared - readMetadata', () => {
       logBuilderTestStep('read class metadata', testsLogger);
       testsLogger.info?.(`📋 Object: ${className} (class)`);
       testsLogger.info?.('📖 Reading metadata...');
-      
-      const result = await client.getUtils().readObjectMetadata('class', className);
-      
+
+      const result = await client
+        .getUtils()
+        .readObjectMetadata('class', className);
+
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
-      
+
       testsLogger.info?.('✅ Metadata retrieved');
       testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
     } catch (error: any) {
       if (error.response?.status === 406) {
-        throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);
+        throw new Error(
+          `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+        );
       }
       throw error;
     }
@@ -129,7 +142,9 @@ describe('Shared - readMetadata', () => {
 
   it('should read domain metadata', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
@@ -139,17 +154,21 @@ describe('Shared - readMetadata', () => {
       logBuilderTestStep('read domain metadata', testsLogger);
       testsLogger.info?.(`📋 Object: ${domainName} (domain)`);
       testsLogger.info?.('📖 Reading metadata...');
-      
-      const result = await client.getUtils().readObjectMetadata('domain', domainName);
-      
+
+      const result = await client
+        .getUtils()
+        .readObjectMetadata('domain', domainName);
+
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
-      
+
       testsLogger.info?.('✅ Metadata retrieved');
       testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
     } catch (error: any) {
       if (error.response?.status === 406) {
-        throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);
+        throw new Error(
+          `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+        );
       }
       throw error;
     }
@@ -157,7 +176,9 @@ describe('Shared - readMetadata', () => {
 
   it('should read table metadata', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
@@ -165,12 +186,16 @@ describe('Shared - readMetadata', () => {
     const tableName = 'T000';
     try {
       logBuilderTestStep('read table metadata', testsLogger);
-      const result = await client.getUtils().readObjectMetadata('table', tableName);
+      const result = await client
+        .getUtils()
+        .readObjectMetadata('table', tableName);
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
     } catch (error: any) {
       if (error.response?.status === 406) {
-        throw new Error(`406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`);
+        throw new Error(
+          `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
+        );
       }
       throw error;
     }
@@ -178,14 +203,18 @@ describe('Shared - readMetadata', () => {
 
   it('should throw error for unsupported object type', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
-    logBuilderTestStep('validate error for unsupported object type', testsLogger);
+    logBuilderTestStep(
+      'validate error for unsupported object type',
+      testsLogger,
+    );
     await expect(
-      client.getUtils().readObjectMetadata('unsupported_type', 'TEST')
+      client.getUtils().readObjectMetadata('unsupported_type', 'TEST'),
     ).rejects.toThrow('Unsupported object type for metadata');
   });
 });
-

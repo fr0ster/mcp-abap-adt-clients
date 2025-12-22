@@ -4,16 +4,16 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate domain name
  * Returns raw response from ADT - consumer decides how to interpret it
- * 
+ *
  * Endpoint: POST /sap/bc/adt/ddic/domains/validation
- * 
+ *
  * Response format:
  * - Success: <SEVERITY>OK</SEVERITY>
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> message
@@ -22,14 +22,14 @@ export async function validateDomainName(
   connection: IAbapConnection,
   domainName: string,
   packageName?: string,
-  description?: string
+  description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/domains/validation`;
   const encodedName = encodeSapObjectName(domainName);
-  
+
   const queryParams = new URLSearchParams({
     objtype: 'doma',
-    objname: encodedName
+    objname: encodedName,
   });
 
   if (packageName) {
@@ -44,8 +44,7 @@ export async function validateDomainName(
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.as+xml'
-    }
+      Accept: 'application/vnd.sap.as+xml',
+    },
   });
 }
-

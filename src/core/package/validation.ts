@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { ICreatePackageParams } from './types';
+import type { ICreatePackageParams } from './types';
 
 /**
  * Step 1: Validate package parameters (basic check)
@@ -13,7 +13,7 @@ import { ICreatePackageParams } from './types';
  */
 export async function validatePackageBasic(
   connection: IAbapConnection,
-  args: ICreatePackageParams
+  args: ICreatePackageParams,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/packages/validation`;
   const params = {
@@ -21,7 +21,7 @@ export async function validatePackageBasic(
     packagename: args.super_package,
     description: args.description || args.package_name,
     packagetype: args.package_type || 'development',
-    checkmode: 'basic'
+    checkmode: 'basic',
   };
 
   return connection.makeAdtRequest({
@@ -30,8 +30,8 @@ export async function validatePackageBasic(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/vnd.sap.as+xml'
-    }
+      Accept: 'application/vnd.sap.as+xml',
+    },
   });
 }
 
@@ -43,7 +43,7 @@ export async function validatePackageFull(
   connection: IAbapConnection,
   args: ICreatePackageParams,
   swcomp: string,
-  transportLayer: string
+  transportLayer: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/packages/validation`;
   const params = {
@@ -54,7 +54,7 @@ export async function validatePackageFull(
     swcomp: swcomp,
     transportlayer: transportLayer,
     recordChanges: 'false',
-    checkmode: 'full'
+    checkmode: 'full',
   };
 
   return connection.makeAdtRequest({
@@ -63,8 +63,7 @@ export async function validatePackageFull(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/vnd.sap.as+xml'
-    }
+      Accept: 'application/vnd.sap.as+xml',
+    },
   });
 }
-

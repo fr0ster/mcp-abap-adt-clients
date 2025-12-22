@@ -2,12 +2,12 @@
  * Package operations - exports
  */
 
-import { IAdtObject } from '@mcp-abap-adt/interfaces';
-import { IPackageConfig, IPackageState } from './types';
+import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IPackageConfig, IPackageState } from './types';
 
-export * from './types';
-export { PackageBuilder } from './PackageBuilder';
 export { AdtPackage } from './AdtPackage';
+export { PackageBuilder } from './PackageBuilder';
+export * from './types';
 
 // Type alias for AdtPackage
 export type AdtPackageType = IAdtObject<IPackageConfig, IPackageState>;

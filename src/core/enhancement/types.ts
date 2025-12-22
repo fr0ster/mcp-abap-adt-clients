@@ -9,23 +9,27 @@
  * - enhsxsb: BAdI Enhancement Spot
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 /**
  * Enhancement type codes used in ADT URLs
  */
-export type EnhancementType = 'enhoxh' | 'enhoxhb' | 'enhoxhh' | 'enhsxs' | 'enhsxsb';
+export type EnhancementType =
+  | 'enhoxh'
+  | 'enhoxhb'
+  | 'enhoxhh'
+  | 'enhsxs'
+  | 'enhsxsb';
 
 /**
  * Enhancement object type codes for ADT
  */
 export const ENHANCEMENT_TYPE_CODES: Record<EnhancementType, string> = {
-  enhoxh: 'ENHO/EXH',      // Enhancement Implementation
-  enhoxhb: 'ENHO/EXHB',    // BAdI Implementation
-  enhoxhh: 'ENHO/EXHH',    // Source Code Plugin
-  enhsxs: 'ENHS/EXS',      // Enhancement Spot
-  enhsxsb: 'ENHS/EXSB'     // BAdI Enhancement Spot
+  enhoxh: 'ENHO/EXH', // Enhancement Implementation
+  enhoxhb: 'ENHO/EXHB', // BAdI Implementation
+  enhoxhh: 'ENHO/EXHH', // Source Code Plugin
+  enhsxs: 'ENHS/EXS', // Enhancement Spot
+  enhsxsb: 'ENHS/EXSB', // BAdI Enhancement Spot
 };
 
 /**
@@ -37,9 +41,9 @@ export interface ICreateEnhancementParams {
   description?: string;
   package_name: string;
   transport_request?: string;
-  enhancement_spot?: string;      // Required for implementations
-  badi_definition?: string;       // Required for BAdI implementations
-  source_code?: string;           // For enhoxhh only
+  enhancement_spot?: string; // Required for implementations
+  badi_definition?: string; // Required for BAdI implementations
+  source_code?: string; // For enhoxhh only
 }
 
 export interface IUpdateEnhancementParams {

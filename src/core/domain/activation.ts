@@ -2,22 +2,26 @@
  * Domain activation operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { activateObjectInSession } from '../../utils/activationUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate domain
  * Makes domain active and usable in SAP system
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function activateDomain(
   connection: IAbapConnection,
-  domainName: string
+  domainName: string,
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/ddic/domains/${encodeSapObjectName(domainName.toLowerCase())}`;
-  return await activateObjectInSession(connection, objectUri, domainName.toUpperCase(), true);
+  return await activateObjectInSession(
+    connection,
+    objectUri,
+    domainName.toUpperCase(),
+    true,
+  );
 }
-

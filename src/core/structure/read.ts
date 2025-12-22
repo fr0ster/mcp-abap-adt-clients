@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -15,9 +15,15 @@ import { readObjectSource } from '../shared/readSource';
 export async function getStructureMetadata(
   connection: IAbapConnection,
   structureName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'structure', structureName, undefined, options ? { withLongPolling: options.withLongPolling } : undefined);
+  return readObjectMetadata(
+    connection,
+    'structure',
+    structureName,
+    undefined,
+    options ? { withLongPolling: options.withLongPolling } : undefined,
+  );
 }
 
 /**
@@ -27,9 +33,16 @@ export async function getStructureSource(
   connection: IAbapConnection,
   structureName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'structure', structureName, undefined, version, options);
+  return readObjectSource(
+    connection,
+    'structure',
+    structureName,
+    undefined,
+    version,
+    options,
+  );
 }
 
 /**
@@ -38,7 +51,7 @@ export async function getStructureSource(
  */
 export async function getStructure(
   connection: IAbapConnection,
-  structureName: string
+  structureName: string,
 ): Promise<AxiosResponse> {
   return getStructureSource(connection, structureName);
 }
@@ -52,7 +65,7 @@ export async function getStructure(
 export async function getStructureTransport(
   connection: IAbapConnection,
   structureName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(structureName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -63,8 +76,7 @@ export async function getStructureTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
-

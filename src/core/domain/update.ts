@@ -3,14 +3,17 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
+import {
+  encodeSapObjectName,
+  limitDescription,
+} from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { IUpdateDomainParams } from './types';
+import type { IUpdateDomainParams } from './types';
 
 /**
  * Update domain with new data
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateDomain(
@@ -18,11 +21,13 @@ export async function updateDomain(
   args: IUpdateDomainParams,
   lockHandle: string,
   username: string,
-  masterSystem?: string
+  masterSystem?: string,
 ): Promise<AxiosResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
 
-  const corrNrParam = args.transport_request ? `&corrNr=${args.transport_request}` : '';
+  const corrNrParam = args.transport_request
+    ? `&corrNr=${args.transport_request}`
+    : '';
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?lockHandle=${lockHandle}${corrNrParam}`;
 
   const datatype = args.datatype || 'CHAR';
@@ -31,9 +36,12 @@ export async function updateDomain(
 
   let fixValuesXml = '';
   if (args.fixed_values && args.fixed_values.length > 0) {
-    const fixValueItems = args.fixed_values.map(fv =>
-      `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`
-    ).join('\n');
+    const fixValueItems = args.fixed_values
+      .map(
+        (fv) =>
+          `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`,
+      )
+      .join('\n');
     fixValuesXml = `    <doma:fixValues>\n${fixValueItems}\n    </doma:fixValues>`;
   } else {
     fixValuesXml = '    <doma:fixValues/>';
@@ -41,7 +49,9 @@ export async function updateDomain(
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.domain_name);
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
              xmlns:adtcore="http://www.sap.com/adt/core"
@@ -73,8 +83,9 @@ ${fixValuesXml}
 </doma:domain>`;
 
   const headers: Record<string, string> = {
-    'Accept': 'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8'
+    Accept:
+      'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
+    'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
   };
 
   return await connection.makeAdtRequest({
@@ -82,7 +93,6 @@ ${fixValuesXml}
     method: 'PUT',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 }
-

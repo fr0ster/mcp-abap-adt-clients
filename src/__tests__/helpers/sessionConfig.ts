@@ -43,8 +43,10 @@ export function getConfig(): SapConfig {
     }
 
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
 
     if (uaaUrl) config.uaaUrl = uaaUrl;
     if (uaaClientId) config.uaaClientId = uaaClientId;
@@ -53,7 +55,9 @@ export function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username;
     config.password = password;

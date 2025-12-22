@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check package for errors
@@ -15,14 +15,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @param xmlContent - Optional XML content to validate (same format as PUT body). If provided, check validates this content instead of saved version.
  * @returns Check result
- * 
+ *
  * Note: When xmlContent is provided, it should be the same XML that will be sent in PUT request.
  */
 export async function checkPackage(
   connection: IAbapConnection,
   packageName: string,
   version: 'active' | 'inactive' = 'active',
-  xmlContent?: string
+  xmlContent?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/checkruns`;
   const objectUri = `/sap/bc/adt/packages/${encodeSapObjectName(packageName).toLowerCase()}`;
@@ -58,9 +58,8 @@ export async function checkPackage(
     timeout: getTimeout('default'),
     data: xmlBody,
     headers: {
-      'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
-    }
+      Accept: 'application/vnd.sap.adt.checkmessages+xml',
+      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+    },
   });
 }
-

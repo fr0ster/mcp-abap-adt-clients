@@ -3,21 +3,21 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock class
  * Must use same session and lock handle from lock operation
- * 
+ *
  * NOTE: Caller should disable stateful session mode via connection.setSessionType("stateless")
  * after calling this function
  */
 export async function unlockClass(
   connection: IAbapConnection,
   className: string,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
@@ -25,7 +25,6 @@ export async function unlockClass(
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    data: null
+    data: null,
   });
 }
-

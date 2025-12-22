@@ -5,9 +5,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get object source URI based on object type
@@ -16,7 +16,7 @@ export function getObjectSourceUri(
   objectType: string,
   objectName: string,
   functionGroup?: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
 ): string {
   const encodedName = encodeSapObjectName(objectName);
   const versionParam = version === 'inactive' ? '?version=inactive' : '';
@@ -32,12 +32,13 @@ export function getObjectSourceUri(
     case 'intf/if':
       return `/sap/bc/adt/oo/interfaces/${encodedName}/source/main${versionParam}`;
     case 'functionmodule':
-    case 'fugr/ff':
+    case 'fugr/ff': {
       if (!functionGroup) {
         throw new Error('Function group is required for function module');
       }
       const encodedGroup = encodeSapObjectName(functionGroup);
       return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/source/main${versionParam}`;
+    }
     case 'view':
     case 'ddls/df':
       return `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
@@ -51,7 +52,9 @@ export function getObjectSourceUri(
     case 'ttyp/df':
       return `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main`;
     default:
-      throw new Error(`Object type ${objectType} does not support source code reading`);
+      throw new Error(
+        `Object type ${objectType} does not support source code reading`,
+      );
   }
 }
 
@@ -60,14 +63,22 @@ export function getObjectSourceUri(
  */
 export function supportsSourceCode(objectType: string): boolean {
   const supportedTypes = [
-    'class', 'clas/oc',
-    'program', 'prog/p',
-    'interface', 'intf/if',
-    'functionmodule', 'fugr/ff',
-    'view', 'ddls/df',
-    'structure', 'stru/dt',
-    'table', 'tabl/dt',
-    'tabletype', 'ttyp/df'
+    'class',
+    'clas/oc',
+    'program',
+    'prog/p',
+    'interface',
+    'intf/if',
+    'functionmodule',
+    'fugr/ff',
+    'view',
+    'ddls/df',
+    'structure',
+    'stru/dt',
+    'table',
+    'tabl/dt',
+    'tabletype',
+    'ttyp/df',
   ];
   return supportedTypes.includes(objectType.toLowerCase());
 }
@@ -89,10 +100,12 @@ export async function readObjectSource(
   objectName: string,
   functionGroup?: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   if (!supportsSourceCode(objectType)) {
-    throw new Error(`Object type ${objectType} does not support source code reading`);
+    throw new Error(
+      `Object type ${objectType} does not support source code reading`,
+    );
   }
 
   let uri = getObjectSourceUri(objectType, objectName, functionGroup, version);
@@ -106,8 +119,7 @@ export async function readObjectSource(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain'
-    }
+      Accept: 'text/plain',
+    },
   });
 }
-

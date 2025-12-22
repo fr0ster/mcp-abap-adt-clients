@@ -10,25 +10,29 @@
  * Run: npm test -- --testPathPattern=dataElement/DataElementBuilder
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { getConfig } from '../../../helpers/sessionConfig';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd} from '../../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  logBuilderTestEnd,
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+} from '../../../helpers/builderTestLogger';
+import { getConfig } from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import {
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   getEnabledTestCase,
@@ -42,10 +46,11 @@ const {
   retryCheckAfterActivate,
   createDependencyDomain,
   extractValidationErrorMessage,
-  getEnvironmentConfig
+  getEnvironmentConfig,
 } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -78,8 +83,10 @@ describe('DataElementBuilder (using AdtClient)', () => {
       hasConfig = true;
       // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
-    } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (_error) {
+      testsLogger.warn?.(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -94,7 +101,9 @@ describe('DataElementBuilder (using AdtClient)', () => {
    * Pre-check: Verify test data element doesn't exist
    * Safety: Skip test if object exists to avoid accidental deletion
    */
-  async function ensureDataElementReady(dataElementName: string): Promise<{ success: boolean; reason?: string }> {
+  async function ensureDataElementReady(
+    dataElementName: string,
+  ): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
       return { success: true };
     }
@@ -104,15 +113,16 @@ describe('DataElementBuilder (using AdtClient)', () => {
       await getDataElement(connection, dataElementName);
       return {
         success: false,
-        reason: `⚠️ SAFETY: Data Element ${dataElementName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
+        reason:
+          `⚠️ SAFETY: Data Element ${dataElementName} already exists! ` +
+          `Delete manually or use different test name to avoid accidental deletion.`,
       };
     } catch (error: any) {
       // 404 is expected - object doesn't exist, we can proceed
       if (error.response?.status !== 404) {
         return {
           success: false,
-          reason: `Cannot verify data element existence: ${error.message}`
+          reason: `Cannot verify data element existence: ${error.message}`,
         };
       }
     }
@@ -127,11 +137,16 @@ describe('DataElementBuilder (using AdtClient)', () => {
   function buildBuilderConfig(testCase: any, resolver?: any) {
     const params = testCase?.params || {};
     // Use resolver to get resolved parameters (from test case params or global defaults)
-    const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
+    const packageName =
+      resolver?.getPackageName?.() || resolvePackageName(params.package_name);
     if (!packageName) {
-      throw new Error('package_name not configured for DataElementBuilder test');
+      throw new Error(
+        'package_name not configured for DataElementBuilder test',
+      );
     }
-    const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
+    const transportRequest =
+      resolver?.getTransportRequest?.() ||
+      resolveTransportRequest(params.transport_request);
     return {
       dataElementName: params.data_element_name,
       packageName,
@@ -145,10 +160,9 @@ describe('DataElementBuilder (using AdtClient)', () => {
       longLabel: params.long_label,
       headingLabel: params.heading_label,
       typeKind: params.type_kind,
-      typeName: params.type_name
+      typeName: params.type_name,
     };
   }
-
 
   describe('Full workflow', () => {
     let testCase: any = null;
@@ -181,7 +195,10 @@ describe('DataElementBuilder (using AdtClient)', () => {
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, 'DataElement - full workflow');
+      const packageCheck = ensurePackageConfig(
+        tc.params,
+        'DataElement - full workflow',
+      );
       if (!packageCheck.success) {
         skipReason = packageCheck.reason || 'Default package is not configured';
         return;
@@ -191,18 +208,24 @@ describe('DataElementBuilder (using AdtClient)', () => {
       dataElementName = tc.params.data_element_name;
 
       // Create domain before test if type_kind is 'domain' and type_name (domain name) is provided
-      if (tc.params.type_kind === 'domain' && (tc.params.type_name || tc.params.domain_name)) {
+      if (
+        tc.params.type_kind === 'domain' &&
+        (tc.params.type_name || tc.params.domain_name)
+      ) {
         const domainNameToUse = tc.params.type_name || tc.params.domain_name;
         // Use resolver for consistent parameter resolution
-        const { TestConfigResolver } = require('../../../helpers/TestConfigResolver');
+        const {
+          TestConfigResolver,
+        } = require('../../../helpers/TestConfigResolver');
         const domainResolver = new TestConfigResolver({
           testCase: tc,
           isCloud: isCloudSystem,
-          logger: testsLogger
+          logger: testsLogger,
         });
         const packageName = domainResolver.getPackageName();
         if (!packageName) {
-          skipReason = 'environment problem, test skipped: package_name not configured for domain creation';
+          skipReason =
+            'environment problem, test skipped: package_name not configured for domain creation';
           testCase = null;
           dataElementName = null;
           return;
@@ -215,14 +238,20 @@ describe('DataElementBuilder (using AdtClient)', () => {
           dataType: tc.params.domain_data_type || 'CHAR',
           length: tc.params.domain_length || 10,
           decimals: tc.params.domain_decimals || 0,
-          transportRequest: domainResolver.getTransportRequest()
+          transportRequest: domainResolver.getTransportRequest(),
         };
 
         // Create domain using AdtClient
-        const domainResult = await createDependencyDomain(client, domainConfig, tc);
-        
+        const domainResult = await createDependencyDomain(
+          client,
+          domainConfig,
+          tc,
+        );
+
         if (!domainResult.success) {
-          skipReason = domainResult.reason || `environment problem, test skipped: Failed to create required dependency domain ${domainNameToUse}`;
+          skipReason =
+            domainResult.reason ||
+            `environment problem, test skipped: Failed to create required dependency domain ${domainNameToUse}`;
           testCase = null;
           dataElementName = null;
           return;
@@ -236,7 +265,8 @@ describe('DataElementBuilder (using AdtClient)', () => {
       if (dataElementName) {
         const cleanup = await ensureDataElementReady(dataElementName);
         if (!cleanup.success) {
-          skipReason = cleanup.reason || 'Failed to cleanup data element before test';
+          skipReason =
+            cleanup.reason || 'Failed to cleanup data element before test';
           testCase = null;
           dataElementName = null;
           domainName = null;
@@ -251,150 +281,220 @@ describe('DataElementBuilder (using AdtClient)', () => {
       const envConfig = getEnvironmentConfig();
       const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
       const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup = testCase?.params?.skip_cleanup !== undefined
-        ? testCase.params.skip_cleanup === true
-        : globalSkipCleanup;
+      const skipCleanup =
+        testCase?.params?.skip_cleanup !== undefined
+          ? testCase.params.skip_cleanup === true
+          : globalSkipCleanup;
       const shouldCleanup = cleanupAfterTest && !skipCleanup;
-      
+
       if (shouldCleanup && domainCreated && domainName) {
         try {
           // Use resolver for consistent parameter resolution
-          const { TestConfigResolver } = require('../../../helpers/TestConfigResolver');
+          const {
+            TestConfigResolver,
+          } = require('../../../helpers/TestConfigResolver');
           const cleanupResolver = new TestConfigResolver({
             testCase,
             isCloud: isCloudSystem,
-            logger: testsLogger
+            logger: testsLogger,
           });
           await client.getDomain().delete({
             domainName: domainName,
-            transportRequest: cleanupResolver.getTransportRequest()
+            transportRequest: cleanupResolver.getTransportRequest(),
           });
         } catch (cleanupError) {
           // Log but don't fail - cleanup errors are silent
-          testsLogger.warn?.(`Cleanup failed for domain ${domainName}:`, cleanupError);
+          testsLogger.warn?.(
+            `Cleanup failed for domain ${domainName}:`,
+            cleanupError,
+          );
         }
       } else if (!shouldCleanup && domainCreated && domainName) {
-        testsLogger.info?.(`⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis:`, domainName);
+        testsLogger.info?.(
+          `⚠️ Cleanup skipped (cleanup_after_test=${cleanupAfterTest}, skip_cleanup=${skipCleanup}) - domain left for analysis:`,
+          domainName,
+        );
       }
     });
 
-    it('should execute full workflow and store all results', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'DataElement - full workflow', definition);
+    it(
+      'should execute full workflow and store all results',
+      async () => {
+        const definition = getBuilderTestDefinition();
+        logBuilderTestStart(
+          testsLogger,
+          'DataElement - full workflow',
+          definition,
+        );
 
-      if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'DataElement - full workflow', skipReason);
-        return;
-      }
+        if (skipReason) {
+          logBuilderTestSkip(
+            testsLogger,
+            'DataElement - full workflow',
+            skipReason,
+          );
+          return;
+        }
 
-      if (!testCase || !dataElementName) {
-        logBuilderTestSkip(testsLogger, 'DataElement - full workflow', skipReason || 'Test case not available');
-        return;
-      }
+        if (!testCase || !dataElementName) {
+          logBuilderTestSkip(
+            testsLogger,
+            'DataElement - full workflow',
+            skipReason || 'Test case not available',
+          );
+          return;
+        }
 
-      // Create resolver for consistent parameter resolution
-      const { TestConfigResolver } = require('../../../helpers/TestConfigResolver');
-      const resolver = new TestConfigResolver({
-        testCase,
-        isCloud: isCloudSystem,
-        logger: testsLogger
-      });
-      const config = buildBuilderConfig(testCase, resolver);
-
-      // Create BaseTester instance
-      const tester = new BaseTester(
-        client.getDataElement(),
-        'DataElement',
-        'create_data_element',
-        'adt_data_element',
-        testsLogger
-      );
-
-      try {
-        // Use BaseTester.flowTest() for standardized CRUD flow
-        await tester.flowTest(config, testCase.params, {
-          updateConfig: {
-            dataElementName: config.dataElementName,
-            packageName: config.packageName!,
-            description: config.description || '',
-            dataType: config.dataType,
-            length: config.length,
-            decimals: config.decimals,
-            shortLabel: config.shortLabel,
-            mediumLabel: config.mediumLabel,
-            longLabel: config.longLabel,
-            headingLabel: config.headingLabel,
-            typeKind: config.typeKind,
-            typeName: config.typeName
-          }
+        // Create resolver for consistent parameter resolution
+        const {
+          TestConfigResolver,
+        } = require('../../../helpers/TestConfigResolver');
+        const resolver = new TestConfigResolver({
+          testCase,
+          isCloud: isCloudSystem,
+          logger: testsLogger,
         });
+        const config = buildBuilderConfig(testCase, resolver);
 
-        logBuilderTestSuccess(testsLogger, 'DataElement - full workflow');
-      } catch (error: any) {
-        logBuilderTestError(testsLogger, 'DataElement - full workflow', error);
-        throw error;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'DataElement - full workflow');
-      }
-    }, getTimeout('test'));
-  });
-
-  describe('Read standard object', () => {
-    it('should read standard SAP data element', async () => {
-      // Use TestConfigResolver for consistent parameter resolution
-      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
-      const standardObject = resolver.getStandardObject('dataElement');
-
-      if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'DataElementBuilder - read standard object', {
-          name: 'read_standard',
-          params: {}
-        });
-        logBuilderTestSkip(testsLogger, 'DataElementBuilder - read standard object',
-          `Standard data element not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
-        return;
-      }
-
-      const standardDataElementName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'DataElementBuilder - read standard object', {
-        name: 'read_standard',
-        params: { data_element_name: standardDataElementName }
-      });
-
-      if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'DataElementBuilder - read standard object', 'No SAP configuration');
-        return;
-      }
-
-      try {
         // Create BaseTester instance
         const tester = new BaseTester(
           client.getDataElement(),
           'DataElement',
           'create_data_element',
           'adt_data_element',
-          testsLogger
+          testsLogger,
         );
 
-        // Use BaseTester.readTest() for standardized read operation
-        const resultState = await tester.readTest({ dataElementName: standardDataElementName });
-        
-        expect(resultState).toBeDefined();
-        expect(resultState?.readResult).toBeDefined();
-        // DataElement read returns data element config - check if dataElementName is present
-        const dataElementConfig = resultState?.readResult;
-        if (dataElementConfig && typeof dataElementConfig === 'object' && 'dataElementName' in dataElementConfig) {
-          expect((dataElementConfig as any).dataElementName).toBe(standardDataElementName);
+        try {
+          // Use BaseTester.flowTest() for standardized CRUD flow
+          await tester.flowTest(config, testCase.params, {
+            updateConfig: {
+              dataElementName: config.dataElementName,
+              packageName: config.packageName!,
+              description: config.description || '',
+              dataType: config.dataType,
+              length: config.length,
+              decimals: config.decimals,
+              shortLabel: config.shortLabel,
+              mediumLabel: config.mediumLabel,
+              longLabel: config.longLabel,
+              headingLabel: config.headingLabel,
+              typeKind: config.typeKind,
+              typeName: config.typeName,
+            },
+          });
+
+          logBuilderTestSuccess(testsLogger, 'DataElement - full workflow');
+        } catch (error: any) {
+          logBuilderTestError(
+            testsLogger,
+            'DataElement - full workflow',
+            error,
+          );
+          throw error;
+        } finally {
+          logBuilderTestEnd(testsLogger, 'DataElement - full workflow');
+        }
+      },
+      getTimeout('test'),
+    );
+  });
+
+  describe('Read standard object', () => {
+    it(
+      'should read standard SAP data element',
+      async () => {
+        // Use TestConfigResolver for consistent parameter resolution
+        const resolver = new TestConfigResolver({
+          isCloud: isCloudSystem,
+          logger: testsLogger,
+        });
+        const standardObject = resolver.getStandardObject('dataElement');
+
+        if (!standardObject) {
+          logBuilderTestStart(
+            testsLogger,
+            'DataElementBuilder - read standard object',
+            {
+              name: 'read_standard',
+              params: {},
+            },
+          );
+          logBuilderTestSkip(
+            testsLogger,
+            'DataElementBuilder - read standard object',
+            `Standard data element not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+          );
+          return;
         }
 
-        logBuilderTestSuccess(testsLogger, 'DataElementBuilder - read standard object');
-      } catch (error) {
-        logBuilderTestError(testsLogger, 'DataElementBuilder - read standard object', error);
-        throw error;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'DataElementBuilder - read standard object');
-      }
-    }, getTimeout('test'));
+        const standardDataElementName = standardObject.name;
+        logBuilderTestStart(
+          testsLogger,
+          'DataElementBuilder - read standard object',
+          {
+            name: 'read_standard',
+            params: { data_element_name: standardDataElementName },
+          },
+        );
+
+        if (!hasConfig) {
+          logBuilderTestSkip(
+            testsLogger,
+            'DataElementBuilder - read standard object',
+            'No SAP configuration',
+          );
+          return;
+        }
+
+        try {
+          // Create BaseTester instance
+          const tester = new BaseTester(
+            client.getDataElement(),
+            'DataElement',
+            'create_data_element',
+            'adt_data_element',
+            testsLogger,
+          );
+
+          // Use BaseTester.readTest() for standardized read operation
+          const resultState = await tester.readTest({
+            dataElementName: standardDataElementName,
+          });
+
+          expect(resultState).toBeDefined();
+          expect(resultState?.readResult).toBeDefined();
+          // DataElement read returns data element config - check if dataElementName is present
+          const dataElementConfig = resultState?.readResult;
+          if (
+            dataElementConfig &&
+            typeof dataElementConfig === 'object' &&
+            'dataElementName' in dataElementConfig
+          ) {
+            expect((dataElementConfig as any).dataElementName).toBe(
+              standardDataElementName,
+            );
+          }
+
+          logBuilderTestSuccess(
+            testsLogger,
+            'DataElementBuilder - read standard object',
+          );
+        } catch (error) {
+          logBuilderTestError(
+            testsLogger,
+            'DataElementBuilder - read standard object',
+            error,
+          );
+          throw error;
+        } finally {
+          logBuilderTestEnd(
+            testsLogger,
+            'DataElementBuilder - read standard object',
+          );
+        }
+      },
+      getTimeout('test'),
+    );
   });
 });
-

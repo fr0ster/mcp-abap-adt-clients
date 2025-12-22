@@ -1,17 +1,15 @@
 /**
  * AdtLocalTypes - High-level CRUD operations for Local Types (implementations include)
- * 
+ *
  * Local types are defined in the implementations include of an ABAP class.
  * All operations require the parent class to be locked.
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { AdtClass } from './AdtClass';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
-import { AdtClass } from './AdtClass';
-import { IClassState } from './types';
+import type { IClassState } from './types';
 
 export interface ILocalTypesConfig {
   className: string;
@@ -21,10 +19,6 @@ export interface ILocalTypesConfig {
 
 export class AdtLocalTypes extends AdtClass {
   public readonly objectType: string = 'LocalTypes';
-
-  constructor(connection: IAbapConnection, logger?: ILogger) {
-    super(connection, logger);
-  }
 
   /**
    * Validate local types code
@@ -41,12 +35,12 @@ export class AdtLocalTypes extends AdtClass {
       this.connection,
       config.className,
       config.localTypesCode,
-      'inactive'
+      'inactive',
     );
 
     return {
       validationResponse: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 
@@ -56,7 +50,7 @@ export class AdtLocalTypes extends AdtClass {
    */
   async create(
     config: Partial<ILocalTypesConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -76,16 +70,16 @@ export class AdtLocalTypes extends AdtClass {
       // 2. Check local types code
       const codeToCheck = options?.sourceCode || config.localTypesCode;
       const state: IClassState = {
-        errors: []
+        errors: [],
       };
-      
+
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking local types code');
         const checkResponse = await checkClassLocalTypes(
           this.connection,
           config.className,
           codeToCheck,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local types check passed');
@@ -98,14 +92,17 @@ export class AdtLocalTypes extends AdtClass {
         config.className,
         codeToCheck!,
         lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local types created');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      const unlockState = await super.unlock(
+        { className: config.className },
+        lockHandle,
+      );
       state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
@@ -117,7 +114,10 @@ export class AdtLocalTypes extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -131,7 +131,7 @@ export class AdtLocalTypes extends AdtClass {
    */
   async read(
     config: Partial<ILocalTypesConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
   ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -139,10 +139,14 @@ export class AdtLocalTypes extends AdtClass {
 
     try {
       const { getClassImplementationsInclude } = await import('./read');
-      const response = await getClassImplementationsInclude(this.connection, config.className, version);
+      const response = await getClassImplementationsInclude(
+        this.connection,
+        config.className,
+        version,
+      );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -160,7 +164,7 @@ export class AdtLocalTypes extends AdtClass {
    */
   async update(
     config: Partial<ILocalTypesConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -176,18 +180,20 @@ export class AdtLocalTypes extends AdtClass {
         throw new Error('Local types code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await updateClassLocalTypes(
         this.connection,
         config.className,
         codeToUpdate,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('Local types updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
@@ -202,16 +208,16 @@ export class AdtLocalTypes extends AdtClass {
       // 2. Check local types code
       const codeToCheck = options?.sourceCode || config.localTypesCode;
       const state: IClassState = {
-        errors: []
+        errors: [],
       };
-      
+
       if (codeToCheck) {
         this.logger?.info?.('Step 2: Checking local types code');
         const checkResponse = await checkClassLocalTypes(
           this.connection,
           config.className,
           codeToCheck,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local types check passed');
@@ -224,14 +230,17 @@ export class AdtLocalTypes extends AdtClass {
         config.className,
         codeToCheck!,
         lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local types updated');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      const unlockState = await super.unlock(
+        { className: config.className },
+        lockHandle,
+      );
       state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
@@ -243,7 +252,10 @@ export class AdtLocalTypes extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -264,7 +276,7 @@ export class AdtLocalTypes extends AdtClass {
     // Delete by updating with empty code
     return await this.update({
       ...config,
-      localTypesCode: ''
+      localTypesCode: '',
     });
   }
 
@@ -284,7 +296,7 @@ export class AdtLocalTypes extends AdtClass {
    */
   async check(
     config: Partial<ILocalTypesConfig>,
-    version: 'active' | 'inactive' = 'inactive'
+    version: 'active' | 'inactive' = 'inactive',
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -297,12 +309,12 @@ export class AdtLocalTypes extends AdtClass {
       this.connection,
       config.className,
       config.localTypesCode,
-      version
+      version,
     );
 
     return {
       checkResult: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 }

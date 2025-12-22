@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { IDeleteEnhancementParams, EnhancementType, getEnhancementUri } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import { getEnhancementUri, type IDeleteEnhancementParams } from './types';
 
 /**
  * Low-level: Check if enhancement can be deleted (deletion check)
@@ -17,7 +17,7 @@ import { IDeleteEnhancementParams, EnhancementType, getEnhancementUri } from './
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: IDeleteEnhancementParams
+  params: IDeleteEnhancementParams,
 ): Promise<AxiosResponse> {
   const { enhancement_name, enhancement_type } = params;
 
@@ -39,8 +39,8 @@ export async function checkDeletion(
 </del:checkRequest>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.deletion.check.response.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml'
+    Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
   };
 
   return await connection.makeAdtRequest({
@@ -48,7 +48,7 @@ export async function checkDeletion(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlPayload,
-    headers
+    headers,
   });
 }
 
@@ -61,7 +61,7 @@ export async function checkDeletion(
  */
 export async function deleteEnhancement(
   connection: IAbapConnection,
-  params: IDeleteEnhancementParams
+  params: IDeleteEnhancementParams,
 ): Promise<AxiosResponse> {
   const { enhancement_name, enhancement_type, transport_request } = params;
 
@@ -79,7 +79,7 @@ export async function deleteEnhancement(
 
   // Build transport number tag
   let transportNumberTag = '';
-  if (transport_request && transport_request.trim()) {
+  if (transport_request?.trim()) {
     transportNumberTag = `<del:transportNumber>${transport_request}</del:transportNumber>`;
   } else {
     transportNumberTag = '<del:transportNumber/>';
@@ -93,8 +93,8 @@ export async function deleteEnhancement(
 </del:deletionRequest>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.deletion.response.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml'
+    Accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml',
   };
 
   const response = await connection.makeAdtRequest({
@@ -102,7 +102,7 @@ export async function deleteEnhancement(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlPayload,
-    headers
+    headers,
   });
 
   return {
@@ -113,7 +113,7 @@ export async function deleteEnhancement(
       enhancement_type,
       object_uri: objectUri,
       transport_request: transport_request || 'local',
-      message: `Enhancement ${enhancement_name} deleted successfully`
-    }
+      message: `Enhancement ${enhancement_name} deleted successfully`,
+    },
   } as AxiosResponse;
 }

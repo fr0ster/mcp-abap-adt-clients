@@ -9,24 +9,29 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { create } from './create';
-import { getServiceDefinition, getServiceDefinitionSource } from './read';
-import { lockServiceDefinition } from './lock';
-import { updateServiceDefinition } from './update';
-import { ICreateServiceDefinitionParams, IUpdateServiceDefinitionParams } from './types';
-import { checkServiceDefinition } from './check';
-import { unlockServiceDefinition } from './unlock';
-import { activateServiceDefinition } from './activation';
-import { deleteServiceDefinition } from './delete';
-import { validateServiceDefinitionName } from './validation';
-import { IServiceDefinitionConfig, IServiceDefinitionState } from './types';
-import { IBuilder } from '../shared/IBuilder';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
+import type { IBuilder } from '../shared/IBuilder';
+import { activateServiceDefinition } from './activation';
+import { checkServiceDefinition } from './check';
+import { create } from './create';
+import { deleteServiceDefinition } from './delete';
+import { lockServiceDefinition } from './lock';
+import { getServiceDefinition, getServiceDefinitionSource } from './read';
+import type {
+  ICreateServiceDefinitionParams,
+  IServiceDefinitionConfig,
+  IServiceDefinitionState,
+  IUpdateServiceDefinitionParams,
+} from './types';
+import { unlockServiceDefinition } from './unlock';
+import { updateServiceDefinition } from './update';
+import { validateServiceDefinitionName } from './validation';
 
-export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionState> {
+export class ServiceDefinitionBuilder
+  implements IBuilder<IServiceDefinitionState>
+{
   private connection: IAbapConnection;
   private logger?: ILogger;
   private config: IServiceDefinitionConfig;
@@ -36,7 +41,7 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
   constructor(
     connection: IAbapConnection,
     config: IServiceDefinitionConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.connection = connection;
     this.logger = logger ?? {
@@ -47,7 +52,7 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
     };
     this.config = { ...config };
     this.state = {
-      errors: []
+      errors: [],
     };
   }
 
@@ -83,11 +88,14 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
   // Operation methods - return Promise<this> for Promise chaining
   async validate(): Promise<AxiosResponse> {
     try {
-      this.logger?.info('Validating service definition name:', this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Validating service definition name:',
+        this.config.serviceDefinitionName,
+      );
       const result = await validateServiceDefinitionName(
         this.connection,
         this.config.serviceDefinitionName,
-        this.config.description
+        this.config.description,
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
@@ -97,11 +105,19 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       // If validation endpoint returns 400 and it's about object existing, that's OK for tests
       if (error.response?.status === 400) {
         const errorData = error.response?.data;
-        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData || {});
-        if (errorText.toLowerCase().includes('already exists') ||
-            errorText.toLowerCase().includes('does already exist') ||
-            errorText.toLowerCase().includes('resource') && errorText.toLowerCase().includes('exist')) {
-          this.logger?.warn(`'Service definition already exists  validation skipped:' ${`this.config.serviceDefinitionName`}`);
+        const errorText =
+          typeof errorData === 'string'
+            ? errorData
+            : JSON.stringify(errorData || {});
+        if (
+          errorText.toLowerCase().includes('already exists') ||
+          errorText.toLowerCase().includes('does already exist') ||
+          (errorText.toLowerCase().includes('resource') &&
+            errorText.toLowerCase().includes('exist'))
+        ) {
+          this.logger?.warn(
+            `'Service definition already exists  validation skipped:' ${`this.config.serviceDefinitionName`}`,
+          );
           this.state.validationResponse = error.response;
           return error.response;
         }
@@ -110,11 +126,19 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       // If validation is not supported for this object type, skip it (log warning)
       const errorMsg = error.message || '';
       const errorData = error.response?.data;
-      const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData || {});
-      if (errorMsg.toLowerCase().includes('not supported') ||
-          errorText.toLowerCase().includes('not supported') ||
-          errorMsg.toLowerCase().includes('object type') && errorMsg.toLowerCase().includes('not supported')) {
-        this.logger?.warn(`'Validation not supported for SRVD/SRV in this SAP system  skipping:' ${`this.config.serviceDefinitionName`}`);
+      const errorText =
+        typeof errorData === 'string'
+          ? errorData
+          : JSON.stringify(errorData || {});
+      if (
+        errorMsg.toLowerCase().includes('not supported') ||
+        errorText.toLowerCase().includes('not supported') ||
+        (errorMsg.toLowerCase().includes('object type') &&
+          errorMsg.toLowerCase().includes('not supported'))
+      ) {
+        this.logger?.warn(
+          `'Validation not supported for SRVD/SRV in this SAP system  skipping:' ${`this.config.serviceDefinitionName`}`,
+        );
         if (error.response) {
           this.state.validationResponse = error.response;
           return error.response;
@@ -124,13 +148,13 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       // Store error response if available
       if (error.response) {
         this.state.validationResponse = error.response;
       }
-      
+
       this.logger?.error('Validation failed:', error);
       throw error;
     }
@@ -138,31 +162,37 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
 
   async read(
     version?: 'active' | 'inactive' | 'workingArea',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IServiceDefinitionConfig | undefined> {
     try {
-      this.logger?.info('Reading service definition:', this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Reading service definition:',
+        this.config.serviceDefinitionName,
+      );
       const result = await getServiceDefinition(
         this.connection,
         this.config.serviceDefinitionName,
         version || 'inactive',
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Service definition read successfully:', result.status);
-      
+
       // Parse and return config directly
-      const xmlData = typeof result.data === 'string'
-        ? result.data
-        : JSON.stringify(result.data);
-      
+      const xmlData =
+        typeof result.data === 'string'
+          ? result.data
+          : JSON.stringify(result.data);
+
       return this.parseServiceDefinitionXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error;
@@ -171,19 +201,28 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
 
   async readSource(): Promise<string | undefined> {
     try {
-      this.logger?.info('Reading service definition source:', this.config.serviceDefinitionName);
-      const result = await getServiceDefinitionSource(this.connection, this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Reading service definition source:',
+        this.config.serviceDefinitionName,
+      );
+      const result = await getServiceDefinitionSource(
+        this.connection,
+        this.config.serviceDefinitionName,
+      );
       // Store raw response for backward compatibility
       this.state.readSourceResult = result;
-      this.logger?.info('Service definition source read successfully:', result.status);
-      
+      this.logger?.info(
+        'Service definition source read successfully:',
+        result.status,
+      );
+
       const sourceCode = typeof result.data === 'string' ? result.data : '';
       return sourceCode;
     } catch (error: any) {
       this.state.errors.push({
         method: 'readSource',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read source failed:', error);
       throw error;
@@ -195,24 +234,30 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger?.info('Creating service definition:', this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Creating service definition:',
+        this.config.serviceDefinitionName,
+      );
       const params: ICreateServiceDefinitionParams = {
         service_definition_name: this.config.serviceDefinitionName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
         description: this.config.description,
-        source_code: this.config.sourceCode
+        source_code: this.config.sourceCode,
       };
-      this.connection.setSessionType("stateful");
+      this.connection.setSessionType('stateful');
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger?.info('Service definition created successfully:', result.status);
+      this.logger?.info(
+        'Service definition created successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       throw error; // Interrupts chain
     }
@@ -220,11 +265,14 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
 
   async lock(): Promise<this> {
     try {
-      this.logger?.info('Locking service definition:', this.config.serviceDefinitionName);
-      this.connection.setSessionType("stateful");
+      this.logger?.info(
+        'Locking service definition:',
+        this.config.serviceDefinitionName,
+      );
+      this.connection.setSessionType('stateful');
       const lockHandle = await lockServiceDefinition(
         this.connection,
-        this.config.serviceDefinitionName
+        this.config.serviceDefinitionName,
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
@@ -235,7 +283,7 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
@@ -245,49 +293,62 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
   async update(): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Service definition must be locked before update. Call lock() first.');
+        throw new Error(
+          'Service definition must be locked before update. Call lock() first.',
+        );
       }
       if (!this.config.sourceCode) {
         throw new Error('Source code is required for update');
       }
-      this.logger?.info('Updating service definition:', this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Updating service definition:',
+        this.config.serviceDefinitionName,
+      );
 
       const params: IUpdateServiceDefinitionParams = {
         service_definition_name: this.config.serviceDefinitionName,
         source_code: this.config.sourceCode,
-        transport_request: this.config.transportRequest
+        transport_request: this.config.transportRequest,
       };
 
       const result = await updateServiceDefinition(
         this.connection,
         params,
-        this.lockHandle
+        this.lockHandle,
       );
 
       this.state.updateResult = result;
 
-      this.logger?.info('Service definition updated successfully:', result.status);
+      this.logger?.info(
+        'Service definition updated successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
+  async check(
+    version: 'active' | 'inactive' = 'inactive',
+    sourceCode?: string,
+  ): Promise<AxiosResponse> {
     try {
       const codeToCheck = sourceCode || this.config.sourceCode;
-      this.logger?.info(`'Checking service definition:'  this.config.serviceDefinitionName  'version:' ${`version, codeToCheck ? 'with source code' : 'saved version'`}`);
+      this.logger?.info(
+        `'Checking service definition:'  this.config.serviceDefinitionName  'version:' ${`version, codeToCheck ? 'with source code' : 'saved version'`}`,
+      );
       const result = await checkServiceDefinition(
         this.connection,
         this.config.serviceDefinitionName,
         version,
-        codeToCheck
+        codeToCheck,
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
@@ -297,7 +358,7 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error;
@@ -309,23 +370,26 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       if (!this.lockHandle) {
         throw new Error('Service definition is not locked. Call lock() first.');
       }
-      this.logger?.info('Unlocking service definition:', this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Unlocking service definition:',
+        this.config.serviceDefinitionName,
+      );
       const result = await unlockServiceDefinition(
         this.connection,
         this.config.serviceDefinitionName,
-        this.lockHandle
+        this.lockHandle,
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Service definition unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
@@ -334,19 +398,25 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
 
   async activate(): Promise<this> {
     try {
-      this.logger?.info('Activating service definition:', this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Activating service definition:',
+        this.config.serviceDefinitionName,
+      );
       const result = await activateServiceDefinition(
         this.connection,
-        this.config.serviceDefinitionName
+        this.config.serviceDefinitionName,
       );
       this.state.activateResult = result;
-      this.logger?.info('Service definition activated successfully:', result.status);
+      this.logger?.info(
+        'Service definition activated successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'activate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
@@ -355,22 +425,25 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
 
   async delete(): Promise<this> {
     try {
-      this.logger?.info('Deleting service definition:', this.config.serviceDefinitionName);
-      const result = await deleteServiceDefinition(
-        this.connection,
-        {
-          service_definition_name: this.config.serviceDefinitionName,
-          transport_request: this.config.transportRequest
-        }
+      this.logger?.info(
+        'Deleting service definition:',
+        this.config.serviceDefinitionName,
       );
+      const result = await deleteServiceDefinition(this.connection, {
+        service_definition_name: this.config.serviceDefinitionName,
+        transport_request: this.config.transportRequest,
+      });
       this.state.deleteResult = result;
-      this.logger?.info('Service definition deleted successfully:', result.status);
+      this.logger?.info(
+        'Service definition deleted successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -385,15 +458,18 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       await unlockServiceDefinition(
         this.connection,
         this.config.serviceDefinitionName,
-        this.lockHandle
+        this.lockHandle,
       );
-      this.logger?.info('Force unlock successful for', this.config.serviceDefinitionName);
+      this.logger?.info(
+        'Force unlock successful for',
+        this.config.serviceDefinitionName,
+      );
     } catch (error: any) {
       this.logger?.warn('Force unlock failed:', error);
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
     }
   }
 
@@ -417,7 +493,9 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
   /**
    * Parse XML response to ServiceDefinitionBuilderConfig
    */
-  private parseServiceDefinitionXml(xmlData: string): IServiceDefinitionConfig | undefined {
+  private parseServiceDefinitionXml(
+    xmlData: string,
+  ): IServiceDefinitionConfig | undefined {
     try {
       const parser = new XMLParser({
         ignoreAttributes: false,
@@ -425,19 +503,24 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       });
 
       const result = parser.parse(xmlData);
-      const srvdSource = result['srvd:srvdSource'] || result['srvdSource'];
+      const srvdSource = result['srvd:srvdSource'] || result.srvdSource;
 
       if (!srvdSource) {
         return undefined;
       }
 
-      const packageRef = srvdSource['adtcore:packageRef'] || srvdSource['packageRef'];
+      const packageRef =
+        srvdSource['adtcore:packageRef'] || srvdSource.packageRef;
 
       return {
-        serviceDefinitionName: srvdSource['adtcore:name'] || srvdSource['name'] || this.config.serviceDefinitionName,
-        packageName: packageRef?.['adtcore:name'] || packageRef?.['name'],
-        description: srvdSource['adtcore:description'] || srvdSource['description'] || '',
-        sourceCode: this.config.sourceCode // Source code is not in metadata, keep existing if set
+        serviceDefinitionName:
+          srvdSource['adtcore:name'] ||
+          srvdSource.name ||
+          this.config.serviceDefinitionName,
+        packageName: packageRef?.['adtcore:name'] || packageRef?.name,
+        description:
+          srvdSource['adtcore:description'] || srvdSource.description || '',
+        sourceCode: this.config.sourceCode, // Source code is not in metadata, keep existing if set
       };
     } catch (error) {
       this.logger?.error('Failed to parse service definition XML:', error);
@@ -450,9 +533,10 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       return undefined;
     }
 
-    const xmlData = typeof this.state.readResult.data === 'string'
-      ? this.state.readResult.data
-      : JSON.stringify(this.state.readResult.data);
+    const xmlData =
+      typeof this.state.readResult.data === 'string'
+        ? this.state.readResult.data
+        : JSON.stringify(this.state.readResult.data);
 
     return this.parseServiceDefinitionXml(xmlData);
   }
@@ -481,7 +565,11 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
     return this.state.deleteResult;
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -504,8 +592,7 @@ export class ServiceDefinitionBuilder implements IBuilder<IServiceDefinitionStat
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

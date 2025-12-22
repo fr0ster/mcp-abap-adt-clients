@@ -1,38 +1,50 @@
 /**
  * AdtMetadataExtension - High-level CRUD operations for Metadata Extension (DDLX) objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
  * - activate uses same session/cookies (no stateful needed)
- * 
+ *
  * Operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IMetadataExtensionConfig, IMetadataExtensionState } from './types';
-import { validateMetadataExtension } from './validation';
-import { createMetadataExtension } from './create';
-import { checkMetadataExtension } from './check';
-import { lockMetadataExtension } from './lock';
-import { updateMetadataExtension } from './update';
-import { unlockMetadataExtension } from './unlock';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateMetadataExtension } from './activate';
+import { checkMetadataExtension } from './check';
+import { createMetadataExtension } from './create';
 import { deleteMetadataExtension } from './delete';
-import { readMetadataExtensionSource, readMetadataExtension, getMetadataExtensionTransport } from './read';
+import { lockMetadataExtension } from './lock';
+import {
+  getMetadataExtensionTransport,
+  readMetadataExtension,
+  readMetadataExtensionSource,
+} from './read';
+import type {
+  IMetadataExtensionConfig,
+  IMetadataExtensionState,
+} from './types';
+import { unlockMetadataExtension } from './unlock';
+import { updateMetadataExtension } from './update';
+import { validateMetadataExtension } from './validation';
 
-export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState> {
+export class AdtMetadataExtension
+  implements IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   public readonly objectType: string = 'MetadataExtension';
@@ -45,10 +57,14 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
   /**
    * Validate metadata extension configuration before creation
    */
-  async validate(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+  async validate(
+    config: Partial<IMetadataExtensionConfig>,
+  ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
-      const error = new Error('Metadata extension name is required for validation');
+      const error = new Error(
+        'Metadata extension name is required for validation',
+      );
       state.errors.push({ method: 'validate', error, timestamp: new Date() });
       throw error;
     }
@@ -58,14 +74,11 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       throw error;
     }
 
-    const response = await validateMetadataExtension(
-      this.connection,
-      {
-        name: config.name,
-        description: config.description || config.name,
-        packageName: config.packageName
-      }
-    );
+    const response = await validateMetadataExtension(this.connection, {
+      name: config.name,
+      description: config.description || config.name,
+      packageName: config.packageName,
+    });
     state.validationResponse = response;
     return state;
   }
@@ -75,7 +88,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
    */
   async create(
     config: IMetadataExtensionConfig,
-    options?: IAdtOperationOptions
+    _options?: IAdtOperationOptions,
   ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
@@ -104,7 +117,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         description: config.description,
         masterLanguage: config.masterLanguage,
         masterSystem: config.masterSystem,
-        responsible: config.responsible
+        responsible: config.responsible,
       });
       this.logger?.info?.('Metadata extension created');
 
@@ -121,7 +134,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
   async read(
     config: Partial<IMetadataExtensionConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IMetadataExtensionState | undefined> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
@@ -135,15 +148,18 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         this.connection,
         config.name,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
-      const sourceCode = typeof response.data === 'string'
-        ? response.data
-        : JSON.stringify(response.data);
+      const _sourceCode =
+        typeof response.data === 'string'
+          ? response.data
+          : JSON.stringify(response.data);
 
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -161,26 +177,36 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
    */
   async readMetadata(
     config: Partial<IMetadataExtensionConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await readMetadataExtension(
         this.connection,
         config.name,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       this.logger?.info?.('Metadata extension metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -191,26 +217,38 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
    */
   async readTransport(
     config: Partial<IMetadataExtensionConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Metadata extension name is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getMetadataExtensionTransport(
         this.connection,
         config.name,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
-      this.logger?.info?.('Metadata extension transport request read successfully');
+      this.logger?.info?.(
+        'Metadata extension transport request read successfully',
+      );
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readTransport', err);
       throw err;
     }
@@ -223,7 +261,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
    */
   async update(
     config: Partial<IMetadataExtensionConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
@@ -239,17 +277,19 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         throw new Error('Source code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await updateMetadataExtension(
         this.connection,
         config.name,
         codeToUpdate,
-        options.lockHandle
+        options.lockHandle,
       );
       this.logger?.info?.('Metadata extension updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
@@ -265,8 +305,15 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkMetadataExtension(this.connection, config.name, 'inactive', codeToCheck);
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        await checkMetadataExtension(
+          this.connection,
+          config.name,
+          'inactive',
+          codeToCheck,
+        );
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -277,21 +324,22 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
           this.connection,
           config.name,
           codeToCheck,
-          lockHandle
+          lockHandle,
         );
         this.logger?.info?.('Metadata extension updated');
 
         // 3.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { name: config.name },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ name: config.name }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -313,46 +361,63 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating metadata extension');
-        const activateResponse = await activateMetadataExtension(this.connection, config.name);
-        this.logger?.info?.('Metadata extension activated, status:', activateResponse.status);
+        const activateResponse = await activateMetadataExtension(
+          this.connection,
+          config.name,
+        );
+        this.logger?.info?.(
+          'Metadata extension activated, status:',
+          activateResponse.status,
+        );
 
         // 6.5. Read with long polling (wait for object to be ready after activation)
         this.logger?.info?.('read (wait for object ready after activation)');
         try {
-          await this.read(
-            { name: config.name },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ name: config.name }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            readError,
+          );
           // Continue anyway - return activation response
         }
 
         return {
           activateResult: activateResponse,
-          errors: []
+          errors: [],
         };
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await readMetadataExtensionSource(this.connection, config.name);
-      const sourceCode = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
+      const readResponse = await readMetadataExtensionSource(
+        this.connection,
+        config.name,
+      );
+      const _sourceCode =
+        typeof readResponse.data === 'string'
+          ? readResponse.data
+          : JSON.stringify(readResponse.data);
 
       return {
         readResult: readResponse,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger?.warn?.('Unlocking metadata extension during error cleanup');
+          this.logger?.warn?.(
+            'Unlocking metadata extension during error cleanup',
+          );
           // We're already in stateful after lock, just unlock and set stateless
-          await unlockMetadataExtension(this.connection, config.name, lockHandle);
+          await unlockMetadataExtension(
+            this.connection,
+            config.name,
+            lockHandle,
+          );
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
           this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
@@ -366,9 +431,16 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
         try {
           this.logger?.warn?.('Deleting metadata extension after failure');
           // No stateful needed - delete doesn't use lock/unlock
-          await deleteMetadataExtension(this.connection, config.name, config.transportRequest);
+          await deleteMetadataExtension(
+            this.connection,
+            config.name,
+            config.transportRequest,
+          );
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete metadata extension after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete metadata extension after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -380,7 +452,9 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
   /**
    * Delete metadata extension
    */
-  async delete(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+  async delete(
+    config: Partial<IMetadataExtensionConfig>,
+  ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Metadata extension name is required');
@@ -391,19 +465,26 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     try {
       // Delete (no stateful needed - no lock/unlock, no deletion check for metadata extensions)
       this.logger?.info?.('Deleting metadata extension');
-      const result = await deleteMetadataExtension(this.connection, config.name, config.transportRequest);
+      const result = await deleteMetadataExtension(
+        this.connection,
+        config.name,
+        config.transportRequest,
+      );
       this.logger?.info?.('Metadata extension deleted');
 
       return {
         deleteResult: result,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'delete',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Delete', err);
       throw err;
-      throw error;
     }
   }
 
@@ -411,27 +492,34 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
    * Activate metadata extension
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<IMetadataExtensionConfig>): Promise<IMetadataExtensionState> {
+  async activate(
+    config: Partial<IMetadataExtensionConfig>,
+  ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
       const error = new Error('Metadata extension name is required');
       state.errors.push({ method: 'activate', error, timestamp: new Date() });
       throw error;
-      throw new Error('Metadata extension name is required');
     }
 
     try {
-      const result = await activateMetadataExtension(this.connection, config.name);
+      const result = await activateMetadataExtension(
+        this.connection,
+        config.name,
+      );
       return {
         activateResult: result,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'activate',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Activate', err);
       throw err;
-      throw error;
     }
   }
 
@@ -440,7 +528,7 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
    */
   async check(
     config: Partial<IMetadataExtensionConfig>,
-    status?: string
+    status?: string,
   ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
@@ -450,8 +538,13 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
     }
 
     // Map status to version
-    const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    const result = await checkMetadataExtension(this.connection, config.name, version);
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
+    const result = await checkMetadataExtension(
+      this.connection,
+      config.name,
+      version,
+    );
     state.checkResult = result;
     return state;
   }
@@ -471,16 +564,23 @@ export class AdtMetadataExtension implements IAdtObject<IMetadataExtensionConfig
   /**
    * Unlock metadata extension
    */
-  async unlock(config: Partial<IMetadataExtensionConfig>, lockHandle: string): Promise<IMetadataExtensionState> {
+  async unlock(
+    config: Partial<IMetadataExtensionConfig>,
+    lockHandle: string,
+  ): Promise<IMetadataExtensionState> {
     if (!config.name) {
       throw new Error('Metadata extension name is required');
     }
 
-    const result = await unlockMetadataExtension(this.connection, config.name, lockHandle);
+    const result = await unlockMetadataExtension(
+      this.connection,
+      config.name,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
-      errors: []
+      errors: [],
     };
   }
 }

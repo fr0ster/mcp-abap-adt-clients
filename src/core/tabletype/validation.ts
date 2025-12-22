@@ -4,9 +4,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate table type name
@@ -21,14 +21,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function validateTableTypeName(
   connection: IAbapConnection,
   tableTypeName: string,
-  description?: string
+  description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/tabletypes/validation`;
   const encodedName = encodeSapObjectName(tableTypeName);
 
   const queryParams = new URLSearchParams({
     objtype: 'ttypda',
-    objname: encodedName
+    objname: encodedName,
   });
 
   // Description is required for table type validation
@@ -39,7 +39,7 @@ export async function validateTableTypeName(
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.as+xml'
-    }
+      Accept: 'application/vnd.sap.as+xml',
+    },
   });
 }

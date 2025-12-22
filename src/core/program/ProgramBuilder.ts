@@ -9,19 +9,22 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { validateProgramName } from './validation';
-import { create } from './create';
-import { lockProgram } from './lock';
-import { checkProgram } from './check';
-import { unlockProgram } from './unlock';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
+import type { IBuilder } from '../shared/IBuilder';
 import { activateProgram } from './activation';
-import { getProgramSource } from './read';
+import { checkProgram } from './check';
+import { create } from './create';
 import { deleteProgram } from './delete';
-import { IProgramConfig, IProgramState, ICreateProgramParams } from './types';
-import { IBuilder } from '../shared/IBuilder';
+import { lockProgram } from './lock';
+import { getProgramSource } from './read';
+import type {
+  ICreateProgramParams,
+  IProgramConfig,
+  IProgramState,
+} from './types';
+import { unlockProgram } from './unlock';
+import { validateProgramName } from './validation';
 
 export class ProgramBuilder implements IBuilder<IProgramState> {
   private connection: IAbapConnection;
@@ -34,14 +37,14 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
   constructor(
     connection: IAbapConnection,
     config: IProgramConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
     this.state = {
-      errors: []
+      errors: [],
     };
   }
 
@@ -92,9 +95,9 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       const response = await validateProgramName(
         this.connection,
         this.config.programName,
-        this.config.description
+        this.config.description,
       );
-      
+
       // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger?.info('Validation successful');
@@ -103,7 +106,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Validation failed:', error);
       throw error;
@@ -124,7 +127,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         programType: this.config.programType,
         application: this.config.application,
         sourceCode: this.sourceCode,
-        activate: false // Don't activate in low-level function
+        activate: false, // Don't activate in low-level function
       };
       const result = await create(this.connection, params);
       this.state.createResult = result;
@@ -134,7 +137,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
@@ -162,7 +165,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
@@ -172,11 +175,15 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
   async update(sourceCode?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Program must be locked before update. Call lock() first.');
+        throw new Error(
+          'Program must be locked before update. Call lock() first.',
+        );
       }
       const code = sourceCode || this.sourceCode;
       if (!code) {
-        throw new Error('Source code is required. Use setCode() or pass as parameter.');
+        throw new Error(
+          'Source code is required. Use setCode() or pass as parameter.',
+        );
       }
       this.logger?.info('Updating program source:', this.config.programName);
 
@@ -189,7 +196,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
 
       const headers = {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Accept': 'text/plain'
+        Accept: 'text/plain',
       };
 
       const { getTimeout } = await import('../../utils/timeouts');
@@ -198,7 +205,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         method: 'PUT',
         timeout: getTimeout('default'),
         data: code,
-        headers
+        headers,
       });
 
       this.state.updateResult = result;
@@ -208,21 +215,26 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
+  async check(
+    version: 'active' | 'inactive' = 'inactive',
+    sourceCode?: string,
+  ): Promise<AxiosResponse> {
     try {
-      this.logger?.info(`'Checking program:'  this.config.programName  'version:' ${`version, sourceCode ? 'with source code' : 'saved version'`}`);
+      this.logger?.info(
+        `'Checking program:'  this.config.programName  'version:' ${`version, sourceCode ? 'with source code' : 'saved version'`}`,
+      );
       const result = await checkProgram(
         this.connection,
         this.config.programName,
         version,
-        sourceCode
+        sourceCode,
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
@@ -232,7 +244,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error;
@@ -248,7 +260,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       const result = await unlockProgram(
         this.connection,
         this.config.programName,
-        this.lockHandle
+        this.lockHandle,
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
@@ -259,7 +271,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
@@ -271,7 +283,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.logger?.info('Activating program:', this.config.programName);
       const result = await activateProgram(
         this.connection,
-        this.config.programName
+        this.config.programName,
       );
       this.state.activateResult = result;
       this.logger?.info('Program activated successfully:', result.status);
@@ -280,7 +292,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'activate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
@@ -290,13 +302,10 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
   async delete(): Promise<this> {
     try {
       this.logger?.info('Deleting program:', this.config.programName);
-      const result = await deleteProgram(
-        this.connection,
-        {
-          programName: this.config.programName,
-          transportRequest: this.config.transportRequest
-        }
-      );
+      const result = await deleteProgram(this.connection, {
+        programName: this.config.programName,
+        transportRequest: this.config.transportRequest,
+      });
       this.state.deleteResult = result;
       this.logger?.info('Program deleted successfully:', result.status);
       return this;
@@ -304,7 +313,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -313,7 +322,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
 
   async read(
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IProgramConfig | undefined> {
     try {
       this.logger?.info('Reading program:', this.config.programName);
@@ -321,26 +330,29 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
         this.connection,
         this.config.programName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Program read successfully:', result.status);
-      
+
       // Parse and return config directly
-      const sourceCode = typeof result.data === 'string'
-        ? result.data
-        : JSON.stringify(result.data);
-      
+      const sourceCode =
+        typeof result.data === 'string'
+          ? result.data
+          : JSON.stringify(result.data);
+
       return {
         programName: this.config.programName,
-        sourceCode
+        sourceCode,
       };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error;
@@ -417,17 +429,22 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
     }
 
     // Program read() returns source code (plain text)
-    const sourceCode = typeof this.state.readResult.data === 'string'
-      ? this.state.readResult.data
-      : JSON.stringify(this.state.readResult.data);
+    const sourceCode =
+      typeof this.state.readResult.data === 'string'
+        ? this.state.readResult.data
+        : JSON.stringify(this.state.readResult.data);
 
     return {
       programName: this.config.programName,
-      sourceCode
+      sourceCode,
     };
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -454,8 +471,7 @@ export class ProgramBuilder implements IBuilder<IProgramState> {
       delete: this.state.deleteResult,
       read: this.state.readResult,
       lockHandle: this.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

@@ -2,8 +2,8 @@
  * Interface unlock operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -14,7 +14,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function unlockInterface(
   connection: IAbapConnection,
   interfaceName: string,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
@@ -24,7 +24,7 @@ export async function unlockInterface(
       method: 'POST',
       timeout: getTimeout(),
       data: '',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     return response;
   } catch (error: any) {
@@ -33,20 +33,21 @@ export async function unlockInterface(
     if (!error.response) {
       throw new Error(
         `Failed to unlock interface ${interfaceName}: No response from server. ` +
-        `Lock handle: ${lockHandle} ` +
-        `The interface may be locked by another user or session may be invalid.`
+          `Lock handle: ${lockHandle} ` +
+          `The interface may be locked by another user or session may be invalid.`,
       );
     }
     // If we have a response, include its status and data in the error
     const status = error.response?.status;
     const statusText = status ? `HTTP ${status}` : 'HTTP ?';
     const errorData = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+      ? typeof error.response.data === 'string'
+        ? error.response.data
+        : JSON.stringify(error.response.data)
       : error.message;
 
     throw new Error(
-      `Failed to unlock interface ${interfaceName} (${statusText}): ${errorData}`
+      `Failed to unlock interface ${interfaceName} (${statusText}): ${errorData}`,
     );
   }
 }
-

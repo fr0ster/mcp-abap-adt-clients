@@ -3,11 +3,11 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { limitDescription } from '../../utils/internalUtils';
-import { ICreateTableTypeParams } from './types';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreateTableTypeParams } from './types';
 
 /**
  * Create empty ABAP table type (XML-based entity like Domain/DataElement)
@@ -16,7 +16,7 @@ import { getSystemInformation } from '../../utils/systemInfo';
  */
 export async function createTableType(
   connection: IAbapConnection,
-  params: ICreateTableTypeParams
+  params: ICreateTableTypeParams,
 ): Promise<AxiosResponse> {
   if (!params.tabletype_name) {
     throw new Error('TableType name is required');
@@ -35,9 +35,15 @@ export async function createTableType(
   const responsible = systemInfo ? username : '';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(params.description || params.tabletype_name);
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
-  const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
+  const description = limitDescription(
+    params.description || params.tabletype_name,
+  );
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
+  const responsibleAttr = responsible
+    ? ` adtcore:responsible="${responsible}"`
+    : '';
 
   // Create empty table type with POST using XML format (ttyp:tableType)
   const createUrl = `/sap/bc/adt/ddic/tabletypes${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
@@ -50,8 +56,8 @@ export async function createTableType(
 </ttyp:tableType>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.tabletype.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml'
+    Accept: 'application/vnd.sap.adt.tabletype.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml',
   };
 
   try {
@@ -60,15 +66,19 @@ export async function createTableType(
       method: 'POST',
       timeout: getTimeout('default'),
       data: tableTypeXml,
-      headers
+      headers,
     });
 
     return createResponse;
   } catch (error: any) {
     const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+      ? typeof error.response.data === 'string'
+        ? error.response.data
+        : JSON.stringify(error.response.data)
       : error.message;
 
-    throw new Error(`Failed to create table type ${params.tabletype_name}: ${errorMessage}`);
+    throw new Error(
+      `Failed to create table type ${params.tabletype_name}: ${errorMessage}`,
+    );
   }
 }

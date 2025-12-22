@@ -4,11 +4,11 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { ICreateDataElementParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreateDataElementParams } from './types';
 
 /**
  * Low-level: Create data element (POST)
@@ -16,7 +16,7 @@ import { ICreateDataElementParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
-  args: ICreateDataElementParams
+  args: ICreateDataElementParams,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
@@ -26,29 +26,42 @@ export async function create(
   const masterSystem = systemInfo?.systemID || '';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(args.description || args.data_element_name);
+  const description = limitDescription(
+    args.description || args.data_element_name,
+  );
   if (!args.type_kind) {
-    throw new Error('type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType');
+    throw new Error(
+      'type_kind is required. Must be one of: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType',
+    );
   }
 
   // Validate required parameters based on type_kind
   // predefinedAbapType and refToPredefinedAbapType require data_type
   // Other types (domain, refToDictionaryType, refToClifType) require type_name
-  if (args.type_kind === 'predefinedAbapType' || args.type_kind === 'refToPredefinedAbapType') {
+  if (
+    args.type_kind === 'predefinedAbapType' ||
+    args.type_kind === 'refToPredefinedAbapType'
+  ) {
     if (!args.data_type) {
-      throw new Error(`data_type is required when type_kind is '${args.type_kind}'. Provide data type (e.g., CHAR, NUMC, INT4).`);
+      throw new Error(
+        `data_type is required when type_kind is '${args.type_kind}'. Provide data type (e.g., CHAR, NUMC, INT4).`,
+      );
     }
   } else {
     // domain, refToDictionaryType, refToClifType require type_name
     if (args.type_kind === 'domain') {
       // For domain, type_name (domain name) is required, but it will be used as data_type internally
       if (!args.type_name && !args.data_type) {
-        throw new Error(`type_name (domain name) is required when type_kind is 'domain'. Provide domain name (e.g., ZOK_AUTH_ID).`);
+        throw new Error(
+          `type_name (domain name) is required when type_kind is 'domain'. Provide domain name (e.g., ZOK_AUTH_ID).`,
+        );
       }
     } else {
       // refToDictionaryType, refToClifType
       if (!args.type_name) {
-        throw new Error(`type_name is required when type_kind is '${args.type_kind}'. Provide ${args.type_kind === 'refToDictionaryType' ? 'data element name' : 'class name'}.`);
+        throw new Error(
+          `type_name is required when type_kind is '${args.type_kind}'. Provide ${args.type_kind === 'refToDictionaryType' ? 'data element name' : 'class name'}.`,
+        );
       }
     }
   }
@@ -60,7 +73,7 @@ export async function create(
   let typeName = '';
   if (typeKindXml === 'domain') {
     // For domain type, typeName comes from dataType (or type_name if dataType not provided)
-    typeName = (args.data_type || args.type_name) ? (args.data_type || args.type_name)!.toUpperCase() : '';
+    typeName = (args.data_type || args.type_name || '').toUpperCase();
   } else {
     // For other types, typeName comes from type_name parameter
     typeName = args.type_name ? args.type_name.toUpperCase() : '';
@@ -74,15 +87,32 @@ export async function create(
   const longLabel = args.long_label || '';
   const headingLabel = args.heading_label || '';
   const searchHelp = args.search_help !== undefined ? args.search_help : '';
-  const searchHelpParameter = args.search_help_parameter !== undefined ? args.search_help_parameter : '';
-  const setGetParameter = args.set_get_parameter !== undefined ? args.set_get_parameter : '';
-  const defaultComponentName = args.default_component_name !== undefined ? args.default_component_name : '';
-  const deactivateInputHistory = args.deactivate_input_history !== undefined ? args.deactivate_input_history : false;
-  const changeDocument = args.change_document !== undefined ? args.change_document : false;
-  const leftToRightDirection = args.left_to_right_direction !== undefined ? args.left_to_right_direction : false;
-  const deactivateBIDIFiltering = args.deactivate_bidi_filtering !== undefined ? args.deactivate_bidi_filtering : false;
+  const searchHelpParameter =
+    args.search_help_parameter !== undefined ? args.search_help_parameter : '';
+  const setGetParameter =
+    args.set_get_parameter !== undefined ? args.set_get_parameter : '';
+  const defaultComponentName =
+    args.default_component_name !== undefined
+      ? args.default_component_name
+      : '';
+  const deactivateInputHistory =
+    args.deactivate_input_history !== undefined
+      ? args.deactivate_input_history
+      : false;
+  const changeDocument =
+    args.change_document !== undefined ? args.change_document : false;
+  const leftToRightDirection =
+    args.left_to_right_direction !== undefined
+      ? args.left_to_right_direction
+      : false;
+  const deactivateBIDIFiltering =
+    args.deactivate_bidi_filtering !== undefined
+      ? args.deactivate_bidi_filtering
+      : false;
 
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel"
             xmlns:adtcore="http://www.sap.com/adt/core"
@@ -125,8 +155,9 @@ export async function create(
 </blue:wbobj>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.dataelements.v2+xml'
+    Accept:
+      'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
+    'Content-Type': 'application/vnd.sap.adt.dataelements.v2+xml',
   };
 
   return connection.makeAdtRequest({
@@ -134,6 +165,6 @@ export async function create(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 }

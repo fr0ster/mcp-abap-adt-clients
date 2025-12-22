@@ -1,36 +1,39 @@
 /**
  * AdtTable - High-level CRUD operations for Table objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
  * - activate uses same session/cookies (no stateful needed)
- * 
+ *
  * Operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { ITableConfig, ITableState } from './types';
-import { validateTableName } from './validation';
-import { createTable } from './create';
-import { runTableCheckRun } from './check';
-import { acquireTableLockHandle } from './lock';
-import { updateTable } from './update';
-import { unlockTable } from './unlock';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateTable } from './activation';
+import { runTableCheckRun } from './check';
+import { createTable } from './create';
 import { checkDeletion, deleteTable } from './delete';
-import { getTableSource, getTableMetadata, getTableTransport } from './read';
+import { acquireTableLockHandle } from './lock';
+import { getTableMetadata, getTableSource, getTableTransport } from './read';
+import type { ITableConfig, ITableState } from './types';
+import { unlockTable } from './unlock';
+import { updateTable } from './update';
+import { validateTableName } from './validation';
 
 export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   private readonly connection: IAbapConnection;
@@ -53,7 +56,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     const validationResponse = await validateTableName(
       this.connection,
       config.tableName,
-      config.description
+      config.description,
     );
     return { validationResponse, errors: [] };
   }
@@ -63,7 +66,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async create(
     config: ITableConfig,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
@@ -74,7 +77,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
 
     let objectCreated = false;
     const state: ITableState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -84,7 +87,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         table_name: config.tableName,
         package_name: config.packageName,
         transport_request: config.transportRequest,
-        ddl_code: options?.sourceCode || config.ddlCode
+        ddl_code: options?.sourceCode || config.ddlCode,
       });
       objectCreated = true;
       this.logger?.info?.('Table created');
@@ -99,10 +102,13 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
           this.logger?.warn?.('Deleting table after failure');
           await deleteTable(this.connection, {
             table_name: config.tableName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete table after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete table after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -117,7 +123,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   async read(
     config: Partial<ITableConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
@@ -128,7 +134,9 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.connection,
         config.tableName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       return { readResult, errors: [] };
     } catch (error: any) {
@@ -144,26 +152,36 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async readMetadata(
     config: Partial<ITableConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<ITableState> {
     const state: ITableState = { errors: [] };
     if (!config.tableName) {
       const error = new Error('Table name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getTableMetadata(
         this.connection,
         config.tableName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       this.logger?.info?.('Table metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -174,26 +192,36 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async readTransport(
     config: Partial<ITableConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<ITableState> {
     const state: ITableState = { errors: [] };
     if (!config.tableName) {
       const error = new Error('Table name is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getTableTransport(
         this.connection,
         config.tableName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
       this.logger?.info?.('Table transport request read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readTransport', err);
       throw err;
     }
@@ -206,7 +234,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async update(
     config: Partial<ITableConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
@@ -219,20 +247,22 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         throw new Error('Source code (ddlCode) is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await updateTable(
         this.connection,
         {
           table_name: config.tableName,
           ddl_code: codeToUpdate,
-          transport_request: config.transportRequest
+          transport_request: config.transportRequest,
         },
-        options.lockHandle
+        options.lockHandle,
       );
       this.logger?.info?.('Table updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
@@ -242,14 +272,25 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking table');
       this.connection.setSessionType('stateful');
-      lockHandle = await acquireTableLockHandle(this.connection, config.tableName);
+      lockHandle = await acquireTableLockHandle(
+        this.connection,
+        config.tableName,
+      );
       this.logger?.info?.('Table locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlCode;
       if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, codeToCheck, 'inactive');
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        await runTableCheckRun(
+          this.connection,
+          'abapCheckRun',
+          config.tableName,
+          codeToCheck,
+          'inactive',
+        );
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -261,23 +302,24 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
           {
             table_name: config.tableName,
             ddl_code: codeToCheck,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           },
-          lockHandle
+          lockHandle,
         );
         this.logger?.info?.('Table updated');
 
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { tableName: config.tableName },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ tableName: config.tableName }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after update:',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -293,14 +335,26 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, 'inactive');
+      await runTableCheckRun(
+        this.connection,
+        'abapCheckRun',
+        config.tableName,
+        undefined,
+        'inactive',
+      );
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating table');
-        const activateResponse = await activateTable(this.connection, config.tableName);
-        this.logger?.info?.('Table activated, status:', activateResponse.status);
+        const activateResponse = await activateTable(
+          this.connection,
+          config.tableName,
+        );
+        this.logger?.info?.(
+          'Table activated, status:',
+          activateResponse.status,
+        );
 
         // 6.5. Read with long polling to ensure object is ready after activation
         this.logger?.info?.('read (wait for object ready after activation)');
@@ -308,31 +362,37 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
           const readState = await this.read(
             { tableName: config.tableName },
             'active',
-            { withLongPolling: true }
+            { withLongPolling: true },
           );
           if (readState) {
             return {
               activateResult: activateResponse,
               readResult: readState.readResult,
-              errors: []
+              errors: [],
             };
           }
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after activation:',
+            readError,
+          );
           // Continue anyway - activation was successful
         }
         return {
           activateResult: activateResponse,
-          errors: []
+          errors: [],
         };
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getTableSource(this.connection, config.tableName);
+      const readResponse = await getTableSource(
+        this.connection,
+        config.tableName,
+      );
       return {
         readResult: readResponse,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -356,10 +416,13 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
           // No stateful needed - delete doesn't use lock/unlock
           await deleteTable(this.connection, {
             table_name: config.tableName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete table after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete table after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -381,7 +444,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       this.logger?.info?.('Checking table for deletion');
       await checkDeletion(this.connection, {
         table_name: config.tableName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('Deletion check passed');
 
@@ -389,7 +452,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       this.logger?.info?.('Deleting table');
       const result = await deleteTable(this.connection, {
         table_name: config.tableName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('Table deleted');
 
@@ -423,7 +486,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async check(
     config: Partial<ITableConfig>,
-    status?: string
+    status?: string,
   ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
@@ -432,8 +495,14 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     // Map status to version
     const version: string = status === 'active' ? 'active' : 'inactive';
     return {
-      checkResult: await runTableCheckRun(this.connection, 'abapCheckRun', config.tableName, undefined, version),
-      errors: []
+      checkResult: await runTableCheckRun(
+        this.connection,
+        'abapCheckRun',
+        config.tableName,
+        undefined,
+        version,
+      ),
+      errors: [],
     };
   }
 
@@ -452,16 +521,23 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   /**
    * Unlock table
    */
-  async unlock(config: Partial<ITableConfig>, lockHandle: string): Promise<ITableState> {
+  async unlock(
+    config: Partial<ITableConfig>,
+    lockHandle: string,
+  ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
     }
 
-    const result = await unlockTable(this.connection, config.tableName, lockHandle);
+    const result = await unlockTable(
+      this.connection,
+      config.tableName,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
-      errors: []
+      errors: [],
     };
   }
 }

@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { ISearchObjectsParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { ISearchObjectsParams } from './types';
 
 /**
  * Search for ABAP objects by name pattern
@@ -17,7 +17,7 @@ import { ISearchObjectsParams } from './types';
  */
 export async function searchObjects(
   connection: IAbapConnection,
-  params: ISearchObjectsParams
+  params: ISearchObjectsParams,
 ): Promise<AxiosResponse> {
   const encodedQuery = encodeSapObjectName(params.query);
   const maxResults = params.maxResults || 100;
@@ -33,8 +33,7 @@ export async function searchObjects(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
-

@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -17,7 +17,7 @@ import { readObjectSource } from '../shared/readSource';
 export async function getClassMetadata(
   connection: IAbapConnection,
   className: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'class', className, undefined, options);
 }
@@ -32,9 +32,16 @@ export async function getClassSource(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'class', className, undefined, version, options);
+  return readObjectSource(
+    connection,
+    'class',
+    className,
+    undefined,
+    version,
+    options,
+  );
 }
 
 /**
@@ -47,7 +54,7 @@ export async function getClassSource(
 export async function getClass(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
 ): Promise<AxiosResponse> {
   return getClassSource(connection, className, version);
 }
@@ -61,7 +68,7 @@ export async function getClass(
 export async function getClassTransport(
   connection: IAbapConnection,
   className: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   let url = `/sap/bc/adt/oo/classes/${encodedName}/transport`;
@@ -74,8 +81,8 @@ export async function getClassTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
 
@@ -88,7 +95,7 @@ export async function getClassTransport(
 export async function getClassDefinitionsInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
@@ -99,8 +106,8 @@ export async function getClassDefinitionsInclude(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain; charset=utf-8'
-    }
+      Accept: 'text/plain; charset=utf-8',
+    },
   });
 }
 
@@ -113,7 +120,7 @@ export async function getClassDefinitionsInclude(
 export async function getClassMacrosInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
@@ -124,8 +131,8 @@ export async function getClassMacrosInclude(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain; charset=utf-8'
-    }
+      Accept: 'text/plain; charset=utf-8',
+    },
   });
 }
 
@@ -138,7 +145,7 @@ export async function getClassMacrosInclude(
 export async function getClassTestClassesInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
@@ -149,8 +156,8 @@ export async function getClassTestClassesInclude(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain; charset=utf-8'
-    }
+      Accept: 'text/plain; charset=utf-8',
+    },
   });
 }
 
@@ -163,7 +170,7 @@ export async function getClassTestClassesInclude(
 export async function getClassImplementationsInclude(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
@@ -174,8 +181,7 @@ export async function getClassImplementationsInclude(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain; charset=utf-8'
-    }
+      Accept: 'text/plain; charset=utf-8',
+    },
   });
 }
-

@@ -1,22 +1,22 @@
 /**
  * Activate Metadata Extension (DDLX)
- * 
+ *
  * Endpoint: POST /sap/bc/adt/activation?method=activate&preauditRequested=true
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { activateObjectInSession } from '../../utils/activationUtils';
 
 /**
  * Activate a metadata extension
- * 
+ *
  * @param connection - ABAP connection instance
  * @param name - Metadata extension name (e.g., 'ZOK_C_CDS_TEST_0001')
  * @param sessionId - Session ID for request tracking
  * @param preaudit - Request pre-audit before activation (default: true)
  * @returns Axios response with activation result
- * 
+ *
  * @example
  * ```typescript
  * await activateMetadataExtension(connection, 'ZOK_C_CDS_TEST_0001', sessionId);
@@ -25,7 +25,7 @@ import { activateObjectInSession } from '../../utils/activationUtils';
 export async function activateMetadataExtension(
   connection: IAbapConnection,
   name: string,
-  preaudit: boolean = true
+  preaudit: boolean = true,
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
   const objectUri = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
@@ -34,6 +34,6 @@ export async function activateMetadataExtension(
     connection,
     objectUri,
     name.toUpperCase(),
-    preaudit
+    preaudit,
   );
 }

@@ -4,11 +4,11 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
+import type { AxiosResponse } from 'axios';
+import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
-import { ICreateServiceDefinitionParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreateServiceDefinitionParams } from './types';
 
 /**
  * Low-level: Create service definition (POST)
@@ -16,7 +16,7 @@ import { ICreateServiceDefinitionParams } from './types';
  */
 export async function create(
   connection: IAbapConnection,
-  args: ICreateServiceDefinitionParams
+  args: ICreateServiceDefinitionParams,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/srvd/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
@@ -27,18 +27,22 @@ export async function create(
   const masterLanguage = systemInfo?.language || 'EN';
 
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(args.description || args.service_definition_name);
+  const description = limitDescription(
+    args.description || args.service_definition_name,
+  );
   const serviceDefinitionName = args.service_definition_name.toUpperCase();
 
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${masterLanguage}" adtcore:name="${serviceDefinitionName}" adtcore:type="SRVD/SRV" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr} adtcore:responsible="${username}" srvd:srvdSourceType="S">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </srvd:srvdSource>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.ddic.srvd.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.ddic.srvd.v1+xml'
+    Accept: 'application/vnd.sap.adt.ddic.srvd.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.ddic.srvd.v1+xml',
   };
 
   return connection.makeAdtRequest({
@@ -46,7 +50,6 @@ export async function create(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 }
-

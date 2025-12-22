@@ -2,7 +2,7 @@
  * FunctionModule module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (camelCase, matching Builder config)
 export interface ICreateFunctionModuleParams {

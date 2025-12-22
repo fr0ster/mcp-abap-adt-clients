@@ -3,11 +3,11 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { ICreateTableParams } from './types';
+import type { AxiosResponse } from 'axios';
+import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreateTableParams } from './types';
 
 /**
  * Create empty ABAP table
@@ -16,7 +16,7 @@ import { getSystemInformation } from '../../utils/systemInfo';
  */
 export async function createTable(
   connection: IAbapConnection,
-  params: ICreateTableParams
+  params: ICreateTableParams,
 ): Promise<AxiosResponse> {
   if (!params.table_name) {
     throw new Error('Table name is required');
@@ -36,8 +36,12 @@ export async function createTable(
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(params.table_name);
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
-  const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
+  const responsibleAttr = responsible
+    ? ` adtcore:responsible="${responsible}"`
+    : '';
 
   // Create empty table with POST
   const createUrl = `/sap/bc/adt/ddic/tables${params.transport_request ? `?corrNr=${params.transport_request}` : ''}`;
@@ -49,8 +53,9 @@ export async function createTable(
 </blue:blueSource>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.tables.v2+xml'
+    Accept:
+      'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml',
+    'Content-Type': 'application/vnd.sap.adt.tables.v2+xml',
   };
 
   try {
@@ -59,16 +64,19 @@ export async function createTable(
       method: 'POST',
       timeout: getTimeout('default'),
       data: tableXml,
-      headers
+      headers,
     });
 
     return createResponse;
   } catch (error: any) {
     const errorMessage = error.response?.data
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data))
+      ? typeof error.response.data === 'string'
+        ? error.response.data
+        : JSON.stringify(error.response.data)
       : error.message;
 
-    throw new Error(`Failed to create table ${params.table_name}: ${errorMessage}`);
+    throw new Error(
+      `Failed to create table ${params.table_name}: ${errorMessage}`,
+    );
   }
 }
-

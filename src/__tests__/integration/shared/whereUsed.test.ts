@@ -5,16 +5,17 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/whereUsed.test
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -56,8 +57,10 @@ function getConfig(): SapConfig {
     }
 
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
 
     if (uaaUrl) config.uaaUrl = uaaUrl;
     if (uaaClientId) config.uaaClientId = uaaClientId;
@@ -66,7 +69,9 @@ function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username;
     config.password = password;
@@ -87,8 +92,10 @@ describe('Shared - getWhereUsed', () => {
       await (connection as any).connect();
       client = new AdtClient(connection, testsLogger);
       hasConfig = true;
-    } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (_error) {
+      testsLogger.warn?.(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -101,107 +108,119 @@ describe('Shared - getWhereUsed', () => {
 
   it('should use default scope without modifications (Eclipse default behavior)', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
+    logBuilderTestStep('where-used with default scope', testsLogger);
+    testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+    testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
-    try {
-      logBuilderTestStep('where-used with default scope', testsLogger);
-      testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
-      testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
-      
-      const utils = client.getUtils();
-      const scopeResponse = await utils.getWhereUsedScope({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class'
-      });
-      
-      expect(scopeResponse.status).toBe(200);
-      expect(scopeResponse.data).toBeDefined();
-      
-      // Step 2: Use scope WITHOUT modifications (exactly as SAP returned it)
-      testsLogger.info?.('🔍 Step 2: Executing where-used search with UNMODIFIED scope...');
-      const result = await utils.getWhereUsed({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class',
-        scopeXml: scopeResponse.data  // Pass scope as-is, no modifications
-      });
-      
-      expect(result.status).toBe(200);
-      expect(result.data).toBeDefined();
-      
-      const match = result.data?.match(/numberOfResults="(\d+)"/);
-      if (match) {
-        testsLogger.info?.(`🎯 Found ${match[1]} usage references with default scope`);
-      }
-      
-      testsLogger.info?.('✅ Test complete: scope used without modifications');
-    } catch (error: any) {
-      throw error;
+    const utils = client.getUtils();
+    const scopeResponse = await utils.getWhereUsedScope({
+      object_name: 'CL_ABAP_CHAR_UTILITIES',
+      object_type: 'class',
+    });
+
+    expect(scopeResponse.status).toBe(200);
+    expect(scopeResponse.data).toBeDefined();
+
+    // Step 2: Use scope WITHOUT modifications (exactly as SAP returned it)
+    testsLogger.info?.(
+      '🔍 Step 2: Executing where-used search with UNMODIFIED scope...',
+    );
+    const result = await utils.getWhereUsed({
+      object_name: 'CL_ABAP_CHAR_UTILITIES',
+      object_type: 'class',
+      scopeXml: scopeResponse.data, // Pass scope as-is, no modifications
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.data).toBeDefined();
+
+    const match = result.data?.match(/numberOfResults="(\d+)"/);
+    if (match) {
+      testsLogger.info?.(
+        `🎯 Found ${match[1]} usage references with default scope`,
+      );
     }
+
+    testsLogger.info?.('✅ Test complete: scope used without modifications');
   }, 30000);
 
   it('should search with all types enabled (Eclipse "select all" behavior)', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
+    logBuilderTestStep('where-used with ALL types enabled', testsLogger);
+    testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+    testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
-    try {
-      logBuilderTestStep('where-used with ALL types enabled', testsLogger);
-      testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
-      testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
-      
-      const utils = client.getUtils();
-      const scopeResponse = await utils.getWhereUsedScope({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class'
-      });
-      
-      expect(scopeResponse.status).toBe(200);
-      
-      // Parse initial state
-      const allTypes = (scopeResponse.data.match(/<usagereferences:type/g) || []).length;
-      const initialSelected = (scopeResponse.data.match(/isSelected="true"/g) || []).length;
-      
-      testsLogger.info?.(`📊 Initial scope: ${initialSelected}/${allTypes} types selected`);
-      
-      // Step 2: Enable ALL types (like Eclipse "Select All" checkbox)
-      testsLogger.info?.('🔧 Modifying scope - enabling ALL types...');
-      const modifiedScope = utils.modifyWhereUsedScope(scopeResponse.data, {
-        enableAll: true
-      });
-      
-      // Verify all types are now selected
-      const finalSelected = (modifiedScope.match(/isSelected="true"/g) || []).length;
-      testsLogger.info?.(`📊 Modified scope: ${finalSelected}/${allTypes} types selected`);
-      expect(finalSelected).toBe(allTypes);
-      
-      // Step 3: Execute search with all types
-      testsLogger.info?.('🔍 Step 3: Executing where-used search with ALL types...');
-      const result = await utils.getWhereUsed({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class',
-        scopeXml: modifiedScope
-      });
-      
-      expect(result.status).toBe(200);
-      expect(result.data).toBeDefined();
-      
-      const match = result.data?.match(/numberOfResults="(\d+)"/);
-      if (match) {
-        testsLogger.info?.(`🎯 Found ${match[1]} usage references with ALL types enabled`);
-      }
-      
-      testsLogger.info?.('✅ Test complete: all types enabled successfully');
-    } catch (error: any) {
-      throw error;
+    const utils = client.getUtils();
+    const scopeResponse = await utils.getWhereUsedScope({
+      object_name: 'CL_ABAP_CHAR_UTILITIES',
+      object_type: 'class',
+    });
+
+    expect(scopeResponse.status).toBe(200);
+
+    // Parse initial state
+    const allTypes = (scopeResponse.data.match(/<usagereferences:type/g) || [])
+      .length;
+    const initialSelected = (
+      scopeResponse.data.match(/isSelected="true"/g) || []
+    ).length;
+
+    testsLogger.info?.(
+      `📊 Initial scope: ${initialSelected}/${allTypes} types selected`,
+    );
+
+    // Step 2: Enable ALL types (like Eclipse "Select All" checkbox)
+    testsLogger.info?.('🔧 Modifying scope - enabling ALL types...');
+    const modifiedScope = utils.modifyWhereUsedScope(scopeResponse.data, {
+      enableAll: true,
+    });
+
+    // Verify all types are now selected
+    const finalSelected = (modifiedScope.match(/isSelected="true"/g) || [])
+      .length;
+    testsLogger.info?.(
+      `📊 Modified scope: ${finalSelected}/${allTypes} types selected`,
+    );
+    expect(finalSelected).toBe(allTypes);
+
+    // Step 3: Execute search with all types
+    testsLogger.info?.(
+      '🔍 Step 3: Executing where-used search with ALL types...',
+    );
+    const result = await utils.getWhereUsed({
+      object_name: 'CL_ABAP_CHAR_UTILITIES',
+      object_type: 'class',
+      scopeXml: modifiedScope,
+    });
+
+    expect(result.status).toBe(200);
+    expect(result.data).toBeDefined();
+
+    const match = result.data?.match(/numberOfResults="(\d+)"/);
+    if (match) {
+      testsLogger.info?.(
+        `🎯 Found ${match[1]} usage references with ALL types enabled`,
+      );
     }
+
+    testsLogger.info?.('✅ Test complete: all types enabled successfully');
   }, 30000);
 
   it('should get where-used for table', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
@@ -209,33 +228,37 @@ describe('Shared - getWhereUsed', () => {
       logBuilderTestStep('get where-used for table', testsLogger);
       testsLogger.info?.('📋 Object: T000 (table)');
       testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
-      
+
       const result = await client.getUtils().getWhereUsed({
         object_name: 'T000',
-        object_type: 'table'
+        object_type: 'table',
       });
-      
+
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();
-      
+
       testsLogger.info?.('✅ Where-used query completed (default types)');
       testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
-      
+
       // Parse and log number of results
       const match = result.data?.match(/numberOfResults="(\d+)"/);
       if (match) {
         testsLogger.info?.(`🎯 Found ${match[1]} usage references`);
-        
+
         // Parse objectTypes to see which types were searched
-        const typeMatches = result.data?.matchAll(/<usagereferences:type name="([^"]+)" isSelected="true"/g);
+        const typeMatches = result.data?.matchAll(
+          /<usagereferences:type name="([^"]+)" isSelected="true"/g,
+        );
         const searchedTypes: string[] = [];
         if (typeMatches) {
           for (const tm of typeMatches) {
             searchedTypes.push(tm[1]);
           }
-          testsLogger.info?.(`🔍 Searched in types: ${searchedTypes.join(', ')}`);
+          testsLogger.info?.(
+            `🔍 Searched in types: ${searchedTypes.join(', ')}`,
+          );
         }
-        
+
         // Log result description if available
         const descMatch = result.data?.match(/resultDescription="([^"]+)"/);
         if (descMatch) {
@@ -244,10 +267,14 @@ describe('Shared - getWhereUsed', () => {
       }
     } catch (error: any) {
       if (error.response?.status === 415) {
-        throw new Error(`415 Unsupported Media Type: The server cannot process the request Content-Type. This may indicate an issue with the Content-Type header format. Error: ${error.message}`);
+        throw new Error(
+          `415 Unsupported Media Type: The server cannot process the request Content-Type. This may indicate an issue with the Content-Type header format. Error: ${error.message}`,
+        );
       }
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-        throw new Error(`Request timeout: Where-used query for table "T000" exceeded timeout. This may indicate that the query is too complex or the system is slow. Consider increasing the timeout or using a simpler test object. Error: ${error.message}`);
+        throw new Error(
+          `Request timeout: Where-used query for table "T000" exceeded timeout. This may indicate that the query is too complex or the system is slow. Consider increasing the timeout or using a simpler test object. Error: ${error.message}`,
+        );
       }
       throw error;
     }
@@ -255,7 +282,9 @@ describe('Shared - getWhereUsed', () => {
 
   it('should throw error if object name is missing', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
@@ -263,14 +292,16 @@ describe('Shared - getWhereUsed', () => {
     await expect(
       client.getUtils().getWhereUsed({
         object_name: '',
-        object_type: 'class'
-      })
+        object_type: 'class',
+      }),
     ).rejects.toThrow('Object name is required');
   });
 
   it('should throw error if object type is missing', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
@@ -278,9 +309,8 @@ describe('Shared - getWhereUsed', () => {
     await expect(
       client.getUtils().getWhereUsed({
         object_name: 'TEST',
-        object_type: ''
-      })
+        object_type: '',
+      }),
     ).rejects.toThrow('Object type is required');
   });
 });
-

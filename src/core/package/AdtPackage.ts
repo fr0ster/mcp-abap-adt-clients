@@ -1,49 +1,52 @@
 /**
  * AdtPackage - High-level CRUD operations for Package objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
- * 
+ *
  * Operation chains:
  * - Create: validate → create → check
  * - Update: lock → check(inactive) → update → unlock → check
  * - Delete: check(deletion) → delete
- * 
+ *
  * Note: Packages are containers and don't have source code.
  * Update only changes metadata (description, superPackage, etc.).
  * Packages don't have activate operation (they are not activated).
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IPackageConfig, IPackageState } from './types';
-import { validatePackageBasic } from './validation';
-import { createPackage } from './create';
-import { checkPackage } from './check';
-import { lockPackage } from './lock';
-import { updatePackage } from './update';
-import { unlockPackage } from './unlock';
-import { checkPackageDeletion, deletePackage } from './delete';
-import { getPackage, getPackageTransport } from './read';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { getSystemInformation } from '../../utils/systemInfo';
+import { checkPackage } from './check';
+import { createPackage } from './create';
+import { checkPackageDeletion, deletePackage } from './delete';
+import { lockPackage } from './lock';
+import { getPackage, getPackageTransport } from './read';
+import type { IPackageConfig, IPackageState } from './types';
+import { unlockPackage } from './unlock';
+import { updatePackage } from './update';
+import { validatePackageBasic } from './validation';
 
 export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   public readonly objectType: string = 'Package';
 
-    constructor(connection: IAbapConnection, logger?: ILogger) {
-      this.connection = connection;
-      this.logger = logger;
-    }
+  constructor(connection: IAbapConnection, logger?: ILogger) {
+    this.connection = connection;
+    this.logger = logger;
+  }
 
   /**
    * Validate package configuration before creation
@@ -56,24 +59,21 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       throw new Error('Super package is required for validation');
     }
 
-    const response = await validatePackageBasic(
-      this.connection,
-      {
-        package_name: config.packageName,
-        super_package: config.superPackage,
-        description: config.description,
-        package_type: config.packageType,
-        software_component: config.softwareComponent,
-        transport_layer: config.transportLayer,
-        transport_request: config.transportRequest,
-        application_component: config.applicationComponent,
-        responsible: config.responsible
-      }
-    );
-    
+    const response = await validatePackageBasic(this.connection, {
+      package_name: config.packageName,
+      super_package: config.superPackage,
+      description: config.description,
+      package_type: config.packageType,
+      software_component: config.softwareComponent,
+      transport_layer: config.transportLayer,
+      transport_request: config.transportRequest,
+      application_component: config.applicationComponent,
+      responsible: config.responsible,
+    });
+
     return {
       validationResponse: response,
-      errors: []
+      errors: [],
     };
   }
 
@@ -83,7 +83,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async create(
     config: IPackageConfig,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -103,20 +103,17 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     try {
       // 1. Validate (no stateful needed)
       this.logger?.info?.('Step 1: Validating package configuration');
-      await validatePackageBasic(
-        this.connection,
-        {
-          package_name: config.packageName,
-          super_package: config.superPackage,
-          description: config.description,
-          package_type: config.packageType,
-          software_component: config.softwareComponent,
-          transport_layer: config.transportLayer,
-          transport_request: config.transportRequest,
-          application_component: config.applicationComponent,
-          responsible: config.responsible
-        }
-      );
+      await validatePackageBasic(this.connection, {
+        package_name: config.packageName,
+        super_package: config.superPackage,
+        description: config.description,
+        package_type: config.packageType,
+        software_component: config.softwareComponent,
+        transport_layer: config.transportLayer,
+        transport_request: config.transportRequest,
+        application_component: config.applicationComponent,
+        responsible: config.responsible,
+      });
       this.logger?.info?.('Validation passed');
 
       // 2. Create (no stateful needed)
@@ -130,21 +127,22 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         transport_layer: config.transportLayer,
         transport_request: config.transportRequest,
         application_component: config.applicationComponent,
-        responsible: config.responsible
+        responsible: config.responsible,
       });
       this.logger?.info?.('Package created');
 
       // 2.5. Read with long polling (wait for object to be ready)
       this.logger?.info?.('read (wait for object ready)');
       try {
-        await this.read(
-          { packageName: config.packageName },
-          'active',
-          { withLongPolling: true }
-        );
+        await this.read({ packageName: config.packageName }, 'active', {
+          withLongPolling: true,
+        });
         this.logger?.info?.('object is ready after creation');
       } catch (readError) {
-        this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+        this.logger?.warn?.(
+          'read with long polling failed (object may not be ready yet):',
+          readError,
+        );
         // Continue anyway - check might still work
       }
       objectCreated = true;
@@ -158,10 +156,14 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       // Note: Packages don't have activate operation
 
       // Read and return result (no stateful needed)
-      const readResponse = await getPackage(this.connection, config.packageName, 'active');
+      const readResponse = await getPackage(
+        this.connection,
+        config.packageName,
+        'active',
+      );
       return {
         createResult: readResponse,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       // Ensure stateless if needed
@@ -173,10 +175,13 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           // No stateful needed - delete doesn't use lock/unlock
           await deletePackage(this.connection, {
             package_name: config.packageName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete package after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete package after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -191,7 +196,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   async read(
     config: Partial<IPackageConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IPackageState | undefined> {
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -202,11 +207,13 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         this.connection,
         config.packageName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -222,12 +229,16 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async readMetadata(
     config: Partial<IPackageConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IPackageState> {
     const state: IPackageState = { errors: [] };
     if (!config.packageName) {
       const error = new Error('Package name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
@@ -236,7 +247,9 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         this.connection,
         config.packageName,
         'active',
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       state.readResult = response;
@@ -244,7 +257,11 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -255,26 +272,36 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async readTransport(
     config: Partial<IPackageConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IPackageState> {
     const state: IPackageState = { errors: [] };
     if (!config.packageName) {
       const error = new Error('Package name is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getPackageTransport(
         this.connection,
         config.packageName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
       this.logger?.info?.('Package transport request read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readTransport', err);
       throw err;
     }
@@ -288,7 +315,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async update(
     config: Partial<IPackageConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -302,8 +329,10 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
-      const systemInfo = await getSystemInformation(this.connection);
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
+      const _systemInfo = await getSystemInformation(this.connection);
       const updateResponse = await updatePackage(
         this.connection,
         {
@@ -313,14 +342,14 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           transport_layer: config.transportLayer,
           description: config.description,
           package_type: config.packageType,
-          responsible: config.responsible
+          responsible: config.responsible,
         },
-        options.lockHandle
+        options.lockHandle,
       );
       this.logger?.info?.('Package updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
@@ -337,8 +366,15 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
       if (xmlToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkPackage(this.connection, config.packageName, 'inactive', xmlToCheck);
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        await checkPackage(
+          this.connection,
+          config.packageName,
+          'inactive',
+          xmlToCheck,
+        );
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -350,29 +386,33 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           {
             package_name: config.packageName,
             super_package: config.superPackage,
-            description: config.updatedDescription || config.description || config.packageName,
+            description:
+              config.updatedDescription ||
+              config.description ||
+              config.packageName,
             package_type: config.packageType,
             software_component: config.softwareComponent,
             transport_layer: config.transportLayer,
             transport_request: config.transportRequest,
             application_component: config.applicationComponent,
-            responsible: config.responsible || systemInfo?.userName
+            responsible: config.responsible || systemInfo?.userName,
           },
-          lockHandle
+          lockHandle,
         );
         this.logger?.info?.('Package updated');
 
         // 3.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { packageName: config.packageName },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ packageName: config.packageName }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -394,10 +434,13 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       // Note: Packages don't have activate operation
 
       // Read and return result (no stateful needed)
-      const readResponse = await getPackage(this.connection, config.packageName);
+      const readResponse = await getPackage(
+        this.connection,
+        config.packageName,
+      );
       return {
         updateResult: readResponse,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -421,10 +464,13 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           // No stateful needed - delete doesn't use lock/unlock
           await deletePackage(this.connection, {
             package_name: config.packageName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete package after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete package after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -446,7 +492,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       this.logger?.info?.('Checking package for deletion');
       await checkPackageDeletion(this.connection, {
         package_name: config.packageName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('Deletion check passed');
 
@@ -454,7 +500,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       this.logger?.info?.('Deleting package');
       const result = await deletePackage(this.connection, {
         package_name: config.packageName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('Package deleted');
 
@@ -469,8 +515,10 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    * Activate package
    * Note: Packages don't have activate operation - this is a stub
    */
-  async activate(config: Partial<IPackageConfig>): Promise<IPackageState> {
-    throw new Error('Activate operation is not supported for Package objects in ADT');
+  async activate(_config: Partial<IPackageConfig>): Promise<IPackageState> {
+    throw new Error(
+      'Activate operation is not supported for Package objects in ADT',
+    );
   }
 
   /**
@@ -478,17 +526,22 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async check(
     config: Partial<IPackageConfig>,
-    status?: string
+    status?: string,
   ): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
 
     // Map status to version
-    const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
     return {
-      checkResult: await checkPackage(this.connection, config.packageName, version),
-      errors: []
+      checkResult: await checkPackage(
+        this.connection,
+        config.packageName,
+        version,
+      ),
+      errors: [],
     };
   }
 
@@ -507,16 +560,23 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   /**
    * Unlock package
    */
-  async unlock(config: Partial<IPackageConfig>, lockHandle: string): Promise<IPackageState> {
+  async unlock(
+    config: Partial<IPackageConfig>,
+    lockHandle: string,
+  ): Promise<IPackageState> {
     if (!config.packageName) {
       throw new Error('Package name is required');
     }
 
-    const result = await unlockPackage(this.connection, config.packageName, lockHandle);
+    const result = await unlockPackage(
+      this.connection,
+      config.packageName,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
-      errors: []
+      errors: [],
     };
   }
 }

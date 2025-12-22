@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock program
@@ -14,10 +14,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function unlockProgram(
   connection: IAbapConnection,
   programName: string,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-  return connection.makeAdtRequest({url, method: 'POST', timeout: getTimeout('default'), data: null});
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null,
+  });
 }
-

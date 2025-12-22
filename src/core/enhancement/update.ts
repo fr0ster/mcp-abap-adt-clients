@@ -3,14 +3,14 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import {
-  IUpdateEnhancementParams,
-  EnhancementType,
+  type EnhancementType,
   getEnhancementUri,
-  supportsSourceCode
+  type IUpdateEnhancementParams,
+  supportsSourceCode,
 } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -31,7 +31,7 @@ const logger = {
  */
 export async function update(
   connection: IAbapConnection,
-  args: IUpdateEnhancementParams
+  args: IUpdateEnhancementParams,
 ): Promise<AxiosResponse> {
   if (!args.enhancement_name) {
     throw new Error('enhancement_name is required');
@@ -47,7 +47,9 @@ export async function update(
   }
 
   if (!supportsSourceCode(args.enhancement_type)) {
-    throw new Error(`Enhancement type '${args.enhancement_type}' does not support source code update. Only 'enhoxhh' supports source code.`);
+    throw new Error(
+      `Enhancement type '${args.enhancement_type}' does not support source code update. Only 'enhoxhh' supports source code.`,
+    );
   }
 
   const encodedName = encodeSapObjectName(args.enhancement_name).toLowerCase();
@@ -64,13 +66,17 @@ export async function update(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Accept': 'text/plain'
+    Accept: 'text/plain',
   };
 
   logger.debug(`[DEBUG] Updating enhancement - URL: ${url}`);
   logger.debug(`[DEBUG] Updating enhancement - Method: PUT`);
-  logger.debug(`[DEBUG] Updating enhancement - Headers: ${JSON.stringify(headers, null, 2)}`);
-  logger.debug(`[DEBUG] Updating enhancement - Source code length: ${args.source_code.length}`);
+  logger.debug(
+    `[DEBUG] Updating enhancement - Headers: ${JSON.stringify(headers, null, 2)}`,
+  );
+  logger.debug(
+    `[DEBUG] Updating enhancement - Source code length: ${args.source_code.length}`,
+  );
 
   try {
     const response = await connection.makeAdtRequest({
@@ -78,18 +84,26 @@ export async function update(
       method: 'PUT',
       timeout: getTimeout('default'),
       data: args.source_code,
-      headers
+      headers,
     });
     return response;
   } catch (error: any) {
     if (error.response) {
-      logger.error(`[ERROR] Update enhancement failed - Status: ${error.response.status}`);
-      logger.error(`[ERROR] Update enhancement failed - StatusText: ${error.response.statusText}`);
-      logger.error(`[ERROR] Update enhancement failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`);
-      logger.error(`[ERROR] Update enhancement failed - Response data (first 1000 chars):`,
+      logger.error(
+        `[ERROR] Update enhancement failed - Status: ${error.response.status}`,
+      );
+      logger.error(
+        `[ERROR] Update enhancement failed - StatusText: ${error.response.statusText}`,
+      );
+      logger.error(
+        `[ERROR] Update enhancement failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`,
+      );
+      logger.error(
+        `[ERROR] Update enhancement failed - Response data (first 1000 chars):`,
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)
-          : JSON.stringify(error.response.data).substring(0, 1000));
+          : JSON.stringify(error.response.data).substring(0, 1000),
+      );
     }
     throw error;
   }
@@ -112,13 +126,13 @@ export async function updateEnhancement(
   enhancementName: string,
   sourceCode: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   return update(connection, {
     enhancement_name: enhancementName,
     enhancement_type: enhancementType,
     source_code: sourceCode,
     lock_handle: lockHandle,
-    transport_request: transportRequest
+    transport_request: transportRequest,
   });
 }

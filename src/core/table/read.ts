@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -15,7 +15,7 @@ import { readObjectSource } from '../shared/readSource';
 export async function getTableMetadata(
   connection: IAbapConnection,
   tableName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'table', tableName, undefined, options);
 }
@@ -27,9 +27,16 @@ export async function getTableSource(
   connection: IAbapConnection,
   tableName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'table', tableName, undefined, version, options);
+  return readObjectSource(
+    connection,
+    'table',
+    tableName,
+    undefined,
+    version,
+    options,
+  );
 }
 
 /**
@@ -38,7 +45,7 @@ export async function getTableSource(
  */
 export async function getTable(
   connection: IAbapConnection,
-  tableName: string
+  tableName: string,
 ): Promise<AxiosResponse> {
   return getTableSource(connection, tableName);
 }
@@ -52,7 +59,7 @@ export async function getTable(
 export async function getTableTransport(
   connection: IAbapConnection,
   tableName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -63,8 +70,7 @@ export async function getTableTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
-

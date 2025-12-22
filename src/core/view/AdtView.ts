@@ -1,36 +1,39 @@
 /**
  * AdtView - High-level CRUD operations for View (DDLS) objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
  * - activate uses same session/cookies (no stateful needed)
- * 
+ *
  * Operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IViewConfig, IViewState } from './types';
-import { validateViewName } from './validation';
-import { createView } from './create';
-import { checkView } from './check';
-import { lockDDLS } from './lock';
-import { updateView } from './update';
-import { unlockDDLS } from './unlock';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateDDLS } from './activation';
+import { checkView } from './check';
+import { createView } from './create';
 import { checkDeletion, deleteView } from './delete';
-import { getViewSource, getViewMetadata, getViewTransport } from './read';
+import { lockDDLS } from './lock';
+import { getViewMetadata, getViewSource, getViewTransport } from './read';
+import type { IViewConfig, IViewState } from './types';
+import { unlockDDLS } from './unlock';
+import { updateView } from './update';
+import { validateViewName } from './validation';
 
 export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   private readonly connection: IAbapConnection;
@@ -56,24 +59,28 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.connection,
         config.viewName,
         config.packageName,
-        config.description
+        config.description,
       );
       state.validationResponse = response;
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'validate',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('validate', err);
       throw err;
     }
-}
+  }
 
   /**
    * Create view with full operation chain
    */
   async create(
     config: IViewConfig,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
@@ -87,7 +94,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
 
     let objectCreated = false;
     const state: IViewState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -98,7 +105,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         package_name: config.packageName,
         transport_request: config.transportRequest,
         description: config.description,
-        ddl_source: options?.sourceCode || config.ddlSource
+        ddl_source: options?.sourceCode || config.ddlSource,
       });
       objectCreated = true;
       this.logger?.info?.('View created');
@@ -114,10 +121,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           // No stateful needed - delete doesn't use lock/unlock
           await deleteView(this.connection, {
             view_name: config.viewName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete view after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete view after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -132,7 +142,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   async read(
     config: Partial<IViewConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IViewState | undefined> {
     if (!config.viewName) {
       throw new Error('View name is required');
@@ -143,11 +153,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.connection,
         config.viewName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -162,26 +174,36 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    */
   async readMetadata(
     config: Partial<IViewConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IViewState> {
     const state: IViewState = { errors: [] };
     if (!config.viewName) {
       const error = new Error('View name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getViewMetadata(
         this.connection,
         config.viewName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       this.logger?.info?.('View metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -192,26 +214,36 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    */
   async readTransport(
     config: Partial<IViewConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IViewState> {
     const state: IViewState = { errors: [] };
     if (!config.viewName) {
       const error = new Error('View name is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getViewTransport(
         this.connection,
         config.viewName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
       this.logger?.info?.('View transport request read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readTransport', err);
       throw err;
     }
@@ -224,7 +256,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    */
   async update(
     config: Partial<IViewConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
@@ -237,18 +269,20 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         throw new Error('Source code (ddlSource) is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await updateView(
         this.connection,
         config.viewName,
         codeToUpdate,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('View updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
@@ -264,8 +298,15 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlSource;
       if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkView(this.connection, config.viewName, 'inactive', codeToCheck);
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        await checkView(
+          this.connection,
+          config.viewName,
+          'inactive',
+          codeToCheck,
+        );
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -277,21 +318,22 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           config.viewName,
           codeToCheck,
           lockHandle,
-          config.transportRequest
+          config.transportRequest,
         );
         this.logger?.info?.('View updated');
 
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { viewName: config.viewName },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ viewName: config.viewName }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after update:',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -313,7 +355,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating view');
-        const activateResponse = await activateDDLS(this.connection, config.viewName);
+        const activateResponse = await activateDDLS(
+          this.connection,
+          config.viewName,
+        );
         this.logger?.info?.('View activated, status:', activateResponse.status);
 
         // 6.5. Read with long polling to ensure object is ready after activation
@@ -322,34 +367,42 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           const readState = await this.read(
             { viewName: config.viewName },
             'active',
-            { withLongPolling: true }
+            { withLongPolling: true },
           );
           if (readState) {
             return {
               readResult: activateResponse,
-              errors: []
+              errors: [],
             };
           }
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after activation:',
+            readError,
+          );
           // Continue anyway - activation was successful
         }
         return {
           readResult: activateResponse,
-          errors: []
+          errors: [],
         };
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getViewSource(this.connection, config.viewName, 'inactive');
-      const ddlSource = typeof readResponse.data === 'string'
-        ? readResponse.data
-        : JSON.stringify(readResponse.data);
+      const readResponse = await getViewSource(
+        this.connection,
+        config.viewName,
+        'inactive',
+      );
+      const _ddlSource =
+        typeof readResponse.data === 'string'
+          ? readResponse.data
+          : JSON.stringify(readResponse.data);
 
       return {
         readResult: readResponse,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -373,10 +426,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           // No stateful needed - delete doesn't use lock/unlock
           await deleteView(this.connection, {
             view_name: config.viewName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete view after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete view after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -398,7 +454,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       this.logger?.info?.('Checking view for deletion');
       await checkDeletion(this.connection, {
         view_name: config.viewName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('Deletion check passed');
 
@@ -406,13 +462,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       this.logger?.info?.('Deleting view');
       const result = await deleteView(this.connection, {
         view_name: config.viewName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('View deleted');
 
       return {
         deleteResult: result,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       this.logger?.error('Delete failed:', error);
@@ -433,7 +489,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       const result = await activateDDLS(this.connection, config.viewName);
       return {
         activateResult: result,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       this.logger?.error('Activate failed:', error);
@@ -446,19 +502,25 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    */
   async check(
     config: Partial<IViewConfig>,
-    status?: string
+    status?: string,
   ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
 
     // Map status to version
-    const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
     // Support ddlSource for checking with source code (standard operation)
     const sourceCode = config.ddlSource;
     return {
-      checkResult: await checkView(this.connection, config.viewName, version, sourceCode),
-      errors: []
+      checkResult: await checkView(
+        this.connection,
+        config.viewName,
+        version,
+        sourceCode,
+      ),
+      errors: [],
     };
   }
 
@@ -477,16 +539,23 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   /**
    * Unlock view
    */
-  async unlock(config: Partial<IViewConfig>, lockHandle: string): Promise<IViewState> {
+  async unlock(
+    config: Partial<IViewConfig>,
+    lockHandle: string,
+  ): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
 
-    const result = await unlockDDLS(this.connection, config.viewName, lockHandle);
+    const result = await unlockDDLS(
+      this.connection,
+      config.viewName,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
-      errors: []
+      errors: [],
     };
   }
 }

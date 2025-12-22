@@ -1,11 +1,11 @@
 /**
  * TestConfigResolver - Centralized YAML configuration resolver for tests
- * 
+ *
  * Automatically resolves test parameters with priority:
  * 1. Test case specific params (testCase.params.*)
  * 2. Global environment defaults (environment.default_*)
  * 3. Environment variables (process.env.SAP_*)
- * 
+ *
  * Usage:
  *   const resolver = new TestConfigResolver(testCase);
  *   const packageName = resolver.getPackageName();
@@ -20,7 +20,7 @@ const {
   getEnvironmentConfig,
   resolvePackageName,
   resolveTransportRequest,
-  resolveStandardObject
+  resolveStandardObject,
 } = require('./test-helper');
 
 export interface ITestConfigResolverOptions {
@@ -42,7 +42,10 @@ export class TestConfigResolver {
     if (options.testCase) {
       this.testCase = options.testCase;
     } else if (options.handlerName && options.testCaseName) {
-      this.testCase = getTestCaseDefinition(options.handlerName, options.testCaseName);
+      this.testCase = getTestCaseDefinition(
+        options.handlerName,
+        options.testCaseName,
+      );
     } else if (options.handlerName) {
       // Try to get first enabled test case
       const { getEnabledTestCase } = require('./test-helper');
@@ -76,7 +79,7 @@ export class TestConfigResolver {
    */
   getParam(paramName: string, defaultValue?: any): any {
     const params = this.getParams();
-    
+
     // First try test case params
     if (params[paramName] !== undefined && params[paramName] !== null) {
       return params[paramName];
@@ -91,13 +94,19 @@ export class TestConfigResolver {
 
     // Try global environment config
     const globalKey = `default_${paramName}`;
-    if (this.envConfig[globalKey] !== undefined && this.envConfig[globalKey] !== null) {
+    if (
+      this.envConfig[globalKey] !== undefined &&
+      this.envConfig[globalKey] !== null
+    ) {
       return this.envConfig[globalKey];
     }
 
     // Try environment variable
     const envVarName = `SAP_${paramName.toUpperCase()}`;
-    if (process.env[envVarName] !== undefined && process.env[envVarName] !== null) {
+    if (
+      process.env[envVarName] !== undefined &&
+      process.env[envVarName] !== null
+    ) {
       return process.env[envVarName];
     }
 
@@ -125,7 +134,9 @@ export class TestConfigResolver {
    * @param objectType - Type of object ('class', 'domain', 'table', etc.)
    * @returns Object with name (and optional group for function modules) or null
    */
-  getStandardObject(objectType: string): { name: string; group?: string } | null {
+  getStandardObject(
+    objectType: string,
+  ): { name: string; group?: string } | null {
     return resolveStandardObject(objectType, this.isCloud, this.testCase);
   }
 
@@ -137,7 +148,7 @@ export class TestConfigResolver {
    */
   getObjectName(paramName: string, standardObjectType?: string): string | null {
     const params = this.getParams();
-    
+
     // First try test case param
     if (params[paramName]) {
       return params[paramName];
@@ -172,7 +183,11 @@ export class TestConfigResolver {
 
     // If available_in is not specified, test is available for all environments
     const availableIn = this.testCase.available_in;
-    if (!availableIn || !Array.isArray(availableIn) || availableIn.length === 0) {
+    if (
+      !availableIn ||
+      !Array.isArray(availableIn) ||
+      availableIn.length === 0
+    ) {
       return true;
     }
 
@@ -199,12 +214,15 @@ export class TestConfigResolver {
    * Create a new resolver for a different test case
    * Useful for getting params from another test case (e.g., read_transport test getting params from create_class)
    */
-  createForTestCase(handlerName: string, testCaseName?: string): TestConfigResolver {
+  createForTestCase(
+    handlerName: string,
+    testCaseName?: string,
+  ): TestConfigResolver {
     return new TestConfigResolver({
       handlerName,
       testCaseName,
       isCloud: this.isCloud,
-      logger: this.logger
+      logger: this.logger,
     });
   }
 
@@ -213,9 +231,14 @@ export class TestConfigResolver {
    * @param handlers - Array of {handlerName, testCaseName} pairs to try
    * @returns New resolver with first found test case, or null if none found
    */
-  tryMultipleHandlers(handlers: Array<{ handlerName: string; testCaseName?: string }>): TestConfigResolver | null {
+  tryMultipleHandlers(
+    handlers: Array<{ handlerName: string; testCaseName?: string }>,
+  ): TestConfigResolver | null {
     for (const handler of handlers) {
-      const resolver = this.createForTestCase(handler.handlerName, handler.testCaseName);
+      const resolver = this.createForTestCase(
+        handler.handlerName,
+        handler.testCaseName,
+      );
       if (resolver.getTestCase()) {
         return resolver;
       }
@@ -223,4 +246,3 @@ export class TestConfigResolver {
     return null;
   }
 }
-

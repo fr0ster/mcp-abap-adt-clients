@@ -2,7 +2,7 @@
  * Program module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
 export interface ICreateProgramParams {

@@ -1,40 +1,53 @@
 /**
  * AdtBehaviorImplementation - High-level CRUD operations for Behavior Implementation objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Behavior Implementation is a special form of class (CLAS/OC) with:
  * - Empty main class source
  * - Special implementations include (local handler class)
- * 
+ *
  * Uses composition with AdtClass for most operations, overriding only
  * methods that work with implementations include (update, read).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
  * - activate uses same session/cookies (no stateful needed)
- * 
+ *
  * Operation chains:
  * - Create: validate → create (via AdtClass) → check → lock → check(inactive) → update (implementations) → unlock → check → activate
  * - Update: lock → check(inactive) → update (implementations) → unlock → check → activate
  * - Delete: check(deletion) → delete (via AdtClass)
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IBehaviorImplementationConfig, IBehaviorImplementationState } from './types';
-import { validateBehaviorImplementationName } from './validation';
-import { updateBehaviorImplementation } from './update';
-import { getBehaviorImplementationSource, getBehaviorImplementationMetadata, getBehaviorImplementationTransport } from './read';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class';
 import { updateClass } from '../class/update';
+import {
+  getBehaviorImplementationMetadata,
+  getBehaviorImplementationSource,
+  getBehaviorImplementationTransport,
+} from './read';
+import type {
+  IBehaviorImplementationConfig,
+  IBehaviorImplementationState,
+} from './types';
+import { updateBehaviorImplementation } from './update';
+import { validateBehaviorImplementationName } from './validation';
 
-export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState> {
+export class AdtBehaviorImplementation
+  implements
+    IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly class: AdtClass;
@@ -49,7 +62,9 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
   /**
    * Validate behavior implementation configuration before creation
    */
-  async validate(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+  async validate(
+    config: Partial<IBehaviorImplementationConfig>,
+  ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required for validation');
@@ -68,13 +83,17 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         config.className,
         config.packageName,
         config.description,
-        config.behaviorDefinition
+        config.behaviorDefinition,
       );
       state.validationResponse = response;
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'validate', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'validate',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('validate', err);
       throw err;
     }
@@ -85,7 +104,7 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
    */
   async create(
     config: IBehaviorImplementationConfig,
-    options?: IAdtOperationOptions
+    _options?: IAdtOperationOptions,
   ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
@@ -101,7 +120,7 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
       throw new Error('Behavior definition is required');
     }
 
-    let objectCreated = false;
+    let _objectCreated = false;
     const systemInfo = await getSystemInformation(this.connection);
     const username = systemInfo?.userName || '';
     const masterSystem = systemInfo?.systemID;
@@ -116,12 +135,12 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
           transportRequest: config.transportRequest,
           description: config.description,
           masterSystem: masterSystem,
-          responsible: username
+          responsible: username,
         },
-        { activateOnCreate: false }
+        { activateOnCreate: false },
       );
       state.createResult = createState.createResult;
-      objectCreated = true;
+      _objectCreated = true;
       this.logger?.info?.('Behavior implementation class created');
       return state;
     } catch (error: any) {
@@ -136,7 +155,7 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
   async read(
     config: Partial<IBehaviorImplementationConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IBehaviorImplementationState | undefined> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
@@ -150,7 +169,9 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         this.connection,
         config.className,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.readResult = response;
       return state;
@@ -170,26 +191,36 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
    */
   async readMetadata(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getBehaviorImplementationMetadata(
         this.connection,
         config.className,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       this.logger?.info?.('Behavior implementation metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -200,26 +231,38 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
    */
   async readTransport(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getBehaviorImplementationTransport(
         this.connection,
         config.className,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
-      this.logger?.info?.('Behavior implementation transport request read successfully');
+      this.logger?.info?.(
+        'Behavior implementation transport request read successfully',
+      );
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readTransport', err);
       throw err;
     }
@@ -232,7 +275,7 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
    */
   async update(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
@@ -243,7 +286,8 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
 
     // Low-level mode: if lockHandle is provided, perform only update operation
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.implementationCode || config.sourceCode;
+      const codeToUpdate =
+        options?.sourceCode || config.implementationCode || config.sourceCode;
       if (!codeToUpdate) {
         throw new Error('Implementation code is required for update');
       }
@@ -251,8 +295,10 @@ export class AdtBehaviorImplementation implements IAdtObject<IBehaviorImplementa
         throw new Error('behaviorDefinition is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
-      
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
+
       // Update main source with "FOR BEHAVIOR OF" clause
       const mainSource = `CLASS ${config.className} DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF ${config.behaviorDefinition}.
 
@@ -266,7 +312,7 @@ ENDCLASS.`;
         config.className,
         mainSource,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
 
       // Update implementations include
@@ -275,12 +321,12 @@ ENDCLASS.`;
         config.className,
         codeToUpdate,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('Behavior implementation updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
@@ -291,16 +337,23 @@ ENDCLASS.`;
       this.logger?.info?.('Step 1: Locking behavior implementation class');
       lockHandle = await this.class.lock({ className: config.className });
       state.lockHandle = lockHandle;
-      this.logger?.info?.('Behavior implementation class locked, handle:', lockHandle);
+      this.logger?.info?.(
+        'Behavior implementation class locked, handle:',
+        lockHandle,
+      );
 
       // 2. Get code for update (from options or config)
-      const codeToCheck = options?.sourceCode || config.implementationCode || config.sourceCode;
+      const codeToCheck =
+        options?.sourceCode || config.implementationCode || config.sourceCode;
 
       // 3. Check inactive version (without sourceCode - implementations include code is not full class code)
       // Note: We don't check with implementations include code because it's not the full class code
       // The implementations include code will be validated when we update it
       this.logger?.info?.('Step 2: Checking inactive version');
-      const checkInactiveState = await this.class.check({ className: config.className }, 'inactive');
+      const checkInactiveState = await this.class.check(
+        { className: config.className },
+        'inactive',
+      );
       state.checkResult = checkInactiveState.checkResult;
       this.logger?.info?.('Check inactive passed');
 
@@ -309,7 +362,9 @@ ENDCLASS.`;
         throw new Error('behaviorDefinition is required for update');
       }
       if (lockHandle) {
-        this.logger?.info?.('Step 3: Updating main source with FOR BEHAVIOR OF clause');
+        this.logger?.info?.(
+          'Step 3: Updating main source with FOR BEHAVIOR OF clause',
+        );
         const mainSource = `CLASS ${config.className} DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF ${config.behaviorDefinition}.
 
 ENDCLASS.
@@ -317,40 +372,45 @@ ENDCLASS.
 CLASS ${config.className} IMPLEMENTATION.
 
 ENDCLASS.`;
-        const mainSourceUpdateResponse = await updateClass(
+        const _mainSourceUpdateResponse = await updateClass(
           this.connection,
           config.className,
           mainSource,
           lockHandle,
-          config.transportRequest
+          config.transportRequest,
         );
         this.logger?.info?.('Main source updated with FOR BEHAVIOR OF clause');
       }
 
       // 5. Update implementations include
       if (codeToCheck && lockHandle) {
-        this.logger?.info?.('Step 4: Updating behavior implementation implementations include');
+        this.logger?.info?.(
+          'Step 4: Updating behavior implementation implementations include',
+        );
         const updateResponse = await updateBehaviorImplementation(
           this.connection,
           config.className,
           codeToCheck,
           lockHandle,
-          config.transportRequest
+          config.transportRequest,
         );
         state.updateResult = updateResponse;
-        this.logger?.info?.('Behavior implementation implementations include updated');
+        this.logger?.info?.(
+          'Behavior implementation implementations include updated',
+        );
 
         // 5.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { className: config.className },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ className: config.className }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -358,7 +418,10 @@ ENDCLASS.`;
       // 6. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 5: Unlocking behavior implementation class');
-        const unlockState = await this.class.unlock({ className: config.className }, lockHandle);
+        const unlockState = await this.class.unlock(
+          { className: config.className },
+          lockHandle,
+        );
         state.unlockResult = unlockState.unlockResult;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
@@ -367,36 +430,48 @@ ENDCLASS.`;
 
       // 7. Final check (no stateful needed)
       this.logger?.info?.('Step 6: Final check');
-      const finalCheckState = await this.class.check({ className: config.className }, 'inactive');
+      const finalCheckState = await this.class.check(
+        { className: config.className },
+        'inactive',
+      );
       state.checkResult = finalCheckState.checkResult;
       this.logger?.info?.('Final check passed');
 
       // 8. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 7: Activating behavior implementation class');
-        const activateState = await this.class.activate({ className: config.className });
+        const activateState = await this.class.activate({
+          className: config.className,
+        });
         state.activateResult = activateState.activateResult;
-        this.logger?.info?.('Behavior implementation class activated, status:', activateState.activateResult?.status);
-        
+        this.logger?.info?.(
+          'Behavior implementation class activated, status:',
+          activateState.activateResult?.status,
+        );
+
         // 6.5. Read with long polling (wait for object to be ready after activation)
         this.logger?.info?.('read (wait for object ready after activation)');
         try {
-          await this.read(
-            { className: config.className },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ className: config.className }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed (object may not be ready yet):', readError);
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            readError,
+          );
           // Continue anyway - return state with activation result
         }
-        
+
         return state;
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getBehaviorImplementationSource(this.connection, config.className);
+      const readResponse = await getBehaviorImplementationSource(
+        this.connection,
+        config.className,
+      );
       state.readResult = readResponse;
 
       return state;
@@ -404,7 +479,9 @@ ENDCLASS.`;
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
-          this.logger?.warn?.('Unlocking behavior implementation class during error cleanup');
+          this.logger?.warn?.(
+            'Unlocking behavior implementation class during error cleanup',
+          );
           await this.class.unlock({ className: config.className }, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -417,13 +494,18 @@ ENDCLASS.`;
 
       if (options?.deleteOnFailure) {
         try {
-          this.logger?.warn?.('Deleting behavior implementation class after failure');
+          this.logger?.warn?.(
+            'Deleting behavior implementation class after failure',
+          );
           await this.class.delete({
             className: config.className,
-            transportRequest: config.transportRequest
+            transportRequest: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete behavior implementation class after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete behavior implementation class after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -435,7 +517,9 @@ ENDCLASS.`;
   /**
    * Delete behavior implementation
    */
-  async delete(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+  async delete(
+    config: Partial<IBehaviorImplementationConfig>,
+  ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required');
@@ -448,7 +532,7 @@ ENDCLASS.`;
       this.logger?.info?.('Deleting behavior implementation class');
       const deleteState = await this.class.delete({
         className: config.className,
-        transportRequest: config.transportRequest
+        transportRequest: config.transportRequest,
       });
       state.deleteResult = deleteState.deleteResult;
       this.logger?.info?.('Behavior implementation class deleted');
@@ -456,7 +540,11 @@ ENDCLASS.`;
       return state;
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'delete', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'delete',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Delete', err);
       throw err;
     }
@@ -466,7 +554,9 @@ ENDCLASS.`;
    * Activate behavior implementation
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<IBehaviorImplementationConfig>): Promise<IBehaviorImplementationState> {
+  async activate(
+    config: Partial<IBehaviorImplementationConfig>,
+  ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
       const error = new Error('Class name is required');
@@ -475,12 +565,18 @@ ENDCLASS.`;
     }
 
     try {
-      const activateState = await this.class.activate({ className: config.className });
+      const activateState = await this.class.activate({
+        className: config.className,
+      });
       state.activateResult = activateState.activateResult;
       return state;
     } catch (error: any) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'activate', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'activate',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('Activate', err);
       throw err;
     }
@@ -491,7 +587,7 @@ ENDCLASS.`;
    */
   async check(
     config: Partial<IBehaviorImplementationConfig>,
-    status?: string
+    status?: string,
   ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
@@ -501,7 +597,10 @@ ENDCLASS.`;
     }
 
     try {
-      const checkState = await this.class.check({ className: config.className }, status);
+      const checkState = await this.class.check(
+        { className: config.className },
+        status,
+      );
       state.checkResult = checkState.checkResult;
       return state;
     } catch (error) {
@@ -528,15 +627,21 @@ ENDCLASS.`;
    * Unlock behavior implementation
    * Delegates to AdtClass since behavior implementation is a class
    */
-  async unlock(config: Partial<IBehaviorImplementationConfig>, lockHandle: string): Promise<IBehaviorImplementationState> {
+  async unlock(
+    config: Partial<IBehaviorImplementationConfig>,
+    lockHandle: string,
+  ): Promise<IBehaviorImplementationState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
 
-    const unlockState = await this.class.unlock({ className: config.className }, lockHandle);
+    const unlockState = await this.class.unlock(
+      { className: config.className },
+      lockHandle,
+    );
     return {
       unlockResult: unlockState.unlockResult,
-      errors: []
+      errors: [],
     };
   }
 }

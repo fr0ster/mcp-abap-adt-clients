@@ -29,20 +29,24 @@
  * ```
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import { createTable } from './create';
-import { acquireTableLockHandle } from './lock';
-import { updateTable } from './update';
-import { runTableCheckRun } from './check';
-import { unlockTable } from './unlock';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
+import type { IBuilder } from '../shared/IBuilder';
 import { activateTable } from './activation';
+import { runTableCheckRun } from './check';
+import { createTable } from './create';
 import { deleteTable } from './delete';
-import { validateTableName } from './validation';
-import { ICreateTableParams, IUpdateTableParams, ITableConfig, ITableState } from './types';
+import { acquireTableLockHandle } from './lock';
 import { getTableSource } from './read';
-import { IBuilder } from '../shared/IBuilder';
+import type {
+  ICreateTableParams,
+  ITableConfig,
+  ITableState,
+  IUpdateTableParams,
+} from './types';
+import { unlockTable } from './unlock';
+import { updateTable } from './update';
+import { validateTableName } from './validation';
 
 export class TableBuilder implements IBuilder<ITableState> {
   private connection: IAbapConnection;
@@ -50,7 +54,7 @@ export class TableBuilder implements IBuilder<ITableState> {
   private config: ITableConfig;
   private lockHandle?: string;
   private state: ITableState = {
-    errors: []
+    errors: [],
   };
 
   constructor(
@@ -101,9 +105,9 @@ export class TableBuilder implements IBuilder<ITableState> {
       const response = await validateTableName(
         this.connection,
         this.config.tableName,
-        this.config.description
+        this.config.description,
       );
-      
+
       // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger?.info('Table name validation successful');
@@ -112,18 +116,20 @@ export class TableBuilder implements IBuilder<ITableState> {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger?.info('Table validation returned 400 - object may already exist');
+        this.logger?.info(
+          'Table validation returned 400 - object may already exist',
+        );
         return error.response;
       }
       // Store error response if available
       if (error.response) {
         this.state.validationResponse = error.response;
       }
-      
+
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Validation failed:', error);
       throw error;
@@ -136,12 +142,12 @@ export class TableBuilder implements IBuilder<ITableState> {
         throw new Error('Package name is required');
       }
       this.logger?.info('Creating table:', this.config.tableName);
-      this.connection.setSessionType("stateful");
+      this.connection.setSessionType('stateful');
       const params: ICreateTableParams = {
         table_name: this.config.tableName,
         package_name: this.config.packageName,
         transport_request: this.config.transportRequest,
-        ddl_code: this.config.ddlCode // Optional - can be added via update() later
+        ddl_code: this.config.ddlCode, // Optional - can be added via update() later
       };
       const result = await createTable(this.connection, params);
       this.state.createResult = result;
@@ -151,7 +157,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Create failed:', error);
       throw error;
@@ -161,10 +167,10 @@ export class TableBuilder implements IBuilder<ITableState> {
   async lock(): Promise<this> {
     try {
       this.logger?.info('Locking table:', this.config.tableName);
-      this.connection.setSessionType("stateful");
+      this.connection.setSessionType('stateful');
       const lockHandle = await acquireTableLockHandle(
         this.connection,
-        this.config.tableName
+        this.config.tableName,
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
@@ -175,7 +181,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error;
@@ -185,7 +191,9 @@ export class TableBuilder implements IBuilder<ITableState> {
   async update(): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Table must be locked before update. Call lock() first.');
+        throw new Error(
+          'Table must be locked before update. Call lock() first.',
+        );
       }
       if (!this.config.ddlCode) {
         throw new Error('DDL code is required');
@@ -195,12 +203,12 @@ export class TableBuilder implements IBuilder<ITableState> {
         table_name: this.config.tableName,
         ddl_code: this.config.ddlCode,
         transport_request: this.config.transportRequest,
-        activate: false
+        activate: false,
       };
       const result = await updateTable(
         this.connection,
         params,
-        this.lockHandle
+        this.lockHandle,
       );
       this.state.updateResult = result;
       this.logger?.info('Table updated successfully:', result.status);
@@ -209,23 +217,29 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error;
     }
   }
 
-  async check(reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun', sourceCode?: string, version: 'active' | 'inactive' | 'new' = 'new'): Promise<AxiosResponse> {
+  async check(
+    reporter: 'tableStatusCheck' | 'abapCheckRun' = 'abapCheckRun',
+    sourceCode?: string,
+    version: 'active' | 'inactive' | 'new' = 'new',
+  ): Promise<AxiosResponse> {
     try {
-      this.logger?.info(`'Checking table:'  this.config.tableName  'reporter:' ${`reporter, sourceCode ? 'with source code' : 'saved version'`}`);
+      this.logger?.info(
+        `'Checking table:'  this.config.tableName  'reporter:' ${`reporter, sourceCode ? 'with source code' : 'saved version'`}`,
+      );
       const codeToCheck = sourceCode || this.config.ddlCode;
       const result = await runTableCheckRun(
         this.connection,
         reporter,
         this.config.tableName,
         codeToCheck,
-        version
+        version,
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
@@ -235,7 +249,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error;
@@ -256,14 +270,14 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Table unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error;
@@ -275,7 +289,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.logger?.info('Activating table:', this.config.tableName);
       const result = await activateTable(
         this.connection,
-        this.config.tableName
+        this.config.tableName,
       );
       this.state.activateResult = result;
       this.logger?.info('Table activated successfully:', result.status);
@@ -284,24 +298,20 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.state.errors.push({
         method: 'activate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate failed:', error);
       throw error;
     }
   }
 
-
   async delete(): Promise<this> {
     try {
       this.logger?.info('Deleting table:', this.config.tableName);
-      const result = await deleteTable(
-        this.connection,
-        {
-          table_name: this.config.tableName,
-          transport_request: this.config.transportRequest
-        }
-      );
+      const result = await deleteTable(this.connection, {
+        table_name: this.config.tableName,
+        transport_request: this.config.transportRequest,
+      });
       this.state.deleteResult = result;
       this.logger?.info('Table deleted successfully:', result.status);
       return this;
@@ -309,7 +319,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -318,7 +328,7 @@ export class TableBuilder implements IBuilder<ITableState> {
 
   async read(
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<ITableConfig | undefined> {
     try {
       this.logger?.info('Reading table:', this.config.tableName);
@@ -326,26 +336,29 @@ export class TableBuilder implements IBuilder<ITableState> {
         this.connection,
         this.config.tableName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Table read successfully:', result.status);
-      
+
       // Parse and return config directly
-      const ddlCode = typeof result.data === 'string'
-        ? result.data
-        : JSON.stringify(result.data);
-      
+      const ddlCode =
+        typeof result.data === 'string'
+          ? result.data
+          : JSON.stringify(result.data);
+
       return {
         tableName: this.config.tableName,
-        ddlCode
+        ddlCode,
       };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error;
@@ -355,16 +368,19 @@ export class TableBuilder implements IBuilder<ITableState> {
   async forceUnlock(): Promise<void> {
     // Try to unlock if we have a lockHandle
     if (!this.lockHandle) {
-      this.logger?.warn('No lockHandle available for force unlock:', this.config.tableName);
-      this.connection.setSessionType("stateless");
+      this.logger?.warn(
+        'No lockHandle available for force unlock:',
+        this.config.tableName,
+      );
+      this.connection.setSessionType('stateless');
       return;
     }
-    
+
     try {
       await unlockTable(
         this.connection,
         this.config.tableName,
-        this.lockHandle
+        this.lockHandle,
       );
       this.logger?.info('Force unlock successful for', this.config.tableName);
     } catch (error: any) {
@@ -372,7 +388,7 @@ export class TableBuilder implements IBuilder<ITableState> {
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
     }
   }
 
@@ -417,7 +433,6 @@ export class TableBuilder implements IBuilder<ITableState> {
     return this.state.activateResult;
   }
 
-
   getDeleteResult(): AxiosResponse | undefined {
     return this.state.deleteResult;
   }
@@ -428,17 +443,22 @@ export class TableBuilder implements IBuilder<ITableState> {
     }
 
     // Table read() returns DDL source code (plain text)
-    const ddlCode = typeof this.state.readResult.data === 'string'
-      ? this.state.readResult.data
-      : JSON.stringify(this.state.readResult.data);
+    const ddlCode =
+      typeof this.state.readResult.data === 'string'
+        ? this.state.readResult.data
+        : JSON.stringify(this.state.readResult.data);
 
     return {
       tableName: this.config.tableName,
-      ddlCode
+      ddlCode,
     };
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -462,8 +482,7 @@ export class TableBuilder implements IBuilder<ITableState> {
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

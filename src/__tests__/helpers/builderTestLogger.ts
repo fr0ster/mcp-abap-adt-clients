@@ -1,6 +1,4 @@
 import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { DefaultLogger } from '@mcp-abap-adt/logger/dist/default-logger';
-import { getLogLevel } from '@mcp-abap-adt/logger/dist/types';
 
 export interface BuilderTestLogger {
   info?: (...args: any[]) => void;
@@ -24,7 +22,10 @@ function getTestLogger(logger: ILogger | undefined): ILogger | undefined {
 
 const debugLogsEnabled = process.env.DEBUG_ADT_TESTS === 'true';
 const lockLogsSetting = (process.env.LOG_LOCKS || 'true').toLowerCase();
-const lockLogsEnabled = lockLogsSetting !== 'false' && lockLogsSetting !== '0' && lockLogsSetting !== 'off';
+const lockLogsEnabled =
+  lockLogsSetting !== 'false' &&
+  lockLogsSetting !== '0' &&
+  lockLogsSetting !== 'off';
 
 // Track test progress
 let testCounter = 0;
@@ -58,10 +59,11 @@ function extractErrorMessage(error: unknown): string {
           const { XMLParser } = require('fast-xml-parser');
           const parser = new XMLParser({ ignoreAttributes: false });
           const parsed = parser.parse(data);
-          const errorText = parsed['exc:exception']?.message?.['#text'] ||
-                           parsed['exc:exception']?.message ||
-                           parsed['exc:exception']?.reason?.['#text'] ||
-                           parsed['exc:exception']?.reason;
+          const errorText =
+            parsed['exc:exception']?.message?.['#text'] ||
+            parsed['exc:exception']?.message ||
+            parsed['exc:exception']?.reason?.['#text'] ||
+            parsed['exc:exception']?.reason;
           if (errorText) {
             dataMessage = errorText;
           } else {
@@ -104,10 +106,14 @@ function extractErrorMessage(error: unknown): string {
 function logImmediate(message: string): void {
   // Use synchronous write to ensure messages appear in order
   // This ensures test logs are not interleaved when tests run sequentially
-  process.stdout.write(message + '\n');
+  process.stdout.write(`${message}\n`);
 }
 
-export function logBuilderTestStart(logger: ILogger | undefined, testName: string, testCase: any): void {
+export function logBuilderTestStart(
+  logger: ILogger | undefined,
+  testName: string,
+  testCase: any,
+): void {
   if (!testCase) {
     return;
   }
@@ -116,7 +122,8 @@ export function logBuilderTestStart(logger: ILogger | undefined, testName: strin
   const startTime = Date.now();
   testStartTimes.set(testName, startTime);
 
-  const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
+  const progress =
+    totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
   const startMessage = `${progress} ▶ START ${testName} :: ${testCase.name}`;
 
   // Use logImmediate for synchronous output (Jest buffers console.log)
@@ -140,17 +147,25 @@ export function resetTestCounter(): void {
   testResults.clear();
 }
 
-export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testName: string, reason: string, silent: boolean = false): void {
+export function logBuilderTestSkip(
+  logger: BuilderTestLogger | undefined,
+  testName: string,
+  reason: string,
+  silent: boolean = false,
+): void {
   // If test was disabled before start, don't log anything
   if (silent) {
     testResults.set(testName, 'SKIP');
     return;
   }
-  
+
   const currentCounter = testCounter > 0 ? testCounter : 1;
-  const progress = totalTests > 0 ? `[${currentCounter}/${totalTests}]` : `[${currentCounter}]`;
+  const progress =
+    totalTests > 0
+      ? `[${currentCounter}/${totalTests}]`
+      : `[${currentCounter}]`;
   const message = `${progress} ⏭ SKIP ${testName} – ${reason}`;
-  
+
   // Use logImmediate for synchronous output (Jest buffers console.log)
   logImmediate(message);
   // Also log via logger if provided (uses DefaultLogger which is synchronous)
@@ -161,13 +176,19 @@ export function logBuilderTestSkip(logger: BuilderTestLogger | undefined, testNa
   testResults.set(testName, 'SKIP');
 }
 
-export function logBuilderTestSuccess(logger: BuilderTestLogger | undefined, testName: string): void {
+export function logBuilderTestSuccess(
+  logger: BuilderTestLogger | undefined,
+  testName: string,
+): void {
   try {
     const startTime = testStartTimes.get(testName);
-    const duration = startTime ? ` (${((Date.now() - startTime) / 1000).toFixed(1)}s)` : '';
-    const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
+    const duration = startTime
+      ? ` (${((Date.now() - startTime) / 1000).toFixed(1)}s)`
+      : '';
+    const progress =
+      totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
     const message = `${progress} ✓ PASS ${testName}${duration}`;
-    
+
     // Use logImmediate for synchronous output (Jest buffers console.log)
     logImmediate(message);
     // Also log via logger if provided (uses DefaultLogger which is synchronous)
@@ -177,18 +198,22 @@ export function logBuilderTestSuccess(logger: BuilderTestLogger | undefined, tes
     }
     testStartTimes.delete(testName);
     testResults.set(testName, 'PASS');
-  } catch (error) {
+  } catch (_error) {
     // Ignore logging errors if test already completed
     // This can happen when tests are run in parallel and Jest considers test done
   }
 }
 
-export function logBuilderTestEnd(logger: BuilderTestLogger | undefined, testName: string): void {
+export function logBuilderTestEnd(
+  logger: BuilderTestLogger | undefined,
+  testName: string,
+): void {
   // Always log test completion to show clear test boundaries
   // This ensures we see when each test finishes, making logs easier to read
   const result = testResults.get(testName);
-  const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
-  
+  const progress =
+    totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
+
   if (result === 'PASS' || result === 'FAIL') {
     // Test already logged result, but we still log completion for clarity
     const message = `${progress} ✓ END ${testName}`;
@@ -202,7 +227,7 @@ export function logBuilderTestEnd(logger: BuilderTestLogger | undefined, testNam
     }
     return;
   }
-  
+
   // If test was skipped or ended without explicit result, log completion
   const message = `${progress} ✓ END ${testName}`;
   logImmediate(message);
@@ -218,11 +243,14 @@ export function logBuilderTestEnd(logger: BuilderTestLogger | undefined, testNam
 export function logBuilderTestError(
   logger: BuilderTestLogger | undefined,
   testName: string,
-  error: unknown
+  error: unknown,
 ): void {
   const startTime = testStartTimes.get(testName);
-  const duration = startTime ? ` (${((Date.now() - startTime) / 1000).toFixed(1)}s)` : '';
-  const progress = totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
+  const duration = startTime
+    ? ` (${((Date.now() - startTime) / 1000).toFixed(1)}s)`
+    : '';
+  const progress =
+    totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
   const errorMessage = extractErrorMessage(error);
   const message = `${progress} ✗ FAIL ${testName}${duration}: ${errorMessage}`;
 
@@ -234,8 +262,13 @@ export function logBuilderTestError(
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as any;
       logImmediate(`  Status: ${axiosError.response?.status}`);
-      logImmediate(`  URL: ${axiosError.config?.url || axiosError.request?.path || 'unknown'}`);
-      if (axiosError.response?.data && typeof axiosError.response.data === 'string') {
+      logImmediate(
+        `  URL: ${axiosError.config?.url || axiosError.request?.path || 'unknown'}`,
+      );
+      if (
+        axiosError.response?.data &&
+        typeof axiosError.response.data === 'string'
+      ) {
         const dataPreview = axiosError.response.data.substring(0, 500);
         logImmediate(`  Response: ${dataPreview}`);
       }
@@ -252,7 +285,10 @@ export function logBuilderTestError(
   testResults.set(testName, 'FAIL');
 }
 
-export function logBuilderTestStep(step: string, logger?: BuilderTestLogger | undefined): void {
+export function logBuilderTestStep(
+  step: string,
+  logger?: BuilderTestLogger | undefined,
+): void {
   const message = `  → ${step}`;
   // Use logImmediate for synchronous output (Jest buffers console.log)
   logImmediate(message);
@@ -268,7 +304,7 @@ export function logBuilderTestStepError(step: string, error: any): void {
     const axiosError = error as any;
     const status = axiosError.response?.status;
     const data = axiosError.response?.data;
-    
+
     let errorMessage = '';
     if (typeof data === 'string') {
       // Try to parse XML error and extract only the meaningful message
@@ -276,28 +312,34 @@ export function logBuilderTestStepError(step: string, error: any): void {
         const { XMLParser } = require('fast-xml-parser');
         const parser = new XMLParser({ ignoreAttributes: false });
         const parsed = parser.parse(data);
-        errorMessage = parsed['exc:exception']?.localizedMessage?.['#text'] ||
-                      parsed['exc:exception']?.localizedMessage ||
-                      parsed['exc:exception']?.message?.['#text'] ||
-                      parsed['exc:exception']?.message ||
-                      parsed['exc:exception']?.reason?.['#text'] ||
-                      parsed['exc:exception']?.reason ||
-                      '';
-        
+        errorMessage =
+          parsed['exc:exception']?.localizedMessage?.['#text'] ||
+          parsed['exc:exception']?.localizedMessage ||
+          parsed['exc:exception']?.message?.['#text'] ||
+          parsed['exc:exception']?.message ||
+          parsed['exc:exception']?.reason?.['#text'] ||
+          parsed['exc:exception']?.reason ||
+          '';
+
         // Clean up HTML tags if present
         if (errorMessage) {
-          errorMessage = errorMessage.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+          errorMessage = errorMessage
+            .replace(/<[^>]*>/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
         }
       } catch {
         // Not XML, try to extract meaningful part
-        const match = data.match(/<message[^>]*>([^<]+)<\/message>/i) ||
-                     data.match(/localizedMessage[^>]*>([^<]+)<\/localizedMessage>/i);
+        const match =
+          data.match(/<message[^>]*>([^<]+)<\/message>/i) ||
+          data.match(/localizedMessage[^>]*>([^<]+)<\/localizedMessage>/i);
         errorMessage = match ? match[1].trim() : '';
       }
     } else if (typeof data === 'object') {
-      errorMessage = data.message || data.error || JSON.stringify(data).substring(0, 200);
+      errorMessage =
+        data.message || data.error || JSON.stringify(data).substring(0, 200);
     }
-    
+
     if (errorMessage) {
       logImmediate(`  ✗ ${step} FAILED (HTTP ${status}): ${errorMessage}`);
     } else {
@@ -312,24 +354,43 @@ export function logBuilderTestStepError(step: string, error: any): void {
 /**
  * Log systemInfo for debugging (used in FunctionGroup create and other operations)
  */
-export function logBuilderSystemInfo(systemInfo: any, finalValues: {
-  masterSystem?: string;
-  responsible?: string;
-  willIncludeMasterSystem?: boolean;
-  willIncludeResponsible?: boolean;
-  masterSystemAttr?: string;
-  responsibleAttr?: string;
-}): void {
+export function logBuilderSystemInfo(
+  systemInfo: any,
+  finalValues: {
+    masterSystem?: string;
+    responsible?: string;
+    willIncludeMasterSystem?: boolean;
+    willIncludeResponsible?: boolean;
+    masterSystemAttr?: string;
+    responsibleAttr?: string;
+  },
+): void {
   if (debugLogsEnabled) {
     logImmediate(`  [SystemInfo] hasSystemInfo: ${!!systemInfo}`);
-    logImmediate(`  [SystemInfo] systemID: ${systemInfo?.systemID || '(none)'}`);
-    logImmediate(`  [SystemInfo] userName: ${systemInfo?.userName || '(none)'}`);
-    logImmediate(`  [SystemInfo] finalMasterSystem: ${finalValues.masterSystem || '(none)'}`);
-    logImmediate(`  [SystemInfo] finalResponsible: ${finalValues.responsible || '(none)'}`);
-    logImmediate(`  [SystemInfo] willIncludeMasterSystem: ${finalValues.willIncludeMasterSystem || false}`);
-    logImmediate(`  [SystemInfo] willIncludeResponsible: ${finalValues.willIncludeResponsible || false}`);
-    logImmediate(`  [SystemInfo] masterSystemAttr: ${finalValues.masterSystemAttr || '(not included)'}`);
-    logImmediate(`  [SystemInfo] responsibleAttr: ${finalValues.responsibleAttr || '(not included)'}`);
+    logImmediate(
+      `  [SystemInfo] systemID: ${systemInfo?.systemID || '(none)'}`,
+    );
+    logImmediate(
+      `  [SystemInfo] userName: ${systemInfo?.userName || '(none)'}`,
+    );
+    logImmediate(
+      `  [SystemInfo] finalMasterSystem: ${finalValues.masterSystem || '(none)'}`,
+    );
+    logImmediate(
+      `  [SystemInfo] finalResponsible: ${finalValues.responsible || '(none)'}`,
+    );
+    logImmediate(
+      `  [SystemInfo] willIncludeMasterSystem: ${finalValues.willIncludeMasterSystem || false}`,
+    );
+    logImmediate(
+      `  [SystemInfo] willIncludeResponsible: ${finalValues.willIncludeResponsible || false}`,
+    );
+    logImmediate(
+      `  [SystemInfo] masterSystemAttr: ${finalValues.masterSystemAttr || '(not included)'}`,
+    );
+    logImmediate(
+      `  [SystemInfo] responsibleAttr: ${finalValues.responsibleAttr || '(not included)'}`,
+    );
   }
 }
 
@@ -337,21 +398,25 @@ export function logBuilderLockEvent(
   objectType: string,
   objectName: string,
   sessionId: string,
-  lockHandle: string
+  lockHandle: string,
 ): void {
   if (!lockLogsEnabled) {
     return;
   }
-  const target = objectType === 'fm' && objectName.includes('/') ? objectName : `${objectType}:${objectName}`;
+  const target =
+    objectType === 'fm' && objectName.includes('/')
+      ? objectName
+      : `${objectType}:${objectName}`;
   logImmediate(`[LOCK] ${target} (session=${sessionId}, handle=${lockHandle})`);
 }
 
 export function getHttpStatusText(error: any): string {
-  const primaryStatus = typeof error?.response?.status === 'number'
-    ? error.response.status
-    : typeof error?.status === 'number'
-      ? error.status
-      : undefined;
+  const primaryStatus =
+    typeof error?.response?.status === 'number'
+      ? error.response.status
+      : typeof error?.status === 'number'
+        ? error.status
+        : undefined;
   if (typeof primaryStatus === 'number') {
     return `HTTP ${primaryStatus}`;
   }
@@ -375,4 +440,3 @@ export function getHttpStatusText(error: any): string {
 
   return 'HTTP ?';
 }
-

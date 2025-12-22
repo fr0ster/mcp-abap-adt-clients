@@ -11,36 +11,38 @@
 
 // High-level AdtObject implementation
 export { AdtEnhancement } from './AdtEnhancement';
+export { activateEnhancement } from './activation';
+export { check, checkEnhancement } from './check';
 
+// Low-level functions
+export { create } from './create';
+export { checkDeletion, deleteEnhancement } from './delete';
+export { lockEnhancement, lockEnhancementForUpdate } from './lock';
+export {
+  getEnhancementMetadata,
+  getEnhancementSource,
+  getEnhancementTransport,
+} from './read';
 // Types
 export type {
   EnhancementType,
-  ICreateEnhancementParams,
-  IUpdateEnhancementParams,
-  IDeleteEnhancementParams,
   ICheckEnhancementParams,
-  IValidateEnhancementParams,
+  ICreateEnhancementParams,
+  IDeleteEnhancementParams,
   IEnhancementConfig,
+  IEnhancementMetadata,
   IEnhancementState,
-  IEnhancementMetadata
+  IUpdateEnhancementParams,
+  IValidateEnhancementParams,
 } from './types';
-
 export {
   ENHANCEMENT_TYPE_CODES,
   getEnhancementBaseUrl,
   getEnhancementUri,
-  supportsSourceCode,
   isImplementationType,
-  isSpotType
+  isSpotType,
+  supportsSourceCode,
 } from './types';
-
-// Low-level functions
-export { create } from './create';
-export { getEnhancementMetadata, getEnhancementSource, getEnhancementTransport } from './read';
-export { update, updateEnhancement } from './update';
-export { checkDeletion, deleteEnhancement } from './delete';
-export { lockEnhancement, lockEnhancementForUpdate } from './lock';
 export { unlockEnhancement } from './unlock';
-export { activateEnhancement } from './activation';
-export { checkEnhancement, check } from './check';
-export { validateEnhancementName, validate } from './validation';
+export { update, updateEnhancement } from './update';
+export { validate, validateEnhancementName } from './validation';

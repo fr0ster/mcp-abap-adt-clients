@@ -1,15 +1,15 @@
 /**
  * AdtUnitTest - High-level CRUD operations for Unit Test objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - No stateful needed for unit test operations
  * - Unit tests don't use lock/unlock
- * 
+ *
  * Operation chains:
  * - Create: create (start test run)
  * - Read: read (get test run status/result)
@@ -19,17 +19,26 @@
  * - Check: not supported (test runs don't have check operation)
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { IClassUnitTestDefinition, IClassUnitTestRunOptions } from './types';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { startClassUnitTestRun } from './run';
-import { getClassUnitTestStatus, getClassUnitTestResult } from '../class/run';
-import { IUnitTestConfig, IUnitTestState } from './types';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { AdtClass, AdtLocalTestClass } from '../class';
-import { IClassState } from '../class/types';
+import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
+import { startClassUnitTestRun } from './run';
+import type {
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
+  IUnitTestConfig,
+  IUnitTestState,
+} from './types';
 
-export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> {
+export class AdtUnitTest
+  implements IAdtObject<IUnitTestConfig, IUnitTestState>
+{
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   public readonly objectType: string = 'UnitTest';
@@ -57,13 +66,15 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    */
   async validate(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
     if (!config.tests || config.tests.length === 0) {
-      throw new Error('At least one test definition is required for validation');
+      throw new Error(
+        'At least one test definition is required for validation',
+      );
     }
 
     // ADT doesn't provide validation endpoint for unit tests
     // Return a mock success response
     return {
-      errors: []
+      errors: [],
     };
   }
 
@@ -72,7 +83,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    */
   async create(
     config: IUnitTestConfig,
-    options?: IAdtOperationOptions
+    _options?: IAdtOperationOptions,
   ): Promise<IUnitTestState> {
     if (!config.tests || config.tests.length === 0) {
       throw new Error('At least one test definition is required');
@@ -83,16 +94,25 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
       const response = await startClassUnitTestRun(
         this.connection,
         config.tests,
-        config.options
+        config.options,
       );
 
       // Log response for debugging
       this.logger?.debug?.('Unit test run response status:', response.status);
-      this.logger?.debug?.('Unit test run response data type:', typeof response.data);
+      this.logger?.debug?.(
+        'Unit test run response data type:',
+        typeof response.data,
+      );
       if (typeof response.data === 'string') {
-        this.logger?.debug?.('Unit test run response data (first 500 chars):', response.data.substring(0, 500));
+        this.logger?.debug?.(
+          'Unit test run response data (first 500 chars):',
+          response.data.substring(0, 500),
+        );
       } else {
-        this.logger?.debug?.('Unit test run response data:', JSON.stringify(response.data));
+        this.logger?.debug?.(
+          'Unit test run response data:',
+          JSON.stringify(response.data),
+        );
       }
 
       // Extract run ID from response
@@ -100,7 +120,10 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
       const runId = this.extractRunId(response);
 
       if (!runId) {
-        this.logger?.error?.('Failed to extract run ID from response. Response data:', response.data);
+        this.logger?.error?.(
+          'Failed to extract run ID from response. Response data:',
+          response.data,
+        );
         throw new Error('Failed to start unit test run: run ID not returned');
       }
 
@@ -110,7 +133,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
 
       return {
         runId,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       this.logger?.error('Create failed:', error);
@@ -123,7 +146,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    */
   async read(
     config: Partial<IUnitTestConfig>,
-    version: 'active' | 'inactive' = 'active'
+    _version: 'active' | 'inactive' = 'active',
   ): Promise<IUnitTestState | undefined> {
     if (!config.runId) {
       throw new Error('Test run ID is required');
@@ -134,15 +157,18 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
       const statusResponse = await getClassUnitTestStatus(
         this.connection,
         config.runId,
-        true // withLongPolling
+        true, // withLongPolling
       );
 
       // Read result if available
       let resultResponse: AxiosResponse | undefined;
       try {
-        resultResponse = await getClassUnitTestResult(this.connection, config.runId);
+        resultResponse = await getClassUnitTestResult(
+          this.connection,
+          config.runId,
+        );
         this.lastResultResponse = resultResponse;
-      } catch (error) {
+      } catch (_error) {
         // Result might not be available yet
         this.logger?.info?.('Test result not available yet');
       }
@@ -156,7 +182,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
         runId: config.runId,
         runStatus: statusResponse.data,
         runResult: resultResponse?.data,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -170,7 +196,9 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    * Read unit test metadata
    * For unit tests, metadata is the same as read() result (status/result information)
    */
-  async readMetadata(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
+  async readMetadata(
+    config: Partial<IUnitTestConfig>,
+  ): Promise<IUnitTestState> {
     // For unit tests, metadata is the same as read() result
     const readResult = await this.read(config);
     if (!readResult) {
@@ -184,26 +212,32 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    * Note: Test runs cannot be updated
    */
   async update(
-    config: Partial<IUnitTestConfig>,
-    options?: IAdtOperationOptions
+    _config: Partial<IUnitTestConfig>,
+    _options?: IAdtOperationOptions,
   ): Promise<IUnitTestState> {
-    throw new Error('Update operation is not supported for Unit Test objects in ADT');
+    throw new Error(
+      'Update operation is not supported for Unit Test objects in ADT',
+    );
   }
 
   /**
    * Delete unit test run
    * Note: Test runs cannot be deleted via ADT
    */
-  async delete(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
-    throw new Error('Delete operation is not supported for Unit Test objects in ADT');
+  async delete(_config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
+    throw new Error(
+      'Delete operation is not supported for Unit Test objects in ADT',
+    );
   }
 
   /**
    * Activate unit test run
    * Note: Test runs are not activated
    */
-  async activate(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
-    throw new Error('Activate operation is not supported for Unit Test objects in ADT');
+  async activate(_config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
+    throw new Error(
+      'Activate operation is not supported for Unit Test objects in ADT',
+    );
   }
 
   /**
@@ -211,10 +245,12 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    * Note: Test runs don't have check operation
    */
   async check(
-    config: Partial<IUnitTestConfig>,
-    status?: string
+    _config: Partial<IUnitTestConfig>,
+    _status?: string,
   ): Promise<IUnitTestState> {
-    throw new Error('Check operation is not supported for Unit Test objects in ADT');
+    throw new Error(
+      'Check operation is not supported for Unit Test objects in ADT',
+    );
   }
 
   /**
@@ -222,11 +258,11 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    */
   async run(
     tests: IClassUnitTestDefinition[],
-    options?: IClassUnitTestRunOptions
+    options?: IClassUnitTestRunOptions,
   ): Promise<string> {
     const result = await this.create({
       tests,
-      options
+      options,
     });
     this.lastRunId = result.runId;
     return result.runId!;
@@ -244,12 +280,12 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    */
   async getStatus(
     runId: string,
-    withLongPolling: boolean = true
+    withLongPolling: boolean = true,
   ): Promise<AxiosResponse> {
     const response = await getClassUnitTestStatus(
       this.connection,
       runId,
-      withLongPolling
+      withLongPolling,
     );
     this.lastStatusResponse = response;
     return response;
@@ -267,12 +303,12 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    */
   async getResult(
     runId: string,
-    options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' }
+    options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
   ): Promise<AxiosResponse> {
     const response = await getClassUnitTestResult(
       this.connection,
       runId,
-      options
+      options,
     );
     this.lastResultResponse = response;
     return response;
@@ -290,11 +326,12 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    */
   protected extractRunId(response: AxiosResponse): string | undefined {
     // First, try to extract from response headers (most reliable)
-    const locationHeader = response.headers?.['location'] || 
-                          response.headers?.['content-location'] || 
-                          response.headers?.['sap-adt-location'];
+    const locationHeader =
+      response.headers?.location ||
+      response.headers?.['content-location'] ||
+      response.headers?.['sap-adt-location'];
     if (locationHeader) {
-      const runIdMatch = locationHeader.match(/\/runs\/([^\/]+)/);
+      const runIdMatch = locationHeader.match(/\/runs\/([^/]+)/);
       if (runIdMatch) {
         return runIdMatch[1];
       }
@@ -309,7 +346,7 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
       const uriMatch = data.match(/uri="([^"]+)"/);
       if (uriMatch) {
         const uri = uriMatch[1];
-        const runIdMatch = uri.match(/\/runs\/([^\/]+)/);
+        const runIdMatch = uri.match(/\/runs\/([^/]+)/);
         if (runIdMatch) {
           return runIdMatch[1];
         }
@@ -318,14 +355,14 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
       const runMatch = data.match(/<aunit:run[^>]*uri="([^"]+)"/);
       if (runMatch) {
         const uri = runMatch[1];
-        const runIdMatch = uri.match(/\/runs\/([^\/]+)/);
+        const runIdMatch = uri.match(/\/runs\/([^/]+)/);
         if (runIdMatch) {
           return runIdMatch[1];
         }
       }
     } else if (data?.uri) {
       const uri = data.uri;
-      const runIdMatch = uri.match(/\/runs\/([^\/]+)/);
+      const runIdMatch = uri.match(/\/runs\/([^/]+)/);
       if (runIdMatch) {
         return runIdMatch[1];
       }
@@ -337,25 +374,30 @@ export class AdtUnitTest implements IAdtObject<IUnitTestConfig, IUnitTestState> 
    * Read transport request information for unit test
    * Note: Unit tests are test runs, not ADT objects, so they don't have transport requests
    */
-  async readTransport(config: Partial<IUnitTestConfig>): Promise<IUnitTestState> {
+  async readTransport(
+    _config: Partial<IUnitTestConfig>,
+  ): Promise<IUnitTestState> {
     // Unit tests are test runs, not ADT objects, so they don't have transport requests
     // Return empty state
     return {
-      errors: []
+      errors: [],
     };
   }
 
   /**
    * Lock unit test (not supported)
    */
-  async lock(config: Partial<IUnitTestConfig>): Promise<string> {
+  async lock(_config: Partial<IUnitTestConfig>): Promise<string> {
     throw new Error('Lock operation is not supported for unit tests');
   }
 
   /**
    * Unlock unit test (not supported)
    */
-  async unlock(config: Partial<IUnitTestConfig>, lockHandle: string): Promise<IUnitTestState> {
+  async unlock(
+    _config: Partial<IUnitTestConfig>,
+    _lockHandle: string,
+  ): Promise<IUnitTestState> {
     throw new Error('Unlock operation is not supported for unit tests');
   }
 }

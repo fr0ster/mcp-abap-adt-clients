@@ -7,9 +7,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { IGetSqlQueryParams } from './types';
+import type { IGetSqlQueryParams } from './types';
 
 /**
  * Execute freestyle SQL query via SAP ADT Data Preview API
@@ -20,7 +20,7 @@ import { IGetSqlQueryParams } from './types';
  */
 export async function getSqlQuery(
   connection: IAbapConnection,
-  params: IGetSqlQueryParams
+  params: IGetSqlQueryParams,
 ): Promise<AxiosResponse> {
   if (!params.sql_query) {
     throw new Error('SQL query is required');
@@ -36,8 +36,7 @@ export async function getSqlQuery(
     data: params.sql_query,
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
-

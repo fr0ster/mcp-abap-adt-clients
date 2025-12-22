@@ -10,35 +10,39 @@
  * Run: npm test -- --testPathPattern=domain/DomainBuilder
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
-import { IDomainConfig, IDomainState } from '../../../../core/domain';
+import type { IDomainConfig, IDomainState } from '../../../../core/domain';
 import { getDomain } from '../../../../core/domain/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { getConfig } from '../../../helpers/sessionConfig';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd
-} from '../../../helpers/builderTestLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  logBuilderTestEnd,
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+} from '../../../helpers/builderTestLogger';
+import { getConfig } from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import {
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   resolvePackageName,
   resolveTransportRequest,
-  getTimeout
+  getTimeout,
 } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -73,7 +77,7 @@ describe('DomainBuilder (using AdtClient)', () => {
         'Domain',
         'create_domain',
         'adt_domain',
-        testsLogger
+        testsLogger,
       );
 
       tester.setup({
@@ -84,9 +88,13 @@ describe('DomainBuilder (using AdtClient)', () => {
         buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
           // Use resolver to get resolved parameters (from test case params or global defaults)
-          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
-          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
           return {
             domainName: params.domain_name,
             packageName,
@@ -99,23 +107,29 @@ describe('DomainBuilder (using AdtClient)', () => {
             lowercase: params.lowercase,
             sign_exists: params.sign_exists,
             value_table: params.value_table,
-            fixed_values: params.fixed_values
+            fixed_values: params.fixed_values,
           };
         },
         ensureObjectReady: async (domainName: string) => {
           if (!connection) return { success: true };
           try {
             await getDomain(connection, domainName);
-            return { success: false, reason: `⚠️ SAFETY: Domain ${domainName} already exists!` };
+            return {
+              success: false,
+              reason: `⚠️ SAFETY: Domain ${domainName} already exists!`,
+            };
           } catch (error: any) {
             if (error.response?.status !== 404) {
-              return { success: false, reason: `Cannot verify domain existence: ${error.message}` };
+              return {
+                success: false,
+                reason: `Cannot verify domain existence: ${error.message}`,
+              };
             }
           }
           return { success: true };
-        }
+        },
       });
-    } catch (error) {
+    } catch (_error) {
       hasConfig = false;
     }
   });
@@ -126,71 +140,99 @@ describe('DomainBuilder (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should execute full workflow and store all results', async () => {
-      if (!hasConfig || !tester) {
-        return;
-      }
-      const config = tester.getConfig();
-      if (!config) {
-        return;
-      }
-      
-      await tester.flowTestAuto({
-        updateConfig: {
-          domainName: config.domainName,
-          packageName: config.packageName,
-          description: config.description || '',
-          datatype: config.datatype,
-          length: config.length,
-          decimals: config.decimals
+    it(
+      'should execute full workflow and store all results',
+      async () => {
+        if (!hasConfig || !tester) {
+          return;
         }
-      });
-    }, getTimeout('test'));
+        const config = tester.getConfig();
+        if (!config) {
+          return;
+        }
+
+        await tester.flowTestAuto({
+          updateConfig: {
+            domainName: config.domainName,
+            packageName: config.packageName,
+            description: config.description || '',
+            datatype: config.datatype,
+            length: config.length,
+            decimals: config.decimals,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
   });
 
   describe('Read standard object', () => {
-    it('should read standard SAP domain', async () => {
-      // Use TestConfigResolver for consistent parameter resolution
-      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
-      const standardObject = resolver.getStandardObject('domain');
-
-      if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'Domain - read standard object', {
-          name: 'read_standard',
-          params: {}
+    it(
+      'should read standard SAP domain',
+      async () => {
+        // Use TestConfigResolver for consistent parameter resolution
+        const resolver = new TestConfigResolver({
+          isCloud: isCloudSystem,
+          logger: testsLogger,
         });
-        logBuilderTestSkip(testsLogger, 'Domain - read standard object',
-          `Standard domain not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
-        return;
-      }
+        const standardObject = resolver.getStandardObject('domain');
 
-      const standardDomainName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'Domain - read standard object', {
-        name: 'read_standard',
-        params: { domain_name: standardDomainName }
-      });
-
-      if (!hasConfig || !tester) {
-        logBuilderTestSkip(testsLogger, 'Domain - read standard object', 'No SAP configuration');
-        return;
-      }
-
-      try {
-        const resultState = await tester.readTest({ domainName: standardDomainName });
-        expect(resultState?.readResult).toBeDefined();
-        const domainConfig = resultState?.readResult;
-        if (domainConfig && typeof domainConfig === 'object' && 'domainName' in domainConfig) {
-          expect((domainConfig as any).domainName).toBe(standardDomainName);
-          expect((domainConfig as any).description).toBeDefined();
+        if (!standardObject) {
+          logBuilderTestStart(testsLogger, 'Domain - read standard object', {
+            name: 'read_standard',
+            params: {},
+          });
+          logBuilderTestSkip(
+            testsLogger,
+            'Domain - read standard object',
+            `Standard domain not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+          );
+          return;
         }
 
-        logBuilderTestSuccess(testsLogger, 'Domain - read standard object');
-      } catch (error) {
-        logBuilderTestError(testsLogger, 'Domain - read standard object', error);
-        throw error;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'Domain - read standard object');
-      }
-    }, getTimeout('test'));
+        const standardDomainName = standardObject.name;
+        logBuilderTestStart(testsLogger, 'Domain - read standard object', {
+          name: 'read_standard',
+          params: { domain_name: standardDomainName },
+        });
+
+        if (!hasConfig || !tester) {
+          logBuilderTestSkip(
+            testsLogger,
+            'Domain - read standard object',
+            'No SAP configuration',
+          );
+          return;
+        }
+
+        try {
+          const resultState = await tester.readTest({
+            domainName: standardDomainName,
+          });
+          expect(resultState?.readResult).toBeDefined();
+          const domainConfig = resultState?.readResult;
+          if (
+            domainConfig &&
+            typeof domainConfig === 'object' &&
+            'domainName' in domainConfig
+          ) {
+            expect((domainConfig as any).domainName).toBe(standardDomainName);
+            expect((domainConfig as any).description).toBeDefined();
+          }
+
+          logBuilderTestSuccess(testsLogger, 'Domain - read standard object');
+        } catch (error) {
+          logBuilderTestError(
+            testsLogger,
+            'Domain - read standard object',
+            error,
+          );
+          throw error;
+        } finally {
+          logBuilderTestEnd(testsLogger, 'Domain - read standard object');
+        }
+      },
+      getTimeout('test'),
+    );
   });
 });

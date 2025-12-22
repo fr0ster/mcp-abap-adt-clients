@@ -1,6 +1,6 @@
 /**
  * SharedBuilder - Cross-cutting ADT operations
- * 
+ *
  * Provides access to operations that don't belong to specific object types:
  * - Search operations
  * - Where-used analysis
@@ -11,8 +11,8 @@
  * - SQL queries and table contents
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
@@ -21,15 +21,15 @@ import { readObjectSource, supportsSourceCode } from './readSource';
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
-import { getWhereUsed } from './whereUsed';
-import {
+import type {
+  IGetSqlQueryParams,
+  IGetTableContentsParams,
+  IGetWhereUsedParams,
   IInactiveObjectsResponse,
   IObjectReference,
   ISearchObjectsParams,
-  IGetSqlQueryParams,
-  IGetTableContentsParams,
-  IGetWhereUsedParams
 } from './types';
+import { getWhereUsed } from './whereUsed';
 
 interface SharedBuilderState {
   searchResult?: AxiosResponse;
@@ -112,15 +112,24 @@ export class SharedBuilder {
    * Get list of inactive objects (not yet activated)
    */
   async listInactiveObjects(includeRawXml: boolean = false): Promise<this> {
-    this.state.inactiveObjects = await getInactiveObjects(this.connection, { includeRawXml });
+    this.state.inactiveObjects = await getInactiveObjects(this.connection, {
+      includeRawXml,
+    });
     return this;
   }
 
   /**
    * Activate multiple objects in a group
    */
-  async activateGroup(objects: IObjectReference[], preauditRequested: boolean = false): Promise<this> {
-    this.state.activateResult = await activateObjectsGroup(this.connection, objects, preauditRequested);
+  async activateGroup(
+    objects: IObjectReference[],
+    preauditRequested: boolean = false,
+  ): Promise<this> {
+    this.state.activateResult = await activateObjectsGroup(
+      this.connection,
+      objects,
+      preauditRequested,
+    );
     return this;
   }
 
@@ -128,23 +137,42 @@ export class SharedBuilder {
    * Check if multiple objects can be deleted (group deletion check)
    */
   async checkDeletionGroup(objects: IObjectReference[]): Promise<this> {
-    this.state.checkDeletionResult = await checkDeletionGroup(this.connection, objects);
+    this.state.checkDeletionResult = await checkDeletionGroup(
+      this.connection,
+      objects,
+    );
     return this;
   }
 
   /**
    * Delete multiple objects in a group
    */
-  async deleteGroup(objects: IObjectReference[], transportRequest?: string): Promise<this> {
-    this.state.deleteResult = await deleteObjectsGroup(this.connection, objects, transportRequest);
+  async deleteGroup(
+    objects: IObjectReference[],
+    transportRequest?: string,
+  ): Promise<this> {
+    this.state.deleteResult = await deleteObjectsGroup(
+      this.connection,
+      objects,
+      transportRequest,
+    );
     return this;
   }
 
   /**
    * Read object metadata (without source code)
    */
-  async readMetadata(objectType: string, objectName: string, functionGroup?: string): Promise<this> {
-    this.state.metadataResult = await readObjectMetadata(this.connection, objectType, objectName, functionGroup);
+  async readMetadata(
+    objectType: string,
+    objectName: string,
+    functionGroup?: string,
+  ): Promise<this> {
+    this.state.metadataResult = await readObjectMetadata(
+      this.connection,
+      objectType,
+      objectName,
+      functionGroup,
+    );
     return this;
   }
 
@@ -152,12 +180,18 @@ export class SharedBuilder {
    * Read object source code
    */
   async readSource(
-    objectType: string, 
-    objectName: string, 
+    objectType: string,
+    objectName: string,
     functionGroup?: string,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
   ): Promise<this> {
-    this.state.sourceResult = await readObjectSource(this.connection, objectType, objectName, functionGroup, version);
+    this.state.sourceResult = await readObjectSource(
+      this.connection,
+      objectType,
+      objectName,
+      functionGroup,
+      version,
+    );
     return this;
   }
 
@@ -190,7 +224,10 @@ export class SharedBuilder {
    * ⚠️ ABAP Cloud Limitation: Only works on on-premise systems with basic auth
    */
   async tableContents(params: IGetTableContentsParams): Promise<this> {
-    this.state.tableContentsResult = await getTableContents(this.connection, params);
+    this.state.tableContentsResult = await getTableContents(
+      this.connection,
+      params,
+    );
     return this;
   }
 }

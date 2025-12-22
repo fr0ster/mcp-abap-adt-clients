@@ -2,11 +2,10 @@
  * View update operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { IUpdateViewSourceParams } from './types';
 
 /**
  * Update view DDL source code
@@ -18,15 +17,20 @@ export async function updateView(
   viewName: string,
   ddlSource: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {
-    'Content-Type': 'text/plain; charset=utf-8'
+    'Content-Type': 'text/plain; charset=utf-8',
   };
 
-  return connection.makeAdtRequest({ url, method: 'PUT', timeout: getTimeout(), data: ddlSource, headers });
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout(),
+    data: ddlSource,
+    headers,
+  });
 }
-

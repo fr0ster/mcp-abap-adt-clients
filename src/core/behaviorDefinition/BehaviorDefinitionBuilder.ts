@@ -9,19 +9,24 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { validate } from './validation';
-import { create } from './create';
-import { lock } from './lock';
-import { unlock } from './unlock';
-import { read, readSource } from './read';
-import { update } from './update';
-import { checkImplementation, checkAbap } from './check';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { activate } from './activation';
+import { checkAbap, checkImplementation } from './check';
+import { create } from './create';
 import { checkDeletion, deleteBehaviorDefinition } from './delete';
-import { IBehaviorDefinitionValidationParams, IBehaviorDefinitionCreateParams, IUpdateBehaviorDefinitionParams, IBehaviorDefinitionConfig, IBehaviorDefinitionState } from './types';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { lock } from './lock';
+import { read, readSource } from './read';
+import type {
+  IBehaviorDefinitionConfig,
+  IBehaviorDefinitionCreateParams,
+  IBehaviorDefinitionState,
+  IBehaviorDefinitionValidationParams,
+  IUpdateBehaviorDefinitionParams,
+} from './types';
+import { unlock } from './unlock';
+import { update } from './update';
+import { validate } from './validation';
 
 export class BehaviorDefinitionBuilder {
   private connection: IAbapConnection;
@@ -34,7 +39,7 @@ export class BehaviorDefinitionBuilder {
   constructor(
     connection: IAbapConnection,
     config: IBehaviorDefinitionConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.connection = connection;
     this.logger = logger;
@@ -73,7 +78,9 @@ export class BehaviorDefinitionBuilder {
     return this;
   }
 
-  setImplementationType(implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection'): this {
+  setImplementationType(
+    implementationType: 'Managed' | 'Unmanaged' | 'Abstract' | 'Projection',
+  ): this {
     this.config.implementationType = implementationType;
     return this;
   }
@@ -92,19 +99,19 @@ export class BehaviorDefinitionBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required for validation');
       }
-      
+
       this.logger?.info('Validating behavior definition:', this.config.name);
-      
+
       const params: IBehaviorDefinitionValidationParams = {
         objname: this.config.name,
         rootEntity: this.config.rootEntity,
         description: this.config.description || '',
         package: this.config.packageName,
-        implementationType: this.config.implementationType || 'Managed'
+        implementationType: this.config.implementationType || 'Managed',
       };
-      
+
       const response = await validate(this.connection, params);
-      
+
       // Store raw response - consumer decides how to interpret it
       this.state.validationResponse = response;
       this.logger?.info('Validation successful');
@@ -113,7 +120,7 @@ export class BehaviorDefinitionBuilder {
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Validation failed:', error);
       throw error; // Interrupts chain
@@ -125,25 +132,28 @@ export class BehaviorDefinitionBuilder {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      
+
       this.logger?.info('Creating behavior definition:', this.config.name);
-      
+
       const params: IBehaviorDefinitionCreateParams = {
         name: this.config.name,
         package: this.config.packageName,
         description: this.config.description || '',
         implementationType: this.config.implementationType || 'Managed',
       };
-      
+
       const result = await create(this.connection, params);
       this.state.createResult = result;
-      this.logger?.info('Behavior definition created successfully:', result.status);
+      this.logger?.info(
+        'Behavior definition created successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
@@ -153,14 +163,11 @@ export class BehaviorDefinitionBuilder {
   async lock(): Promise<this> {
     try {
       this.logger?.info('Locking behavior definition:', this.config.name);
-      
-      // Enable stateful session mode
-      this.connection.setSessionType("stateful");
 
-      const lockHandle = await lock(
-        this.connection,
-        this.config.name
-      );
+      // Enable stateful session mode
+      this.connection.setSessionType('stateful');
+
+      const lockHandle = await lock(this.connection, this.config.name);
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
 
@@ -169,13 +176,15 @@ export class BehaviorDefinitionBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger?.info(`'Behavior definition locked  handle:' ${`lockHandle`}`);
+      this.logger?.info(
+        `'Behavior definition locked  handle:' ${`lockHandle`}`,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
@@ -184,16 +193,21 @@ export class BehaviorDefinitionBuilder {
 
   async readSource(): Promise<this> {
     try {
-      this.logger?.info('Reading behavior definition source:', this.config.name);
+      this.logger?.info(
+        'Reading behavior definition source:',
+        this.config.name,
+      );
       const response = await readSource(this.connection, this.config.name);
       this.sourceCode = response.data;
-      this.logger?.info(`'Source code read  length:' ${`response.data?.length || 0`}`);
+      this.logger?.info(
+        `'Source code read  length:' ${`response.data?.length || 0`}`,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'readSource',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read source failed:', error);
       throw error;
@@ -203,58 +217,73 @@ export class BehaviorDefinitionBuilder {
   async update(sourceCode?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Behavior definition must be locked before update. Call lock() first.');
+        throw new Error(
+          'Behavior definition must be locked before update. Call lock() first.',
+        );
       }
       const code = sourceCode || this.sourceCode;
       if (!code) {
-        throw new Error('Source code is required. Use setCode() or pass as parameter.');
+        throw new Error(
+          'Source code is required. Use setCode() or pass as parameter.',
+        );
       }
-      this.logger?.info('Updating behavior definition source:', this.config.name);
+      this.logger?.info(
+        'Updating behavior definition source:',
+        this.config.name,
+      );
 
       const params: IUpdateBehaviorDefinitionParams = {
         name: this.config.name,
         sourceCode: code,
         lockHandle: this.lockHandle,
-        transportRequest: this.config.transportRequest
+        transportRequest: this.config.transportRequest,
       };
       const result = await update(this.connection, params);
 
       this.state.updateResult = result;
-      this.logger?.info('Behavior definition updated successfully:', result.status);
+      this.logger?.info(
+        'Behavior definition updated successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<this> {
+  async check(
+    version: 'active' | 'inactive' = 'inactive',
+    sourceCode?: string,
+  ): Promise<this> {
     try {
-      this.logger?.info(`'Checking behavior definition:'  this.config.name  'version:' ${`version`}`);
-      
+      this.logger?.info(
+        `'Checking behavior definition:'  this.config.name  'version:' ${`version`}`,
+      );
+
       // Use provided source code or stored source code
       const codeToCheck = sourceCode || this.sourceCode;
-      
+
       // Run both implementation check and ABAP check
       const implResult = await checkImplementation(
         this.connection,
         this.config.name,
         version,
-        codeToCheck
+        codeToCheck,
       );
-      
+
       const abapResult = await checkAbap(
         this.connection,
         this.config.name,
         version,
-        codeToCheck
+        codeToCheck,
       );
-      
+
       this.state.checkResults = [implResult, abapResult];
       this.logger?.info('Behavior definition check successful');
       return this;
@@ -262,7 +291,7 @@ export class BehaviorDefinitionBuilder {
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error; // Interrupts chain
@@ -272,7 +301,9 @@ export class BehaviorDefinitionBuilder {
   async unlock(): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Behavior definition is not locked. Call lock() first.');
+        throw new Error(
+          'Behavior definition is not locked. Call lock() first.',
+        );
       }
       this.logger?.info('Unlocking behavior definition:', this.config.name);
       const result = await unlock(
@@ -284,16 +315,16 @@ export class BehaviorDefinitionBuilder {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.logger?.info('Behavior definition unlocked successfully');
-      
+
       // Enable stateless session mode
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
 
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
@@ -306,16 +337,19 @@ export class BehaviorDefinitionBuilder {
       const result = await activate(
         this.connection,
         this.config.name,
-        preauditRequested
+        preauditRequested,
       );
       this.state.activateResult = result;
-      this.logger?.info('Behavior definition activated successfully:', result.status);
+      this.logger?.info(
+        'Behavior definition activated successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'activate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
@@ -324,11 +358,11 @@ export class BehaviorDefinitionBuilder {
 
   async checkDeletion(): Promise<this> {
     try {
-      this.logger?.info('Checking deletion for behavior definition:', this.config.name);
-      const result = await checkDeletion(
-        this.connection,
+      this.logger?.info(
+        'Checking deletion for behavior definition:',
         this.config.name,
       );
+      const result = await checkDeletion(this.connection, this.config.name);
       this.state.deleteCheckResult = result;
       this.logger?.info('Deletion check successful:', result.status);
       return this;
@@ -336,7 +370,7 @@ export class BehaviorDefinitionBuilder {
       this.state.errors.push({
         method: 'checkDeletion',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Deletion check failed:', error);
       throw error;
@@ -349,16 +383,19 @@ export class BehaviorDefinitionBuilder {
       const result = await deleteBehaviorDefinition(
         this.connection,
         this.config.name,
-        this.config.transportRequest
+        this.config.transportRequest,
       );
       this.state.deleteResult = result;
-      this.logger?.info('Behavior definition deleted successfully:', result.status);
+      this.logger?.info(
+        'Behavior definition deleted successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -367,25 +404,33 @@ export class BehaviorDefinitionBuilder {
 
   async read(
     version: 'active' | 'inactive' = 'inactive',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<this> {
     try {
-      this.logger?.info('Reading behavior definition metadata:', this.config.name);
+      this.logger?.info(
+        'Reading behavior definition metadata:',
+        this.config.name,
+      );
       const result = await read(
         this.connection,
         this.config.name,
         '',
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       this.state.readResult = result;
-      this.logger?.info('Behavior definition read successfully:', result.status);
+      this.logger?.info(
+        'Behavior definition read successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error; // Interrupts chain
@@ -397,11 +442,7 @@ export class BehaviorDefinitionBuilder {
       return;
     }
     try {
-      await unlock(
-        this.connection,
-        this.config.name,
-        this.lockHandle,
-      );
+      await unlock(this.connection, this.config.name, this.lockHandle);
       this.logger?.info('Force unlock successful for', this.config.name);
     } catch (error: any) {
       this.logger?.warn('Force unlock failed:', error);
@@ -464,7 +505,11 @@ export class BehaviorDefinitionBuilder {
     return this.state.readResult;
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -491,8 +536,7 @@ export class BehaviorDefinitionBuilder {
       delete: this.state.deleteResult,
       read: this.state.readResult,
       lockHandle: this.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

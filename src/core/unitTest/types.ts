@@ -2,7 +2,7 @@
  * Unit test module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Unit test definition types (local to adt-clients)
 export interface IClassUnitTestDefinition {
@@ -70,4 +70,3 @@ export interface IUnitTestState extends IAdtObjectState {
   runStatus?: any;
   runResult?: any;
 }
-

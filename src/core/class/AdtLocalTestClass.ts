@@ -1,17 +1,15 @@
 /**
  * AdtLocalTestClass - High-level CRUD operations for Local Test Classes
- * 
+ *
  * Local test classes are defined in the testclasses include of an ABAP class.
  * All operations require the parent class to be locked.
  */
 
-import { IAbapConnection, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { AdtClass } from './AdtClass';
 import { checkClassLocalTestClass } from './check';
 import { updateClassTestInclude } from './testclasses';
-import { AdtClass } from './AdtClass';
-import { IClassState, IClassConfig } from './types';
+import type { IClassState } from './types';
 
 export interface ILocalTestClassConfig {
   className: string;
@@ -22,10 +20,6 @@ export interface ILocalTestClassConfig {
 
 export class AdtLocalTestClass extends AdtClass {
   public readonly objectType: string = 'LocalTestClass';
-
-  constructor(connection: IAbapConnection, logger?: ILogger) {
-    super(connection, logger);
-  }
 
   /**
    * Validate local test class code
@@ -42,12 +36,12 @@ export class AdtLocalTestClass extends AdtClass {
       this.connection,
       config.className,
       config.testClassCode,
-      'inactive'
+      'inactive',
     );
 
     return {
       validationResponse: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 
@@ -57,7 +51,7 @@ export class AdtLocalTestClass extends AdtClass {
    */
   async create(
     config: Partial<ILocalTestClassConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -68,7 +62,7 @@ export class AdtLocalTestClass extends AdtClass {
 
     let parentLockHandle: string | undefined;
     const state: IClassState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -86,7 +80,7 @@ export class AdtLocalTestClass extends AdtClass {
           this.connection,
           config.className,
           config.testClassCode,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Test class check passed');
@@ -99,7 +93,7 @@ export class AdtLocalTestClass extends AdtClass {
         config.className,
         config.testClassCode!,
         parentLockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Test class created');
@@ -107,7 +101,10 @@ export class AdtLocalTestClass extends AdtClass {
       // 4. Unlock parent class (obligatory stateless after unlock)
       if (parentLockHandle) {
         this.logger?.info?.('Step 4: Unlocking parent class');
-        const unlockState = await super.unlock({ className: config.className }, parentLockHandle);
+        const unlockState = await super.unlock(
+          { className: config.className },
+          parentLockHandle,
+        );
         state.unlockResult = unlockState.unlockResult;
         parentLockHandle = undefined;
       }
@@ -115,7 +112,9 @@ export class AdtLocalTestClass extends AdtClass {
       // 5. Activate parent class (if requested)
       if (options?.activateOnCreate) {
         this.logger?.info?.('Step 5: Activating parent class');
-        const activateState = await this.activate({ className: config.className });
+        const activateState = await this.activate({
+          className: config.className,
+        });
         state.activateResult = activateState.activateResult;
         this.logger?.info?.('Parent class activated');
       }
@@ -128,7 +127,10 @@ export class AdtLocalTestClass extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, parentLockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -142,7 +144,7 @@ export class AdtLocalTestClass extends AdtClass {
    */
   async read(
     config: Partial<ILocalTestClassConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
   ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -150,10 +152,14 @@ export class AdtLocalTestClass extends AdtClass {
 
     try {
       const { getClassTestClassesInclude } = await import('./read');
-      const response = await getClassTestClassesInclude(this.connection, config.className, version);
+      const response = await getClassTestClassesInclude(
+        this.connection,
+        config.className,
+        version,
+      );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -171,7 +177,7 @@ export class AdtLocalTestClass extends AdtClass {
    */
   async update(
     config: Partial<ILocalTestClassConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -187,24 +193,26 @@ export class AdtLocalTestClass extends AdtClass {
         throw new Error('Test class code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await updateClassTestInclude(
         this.connection,
         config.className,
         codeToUpdate,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('Test class updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
     let parentLockHandle: string | undefined;
     const state: IClassState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -223,7 +231,7 @@ export class AdtLocalTestClass extends AdtClass {
           this.connection,
           config.className,
           codeToCheck,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Test class check passed');
@@ -236,7 +244,7 @@ export class AdtLocalTestClass extends AdtClass {
         config.className,
         codeToCheck!,
         parentLockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Test class updated');
@@ -244,7 +252,10 @@ export class AdtLocalTestClass extends AdtClass {
       // 4. Unlock parent class (obligatory stateless after unlock)
       if (parentLockHandle) {
         this.logger?.info?.('Step 4: Unlocking parent class');
-        const unlockState = await super.unlock({ className: config.className }, parentLockHandle);
+        const unlockState = await super.unlock(
+          { className: config.className },
+          parentLockHandle,
+        );
         state.unlockResult = unlockState.unlockResult;
         parentLockHandle = undefined;
       }
@@ -252,7 +263,9 @@ export class AdtLocalTestClass extends AdtClass {
       // 5. Activate parent class (if requested)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 5: Activating parent class');
-        const activateState = await this.activate({ className: config.className });
+        const activateState = await this.activate({
+          className: config.className,
+        });
         state.activateResult = activateState.activateResult;
         this.logger?.info?.('Parent class activated');
       }
@@ -265,7 +278,10 @@ export class AdtLocalTestClass extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, parentLockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -286,7 +302,7 @@ export class AdtLocalTestClass extends AdtClass {
     // Delete by updating with empty code
     return await this.update({
       ...config,
-      testClassCode: ''
+      testClassCode: '',
     });
   }
 
@@ -296,7 +312,7 @@ export class AdtLocalTestClass extends AdtClass {
    */
   async check(
     config: Partial<ILocalTestClassConfig>,
-    status: string = 'inactive'
+    status: string = 'inactive',
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -309,12 +325,12 @@ export class AdtLocalTestClass extends AdtClass {
       this.connection,
       config.className,
       config.testClassCode,
-      status as 'active' | 'inactive'
+      status as 'active' | 'inactive',
     );
 
     return {
       checkResult: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 }

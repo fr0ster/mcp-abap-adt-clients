@@ -24,13 +24,15 @@
  * ```
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { ITransportConfig } from './types';
-import { AxiosResponse } from 'axios';
-import { ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { createTransport } from './create';
 import { getTransport } from './read';
-import { ICreateTransportParams, ITransportState } from './types';
+import type {
+  ICreateTransportParams,
+  ITransportConfig,
+  ITransportState,
+} from './types';
 
 export class TransportBuilder {
   private connection: IAbapConnection;
@@ -41,13 +43,13 @@ export class TransportBuilder {
   constructor(
     connection: IAbapConnection,
     config: ITransportConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.connection = connection;
     this.logger = logger || (undefined as unknown as ILogger);
     this.config = { ...config };
     this.state = {
-      errors: []
+      errors: [],
     };
   }
 
@@ -84,18 +86,22 @@ export class TransportBuilder {
         description: this.config.description,
         transport_type: this.config.transportType || 'workbench',
         target_system: this.config.targetSystem,
-        owner: this.config.owner
+        owner: this.config.owner,
       };
       const result = await createTransport(this.connection, params);
       this.state.createResult = result;
 
       // Extract transport number from response if available
       if (result.data && typeof result.data === 'object') {
-        this.state.transportNumber = result.data.transport_request || result.data.transport_number;
+        this.state.transportNumber =
+          result.data.transport_request || result.data.transport_number;
         this.state.taskNumber = result.data.task_number;
       }
 
-      this.logger?.info('Transport request created successfully:', result.status);
+      this.logger?.info(
+        'Transport request created successfully:',
+        result.status,
+      );
       if (this.state.transportNumber) {
         this.logger?.info('Transport number:', this.state.transportNumber);
       }
@@ -104,7 +110,7 @@ export class TransportBuilder {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Create failed:', error);
       throw error;
@@ -117,7 +123,9 @@ export class TransportBuilder {
       const numberToRead = transportNumber || this.state.transportNumber;
 
       if (!numberToRead) {
-        throw new Error('Transport number is required. Provide transportNumber parameter or create transport first.');
+        throw new Error(
+          'Transport number is required. Provide transportNumber parameter or create transport first.',
+        );
       }
 
       this.logger?.info('Reading transport request:', numberToRead);
@@ -135,7 +143,7 @@ export class TransportBuilder {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error;
@@ -163,7 +171,11 @@ export class TransportBuilder {
     return this.state.readResult;
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -179,8 +191,7 @@ export class TransportBuilder {
       read: this.state.readResult,
       transportNumber: this.state.transportNumber,
       taskNumber: this.state.taskNumber,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

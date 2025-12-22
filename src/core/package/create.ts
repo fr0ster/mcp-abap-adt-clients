@@ -3,16 +3,19 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { ICreatePackageParams } from './types';
-import { getSystemInformation } from '../../utils/systemInfo';
+import type { AxiosResponse } from 'axios';
 import { limitDescription } from '../../utils/internalUtils';
+import { getSystemInformation } from '../../utils/systemInfo';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreatePackageParams } from './types';
 
 /**
  * Create ABAP package via single ADT POST (no validation or follow-up checks).
  */
-export async function createPackage(connection: IAbapConnection, params: ICreatePackageParams): Promise<AxiosResponse> {
+export async function createPackage(
+  connection: IAbapConnection,
+  params: ICreatePackageParams,
+): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('Package name is required');
   }
@@ -28,7 +31,9 @@ export async function createPackage(connection: IAbapConnection, params: ICreate
       .replace(/'/g, '&apos;');
 
   // Description is limited to 60 characters in SAP ADT
-  const description = escapeXml(limitDescription(params.description || params.package_name));
+  const description = escapeXml(
+    limitDescription(params.description || params.package_name),
+  );
   const packageType = params.package_type || 'development';
 
   const systemInfo = await getSystemInformation(connection);
@@ -58,8 +63,12 @@ export async function createPackage(connection: IAbapConnection, params: ICreate
     ? `<pak:superPackage adtcore:name="${escapeXml(params.super_package)}"/>`
     : '<pak:superPackage/>';
 
-  const responsibleAttr = responsibleUser ? ` adtcore:responsible="${escapeXml(responsibleUser)}"` : '';
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${escapeXml(masterSystem)}"` : '';
+  const responsibleAttr = responsibleUser
+    ? ` adtcore:responsible="${escapeXml(responsibleUser)}"`
+    : '';
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${escapeXml(masterSystem)}"`
+    : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
@@ -77,7 +86,9 @@ export async function createPackage(connection: IAbapConnection, params: ICreate
   <pak:subPackages/>
 </pak:package>`;
 
-  const queryParams = params.transport_request ? { corrNr: params.transport_request } : undefined;
+  const queryParams = params.transport_request
+    ? { corrNr: params.transport_request }
+    : undefined;
 
   return connection.makeAdtRequest({
     url,
@@ -86,8 +97,9 @@ export async function createPackage(connection: IAbapConnection, params: ICreate
     data: xmlBody,
     params: queryParams,
     headers: {
-      'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
-      'Content-Type': 'application/vnd.sap.adt.packages.v2+xml'
-    }
+      Accept:
+        'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
+      'Content-Type': 'application/vnd.sap.adt.packages.v2+xml',
+    },
   });
 }

@@ -10,25 +10,32 @@
  * Run: npm test -- --testPathPattern=metadataExtension
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../../clients/AdtClient';
-import { IMetadataExtensionConfig, IMetadataExtensionState } from '../../../../core/metadataExtension';
-import { getConfig } from '../../../helpers/sessionConfig';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
-import { BaseTester } from '../../../helpers/BaseTester';
-import * as path from 'path';
-import * as fs from 'fs';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { AdtClient } from '../../../../clients/AdtClient';
+import type {
+  IMetadataExtensionConfig,
+  IMetadataExtensionState,
+} from '../../../../core/metadataExtension';
+import { BaseTester } from '../../../helpers/BaseTester';
+import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   resolvePackageName,
   resolveTransportRequest,
-  getTimeout
+  getTimeout,
 } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -48,7 +55,10 @@ describe('MetadataExtension (using AdtClient)', () => {
   let hasConfig = false;
   let tester: BaseTester<IMetadataExtensionConfig, IMetadataExtensionState>;
 
-  function generateDefaultSourceCode(extName: string, targetEntity: string): string {
+  function generateDefaultSourceCode(
+    extName: string,
+    targetEntity: string,
+  ): string {
     return `@MetadataExtension : {
   @EndUserText.label: 'Metadata Extension for ${targetEntity}'
 }
@@ -72,7 +82,7 @@ extend view ${targetEntity} with "${extName}"
         'MetadataExtension',
         'create_metadata_extension',
         'adt_metadata_extension',
-        testsLogger
+        testsLogger,
       );
 
       tester.setup({
@@ -83,18 +93,22 @@ extend view ${targetEntity} with "${extName}"
         buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
           // Use resolver to get resolved parameters (from test case params or global defaults)
-          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
           if (!packageName) {
-            throw new Error('Package name is not configured. Set params.package_name or environment.default_package');
+            throw new Error(
+              'Package name is not configured. Set params.package_name or environment.default_package',
+            );
           }
 
           const extName =
-            params.ext_name ||
-            params.name ||
-            params.metadata_extension_name;
+            params.ext_name || params.name || params.metadata_extension_name;
 
           if (!extName) {
-            throw new Error('ext_name is not configured for MetadataExtension test');
+            throw new Error(
+              'ext_name is not configured for MetadataExtension test',
+            );
           }
 
           const targetEntity = (
@@ -104,23 +118,30 @@ extend view ${targetEntity} with "${extName}"
           )?.trim();
 
           if (!targetEntity) {
-            throw new Error('target_entity is not configured for MetadataExtension test. Use existing CDS view name.');
+            throw new Error(
+              'target_entity is not configured for MetadataExtension test. Use existing CDS view name.',
+            );
           }
 
-          const description = params.description || `Metadata Extension for ${targetEntity}`;
+          const description =
+            params.description || `Metadata Extension for ${targetEntity}`;
 
-          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
           return {
             name: extName,
             packageName,
             targetEntity,
             description,
             transportRequest,
-            sourceCode: params.source_code || generateDefaultSourceCode(extName, targetEntity)
+            sourceCode:
+              params.source_code ||
+              generateDefaultSourceCode(extName, targetEntity),
           };
-        }
+        },
       });
-    } catch (error) {
+    } catch (_error) {
       hasConfig = false;
     }
   });
@@ -131,22 +152,26 @@ extend view ${targetEntity} with "${extName}"
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should execute full workflow and store all results', async () => {
-      if (!hasConfig || !tester) {
-        return;
-      }
-      const config = tester.getConfig();
-      if (!config) {
-        return;
-      }
-
-      await tester.flowTestAuto({
-        sourceCode: config.sourceCode,
-        updateConfig: {
-          name: config.name,
-          sourceCode: config.sourceCode
+    it(
+      'should execute full workflow and store all results',
+      async () => {
+        if (!hasConfig || !tester) {
+          return;
         }
-      });
-    }, getTimeout('test'));
+        const config = tester.getConfig();
+        if (!config) {
+          return;
+        }
+
+        await tester.flowTestAuto({
+          sourceCode: config.sourceCode,
+          updateConfig: {
+            name: config.name,
+            sourceCode: config.sourceCode,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
   });
 });

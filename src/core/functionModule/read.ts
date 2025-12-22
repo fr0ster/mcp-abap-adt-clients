@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -16,9 +16,15 @@ export async function getFunctionMetadata(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'functionmodule', functionName, functionGroup, options);
+  return readObjectMetadata(
+    connection,
+    'functionmodule',
+    functionName,
+    functionGroup,
+    options,
+  );
 }
 
 /**
@@ -33,9 +39,16 @@ export async function getFunctionSource(
   functionName: string,
   functionGroup: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'functionmodule', functionName, functionGroup, version, options);
+  return readObjectSource(
+    connection,
+    'functionmodule',
+    functionName,
+    functionGroup,
+    version,
+    options,
+  );
 }
 
 /**
@@ -46,7 +59,7 @@ export async function getFunction(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-  version: 'active' | 'inactive' = 'active'
+  version: 'active' | 'inactive' = 'active',
 ): Promise<AxiosResponse> {
   return getFunctionSource(connection, functionName, functionGroup, version);
 }
@@ -62,7 +75,7 @@ export async function getFunctionModuleTransport(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
@@ -74,7 +87,7 @@ export async function getFunctionModuleTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }

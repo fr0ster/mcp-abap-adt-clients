@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ABAP data element
@@ -13,7 +13,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function getDataElement(
   connection: IAbapConnection,
   dataElementName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -23,7 +23,7 @@ export async function getDataElement(
     url,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: {}
+    headers: {},
   });
 }
 
@@ -36,7 +36,7 @@ export async function getDataElement(
 export async function getDataElementTransport(
   connection: IAbapConnection,
   dataElementName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -47,8 +47,7 @@ export async function getDataElementTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
-

@@ -6,10 +6,10 @@
  * 2. Group activation: /sap/bc/adt/activation/runs (for multiple objects)
  */
 
-import { AxiosResponse } from 'axios';
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from './timeouts';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from './internalUtils';
+import { getTimeout } from './timeouts';
 
 /**
  * Build object URI from name and type
@@ -97,7 +97,7 @@ export async function activateObjectInSession(
   connection: IAbapConnection,
   objectUri: string,
   objectName: string,
-  preaudit: boolean = true
+  preaudit: boolean = true,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/activation?method=activate&preauditRequested=${preaudit}`;
 
@@ -108,7 +108,7 @@ export async function activateObjectInSession(
 
   const headers = {
     'Content-Type': 'application/vnd.sap.adt.activation+xml',
-    'Accept': 'application/xml'
+    Accept: 'application/xml',
   };
 
   return await connection.makeAdtRequest({
@@ -116,6 +116,6 @@ export async function activateObjectInSession(
     method: 'POST',
     timeout: getTimeout('default'),
     data: activationXml,
-    headers
+    headers,
   });
 }

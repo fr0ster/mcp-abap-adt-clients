@@ -2,7 +2,7 @@
  * DataElement module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 /**
  * SAP ADT supports the following type kinds for data elements:
@@ -22,7 +22,12 @@ export interface ICreateDataElementParams {
   description?: string;
   package_name: string;
   transport_request?: string;
-  type_kind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
+  type_kind?:
+    | 'domain'
+    | 'predefinedAbapType'
+    | 'refToPredefinedAbapType'
+    | 'refToDictionaryType'
+    | 'refToClifType';
   type_name?: string;
   data_type?: string;
   length?: number;
@@ -46,7 +51,12 @@ export interface IUpdateDataElementParams {
   description?: string;
   package_name: string;
   transport_request?: string;
-  type_kind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
+  type_kind?:
+    | 'domain'
+    | 'predefinedAbapType'
+    | 'refToPredefinedAbapType'
+    | 'refToDictionaryType'
+    | 'refToClifType';
   type_name?: string;
   data_type?: string;
   length?: number;
@@ -86,7 +96,12 @@ export interface IDataElementConfig {
   mediumLabel?: string;
   longLabel?: string;
   headingLabel?: string;
-  typeKind?: 'domain' | 'predefinedAbapType' | 'refToPredefinedAbapType' | 'refToDictionaryType' | 'refToClifType';
+  typeKind?:
+    | 'domain'
+    | 'predefinedAbapType'
+    | 'refToPredefinedAbapType'
+    | 'refToDictionaryType'
+    | 'refToClifType';
   typeName?: string;
   searchHelp?: string;
   searchHelpParameter?: string;

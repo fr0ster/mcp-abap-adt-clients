@@ -1,23 +1,23 @@
 /**
  * Include operations for ABAP objects
- * 
+ *
  * Retrieves source code of specific ABAP include files.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get include source code
- * 
+ *
  * Endpoint: GET /sap/bc/adt/programs/includes/{name}/source/main
- * 
+ *
  * @param connection - ABAP connection instance
  * @param includeName - Include name
  * @returns Axios response with source code (plain text)
- * 
+ *
  * @example
  * ```typescript
  * const response = await getInclude(connection, 'ZMY_INCLUDE');
@@ -26,7 +26,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  */
 export async function getInclude(
   connection: IAbapConnection,
-  includeName: string
+  includeName: string,
 ): Promise<AxiosResponse> {
   if (!includeName) {
     throw new Error('Include name is required');
@@ -40,8 +40,7 @@ export async function getInclude(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain'
-    }
+      Accept: 'text/plain',
+    },
   });
 }
-

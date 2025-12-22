@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -15,9 +15,15 @@ import { readObjectSource } from '../shared/readSource';
 export async function getInterfaceMetadata(
   connection: IAbapConnection,
   interfaceName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'interface', interfaceName, undefined, options);
+  return readObjectMetadata(
+    connection,
+    'interface',
+    interfaceName,
+    undefined,
+    options,
+  );
 }
 
 /**
@@ -28,9 +34,16 @@ export async function getInterfaceSource(
   connection: IAbapConnection,
   interfaceName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'interface', interfaceName, undefined, version, options);
+  return readObjectSource(
+    connection,
+    'interface',
+    interfaceName,
+    undefined,
+    version,
+    options,
+  );
 }
 
 /**
@@ -39,7 +52,7 @@ export async function getInterfaceSource(
  */
 export async function getInterface(
   connection: IAbapConnection,
-  interfaceName: string
+  interfaceName: string,
 ): Promise<AxiosResponse> {
   return getInterfaceSource(connection, interfaceName);
 }
@@ -53,7 +66,7 @@ export async function getInterface(
 export async function getInterfaceTransport(
   connection: IAbapConnection,
   interfaceName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(interfaceName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -64,8 +77,7 @@ export async function getInterfaceTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
-

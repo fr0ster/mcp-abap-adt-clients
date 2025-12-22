@@ -6,41 +6,46 @@
  * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=package    (ADT-clients logs)
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
+import type { IPackageConfig, IPackageState } from '../../../../core/package';
 import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  logBuilderTestEnd,
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+} from '../../../helpers/builderTestLogger';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd
-} from '../../../helpers/builderTestLogger';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
-import { BaseTester } from '../../../helpers/BaseTester';
-import { IPackageConfig, IPackageState } from '../../../../core/package';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   getTestCaseDefinition,
   resolvePackageName,
   resolveStandardObject,
-  getTimeout
+  getTimeout,
 } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_ADT_TESTS === 'true' || process.env.DEBUG_ADT === 'true';
-const debugConnection = process.env.DEBUG_CONNECTORS === 'true'; // Connection uses DEBUG_CONNECTORS
+const debugEnabled =
+  process.env.DEBUG_ADT_TESTS === 'true' || process.env.DEBUG_ADT === 'true';
+const _debugConnection = process.env.DEBUG_CONNECTORS === 'true'; // Connection uses DEBUG_CONNECTORS
 
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
 const connectionLogger: ILogger = createConnectionLogger();
@@ -54,7 +59,7 @@ const testsLogger: ILogger = createTestsLogger();
 describe('PackageBuilder (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let connectionConfig: any = null;
+  let _connectionConfig: any = null;
   let hasConfig = false;
   let isCloudSystem = false;
   let tester: BaseTester<IPackageConfig, IPackageState>;
@@ -62,7 +67,7 @@ describe('PackageBuilder (using AdtClient)', () => {
   beforeAll(async () => {
     try {
       const config = getConfig();
-      connectionConfig = config;
+      _connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       client = new AdtClient(connection, builderLogger);
@@ -74,7 +79,7 @@ describe('PackageBuilder (using AdtClient)', () => {
         'Package',
         'create_package',
         'adt_package',
-        testsLogger
+        testsLogger,
       );
 
       tester.setup({
@@ -86,9 +91,16 @@ describe('PackageBuilder (using AdtClient)', () => {
           const params = testCase?.params || {};
           // Use resolver to get resolved parameters (from test case params or global defaults)
           // Priority: super_package > package_name (from resolver) > global default
-          const parentPackage = params.super_package || resolver?.getPackageName?.() || resolvePackageName(params.package_name);
-          if (!parentPackage) throw new Error('Parent package is not configured');
-          const testPackage = params.test_package || params.test_package_name || params.package_name;
+          const parentPackage =
+            params.super_package ||
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
+          if (!parentPackage)
+            throw new Error('Parent package is not configured');
+          const testPackage =
+            params.test_package ||
+            params.test_package_name ||
+            params.package_name;
           if (!testPackage) throw new Error('test_package is not configured');
           return {
             packageName: testPackage,
@@ -100,22 +112,28 @@ describe('PackageBuilder (using AdtClient)', () => {
             transportLayer: params.transport_layer,
             transportRequest: params.transport_request,
             applicationComponent: params.application_component,
-            responsible: params.responsible
+            responsible: params.responsible,
           };
         },
         ensureObjectReady: async (packageName: string) => {
           if (!connection) return { success: true };
           try {
             await getPackage(connection, packageName);
-            return { success: false, reason: `⚠️ SAFETY: Package ${packageName} already exists!` };
+            return {
+              success: false,
+              reason: `⚠️ SAFETY: Package ${packageName} already exists!`,
+            };
           } catch (error: any) {
             const status = error.response?.status;
             if (status === 404) return { success: true };
-            return { success: false, reason: `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status})` };
+            return {
+              success: false,
+              reason: `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status})`,
+            };
           }
-        }
+        },
       });
-    } catch (error) {
+    } catch (_error) {
       hasConfig = false;
     }
   });
@@ -126,7 +144,9 @@ describe('PackageBuilder (using AdtClient)', () => {
    * Pre-check: Verify test package doesn't exist
    * Safety: Skip test if object exists to avoid accidental deletion
    */
-  async function ensurePackageReady(packageName: string): Promise<{ success: boolean; reason?: string }> {
+  async function _ensurePackageReady(
+    packageName: string,
+  ): Promise<{ success: boolean; reason?: string }> {
     if (!connection) {
       return { success: true };
     }
@@ -137,28 +157,32 @@ describe('PackageBuilder (using AdtClient)', () => {
       // Package exists - skip test for safety
       return {
         success: false,
-        reason: `⚠️ SAFETY: Package ${packageName} already exists! ` +
-                `Delete manually or use different test name to avoid accidental deletion.`
+        reason:
+          `⚠️ SAFETY: Package ${packageName} already exists! ` +
+          `Delete manually or use different test name to avoid accidental deletion.`,
       };
     } catch (error: any) {
       const status = error.response?.status;
-      
+
       // 404 is expected - object doesn't exist, we can proceed
       if (status === 404) {
         return { success: true };
       }
-      
+
       // Any other error (including locked state) means package might exist
       // Better to skip test for safety
       const errorMsg = error.message || 'Unknown error';
       if (debugEnabled) {
-        builderLogger.warn?.(`[PRE-CHECK] Package ${packageName} check failed with status ${status}: ${errorMsg}`);
+        builderLogger.warn?.(
+          `[PRE-CHECK] Package ${packageName} check failed with status ${status}: ${errorMsg}`,
+        );
       }
-      
+
       return {
         success: false,
-        reason: `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status}). ` +
-                `May be locked or inaccessible. Delete/unlock manually to proceed.`
+        reason:
+          `⚠️ SAFETY: Cannot verify package ${packageName} doesn't exist (HTTP ${status}). ` +
+          `May be locked or inaccessible. Delete/unlock manually to proceed.`,
       };
     }
   }
@@ -167,74 +191,103 @@ describe('PackageBuilder (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should execute full workflow and store all results', async () => {
-      if (!hasConfig || !tester) {
-        return;
-      }
-      const config = tester.getConfig();
-      if (!config) {
-        return;
-      }
-
-      await tester.flowTestAuto({
-        updateConfig: {
-          packageName: config.packageName,
-          superPackage: config.superPackage,
-          description: config.description || '',
-          updatedDescription: config.updatedDescription || config.description || '',
-          packageType: config.packageType,
-          softwareComponent: config.softwareComponent,
-          transportLayer: config.transportLayer,
-          applicationComponent: config.applicationComponent,
-          responsible: config.responsible
+    it(
+      'should execute full workflow and store all results',
+      async () => {
+        if (!hasConfig || !tester) {
+          return;
         }
-      });
-    }, getTimeout('test'));
+        const config = tester.getConfig();
+        if (!config) {
+          return;
+        }
+
+        await tester.flowTestAuto({
+          updateConfig: {
+            packageName: config.packageName,
+            superPackage: config.superPackage,
+            description: config.description || '',
+            updatedDescription:
+              config.updatedDescription || config.description || '',
+            packageType: config.packageType,
+            softwareComponent: config.softwareComponent,
+            transportLayer: config.transportLayer,
+            applicationComponent: config.applicationComponent,
+            responsible: config.responsible,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
   });
 
   describe('Read standard object', () => {
-    it('should read standard SAP package', async () => {
-      const standardObject = resolveStandardObject('package', isCloudSystem, null);
-
-      if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'Package - read standard object', {
-          name: 'read_standard',
-          params: {}
-        });
-        logBuilderTestSkip(
-          testsLogger,
-          'Package - read standard object',
-          `Standard package not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`
+    it(
+      'should read standard SAP package',
+      async () => {
+        const standardObject = resolveStandardObject(
+          'package',
+          isCloudSystem,
+          null,
         );
-        return;
-      }
 
-      const standardPackageName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'Package - read standard object', {
-        name: 'read_standard',
-        params: { package_name: standardPackageName }
-      });
-
-      if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'Package - read standard object', 'No SAP configuration');
-        return;
-      }
-
-      try {
-        const resultState = await tester.readTest({ packageName: standardPackageName });
-        expect(resultState?.readResult).toBeDefined();
-        const packageConfig = resultState?.readResult;
-        if (packageConfig && typeof packageConfig === 'object' && 'packageName' in packageConfig) {
-          expect((packageConfig as any).packageName).toBe(standardPackageName);
+        if (!standardObject) {
+          logBuilderTestStart(testsLogger, 'Package - read standard object', {
+            name: 'read_standard',
+            params: {},
+          });
+          logBuilderTestSkip(
+            testsLogger,
+            'Package - read standard object',
+            `Standard package not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+          );
+          return;
         }
 
-        logBuilderTestSuccess(testsLogger, 'Package - read standard object');
-      } catch (error) {
-        logBuilderTestError(testsLogger, 'Package - read standard object', error);
-        throw error;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'Package - read standard object');
-      }
-    }, getTimeout('test'));
+        const standardPackageName = standardObject.name;
+        logBuilderTestStart(testsLogger, 'Package - read standard object', {
+          name: 'read_standard',
+          params: { package_name: standardPackageName },
+        });
+
+        if (!hasConfig) {
+          logBuilderTestSkip(
+            testsLogger,
+            'Package - read standard object',
+            'No SAP configuration',
+          );
+          return;
+        }
+
+        try {
+          const resultState = await tester.readTest({
+            packageName: standardPackageName,
+          });
+          expect(resultState?.readResult).toBeDefined();
+          const packageConfig = resultState?.readResult;
+          if (
+            packageConfig &&
+            typeof packageConfig === 'object' &&
+            'packageName' in packageConfig
+          ) {
+            expect((packageConfig as any).packageName).toBe(
+              standardPackageName,
+            );
+          }
+
+          logBuilderTestSuccess(testsLogger, 'Package - read standard object');
+        } catch (error) {
+          logBuilderTestError(
+            testsLogger,
+            'Package - read standard object',
+            error,
+          );
+          throw error;
+        } finally {
+          logBuilderTestEnd(testsLogger, 'Package - read standard object');
+        }
+      },
+      getTimeout('test'),
+    );
   });
 });

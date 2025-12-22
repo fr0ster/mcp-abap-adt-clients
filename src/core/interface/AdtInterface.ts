@@ -1,38 +1,47 @@
 /**
  * AdtInterface - High-level CRUD operations for Interface objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
  * - activate uses same session/cookies (no stateful needed)
- * 
+ *
  * Operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { validateInterfaceName } from './validation';
-import { create as createInterface } from './create';
-import { upload } from './update';
-import { checkInterface } from './check';
-import { lockInterface } from './lock';
-import { unlockInterface } from './unlock';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateInterface } from './activation';
+import { checkInterface } from './check';
+import { create as createInterface } from './create';
 import { checkDeletion, deleteInterface } from './delete';
-import { getInterfaceSource, getInterfaceTransport, getInterfaceMetadata } from './read';
-import { IInterfaceConfig, IInterfaceState } from './types';
+import { lockInterface } from './lock';
+import {
+  getInterfaceMetadata,
+  getInterfaceSource,
+  getInterfaceTransport,
+} from './read';
+import type { IInterfaceConfig, IInterfaceState } from './types';
+import { unlockInterface } from './unlock';
+import { upload } from './update';
+import { validateInterfaceName } from './validation';
 
-export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceState> {
+export class AdtInterface
+  implements IAdtObject<IInterfaceConfig, IInterfaceState>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   public readonly objectType: string = 'Interface';
@@ -54,12 +63,12 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       this.connection,
       config.interfaceName,
       config.packageName,
-      config.description
+      config.description,
     );
 
     return {
       validationResponse: validationResponse,
-      errors: []
+      errors: [],
     };
   }
 
@@ -68,7 +77,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
    */
   async create(
     config: IInterfaceConfig,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IInterfaceState> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -82,7 +91,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
 
     let objectCreated = false;
     const state: IInterfaceState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -92,7 +101,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         interfaceName: config.interfaceName,
         packageName: config.packageName,
         transportRequest: config.transportRequest,
-        description: config.description
+        description: config.description,
       });
       state.createResult = createResponse;
       objectCreated = true;
@@ -109,11 +118,14 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
           this.connection.setSessionType('stateful');
           await deleteInterface(this.connection, {
             interface_name: config.interfaceName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete interface after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete interface after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -128,7 +140,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
   async read(
     config: Partial<IInterfaceConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IInterfaceState | undefined> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -139,11 +151,13 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         this.connection,
         config.interfaceName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -159,26 +173,36 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
    */
   async readMetadata(
     config: Partial<IInterfaceConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IInterfaceState> {
     const state: IInterfaceState = { errors: [] };
     if (!config.interfaceName) {
       const error = new Error('Interface name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getInterfaceMetadata(
         this.connection,
         config.interfaceName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       this.logger?.info?.('Interface metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -191,7 +215,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
    */
   async update(
     config: Partial<IInterfaceConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IInterfaceState> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -204,30 +228,35 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         throw new Error('Source code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       await upload(
         this.connection,
         config.interfaceName,
         codeToUpdate,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('Interface updated (low-level)');
       return {
-        errors: []
+        errors: [],
       };
     }
 
     let lockHandle: string | undefined;
     const state: IInterfaceState = {
-      errors: []
+      errors: [],
     };
 
     try {
       // 1. Lock (update always starts with lock, stateful only for lock)
       this.logger?.info?.('Step 1: Locking interface');
       this.connection.setSessionType('stateful');
-      const lockResult = await lockInterface(this.connection, config.interfaceName);
+      const lockResult = await lockInterface(
+        this.connection,
+        config.interfaceName,
+      );
       lockHandle = lockResult.lockHandle;
       state.lockHandle = lockHandle;
       this.logger?.info?.('Interface locked, handle:', lockHandle);
@@ -235,8 +264,15 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        const checkResponse = await checkInterface(this.connection, config.interfaceName, 'inactive', codeToCheck);
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        const checkResponse = await checkInterface(
+          this.connection,
+          config.interfaceName,
+          'inactive',
+          codeToCheck,
+        );
         state.checkResult = checkResponse;
         this.logger?.info?.('Check inactive with update content passed');
       }
@@ -249,7 +285,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
           config.interfaceName,
           codeToCheck,
           lockHandle,
-          config.transportRequest
+          config.transportRequest,
         );
         // upload() returns void, so we don't store it in state
         this.logger?.info?.('Interface updated');
@@ -257,14 +293,15 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { interfaceName: config.interfaceName },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ interfaceName: config.interfaceName }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after update:',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -272,7 +309,11 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking interface');
-        const unlockResponse = await unlockInterface(this.connection, config.interfaceName, lockHandle);
+        const unlockResponse = await unlockInterface(
+          this.connection,
+          config.interfaceName,
+          lockHandle,
+        );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
@@ -281,16 +322,26 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      const checkResponse2 = await checkInterface(this.connection, config.interfaceName, 'inactive');
+      const checkResponse2 = await checkInterface(
+        this.connection,
+        config.interfaceName,
+        'inactive',
+      );
       state.checkResult = checkResponse2;
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating interface');
-        const activateResponse = await activateInterface(this.connection, config.interfaceName);
+        const activateResponse = await activateInterface(
+          this.connection,
+          config.interfaceName,
+        );
         state.activateResult = activateResponse;
-        this.logger?.info?.('Interface activated, status:', activateResponse.status);
+        this.logger?.info?.(
+          'Interface activated, status:',
+          activateResponse.status,
+        );
 
         // 6.5. Read with long polling to ensure object is ready after activation
         this.logger?.info?.('read (wait for object ready after activation)');
@@ -298,19 +349,26 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
           const readState = await this.read(
             { interfaceName: config.interfaceName },
             'active',
-            { withLongPolling: true }
+            { withLongPolling: true },
           );
           if (readState) {
             state.readResult = readState.readResult;
           }
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after activation:',
+            readError,
+          );
           // Continue anyway - activation was successful
         }
       } else {
         // Read inactive version if not activated
-        const readResponse = await getInterfaceSource(this.connection, config.interfaceName, 'inactive');
+        const readResponse = await getInterfaceSource(
+          this.connection,
+          config.interfaceName,
+          'inactive',
+        );
         state.readResult = readResponse;
       }
 
@@ -321,7 +379,11 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
         try {
           this.logger?.warn?.('Unlocking interface during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
-          await unlockInterface(this.connection, config.interfaceName, lockHandle);
+          await unlockInterface(
+            this.connection,
+            config.interfaceName,
+            lockHandle,
+          );
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
           this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
@@ -337,11 +399,14 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
           this.connection.setSessionType('stateful');
           await deleteInterface(this.connection, {
             interface_name: config.interfaceName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete interface after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete interface after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -359,7 +424,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
     }
 
     const state: IInterfaceState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -367,7 +432,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       this.logger?.info?.('Checking interface for deletion');
       const checkResponse = await checkDeletion(this.connection, {
         interface_name: config.interfaceName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       state.checkResult = checkResponse;
       this.logger?.info?.('Deletion check passed');
@@ -377,7 +442,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       this.connection.setSessionType('stateful');
       const deleteResponse = await deleteInterface(this.connection, {
         interface_name: config.interfaceName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       state.deleteResult = deleteResponse;
       this.logger?.info?.('Interface deleted');
@@ -401,11 +466,14 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
     }
 
     const state: IInterfaceState = {
-      errors: []
+      errors: [],
     };
 
     try {
-      const activateResponse = await activateInterface(this.connection, config.interfaceName);
+      const activateResponse = await activateInterface(
+        this.connection,
+        config.interfaceName,
+      );
       state.activateResult = activateResponse;
       return state;
     } catch (error: any) {
@@ -419,19 +487,25 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
    */
   async check(
     config: Partial<IInterfaceConfig>,
-    status?: string
+    status?: string,
   ): Promise<IInterfaceState> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
 
     const state: IInterfaceState = {
-      errors: []
+      errors: [],
     };
 
     // Map status to version
-    const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-    const checkResponse = await checkInterface(this.connection, config.interfaceName, version, config.sourceCode);
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
+    const checkResponse = await checkInterface(
+      this.connection,
+      config.interfaceName,
+      version,
+      config.sourceCode,
+    );
     state.checkResult = checkResponse;
     return state;
   }
@@ -441,10 +515,10 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
    */
   async readTransport(
     config: Partial<IInterfaceConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IInterfaceState> {
     const state: IInterfaceState = {
-      errors: []
+      errors: [],
     };
 
     if (!config.interfaceName) {
@@ -452,7 +526,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       state.errors.push({
         method: 'readTransport',
         error,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       throw error;
     }
@@ -461,7 +535,9 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       const response = await getInterfaceTransport(
         this.connection,
         config.interfaceName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
       this.logger?.info?.('Transport request read successfully');
@@ -471,7 +547,7 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
       state.errors.push({
         method: 'readTransport',
         error: err,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('readTransport', err);
       throw err;
@@ -494,16 +570,23 @@ export class AdtInterface implements IAdtObject<IInterfaceConfig, IInterfaceStat
   /**
    * Unlock interface
    */
-  async unlock(config: Partial<IInterfaceConfig>, lockHandle: string): Promise<IInterfaceState> {
+  async unlock(
+    config: Partial<IInterfaceConfig>,
+    lockHandle: string,
+  ): Promise<IInterfaceState> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
     }
 
-    const result = await unlockInterface(this.connection, config.interfaceName, lockHandle);
+    const result = await unlockInterface(
+      this.connection,
+      config.interfaceName,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
-      errors: []
+      errors: [],
     };
   }
 }

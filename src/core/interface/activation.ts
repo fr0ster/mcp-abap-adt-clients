@@ -2,10 +2,10 @@
  * Interface activation operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { activateObjectInSession } from '../../utils/activationUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate interface
@@ -13,9 +13,13 @@ import { activateObjectInSession } from '../../utils/activationUtils';
  */
 export async function activateInterface(
   connection: IAbapConnection,
-  interfaceName: string
+  interfaceName: string,
 ): Promise<AxiosResponse> {
   const objectUri = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}`;
-  return await activateObjectInSession(connection, objectUri, interfaceName, true);
+  return await activateObjectInSession(
+    connection,
+    objectUri,
+    interfaceName,
+    true,
+  );
 }
-

@@ -5,14 +5,18 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get object metadata URI based on object type
  */
-export function getObjectMetadataUri(objectType: string, objectName: string, functionGroup?: string): string {
+export function getObjectMetadataUri(
+  objectType: string,
+  objectName: string,
+  functionGroup?: string,
+): string {
   const encodedName = encodeSapObjectName(objectName);
 
   switch (objectType.toLowerCase()) {
@@ -26,12 +30,13 @@ export function getObjectMetadataUri(objectType: string, objectName: string, fun
     case 'intf/if':
       return `/sap/bc/adt/oo/interfaces/${encodedName}`;
     case 'functionmodule':
-    case 'fugr/ff':
+    case 'fugr/ff': {
       if (!functionGroup) {
         throw new Error('Function group is required for function module');
       }
       const encodedGroup = encodeSapObjectName(functionGroup);
       return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
+    }
     case 'view':
     case 'ddls/df':
       return `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
@@ -66,7 +71,7 @@ export function getObjectMetadataUri(objectType: string, objectName: string, fun
  */
 function getAcceptHeader(objectType: string): string {
   const type = objectType.toLowerCase();
-  
+
   switch (type) {
     case 'class':
     case 'clas/oc':
@@ -124,7 +129,7 @@ export async function readObjectMetadata(
   objectType: string,
   objectName: string,
   functionGroup?: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
   if (options?.withLongPolling) {
@@ -137,8 +142,7 @@ export async function readObjectMetadata(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': acceptHeader
-    }
+      Accept: acceptHeader,
+    },
   });
 }
-

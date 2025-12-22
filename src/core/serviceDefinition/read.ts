@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ABAP service definition
@@ -14,7 +14,7 @@ export async function getServiceDefinition(
   connection: IAbapConnection,
   serviceDefinitionName: string,
   version: 'active' | 'inactive' | 'workingArea' = 'inactive',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const queryParams: string[] = [];
@@ -32,8 +32,8 @@ export async function getServiceDefinition(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.ddic.srvd.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.ddic.srvd.v1+xml',
+    },
   });
 }
 
@@ -44,7 +44,7 @@ export async function getServiceDefinitionSource(
   connection: IAbapConnection,
   serviceDefinitionName: string,
   version: 'active' | 'inactive' | 'workingArea' = 'inactive',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const queryParams: string[] = [];
@@ -62,8 +62,8 @@ export async function getServiceDefinitionSource(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain'
-    }
+      Accept: 'text/plain',
+    },
   });
 }
 
@@ -76,7 +76,7 @@ export async function getServiceDefinitionSource(
 export async function getServiceDefinitionTransport(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(serviceDefinitionName.toLowerCase());
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -87,8 +87,7 @@ export async function getServiceDefinitionTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
-

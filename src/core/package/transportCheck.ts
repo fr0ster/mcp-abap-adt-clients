@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from 'fast-xml-parser';
-import { ICreatePackageParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreatePackageParams } from './types';
 
 /**
  * Step 2: Check transport requirements
@@ -13,7 +13,7 @@ import { ICreatePackageParams } from './types';
 export async function checkTransportRequirements(
   connection: IAbapConnection,
   args: ICreatePackageParams,
-  transportLayer: string
+  transportLayer: string,
 ): Promise<string[]> {
   const url = `/sap/bc/adt/cts/transportchecks`;
 
@@ -39,9 +39,11 @@ export async function checkTransportRequirements(
     data: xmlBody,
     params: { transportLayer },
     headers: {
-      'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.transport.service.checkData',
-      'Content-Type': 'application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.transport.service.checkData'
-    }
+      Accept:
+        'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.transport.service.checkData',
+      'Content-Type':
+        'application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.transport.service.checkData',
+    },
   });
 
   const parser = new XMLParser({ ignoreAttributes: false });
@@ -60,4 +62,3 @@ export async function checkTransportRequirements(
 
   return transportNumbers;
 }
-

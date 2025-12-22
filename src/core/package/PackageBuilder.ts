@@ -27,19 +27,26 @@
  * ```
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import { createPackage } from './create';
-import { validatePackageBasic, validatePackageFull } from './validation';
-import { checkPackage } from './check';
-import { getPackage } from './read';
-import { lockPackage } from './lock';
-import { unlockPackage } from './unlock';
-import { deletePackage, checkPackageDeletion, parsePackageDeletionCheck } from './delete';
-import { updatePackageDescription } from './update';
-import { ICreatePackageParams, IPackageConfig, IPackageState } from './types';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
+import { checkPackage } from './check';
+import { createPackage } from './create';
+import {
+  checkPackageDeletion,
+  deletePackage,
+  parsePackageDeletionCheck,
+} from './delete';
+import { lockPackage } from './lock';
+import { getPackage } from './read';
+import type {
+  ICreatePackageParams,
+  IPackageConfig,
+  IPackageState,
+} from './types';
+import { unlockPackage } from './unlock';
+import { updatePackageDescription } from './update';
+import { validatePackageBasic, validatePackageFull } from './validation';
 
 export class PackageBuilder {
   private connection: IAbapConnection;
@@ -50,13 +57,13 @@ export class PackageBuilder {
   constructor(
     connection: IAbapConnection,
     config: IPackageConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.connection = connection;
     this.logger = logger || (undefined as unknown as ILogger);
     this.config = { ...config };
     this.state = {
-      errors: []
+      errors: [],
     };
   }
 
@@ -122,7 +129,7 @@ export class PackageBuilder {
         transport_layer: this.config.transportLayer,
         transport_request: this.config.transportRequest,
         application_component: this.config.applicationComponent,
-        responsible: this.config.responsible
+        responsible: this.config.responsible,
       };
 
       // Basic validation
@@ -146,7 +153,12 @@ export class PackageBuilder {
       // SAP requires transport layer for full validation, so we skip it if not provided
       if (this.config.transportLayer && this.config.softwareComponent) {
         try {
-          const fullResponse = await validatePackageFull(this.connection, params, this.config.softwareComponent, this.config.transportLayer);
+          const fullResponse = await validatePackageFull(
+            this.connection,
+            params,
+            this.config.softwareComponent,
+            this.config.transportLayer,
+          );
           // Store full validation response (overwrites basic if both are done)
           this.state.validationResponse = fullResponse;
           this.logger?.info('Package full validation successful');
@@ -160,7 +172,9 @@ export class PackageBuilder {
           throw fullValidationError;
         }
       } else {
-        this.logger?.info('Skipping full validation (transport layer or software component not provided)');
+        this.logger?.info(
+          'Skipping full validation (transport layer or software component not provided)',
+        );
       }
 
       return response!;
@@ -168,7 +182,7 @@ export class PackageBuilder {
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Validation failed:', error);
       throw error;
@@ -193,7 +207,7 @@ export class PackageBuilder {
         transport_layer: this.config.transportLayer,
         transport_request: this.config.transportRequest,
         application_component: this.config.applicationComponent,
-        responsible: this.config.responsible
+        responsible: this.config.responsible,
       };
       const result = await createPackage(this.connection, params);
       this.state.createResult = result;
@@ -203,18 +217,25 @@ export class PackageBuilder {
       const errorMsg = error.message || '';
       // If package already exists, try to read it instead of failing
       if (errorMsg.includes('already exists') || errorMsg.includes('PAK042')) {
-        this.logger?.warn(`Package ${this.config.packageName} already exists. Attempting to read existing package.`);
+        this.logger?.warn(
+          `Package ${this.config.packageName} already exists. Attempting to read existing package.`,
+        );
         try {
-          const existingResult = await getPackage(this.connection, this.config.packageName);
+          const existingResult = await getPackage(
+            this.connection,
+            this.config.packageName,
+          );
           this.state.createResult = existingResult; // Store read result as create result
-          this.logger?.info(`'Package already exists  read successfully:' ${`existingResult.status`}`);
+          this.logger?.info(
+            `'Package already exists  read successfully:' ${`existingResult.status`}`,
+          );
           return this;
-        } catch (readError: any) {
+        } catch (_readError: any) {
           // If read also fails, throw original create error
           this.state.errors.push({
             method: 'create',
             error: error instanceof Error ? error : new Error(String(error)),
-            timestamp: new Date()
+            timestamp: new Date(),
           });
           this.logger?.error('Create and read failed:', error);
           throw error;
@@ -224,7 +245,7 @@ export class PackageBuilder {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Create failed:', error);
       throw error;
@@ -233,41 +254,54 @@ export class PackageBuilder {
 
   async read(
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IPackageConfig | undefined> {
     try {
-      this.logger?.info(`'Reading package:'  this.config.packageName  'version:' ${`version`}`);
+      this.logger?.info(
+        `'Reading package:'  this.config.packageName  'version:' ${`version`}`,
+      );
       const result = await getPackage(
         this.connection,
         this.config.packageName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Package read successfully:', result.status);
-      
+
       // Parse and return config directly
-      const xmlData = typeof result.data === 'string'
-        ? result.data
-        : JSON.stringify(result.data);
-      
+      const xmlData =
+        typeof result.data === 'string'
+          ? result.data
+          : JSON.stringify(result.data);
+
       return this.parsePackageXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error;
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'active'): Promise<AxiosResponse> {
+  async check(
+    version: 'active' | 'inactive' = 'active',
+  ): Promise<AxiosResponse> {
     try {
-      this.logger?.info(`'Checking package:'  this.config.packageName  'version:' ${`version`}`);
-      const result = await checkPackage(this.connection, this.config.packageName, version);
+      this.logger?.info(
+        `'Checking package:'  this.config.packageName  'version:' ${`version`}`,
+      );
+      const result = await checkPackage(
+        this.connection,
+        this.config.packageName,
+        version,
+      );
       // Store result for backward compatibility
       this.state.checkResult = result;
       this.logger?.info('Package check successful');
@@ -276,7 +310,7 @@ export class PackageBuilder {
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error;
@@ -286,12 +320,12 @@ export class PackageBuilder {
   async lock(): Promise<this> {
     try {
       // Enable stateful session mode for lock/update/unlock sequence
-      this.connection.setSessionType("stateful");
-      
+      this.connection.setSessionType('stateful');
+
       this.logger?.info('Locking package:', this.config.packageName);
       const lockHandle = await lockPackage(
         this.connection,
-        this.config.packageName
+        this.config.packageName,
       );
       this.state.lockHandle = lockHandle;
 
@@ -300,13 +334,15 @@ export class PackageBuilder {
         this.config.onLock(lockHandle);
       }
 
-      this.logger?.info(`'Package locked successfully  lock handle:' ${`lockHandle`}`);
+      this.logger?.info(
+        `'Package locked successfully  lock handle:' ${`lockHandle`}`,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error;
@@ -316,27 +352,29 @@ export class PackageBuilder {
   async unlock(): Promise<this> {
     try {
       if (!this.state.lockHandle) {
-        throw new Error('Package must be locked before unlocking. Call lock() first.');
+        throw new Error(
+          'Package must be locked before unlocking. Call lock() first.',
+        );
       }
       this.logger?.info('Unlocking package:', this.config.packageName);
       const result = await unlockPackage(
         this.connection,
         this.config.packageName,
-        this.state.lockHandle
+        this.state.lockHandle,
       );
       this.state.unlockResult = result;
       this.state.lockHandle = undefined;
-      
+
       // Switch back to stateless mode after unlock
-      this.connection.setSessionType("stateless");
-      
+      this.connection.setSessionType('stateless');
+
       this.logger?.info('Package unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error;
@@ -346,28 +384,39 @@ export class PackageBuilder {
   async update(): Promise<this> {
     try {
       if (!this.state.lockHandle) {
-        throw new Error('Package must be locked before updating. Call lock() first.');
+        throw new Error(
+          'Package must be locked before updating. Call lock() first.',
+        );
       }
-      const descriptionToUpdate = this.config.updatedDescription || this.config.description;
+      const descriptionToUpdate =
+        this.config.updatedDescription || this.config.description;
       if (!descriptionToUpdate) {
-        throw new Error('Description or updatedDescription is required for package update');
+        throw new Error(
+          'Description or updatedDescription is required for package update',
+        );
       }
-      this.logger?.info('Updating package description:', this.config.packageName);
+      this.logger?.info(
+        'Updating package description:',
+        this.config.packageName,
+      );
       const result = await updatePackageDescription(
         this.connection,
         this.config.packageName,
         descriptionToUpdate,
         this.state.lockHandle,
-        this.config.superPackage
+        this.config.superPackage,
       );
       this.state.updateResult = result;
-      this.logger?.info('Package description updated successfully:', result.status);
+      this.logger?.info(
+        'Package description updated successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error;
@@ -377,30 +426,26 @@ export class PackageBuilder {
   async delete(): Promise<this> {
     try {
       this.logger?.info('Deleting package:', this.config.packageName);
-      
+
       // Check if package can be deleted first (same as Eclipse ADT does)
       this.logger?.debug('Checking if package can be deleted...');
-      const checkResponse = await checkPackageDeletion(
-        this.connection,
-        {
-          package_name: this.config.packageName
-        }
-      );
-      
+      const checkResponse = await checkPackageDeletion(this.connection, {
+        package_name: this.config.packageName,
+      });
+
       const checkResult = parsePackageDeletionCheck(checkResponse);
       if (!checkResult.isDeletable) {
-        throw new Error(`Package cannot be deleted: ${checkResult.message || 'Unknown reason'}`);
+        throw new Error(
+          `Package cannot be deleted: ${checkResult.message || 'Unknown reason'}`,
+        );
       }
       this.logger?.debug('Package deletion check passed');
-      
+
       // Proceed with deletion
-      const result = await deletePackage(
-        this.connection,
-        {
-          package_name: this.config.packageName,
-          transport_request: this.config.transportRequest
-        }
-      );
+      const result = await deletePackage(this.connection, {
+        package_name: this.config.packageName,
+        transport_request: this.config.transportRequest,
+      });
       this.state.deleteResult = result;
       this.logger?.info('Package deleted successfully:', result.status);
       return this;
@@ -408,7 +453,7 @@ export class PackageBuilder {
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -423,10 +468,10 @@ export class PackageBuilder {
       await unlockPackage(
         this.connection,
         this.config.packageName,
-        this.state.lockHandle
+        this.state.lockHandle,
       );
       // Switch back to stateless after force unlock
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Force unlock successful for', this.config.packageName);
     } catch (error: any) {
       this.logger?.warn('Force unlock failed:', error);
@@ -475,12 +520,12 @@ export class PackageBuilder {
 
       return {
         packageName: pkg['adtcore:name'] || this.config.packageName,
-        superPackage: superPackage?.['adtcore:name'] || superPackage?.['name'],
+        superPackage: superPackage?.['adtcore:name'] || superPackage?.name,
         description: pkg['adtcore:description'] || '',
         packageType: attributes?.['pak:packageType'],
         softwareComponent: transport?.['pak:softwareComponent']?.['pak:name'],
         transportLayer: transport?.['pak:transportLayer']?.['pak:name'],
-        applicationComponent: pkg['pak:applicationComponent']?.['pak:name']
+        applicationComponent: pkg['pak:applicationComponent']?.['pak:name'],
       };
     } catch (error) {
       this.logger?.error('Failed to parse package XML:', error);
@@ -493,9 +538,10 @@ export class PackageBuilder {
       return undefined;
     }
 
-    const xmlData = typeof this.state.readResult.data === 'string'
-      ? this.state.readResult.data
-      : JSON.stringify(this.state.readResult.data);
+    const xmlData =
+      typeof this.state.readResult.data === 'string'
+        ? this.state.readResult.data
+        : JSON.stringify(this.state.readResult.data);
 
     return this.parsePackageXml(xmlData);
   }
@@ -504,7 +550,11 @@ export class PackageBuilder {
     return this.state.checkResult;
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -552,8 +602,7 @@ export class PackageBuilder {
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
       lockHandle: this.state.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

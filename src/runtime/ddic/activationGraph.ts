@@ -1,13 +1,13 @@
 /**
  * DDIC Activation Graph
- * 
+ *
  * Provides functions for reading DDIC activation dependency graph with logs:
  * - Get activation graph
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
 
 /**
  * Get activation graph options
@@ -20,18 +20,18 @@ export interface IGetActivationGraphOptions {
 
 /**
  * Get DDIC activation graph with logs
- * 
+ *
  * @param connection - ABAP connection
  * @param options - Optional parameters
  * @returns Axios response with activation graph
  */
 export async function getActivationGraph(
   connection: IAbapConnection,
-  options?: IGetActivationGraphOptions
+  options?: IGetActivationGraphOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/logs/activationgraph`;
   const params: Record<string, any> = {};
-  
+
   if (options?.objectName) params.objectName = options.objectName;
   if (options?.objectType) params.objectType = options.objectType;
   if (options?.logName) params.logName = options.logName;
@@ -42,9 +42,9 @@ export async function getActivationGraph(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/categories/ddic/logs/activation/graph'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/categories/ddic/logs/activation/graph',
+    },
   });
 }
-

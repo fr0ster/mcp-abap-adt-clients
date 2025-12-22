@@ -3,22 +3,22 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
 
 /**
  * Unlock behavior definition
- * 
+ *
  * Endpoint: POST /sap/bc/adt/bo/behaviordefinitions/{name}?_action=UNLOCK&lockHandle={handle}
- * 
+ *
  * Must use same session and lock handle from lock operation
- * 
+ *
  * @param connection - ABAP connection instance
  * @param name - Behavior definition name
  * @param lockHandle - Lock handle obtained from lock operation
  * @param sessionId - Session ID for request tracking
  * @returns Axios response
- * 
+ *
  * @example
  * ```typescript
  * const lockHandle = await lock(connection, 'Z_MY_BDEF', sessionId);
@@ -27,15 +27,15 @@ import { AxiosResponse } from 'axios';
  * ```
  */
 export async function unlock(
-    connection: IAbapConnection,
-    name: string,
-    lockHandle: string,
+  connection: IAbapConnection,
+  name: string,
+  lockHandle: string,
 ): Promise<AxiosResponse> {
-    const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
-    return connection.makeAdtRequest({
-        url,
-        method: 'POST',
-        timeout: getTimeout('default')
-    });
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+  });
 }

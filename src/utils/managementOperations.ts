@@ -3,8 +3,8 @@
  * All activation and check methods are implemented here once and reused by clients
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from './timeouts';
 
 /**
@@ -17,7 +17,7 @@ async function makeAdtRequest(
   timeout: 'default' | 'csrf' | 'long' | number = 'default',
   data?: any,
   params?: any,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
 ): Promise<AxiosResponse> {
   const timeoutValue = getTimeout(timeout);
   return connection.makeAdtRequest({
@@ -41,25 +41,35 @@ async function makeAdtRequest(
 export async function activateObjectsGroup(
   connection: IAbapConnection,
   objects: Array<{ uri: string; name: string }>,
-  preaudit: boolean = true
+  preaudit: boolean = true,
 ): Promise<AxiosResponse> {
-  
   const url = `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`;
 
-  const objectReferences = objects.map(obj =>
-    `  <adtcore:objectReference adtcore:uri="${obj.uri}" adtcore:name="${obj.name}"/>`
-  ).join('\n');
+  const objectReferences = objects
+    .map(
+      (obj) =>
+        `  <adtcore:objectReference adtcore:uri="${obj.uri}" adtcore:name="${obj.name}"/>`,
+    )
+    .join('\n');
 
   const activationXml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">
 ${objectReferences}
 </adtcore:objectReferences>`;
 
   const headers = {
-    'Accept': 'application/xml',
-    'Content-Type': 'application/xml'
+    Accept: 'application/xml',
+    'Content-Type': 'application/xml',
   };
 
-  return makeAdtRequest(connection, url, 'POST', 'default', activationXml, undefined, headers);
+  return makeAdtRequest(
+    connection,
+    url,
+    'POST',
+    'default',
+    activationXml,
+    undefined,
+    headers,
+  );
 }
 
 /**
@@ -69,38 +79,57 @@ export function parseActivationResponse(responseData: string | any): {
   activated: boolean;
   checked: boolean;
   generated: boolean;
-  messages: Array<{ type: string; text: string; line?: number; column?: number }>;
+  messages: Array<{
+    type: string;
+    text: string;
+    line?: number;
+    column?: number;
+  }>;
 } {
   const { XMLParser } = require('fast-xml-parser');
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
-    parseAttributeValue: true
+    parseAttributeValue: true,
   });
 
   try {
-    const data = typeof responseData === 'string' ? responseData : responseData.data || JSON.stringify(responseData);
+    const data =
+      typeof responseData === 'string'
+        ? responseData
+        : responseData.data || JSON.stringify(responseData);
     const result = parser.parse(data);
 
     // Check for properties element
     const properties = result['chkl:messages']?.['chkl:properties'];
 
-    const activated = properties?.['@_activationExecuted'] === 'true' || properties?.['@_activationExecuted'] === true;
-    const checked = properties?.['@_checkExecuted'] === 'true' || properties?.['@_checkExecuted'] === true;
-    const generated = properties?.['@_generationExecuted'] === 'true' || properties?.['@_generationExecuted'] === true;
+    const activated =
+      properties?.['@_activationExecuted'] === 'true' ||
+      properties?.['@_activationExecuted'] === true;
+    const checked =
+      properties?.['@_checkExecuted'] === 'true' ||
+      properties?.['@_checkExecuted'] === true;
+    const generated =
+      properties?.['@_generationExecuted'] === 'true' ||
+      properties?.['@_generationExecuted'] === true;
 
     // Parse messages (warnings/errors)
-    const messages: Array<{ type: string; text: string; line?: number; column?: number }> = [];
-    const msgData = result['chkl:messages']?.['msg'];
+    const messages: Array<{
+      type: string;
+      text: string;
+      line?: number;
+      column?: number;
+    }> = [];
+    const msgData = result['chkl:messages']?.msg;
 
     if (msgData) {
       const msgArray = Array.isArray(msgData) ? msgData : [msgData];
       msgArray.forEach((msg: any) => {
         messages.push({
           type: msg['@_type'] || 'info',
-          text: msg['shortText']?.['txt'] || msg['shortText'] || 'Unknown message',
+          text: msg.shortText?.txt || msg.shortText || 'Unknown message',
           line: msg['@_line'],
-          column: msg['@_column']
+          column: msg['@_column'],
         });
       });
     }
@@ -109,14 +138,16 @@ export function parseActivationResponse(responseData: string | any): {
       activated,
       checked,
       generated,
-      messages
+      messages,
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       activated: false,
       checked: false,
       generated: false,
-      messages: [{ type: 'error', text: 'Failed to parse activation response' }]
+      messages: [
+        { type: 'error', text: 'Failed to parse activation response' },
+      ],
     };
   }
 }
@@ -129,9 +160,14 @@ export async function checkObject(
   connection: IAbapConnection,
   name: string,
   type: string,
-  version?: string
+  version?: string,
 ): Promise<AxiosResponse> {
   const { runCheckRun } = await import('../utils/checkRun');
-  return runCheckRun(connection, type, name, version || 'active', 'abapCheckRun');
+  return runCheckRun(
+    connection,
+    type,
+    name,
+    version || 'active',
+    'abapCheckRun',
+  );
 }
-

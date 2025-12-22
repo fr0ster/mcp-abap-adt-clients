@@ -10,36 +10,43 @@
  * Run: npm test -- --testPathPattern=serviceDefinition/ServiceDefinitionBuilder
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
+import type {
+  IServiceDefinitionConfig,
+  IServiceDefinitionState,
+} from '../../../../core/serviceDefinition';
 import { getServiceDefinition } from '../../../../core/serviceDefinition/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { getConfig } from '../../../helpers/sessionConfig';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd
-} from '../../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../../helpers/testLogger';
 import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  logBuilderTestEnd,
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+} from '../../../helpers/builderTestLogger';
+import { getConfig } from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
-import { IServiceDefinitionConfig, IServiceDefinitionState } from '../../../../core/serviceDefinition';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import {
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   getEnabledTestCase,
   resolvePackageName,
   resolveTransportRequest,
-  getTimeout
+  getTimeout,
 } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -78,7 +85,7 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         'ServiceDefinition',
         'create_service_definition',
         'adt_service_definition',
-        testsLogger
+        testsLogger,
       );
 
       tester.setup({
@@ -89,31 +96,41 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
           // Use resolver to get resolved parameters (from test case params or global defaults)
-          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
-          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
           return {
             serviceDefinitionName: params.service_definition_name,
             packageName,
             transportRequest,
             description: params.description,
-            sourceCode: params.source_code
+            sourceCode: params.source_code,
           };
         },
         ensureObjectReady: async (serviceDefinitionName: string) => {
           if (!connection) return { success: true };
           try {
             await getServiceDefinition(connection, serviceDefinitionName);
-            return { success: false, reason: `⚠️ SAFETY: Service Definition ${serviceDefinitionName} already exists!` };
+            return {
+              success: false,
+              reason: `⚠️ SAFETY: Service Definition ${serviceDefinitionName} already exists!`,
+            };
           } catch (error: any) {
             if (error.response?.status !== 404) {
-              return { success: false, reason: `Cannot verify service definition existence: ${error.message}` };
+              return {
+                success: false,
+                reason: `Cannot verify service definition existence: ${error.message}`,
+              };
             }
           }
           return { success: true };
-        }
+        },
       });
-    } catch (error) {
+    } catch (_error) {
       hasConfig = false;
     }
   });
@@ -124,114 +141,187 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should execute full workflow and store all results', async () => {
-      if (!hasConfig || !tester) {
-        return;
-      }
-      const config = tester.getConfig();
-      if (!config) {
-        return;
-      }
-
-      const testCase = tester.getTestCaseDefinition();
-      const sourceCode = testCase?.params?.source_code || config.sourceCode || 
-        `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n  expose ZOK_C_CDS_TEST;\n}`;
-
-      await tester.flowTestAuto({
-        sourceCode: sourceCode,
-        updateConfig: {
-          serviceDefinitionName: config.serviceDefinitionName,
-          packageName: config.packageName,
-          description: config.description || '',
-          sourceCode: sourceCode
+    it(
+      'should execute full workflow and store all results',
+      async () => {
+        if (!hasConfig || !tester) {
+          return;
         }
-      });
-    }, getTimeout('test'));
+        const config = tester.getConfig();
+        if (!config) {
+          return;
+        }
+
+        const testCase = tester.getTestCaseDefinition();
+        const sourceCode =
+          testCase?.params?.source_code ||
+          config.sourceCode ||
+          `@EndUserText.label: '${config.description || config.serviceDefinitionName}'\ndefine service ${config.serviceDefinitionName} {\n  expose ZOK_C_CDS_TEST;\n}`;
+
+        await tester.flowTestAuto({
+          sourceCode: sourceCode,
+          updateConfig: {
+            serviceDefinitionName: config.serviceDefinitionName,
+            packageName: config.packageName,
+            description: config.description || '',
+            sourceCode: sourceCode,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
   });
 
   describe('Read standard object', () => {
-    it('should read standard SAP service definition', async () => {
-      const { getTestCaseDefinition } = require('../../../helpers/test-helper');
-      const testCase = getTestCaseDefinition('read_service_definition', 'read_standard_service_definition');
-      
-      if (!testCase) {
-        logBuilderTestStart(testsLogger, 'ServiceDefinitionBuilder - read standard object', {
-          name: 'read_standard',
-          params: {}
-        });
-        logBuilderTestSkip(testsLogger, 'ServiceDefinitionBuilder - read standard object',
-          'Test case not defined in test-config.yaml');
-        return;
-      }
+    it(
+      'should read standard SAP service definition',
+      async () => {
+        const {
+          getTestCaseDefinition,
+        } = require('../../../helpers/test-helper');
+        const testCase = getTestCaseDefinition(
+          'read_service_definition',
+          'read_standard_service_definition',
+        );
 
-      const enabledTestCase = getEnabledTestCase('read_service_definition', 'read_standard_service_definition');
-      if (!enabledTestCase) {
-        logBuilderTestStart(testsLogger, 'ServiceDefinitionBuilder - read standard object', {
-          name: 'read_standard',
-          params: {}
-        });
-        logBuilderTestSkip(testsLogger, 'ServiceDefinitionBuilder - read standard object',
-          'Test case disabled or not found');
-        return;
-      }
+        if (!testCase) {
+          logBuilderTestStart(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+            {
+              name: 'read_standard',
+              params: {},
+            },
+          );
+          logBuilderTestSkip(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+            'Test case not defined in test-config.yaml',
+          );
+          return;
+        }
 
-      // Get service definition name from test case params
-      let serviceDefinitionName = enabledTestCase.params?.service_definition_name_cloud && isCloudSystem
-        ? enabledTestCase.params.service_definition_name_cloud
-        : enabledTestCase.params?.service_definition_name_onprem && !isCloudSystem
-        ? enabledTestCase.params.service_definition_name_onprem
-        : enabledTestCase.params?.service_definition_name;
+        const enabledTestCase = getEnabledTestCase(
+          'read_service_definition',
+          'read_standard_service_definition',
+        );
+        if (!enabledTestCase) {
+          logBuilderTestStart(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+            {
+              name: 'read_standard',
+              params: {},
+            },
+          );
+          logBuilderTestSkip(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+            'Test case disabled or not found',
+          );
+          return;
+        }
 
-      if (!serviceDefinitionName) {
-        // Fallback to standard_objects registry using TestConfigResolver
-        const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
-        const standardObject = resolver.getStandardObject('serviceDefinition');
-        if (!standardObject) {
-          logBuilderTestStart(testsLogger, 'ServiceDefinitionBuilder - read standard object', {
-            name: 'read_standard',
-            params: {}
+        // Get service definition name from test case params
+        let serviceDefinitionName =
+          enabledTestCase.params?.service_definition_name_cloud && isCloudSystem
+            ? enabledTestCase.params.service_definition_name_cloud
+            : enabledTestCase.params?.service_definition_name_onprem &&
+                !isCloudSystem
+              ? enabledTestCase.params.service_definition_name_onprem
+              : enabledTestCase.params?.service_definition_name;
+
+        if (!serviceDefinitionName) {
+          // Fallback to standard_objects registry using TestConfigResolver
+          const resolver = new TestConfigResolver({
+            isCloud: isCloudSystem,
+            logger: testsLogger,
           });
-          logBuilderTestSkip(testsLogger, 'ServiceDefinitionBuilder - read standard object',
-            `Standard service definition not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`);
+          const standardObject =
+            resolver.getStandardObject('serviceDefinition');
+          if (!standardObject) {
+            logBuilderTestStart(
+              testsLogger,
+              'ServiceDefinitionBuilder - read standard object',
+              {
+                name: 'read_standard',
+                params: {},
+              },
+            );
+            logBuilderTestSkip(
+              testsLogger,
+              'ServiceDefinitionBuilder - read standard object',
+              `Standard service definition not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            );
+            return;
+          }
+          serviceDefinitionName = standardObject.name;
+        }
+
+        logBuilderTestStart(
+          testsLogger,
+          'ServiceDefinitionBuilder - read standard object',
+          {
+            name: 'read_standard',
+            params: { service_definition_name: serviceDefinitionName },
+          },
+        );
+
+        if (!hasConfig) {
+          logBuilderTestSkip(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+            'No SAP configuration',
+          );
           return;
         }
-        serviceDefinitionName = standardObject.name;
-      }
 
-      logBuilderTestStart(testsLogger, 'ServiceDefinitionBuilder - read standard object', {
-        name: 'read_standard',
-        params: { service_definition_name: serviceDefinitionName }
-      });
+        try {
+          const resultState = await client
+            .getServiceDefinition()
+            .read({ serviceDefinitionName: serviceDefinitionName });
+          expect(resultState).toBeDefined();
+          expect(resultState?.readResult).toBeDefined();
+          // ServiceDefinition read returns service definition config - check if serviceDefinitionName is present
+          const serviceDefinitionConfig = resultState?.readResult;
+          if (
+            serviceDefinitionConfig &&
+            typeof serviceDefinitionConfig === 'object' &&
+            'serviceDefinitionName' in serviceDefinitionConfig
+          ) {
+            expect((serviceDefinitionConfig as any).serviceDefinitionName).toBe(
+              serviceDefinitionName,
+            );
+          }
 
-      if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'ServiceDefinitionBuilder - read standard object', 'No SAP configuration');
-        return;
-      }
-
-      try {
-        const resultState = await client.getServiceDefinition().read({ serviceDefinitionName: serviceDefinitionName });
-        expect(resultState).toBeDefined();
-        expect(resultState?.readResult).toBeDefined();
-        // ServiceDefinition read returns service definition config - check if serviceDefinitionName is present
-        const serviceDefinitionConfig = resultState?.readResult;
-        if (serviceDefinitionConfig && typeof serviceDefinitionConfig === 'object' && 'serviceDefinitionName' in serviceDefinitionConfig) {
-          expect((serviceDefinitionConfig as any).serviceDefinitionName).toBe(serviceDefinitionName);
+          logBuilderTestSuccess(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+          );
+        } catch (error: any) {
+          // If object doesn't exist (404), skip the test instead of failing
+          if (error.response?.status === 404) {
+            logBuilderTestSkip(
+              testsLogger,
+              'ServiceDefinitionBuilder - read standard object',
+              `Standard service definition ${serviceDefinitionName} not found in system`,
+            );
+            return;
+          }
+          logBuilderTestError(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+            error,
+          );
+          throw error;
+        } finally {
+          logBuilderTestEnd(
+            testsLogger,
+            'ServiceDefinitionBuilder - read standard object',
+          );
         }
-
-        logBuilderTestSuccess(testsLogger, 'ServiceDefinitionBuilder - read standard object');
-      } catch (error: any) {
-        // If object doesn't exist (404), skip the test instead of failing
-        if (error.response?.status === 404) {
-          logBuilderTestSkip(testsLogger, 'ServiceDefinitionBuilder - read standard object',
-            `Standard service definition ${serviceDefinitionName} not found in system`);
-          return;
-        }
-        logBuilderTestError(testsLogger, 'ServiceDefinitionBuilder - read standard object', error);
-        throw error;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'ServiceDefinitionBuilder - read standard object');
-      }
-    }, getTimeout('test'));
+      },
+      getTimeout('test'),
+    );
   });
 });
-

@@ -7,23 +7,23 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/tableContents.test
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../clients/AdtClient';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { TestConfigResolver } from '../../helpers/TestConfigResolver';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestStep
-} from '../../helpers/builderTestLogger';
-import { createTestsLogger } from '../../helpers/testLogger';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { AdtClient } from '../../../clients/AdtClient';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
+import {
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestStep,
+} from '../../helpers/builderTestLogger';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
+import { createTestsLogger } from '../../helpers/testLogger';
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -65,8 +65,10 @@ function getConfig(): SapConfig {
     }
 
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
 
     if (uaaUrl) config.uaaUrl = uaaUrl;
     if (uaaClientId) config.uaaClientId = uaaClientId;
@@ -75,7 +77,9 @@ function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username;
     config.password = password;
@@ -99,8 +103,10 @@ describe('Shared - getTableContents', () => {
       hasConfig = true;
       // Check if this is a cloud system using system information endpoint
       isCloudSystem = await isCloudEnvironment(connection);
-    } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (_error) {
+      testsLogger.warn?.(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -113,32 +119,43 @@ describe('Shared - getTableContents', () => {
 
   it('should get table contents', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents', 'No SAP configuration');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
+        'No SAP configuration',
+      );
       return;
     }
 
     // Get test case from YAML configuration
-    const resolver = new TestConfigResolver({ 
-      isCloud: isCloudSystem, 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
       logger: testsLogger,
       handlerName: 'table_contents',
-      testCaseName: 'get_table_contents'
+      testCaseName: 'get_table_contents',
     });
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents', 'Test case not found or disabled');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
+        'Test case not found or disabled',
+      );
       return;
     }
 
     if (!resolver.isAvailableForEnvironment()) {
       logBuilderTestStart(testsLogger, 'Shared - getTableContents', {
         name: 'get_table_contents',
-        params: {}
+        params: {},
       });
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents',
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
-        `Table contents are only supported on on-premise systems.`);
+          `Table contents are only supported on on-premise systems.`,
+      );
       return;
     }
 
@@ -149,7 +166,7 @@ describe('Shared - getTableContents', () => {
     logBuilderTestStep('get table contents', testsLogger);
     const result = await client.getUtils().getTableContents({
       table_name: tableName,
-      max_rows: maxRows
+      max_rows: maxRows,
     });
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -157,28 +174,39 @@ describe('Shared - getTableContents', () => {
 
   it('should use default max_rows if not provided', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents', 'No SAP configuration');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
+        'No SAP configuration',
+      );
       return;
     }
 
     // Get test case from YAML configuration
-    const resolver = new TestConfigResolver({ 
-      isCloud: isCloudSystem, 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
       logger: testsLogger,
       handlerName: 'table_contents',
-      testCaseName: 'get_table_contents_default_max_rows'
+      testCaseName: 'get_table_contents_default_max_rows',
     });
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents', 'Test case not found or disabled');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
+        'Test case not found or disabled',
+      );
       return;
     }
 
     if (!resolver.isAvailableForEnvironment()) {
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents',
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
-        `Table contents are only supported on on-premise systems.`);
+          `Table contents are only supported on on-premise systems.`,
+      );
       return;
     }
 
@@ -187,7 +215,7 @@ describe('Shared - getTableContents', () => {
 
     logBuilderTestStep('get table contents with default max_rows', testsLogger);
     const result = await client.getUtils().getTableContents({
-      table_name: tableName
+      table_name: tableName,
     });
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -195,31 +223,37 @@ describe('Shared - getTableContents', () => {
 
   it('should throw error if table name is missing', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents', 'No SAP configuration');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
+        'No SAP configuration',
+      );
       return;
     }
 
     // Get test case from YAML configuration (use first available)
-    const resolver = new TestConfigResolver({ 
-      isCloud: isCloudSystem, 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
       logger: testsLogger,
-      handlerName: 'table_contents'
+      handlerName: 'table_contents',
     });
 
     const testCase = resolver.getTestCase();
     if (testCase && !resolver.isAvailableForEnvironment()) {
-      logBuilderTestSkip(testsLogger, 'Shared - getTableContents',
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getTableContents',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
-        `Table contents are only supported on on-premise systems.`);
+          `Table contents are only supported on on-premise systems.`,
+      );
       return;
     }
 
     logBuilderTestStep('validate error if table name is missing', testsLogger);
     await expect(
       client.getUtils().getTableContents({
-        table_name: ''
-      })
+        table_name: '',
+      }),
     ).rejects.toThrow('Table name is required');
   });
 });
-

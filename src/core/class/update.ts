@@ -3,20 +3,20 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Update class source code with validation (high-level function)
- * 
+ *
  * This function:
  * 1. Validates source code using check operation
  * 2. Only updates if validation passes (no errors)
  * 3. Allows warnings to pass through
- * 
+ *
  * Requires class to be locked first
- * 
+ *
  * @param connection - SAP connection
  * @param className - Class name
  * @param sourceCode - Source code to validate and update
@@ -24,7 +24,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * @param transportRequest - Optional transport request
  * @returns Update result
  * @throws Error if check finds errors or update fails
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateClassWithCheck(
@@ -32,7 +32,7 @@ export async function updateClassWithCheck(
   className: string,
   sourceCode: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   if (!sourceCode) {
     throw new Error('source_code is required');
@@ -47,23 +47,36 @@ export async function updateClassWithCheck(
   const { parseCheckRunResponse } = await import('../../utils/checkRun');
 
   // Check source code before update
-  const checkResponse = await checkClass(connection, className, 'inactive', sourceCode);
+  const checkResponse = await checkClass(
+    connection,
+    className,
+    'inactive',
+    sourceCode,
+  );
   const checkResult = parseCheckRunResponse(checkResponse);
 
   // Block update if there are errors
   if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err: any) => err.text).join('; ');
+    const errorMessages = checkResult.errors
+      .map((err: any) => err.text)
+      .join('; ');
     throw new Error(`Class check failed, update blocked: ${errorMessages}`);
   }
 
   // Proceed with update (warnings are allowed)
-  return await updateClass(connection, className, sourceCode, lockHandle, transportRequest);
+  return await updateClass(
+    connection,
+    className,
+    sourceCode,
+    lockHandle,
+    transportRequest,
+  );
 }
 
 /**
  * Update class source code (low-level function)
  * Requires class to be locked first
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateClass(
@@ -71,7 +84,7 @@ export async function updateClass(
   className: string,
   sourceCode: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   if (!sourceCode) {
     throw new Error('source_code is required');
@@ -89,7 +102,7 @@ export async function updateClass(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Accept': 'text/plain'
+    Accept: 'text/plain',
   };
 
   return await connection.makeAdtRequest({
@@ -97,14 +110,14 @@ export async function updateClass(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: sourceCode,
-    headers
+    headers,
   });
 }
 
 /**
  * Update class implementations include (low-level function)
  * Requires class to be locked first
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updateClassImplementations(
@@ -112,7 +125,7 @@ export async function updateClassImplementations(
   className: string,
   implementationCode: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   if (!implementationCode) {
     throw new Error('implementationCode is required');
@@ -130,7 +143,7 @@ export async function updateClassImplementations(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Accept': 'text/plain'
+    Accept: 'text/plain',
   };
 
   return await connection.makeAdtRequest({
@@ -138,8 +151,6 @@ export async function updateClassImplementations(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: implementationCode,
-    headers
+    headers,
   });
 }
-
-

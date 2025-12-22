@@ -3,16 +3,16 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Update class local types include (implementations)
- * 
+ *
  * Local helper classes, interface definitions and type declarations.
  * Requires the class to be locked (lock handle) before calling.
- * 
+ *
  * @param connection - SAP connection
  * @param className - Class name
  * @param localTypesSource - Local types source code
@@ -25,7 +25,7 @@ export async function updateClassLocalTypes(
   className: string,
   localTypesSource: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   return updateClassInclude(
     connection,
@@ -33,16 +33,16 @@ export async function updateClassLocalTypes(
     localTypesSource,
     'implementations',
     lockHandle,
-    transportRequest
+    transportRequest,
   );
 }
 
 /**
  * Update class-relevant local types include (definitions)
- * 
+ *
  * Type declarations needed for components in the private section.
  * Requires the class to be locked (lock handle) before calling.
- * 
+ *
  * @param connection - SAP connection
  * @param className - Class name
  * @param definitionsSource - Definitions source code
@@ -55,7 +55,7 @@ export async function updateClassDefinitions(
   className: string,
   definitionsSource: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   return updateClassInclude(
     connection,
@@ -63,17 +63,17 @@ export async function updateClassDefinitions(
     definitionsSource,
     'definitions',
     lockHandle,
-    transportRequest
+    transportRequest,
   );
 }
 
 /**
  * Update class macros include
- * 
+ *
  * Macro definitions needed in the implementation part of the class.
  * Note: Macros are supported in older ABAP versions but not in newer ones.
  * Requires the class to be locked (lock handle) before calling.
- * 
+ *
  * @param connection - SAP connection
  * @param className - Class name
  * @param macrosSource - Macros source code
@@ -86,7 +86,7 @@ export async function updateClassMacros(
   className: string,
   macrosSource: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   return updateClassInclude(
     connection,
@@ -94,13 +94,13 @@ export async function updateClassMacros(
     macrosSource,
     'macros',
     lockHandle,
-    transportRequest
+    transportRequest,
   );
 }
 
 /**
  * Generic function to update any class include file
- * 
+ *
  * @param connection - SAP connection
  * @param className - Class name
  * @param includeSource - Include source code
@@ -115,7 +115,7 @@ async function updateClassInclude(
   includeSource: string,
   includeType: 'implementations' | 'definitions' | 'macros',
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   if (!includeSource) {
     throw new Error(`${includeType} source code is required`);
@@ -133,7 +133,7 @@ async function updateClassInclude(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    Accept: 'text/plain'
+    Accept: 'text/plain',
   };
 
   return await connection.makeAdtRequest({
@@ -141,6 +141,6 @@ async function updateClassInclude(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: includeSource,
-    headers
+    headers,
   });
 }

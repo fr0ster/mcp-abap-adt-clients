@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { IUpdateTableParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { IUpdateTableParams } from './types';
 
 /**
  * Update table using existing lock/session (Builder workflow)
@@ -14,7 +14,7 @@ import { IUpdateTableParams } from './types';
 export async function updateTable(
   connection: IAbapConnection,
   params: IUpdateTableParams,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   if (!params.table_name) {
     throw new Error('table_name is required');
@@ -31,9 +31,14 @@ export async function updateTable(
   const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {
-    'Content-Type': 'text/plain; charset=utf-8'
+    'Content-Type': 'text/plain; charset=utf-8',
   };
 
-  return connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: params.ddl_code, headers});
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: params.ddl_code,
+    headers,
+  });
 }
-

@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { IUpdateFunctionModuleParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { IUpdateFunctionModuleParams } from './types';
 
 /**
  * Upload function module source code (low-level - uses existing lockHandle)
@@ -15,10 +15,14 @@ import { IUpdateFunctionModuleParams } from './types';
  */
 export async function update(
   connection: IAbapConnection,
-  params: IUpdateFunctionModuleParams
+  params: IUpdateFunctionModuleParams,
 ): Promise<AxiosResponse> {
-  const encodedGroupName = encodeSapObjectName(params.functionGroupName).toLowerCase();
-  const encodedModuleName = encodeSapObjectName(params.functionModuleName).toLowerCase();
+  const encodedGroupName = encodeSapObjectName(
+    params.functionGroupName,
+  ).toLowerCase();
+  const encodedModuleName = encodeSapObjectName(
+    params.functionModuleName,
+  ).toLowerCase();
 
   let url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}/source/main?lockHandle=${params.lockHandle}`;
   if (params.transportRequest) {
@@ -27,7 +31,7 @@ export async function update(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Accept': 'text/plain'
+    Accept: 'text/plain',
   };
 
   const response = await connection.makeAdtRequest({
@@ -35,9 +39,8 @@ export async function update(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: params.sourceCode,
-    headers
+    headers,
   });
 
   return response;
 }
-

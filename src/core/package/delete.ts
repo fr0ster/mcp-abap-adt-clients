@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 export interface DeletePackageParams {
   package_name: string;
@@ -16,12 +16,12 @@ export interface DeletePackageParams {
 /**
  * Check if package can be deleted (deletion check)
  * Returns response with isDeletable flag
- * 
+ *
  * NOTE: Uses stateful session headers automatically if connection has stateful mode enabled
  */
 export async function checkPackageDeletion(
   connection: IAbapConnection,
-  params: DeletePackageParams
+  params: DeletePackageParams,
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('package_name is required');
@@ -39,8 +39,8 @@ export async function checkPackageDeletion(
 </del:checkRequest>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.deletion.check.response.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml'
+    Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
   };
 
   return await connection.makeAdtRequest({
@@ -48,33 +48,46 @@ export async function checkPackageDeletion(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlPayload,
-    headers
+    headers,
   });
 }
 
 /**
  * Parse deletion check response to get isDeletable flag
  */
-export function parsePackageDeletionCheck(response: AxiosResponse): { isDeletable: boolean; message?: string } {
+export function parsePackageDeletionCheck(response: AxiosResponse): {
+  isDeletable: boolean;
+  message?: string;
+} {
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: '@_'
+    attributeNamePrefix: '@_',
   });
 
   try {
     const result = parser.parse(response.data);
-    const checkObject = result['del:checkResponse']?.['del:object'] || result['checkResponse']?.['object'];
-    
+    const checkObject =
+      result['del:checkResponse']?.['del:object'] ||
+      result.checkResponse?.object;
+
     if (!checkObject) {
       return { isDeletable: false, message: 'No check result in response' };
     }
 
-    const isDeletable = checkObject['@_del:isDeletable'] === 'true' || checkObject['@_isDeletable'] === 'true';
-    const message = checkObject['del:message']?.['del:text'] || checkObject['message']?.['text'] || '';
+    const isDeletable =
+      checkObject['@_del:isDeletable'] === 'true' ||
+      checkObject['@_isDeletable'] === 'true';
+    const message =
+      checkObject['del:message']?.['del:text'] ||
+      checkObject.message?.text ||
+      '';
 
     return { isDeletable, message: message || undefined };
   } catch (error) {
-    return { isDeletable: false, message: `Failed to parse check response: ${error}` };
+    return {
+      isDeletable: false,
+      message: `Failed to parse check response: ${error}`,
+    };
   }
 }
 
@@ -84,7 +97,7 @@ export function parsePackageDeletionCheck(response: AxiosResponse): { isDeletabl
  */
 export async function deletePackage(
   connection: IAbapConnection,
-  params: DeletePackageParams
+  params: DeletePackageParams,
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('package_name is required');
@@ -98,7 +111,7 @@ export async function deletePackage(
   // Build XML deletion request
   // For packages, empty transportNumber tag may be required if no transport_request provided
   let transportNumberTag = '';
-  if (params.transport_request && params.transport_request.trim()) {
+  if (params.transport_request?.trim()) {
     transportNumberTag = `<del:transportNumber>${params.transport_request}</del:transportNumber>`;
   } else {
     // For packages: add empty self-closing tag
@@ -113,8 +126,8 @@ export async function deletePackage(
 </del:deletionRequest>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.deletion.response.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml'
+    Accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml',
   };
 
   const response = await connection.makeAdtRequest({
@@ -122,32 +135,41 @@ export async function deletePackage(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlPayload,
-    headers
+    headers,
   });
 
   // Parse response to check if deletion was successful
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: '@_'
+    attributeNamePrefix: '@_',
   });
 
   try {
     const result = parser.parse(response.data);
-    const deleteObject = result['del:deletionResult']?.['del:object'] || result['deletionResult']?.['object'];
-    const isDeleted = deleteObject?.['@_del:isDeleted'] === 'true' || deleteObject?.['@_isDeleted'] === 'true';
+    const deleteObject =
+      result['del:deletionResult']?.['del:object'] ||
+      result.deletionResult?.object;
+    const isDeleted =
+      deleteObject?.['@_del:isDeleted'] === 'true' ||
+      deleteObject?.['@_isDeleted'] === 'true';
 
     if (!isDeleted) {
-      const message = deleteObject?.['del:message']?.['del:text'] || deleteObject?.['message']?.['text'] || 'Deletion failed';
+      const message =
+        deleteObject?.['del:message']?.['del:text'] ||
+        deleteObject?.message?.text ||
+        'Deletion failed';
       throw new Error(`Package deletion failed: ${message}`);
     }
   } catch (error: any) {
     // If parsing fails or isDeleted is false, throw error
-    if (error.message && error.message.includes('Package deletion failed')) {
+    if (error.message?.includes('Package deletion failed')) {
       throw error;
     }
     // If it's a parse error, check HTTP status
     if (response.status >= 400) {
-      throw new Error(`Package deletion failed: HTTP ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Package deletion failed: HTTP ${response.status} ${response.statusText}`,
+      );
     }
   }
 
@@ -160,8 +182,7 @@ export async function deletePackage(
       object_type: 'DEVC/K',
       object_uri: objectUri,
       transport_request: params.transport_request || 'local',
-      message: `Package ${params.package_name} deleted successfully`
-    }
+      message: `Package ${params.package_name} deleted successfully`,
+    },
   } as AxiosResponse;
 }
-

@@ -4,9 +4,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock structure
@@ -23,7 +23,6 @@ export async function unlockStructure(
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    data: null
+    data: null,
   });
 }
-

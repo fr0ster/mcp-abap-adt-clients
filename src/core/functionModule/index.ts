@@ -2,12 +2,15 @@
  * FunctionModule operations - exports
  */
 
-import { IAdtObject } from '@mcp-abap-adt/interfaces';
-import { IFunctionModuleConfig, IFunctionModuleState } from './types';
+import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IFunctionModuleConfig, IFunctionModuleState } from './types';
 
-export * from './types';
-export { FunctionModuleBuilder } from './FunctionModuleBuilder';
 export { AdtFunctionModule } from './AdtFunctionModule';
+export { FunctionModuleBuilder } from './FunctionModuleBuilder';
+export * from './types';
 
 // Type alias for AdtFunctionModule
-export type AdtFunctionModuleType = IAdtObject<IFunctionModuleConfig, IFunctionModuleState>;
+export type AdtFunctionModuleType = IAdtObject<
+  IFunctionModuleConfig,
+  IFunctionModuleState
+>;

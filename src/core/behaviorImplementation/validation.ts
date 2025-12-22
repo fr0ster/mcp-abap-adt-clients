@@ -3,14 +3,17 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { AxiosError, type AxiosResponse } from 'axios';
+import {
+  encodeSapObjectName,
+  limitDescription,
+} from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse, AxiosError } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
 
 /**
  * Validate behavior implementation class name
  * Uses ADT validation endpoint: /sap/bc/adt/oo/validation/objectname
- * 
+ *
  * @param connection - SAP connection
  * @param className - Behavior implementation class name (e.g., ZBP_OK_I_CDS_TEST)
  * @param packageName - Package name
@@ -23,14 +26,14 @@ export async function validateBehaviorImplementationName(
   className: string,
   packageName?: string,
   description?: string,
-  behaviorDefinition?: string
+  behaviorDefinition?: string,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
 
   // Build query parameters for behavior implementation validation
   const params = new URLSearchParams({
     objname: encodedName,
-    objtype: 'CLAS/OC'
+    objtype: 'CLAS/OC',
   });
 
   if (packageName) {
@@ -48,7 +51,8 @@ export async function validateBehaviorImplementationName(
 
   const url = `/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check',
   };
 
   try {
@@ -56,7 +60,7 @@ export async function validateBehaviorImplementationName(
       url,
       method: 'POST',
       timeout: getTimeout('default'),
-      headers
+      headers,
     });
   } catch (error: any) {
     // If validation returns 400 and object already exists, return error response instead of throwing
@@ -66,4 +70,3 @@ export async function validateBehaviorImplementationName(
     throw error;
   }
 }
-

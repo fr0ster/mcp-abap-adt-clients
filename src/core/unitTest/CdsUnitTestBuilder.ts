@@ -1,20 +1,19 @@
 /**
  * CdsUnitTestBuilder - Builder for CDS unit tests (full class lifecycle)
- * 
+ *
  * Extends ClassBuilder for full class operations and adds CDS-specific validation
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IClassBuilderConfig } from '../class';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IClassBuilderConfig } from '../class';
 import { BaseUnitTestBuilder } from './BaseUnitTestBuilder';
+import type { ClassUnitTestRunOptions } from './types';
 import { validateCdsForUnitTest } from './validateCdsForUnitTest';
-import { ClassUnitTestRunOptions } from './types';
 
 export interface CdsUnitTestBuilderConfig {
   className: string;
   packageName: string;
-  cdsViewName: string;  // CDS view name for generating test class source
+  cdsViewName: string; // CDS view name for generating test class source
   transportRequest?: string;
   description?: string;
   testClassSource?: string;
@@ -23,10 +22,10 @@ export interface CdsUnitTestBuilderConfig {
 
 /**
  * Builder for CDS unit tests (full class lifecycle)
- * 
+ *
  * Extends BaseUnitTestBuilder and overrides create() to create class with CDS template,
  * then lock and add test class source
- * 
+ *
  * @example
  * ```typescript
  * const builder = new CdsUnitTestBuilder(connection, logger, {
@@ -35,7 +34,7 @@ export interface CdsUnitTestBuilderConfig {
  *   classTemplate: '<template>...</template>',
  *   testClassSource: 'CLASS ltc_test...'
  * });
- * 
+ *
  * await builder
  *   .validateCdsForUnitTest('ZCDS_MY_VIEW')
  *   .then(b => b.create())  // Creates empty class, locks, adds test class
@@ -52,19 +51,20 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
   constructor(
     connection: IAbapConnection,
     config: CdsUnitTestBuilderConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     const classConfig: IClassBuilderConfig = {
       className: config.className,
-      description: config.description || `CDS unit test for ${config.className}`,
+      description:
+        config.description || `CDS unit test for ${config.className}`,
       packageName: config.packageName,
       transportRequest: config.transportRequest,
       testClassCode: config.testClassSource,
       classTemplate: config.classTemplate,
-      final: true
+      final: true,
     };
     super(connection, classConfig, logger);
-    
+
     this.cdsConfig = config;
   }
 
@@ -79,20 +79,30 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
     try {
       // Ensure classTemplate is set (required for CDS unit test)
       if (!this.cdsConfig.classTemplate) {
-        throw new Error('classTemplate is required for CDS unit test class creation');
+        throw new Error(
+          'classTemplate is required for CDS unit test class creation',
+        );
       }
 
       // Ensure testClassSource is set
       if (!this.cdsConfig.testClassSource) {
-        throw new Error('testClassSource is required for CDS unit test class creation');
+        throw new Error(
+          'testClassSource is required for CDS unit test class creation',
+        );
       }
 
       // Step 1: Create empty class with CDS template (includes testclasses include)
-      this.logger?.info('Creating CDS unit test class with template:', this.cdsConfig.className);
+      this.logger?.info(
+        'Creating CDS unit test class with template:',
+        this.cdsConfig.className,
+      );
       await super.create();
 
       // Step 2: Lock class (required for updating test class)
-      this.logger?.info('Locking class for test class update:', this.cdsConfig.className);
+      this.logger?.info(
+        'Locking class for test class update:',
+        this.cdsConfig.className,
+      );
       await this.lock();
 
       // Step 3: Add test class source (uses lock handle from step 2)
@@ -100,7 +110,10 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
       await this.update(this.cdsConfig.testClassSource);
 
       // Step 4: Unlock class (required before activation can proceed)
-      this.logger?.info('Unlocking class after test class update:', this.cdsConfig.className);
+      this.logger?.info(
+        'Unlocking class after test class update:',
+        this.cdsConfig.className,
+      );
       await this.unlock();
 
       return this;
@@ -116,27 +129,44 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
    */
   async validateCdsForUnitTest(cdsViewName: string): Promise<this> {
     try {
-      this.logger?.info('Validating CDS view for unit test doubles:', cdsViewName);
-      const response = await validateCdsForUnitTest(this.connection, cdsViewName);
-      
+      this.logger?.info(
+        'Validating CDS view for unit test doubles:',
+        cdsViewName,
+      );
+      const response = await validateCdsForUnitTest(
+        this.connection,
+        cdsViewName,
+      );
+
       // Check if validation succeeded (SEVERITY=OK)
       if (response?.status === 200) {
         const { XMLParser } = require('fast-xml-parser');
         const parser = new XMLParser({ ignoreAttributes: false });
         const parsed = parser.parse(response.data);
-        const severity = parsed?.['asx:abap']?.['asx:values']?.['DATA']?.['SEVERITY'];
-        
+        const severity = parsed?.['asx:abap']?.['asx:values']?.DATA?.SEVERITY;
+
         if (severity !== 'OK') {
-          const shortText = parsed?.['asx:abap']?.['asx:values']?.['DATA']?.['SHORT_TEXT'] || '';
-          const longText = parsed?.['asx:abap']?.['asx:values']?.['DATA']?.['LONG_TEXT'] || '';
-          const errorMessage = shortText || longText || `Validation failed with severity: ${severity}`;
-          throw new Error(`CDS view ${cdsViewName} validation for unit test doubles failed: ${errorMessage}`);
+          const shortText =
+            parsed?.['asx:abap']?.['asx:values']?.DATA?.SHORT_TEXT || '';
+          const longText =
+            parsed?.['asx:abap']?.['asx:values']?.DATA?.LONG_TEXT || '';
+          const errorMessage =
+            shortText ||
+            longText ||
+            `Validation failed with severity: ${severity}`;
+          throw new Error(
+            `CDS view ${cdsViewName} validation for unit test doubles failed: ${errorMessage}`,
+          );
         }
-        
-        this.logger?.info('CDS view validated successfully for unit test doubles');
+
+        this.logger?.info(
+          'CDS view validated successfully for unit test doubles',
+        );
         return this;
       } else {
-        throw new Error(`CDS view validation failed with HTTP ${response.status}`);
+        throw new Error(
+          `CDS view validation failed with HTTP ${response.status}`,
+        );
       }
     } catch (error: any) {
       this.logger?.error('Validate CDS for unit test failed:', error);
@@ -148,7 +178,10 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
    * Start unit test run by object (for CDS unit tests)
    * Override to use className from config
    */
-  async runForObject(className?: string, options?: ClassUnitTestRunOptions): Promise<this> {
+  async runForObject(
+    className?: string,
+    options?: ClassUnitTestRunOptions,
+  ): Promise<this> {
     // Use className from config if not provided
     const targetClassName = className || this.cdsConfig.className;
     return await super.runForObject(targetClassName, options);
@@ -169,4 +202,3 @@ export class CdsUnitTestBuilder extends BaseUnitTestBuilder {
     }
   }
 }
-

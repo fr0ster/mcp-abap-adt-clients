@@ -3,16 +3,20 @@
  * Copy this structure to all test files
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { getConfig } from '../helpers/sessionConfig';
-import * as path from 'path';
-import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import { getConfig } from '../helpers/sessionConfig';
 
-const { getEnabledTestCase, validateTestCaseForUserSpace } = require('./test-helper');
+const {
+  getEnabledTestCase,
+  validateTestCaseForUserSpace,
+} = require('./test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -36,7 +40,7 @@ describe('Module - Operation', () => {
       connection = createAbapConnection(config, logger);
       await (connection as any).connect();
       hasConfig = true;
-    } catch (error) {
+    } catch (_error) {
       logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
       hasConfig = false;
     }
@@ -57,4 +61,3 @@ describe('Module - Operation', () => {
     // Test implementation
   }, 30000);
 });
-

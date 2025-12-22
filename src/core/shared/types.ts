@@ -6,8 +6,8 @@
  * Object reference for group activation and inactive objects
  */
 export interface IObjectReference {
-    type: string;
-    name: string;
+  type: string;
+  name: string;
 }
 
 /**

@@ -1,36 +1,43 @@
 /**
  * AdtProgram - High-level CRUD operations for Program objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
  * - activate uses same session/cookies (no stateful needed)
- * 
+ *
  * Operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IProgramConfig, IProgramState } from './types';
-import { validateProgramName } from './validation';
-import { create as createProgram } from './create';
-import { checkProgram } from './check';
-import { lockProgram } from './lock';
-import { uploadProgramSource } from './update';
-import { unlockProgram } from './unlock';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateProgram } from './activation';
+import { checkProgram } from './check';
+import { create as createProgram } from './create';
 import { checkDeletion, deleteProgram } from './delete';
-import { getProgramSource, getProgramTransport, getProgramMetadata } from './read';
+import { lockProgram } from './lock';
+import {
+  getProgramMetadata,
+  getProgramSource,
+  getProgramTransport,
+} from './read';
+import type { IProgramConfig, IProgramState } from './types';
+import { unlockProgram } from './unlock';
+import { uploadProgramSource } from './update';
+import { validateProgramName } from './validation';
 
 export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   private readonly connection: IAbapConnection;
@@ -54,24 +61,24 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       const validationResponse = await validateProgramName(
         this.connection,
         config.programName,
-        config.description
+        config.description,
       );
 
       return {
         validationResponse: validationResponse,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       const status = error.response?.status;
       const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data 
-        ? (typeof error.response.data === 'string' 
-            ? error.response.data.substring(0, 500)
-            : JSON.stringify(error.response.data).substring(0, 500))
+      const errorMessage = error.response?.data
+        ? typeof error.response.data === 'string'
+          ? error.response.data.substring(0, 500)
+          : JSON.stringify(error.response.data).substring(0, 500)
         : error.message || 'Unknown error';
 
       this.logger?.error?.(
-        `Validation failed: HTTP ${status} ${statusText} - ${errorMessage}`
+        `Validation failed: HTTP ${status} ${statusText} - ${errorMessage}`,
       );
 
       if (status === 400 || (status >= 400 && status < 500)) {
@@ -87,7 +94,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async create(
     config: IProgramConfig,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -97,9 +104,9 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     }
 
     let objectCreated = false;
-    const sessionId = this.connection.getSessionId?.() || '';
+    const _sessionId = this.connection.getSessionId?.() || '';
     const state: IProgramState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -113,7 +120,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         description: config.description,
         programType: config.programType,
         application: config.application,
-        sourceCode: options?.sourceCode || config.sourceCode
+        sourceCode: options?.sourceCode || config.sourceCode,
       });
       state.createResult = createResponse;
       objectCreated = true;
@@ -131,11 +138,14 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           this.connection.setSessionType('stateful');
           await deleteProgram(this.connection, {
             programName: config.programName,
-            transportRequest: config.transportRequest
+            transportRequest: config.transportRequest,
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete program after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete program after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -150,7 +160,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   async read(
     config: Partial<IProgramConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IProgramState | undefined> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -161,11 +171,13 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         this.connection,
         config.programName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -180,26 +192,36 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async readMetadata(
     config: Partial<IProgramConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IProgramState> {
     const state: IProgramState = { errors: [] };
     if (!config.programName) {
       const error = new Error('Program name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getProgramMetadata(
         this.connection,
         config.programName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       this.logger?.info?.('Program metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -212,7 +234,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async update(
     config: Partial<IProgramConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -225,7 +247,9 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         throw new Error('Source code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const sessionId = this.connection.getSessionId?.() || '';
       const updateResponse = await uploadProgramSource(
         this.connection,
@@ -233,19 +257,19 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         codeToUpdate,
         options.lockHandle,
         sessionId,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('Program updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
     let lockHandle: string | undefined;
     const sessionId = this.connection.getSessionId?.() || '';
     const state: IProgramState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -259,8 +283,15 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        const checkResponse = await checkProgram(this.connection, config.programName, 'inactive', codeToCheck);
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        const checkResponse = await checkProgram(
+          this.connection,
+          config.programName,
+          'inactive',
+          codeToCheck,
+        );
         state.checkResult = checkResponse;
         this.logger?.info?.('Check inactive with update content passed');
       }
@@ -274,7 +305,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           codeToCheck,
           lockHandle,
           sessionId,
-          config.transportRequest
+          config.transportRequest,
         );
         state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
@@ -282,14 +313,15 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { programName: config.programName },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ programName: config.programName }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after update:',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -297,7 +329,11 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking program');
-        const unlockResponse = await unlockProgram(this.connection, config.programName, lockHandle);
+        const unlockResponse = await unlockProgram(
+          this.connection,
+          config.programName,
+          lockHandle,
+        );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
@@ -306,16 +342,26 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      const checkResponse2 = await checkProgram(this.connection, config.programName, 'inactive');
+      const checkResponse2 = await checkProgram(
+        this.connection,
+        config.programName,
+        'inactive',
+      );
       state.checkResult = checkResponse2;
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating program');
-        const activateResponse = await activateProgram(this.connection, config.programName);
+        const activateResponse = await activateProgram(
+          this.connection,
+          config.programName,
+        );
         state.activateResult = activateResponse;
-        this.logger?.info?.('Program activated, status:', activateResponse.status);
+        this.logger?.info?.(
+          'Program activated, status:',
+          activateResponse.status,
+        );
 
         // 6.5. Read with long polling to ensure object is ready after activation
         this.logger?.info?.('read (wait for object ready after activation)');
@@ -323,14 +369,17 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           const readState = await this.read(
             { programName: config.programName },
             'active',
-            { withLongPolling: true }
+            { withLongPolling: true },
           );
           if (readState) {
             state.readResult = readState.readResult;
           }
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after activation:',
+            readError,
+          );
           // Continue anyway - activation was successful
         }
       }
@@ -358,11 +407,14 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           this.connection.setSessionType('stateful');
           await deleteProgram(this.connection, {
             programName: config.programName,
-            transportRequest: config.transportRequest
+            transportRequest: config.transportRequest,
           });
           this.connection.setSessionType('stateless');
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete program after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete program after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -380,7 +432,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     }
 
     const state: IProgramState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -388,7 +440,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.logger?.info?.('Checking program for deletion');
       const checkResponse = await checkDeletion(this.connection, {
         programName: config.programName,
-        transportRequest: config.transportRequest
+        transportRequest: config.transportRequest,
       });
       state.checkResult = checkResponse;
       this.logger?.info?.('Deletion check passed');
@@ -398,7 +450,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.connection.setSessionType('stateful');
       const deleteResponse = await deleteProgram(this.connection, {
         programName: config.programName,
-        transportRequest: config.transportRequest
+        transportRequest: config.transportRequest,
       });
       state.deleteResult = deleteResponse;
       this.logger?.info?.('Program deleted');
@@ -422,24 +474,27 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     }
 
     const state: IProgramState = {
-      errors: []
+      errors: [],
     };
 
     try {
-      const activateResponse = await activateProgram(this.connection, config.programName);
+      const activateResponse = await activateProgram(
+        this.connection,
+        config.programName,
+      );
       state.activateResult = activateResponse;
       return state;
     } catch (error: any) {
       const status = error.response?.status;
       const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data 
-        ? (typeof error.response.data === 'string' 
-            ? error.response.data.substring(0, 500)
-            : JSON.stringify(error.response.data).substring(0, 500))
+      const errorMessage = error.response?.data
+        ? typeof error.response.data === 'string'
+          ? error.response.data.substring(0, 500)
+          : JSON.stringify(error.response.data).substring(0, 500)
         : error.message || 'Unknown error';
 
       this.logger?.error?.(
-        `Activate failed: HTTP ${status} ${statusText} - ${errorMessage}`
+        `Activate failed: HTTP ${status} ${statusText} - ${errorMessage}`,
       );
 
       this.logger?.error('Activate failed:', error);
@@ -452,20 +507,26 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async check(
     config: Partial<IProgramConfig>,
-    status?: string
+    status?: string,
   ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
     const state: IProgramState = {
-      errors: []
+      errors: [],
     };
 
     try {
       // Map status to version
-      const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
-      const checkResponse = await checkProgram(this.connection, config.programName, version, config.sourceCode);
+      const version: 'active' | 'inactive' =
+        status === 'active' ? 'active' : 'inactive';
+      const checkResponse = await checkProgram(
+        this.connection,
+        config.programName,
+        version,
+        config.sourceCode,
+      );
       state.checkResult = checkResponse;
       return state;
     } catch (error: any) {
@@ -479,10 +540,10 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async readTransport(
     config: Partial<IProgramConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IProgramState> {
     const state: IProgramState = {
-      errors: []
+      errors: [],
     };
 
     if (!config.programName) {
@@ -490,7 +551,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       state.errors.push({
         method: 'readTransport',
         error,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       throw error;
     }
@@ -499,7 +560,9 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       const response = await getProgramTransport(
         this.connection,
         config.programName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
       this.logger?.info?.('Transport request read successfully');
@@ -509,7 +572,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       state.errors.push({
         method: 'readTransport',
         error: err,
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('readTransport', err);
       throw err;
@@ -531,16 +594,23 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   /**
    * Unlock program
    */
-  async unlock(config: Partial<IProgramConfig>, lockHandle: string): Promise<IProgramState> {
+  async unlock(
+    config: Partial<IProgramConfig>,
+    lockHandle: string,
+  ): Promise<IProgramState> {
     if (!config.programName) {
       throw new Error('Program name is required');
     }
 
-    const result = await unlockProgram(this.connection, config.programName, lockHandle);
+    const result = await unlockProgram(
+      this.connection,
+      config.programName,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
-      errors: []
+      errors: [],
     };
   }
 }

@@ -2,7 +2,7 @@
  * Domain module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 export interface IFixedValue {
   low: string;
@@ -65,5 +65,4 @@ export interface IDomainConfig {
   fixed_values?: IFixedValue[];
 }
 
-export interface IDomainState extends IAdtObjectState {
-}
+export interface IDomainState extends IAdtObjectState {}

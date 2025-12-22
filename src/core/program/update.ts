@@ -2,10 +2,9 @@
  * Program update operations - low-level functions for ProgramBuilder
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { IUpdateProgramSourceParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Upload program source code (low-level - uses existing lockHandle)
@@ -17,8 +16,8 @@ export async function uploadProgramSource(
   programName: string,
   sourceCode: string,
   lockHandle: string,
-  sessionId: string,
-  corrNr?: string
+  _sessionId: string,
+  corrNr?: string,
 ) {
   let url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?lockHandle=${lockHandle}`;
   if (corrNr) {
@@ -27,9 +26,14 @@ export async function uploadProgramSource(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Accept': 'text/plain'
+    Accept: 'text/plain',
   };
 
-  return await connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout('default'), data: sourceCode, headers});
+  return await connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: sourceCode,
+    headers,
+  });
 }
-

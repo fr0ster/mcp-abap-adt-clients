@@ -4,9 +4,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Lock service definition for modification
@@ -14,20 +14,23 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  */
 export async function lockServiceDefinition(
   connection: IAbapConnection,
-  serviceDefinitionName: string
+  serviceDefinitionName: string,
 ): Promise<string> {
-  const serviceDefinitionNameEncoded = encodeSapObjectName(serviceDefinitionName.toLowerCase());
+  const serviceDefinitionNameEncoded = encodeSapObjectName(
+    serviceDefinitionName.toLowerCase(),
+  );
   const url = `/sap/bc/adt/ddic/srvd/sources/${serviceDefinitionNameEncoded}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
   };
 
   const response = await connection.makeAdtRequest({
     method: 'POST',
     url,
     headers,
-    timeout: getTimeout('default')
+    timeout: getTimeout('default'),
   });
 
   const parser = new XMLParser({
@@ -36,7 +39,7 @@ export async function lockServiceDefinition(
   });
 
   const result = parser.parse(response.data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
+  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
 
   if (!lockHandle) {
     throw new Error('Failed to extract lock handle from response');
@@ -44,4 +47,3 @@ export async function lockServiceDefinition(
 
   return lockHandle;
 }
-

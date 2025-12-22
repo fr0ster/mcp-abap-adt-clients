@@ -7,23 +7,23 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/sqlQuery.test
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../clients/AdtClient';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { TestConfigResolver } from '../../helpers/TestConfigResolver';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestStep
-} from '../../helpers/builderTestLogger';
-import { createTestsLogger } from '../../helpers/testLogger';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { AdtClient } from '../../../clients/AdtClient';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
+import {
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestStep,
+} from '../../helpers/builderTestLogger';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
+import { createTestsLogger } from '../../helpers/testLogger';
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -65,8 +65,10 @@ function getConfig(): SapConfig {
     }
 
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
 
     if (uaaUrl) config.uaaUrl = uaaUrl;
     if (uaaClientId) config.uaaClientId = uaaClientId;
@@ -75,7 +77,9 @@ function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username;
     config.password = password;
@@ -99,8 +103,10 @@ describe('Shared - getSqlQuery', () => {
       hasConfig = true;
       // Check if this is a cloud system using system information endpoint
       isCloudSystem = await isCloudEnvironment(connection);
-    } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (_error) {
+      testsLogger.warn?.(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -113,32 +119,43 @@ describe('Shared - getSqlQuery', () => {
 
   it('should execute SQL query', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'No SAP configuration');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getSqlQuery',
+        'No SAP configuration',
+      );
       return;
     }
 
     // Get test case from YAML configuration
-    const resolver = new TestConfigResolver({ 
-      isCloud: isCloudSystem, 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
       logger: testsLogger,
       handlerName: 'sql_query',
-      testCaseName: 'execute_sql_query'
+      testCaseName: 'execute_sql_query',
     });
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'Test case not found or disabled');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getSqlQuery',
+        'Test case not found or disabled',
+      );
       return;
     }
 
     if (!resolver.isAvailableForEnvironment()) {
       logBuilderTestStart(testsLogger, 'Shared - getSqlQuery', {
         name: 'execute_sql_query',
-        params: {}
+        params: {},
       });
-      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery',
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getSqlQuery',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
-        `SQL queries are only supported on on-premise systems.`);
+          `SQL queries are only supported on on-premise systems.`,
+      );
       return;
     }
 
@@ -153,7 +170,7 @@ describe('Shared - getSqlQuery', () => {
     logBuilderTestStep('execute SQL query', testsLogger);
     const result = await client.getUtils().getSqlQuery({
       sql_query: sqlQuery,
-      row_number: rowNumber
+      row_number: rowNumber,
     });
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -161,28 +178,39 @@ describe('Shared - getSqlQuery', () => {
 
   it('should use default row_number if not provided', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'No SAP configuration');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getSqlQuery',
+        'No SAP configuration',
+      );
       return;
     }
 
     // Get test case from YAML configuration
-    const resolver = new TestConfigResolver({ 
-      isCloud: isCloudSystem, 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
       logger: testsLogger,
       handlerName: 'sql_query',
-      testCaseName: 'execute_sql_query_default_row_number'
+      testCaseName: 'execute_sql_query_default_row_number',
     });
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery', 'Test case not found or disabled');
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getSqlQuery',
+        'Test case not found or disabled',
+      );
       return;
     }
 
     if (!resolver.isAvailableForEnvironment()) {
-      logBuilderTestSkip(testsLogger, 'Shared - getSqlQuery',
+      logBuilderTestSkip(
+        testsLogger,
+        'Shared - getSqlQuery',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
-        `SQL queries are only supported on on-premise systems.`);
+          `SQL queries are only supported on on-premise systems.`,
+      );
       return;
     }
 
@@ -193,9 +221,12 @@ describe('Shared - getSqlQuery', () => {
       sqlQuery = `SELECT * FROM ${tableName}`;
     }
 
-    logBuilderTestStep('execute SQL query with default row_number', testsLogger);
+    logBuilderTestStep(
+      'execute SQL query with default row_number',
+      testsLogger,
+    );
     const result = await client.getUtils().getSqlQuery({
-      sql_query: sqlQuery
+      sql_query: sqlQuery,
     });
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -203,16 +234,17 @@ describe('Shared - getSqlQuery', () => {
 
   it('should throw error if SQL query is missing', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
     logBuilderTestStep('validate error if SQL query is missing', testsLogger);
     await expect(
       client.getUtils().getSqlQuery({
-        sql_query: ''
-      })
+        sql_query: '',
+      }),
     ).rejects.toThrow('SQL query is required');
   });
 });
-

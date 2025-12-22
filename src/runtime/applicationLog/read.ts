@@ -1,6 +1,6 @@
 /**
  * Application Log Objects
- * 
+ *
  * Provides functions for reading application log objects:
  * - Get application log object properties
  * - Get application log object source
@@ -8,8 +8,8 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
 
 /**
  * Get application log object options
@@ -24,7 +24,7 @@ export interface IGetApplicationLogObjectOptions {
 
 /**
  * Get application log object properties
- * 
+ *
  * @param connection - ABAP connection
  * @param objectName - Application log object name
  * @param options - Optional parameters
@@ -33,11 +33,11 @@ export interface IGetApplicationLogObjectOptions {
 export async function getApplicationLogObject(
   connection: IAbapConnection,
   objectName: string,
-  options?: IGetApplicationLogObjectOptions
+  options?: IGetApplicationLogObjectOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/${objectName}`;
   const params: Record<string, any> = {};
-  
+
   if (options?.corrNr) params.corrNr = options.corrNr;
   if (options?.lockHandle) params.lockHandle = options.lockHandle;
   if (options?.version) params.version = options.version;
@@ -50,9 +50,10 @@ export async function getApplicationLogObject(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/properties'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/properties',
+    },
   });
 }
 
@@ -67,7 +68,7 @@ export interface IGetApplicationLogSourceOptions {
 
 /**
  * Get application log object source
- * 
+ *
  * @param connection - ABAP connection
  * @param objectName - Application log object name
  * @param options - Optional parameters
@@ -76,11 +77,11 @@ export interface IGetApplicationLogSourceOptions {
 export async function getApplicationLogSource(
   connection: IAbapConnection,
   objectName: string,
-  options?: IGetApplicationLogSourceOptions
+  options?: IGetApplicationLogSourceOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/${objectName}/source/main`;
   const params: Record<string, any> = {};
-  
+
   if (options?.corrNr) params.corrNr = options.corrNr;
   if (options?.lockHandle) params.lockHandle = options.lockHandle;
   if (options?.version) params.version = options.version;
@@ -91,26 +92,27 @@ export async function getApplicationLogSource(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/source'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/wbobj/applicationlogobjects/aplotyp/source',
+    },
   });
 }
 
 /**
  * Validate application log object name
- * 
+ *
  * @param connection - ABAP connection
  * @param objectName - Application log object name to validate
  * @returns Axios response with validation result
  */
 export async function validateApplicationLogName(
   connection: IAbapConnection,
-  objectName: string
+  objectName: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/validation`;
   const params: Record<string, any> = {};
-  
+
   // Note: According to the template, validation might need objectName as a parameter
   // Adjust based on actual ADT endpoint behavior
   params.objectName = objectName;
@@ -121,8 +123,7 @@ export async function validateApplicationLogName(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
-

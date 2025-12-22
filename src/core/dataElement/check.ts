@@ -2,11 +2,11 @@
  * DataElement check operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
-import { getTimeout } from '../../utils/timeouts';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
+import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check data element syntax
@@ -16,7 +16,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @param xmlContent - Optional XML content to validate (same format as PUT body). If provided, check validates this content instead of saved version.
  * @returns Check result with errors/warnings
- * 
+ *
  * Note: For DDIC objects like data elements, check may not be fully supported in all SAP systems.
  * If check fails with "importing from database" error, it's often safe to skip.
  * When xmlContent is provided, it should be the same XML that will be sent in PUT request.
@@ -25,7 +25,7 @@ export async function checkDataElement(
   connection: IAbapConnection,
   dataElementName: string,
   version: string = 'active',
-  xmlContent?: string
+  xmlContent?: string,
 ): Promise<AxiosResponse> {
   let response: AxiosResponse;
 
@@ -47,8 +47,8 @@ export async function checkDataElement(
 </chkrun:checkObjectList>`;
 
     const headers = {
-      'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+      Accept: 'application/vnd.sap.adt.checkmessages+xml',
+      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
     };
 
     const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
@@ -58,31 +58,44 @@ export async function checkDataElement(
       method: 'POST',
       timeout: getTimeout('default'),
       data: xmlBody,
-      headers
+      headers,
     });
   } else {
     // Check saved version (without XML content)
-    response = await runCheckRun(connection, 'data_element', dataElementName, version, 'abapCheckRun', undefined);
+    response = await runCheckRun(
+      connection,
+      'data_element',
+      dataElementName,
+      version,
+      'abapCheckRun',
+      undefined,
+    );
   }
 
   const checkResult = parseCheckRunResponse(response);
 
   // Check only for type E messages - HTTP 200 is normal, errors are in XML response
   if (checkResult.errors.length > 0) {
-    const errorTexts = checkResult.errors.map(err => err.text || '').join(' ').toLowerCase();
-    
+    const errorTexts = checkResult.errors
+      .map((err) => err.text || '')
+      .join(' ')
+      .toLowerCase();
+
     // Ignore messages that should not cause failure
-    const shouldIgnore = 
+    const shouldIgnore =
       errorTexts.includes('has been checked') ||
       errorTexts.includes('was checked') ||
-      errorTexts.includes('importing') && errorTexts.includes('database') ||
+      (errorTexts.includes('importing') && errorTexts.includes('database')) ||
       // For newly created empty data elements, these errors are expected until object is fully initialized
-      (errorTexts.includes('no domain') && errorTexts.includes('data type was defined')) ||
-      (errorTexts.includes('datatype is expected'));
-    
+      (errorTexts.includes('no domain') &&
+        errorTexts.includes('data type was defined')) ||
+      errorTexts.includes('datatype is expected');
+
     if (!shouldIgnore) {
       // Has type E errors that should not be ignored - throw error
-      const errorMessages = checkResult.errors.map(err => err.text).join('; ');
+      const errorMessages = checkResult.errors
+        .map((err) => err.text)
+        .join('; ');
       throw new Error(`Data element check failed: ${errorMessages}`);
     }
   }

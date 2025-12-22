@@ -4,16 +4,16 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate service definition name
  * Returns raw response from ADT - consumer decides how to interpret it
- * 
+ *
  * Endpoint: POST /sap/bc/adt/ddic/srvd/sources/validation
- * 
+ *
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
  * - Error: <CHECK_RESULT/> or error response
@@ -21,14 +21,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function validateServiceDefinitionName(
   connection: IAbapConnection,
   serviceDefinitionName: string,
-  description?: string
+  description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/srvd/sources/validation`;
   const encodedName = encodeSapObjectName(serviceDefinitionName);
-  
+
   const queryParams = new URLSearchParams({
     objtype: 'srvdsrv',
-    objname: encodedName
+    objname: encodedName,
   });
 
   if (description) {
@@ -40,8 +40,7 @@ export async function validateServiceDefinitionName(
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.as+xml'
-    }
+      Accept: 'application/vnd.sap.as+xml',
+    },
   });
 }
-

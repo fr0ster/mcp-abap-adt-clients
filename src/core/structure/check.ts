@@ -2,9 +2,9 @@
  * Structure check operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
+import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 
 /**
  * Check structure syntax
@@ -15,9 +15,16 @@ export async function checkStructure(
   connection: IAbapConnection,
   structureName: string,
   version: string = 'active',
-  sourceCode?: string
+  sourceCode?: string,
 ): Promise<AxiosResponse> {
-  const response = await runCheckRun(connection, 'structure', structureName, version, 'abapCheckRun', sourceCode);
+  const response = await runCheckRun(
+    connection,
+    'structure',
+    structureName,
+    version,
+    'abapCheckRun',
+    sourceCode,
+  );
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {
@@ -25,25 +32,34 @@ export async function checkStructure(
     // are often non-critical and can be safely ignored, especially for inactive versions
     const errorMessage = checkResult.message || '';
     // Check both message and errors array for "has been checked" message
-    const hasCheckedMessage = errorMessage.toLowerCase().includes('has been checked') ||
-      checkResult.errors.some((err: any) => (err.text || '').toLowerCase().includes('has been checked'));
+    const hasCheckedMessage =
+      errorMessage.toLowerCase().includes('has been checked') ||
+      checkResult.errors.some((err: any) =>
+        (err.text || '').toLowerCase().includes('has been checked'),
+      );
 
     if (hasCheckedMessage) {
       // This is expected behavior - structure was already checked, return response anyway
       if (process.env.DEBUG_ADT_LIBS === 'true') {
-        console.warn(`Check warning for structure ${structureName}: ${errorMessage} (structure was already checked)`);
+        console.warn(
+          `Check warning for structure ${structureName}: ${errorMessage} (structure was already checked)`,
+        );
       }
       return response; // Return response anyway
     }
 
-    if ((errorMessage.toLowerCase().includes('inactive version') &&
-         errorMessage.toLowerCase().includes('does not exist')) ||
-        (errorMessage.toLowerCase().includes('importing') &&
-         errorMessage.toLowerCase().includes('database'))) {
+    if (
+      (errorMessage.toLowerCase().includes('inactive version') &&
+        errorMessage.toLowerCase().includes('does not exist')) ||
+      (errorMessage.toLowerCase().includes('importing') &&
+        errorMessage.toLowerCase().includes('database'))
+    ) {
       // This is expected behavior for DDIC objects - check may not be fully supported
       // Return response without throwing - test chain can continue
       if (process.env.DEBUG_ADT_LIBS === 'true') {
-        console.warn(`Check warning for structure ${structureName}: ${errorMessage} (check may not be fully supported for DDIC objects)`);
+        console.warn(
+          `Check warning for structure ${structureName}: ${errorMessage} (check may not be fully supported for DDIC objects)`,
+        );
       }
       return response; // Return response anyway
     }
@@ -52,4 +68,3 @@ export async function checkStructure(
 
   return response;
 }
-

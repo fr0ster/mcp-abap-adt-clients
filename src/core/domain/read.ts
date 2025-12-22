@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ABAP domain
@@ -18,7 +18,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function getDomain(
   connection: IAbapConnection,
   domainName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(domainName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -28,7 +28,7 @@ export async function getDomain(
     url,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: {}
+    headers: {},
   });
 }
 
@@ -44,7 +44,7 @@ export async function getDomain(
 export async function getDomainTransport(
   connection: IAbapConnection,
   domainName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(domainName);
   let url = `/sap/bc/adt/ddic/domains/${encodedName}/transport`;
@@ -57,8 +57,7 @@ export async function getDomainTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
-

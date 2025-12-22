@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Unlock the table after DDL content is added
@@ -14,7 +14,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function unlockTable(
   connection: IAbapConnection,
   tableName: string,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
@@ -23,7 +23,7 @@ export async function unlockTable(
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers: {}
+    headers: {},
   });
 }
 
@@ -32,7 +32,7 @@ export async function unlockTable(
  */
 export async function deleteTableLock(
   connection: IAbapConnection,
-  tableName: string
+  tableName: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeSapObjectName(tableName)}`;
 
@@ -41,7 +41,6 @@ export async function deleteTableLock(
     method: 'POST',
     timeout: getTimeout('default'),
     data: '',
-    headers: {}
+    headers: {},
   });
 }
-

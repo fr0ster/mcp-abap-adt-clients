@@ -6,14 +6,17 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { getFunctionGroup } from './read';
+import {
+  encodeSapObjectName,
+  limitDescription,
+} from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { lockFunctionGroup } from './lock';
+import { getFunctionGroup } from './read';
+import type { IUpdateFunctionGroupParams } from './types';
 import { unlockFunctionGroup } from './unlock';
-import { IUpdateFunctionGroupParams } from './types';
 
 /**
  * Update function group metadata via PUT
@@ -24,7 +27,7 @@ async function updateFunctionGroupMetadata(
   currentXml: string,
   newDescription: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
 
@@ -34,7 +37,7 @@ async function updateFunctionGroupMetadata(
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@_',
-    parseAttributeValue: false
+    parseAttributeValue: false,
   });
 
   const parsedXml = parser.parse(currentXml);
@@ -50,12 +53,13 @@ async function updateFunctionGroupMetadata(
   // Rebuild XML (simplified - use original XML with replaced description)
   const updatedXml = currentXml.replace(
     /adtcore:description="[^"]*"/,
-    `adtcore:description="${limitedDescription}"`
+    `adtcore:description="${limitedDescription}"`,
   );
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8',
-    'Accept': 'application/vnd.sap.adt.functions.groups.v3+xml'
+    'Content-Type':
+      'application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8',
+    Accept: 'application/vnd.sap.adt.functions.groups.v3+xml',
   };
 
   return connection.makeAdtRequest({
@@ -63,7 +67,7 @@ async function updateFunctionGroupMetadata(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: updatedXml,
-    headers
+    headers,
   });
 }
 
@@ -73,7 +77,7 @@ async function updateFunctionGroupMetadata(
  */
 export async function updateFunctionGroup(
   connection: IAbapConnection,
-  params: IUpdateFunctionGroupParams
+  params: IUpdateFunctionGroupParams,
 ): Promise<AxiosResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');
@@ -89,7 +93,10 @@ export async function updateFunctionGroup(
   try {
     // Lock if not already locked
     if (!lockHandle) {
-      lockHandle = await lockFunctionGroup(connection, params.function_group_name);
+      lockHandle = await lockFunctionGroup(
+        connection,
+        params.function_group_name,
+      );
       shouldUnlock = true;
     }
 
@@ -98,10 +105,15 @@ export async function updateFunctionGroup(
     }
 
     // Get current XML
-    const currentResponse = await getFunctionGroup(connection, params.function_group_name, undefined);
-    const currentXml = typeof currentResponse.data === 'string'
-      ? currentResponse.data
-      : JSON.stringify(currentResponse.data);
+    const currentResponse = await getFunctionGroup(
+      connection,
+      params.function_group_name,
+      undefined,
+    );
+    const currentXml =
+      typeof currentResponse.data === 'string'
+        ? currentResponse.data
+        : JSON.stringify(currentResponse.data);
 
     // Update metadata
     const updateResponse = await updateFunctionGroupMetadata(
@@ -110,22 +122,29 @@ export async function updateFunctionGroup(
       currentXml,
       params.description,
       lockHandle,
-      params.transport_request
+      params.transport_request,
     );
 
     // Unlock if we locked it
     if (shouldUnlock && lockHandle) {
-      await unlockFunctionGroup(connection, params.function_group_name, lockHandle);
+      await unlockFunctionGroup(
+        connection,
+        params.function_group_name,
+        lockHandle,
+      );
     }
 
     return updateResponse;
-
   } catch (error: any) {
     // Unlock on error if we locked it
     if (shouldUnlock && lockHandle) {
       try {
-        await unlockFunctionGroup(connection, params.function_group_name, lockHandle);
-      } catch (unlockError) {
+        await unlockFunctionGroup(
+          connection,
+          params.function_group_name,
+          lockHandle,
+        );
+      } catch (_unlockError) {
         // Ignore unlock errors
       }
     }
@@ -135,18 +154,23 @@ export async function updateFunctionGroup(
       errorMessage = `Bad request. Check parameters.`;
     } else if (error.response?.status === 404) {
       errorMessage = `Function group ${params.function_group_name} not found.`;
-    } else if (error.response?.data && typeof error.response.data === 'string') {
+    } else if (
+      error.response?.data &&
+      typeof error.response.data === 'string'
+    ) {
       try {
         const parser = new XMLParser({
           ignoreAttributes: false,
-          attributeNamePrefix: '@_'
+          attributeNamePrefix: '@_',
         });
         const errorData = parser.parse(error.response.data);
-        const errorMsg = errorData['exc:exception']?.message?.['#text'] || errorData['exc:exception']?.message;
+        const errorMsg =
+          errorData['exc:exception']?.message?.['#text'] ||
+          errorData['exc:exception']?.message;
         if (errorMsg) {
           errorMessage = `SAP Error: ${errorMsg}`;
         }
-      } catch (parseError) {
+      } catch (_parseError) {
         // Keep original error message
       }
     }
@@ -154,4 +178,3 @@ export async function updateFunctionGroup(
     throw new Error(errorMessage);
   }
 }
-

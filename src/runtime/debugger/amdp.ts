@@ -1,6 +1,6 @@
 /**
  * AMDP Debugger for ADT
- * 
+ *
  * Provides functions for managing AMDP (ABAP Managed Database Procedures) debugger sessions:
  * - Debugger session management (start, resume, terminate)
  * - Debuggee operations
@@ -11,12 +11,12 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
 
 /**
  * Start AMDP debugger
- * 
+ *
  * @param connection - ABAP connection
  * @param options - Debugger start options
  * @returns Axios response with debugger session
@@ -29,12 +29,13 @@ export interface IStartAmdpDebuggerOptions {
 
 export async function startAmdpDebugger(
   connection: IAbapConnection,
-  options?: IStartAmdpDebuggerOptions
+  options?: IStartAmdpDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main`;
   const params: Record<string, any> = {};
-  
-  if (options?.stopExisting !== undefined) params.stopExisting = options.stopExisting;
+
+  if (options?.stopExisting !== undefined)
+    params.stopExisting = options.stopExisting;
   if (options?.requestUser) params.requestUser = options.requestUser;
   if (options?.cascadeMode) params.cascadeMode = options.cascadeMode;
 
@@ -44,22 +45,23 @@ export async function startAmdpDebugger(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/start'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/start',
+    },
   });
 }
 
 /**
  * Resume AMDP debugger
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @returns Axios response with debugger session
  */
 export async function resumeAmdpDebugger(
   connection: IAbapConnection,
-  mainId: string
+  mainId: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}`;
 
@@ -68,15 +70,16 @@ export async function resumeAmdpDebugger(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/resume'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/resume',
+    },
   });
 }
 
 /**
  * Terminate AMDP debugger
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @param hardStop - Whether to perform hard stop
@@ -85,11 +88,11 @@ export async function resumeAmdpDebugger(
 export async function terminateAmdpDebugger(
   connection: IAbapConnection,
   mainId: string,
-  hardStop?: boolean
+  hardStop?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}`;
   const params: Record<string, any> = {};
-  
+
   if (hardStop !== undefined) params.hardStop = hardStop;
 
   return connection.makeAdtRequest({
@@ -98,15 +101,16 @@ export async function terminateAmdpDebugger(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/terminate'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/terminate',
+    },
   });
 }
 
 /**
  * Get debuggee information
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @param debuggeeId - Debuggee ID
@@ -115,7 +119,7 @@ export async function terminateAmdpDebugger(
 export async function getAmdpDebuggee(
   connection: IAbapConnection,
   mainId: string,
-  debuggeeId: string
+  debuggeeId: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
 
@@ -124,15 +128,16 @@ export async function getAmdpDebuggee(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/debuggee'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/debuggee',
+    },
   });
 }
 
 /**
  * Get variable value
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @param debuggeeId - Debuggee ID
@@ -147,11 +152,11 @@ export async function getAmdpVariable(
   debuggeeId: string,
   varname: string,
   offset?: number,
-  length?: number
+  length?: number,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
   const params: Record<string, any> = {};
-  
+
   if (offset !== undefined) params.offset = offset;
   if (length !== undefined) params.length = length;
 
@@ -161,15 +166,16 @@ export async function getAmdpVariable(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/vars'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/vars',
+    },
   });
 }
 
 /**
  * Set variable value
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @param debuggeeId - Debuggee ID
@@ -182,11 +188,11 @@ export async function setAmdpVariable(
   mainId: string,
   debuggeeId: string,
   varname: string,
-  setNull?: boolean
+  setNull?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
   const params: Record<string, any> = {};
-  
+
   if (setNull !== undefined) params.setNull = setNull;
 
   return connection.makeAdtRequest({
@@ -195,15 +201,16 @@ export async function setAmdpVariable(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/setvars'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/setvars',
+    },
   });
 }
 
 /**
  * Lookup objects/variables
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @param debuggeeId - Debuggee ID
@@ -214,11 +221,11 @@ export async function lookupAmdp(
   connection: IAbapConnection,
   mainId: string,
   debuggeeId: string,
-  name?: string
+  name?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/lookup`;
   const params: Record<string, any> = {};
-  
+
   if (name) params.name = name;
 
   return connection.makeAdtRequest({
@@ -227,15 +234,16 @@ export async function lookupAmdp(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/lookup'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/lookup',
+    },
   });
 }
 
 /**
  * Step over in AMDP debugger
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @param debuggeeId - Debuggee ID
@@ -244,7 +252,7 @@ export async function lookupAmdp(
 export async function stepOverAmdp(
   connection: IAbapConnection,
   mainId: string,
-  debuggeeId: string
+  debuggeeId: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
 
@@ -254,15 +262,16 @@ export async function stepOverAmdp(
     timeout: getTimeout('default'),
     params: { step: 'over' },
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/step/over'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/step/over',
+    },
   });
 }
 
 /**
  * Continue execution in AMDP debugger
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @param debuggeeId - Debuggee ID
@@ -271,7 +280,7 @@ export async function stepOverAmdp(
 export async function stepContinueAmdp(
   connection: IAbapConnection,
   mainId: string,
-  debuggeeId: string
+  debuggeeId: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}`;
 
@@ -281,22 +290,23 @@ export async function stepContinueAmdp(
     timeout: getTimeout('default'),
     params: { step: 'continue' },
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/step/continue'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/step/continue',
+    },
   });
 }
 
 /**
  * Get breakpoints
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @returns Axios response with breakpoints
  */
 export async function getAmdpBreakpoints(
   connection: IAbapConnection,
-  mainId: string
+  mainId: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
 
@@ -305,22 +315,23 @@ export async function getAmdpBreakpoints(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/breakpoints'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/breakpoints',
+    },
   });
 }
 
 /**
  * Get breakpoints for LLang
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @returns Axios response with LLang breakpoints
  */
 export async function getAmdpBreakpointsLlang(
   connection: IAbapConnection,
-  mainId: string
+  mainId: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
 
@@ -329,22 +340,23 @@ export async function getAmdpBreakpointsLlang(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/breakpoints/llang'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/breakpoints/llang',
+    },
   });
 }
 
 /**
  * Get breakpoints for table functions
- * 
+ *
  * @param connection - ABAP connection
  * @param mainId - Main debugger session ID
  * @returns Axios response with table function breakpoints
  */
 export async function getAmdpBreakpointsTableFunctions(
   connection: IAbapConnection,
-  mainId: string
+  mainId: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/breakpoints`;
 
@@ -353,9 +365,9 @@ export async function getAmdpBreakpointsTableFunctions(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/amdp/debugger/relations/breakpoints/tablefunctions'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/amdp/debugger/relations/breakpoints/tablefunctions',
+    },
   });
 }
-

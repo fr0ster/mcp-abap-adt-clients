@@ -10,38 +10,44 @@
  * Run: npm test -- --testPathPattern=functionGroup/FunctionGroupBuilder
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../../clients/AdtClient';
-import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { getConfig } from '../../../helpers/sessionConfig';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd
-} from '../../../helpers/builderTestLogger';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
-import { BaseTester } from '../../../helpers/BaseTester';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
-import { IFunctionGroupConfig, IFunctionGroupState } from '../../../../core/functionGroup';
-import * as path from 'path';
-import * as fs from 'fs';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { AdtClient } from '../../../../clients/AdtClient';
+import type {
+  IFunctionGroupConfig,
+  IFunctionGroupState,
+} from '../../../../core/functionGroup';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  logBuilderTestEnd,
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+} from '../../../helpers/builderTestLogger';
+import { getConfig } from '../../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
+import {
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   resolvePackageName,
   resolveTransportRequest,
-  getTimeout
+  getTimeout,
 } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
-
 
 // Connection logs use DEBUG_CONNECTORS (from @mcp-abap-adt/connection)
 const connectionLogger: ILogger = createConnectionLogger();
@@ -73,7 +79,7 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
         'FunctionGroup',
         'create_function_group',
         'adt_function_group',
-        testsLogger
+        testsLogger,
       );
 
       tester.setup({
@@ -84,19 +90,23 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
         buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
           // Use resolver to get resolved parameters (from test case params or global defaults)
-          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
-          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
           return {
             functionGroupName: params.function_group_name,
             packageName,
             transportRequest,
-            description: params.description
+            description: params.description,
           };
         },
-        ensureObjectReady: async () => ({ success: true })
+        ensureObjectReady: async () => ({ success: true }),
       });
-    } catch (error) {
+    } catch (_error) {
       hasConfig = false;
     }
   });
@@ -107,73 +117,114 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should execute full workflow and store all results', async () => {
-      if (!hasConfig || !tester) {
-        return;
-      }
-      const config = tester.getConfig();
-      if (!config) {
-        return;
-      }
-
-      await tester.flowTestAuto({
-        updateConfig: {
-          functionGroupName: config.functionGroupName,
-          packageName: config.packageName,
-          description: config.description || '',
-          transportRequest: config.transportRequest
+    it(
+      'should execute full workflow and store all results',
+      async () => {
+        if (!hasConfig || !tester) {
+          return;
         }
-      });
-    }, getTimeout('test'));
+        const config = tester.getConfig();
+        if (!config) {
+          return;
+        }
+
+        await tester.flowTestAuto({
+          updateConfig: {
+            functionGroupName: config.functionGroupName,
+            packageName: config.packageName,
+            description: config.description || '',
+            transportRequest: config.transportRequest,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
   });
 
   describe('Read standard object', () => {
-    it('should read standard SAP function group', async () => {
-      // Use TestConfigResolver for consistent parameter resolution
-      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
-      const standardObject = resolver.getStandardObject('function_group');
-
-      if (!standardObject) {
-        logBuilderTestStart(testsLogger, 'FunctionGroupBuilder - read standard object', {
-          name: 'read_standard',
-          params: {}
+    it(
+      'should read standard SAP function group',
+      async () => {
+        // Use TestConfigResolver for consistent parameter resolution
+        const resolver = new TestConfigResolver({
+          isCloud: isCloudSystem,
+          logger: testsLogger,
         });
-        logBuilderTestSkip(
-          builderLogger,
-          'FunctionGroupBuilder - read standard object',
-          `Standard function group not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`
-        );
-        return;
-      }
+        const standardObject = resolver.getStandardObject('function_group');
 
-      const standardFunctionGroupName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'FunctionGroupBuilder - read standard object', {
-        name: 'read_standard',
-        params: { function_group_name: standardFunctionGroupName }
-      });
-
-      if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'FunctionGroupBuilder - read standard object', 'No SAP configuration');
-        return;
-      }
-
-      try {
-        const resultState = await client.getFunctionGroup().read({ functionGroupName: standardFunctionGroupName });
-        expect(resultState).toBeDefined();
-        expect(resultState?.readResult).toBeDefined();
-        // FunctionGroup read returns function group config - check if functionGroupName is present
-        const functionGroupConfig = resultState?.readResult;
-        if (functionGroupConfig && typeof functionGroupConfig === 'object' && 'functionGroupName' in functionGroupConfig) {
-          expect((functionGroupConfig as any).functionGroupName).toBe(standardFunctionGroupName);
+        if (!standardObject) {
+          logBuilderTestStart(
+            testsLogger,
+            'FunctionGroupBuilder - read standard object',
+            {
+              name: 'read_standard',
+              params: {},
+            },
+          );
+          logBuilderTestSkip(
+            builderLogger,
+            'FunctionGroupBuilder - read standard object',
+            `Standard function group not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+          );
+          return;
         }
 
-        logBuilderTestSuccess(testsLogger, 'FunctionGroupBuilder - read standard object');
-      } catch (error) {
-        logBuilderTestError(testsLogger, 'FunctionGroupBuilder - read standard object', error);
-        throw error;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'FunctionGroupBuilder - read standard object');
-      }
-    }, getTimeout('test'));
+        const standardFunctionGroupName = standardObject.name;
+        logBuilderTestStart(
+          testsLogger,
+          'FunctionGroupBuilder - read standard object',
+          {
+            name: 'read_standard',
+            params: { function_group_name: standardFunctionGroupName },
+          },
+        );
+
+        if (!hasConfig) {
+          logBuilderTestSkip(
+            testsLogger,
+            'FunctionGroupBuilder - read standard object',
+            'No SAP configuration',
+          );
+          return;
+        }
+
+        try {
+          const resultState = await client
+            .getFunctionGroup()
+            .read({ functionGroupName: standardFunctionGroupName });
+          expect(resultState).toBeDefined();
+          expect(resultState?.readResult).toBeDefined();
+          // FunctionGroup read returns function group config - check if functionGroupName is present
+          const functionGroupConfig = resultState?.readResult;
+          if (
+            functionGroupConfig &&
+            typeof functionGroupConfig === 'object' &&
+            'functionGroupName' in functionGroupConfig
+          ) {
+            expect((functionGroupConfig as any).functionGroupName).toBe(
+              standardFunctionGroupName,
+            );
+          }
+
+          logBuilderTestSuccess(
+            testsLogger,
+            'FunctionGroupBuilder - read standard object',
+          );
+        } catch (error) {
+          logBuilderTestError(
+            testsLogger,
+            'FunctionGroupBuilder - read standard object',
+            error,
+          );
+          throw error;
+        } finally {
+          logBuilderTestEnd(
+            testsLogger,
+            'FunctionGroupBuilder - read standard object',
+          );
+        }
+      },
+      getTimeout('test'),
+    );
   });
 });

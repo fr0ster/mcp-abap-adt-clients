@@ -2,12 +2,12 @@
  * Program operations - exports
  */
 
-import { IAdtObject } from '@mcp-abap-adt/interfaces';
-import { IProgramConfig, IProgramState } from './types';
+import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IProgramConfig, IProgramState } from './types';
 
-export * from './types';
-export { ProgramBuilder } from './ProgramBuilder';
 export { AdtProgram } from './AdtProgram';
+export { ProgramBuilder } from './ProgramBuilder';
+export * from './types';
 
 // Type alias for AdtProgram
 export type AdtProgramType = IAdtObject<IProgramConfig, IProgramState>;

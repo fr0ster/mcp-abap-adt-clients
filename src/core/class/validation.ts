@@ -3,10 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { runCheckRunWithSource, parseCheckRunResponse } from '../../utils/checkRun';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate class name and superclass
@@ -22,14 +21,14 @@ export async function validateClassName(
   className: string,
   packageName?: string,
   description?: string,
-  superClass?: string
+  superClass?: string,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
 
   // Build query parameters for class validation
   const params = new URLSearchParams({
     objname: encodedName,
-    objtype: 'CLAS/OC'
+    objtype: 'CLAS/OC',
   });
 
   if (packageName) {
@@ -46,14 +45,15 @@ export async function validateClassName(
 
   const url = `/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check',
   };
 
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    headers
+    headers,
   });
 }
 
@@ -75,18 +75,32 @@ export async function validateClassSource(
   connection: IAbapConnection,
   className: string,
   sourceCode?: string,
-  version: 'inactive' | 'active' = 'active'
+  version: 'inactive' | 'active' = 'active',
 ): Promise<AxiosResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
+    await import('../../utils/checkRun');
 
   let response: AxiosResponse;
 
   if (sourceCode) {
     // Live validation with artifacts (code not saved to SAP)
-    response = await runCheckRunWithSource(connection, 'class', className, sourceCode, version, 'abapCheckRun');
+    response = await runCheckRunWithSource(
+      connection,
+      'class',
+      className,
+      sourceCode,
+      version,
+      'abapCheckRun',
+    );
   } else {
     // Validate existing object in SAP (without artifacts)
-    response = await runCheckRun(connection, 'class', className, version, 'abapCheckRun');
+    response = await runCheckRun(
+      connection,
+      'class',
+      className,
+      version,
+      'abapCheckRun',
+    );
   }
 
   const checkResult = parseCheckRunResponse(response);

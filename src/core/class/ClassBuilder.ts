@@ -34,24 +34,23 @@
  * ```
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { validateClassName } from './validation';
-import { create as createClassObject } from './create';
-import { getClassSource, getClassMetadata, getClassTransport } from './read';
-import { lockClass } from './lock';
-import { updateClass } from './update';
-import {
-  updateClassTestInclude,
-  lockClassTestClasses,
-  unlockClassTestClasses
-} from './testclasses';
-import { checkClass } from './check';
-import { unlockClass } from './unlock';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { activateClass } from './activation';
+import { checkClass } from './check';
+import { create as createClassObject } from './create';
 import { deleteClass } from './delete';
-import { IClassConfig, IClassState } from './types';
+import { lockClass } from './lock';
+import { getClassMetadata, getClassSource, getClassTransport } from './read';
+import {
+  lockClassTestClasses,
+  unlockClassTestClasses,
+  updateClassTestInclude,
+} from './testclasses';
+import type { IClassConfig, IClassState } from './types';
+import { unlockClass } from './unlock';
+import { updateClass } from './update';
+import { validateClassName } from './validation';
 
 export class ClassBuilder {
   protected connection: IAbapConnection;
@@ -65,13 +64,13 @@ export class ClassBuilder {
   constructor(
     connection: IAbapConnection,
     config: IClassConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.config = { ...config };
     this.state = {
-      errors: []
+      errors: [],
     };
   }
 
@@ -114,13 +113,17 @@ export class ClassBuilder {
 
   setLocalTypesCode(localTypesCode: string): this {
     this.config.localTypesCode = localTypesCode;
-    this.logger?.debug(`Local types code set, length: ${localTypesCode.length}`);
+    this.logger?.debug(
+      `Local types code set, length: ${localTypesCode.length}`,
+    );
     return this;
   }
 
   setDefinitionsCode(definitionsCode: string): this {
     this.config.definitionsCode = definitionsCode;
-    this.logger?.debug(`'Definitions code set  length:' ${`definitionsCode.length`}`);
+    this.logger?.debug(
+      `'Definitions code set  length:' ${`definitionsCode.length`}`,
+    );
     return this;
   }
 
@@ -171,7 +174,7 @@ export class ClassBuilder {
         this.config.className,
         this.config.packageName,
         this.config.description,
-        this.config.superclass
+        this.config.superclass,
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
@@ -181,18 +184,20 @@ export class ClassBuilder {
       // For validation, HTTP 400 might indicate object exists or validation error - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger?.info('Class validation returned 400 - object may already exist or validation error');
+        this.logger?.info(
+          'Class validation returned 400 - object may already exist or validation error',
+        );
         return error.response;
       }
       // Store error response if available
       if (error.response) {
         this.state.validationResponse = error.response;
       }
-      
+
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Validation failed:', error);
       throw error;
@@ -206,7 +211,6 @@ export class ClassBuilder {
       }
       this.logger?.info('Creating class:', this.config.className);
 
-      
       const result = await createClassObject(this.connection, {
         class_name: this.config.className,
         package_name: this.config.packageName,
@@ -218,7 +222,7 @@ export class ClassBuilder {
         create_protected: this.config.createProtected,
         master_system: this.config.masterSystem,
         responsible: this.config.responsible,
-        template_xml: this.config.classTemplate
+        template_xml: this.config.classTemplate,
       });
       this.state.createResult = result;
       this.logger?.info('Class created successfully:', result.status);
@@ -227,7 +231,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       throw error; // Interrupts chain
     }
@@ -235,34 +239,41 @@ export class ClassBuilder {
 
   async read(
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IClassConfig | undefined> {
     try {
-      this.logger?.info(`Reading class source: ${this.config.className}, version: ${version}`);
+      this.logger?.info(
+        `Reading class source: ${this.config.className}, version: ${version}`,
+      );
       const result = await getClassSource(
         this.connection,
         this.config.className,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;
-      this.logger?.info(`Class source read successfully: ${result.status}, bytes: ${result.data?.length || 0}`);
-      
+      this.logger?.info(
+        `Class source read successfully: ${result.status}, bytes: ${result.data?.length || 0}`,
+      );
+
       // Parse and return config directly
-      const sourceCode = typeof result.data === 'string'
-        ? result.data
-        : JSON.stringify(result.data);
-      
+      const sourceCode =
+        typeof result.data === 'string'
+          ? result.data
+          : JSON.stringify(result.data);
+
       return {
         className: this.config.className,
-        sourceCode
+        sourceCode,
       };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', {
         className: this.config.className,
@@ -270,7 +281,7 @@ export class ClassBuilder {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
-        message: error.message
+        message: error.message,
       });
       throw error;
     }
@@ -279,7 +290,10 @@ export class ClassBuilder {
   async readMetadata(): Promise<this> {
     try {
       this.logger?.info('Reading class metadata:', this.config.className);
-      const result = await getClassMetadata(this.connection, this.config.className);
+      const result = await getClassMetadata(
+        this.connection,
+        this.config.className,
+      );
       this.state.metadataResult = result;
       this.logger?.info('Class metadata read successfully:', result.status);
       return this;
@@ -287,7 +301,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'readMetadata',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read metadata failed:', error);
       throw error; // Interrupts chain
@@ -296,8 +310,14 @@ export class ClassBuilder {
 
   async readTransport(): Promise<this> {
     try {
-      this.logger?.info('Reading transport request for class:', this.config.className);
-      const result = await getClassTransport(this.connection, this.config.className);
+      this.logger?.info(
+        'Reading transport request for class:',
+        this.config.className,
+      );
+      const result = await getClassTransport(
+        this.connection,
+        this.config.className,
+      );
       this.state.transportResult = result;
       this.logger?.info('Transport request read successfully:', result.status);
       return this;
@@ -305,7 +325,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'readTransport',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read transport failed:', error);
       throw error; // Interrupts chain
@@ -315,13 +335,13 @@ export class ClassBuilder {
   async lock(): Promise<this> {
     try {
       this.logger?.info('Locking class:', this.config.className);
-      
+
       // Enable stateful session mode
-      this.connection.setSessionType("stateful");
-      
+      this.connection.setSessionType('stateful');
+
       const lockHandle = await lockClass(
         this.connection,
-        this.config.className
+        this.config.className,
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
@@ -332,7 +352,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
@@ -343,7 +363,10 @@ export class ClassBuilder {
     try {
       this.logger?.info('Locking test classes for:', this.config.className);
       this.connection.setSessionType('stateful');
-      const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
+      const lockHandle = await lockClassTestClasses(
+        this.connection,
+        this.config.className,
+      );
       this.testLockHandle = lockHandle;
       this.state.testLockHandle = lockHandle;
       this.logger?.info(`Test classes locked, handle: ${lockHandle}`);
@@ -352,7 +375,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'lockTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock test classes failed:', error);
       throw error;
@@ -361,11 +384,11 @@ export class ClassBuilder {
 
   /**
    * Check test class code
-   * 
+   *
    * Validates ABAP Unit test class source code using SAP check run.
    * This is a separate validation from main class check because test classes
    * use a different URI (/includes/testclasses vs /source/main).
-   * 
+   *
    * @param testClassSource - Optional test class source code. If not provided, uses stored testClassCode
    * @returns this for chaining
    * @throws Error if check finds errors (chkrun:type="E")
@@ -374,20 +397,27 @@ export class ClassBuilder {
     try {
       const code = testClassSource || this.config.testClassCode;
       if (!code) {
-        throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
+        throw new Error(
+          'Test class source code is required. Use setTestClassCode() or pass as parameter.',
+        );
       }
-      
+
       this.logger?.info('Checking test class code:', this.config.className);
       const { checkClassLocalTestClass } = await import('./check');
-      await checkClassLocalTestClass(this.connection, this.config.className, code, 'inactive');
+      await checkClassLocalTestClass(
+        this.connection,
+        this.config.className,
+        code,
+        'inactive',
+      );
       this.logger?.info('Test class code check passed');
-      
+
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'checkTestClass',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Test class check failed:', error);
       throw error;
@@ -398,20 +428,27 @@ export class ClassBuilder {
     try {
       const code = localTypesSource || this.config.localTypesCode;
       if (!code) {
-        throw new Error('Local types source code is required. Use setLocalTypesCode() or pass as parameter.');
+        throw new Error(
+          'Local types source code is required. Use setLocalTypesCode() or pass as parameter.',
+        );
       }
-      
+
       this.logger?.info('Checking local types code:', this.config.className);
       const { checkClassLocalTypes } = await import('./check');
-      await checkClassLocalTypes(this.connection, this.config.className, code, 'inactive');
+      await checkClassLocalTypes(
+        this.connection,
+        this.config.className,
+        code,
+        'inactive',
+      );
       this.logger?.info('Local types code check passed');
-      
+
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'checkLocalTypes',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Local types check failed:', error);
       throw error;
@@ -422,20 +459,27 @@ export class ClassBuilder {
     try {
       const code = definitionsSource || this.config.definitionsCode;
       if (!code) {
-        throw new Error('Definitions source code is required. Use setDefinitionsCode() or pass as parameter.');
+        throw new Error(
+          'Definitions source code is required. Use setDefinitionsCode() or pass as parameter.',
+        );
       }
-      
+
       this.logger?.info('Checking definitions code:', this.config.className);
       const { checkClassDefinitions } = await import('./check');
-      await checkClassDefinitions(this.connection, this.config.className, code, 'inactive');
+      await checkClassDefinitions(
+        this.connection,
+        this.config.className,
+        code,
+        'inactive',
+      );
       this.logger?.info('Definitions code check passed');
-      
+
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'checkDefinitions',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Definitions check failed:', error);
       throw error;
@@ -446,37 +490,51 @@ export class ClassBuilder {
     try {
       const code = macrosSource || this.config.macrosCode;
       if (!code) {
-        throw new Error('Macros source code is required. Use setMacrosCode() or pass as parameter.');
+        throw new Error(
+          'Macros source code is required. Use setMacrosCode() or pass as parameter.',
+        );
       }
-      
+
       this.logger?.info('Checking macros code:', this.config.className);
       const { checkClassMacros } = await import('./check');
-      await checkClassMacros(this.connection, this.config.className, code, 'inactive');
+      await checkClassMacros(
+        this.connection,
+        this.config.className,
+        code,
+        'inactive',
+      );
       this.logger?.info('Macros code check passed');
-      
+
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'checkMacros',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Macros check failed:', error);
       throw error;
     }
   }
 
-  async update(sourceCode?: string, options?: { implementations?: string; testClasses?: string }): Promise<this> {
+  async update(
+    sourceCode?: string,
+    options?: { implementations?: string; testClasses?: string },
+  ): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Class must be locked before update. Call lock() first.');
+        throw new Error(
+          'Class must be locked before update. Call lock() first.',
+        );
       }
 
       // Update main source if provided
       if (sourceCode || this.sourceCode) {
         const code = sourceCode || this.sourceCode;
         if (!code) {
-          throw new Error('Source code is required. Use setCode() or pass as parameter.');
+          throw new Error(
+            'Source code is required. Use setCode() or pass as parameter.',
+          );
         }
         this.logger?.info('Updating class main source:', this.config.className);
         const result = await updateClass(
@@ -484,40 +542,55 @@ export class ClassBuilder {
           this.config.className,
           code,
           this.lockHandle,
-          this.config.transportRequest
+          this.config.transportRequest,
         );
         this.state.updateResult = result;
-        this.logger?.info('Class main source updated successfully:', result.status);
+        this.logger?.info(
+          'Class main source updated successfully:',
+          result.status,
+        );
       }
 
       // Update implementations include if provided
       if (options?.implementations) {
         const { updateClassImplementations } = await import('./update');
-        this.logger?.info('Updating class implementations include:', this.config.className);
+        this.logger?.info(
+          'Updating class implementations include:',
+          this.config.className,
+        );
         const result = await updateClassImplementations(
           this.connection,
           this.config.className,
           options.implementations,
           this.lockHandle,
-          this.config.transportRequest
+          this.config.transportRequest,
         );
         this.state.updateResult = result;
-        this.logger?.info('Class implementations updated successfully:', result.status);
+        this.logger?.info(
+          'Class implementations updated successfully:',
+          result.status,
+        );
       }
 
       // Update test classes if provided (uses same lock handle as main source)
       if (options?.testClasses) {
         const { updateClassTestInclude } = await import('./testclasses');
-        this.logger?.info('Updating class test classes:', this.config.className);
+        this.logger?.info(
+          'Updating class test classes:',
+          this.config.className,
+        );
         const result = await updateClassTestInclude(
           this.connection,
           this.config.className,
           options.testClasses,
           this.lockHandle,
-          this.config.transportRequest
+          this.config.transportRequest,
         );
         this.state.testClassesResult = result;
-        this.logger?.info('Class test classes updated successfully:', result.status);
+        this.logger?.info(
+          'Class test classes updated successfully:',
+          result.status,
+        );
       }
 
       return this;
@@ -525,7 +598,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
@@ -541,20 +614,27 @@ export class ClassBuilder {
   async updateTestClass(testClassSource?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Class must be locked before updating test class. Call lock() first.');
+        throw new Error(
+          'Class must be locked before updating test class. Call lock() first.',
+        );
       }
       const code = testClassSource || this.config.testClassCode;
       if (!code) {
-        throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
+        throw new Error(
+          'Test class source code is required. Use setTestClassCode() or pass as parameter.',
+        );
       }
-      
-      this.logger?.info('Updating test class (local class):', this.config.className);
+
+      this.logger?.info(
+        'Updating test class (local class):',
+        this.config.className,
+      );
       const result = await updateClassTestInclude(
         this.connection,
         this.config.className,
         code,
         this.lockHandle, // Use global class lock handle
-        this.config.transportRequest
+        this.config.transportRequest,
       );
       this.state.testClassesResult = result;
       this.logger?.info('Test class updated successfully:', result.status);
@@ -563,7 +643,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'updateTestClass',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update test class failed:', error);
       throw error;
@@ -579,32 +659,39 @@ export class ClassBuilder {
   async updateTestClasses(testClassSource?: string): Promise<this> {
     try {
       if (!this.testLockHandle) {
-        throw new Error('Test classes must be locked before update. Call lockTestClasses() first.');
+        throw new Error(
+          'Test classes must be locked before update. Call lockTestClasses() first.',
+        );
       }
       const code = testClassSource || this.config.testClassCode;
       if (!code) {
-        throw new Error('Test class source code is required. Use setTestClassCode() or pass as parameter.');
+        throw new Error(
+          'Test class source code is required. Use setTestClassCode() or pass as parameter.',
+        );
       }
-      
+
       // Check test class code before update using dedicated method
       await this.checkTestClass(code);
-      
+
       this.logger?.info('Updating class test include:', this.config.className);
       const result = await updateClassTestInclude(
         this.connection,
         this.config.className,
         code,
         this.testLockHandle,
-        this.config.transportRequest
+        this.config.transportRequest,
       );
       this.state.testClassesResult = result;
-      this.logger?.info('Class test include updated successfully:', result.status);
+      this.logger?.info(
+        'Class test include updated successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'updateTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update test classes failed:', error);
       throw error;
@@ -614,13 +701,17 @@ export class ClassBuilder {
   async updateLocalTypes(localTypesSource?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Class must be locked before updating local types. Call lock() first.');
+        throw new Error(
+          'Class must be locked before updating local types. Call lock() first.',
+        );
       }
       const code = localTypesSource || this.config.localTypesCode;
       if (!code) {
-        throw new Error('Local types source code is required. Use setLocalTypesCode() or pass as parameter.');
+        throw new Error(
+          'Local types source code is required. Use setLocalTypesCode() or pass as parameter.',
+        );
       }
-      
+
       this.logger?.info('Updating local types:', this.config.className);
       const { updateClassLocalTypes } = await import('./includes');
       const result = await updateClassLocalTypes(
@@ -628,7 +719,7 @@ export class ClassBuilder {
         this.config.className,
         code,
         this.lockHandle,
-        this.config.transportRequest
+        this.config.transportRequest,
       );
       this.logger?.info('Local types updated successfully:', result.status);
       return this;
@@ -636,7 +727,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'updateLocalTypes',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update local types failed:', error);
       throw error;
@@ -646,13 +737,17 @@ export class ClassBuilder {
   async updateDefinitions(definitionsSource?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Class must be locked before updating definitions. Call lock() first.');
+        throw new Error(
+          'Class must be locked before updating definitions. Call lock() first.',
+        );
       }
       const code = definitionsSource || this.config.definitionsCode;
       if (!code) {
-        throw new Error('Definitions source code is required. Use setDefinitionsCode() or pass as parameter.');
+        throw new Error(
+          'Definitions source code is required. Use setDefinitionsCode() or pass as parameter.',
+        );
       }
-      
+
       this.logger?.info('Updating definitions:', this.config.className);
       const { updateClassDefinitions } = await import('./includes');
       const result = await updateClassDefinitions(
@@ -660,7 +755,7 @@ export class ClassBuilder {
         this.config.className,
         code,
         this.lockHandle,
-        this.config.transportRequest
+        this.config.transportRequest,
       );
       this.logger?.info('Definitions updated successfully:', result.status);
       return this;
@@ -668,7 +763,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'updateDefinitions',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update definitions failed:', error);
       throw error;
@@ -678,13 +773,17 @@ export class ClassBuilder {
   async updateMacros(macrosSource?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Class must be locked before updating macros. Call lock() first.');
+        throw new Error(
+          'Class must be locked before updating macros. Call lock() first.',
+        );
       }
       const code = macrosSource || this.config.macrosCode;
       if (!code) {
-        throw new Error('Macros source code is required. Use setMacrosCode() or pass as parameter.');
+        throw new Error(
+          'Macros source code is required. Use setMacrosCode() or pass as parameter.',
+        );
       }
-      
+
       this.logger?.info('Updating macros:', this.config.className);
       const { updateClassMacros } = await import('./includes');
       const result = await updateClassMacros(
@@ -692,7 +791,7 @@ export class ClassBuilder {
         this.config.className,
         code,
         this.lockHandle,
-        this.config.transportRequest
+        this.config.transportRequest,
       );
       this.logger?.info('Macros updated successfully:', result.status);
       return this;
@@ -700,25 +799,30 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'updateMacros',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update macros failed:', error);
       throw error;
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
+  async check(
+    version: 'active' | 'inactive' = 'inactive',
+    sourceCode?: string,
+  ): Promise<AxiosResponse> {
     try {
-      this.logger?.info(`Checking class: ${this.config.className}, version: ${version}`);
-      
+      this.logger?.info(
+        `Checking class: ${this.config.className}, version: ${version}`,
+      );
+
       // Use provided source code or stored source code
       const codeToCheck = sourceCode || this.sourceCode;
-      
+
       const result = await checkClass(
         this.connection,
         this.config.className,
         version,
-        codeToCheck
+        codeToCheck,
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
@@ -728,7 +832,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error;
@@ -744,22 +848,22 @@ export class ClassBuilder {
       const result = await unlockClass(
         this.connection,
         this.config.className,
-        this.lockHandle
+        this.lockHandle,
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      
+
       // Disable stateful session mode after unlock
-      this.connection.setSessionType("stateless");
-      
+      this.connection.setSessionType('stateless');
+
       this.logger?.info('Class unlocked successfully:', result.status);
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
@@ -776,7 +880,7 @@ export class ClassBuilder {
       const result = await unlockClassTestClasses(
         this.connection,
         this.config.className,
-        this.testLockHandle
+        this.testLockHandle,
       );
       this.state.testLockHandle = undefined;
       this.testLockHandle = undefined;
@@ -786,7 +890,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'unlockTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock test classes failed:', error);
       throw error;
@@ -798,7 +902,7 @@ export class ClassBuilder {
       this.logger?.info('Activating class:', this.config.className);
       const result = await activateClass(
         this.connection,
-        this.config.className
+        this.config.className,
       );
       this.state.activateResult = result;
       this.logger?.info('Class activated successfully:', result.status);
@@ -807,7 +911,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'activate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
@@ -816,19 +920,25 @@ export class ClassBuilder {
 
   async activateTestClasses(): Promise<this> {
     try {
-      this.logger?.info('Activating test classes via class activation:', this.config.className);
+      this.logger?.info(
+        'Activating test classes via class activation:',
+        this.config.className,
+      );
       const result = await activateClass(
         this.connection,
-        this.config.className
+        this.config.className,
       );
       this.state.testActivateResult = result;
-      this.logger?.info('Test classes activated within class activation:', result.status);
+      this.logger?.info(
+        'Test classes activated within class activation:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'activateTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate test classes failed:', error);
       throw error;
@@ -838,13 +948,10 @@ export class ClassBuilder {
   async delete(): Promise<this> {
     try {
       this.logger?.info('Deleting class:', this.config.className);
-      const result = await deleteClass(
-        this.connection,
-        {
-          class_name: this.config.className,
-          transport_request: this.config.transportRequest
-        }
-      );
+      const result = await deleteClass(this.connection, {
+        class_name: this.config.className,
+        transport_request: this.config.transportRequest,
+      });
       this.state.deleteResult = result;
       this.logger?.info('Class deleted successfully:', result.status);
       return this;
@@ -852,7 +959,7 @@ export class ClassBuilder {
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -863,8 +970,11 @@ export class ClassBuilder {
     try {
       this.logger?.info('Clearing test classes for:', this.config.className);
       this.connection.setSessionType('stateful');
-      
-      const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
+
+      const lockHandle = await lockClassTestClasses(
+        this.connection,
+        this.config.className,
+      );
       this.testLockHandle = lockHandle;
       this.state.testLockHandle = lockHandle;
 
@@ -874,22 +984,26 @@ export class ClassBuilder {
         this.config.className,
         emptyTestSource,
         lockHandle,
-        this.config.transportRequest
+        this.config.transportRequest,
       );
       this.state.testClassesResult = result;
 
-      await unlockClassTestClasses(this.connection, this.config.className, lockHandle);
+      await unlockClassTestClasses(
+        this.connection,
+        this.config.className,
+        lockHandle,
+      );
       this.testLockHandle = undefined;
       this.state.testLockHandle = undefined;
 
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Test classes cleared successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'clearTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Clear test classes failed:', error);
       throw error;
@@ -905,7 +1019,7 @@ export class ClassBuilder {
         await unlockClass(
           this.connection,
           this.config.className,
-          this.lockHandle
+          this.lockHandle,
         );
         this.lockHandle = undefined;
         this.state.lockHandle = undefined;
@@ -915,13 +1029,13 @@ export class ClassBuilder {
         await unlockClassTestClasses(
           this.connection,
           this.config.className,
-          this.testLockHandle
+          this.testLockHandle,
         );
         this.testLockHandle = undefined;
         this.state.testLockHandle = undefined;
       }
 
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Force unlock successful for', this.config.className);
     } catch (error: any) {
       this.logger?.warn('Force unlock failed:', error);
@@ -947,13 +1061,14 @@ export class ClassBuilder {
     }
 
     // Class read() returns source code (plain text)
-    const sourceCode = typeof this.state.readResult.data === 'string'
-      ? this.state.readResult.data
-      : JSON.stringify(this.state.readResult.data);
+    const sourceCode =
+      typeof this.state.readResult.data === 'string'
+        ? this.state.readResult.data
+        : JSON.stringify(this.state.readResult.data);
 
     return {
       className: this.config.className,
-      sourceCode
+      sourceCode,
     };
   }
 
@@ -1001,7 +1116,11 @@ export class ClassBuilder {
     return this.state.deleteResult;
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -1042,8 +1161,7 @@ export class ClassBuilder {
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

@@ -10,32 +10,35 @@
  * Run: npm test -- --testPathPattern=transport/TransportBuilder
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import * as dotenv from 'dotenv';
 import { TransportBuilder } from '../../../../core/transport/TransportBuilder';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import { getConfig } from '../../../helpers/sessionConfig';
 import {
+  logBuilderTestEnd,
   logBuilderTestError,
   logBuilderTestSkip,
   logBuilderTestStart,
+  logBuilderTestStep,
   logBuilderTestSuccess,
-  logBuilderTestEnd,
-  logBuilderTestStep
 } from '../../../helpers/builderTestLogger';
-import { createConnectionLogger, createBuilderLogger, createTestsLogger } from '../../../helpers/testLogger';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as dotenv from 'dotenv';
+import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   getEnabledTestCase,
-  getTestCaseDefinition
+  getTestCaseDefinition,
 } = require('../../../helpers/test-helper');
 const { getTimeout } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -59,8 +62,10 @@ describe('TransportBuilder', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
-    } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (_error) {
+      testsLogger.warn?.(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -75,13 +80,18 @@ describe('TransportBuilder', () => {
     return getTestCaseDefinition('create_transport', 'builder_transport');
   }
 
-  function buildBuilderConfig(testCase: any): { description: string; transportType?: string; owner?: string; targetSystem?: string } {
+  function buildBuilderConfig(testCase: any): {
+    description: string;
+    transportType?: string;
+    owner?: string;
+    targetSystem?: string;
+  } {
     const params = testCase?.params || {};
     return {
       description: params.description || '',
       transportType: params.transport_type || 'workbench',
       owner: params.owner,
-      targetSystem: params.target_system
+      targetSystem: params.target_system,
     };
   }
 
@@ -117,73 +127,115 @@ describe('TransportBuilder', () => {
     afterEach(async () => {
       // Transports cannot be deleted, so no cleanup needed
       // Just log if needed
-        testsLogger.debug?.('[BUILDER TESTS] Transport was created (cannot be deleted)');
+      testsLogger.debug?.(
+        '[BUILDER TESTS] Transport was created (cannot be deleted)',
+      );
     });
 
-    it('should execute full workflow: create and read transport', async () => {
-      const definition = getBuilderTestDefinition();
-      logBuilderTestStart(testsLogger, 'TransportBuilder - full workflow', definition);
+    it(
+      'should execute full workflow: create and read transport',
+      async () => {
+        const definition = getBuilderTestDefinition();
+        logBuilderTestStart(
+          testsLogger,
+          'TransportBuilder - full workflow',
+          definition,
+        );
 
-      if (skipReason) {
-        logBuilderTestSkip(testsLogger, 'TransportBuilder - full workflow', skipReason);
-        return;
-      }
+        if (skipReason) {
+          logBuilderTestSkip(
+            testsLogger,
+            'TransportBuilder - full workflow',
+            skipReason,
+          );
+          return;
+        }
 
-      if (!testCase) {
-        logBuilderTestSkip(testsLogger, 'TransportBuilder - full workflow', skipReason || 'Test case not available');
-        return;
-      }
+        if (!testCase) {
+          logBuilderTestSkip(
+            testsLogger,
+            'TransportBuilder - full workflow',
+            skipReason || 'Test case not available',
+          );
+          return;
+        }
 
-      const builder = new TransportBuilder(connection, buildBuilderConfig(testCase) as any, builderLogger);
-      let transportNumber: string | null = null;
+        const builder = new TransportBuilder(
+          connection,
+          buildBuilderConfig(testCase) as any,
+          builderLogger,
+        );
+        let transportNumber: string | null = null;
 
-      try {
-        logBuilderTestStep('create');
-      await builder.create();
+        try {
+          logBuilderTestStep('create');
+          await builder.create();
 
-        const state = builder.getState();
-        expect(state.createResult).toBeDefined();
-        expect(state.transportNumber).toBeDefined();
-        expect(state.errors.length).toBe(0);
+          const state = builder.getState();
+          expect(state.createResult).toBeDefined();
+          expect(state.transportNumber).toBeDefined();
+          expect(state.errors.length).toBe(0);
 
-        transportNumber = state.transportNumber || null;
+          transportNumber = state.transportNumber || null;
 
-        logBuilderTestSuccess(testsLogger, 'TransportBuilder - full workflow');
-      } catch (error: any) {
-        // If username not found or user doesn't exist, skip test instead of failing
-        const errorMsg = error.message || '';
-        const errorData = error.response?.data || '';
-        const errorText = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
-        const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
+          logBuilderTestSuccess(
+            testsLogger,
+            'TransportBuilder - full workflow',
+          );
+        } catch (error: any) {
+          // If username not found or user doesn't exist, skip test instead of failing
+          const errorMsg = error.message || '';
+          const errorData = error.response?.data || '';
+          const errorText =
+            typeof errorData === 'string'
+              ? errorData
+              : JSON.stringify(errorData);
+          const fullErrorText = `${errorMsg} ${errorText}`.toLowerCase();
 
-        if (fullErrorText.includes('username not found') ||
+          if (
+            fullErrorText.includes('username not found') ||
             fullErrorText.includes('does not exist in the system') ||
-            fullErrorText.includes('user') && fullErrorText.includes('does not exist')) {
-          logBuilderTestSkip(testsLogger, 'TransportBuilder - full workflow', 'Username not found or user does not exist in system');
-          return; // Skip test
-        }
-        logBuilderTestError(testsLogger, 'TransportBuilder - full workflow', error);
-        throw error;
-      } finally {
-        // Read the created transport before cleanup (using transportNumber from state)
-        if (transportNumber) {
-          try {
-            logBuilderTestStep('read');
-            // Read without parameter - uses transportNumber from state
-            await builder.read();
-
-            const readResult = builder.getReadResult();
-            expect(readResult).toBeDefined();
-            expect(readResult?.status).toBe(200);
-            expect(readResult?.data).toBeDefined();
-          } catch (readError: any) {
-              testsLogger.warn?.(`Failed to read transport ${transportNumber}:`, readError);
-            // Don't fail the test if read fails
+            (fullErrorText.includes('user') &&
+              fullErrorText.includes('does not exist'))
+          ) {
+            logBuilderTestSkip(
+              testsLogger,
+              'TransportBuilder - full workflow',
+              'Username not found or user does not exist in system',
+            );
+            return; // Skip test
           }
-        }
+          logBuilderTestError(
+            testsLogger,
+            'TransportBuilder - full workflow',
+            error,
+          );
+          throw error;
+        } finally {
+          // Read the created transport before cleanup (using transportNumber from state)
+          if (transportNumber) {
+            try {
+              logBuilderTestStep('read');
+              // Read without parameter - uses transportNumber from state
+              await builder.read();
 
-        logBuilderTestEnd(testsLogger, 'TransportBuilder - full workflow');
-      }
-    }, getTimeout('test'));
+              const readResult = builder.getReadResult();
+              expect(readResult).toBeDefined();
+              expect(readResult?.status).toBe(200);
+              expect(readResult?.data).toBeDefined();
+            } catch (readError: any) {
+              testsLogger.warn?.(
+                `Failed to read transport ${transportNumber}:`,
+                readError,
+              );
+              // Don't fail the test if read fails
+            }
+          }
+
+          logBuilderTestEnd(testsLogger, 'TransportBuilder - full workflow');
+        }
+      },
+      getTimeout('test'),
+    );
   });
 });

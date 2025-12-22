@@ -2,8 +2,7 @@
  * Behavior Implementation module type definitions
  */
 
-import { AxiosResponse } from 'axios';
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
 export interface ICreateBehaviorImplementationParams {
@@ -24,7 +23,7 @@ export interface IBehaviorImplementationConfig {
   transportRequest?: string; // Only optional parameter
   behaviorDefinition: string; // Required - root entity name (BDEF name)
   sourceCode?: string; // Implementation source code (legacy, use implementationCode instead)
-  /** 
+  /**
    * Custom code for implementations include (local handler class) - used in updateImplementations()
    * If provided, takes precedence over sourceCode and default generated code.
    * Should contain the complete local handler class definition and implementation.
@@ -41,4 +40,3 @@ export interface IBehaviorImplementationState extends IAdtObjectState {
   // validationResponse, createResult, lockHandle, updateResult, checkResult,
   // unlockResult, activateResult, deleteResult, readResult, transportResult, errors
 }
-

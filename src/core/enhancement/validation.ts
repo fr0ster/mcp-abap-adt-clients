@@ -3,14 +3,14 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import {
-  IValidateEnhancementParams,
-  EnhancementType,
+  ENHANCEMENT_TYPE_CODES,
+  type EnhancementType,
   getEnhancementBaseUrl,
-  ENHANCEMENT_TYPE_CODES
+  type IValidateEnhancementParams,
 } from './types';
 
 /**
@@ -25,9 +25,10 @@ import {
  */
 export async function validateEnhancementName(
   connection: IAbapConnection,
-  params: IValidateEnhancementParams
+  params: IValidateEnhancementParams,
 ): Promise<AxiosResponse> {
-  const { enhancement_name, enhancement_type, package_name, description } = params;
+  const { enhancement_name, enhancement_type, package_name, description } =
+    params;
 
   if (!enhancement_name) {
     throw new Error('enhancement_name is required');
@@ -42,7 +43,7 @@ export async function validateEnhancementName(
   // Build query parameters for validation
   const queryParams = new URLSearchParams({
     objname: encodedName,
-    objtype: typeCode
+    objtype: typeCode,
   });
 
   if (package_name) {
@@ -56,14 +57,15 @@ export async function validateEnhancementName(
   const url = `${getEnhancementBaseUrl(enhancement_type)}/validation?${queryParams.toString()}`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.validation.objectname'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.validation.objectname',
   };
 
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    headers
+    headers,
   });
 }
 
@@ -82,12 +84,12 @@ export async function validate(
   enhancementType: EnhancementType,
   enhancementName: string,
   packageName?: string,
-  description?: string
+  description?: string,
 ): Promise<AxiosResponse> {
   return validateEnhancementName(connection, {
     enhancement_name: enhancementName,
     enhancement_type: enhancementType,
     package_name: packageName,
-    description
+    description,
   });
 }

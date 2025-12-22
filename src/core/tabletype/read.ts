@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Get ABAP table type metadata (without source code)
@@ -13,7 +13,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function getTableTypeMetadata(
   connection: IAbapConnection,
   tableTypeName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -25,33 +25,39 @@ export async function getTableTypeMetadata(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        'Accept': 'application/vnd.sap.adt.tabletype.v1+xml'
-      }
+        Accept: 'application/vnd.sap.adt.tabletype.v1+xml',
+      },
     });
   } catch (error: any) {
     // Output full error response as-is for debugging
     const status = error.response?.status || 'unknown';
     const statusText = error.response?.statusText || '';
-    const responseHeaders = JSON.stringify(error.response?.headers || {}, null, 2);
-    const responseData = error.response?.data 
-      ? (typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data, null, 2))
+    const responseHeaders = JSON.stringify(
+      error.response?.headers || {},
+      null,
+      2,
+    );
+    const responseData = error.response?.data
+      ? typeof error.response.data === 'string'
+        ? error.response.data
+        : JSON.stringify(error.response.data, null, 2)
       : error.message || 'No response data';
-    
+
     const fullError = `getTableTypeMetadata failed for ${tableTypeName}
 HTTP Status: ${status} ${statusText}
 Response Headers: ${responseHeaders}
 Response Data: ${responseData}
 Request URL: ${url}
-Request Headers: ${JSON.stringify({ 'Accept': 'application/vnd.sap.adt.tabletype.v1+xml' }, null, 2)}`;
-    
+Request Headers: ${JSON.stringify({ Accept: 'application/vnd.sap.adt.tabletype.v1+xml' }, null, 2)}`;
+
     process.stderr.write('\n=== getTableTypeMetadata Error ===\n');
     process.stderr.write(fullError);
     process.stderr.write('\n=== End Error ===\n\n');
-    
+
     console.error('\n=== getTableTypeMetadata Error ===');
     console.error(fullError);
     console.error('=== End Error ===\n');
-    
+
     throw error;
   }
 }
@@ -63,13 +69,17 @@ export async function getTableTypeSource(
   connection: IAbapConnection,
   tableTypeName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const versionParam = version === 'inactive' ? 'version=inactive' : '';
-  const longPollingParam = options?.withLongPolling ? 'withLongPolling=true' : '';
+  const longPollingParam = options?.withLongPolling
+    ? 'withLongPolling=true'
+    : '';
 
-  const queryParams = [versionParam, longPollingParam].filter(Boolean).join('&');
+  const queryParams = [versionParam, longPollingParam]
+    .filter(Boolean)
+    .join('&');
   const query = queryParams ? `?${queryParams}` : '';
 
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main${query}`;
@@ -79,8 +89,8 @@ export async function getTableTypeSource(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'text/plain'
-    }
+      Accept: 'text/plain',
+    },
   });
 }
 
@@ -90,7 +100,7 @@ export async function getTableTypeSource(
  */
 export async function getTableType(
   connection: IAbapConnection,
-  tableTypeName: string
+  tableTypeName: string,
 ): Promise<AxiosResponse> {
   return getTableTypeSource(connection, tableTypeName);
 }
@@ -104,7 +114,7 @@ export async function getTableType(
 export async function getTableTypeTransport(
   connection: IAbapConnection,
   tableTypeName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -115,7 +125,7 @@ export async function getTableTypeTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }

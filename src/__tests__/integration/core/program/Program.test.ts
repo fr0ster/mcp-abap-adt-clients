@@ -10,35 +10,39 @@
  * Run: npm test -- --testPathPattern=program/Program
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '../../../../clients/AdtClient';
-import { getProgramSource } from '../../../../core/program/read';
-import { getConfig } from '../../../helpers/sessionConfig';
-import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
-  logBuilderTestEnd
-} from '../../../helpers/builderTestLogger';
-import { createBuilderLogger, createConnectionLogger, createTestsLogger } from '../../../helpers/testLogger';
-import { BaseTester } from '../../../helpers/BaseTester';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
-import { IProgramConfig, IProgramState } from '../../../../core/program';
-import * as path from 'path';
-import * as fs from 'fs';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
+import { AdtClient } from '../../../../clients/AdtClient';
+import type { IProgramConfig, IProgramState } from '../../../../core/program';
+import { getProgramSource } from '../../../../core/program/read';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { BaseTester } from '../../../helpers/BaseTester';
+import {
+  logBuilderTestEnd,
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
+  logBuilderTestSuccess,
+} from '../../../helpers/builderTestLogger';
+import { getConfig } from '../../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
+import {
+  createBuilderLogger,
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 
 const {
   resolvePackageName,
   resolveTransportRequest,
-  getTimeout
+  getTimeout,
 } = require('../../../helpers/test-helper');
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -73,7 +77,7 @@ describe('Program (using AdtClient)', () => {
         'Program',
         'create_program',
         'adt_program',
-        testsLogger
+        testsLogger,
       );
 
       tester.setup({
@@ -84,32 +88,42 @@ describe('Program (using AdtClient)', () => {
         buildConfig: (testCase: any, resolver?: any) => {
           const params = testCase?.params || {};
           // Use resolver to get resolved parameters (from test case params or global defaults)
-          const packageName = resolver?.getPackageName?.() || resolvePackageName(params.package_name);
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
           if (!packageName) throw new Error('package_name not configured');
-          const transportRequest = resolver?.getTransportRequest?.() || resolveTransportRequest(params.transport_request);
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
           return {
             programName: params.program_name,
             packageName,
             transportRequest,
             description: params.description,
             programType: params.program_type,
-            sourceCode: params.source_code
+            sourceCode: params.source_code,
           };
         },
         ensureObjectReady: async (programName: string) => {
           if (!connection) return { success: true };
           try {
             await getProgramSource(connection, programName);
-            return { success: false, reason: `⚠️ SAFETY: Program ${programName} already exists!` };
+            return {
+              success: false,
+              reason: `⚠️ SAFETY: Program ${programName} already exists!`,
+            };
           } catch (error: any) {
             if (error.response?.status !== 404) {
-              return { success: false, reason: `Cannot verify program existence: ${error.message}` };
+              return {
+                success: false,
+                reason: `Cannot verify program existence: ${error.message}`,
+              };
             }
           }
           return { success: true };
-        }
+        },
       });
-    } catch (error) {
+    } catch (_error) {
       hasConfig = false;
     }
   });
@@ -120,88 +134,118 @@ describe('Program (using AdtClient)', () => {
     beforeEach(() => tester?.beforeEach()());
     afterEach(() => tester?.afterEach()());
 
-    it('should execute full workflow and store all results', async () => {
-      if (!hasConfig || !tester) {
-        return;
-      }
-
-      if (isCloudSystem) {
-        logBuilderTestSkip(testsLogger, 'Program - full workflow', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
-        return;
-      }
-
-      const config = tester.getConfig();
-      if (!config) {
-        return;
-      }
-
-      const testCase = tester.getTestCaseDefinition();
-      const sourceCode = testCase?.params?.source_code || config.sourceCode || '';
-
-      await tester.flowTestAuto({
-        sourceCode: sourceCode,
-        updateConfig: {
-          programName: config.programName,
-          packageName: config.packageName,
-          description: config.description || '',
-          programType: config.programType,
-          sourceCode: sourceCode
+    it(
+      'should execute full workflow and store all results',
+      async () => {
+        if (!hasConfig || !tester) {
+          return;
         }
-      });
-    }, getTimeout('test'));
+
+        if (isCloudSystem) {
+          logBuilderTestSkip(
+            testsLogger,
+            'Program - full workflow',
+            'Programs are not supported in cloud systems (BTP ABAP Environment)',
+          );
+          return;
+        }
+
+        const config = tester.getConfig();
+        if (!config) {
+          return;
+        }
+
+        const testCase = tester.getTestCaseDefinition();
+        const sourceCode =
+          testCase?.params?.source_code || config.sourceCode || '';
+
+        await tester.flowTestAuto({
+          sourceCode: sourceCode,
+          updateConfig: {
+            programName: config.programName,
+            packageName: config.packageName,
+            description: config.description || '',
+            programType: config.programType,
+            sourceCode: sourceCode,
+          },
+        });
+      },
+      getTimeout('test'),
+    );
   });
 
   describe('Read standard object', () => {
-    it('should read standard SAP program', async () => {
-      if (!hasConfig) {
-        logBuilderTestSkip(testsLogger, 'Program - read standard object', 'No SAP configuration');
-        return;
-      }
+    it(
+      'should read standard SAP program',
+      async () => {
+        if (!hasConfig) {
+          logBuilderTestSkip(
+            testsLogger,
+            'Program - read standard object',
+            'No SAP configuration',
+          );
+          return;
+        }
 
-      if (isCloudSystem) {
-        logBuilderTestSkip(testsLogger, 'Program - read standard object', 'Programs are not supported in cloud systems (BTP ABAP Environment)');
-        return;
-      }
+        if (isCloudSystem) {
+          logBuilderTestSkip(
+            testsLogger,
+            'Program - read standard object',
+            'Programs are not supported in cloud systems (BTP ABAP Environment)',
+          );
+          return;
+        }
 
-      // Use TestConfigResolver for consistent parameter resolution
-      const resolver = new TestConfigResolver({ isCloud: isCloudSystem, logger: testsLogger });
-      const standardObject = resolver.getStandardObject('program');
+        // Use TestConfigResolver for consistent parameter resolution
+        const resolver = new TestConfigResolver({
+          isCloud: isCloudSystem,
+          logger: testsLogger,
+        });
+        const standardObject = resolver.getStandardObject('program');
 
-      if (!standardObject) {
+        if (!standardObject) {
+          logBuilderTestStart(testsLogger, 'Program - read standard object', {
+            name: 'read_standard',
+            params: {},
+          });
+          logBuilderTestSkip(
+            testsLogger,
+            'Program - read standard object',
+            'Standard program not configured for on-premise environment',
+          );
+          return;
+        }
+
+        const standardProgramName = standardObject.name;
         logBuilderTestStart(testsLogger, 'Program - read standard object', {
           name: 'read_standard',
-          params: {}
+          params: { program_name: standardProgramName },
         });
-        logBuilderTestSkip(
-          testsLogger,
-          'Program - read standard object',
-          'Standard program not configured for on-premise environment'
-        );
-        return;
-      }
 
-      const standardProgramName = standardObject.name;
-      logBuilderTestStart(testsLogger, 'Program - read standard object', {
-        name: 'read_standard',
-        params: { program_name: standardProgramName }
-      });
+        try {
+          const resultState = await tester.readTest({
+            programName: standardProgramName,
+          });
+          expect(resultState?.readResult).toBeDefined();
+          const sourceCode =
+            typeof resultState?.readResult === 'string'
+              ? resultState.readResult
+              : (resultState?.readResult as any)?.data || '';
+          expect(typeof sourceCode).toBe('string');
 
-      try {
-        const resultState = await tester.readTest({ programName: standardProgramName });
-        expect(resultState?.readResult).toBeDefined();
-        const sourceCode = typeof resultState?.readResult === 'string' 
-          ? resultState.readResult 
-          : (resultState?.readResult as any)?.data || '';
-        expect(typeof sourceCode).toBe('string');
-
-        logBuilderTestSuccess(testsLogger, 'Program - read standard object');
-      } catch (error) {
-        logBuilderTestError(testsLogger, 'Program - read standard object', error);
-        throw error;
-      } finally {
-        logBuilderTestEnd(testsLogger, 'Program - read standard object');
-      }
-    }, getTimeout('test'));
+          logBuilderTestSuccess(testsLogger, 'Program - read standard object');
+        } catch (error) {
+          logBuilderTestError(
+            testsLogger,
+            'Program - read standard object',
+            error,
+          );
+          throw error;
+        } finally {
+          logBuilderTestEnd(testsLogger, 'Program - read standard object');
+        }
+      },
+      getTimeout('test'),
+    );
   });
 });
-

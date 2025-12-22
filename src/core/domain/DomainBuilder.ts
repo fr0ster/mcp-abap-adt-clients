@@ -31,22 +31,27 @@
  * ```
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import { create } from './create';
-import { lockDomain, acquireLockHandle } from './lock';
-import { updateDomain } from './update';
-import { ICreateDomainParams, IUpdateDomainParams, IFixedValue, IDomainConfig, IDomainState } from './types';
-import { checkDomainSyntax } from './check';
-import { unlockDomain } from './unlock';
-import { activateDomain } from './activation';
-import { deleteDomain } from './delete';
-import { validateDomainName } from './validation';
-import { getSystemInformation } from '../../utils/systemInfo';
-import { getDomain, getDomainTransport } from './read';
-import { IBuilder } from '../shared/IBuilder';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
+import { getSystemInformation } from '../../utils/systemInfo';
+import type { IBuilder } from '../shared/IBuilder';
+import { activateDomain } from './activation';
+import { checkDomainSyntax } from './check';
+import { create } from './create';
+import { deleteDomain } from './delete';
+import { lockDomain } from './lock';
+import { getDomain, getDomainTransport } from './read';
+import type {
+  ICreateDomainParams,
+  IDomainConfig,
+  IDomainState,
+  IFixedValue,
+  IUpdateDomainParams,
+} from './types';
+import { unlockDomain } from './unlock';
+import { updateDomain } from './update';
+import { validateDomainName } from './validation';
 
 export class DomainBuilder implements IBuilder<IDomainState> {
   private connection: IAbapConnection;
@@ -55,23 +60,23 @@ export class DomainBuilder implements IBuilder<IDomainState> {
   private lockHandle?: string;
   private state: IDomainState;
 
-    constructor(
-      connection: IAbapConnection,
-      config: IDomainConfig,
-      logger?: ILogger
-    ) {
-      this.connection = connection;
-      this.logger = logger ?? {
-        debug: () => {},
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-      };
-      this.config = { ...config };
-      this.state = {
-        errors: []
-      };
-    }
+  constructor(
+    connection: IAbapConnection,
+    config: IDomainConfig,
+    logger?: ILogger,
+  ) {
+    this.connection = connection;
+    this.logger = logger ?? {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    };
+    this.config = { ...config };
+    this.state = {
+      errors: [],
+    };
+  }
 
   // Builder methods - return this for chaining
   setPackage(packageName: string): this {
@@ -145,7 +150,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         this.connection,
         this.config.domainName,
         this.config.packageName,
-        this.config.description
+        this.config.description,
       );
       // Store raw response for backward compatibility
       this.state.validationResponse = result;
@@ -155,7 +160,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Validation failed:', error);
       throw error;
@@ -172,10 +177,14 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       // Get masterSystem and responsible (only for cloud systems)
       const systemInfo = await getSystemInformation(this.connection);
       const masterSystem = systemInfo?.systemID;
-      const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+      const username =
+        systemInfo?.userName ||
+        process.env.SAP_USER ||
+        process.env.SAP_USERNAME ||
+        'MPCUSER';
 
       // Enable stateful session mode
-      this.connection.setSessionType("stateful");
+      this.connection.setSessionType('stateful');
 
       const params: ICreateDomainParams = {
         domain_name: this.config.domainName,
@@ -189,7 +198,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         lowercase: this.config.lowercase,
         sign_exists: this.config.sign_exists,
         value_table: this.config.value_table,
-        fixed_values: this.config.fixed_values
+        fixed_values: this.config.fixed_values,
       };
 
       // Create empty domain only (initial POST to register the name)
@@ -197,7 +206,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         this.connection,
         params,
         username,
-        masterSystem
+        masterSystem,
       );
       this.state.createResult = result;
       this.logger?.info('Empty domain created successfully:', result.status);
@@ -206,7 +215,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Create failed:', error);
       throw error; // Interrupts chain
@@ -218,11 +227,11 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       this.logger?.info('Locking domain:', this.config.domainName);
 
       // Enable stateful session mode
-      this.connection.setSessionType("stateful");
+      this.connection.setSessionType('stateful');
 
       const lockHandle = await lockDomain(
         this.connection,
-        this.config.domainName
+        this.config.domainName,
       );
       this.lockHandle = lockHandle;
       this.state.lockHandle = lockHandle;
@@ -233,7 +242,7 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
@@ -243,7 +252,9 @@ export class DomainBuilder implements IBuilder<IDomainState> {
   async update(): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Domain must be locked before update. Call lock() first.');
+        throw new Error(
+          'Domain must be locked before update. Call lock() first.',
+        );
       }
       if (!this.config.packageName) {
         throw new Error('Package name is required');
@@ -252,9 +263,16 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       // Get masterSystem and responsible (only for cloud systems)
       const systemInfo = await getSystemInformation(this.connection);
       const masterSystem = systemInfo?.systemID;
-      const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+      const username =
+        systemInfo?.userName ||
+        process.env.SAP_USER ||
+        process.env.SAP_USERNAME ||
+        'MPCUSER';
 
-      this.logger?.info('Updating domain (UPDATE workflow):', this.config.domainName);
+      this.logger?.info(
+        'Updating domain (UPDATE workflow):',
+        this.config.domainName,
+      );
       const updateParams: IUpdateDomainParams = {
         domain_name: this.config.domainName,
         package_name: this.config.packageName,
@@ -268,12 +286,18 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         sign_exists: this.config.sign_exists,
         value_table: this.config.value_table,
         fixed_values: this.config.fixed_values,
-        activate: false // Don't activate in low-level function
+        activate: false, // Don't activate in low-level function
       };
 
       // Use updateDomain (low-level) - stateful session already set by lock()
       // Connection object maintains sessionMode state between builder instances
-      const result = await updateDomain(this.connection, updateParams, this.lockHandle, username, masterSystem);
+      const result = await updateDomain(
+        this.connection,
+        updateParams,
+        this.lockHandle,
+        username,
+        masterSystem,
+      );
 
       this.state.updateResult = result;
       this.logger?.info('Domain updated successfully:', result.status);
@@ -282,16 +306,20 @@ export class DomainBuilder implements IBuilder<IDomainState> {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error; // Interrupts chain
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive'): Promise<AxiosResponse> {
+  async check(
+    version: 'active' | 'inactive' = 'inactive',
+  ): Promise<AxiosResponse> {
     try {
-      this.logger?.info(`'Checking domain:'  this.config.domainName  'version:' ${`version`}`);
+      this.logger?.info(
+        `'Checking domain:'  this.config.domainName  'version:' ${`version`}`,
+      );
 
       // Generate XML content to check (same as will be sent in PUT)
       let xmlContent: string | undefined;
@@ -299,7 +327,11 @@ export class DomainBuilder implements IBuilder<IDomainState> {
         // Only generate XML if we have enough config to build it
         const systemInfo = await getSystemInformation(this.connection);
         const masterSystem = systemInfo?.systemID;
-        const username = systemInfo?.userName || process.env.SAP_USER || process.env.SAP_USERNAME || 'MPCUSER';
+        const username =
+          systemInfo?.userName ||
+          process.env.SAP_USER ||
+          process.env.SAP_USERNAME ||
+          'MPCUSER';
 
         const datatype = this.config.datatype || 'CHAR';
         const length = this.config.length || 100;
@@ -307,16 +339,21 @@ export class DomainBuilder implements IBuilder<IDomainState> {
 
         let fixValuesXml = '';
         if (this.config.fixed_values && this.config.fixed_values.length > 0) {
-          const fixValueItems = this.config.fixed_values.map(fv =>
-            `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`
-          ).join('\n');
+          const fixValueItems = this.config.fixed_values
+            .map(
+              (fv) =>
+                `      <doma:fixValue>\n        <doma:low>${fv.low}</doma:low>\n        <doma:text>${fv.text}</doma:text>\n      </doma:fixValue>`,
+            )
+            .join('\n');
           fixValuesXml = `    <doma:fixValues>\n${fixValueItems}\n    </doma:fixValues>`;
         } else {
           fixValuesXml = '    <doma:fixValues/>';
         }
 
         const description = this.config.description || this.config.domainName;
-        const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
+        const masterSystemAttr = masterSystem
+          ? ` adtcore:masterSystem="${masterSystem}"`
+          : '';
 
         xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
@@ -353,7 +390,7 @@ ${fixValuesXml}
         this.connection,
         this.config.domainName,
         version,
-        xmlContent
+        xmlContent,
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
@@ -363,7 +400,7 @@ ${fixValuesXml}
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error;
@@ -379,19 +416,19 @@ ${fixValuesXml}
       const result = await unlockDomain(
         this.connection,
         this.config.domainName,
-        this.lockHandle
+        this.lockHandle,
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Domain unlocked successfully');
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
@@ -403,7 +440,7 @@ ${fixValuesXml}
       this.logger?.info('Activating domain:', this.config.domainName);
       const result = await activateDomain(
         this.connection,
-        this.config.domainName
+        this.config.domainName,
       );
       this.state.activateResult = result;
       this.logger?.info('Domain activated successfully:', result.status);
@@ -412,24 +449,20 @@ ${fixValuesXml}
       this.state.errors.push({
         method: 'activate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
 
-
   async delete(): Promise<this> {
     try {
       this.logger?.info('Deleting domain:', this.config.domainName);
-      const result = await deleteDomain(
-        this.connection,
-        {
-          domain_name: this.config.domainName,
-          transport_request: this.config.transportRequest
-        }
-      );
+      const result = await deleteDomain(this.connection, {
+        domain_name: this.config.domainName,
+        transport_request: this.config.transportRequest,
+      });
       this.state.deleteResult = result;
       this.logger?.info('Domain deleted successfully:', result.status);
       return this;
@@ -437,7 +470,7 @@ ${fixValuesXml}
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -445,27 +478,32 @@ ${fixValuesXml}
   }
 
   async read(
-    version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean }
+    _version?: 'active' | 'inactive',
+    options?: { withLongPolling?: boolean },
   ): Promise<IDomainConfig | undefined> {
     try {
       this.logger?.info('Reading domain:', this.config.domainName);
-      const result = await getDomain(this.connection, this.config.domainName, options);
+      const result = await getDomain(
+        this.connection,
+        this.config.domainName,
+        options,
+      );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Domain read successfully:', result.status);
 
       // Parse and return config directly
-      const xmlData = typeof result.data === 'string'
-        ? result.data
-        : JSON.stringify(result.data);
+      const xmlData =
+        typeof result.data === 'string'
+          ? result.data
+          : JSON.stringify(result.data);
 
       return this.parseDomainXml(xmlData);
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error;
@@ -474,8 +512,14 @@ ${fixValuesXml}
 
   async readTransport(): Promise<this> {
     try {
-      this.logger?.info('Reading transport request for domain:', this.config.domainName);
-      const result = await getDomainTransport(this.connection, this.config.domainName);
+      this.logger?.info(
+        'Reading transport request for domain:',
+        this.config.domainName,
+      );
+      const result = await getDomainTransport(
+        this.connection,
+        this.config.domainName,
+      );
       this.state.transportResult = result;
       this.logger?.info('Transport request read successfully:', result.status);
       return this;
@@ -483,7 +527,7 @@ ${fixValuesXml}
       this.state.errors.push({
         method: 'readTransport',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read transport failed:', error);
       throw error; // Interrupts chain
@@ -498,7 +542,7 @@ ${fixValuesXml}
       await unlockDomain(
         this.connection,
         this.config.domainName,
-        this.lockHandle
+        this.lockHandle,
       );
       this.logger?.info('Force unlock successful for', this.config.domainName);
     } catch (error: any) {
@@ -506,7 +550,7 @@ ${fixValuesXml}
     } finally {
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
     }
   }
 
@@ -547,7 +591,6 @@ ${fixValuesXml}
     return this.state.activateResult;
   }
 
-
   getDeleteResult(): AxiosResponse | undefined {
     return this.state.deleteResult;
   }
@@ -570,53 +613,76 @@ ${fixValuesXml}
       }
 
       // Extract fixed values if present
-      const fixValues = domain['doma:content']?.['doma:valueInformation']?.['doma:fixValues']?.['doma:fixValue'];
+      const fixValues =
+        domain['doma:content']?.['doma:valueInformation']?.['doma:fixValues']?.[
+          'doma:fixValue'
+        ];
       const fixedValues = Array.isArray(fixValues)
         ? fixValues.map((fv: any) => ({
-          low: fv['doma:low'] || '',
-          text: fv['doma:text'] || ''
-        }))
+            low: fv['doma:low'] || '',
+            text: fv['doma:text'] || '',
+          }))
         : fixValues
-          ? [{
-            low: fixValues['doma:low'] || '',
-            text: fixValues['doma:text'] || ''
-          }]
+          ? [
+              {
+                low: fixValues['doma:low'] || '',
+                text: fixValues['doma:text'] || '',
+              },
+            ]
           : undefined;
 
       // Parse length and decimals - GET returns "000010", PUT needs "100"
-      const lengthStr = domain['doma:content']?.['doma:typeInformation']?.['doma:length'];
+      const lengthStr =
+        domain['doma:content']?.['doma:typeInformation']?.['doma:length'];
       const length = lengthStr ? parseInt(lengthStr, 10) : undefined;
 
-      const decimalsStr = domain['doma:content']?.['doma:typeInformation']?.['doma:decimals'];
+      const decimalsStr =
+        domain['doma:content']?.['doma:typeInformation']?.['doma:decimals'];
       const decimals = decimalsStr ? parseInt(decimalsStr, 10) : undefined;
 
       // Parse conversion exit - can be empty string or missing
-      const conversionExit = domain['doma:content']?.['doma:outputInformation']?.['doma:conversionExit'];
-      const conversion_exit = conversionExit && conversionExit.trim() !== '' ? conversionExit : undefined;
+      const conversionExit =
+        domain['doma:content']?.['doma:outputInformation']?.[
+          'doma:conversionExit'
+        ];
+      const conversion_exit =
+        conversionExit && conversionExit.trim() !== ''
+          ? conversionExit
+          : undefined;
 
       // Parse boolean values - GET returns "false"/"true" as strings
-      const lowercaseStr = domain['doma:content']?.['doma:outputInformation']?.['doma:lowercase'];
+      const lowercaseStr =
+        domain['doma:content']?.['doma:outputInformation']?.['doma:lowercase'];
       const lowercase = lowercaseStr === 'true' || lowercaseStr === true;
 
-      const signExistsStr = domain['doma:content']?.['doma:outputInformation']?.['doma:signExists'];
+      const signExistsStr =
+        domain['doma:content']?.['doma:outputInformation']?.['doma:signExists'];
       const sign_exists = signExistsStr === 'true' || signExistsStr === true;
 
       // Parse value table - can be empty or have adtcore:name attribute
-      const valueTableRef = domain['doma:content']?.['doma:valueInformation']?.['doma:valueTableRef'];
-      const value_table = valueTableRef?.['adtcore:name'] || (typeof valueTableRef === 'string' && valueTableRef.trim() !== '' ? valueTableRef : undefined);
+      const valueTableRef =
+        domain['doma:content']?.['doma:valueInformation']?.[
+          'doma:valueTableRef'
+        ];
+      const value_table =
+        valueTableRef?.['adtcore:name'] ||
+        (typeof valueTableRef === 'string' && valueTableRef.trim() !== ''
+          ? valueTableRef
+          : undefined);
 
       return {
         domainName: domain['adtcore:name'] || this.config.domainName,
         packageName: domain['adtcore:packageRef']?.['adtcore:name'],
         description: domain['adtcore:description'] || '',
-        datatype: domain['doma:content']?.['doma:typeInformation']?.['doma:datatype'],
+        datatype:
+          domain['doma:content']?.['doma:typeInformation']?.['doma:datatype'],
         length,
         decimals,
         conversion_exit,
         lowercase,
         sign_exists,
         value_table,
-        fixed_values: fixedValues
+        fixed_values: fixedValues,
       };
     } catch (error) {
       this.logger?.error('Failed to parse domain XML:', error);
@@ -629,9 +695,10 @@ ${fixValuesXml}
       return undefined;
     }
 
-    const xmlData = typeof this.state.readResult.data === 'string'
-      ? this.state.readResult.data
-      : JSON.stringify(this.state.readResult.data);
+    const xmlData =
+      typeof this.state.readResult.data === 'string'
+        ? this.state.readResult.data
+        : JSON.stringify(this.state.readResult.data);
 
     return this.parseDomainXml(xmlData);
   }
@@ -640,7 +707,11 @@ ${fixValuesXml}
     return this.state.transportResult;
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -663,8 +734,7 @@ ${fixValuesXml}
       activate: this.state.activateResult,
       delete: this.state.deleteResult,
       lockHandle: this.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

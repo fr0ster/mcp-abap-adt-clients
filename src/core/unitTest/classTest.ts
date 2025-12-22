@@ -3,24 +3,25 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { activateObjectInSession } from '../../utils/activationUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Lock test classes for a class
  */
 export async function lockClassTestClasses(
   connection: IAbapConnection,
-  className: string
+  className: string,
 ): Promise<string> {
   const encodedName = encodeSapObjectName(className).toLowerCase();
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
-    Accept: 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
   };
 
   const response = await connection.makeAdtRequest({
@@ -28,15 +29,20 @@ export async function lockClassTestClasses(
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers
+    headers,
   });
 
-  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+  });
   const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
+  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
 
   if (!lockHandle) {
-    throw new Error('Failed to obtain lock handle for test classes. They may already be locked by another user.');
+    throw new Error(
+      'Failed to obtain lock handle for test classes. They may already be locked by another user.',
+    );
   }
 
   return lockHandle;
@@ -50,7 +56,7 @@ export async function updateClassTestInclude(
   className: string,
   testClassSource: string,
   lockHandle: string,
-  transportRequest?: string
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   if (!lockHandle) {
     throw new Error('lockHandle is required to update test classes');
@@ -64,7 +70,7 @@ export async function updateClassTestInclude(
 
   const headers = {
     'Content-Type': 'text/plain; charset=utf-8',
-    Accept: 'text/plain'
+    Accept: 'text/plain',
   };
 
   return await connection.makeAdtRequest({
@@ -72,7 +78,7 @@ export async function updateClassTestInclude(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: testClassSource,
-    headers
+    headers,
   });
 }
 
@@ -82,7 +88,7 @@ export async function updateClassTestInclude(
 export async function unlockClassTestClasses(
   connection: IAbapConnection,
   className: string,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   if (!lockHandle) {
     throw new Error('lockHandle is required to unlock test classes');
@@ -92,7 +98,7 @@ export async function unlockClassTestClasses(
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?_action=UNLOCK&lockHandle=${lockHandle}`;
 
   const headers = {
-    'Content-Type': 'application/x-www-form-urlencoded'
+    'Content-Type': 'application/x-www-form-urlencoded',
   };
 
   return connection.makeAdtRequest({
@@ -100,7 +106,7 @@ export async function unlockClassTestClasses(
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers
+    headers,
   });
 }
 
@@ -110,7 +116,7 @@ export async function unlockClassTestClasses(
 export async function activateClassTestClasses(
   connection: IAbapConnection,
   className: string,
-  testClassName: string
+  testClassName: string,
 ): Promise<AxiosResponse> {
   const encodedClass = encodeSapObjectName(className).toLowerCase();
   const encodedTest = encodeSapObjectName(testClassName).toUpperCase();
@@ -118,4 +124,3 @@ export async function activateClassTestClasses(
   const objectName = `${className.toUpperCase()}#${encodedTest}`;
   return activateObjectInSession(connection, objectUri, objectName, true);
 }
-

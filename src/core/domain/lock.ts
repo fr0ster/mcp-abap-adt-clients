@@ -3,26 +3,26 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { ICreateDomainParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { ICreateDomainParams } from './types';
 
 /**
  * Acquire lock handle by attempting to lock the domain (for create)
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function acquireLockHandle(
   connection: IAbapConnection,
-  args: ICreateDomainParams
+  args: ICreateDomainParams,
 ): Promise<string> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
   };
 
   try {
@@ -31,7 +31,7 @@ export async function acquireLockHandle(
       method: 'POST',
       timeout: getTimeout('default'),
       data: null,
-      headers
+      headers,
     });
 
     const parser = new XMLParser({
@@ -40,7 +40,7 @@ export async function acquireLockHandle(
     });
 
     const result = parser.parse(response.data);
-    const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
+    const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
 
     if (!lockHandle) {
       throw new Error('Failed to obtain lock handle from SAP response');
@@ -50,12 +50,12 @@ export async function acquireLockHandle(
   } catch (error: any) {
     if (error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
       throw new Error(
-        `Domain ${args.domain_name} already exists. Please delete it first or use a different name.`
+        `Domain ${args.domain_name} already exists. Please delete it first or use a different name.`,
       );
     }
 
     throw new Error(
-      `Failed to create empty domain ${args.domain_name}: ${error.message || error}`
+      `Failed to create empty domain ${args.domain_name}: ${error.message || error}`,
     );
   }
 }
@@ -63,18 +63,19 @@ export async function acquireLockHandle(
 /**
  * Lock domain for modification
  * Returns lock handle that must be used in subsequent requests
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function lockDomain(
   connection: IAbapConnection,
-  domainName: string
+  domainName: string,
 ): Promise<string> {
   const domainNameEncoded = encodeSapObjectName(domainName.toLowerCase());
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
   };
 
   const response = await connection.makeAdtRequest({
@@ -82,16 +83,16 @@ export async function lockDomain(
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers
+    headers,
   });
 
   const parser = new XMLParser({
     ignoreAttributes: false,
-    attributeNamePrefix: ''
+    attributeNamePrefix: '',
   });
 
   const result = parser.parse(response.data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
+  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
 
   if (!lockHandle) {
     throw new Error('Failed to extract lock handle from response');
@@ -99,4 +100,3 @@ export async function lockDomain(
 
   return lockHandle;
 }
-

@@ -1,6 +1,6 @@
 /**
  * ABAP Debugger (Standard)
- * 
+ *
  * Provides functions for managing ABAP debugger sessions:
  * - Debugger listeners (launch, stop, get)
  * - Memory sizes
@@ -14,12 +14,12 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
 
 /**
  * Launch debugger
- * 
+ *
  * @param connection - ABAP connection
  * @param options - Debugger launch options
  * @returns Axios response with debugger session
@@ -36,18 +36,20 @@ export interface ILaunchDebuggerOptions {
 
 export async function launchDebugger(
   connection: IAbapConnection,
-  options?: ILaunchDebuggerOptions
+  options?: ILaunchDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
   const params: Record<string, any> = {};
-  
+
   if (options?.debuggingMode) params.debuggingMode = options.debuggingMode;
   if (options?.requestUser) params.requestUser = options.requestUser;
   if (options?.terminalId) params.terminalId = options.terminalId;
   if (options?.ideId) params.ideId = options.ideId;
   if (options?.timeout !== undefined) params.timeout = options.timeout;
-  if (options?.checkConflict !== undefined) params.checkConflict = options.checkConflict;
-  if (options?.isNotifiedOnConflict !== undefined) params.isNotifiedOnConflict = options.isNotifiedOnConflict;
+  if (options?.checkConflict !== undefined)
+    params.checkConflict = options.checkConflict;
+  if (options?.isNotifiedOnConflict !== undefined)
+    params.isNotifiedOnConflict = options.isNotifiedOnConflict;
 
   return connection.makeAdtRequest({
     url,
@@ -55,15 +57,15 @@ export async function launchDebugger(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/launch'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/launch',
+    },
   });
 }
 
 /**
  * Stop debugger
- * 
+ *
  * @param connection - ABAP connection
  * @param options - Debugger stop options
  * @returns Axios response
@@ -79,17 +81,19 @@ export interface IStopDebuggerOptions {
 
 export async function stopDebugger(
   connection: IAbapConnection,
-  options?: IStopDebuggerOptions
+  options?: IStopDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
   const params: Record<string, any> = {};
-  
+
   if (options?.debuggingMode) params.debuggingMode = options.debuggingMode;
   if (options?.requestUser) params.requestUser = options.requestUser;
   if (options?.terminalId) params.terminalId = options.terminalId;
   if (options?.ideId) params.ideId = options.ideId;
-  if (options?.checkConflict !== undefined) params.checkConflict = options.checkConflict;
-  if (options?.notifyConflict !== undefined) params.notifyConflict = options.notifyConflict;
+  if (options?.checkConflict !== undefined)
+    params.checkConflict = options.checkConflict;
+  if (options?.notifyConflict !== undefined)
+    params.notifyConflict = options.notifyConflict;
 
   return connection.makeAdtRequest({
     url,
@@ -97,15 +101,15 @@ export async function stopDebugger(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/stop'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/stop',
+    },
   });
 }
 
 /**
  * Get debugger session
- * 
+ *
  * @param connection - ABAP connection
  * @param options - Debugger get options
  * @returns Axios response with debugger session
@@ -120,16 +124,17 @@ export interface IGetDebuggerOptions {
 
 export async function getDebugger(
   connection: IAbapConnection,
-  options?: IGetDebuggerOptions
+  options?: IGetDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
   const params: Record<string, any> = {};
-  
+
   if (options?.debuggingMode) params.debuggingMode = options.debuggingMode;
   if (options?.requestUser) params.requestUser = options.requestUser;
   if (options?.terminalId) params.terminalId = options.terminalId;
   if (options?.ideId) params.ideId = options.ideId;
-  if (options?.checkConflict !== undefined) params.checkConflict = options.checkConflict;
+  if (options?.checkConflict !== undefined)
+    params.checkConflict = options.checkConflict;
 
   return connection.makeAdtRequest({
     url,
@@ -137,26 +142,26 @@ export async function getDebugger(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/get'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/get',
+    },
   });
 }
 
 /**
  * Get memory sizes
- * 
+ *
  * @param connection - ABAP connection
  * @param includeAbap - Include ABAP memory (optional)
  * @returns Axios response with memory sizes
  */
 export async function getMemorySizes(
   connection: IAbapConnection,
-  includeAbap?: boolean
+  includeAbap?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/memorysizes`;
   const params: Record<string, any> = {};
-  
+
   if (includeAbap !== undefined) params.includeAbap = includeAbap;
 
   return connection.makeAdtRequest({
@@ -165,14 +170,14 @@ export async function getMemorySizes(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Get system area
- * 
+ *
  * @param connection - ABAP connection
  * @param systemarea - System area name
  * @param options - System area options
@@ -192,7 +197,7 @@ export interface IGetSystemAreaOptions {
 export async function getSystemArea(
   connection: IAbapConnection,
   systemarea: string,
-  options?: IGetSystemAreaOptions
+  options?: IGetSystemAreaOptions,
 ): Promise<AxiosResponse> {
   if (!systemarea) {
     throw new Error('System area is required');
@@ -200,13 +205,16 @@ export async function getSystemArea(
 
   const url = `/sap/bc/adt/debugger/systemareas/${encodeURIComponent(systemarea)}`;
   const params: Record<string, any> = {};
-  
+
   if (options?.offset !== undefined) params.offset = options.offset;
   if (options?.length !== undefined) params.length = options.length;
   if (options?.element) params.element = options.element;
-  if (options?.isSelection !== undefined) params.isSelection = options.isSelection;
-  if (options?.selectedLine !== undefined) params.selectedLine = options.selectedLine;
-  if (options?.selectedColumn !== undefined) params.selectedColumn = options.selectedColumn;
+  if (options?.isSelection !== undefined)
+    params.isSelection = options.isSelection;
+  if (options?.selectedLine !== undefined)
+    params.selectedLine = options.selectedLine;
+  if (options?.selectedColumn !== undefined)
+    params.selectedColumn = options.selectedColumn;
   if (options?.programContext) params.programContext = options.programContext;
   if (options?.filter) params.filter = options.filter;
 
@@ -216,25 +224,25 @@ export async function getSystemArea(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Synchronize breakpoints
- * 
+ *
  * @param connection - ABAP connection
  * @param checkConflict - Check for conflicts (optional)
  * @returns Axios response with breakpoints
  */
 export async function synchronizeBreakpoints(
   connection: IAbapConnection,
-  checkConflict?: boolean
+  checkConflict?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints`;
   const params: Record<string, any> = {};
-  
+
   if (checkConflict !== undefined) params.checkConflict = checkConflict;
 
   return connection.makeAdtRequest({
@@ -243,20 +251,21 @@ export async function synchronizeBreakpoints(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/synchronize'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/debugger/relations/synchronize',
+    },
   });
 }
 
 /**
  * Get breakpoint statements
- * 
+ *
  * @param connection - ABAP connection
  * @returns Axios response with breakpoint statements
  */
 export async function getBreakpointStatements(
-  connection: IAbapConnection
+  connection: IAbapConnection,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/statements`;
 
@@ -265,19 +274,19 @@ export async function getBreakpointStatements(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Get breakpoint message types
- * 
+ *
  * @param connection - ABAP connection
  * @returns Axios response with message types
  */
 export async function getBreakpointMessageTypes(
-  connection: IAbapConnection
+  connection: IAbapConnection,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/messagetypes`;
 
@@ -286,19 +295,19 @@ export async function getBreakpointMessageTypes(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Get breakpoint conditions
- * 
+ *
  * @param connection - ABAP connection
  * @returns Axios response with breakpoint conditions
  */
 export async function getBreakpointConditions(
-  connection: IAbapConnection
+  connection: IAbapConnection,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/conditions`;
 
@@ -307,19 +316,19 @@ export async function getBreakpointConditions(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Validate breakpoints
- * 
+ *
  * @param connection - ABAP connection
  * @returns Axios response with validation results
  */
 export async function validateBreakpoints(
-  connection: IAbapConnection
+  connection: IAbapConnection,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/validations`;
 
@@ -328,19 +337,19 @@ export async function validateBreakpoints(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Get VIT breakpoints
- * 
+ *
  * @param connection - ABAP connection
  * @returns Axios response with VIT breakpoints
  */
 export async function getVitBreakpoints(
-  connection: IAbapConnection
+  connection: IAbapConnection,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints/vit`;
 
@@ -349,14 +358,14 @@ export async function getVitBreakpoints(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Get variable max length
- * 
+ *
  * @param connection - ABAP connection
  * @param variableName - Variable name
  * @param part - Variable part
@@ -367,7 +376,7 @@ export async function getVariableMaxLength(
   connection: IAbapConnection,
   variableName: string,
   part: string,
-  maxLength?: number
+  maxLength?: number,
 ): Promise<AxiosResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
@@ -375,7 +384,7 @@ export async function getVariableMaxLength(
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, any> = {};
-  
+
   if (maxLength !== undefined) params.maxLength = maxLength;
 
   return connection.makeAdtRequest({
@@ -384,15 +393,16 @@ export async function getVariableMaxLength(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/maxlength'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/debugger/relations/maxlength',
+    },
   });
 }
 
 /**
  * Get variable subcomponents
- * 
+ *
  * @param connection - ABAP connection
  * @param variableName - Variable name
  * @param part - Variable part
@@ -405,7 +415,7 @@ export async function getVariableSubcomponents(
   variableName: string,
   part: string,
   component?: string,
-  line?: number
+  line?: number,
 ): Promise<AxiosResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
@@ -413,7 +423,7 @@ export async function getVariableSubcomponents(
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, any> = {};
-  
+
   if (component) params.component = component;
   if (line !== undefined) params.line = line;
 
@@ -423,15 +433,16 @@ export async function getVariableSubcomponents(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/subcomponents'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/debugger/relations/subcomponents',
+    },
   });
 }
 
 /**
  * Get variable as CSV
- * 
+ *
  * @param connection - ABAP connection
  * @param variableName - Variable name
  * @param part - Variable part
@@ -452,7 +463,7 @@ export async function getVariableAsCsv(
   connection: IAbapConnection,
   variableName: string,
   part: string,
-  options?: IGetVariableAsCsvOptions
+  options?: IGetVariableAsCsvOptions,
 ): Promise<AxiosResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
@@ -460,7 +471,7 @@ export async function getVariableAsCsv(
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, any> = {};
-  
+
   if (options?.offset !== undefined) params.offset = options.offset;
   if (options?.length !== undefined) params.length = options.length;
   if (options?.filter) params.filter = options.filter;
@@ -475,15 +486,15 @@ export async function getVariableAsCsv(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'text/csv',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/csv'
-    }
+      Accept: 'text/csv',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/csv',
+    },
   });
 }
 
 /**
  * Get variable as JSON
- * 
+ *
  * @param connection - ABAP connection
  * @param variableName - Variable name
  * @param part - Variable part
@@ -504,7 +515,7 @@ export async function getVariableAsJson(
   connection: IAbapConnection,
   variableName: string,
   part: string,
-  options?: IGetVariableAsJsonOptions
+  options?: IGetVariableAsJsonOptions,
 ): Promise<AxiosResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
@@ -512,7 +523,7 @@ export async function getVariableAsJson(
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, any> = {};
-  
+
   if (options?.offset !== undefined) params.offset = options.offset;
   if (options?.length !== undefined) params.length = options.length;
   if (options?.filter) params.filter = options.filter;
@@ -527,15 +538,15 @@ export async function getVariableAsJson(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/json',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/json'
-    }
+      Accept: 'application/json',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/json',
+    },
   });
 }
 
 /**
  * Get variable value statement
- * 
+ *
  * @param connection - ABAP connection
  * @param variableName - Variable name
  * @param part - Variable part
@@ -556,7 +567,7 @@ export async function getVariableValueStatement(
   connection: IAbapConnection,
   variableName: string,
   part: string,
-  options?: IGetVariableValueStatementOptions
+  options?: IGetVariableValueStatementOptions,
 ): Promise<AxiosResponse> {
   if (!variableName || !part) {
     throw new Error('Variable name and part are required');
@@ -564,14 +575,19 @@ export async function getVariableValueStatement(
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
   const params: Record<string, any> = {};
-  
+
   if (options?.rows !== undefined) params.rows = options.rows;
-  if (options?.maxStringLength !== undefined) params.maxStringLength = options.maxStringLength;
-  if (options?.maxNestingLevel !== undefined) params.maxNestingLevel = options.maxNestingLevel;
-  if (options?.maxTotalSize !== undefined) params.maxTotalSize = options.maxTotalSize;
-  if (options?.ignoreInitialValues !== undefined) params.ignoreInitialValues = options.ignoreInitialValues;
+  if (options?.maxStringLength !== undefined)
+    params.maxStringLength = options.maxStringLength;
+  if (options?.maxNestingLevel !== undefined)
+    params.maxNestingLevel = options.maxNestingLevel;
+  if (options?.maxTotalSize !== undefined)
+    params.maxTotalSize = options.maxTotalSize;
+  if (options?.ignoreInitialValues !== undefined)
+    params.ignoreInitialValues = options.ignoreInitialValues;
   if (options?.c) params.c = options.c;
-  if (options?.lineBreakThreshold !== undefined) params.lineBreakThreshold = options.lineBreakThreshold;
+  if (options?.lineBreakThreshold !== undefined)
+    params.lineBreakThreshold = options.lineBreakThreshold;
 
   return connection.makeAdtRequest({
     url,
@@ -579,15 +595,16 @@ export async function getVariableValueStatement(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/valueStatement'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation':
+        'http://www.sap.com/adt/debugger/relations/valueStatement',
+    },
   });
 }
 
 /**
  * Execute debugger action
- * 
+ *
  * @param connection - ABAP connection
  * @param action - Action name
  * @param value - Action value (optional)
@@ -596,7 +613,7 @@ export async function getVariableValueStatement(
 export async function executeDebuggerAction(
   connection: IAbapConnection,
   action: string,
-  value?: string
+  value?: string,
 ): Promise<AxiosResponse> {
   if (!action) {
     throw new Error('Action is required');
@@ -604,7 +621,7 @@ export async function executeDebuggerAction(
 
   const url = `/sap/bc/adt/debugger/actions`;
   const params: Record<string, any> = { action };
-  
+
   if (value) params.value = value;
 
   return connection.makeAdtRequest({
@@ -613,20 +630,20 @@ export async function executeDebuggerAction(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/action'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/action',
+    },
   });
 }
 
 /**
  * Get call stack
- * 
+ *
  * @param connection - ABAP connection
  * @returns Axios response with call stack
  */
 export async function getCallStack(
-  connection: IAbapConnection
+  connection: IAbapConnection,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/stack`;
 
@@ -635,14 +652,14 @@ export async function getCallStack(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
 
 /**
  * Insert watchpoint
- * 
+ *
  * @param connection - ABAP connection
  * @param variableName - Variable name
  * @param condition - Watchpoint condition (optional)
@@ -651,7 +668,7 @@ export async function getCallStack(
 export async function insertWatchpoint(
   connection: IAbapConnection,
   variableName: string,
-  condition?: string
+  condition?: string,
 ): Promise<AxiosResponse> {
   if (!variableName) {
     throw new Error('Variable name is required');
@@ -659,7 +676,7 @@ export async function insertWatchpoint(
 
   const url = `/sap/bc/adt/debugger/watchpoints`;
   const params: Record<string, any> = { variableName };
-  
+
   if (condition) params.condition = condition;
 
   return connection.makeAdtRequest({
@@ -668,20 +685,20 @@ export async function insertWatchpoint(
     timeout: getTimeout('default'),
     params,
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/insert'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/insert',
+    },
   });
 }
 
 /**
  * Get watchpoints
- * 
+ *
  * @param connection - ABAP connection
  * @returns Axios response with watchpoints
  */
 export async function getWatchpoints(
-  connection: IAbapConnection
+  connection: IAbapConnection,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/watchpoints`;
 
@@ -690,22 +707,22 @@ export async function getWatchpoints(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/xml',
-      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/get'
-    }
+      Accept: 'application/xml',
+      'X-sap-adt-relation': 'http://www.sap.com/adt/debugger/relations/get',
+    },
   });
 }
 
 /**
  * Execute batch request
- * 
+ *
  * @param connection - ABAP connection
  * @param requests - Batch requests (XML body)
  * @returns Axios response with batch results
  */
 export async function executeBatchRequest(
   connection: IAbapConnection,
-  requests: string
+  requests: string,
 ): Promise<AxiosResponse> {
   if (!requests) {
     throw new Error('Requests are required');
@@ -720,8 +737,7 @@ export async function executeBatchRequest(
     data: requests,
     headers: {
       'Content-Type': 'application/xml',
-      'Accept': 'application/xml'
-    }
+      Accept: 'application/xml',
+    },
   });
 }
-

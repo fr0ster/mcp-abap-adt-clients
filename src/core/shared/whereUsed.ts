@@ -3,38 +3,38 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
 
 /**
  * Modify where-used scope to enable/disable specific object types
- * 
+ *
  * @param scopeXml - Scope XML from getWhereUsedScope()
  * @param options - Modification options
  * @returns Modified scope XML
- * 
+ *
  * @example
  * const scopeResponse = await getWhereUsedScope(connection, { object_name: 'ZMY_CLASS', object_type: 'class' });
  * let scopeXml = scopeResponse.data;
- * 
+ *
  * // Enable all types
  * scopeXml = modifyWhereUsedScope(scopeXml, { enableAll: true });
- * 
+ *
  * // Enable specific types only
- * scopeXml = modifyWhereUsedScope(scopeXml, { 
- *   enableOnly: ['CLAS/OC', 'INTF/OI', 'FUGR/FF'] 
+ * scopeXml = modifyWhereUsedScope(scopeXml, {
+ *   enableOnly: ['CLAS/OC', 'INTF/OI', 'FUGR/FF']
  * });
- * 
+ *
  * // Enable additional types (keeps existing selections)
- * scopeXml = modifyWhereUsedScope(scopeXml, { 
- *   enable: ['FUGR/FF', 'TABL/DT'] 
+ * scopeXml = modifyWhereUsedScope(scopeXml, {
+ *   enable: ['FUGR/FF', 'TABL/DT']
  * });
- * 
+ *
  * // Disable specific types
- * scopeXml = modifyWhereUsedScope(scopeXml, { 
- *   disable: ['WDYN/YT', 'WAPA/WO'] 
+ * scopeXml = modifyWhereUsedScope(scopeXml, {
+ *   disable: ['WDYN/YT', 'WAPA/WO']
  * });
  */
 export function modifyWhereUsedScope(
@@ -44,7 +44,7 @@ export function modifyWhereUsedScope(
     enableOnly?: string[];
     enable?: string[];
     disable?: string[];
-  }
+  },
 ): string {
   let result = scopeXml;
 
@@ -55,21 +55,30 @@ export function modifyWhereUsedScope(
     // First disable all, then enable only specified
     result = result.replace(/isSelected="true"/g, 'isSelected="false"');
     for (const typeName of options.enableOnly) {
-      const typeRegex = new RegExp(`(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`, 'g');
+      const typeRegex = new RegExp(
+        `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`,
+        'g',
+      );
       result = result.replace(typeRegex, '$1 $2"true"');
     }
   } else {
     // Enable specific types (keep existing selections)
     if (options.enable) {
       for (const typeName of options.enable) {
-        const typeRegex = new RegExp(`(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`, 'g');
+        const typeRegex = new RegExp(
+          `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`,
+          'g',
+        );
         result = result.replace(typeRegex, '$1 $2"true"');
       }
     }
     // Disable specific types
     if (options.disable) {
       for (const typeName of options.disable) {
-        const typeRegex = new RegExp(`(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"true"`, 'g');
+        const typeRegex = new RegExp(
+          `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"true"`,
+          'g',
+        );
         result = result.replace(typeRegex, '$1 $2"false"');
       }
     }
@@ -133,25 +142,25 @@ function buildObjectUri(objectName: string, objectType: string): string {
 
 /**
  * Get where-used scope configuration (Step 1 of 2)
- * 
+ *
  * Returns available object types for where-used search.
  * Consumer can modify isSelected attributes before passing to getWhereUsed()
  *
  * @param connection - ABAP connection
  * @param params - Scope parameters
  * @returns Scope configuration XML with available object types
- * 
+ *
  * @example
  * // Step 1: Get scope
  * const scopeResponse = await getWhereUsedScope(connection, {
  *   object_name: 'ZMY_CLASS',
  *   object_type: 'class'
  * });
- * 
+ *
  * // Modify scope XML to select/deselect object types
  * let scopeXml = scopeResponse.data;
  * scopeXml = scopeXml.replace(/name="FUGR\/FF" isSelected="false"/, 'name="FUGR/FF" isSelected="true"');
- * 
+ *
  * // Step 2: Execute search with modified scope
  * const result = await getWhereUsed(connection, {
  *   object_name: 'ZMY_CLASS',
@@ -161,7 +170,7 @@ function buildObjectUri(objectName: string, objectType: string): string {
  */
 export async function getWhereUsedScope(
   connection: IAbapConnection,
-  params: IGetWhereUsedScopeParams
+  params: IGetWhereUsedScopeParams,
 ): Promise<AxiosResponse> {
   if (!params.object_name) {
     throw new Error('Object name is required');
@@ -172,23 +181,26 @@ export async function getWhereUsedScope(
 
   const objectUri = buildObjectUri(params.object_name, params.object_type);
   const scopeUrl = `/sap/bc/adt/repository/informationsystem/usageReferences/scope?uri=${encodeURIComponent(objectUri)}`;
-  const scopeRequestBody = '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageScopeRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageScopeRequest>';
-  
+  const scopeRequestBody =
+    '<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageScopeRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/></usagereferences:usageScopeRequest>';
+
   return connection.makeAdtRequest({
     url: scopeUrl,
     method: 'POST',
     timeout: getTimeout('default'),
     data: scopeRequestBody,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.repository.usagereferences.scope.request.v1+xml',
-      'Accept': 'application/vnd.sap.adt.repository.usagereferences.scope.response.v1+xml'
-    }
+      'Content-Type':
+        'application/vnd.sap.adt.repository.usagereferences.scope.request.v1+xml',
+      Accept:
+        'application/vnd.sap.adt.repository.usagereferences.scope.response.v1+xml',
+    },
   });
 }
 
 /**
  * Get where-used references for ABAP object (Step 2 of 2)
- * 
+ *
  * Eclipse ADT uses a two-step process:
  * 1. GET scope configuration (getWhereUsedScope) - returns available object types
  * 2. POST actual search with scope (this function) - executes search
@@ -200,7 +212,7 @@ export async function getWhereUsedScope(
  */
 export async function getWhereUsed(
   connection: IAbapConnection,
-  params: IGetWhereUsedParams
+  params: IGetWhereUsedParams,
 ): Promise<AxiosResponse> {
   if (!params.object_name) {
     throw new Error('Object name is required');
@@ -210,27 +222,33 @@ export async function getWhereUsed(
   }
 
   const objectUri = buildObjectUri(params.object_name, params.object_type);
-  
+
   // If scope not provided, fetch default scope
   let scopeXml: string = params.scopeXml || '';
   if (!scopeXml) {
     const scopeResponse = await getWhereUsedScope(connection, {
       object_name: params.object_name,
-      object_type: params.object_type
+      object_type: params.object_type,
     });
     scopeXml = scopeResponse.data;
   }
-  
+
   // Step 2: Perform actual where-used search with scope
   const searchUrl = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
-  
+
   // Build request body with scope from step 1
   // Extract inner content of usageScopeResult and wrap it in usageReferenceRequest
   const scopeContent = scopeXml
     .replace(/<\?xml[^>]*\?>/, '')
-    .replace(/<usagereferences:usageScopeResult[^>]*>/, '<usagereferences:scope>')
-    .replace(/<\/usagereferences:usageScopeResult>/, '</usagereferences:scope>');
-  
+    .replace(
+      /<usagereferences:usageScopeResult[^>]*>/,
+      '<usagereferences:scope>',
+    )
+    .replace(
+      /<\/usagereferences:usageScopeResult>/,
+      '</usagereferences:scope>',
+    );
+
   const searchRequestBody = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/>${scopeContent}</usagereferences:usageReferenceRequest>`;
 
   return connection.makeAdtRequest({
@@ -239,9 +257,10 @@ export async function getWhereUsed(
     timeout: getTimeout('default'),
     data: searchRequestBody,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
-      'Accept': 'application/vnd.sap.adt.repository.usagereferences.result.v1+xml'
-    }
+      'Content-Type':
+        'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
+      Accept:
+        'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
+    },
   });
 }
-

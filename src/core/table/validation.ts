@@ -4,16 +4,16 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Validate table name
  * Returns raw response from ADT - consumer decides how to interpret it
- * 
+ *
  * Endpoint: POST /sap/bc/adt/ddic/tables/validation
- * 
+ *
  * Response format:
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
  * - Error: <exc:exception> with message about existing object or validation failure
@@ -21,14 +21,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 export async function validateTableName(
   connection: IAbapConnection,
   tableName: string,
-  description?: string
+  description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/tables/validation`;
   const encodedName = encodeSapObjectName(tableName);
-  
+
   const queryParams = new URLSearchParams({
     objtype: 'tabldt',
-    objname: encodedName
+    objname: encodedName,
   });
 
   // Description is required for table validation
@@ -39,8 +39,7 @@ export async function validateTableName(
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.as+xml'
-    }
+      Accept: 'application/vnd.sap.as+xml',
+    },
   });
 }
-

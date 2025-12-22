@@ -5,6 +5,5 @@
 export {
   getCheckFailureLogs,
   getExecutionLog,
-  type IGetCheckFailureLogsOptions
+  type IGetCheckFailureLogsOptions,
 } from './logs';
-

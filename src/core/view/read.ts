@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { readObjectMetadata } from '../shared/readMetadata';
 import { readObjectSource } from '../shared/readSource';
 
@@ -15,7 +15,7 @@ import { readObjectSource } from '../shared/readSource';
 export async function getViewMetadata(
   connection: IAbapConnection,
   viewName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   return readObjectMetadata(connection, 'view', viewName, undefined, options);
 }
@@ -27,9 +27,16 @@ export async function getViewSource(
   connection: IAbapConnection,
   viewName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(connection, 'view', viewName, undefined, version, options);
+  return readObjectSource(
+    connection,
+    'view',
+    viewName,
+    undefined,
+    version,
+    options,
+  );
 }
 
 /**
@@ -38,7 +45,7 @@ export async function getViewSource(
  */
 export async function getView(
   connection: IAbapConnection,
-  viewName: string
+  viewName: string,
 ): Promise<AxiosResponse> {
   return getViewSource(connection, viewName);
 }
@@ -52,7 +59,7 @@ export async function getView(
 export async function getViewTransport(
   connection: IAbapConnection,
   viewName: string,
-  options?: { withLongPolling?: boolean }
+  options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(viewName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -63,8 +70,7 @@ export async function getViewTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      'Accept': 'application/vnd.sap.adt.transportorganizer.v1+xml'
-    }
+      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    },
   });
 }
-

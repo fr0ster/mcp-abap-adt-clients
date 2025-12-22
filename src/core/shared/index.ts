@@ -2,26 +2,25 @@
  * Shared operations - cross-cutting ADT functionality
  */
 
-export { SharedBuilder } from './SharedBuilder';
 export { AdtUtils } from './AdtUtils';
+// Error classes for unsupported operations
+export {
+  UnsupportedActivateOperationError,
+  UnsupportedAdtOperationError,
+  UnsupportedCheckOperationError,
+  UnsupportedCreateOperationError,
+  UnsupportedDeleteOperationError,
+  UnsupportedUpdateOperationError,
+  UnsupportedValidateOperationError,
+} from './errors';
+export { SharedBuilder } from './SharedBuilder';
 export { getTransaction } from './transaction';
-export type { 
-  IObjectReference as ObjectReference,
-  IInactiveObjectsResponse as InactiveObjectsResponse,
-  ISearchObjectsParams as SearchObjectsParams,
+export type {
   IGetSqlQueryParams as GetSqlQueryParams,
   IGetTableContentsParams as GetTableContentsParams,
   IGetWhereUsedParams as GetWhereUsedParams,
-  IGetWhereUsedScopeParams as GetWhereUsedScopeParams
+  IGetWhereUsedScopeParams as GetWhereUsedScopeParams,
+  IInactiveObjectsResponse as InactiveObjectsResponse,
+  IObjectReference as ObjectReference,
+  ISearchObjectsParams as SearchObjectsParams,
 } from './types';
-
-// Error classes for unsupported operations
-export {
-  UnsupportedAdtOperationError,
-  UnsupportedCreateOperationError,
-  UnsupportedUpdateOperationError,
-  UnsupportedDeleteOperationError,
-  UnsupportedActivateOperationError,
-  UnsupportedCheckOperationError,
-  UnsupportedValidateOperationError
-} from './errors';

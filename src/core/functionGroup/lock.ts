@@ -3,9 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Lock a function group for editing
@@ -18,28 +18,33 @@ import { XMLParser } from 'fast-xml-parser';
 export async function lockFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
-  sessionId: string = ''
+  _sessionId: string = '',
 ): Promise<string> {
   const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
   };
 
   const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    headers
+    headers,
   });
 
   // Extract lock handle from response header
   const lockHandle = response.headers['sap-adt-lm-handle'];
   if (!lockHandle) {
     // Try parsing from XML body if header not present
-    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' });
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+    });
     const result = parser.parse(response.data);
-    const xmlLockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
+    const xmlLockHandle =
+      result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
 
     if (!xmlLockHandle) {
       throw new Error('Failed to acquire lock: no lock handle in response');
@@ -63,13 +68,13 @@ export async function unlockFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
   lockHandle: string,
-  sessionId: string = ''
+  _sessionId: string = '',
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
 
   return connection.makeAdtRequest({
     url,
     method: 'POST',
-    timeout: getTimeout('default')
+    timeout: getTimeout('default'),
   });
 }

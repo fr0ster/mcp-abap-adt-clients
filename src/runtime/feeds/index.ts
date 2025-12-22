@@ -4,6 +4,5 @@
 
 export {
   getFeeds,
-  getFeedVariants
+  getFeedVariants,
 } from './read';
-

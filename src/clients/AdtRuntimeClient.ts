@@ -1,177 +1,164 @@
 /**
  * AdtRuntimeClient - Runtime Operations Client
- * 
+ *
  * Provides access to runtime-related ADT operations:
  * - Memory snapshots analysis
  * - Profiler traces
  * - Debugger operations
  * - Logs analysis
  * - Feed reader operations
- * 
+ *
  * This is a standalone client for runtime operations, similar to ReadOnlyClient and CrudClient.
- * 
+ *
  * Usage:
  * ```typescript
  * import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
- * 
+ *
  * const client = new AdtRuntimeClient(connection, logger);
- * 
+ *
  * // Memory snapshots
  * const snapshots = await client.listMemorySnapshots();
  * const snapshot = await client.getMemorySnapshot('snapshot-id');
- * 
+ *
  * // Profiler traces
  * const traceFiles = await client.listProfilerTraceFiles();
  * const traceParams = await client.getProfilerTraceParameters();
- * 
+ *
  * // Debugging
  * await client.launchDebugger({ debuggingMode: 'external' });
  * const callStack = await client.getCallStack();
- * 
+ *
  * // Logs
  * const appLog = await client.getApplicationLogObject('Z_MY_LOG');
  * const atcLogs = await client.getAtcCheckFailureLogs();
  * ```
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-
-// Import memory snapshot functions
-import {
-  listSnapshots as listSnapshotsUtil,
-  getSnapshot as getSnapshotUtil,
-  getSnapshotRankingList as getSnapshotRankingListUtil,
-  getSnapshotDeltaRankingList as getSnapshotDeltaRankingListUtil,
-  getSnapshotChildren as getSnapshotChildrenUtil,
-  getSnapshotDeltaChildren as getSnapshotDeltaChildrenUtil,
-  getSnapshotReferences as getSnapshotReferencesUtil,
-  getSnapshotDeltaReferences as getSnapshotDeltaReferencesUtil,
-  getSnapshotOverview as getSnapshotOverviewUtil,
-  getSnapshotDeltaOverview as getSnapshotDeltaOverviewUtil,
-  type ISnapshotRankingListOptions,
-  type ISnapshotChildrenOptions,
-  type ISnapshotReferencesOptions
-} from '../runtime/memory';
-
-// Import profiler trace functions
-import {
-  listTraceFiles as listTraceFilesUtil,
-  getTraceParameters as getTraceParametersUtil,
-  getTraceParametersForCallstack as getTraceParametersForCallstackUtil,
-  getTraceParametersForAmdp as getTraceParametersForAmdpUtil,
-  listTraceRequests as listTraceRequestsUtil,
-  getTraceRequestsByUri as getTraceRequestsByUriUtil,
-  listObjectTypes as listObjectTypesUtil,
-  listProcessTypes as listProcessTypesUtil
-} from '../runtime/traces/profiler';
-
-// Import cross trace functions
-import {
-  listCrossTraces as listCrossTracesUtil,
-  getCrossTrace as getCrossTraceUtil,
-  getCrossTraceRecords as getCrossTraceRecordsUtil,
-  getCrossTraceRecordContent as getCrossTraceRecordContentUtil,
-  getCrossTraceActivations as getCrossTraceActivationsUtil,
-  type IListCrossTracesOptions
-} from '../runtime/traces/crossTrace';
-
-// Import ST05 trace functions
-import {
-  getSt05TraceState as getSt05TraceStateUtil,
-  getSt05TraceDirectory as getSt05TraceDirectoryUtil
-} from '../runtime/traces/st05';
-
-// Import feed functions
-import {
-  getFeeds as getFeedsUtil,
-  getFeedVariants as getFeedVariantsUtil
-} from '../runtime/feeds';
-
-// Import ABAP debugger functions
-import {
-  launchDebugger as launchDebuggerUtil,
-  stopDebugger as stopDebuggerUtil,
-  getDebugger as getDebuggerUtil,
-  getMemorySizes as getMemorySizesUtil,
-  getSystemArea as getSystemAreaUtil,
-  synchronizeBreakpoints as synchronizeBreakpointsUtil,
-  getBreakpointStatements as getBreakpointStatementsUtil,
-  getBreakpointMessageTypes as getBreakpointMessageTypesUtil,
-  getBreakpointConditions as getBreakpointConditionsUtil,
-  validateBreakpoints as validateBreakpointsUtil,
-  getVitBreakpoints as getVitBreakpointsUtil,
-  getVariableMaxLength as getVariableMaxLengthUtil,
-  getVariableSubcomponents as getVariableSubcomponentsUtil,
-  getVariableAsCsv as getVariableAsCsvUtil,
-  getVariableAsJson as getVariableAsJsonUtil,
-  getVariableValueStatement as getVariableValueStatementUtil,
-  executeDebuggerAction as executeDebuggerActionUtil,
-  getCallStack as getCallStackUtil,
-  insertWatchpoint as insertWatchpointUtil,
-  getWatchpoints as getWatchpointsUtil,
-  executeBatchRequest as executeBatchRequestUtil,
-  type ILaunchDebuggerOptions,
-  type IStopDebuggerOptions,
-  type IGetDebuggerOptions,
-  type IGetSystemAreaOptions,
-  type IGetVariableAsCsvOptions,
-  type IGetVariableAsJsonOptions,
-  type IGetVariableValueStatementOptions
-} from '../runtime/debugger/abap';
-
-// Import AMDP debugger functions
-import {
-  startAmdpDebugger as startAmdpDebuggerUtil,
-  resumeAmdpDebugger as resumeAmdpDebuggerUtil,
-  terminateAmdpDebugger as terminateAmdpDebuggerUtil,
-  getAmdpDebuggee as getAmdpDebuggeeUtil,
-  getAmdpVariable as getAmdpVariableUtil,
-  setAmdpVariable as setAmdpVariableUtil,
-  lookupAmdp as lookupAmdpUtil,
-  stepOverAmdp as stepOverAmdpUtil,
-  stepContinueAmdp as stepContinueAmdpUtil,
-  getAmdpBreakpoints as getAmdpBreakpointsUtil,
-  getAmdpBreakpointsLlang as getAmdpBreakpointsLlangUtil,
-  getAmdpBreakpointsTableFunctions as getAmdpBreakpointsTableFunctionsUtil,
-  type IStartAmdpDebuggerOptions
-} from '../runtime/debugger/amdp';
-
-// Import AMDP data preview functions
-import {
-  getAmdpDataPreview as getAmdpDataPreviewUtil,
-  getAmdpCellSubstring as getAmdpCellSubstringUtil,
-  type IGetAmdpDataPreviewOptions,
-  type IGetAmdpCellSubstringOptions
-} from '../runtime/debugger/amdpDataPreview';
-
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 // Import log functions
 import {
   getApplicationLogObject as getApplicationLogObjectUtil,
   getApplicationLogSource as getApplicationLogSourceUtil,
-  validateApplicationLogName as validateApplicationLogNameUtil,
   type IGetApplicationLogObjectOptions,
-  type IGetApplicationLogSourceOptions
+  type IGetApplicationLogSourceOptions,
+  validateApplicationLogName as validateApplicationLogNameUtil,
 } from '../runtime/applicationLog/read';
 import {
   getCheckFailureLogs as getCheckFailureLogsUtil,
   getExecutionLog as getExecutionLogUtil,
-  type IGetCheckFailureLogsOptions
+  type IGetCheckFailureLogsOptions,
 } from '../runtime/atc/logs';
 import {
   getActivationGraph as getActivationGraphUtil,
-  type IGetActivationGraphOptions
+  type IGetActivationGraphOptions,
 } from '../runtime/ddic/activationGraph';
+// Import ABAP debugger functions
+import {
+  executeBatchRequest as executeBatchRequestUtil,
+  executeDebuggerAction as executeDebuggerActionUtil,
+  getBreakpointConditions as getBreakpointConditionsUtil,
+  getBreakpointMessageTypes as getBreakpointMessageTypesUtil,
+  getBreakpointStatements as getBreakpointStatementsUtil,
+  getCallStack as getCallStackUtil,
+  getDebugger as getDebuggerUtil,
+  getMemorySizes as getMemorySizesUtil,
+  getSystemArea as getSystemAreaUtil,
+  getVariableAsCsv as getVariableAsCsvUtil,
+  getVariableAsJson as getVariableAsJsonUtil,
+  getVariableMaxLength as getVariableMaxLengthUtil,
+  getVariableSubcomponents as getVariableSubcomponentsUtil,
+  getVariableValueStatement as getVariableValueStatementUtil,
+  getVitBreakpoints as getVitBreakpointsUtil,
+  getWatchpoints as getWatchpointsUtil,
+  type IGetDebuggerOptions,
+  type IGetSystemAreaOptions,
+  type IGetVariableAsCsvOptions,
+  type IGetVariableAsJsonOptions,
+  type IGetVariableValueStatementOptions,
+  type ILaunchDebuggerOptions,
+  type IStopDebuggerOptions,
+  insertWatchpoint as insertWatchpointUtil,
+  launchDebugger as launchDebuggerUtil,
+  stopDebugger as stopDebuggerUtil,
+  synchronizeBreakpoints as synchronizeBreakpointsUtil,
+  validateBreakpoints as validateBreakpointsUtil,
+} from '../runtime/debugger/abap';
+// Import AMDP debugger functions
+import {
+  getAmdpBreakpointsLlang as getAmdpBreakpointsLlangUtil,
+  getAmdpBreakpointsTableFunctions as getAmdpBreakpointsTableFunctionsUtil,
+  getAmdpBreakpoints as getAmdpBreakpointsUtil,
+  getAmdpDebuggee as getAmdpDebuggeeUtil,
+  getAmdpVariable as getAmdpVariableUtil,
+  type IStartAmdpDebuggerOptions,
+  lookupAmdp as lookupAmdpUtil,
+  resumeAmdpDebugger as resumeAmdpDebuggerUtil,
+  setAmdpVariable as setAmdpVariableUtil,
+  startAmdpDebugger as startAmdpDebuggerUtil,
+  stepContinueAmdp as stepContinueAmdpUtil,
+  stepOverAmdp as stepOverAmdpUtil,
+  terminateAmdpDebugger as terminateAmdpDebuggerUtil,
+} from '../runtime/debugger/amdp';
+// Import AMDP data preview functions
+import {
+  getAmdpCellSubstring as getAmdpCellSubstringUtil,
+  getAmdpDataPreview as getAmdpDataPreviewUtil,
+  type IGetAmdpCellSubstringOptions,
+  type IGetAmdpDataPreviewOptions,
+} from '../runtime/debugger/amdpDataPreview';
+// Import feed functions
+import {
+  getFeeds as getFeedsUtil,
+  getFeedVariants as getFeedVariantsUtil,
+} from '../runtime/feeds';
+// Import memory snapshot functions
+import {
+  getSnapshotChildren as getSnapshotChildrenUtil,
+  getSnapshotDeltaChildren as getSnapshotDeltaChildrenUtil,
+  getSnapshotDeltaOverview as getSnapshotDeltaOverviewUtil,
+  getSnapshotDeltaRankingList as getSnapshotDeltaRankingListUtil,
+  getSnapshotDeltaReferences as getSnapshotDeltaReferencesUtil,
+  getSnapshotOverview as getSnapshotOverviewUtil,
+  getSnapshotRankingList as getSnapshotRankingListUtil,
+  getSnapshotReferences as getSnapshotReferencesUtil,
+  getSnapshot as getSnapshotUtil,
+  type ISnapshotChildrenOptions,
+  type ISnapshotRankingListOptions,
+  type ISnapshotReferencesOptions,
+  listSnapshots as listSnapshotsUtil,
+} from '../runtime/memory';
+// Import cross trace functions
+import {
+  getCrossTraceActivations as getCrossTraceActivationsUtil,
+  getCrossTraceRecordContent as getCrossTraceRecordContentUtil,
+  getCrossTraceRecords as getCrossTraceRecordsUtil,
+  getCrossTrace as getCrossTraceUtil,
+  type IListCrossTracesOptions,
+  listCrossTraces as listCrossTracesUtil,
+} from '../runtime/traces/crossTrace';
+// Import profiler trace functions
+import {
+  getTraceParametersForAmdp as getTraceParametersForAmdpUtil,
+  getTraceParametersForCallstack as getTraceParametersForCallstackUtil,
+  getTraceParameters as getTraceParametersUtil,
+  getTraceRequestsByUri as getTraceRequestsByUriUtil,
+  listObjectTypes as listObjectTypesUtil,
+  listProcessTypes as listProcessTypesUtil,
+  listTraceFiles as listTraceFilesUtil,
+  listTraceRequests as listTraceRequestsUtil,
+} from '../runtime/traces/profiler';
+// Import ST05 trace functions
+import {
+  getSt05TraceDirectory as getSt05TraceDirectoryUtil,
+  getSt05TraceState as getSt05TraceStateUtil,
+} from '../runtime/traces/st05';
 
 export class AdtRuntimeClient {
   private connection: IAbapConnection;
-  private logger: ILogger;
+  private logger?: ILogger;
 
-  constructor(
-    connection: IAbapConnection,
-    logger?: ILogger
-  ) {
+  constructor(connection: IAbapConnection, logger?: ILogger) {
     this.connection = connection;
     this.logger = logger ?? {
       debug: () => {},
@@ -187,18 +174,21 @@ export class AdtRuntimeClient {
 
   /**
    * List memory snapshots
-   * 
+   *
    * @param user - Optional user filter
    * @param originalUser - Optional original user filter
    * @returns Axios response with list of snapshots
    */
-  async listMemorySnapshots(user?: string, originalUser?: string): Promise<AxiosResponse> {
+  async listMemorySnapshots(
+    user?: string,
+    originalUser?: string,
+  ): Promise<AxiosResponse> {
     return listSnapshotsUtil(this.connection, user, originalUser);
   }
 
   /**
    * Get memory snapshot by ID
-   * 
+   *
    * @param snapshotId - Snapshot ID
    * @returns Axios response with snapshot data
    */
@@ -208,21 +198,21 @@ export class AdtRuntimeClient {
 
   /**
    * Get memory snapshot ranking list
-   * 
+   *
    * @param snapshotId - Snapshot ID
    * @param options - Optional ranking list options
    * @returns Axios response with ranking list
    */
   async getMemorySnapshotRankingList(
     snapshotId: string,
-    options?: ISnapshotRankingListOptions
+    options?: ISnapshotRankingListOptions,
   ): Promise<AxiosResponse> {
     return getSnapshotRankingListUtil(this.connection, snapshotId, options);
   }
 
   /**
    * Get delta ranking list between two memory snapshots
-   * 
+   *
    * @param uri1 - URI of first snapshot
    * @param uri2 - URI of second snapshot
    * @param options - Optional ranking list options
@@ -231,14 +221,19 @@ export class AdtRuntimeClient {
   async getMemorySnapshotDeltaRankingList(
     uri1: string,
     uri2: string,
-    options?: ISnapshotRankingListOptions
+    options?: ISnapshotRankingListOptions,
   ): Promise<AxiosResponse> {
-    return getSnapshotDeltaRankingListUtil(this.connection, uri1, uri2, options);
+    return getSnapshotDeltaRankingListUtil(
+      this.connection,
+      uri1,
+      uri2,
+      options,
+    );
   }
 
   /**
    * Get memory snapshot children
-   * 
+   *
    * @param snapshotId - Snapshot ID
    * @param parentKey - Parent key
    * @param options - Optional children options
@@ -247,14 +242,19 @@ export class AdtRuntimeClient {
   async getMemorySnapshotChildren(
     snapshotId: string,
     parentKey: string,
-    options?: ISnapshotChildrenOptions
+    options?: ISnapshotChildrenOptions,
   ): Promise<AxiosResponse> {
-    return getSnapshotChildrenUtil(this.connection, snapshotId, parentKey, options);
+    return getSnapshotChildrenUtil(
+      this.connection,
+      snapshotId,
+      parentKey,
+      options,
+    );
   }
 
   /**
    * Get delta children between two memory snapshots
-   * 
+   *
    * @param uri1 - URI of first snapshot
    * @param uri2 - URI of second snapshot
    * @param parentKey - Parent key
@@ -265,14 +265,20 @@ export class AdtRuntimeClient {
     uri1: string,
     uri2: string,
     parentKey: string,
-    options?: ISnapshotChildrenOptions
+    options?: ISnapshotChildrenOptions,
   ): Promise<AxiosResponse> {
-    return getSnapshotDeltaChildrenUtil(this.connection, uri1, uri2, parentKey, options);
+    return getSnapshotDeltaChildrenUtil(
+      this.connection,
+      uri1,
+      uri2,
+      parentKey,
+      options,
+    );
   }
 
   /**
    * Get memory snapshot references
-   * 
+   *
    * @param snapshotId - Snapshot ID
    * @param objectKey - Object key
    * @param options - Optional references options
@@ -281,14 +287,19 @@ export class AdtRuntimeClient {
   async getMemorySnapshotReferences(
     snapshotId: string,
     objectKey: string,
-    options?: ISnapshotReferencesOptions
+    options?: ISnapshotReferencesOptions,
   ): Promise<AxiosResponse> {
-    return getSnapshotReferencesUtil(this.connection, snapshotId, objectKey, options);
+    return getSnapshotReferencesUtil(
+      this.connection,
+      snapshotId,
+      objectKey,
+      options,
+    );
   }
 
   /**
    * Get delta references between two memory snapshots
-   * 
+   *
    * @param uri1 - URI of first snapshot
    * @param uri2 - URI of second snapshot
    * @param objectKey - Object key
@@ -299,14 +310,20 @@ export class AdtRuntimeClient {
     uri1: string,
     uri2: string,
     objectKey: string,
-    options?: ISnapshotReferencesOptions
+    options?: ISnapshotReferencesOptions,
   ): Promise<AxiosResponse> {
-    return getSnapshotDeltaReferencesUtil(this.connection, uri1, uri2, objectKey, options);
+    return getSnapshotDeltaReferencesUtil(
+      this.connection,
+      uri1,
+      uri2,
+      objectKey,
+      options,
+    );
   }
 
   /**
    * Get memory snapshot overview
-   * 
+   *
    * @param snapshotId - Snapshot ID
    * @returns Axios response with snapshot overview
    */
@@ -316,12 +333,15 @@ export class AdtRuntimeClient {
 
   /**
    * Get delta overview between two memory snapshots
-   * 
+   *
    * @param uri1 - URI of first snapshot
    * @param uri2 - URI of second snapshot
    * @returns Axios response with delta overview
    */
-  async getMemorySnapshotDeltaOverview(uri1: string, uri2: string): Promise<AxiosResponse> {
+  async getMemorySnapshotDeltaOverview(
+    uri1: string,
+    uri2: string,
+  ): Promise<AxiosResponse> {
     return getSnapshotDeltaOverviewUtil(this.connection, uri1, uri2);
   }
 
@@ -331,7 +351,7 @@ export class AdtRuntimeClient {
 
   /**
    * List ABAP profiler trace files
-   * 
+   *
    * @returns Axios response with list of trace files
    */
   async listProfilerTraceFiles(): Promise<AxiosResponse> {
@@ -340,7 +360,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get ABAP profiler trace parameters
-   * 
+   *
    * @returns Axios response with trace parameters
    */
   async getProfilerTraceParameters(): Promise<AxiosResponse> {
@@ -349,7 +369,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get trace parameters for callstack aggregation
-   * 
+   *
    * @returns Axios response with callstack aggregation parameters
    */
   async getProfilerTraceParametersForCallstack(): Promise<AxiosResponse> {
@@ -358,7 +378,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get trace parameters for AMDP trace
-   * 
+   *
    * @returns Axios response with AMDP trace parameters
    */
   async getProfilerTraceParametersForAmdp(): Promise<AxiosResponse> {
@@ -367,7 +387,7 @@ export class AdtRuntimeClient {
 
   /**
    * List ABAP profiler trace requests
-   * 
+   *
    * @returns Axios response with list of trace requests
    */
   async listProfilerTraceRequests(): Promise<AxiosResponse> {
@@ -376,7 +396,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get trace requests filtered by URI
-   * 
+   *
    * @param uri - Object URI to filter by
    * @returns Axios response with filtered trace requests
    */
@@ -386,7 +406,7 @@ export class AdtRuntimeClient {
 
   /**
    * List available object types for tracing
-   * 
+   *
    * @returns Axios response with list of object types
    */
   async listProfilerObjectTypes(): Promise<AxiosResponse> {
@@ -395,7 +415,7 @@ export class AdtRuntimeClient {
 
   /**
    * List available process types for tracing
-   * 
+   *
    * @returns Axios response with list of process types
    */
   async listProfilerProcessTypes(): Promise<AxiosResponse> {
@@ -408,28 +428,33 @@ export class AdtRuntimeClient {
 
   /**
    * List cross traces
-   * 
+   *
    * @param options - Optional filters
    * @returns Axios response with list of traces
    */
-  async listCrossTraces(options?: IListCrossTracesOptions): Promise<AxiosResponse> {
+  async listCrossTraces(
+    options?: IListCrossTracesOptions,
+  ): Promise<AxiosResponse> {
     return listCrossTracesUtil(this.connection, options);
   }
 
   /**
    * Get cross trace details
-   * 
+   *
    * @param traceId - Trace ID
    * @param includeSensitiveData - Whether to include sensitive data
    * @returns Axios response with trace details
    */
-  async getCrossTrace(traceId: string, includeSensitiveData?: boolean): Promise<AxiosResponse> {
+  async getCrossTrace(
+    traceId: string,
+    includeSensitiveData?: boolean,
+  ): Promise<AxiosResponse> {
     return getCrossTraceUtil(this.connection, traceId, includeSensitiveData);
   }
 
   /**
    * Get cross trace records
-   * 
+   *
    * @param traceId - Trace ID
    * @returns Axios response with trace records
    */
@@ -439,18 +464,25 @@ export class AdtRuntimeClient {
 
   /**
    * Get cross trace record content
-   * 
+   *
    * @param traceId - Trace ID
    * @param recordNumber - Record number
    * @returns Axios response with record content
    */
-  async getCrossTraceRecordContent(traceId: string, recordNumber: number): Promise<AxiosResponse> {
-    return getCrossTraceRecordContentUtil(this.connection, traceId, recordNumber);
+  async getCrossTraceRecordContent(
+    traceId: string,
+    recordNumber: number,
+  ): Promise<AxiosResponse> {
+    return getCrossTraceRecordContentUtil(
+      this.connection,
+      traceId,
+      recordNumber,
+    );
   }
 
   /**
    * Get cross trace activations
-   * 
+   *
    * @returns Axios response with trace activations
    */
   async getCrossTraceActivations(): Promise<AxiosResponse> {
@@ -463,17 +495,19 @@ export class AdtRuntimeClient {
 
   /**
    * Launch debugger session
-   * 
+   *
    * @param options - Debugger launch options
    * @returns Axios response with debugger session
    */
-  async launchDebugger(options?: ILaunchDebuggerOptions): Promise<AxiosResponse> {
+  async launchDebugger(
+    options?: ILaunchDebuggerOptions,
+  ): Promise<AxiosResponse> {
     return launchDebuggerUtil(this.connection, options);
   }
 
   /**
    * Stop debugger session
-   * 
+   *
    * @param options - Debugger stop options
    * @returns Axios response
    */
@@ -483,7 +517,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get debugger session
-   * 
+   *
    * @param options - Debugger get options
    * @returns Axios response with debugger session
    */
@@ -493,7 +527,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get memory sizes
-   * 
+   *
    * @param includeAbap - Include ABAP memory (optional)
    * @returns Axios response with memory sizes
    */
@@ -503,28 +537,33 @@ export class AdtRuntimeClient {
 
   /**
    * Get system area
-   * 
+   *
    * @param systemarea - System area name
    * @param options - System area options
    * @returns Axios response with system area data
    */
-  async getDebuggerSystemArea(systemarea: string, options?: IGetSystemAreaOptions): Promise<AxiosResponse> {
+  async getDebuggerSystemArea(
+    systemarea: string,
+    options?: IGetSystemAreaOptions,
+  ): Promise<AxiosResponse> {
     return getSystemAreaUtil(this.connection, systemarea, options);
   }
 
   /**
    * Synchronize breakpoints
-   * 
+   *
    * @param checkConflict - Check for conflicts (optional)
    * @returns Axios response with breakpoints
    */
-  async synchronizeBreakpoints(checkConflict?: boolean): Promise<AxiosResponse> {
+  async synchronizeBreakpoints(
+    checkConflict?: boolean,
+  ): Promise<AxiosResponse> {
     return synchronizeBreakpointsUtil(this.connection, checkConflict);
   }
 
   /**
    * Get breakpoint statements
-   * 
+   *
    * @returns Axios response with breakpoint statements
    */
   async getBreakpointStatements(): Promise<AxiosResponse> {
@@ -533,7 +572,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get breakpoint message types
-   * 
+   *
    * @returns Axios response with message types
    */
   async getBreakpointMessageTypes(): Promise<AxiosResponse> {
@@ -542,7 +581,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get breakpoint conditions
-   * 
+   *
    * @returns Axios response with breakpoint conditions
    */
   async getBreakpointConditions(): Promise<AxiosResponse> {
@@ -551,7 +590,7 @@ export class AdtRuntimeClient {
 
   /**
    * Validate breakpoints
-   * 
+   *
    * @returns Axios response with validation results
    */
   async validateBreakpoints(): Promise<AxiosResponse> {
@@ -560,7 +599,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get VIT breakpoints
-   * 
+   *
    * @returns Axios response with VIT breakpoints
    */
   async getVitBreakpoints(): Promise<AxiosResponse> {
@@ -569,79 +608,119 @@ export class AdtRuntimeClient {
 
   /**
    * Get variable max length
-   * 
+   *
    * @param variableName - Variable name
    * @param part - Variable part
    * @param maxLength - Max length (optional)
    * @returns Axios response with max length
    */
-  async getVariableMaxLength(variableName: string, part: string, maxLength?: number): Promise<AxiosResponse> {
-    return getVariableMaxLengthUtil(this.connection, variableName, part, maxLength);
+  async getVariableMaxLength(
+    variableName: string,
+    part: string,
+    maxLength?: number,
+  ): Promise<AxiosResponse> {
+    return getVariableMaxLengthUtil(
+      this.connection,
+      variableName,
+      part,
+      maxLength,
+    );
   }
 
   /**
    * Get variable subcomponents
-   * 
+   *
    * @param variableName - Variable name
    * @param part - Variable part
    * @param component - Component name (optional)
    * @param line - Line number (optional)
    * @returns Axios response with subcomponents
    */
-  async getVariableSubcomponents(variableName: string, part: string, component?: string, line?: number): Promise<AxiosResponse> {
-    return getVariableSubcomponentsUtil(this.connection, variableName, part, component, line);
+  async getVariableSubcomponents(
+    variableName: string,
+    part: string,
+    component?: string,
+    line?: number,
+  ): Promise<AxiosResponse> {
+    return getVariableSubcomponentsUtil(
+      this.connection,
+      variableName,
+      part,
+      component,
+      line,
+    );
   }
 
   /**
    * Get variable as CSV
-   * 
+   *
    * @param variableName - Variable name
    * @param part - Variable part
    * @param options - CSV options
    * @returns Axios response with CSV data
    */
-  async getVariableAsCsv(variableName: string, part: string, options?: IGetVariableAsCsvOptions): Promise<AxiosResponse> {
+  async getVariableAsCsv(
+    variableName: string,
+    part: string,
+    options?: IGetVariableAsCsvOptions,
+  ): Promise<AxiosResponse> {
     return getVariableAsCsvUtil(this.connection, variableName, part, options);
   }
 
   /**
    * Get variable as JSON
-   * 
+   *
    * @param variableName - Variable name
    * @param part - Variable part
    * @param options - JSON options
    * @returns Axios response with JSON data
    */
-  async getVariableAsJson(variableName: string, part: string, options?: IGetVariableAsJsonOptions): Promise<AxiosResponse> {
+  async getVariableAsJson(
+    variableName: string,
+    part: string,
+    options?: IGetVariableAsJsonOptions,
+  ): Promise<AxiosResponse> {
     return getVariableAsJsonUtil(this.connection, variableName, part, options);
   }
 
   /**
    * Get variable value statement
-   * 
+   *
    * @param variableName - Variable name
    * @param part - Variable part
    * @param options - Value statement options
    * @returns Axios response with value statement
    */
-  async getVariableValueStatement(variableName: string, part: string, options?: IGetVariableValueStatementOptions): Promise<AxiosResponse> {
-    return getVariableValueStatementUtil(this.connection, variableName, part, options);
+  async getVariableValueStatement(
+    variableName: string,
+    part: string,
+    options?: IGetVariableValueStatementOptions,
+  ): Promise<AxiosResponse> {
+    return getVariableValueStatementUtil(
+      this.connection,
+      variableName,
+      part,
+      options,
+    );
   }
 
   /**
    * Execute debugger action
-   * 
+   *
    * @param action - Action name
    * @param value - Action value (optional)
    * @returns Axios response
    */
-  async executeDebuggerAction(action: string, value?: string): Promise<AxiosResponse> {
+  async executeDebuggerAction(
+    action: string,
+    value?: string,
+  ): Promise<AxiosResponse> {
     return executeDebuggerActionUtil(this.connection, action, value);
   }
 
   /**
    * Get call stack
-   * 
+   *
    * @returns Axios response with call stack
    */
   async getCallStack(): Promise<AxiosResponse> {
@@ -650,18 +729,21 @@ export class AdtRuntimeClient {
 
   /**
    * Insert watchpoint
-   * 
+   *
    * @param variableName - Variable name
    * @param condition - Watchpoint condition (optional)
    * @returns Axios response
    */
-  async insertWatchpoint(variableName: string, condition?: string): Promise<AxiosResponse> {
+  async insertWatchpoint(
+    variableName: string,
+    condition?: string,
+  ): Promise<AxiosResponse> {
     return insertWatchpointUtil(this.connection, variableName, condition);
   }
 
   /**
    * Get watchpoints
-   * 
+   *
    * @returns Axios response with watchpoints
    */
   async getWatchpoints(): Promise<AxiosResponse> {
@@ -670,7 +752,7 @@ export class AdtRuntimeClient {
 
   /**
    * Execute batch request
-   * 
+   *
    * @param requests - Batch requests (XML body)
    * @returns Axios response with batch results
    */
@@ -684,17 +766,19 @@ export class AdtRuntimeClient {
 
   /**
    * Start AMDP debugger session
-   * 
+   *
    * @param options - Debugger start options
    * @returns Axios response with debugger session
    */
-  async startAmdpDebugger(options?: IStartAmdpDebuggerOptions): Promise<AxiosResponse> {
+  async startAmdpDebugger(
+    options?: IStartAmdpDebuggerOptions,
+  ): Promise<AxiosResponse> {
     return startAmdpDebuggerUtil(this.connection, options);
   }
 
   /**
    * Resume AMDP debugger session
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @returns Axios response with debugger session
    */
@@ -704,29 +788,35 @@ export class AdtRuntimeClient {
 
   /**
    * Terminate AMDP debugger session
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @param hardStop - Whether to perform hard stop
    * @returns Axios response
    */
-  async terminateAmdpDebugger(mainId: string, hardStop?: boolean): Promise<AxiosResponse> {
+  async terminateAmdpDebugger(
+    mainId: string,
+    hardStop?: boolean,
+  ): Promise<AxiosResponse> {
     return terminateAmdpDebuggerUtil(this.connection, mainId, hardStop);
   }
 
   /**
    * Get AMDP debuggee information
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @param debuggeeId - Debuggee ID
    * @returns Axios response with debuggee information
    */
-  async getAmdpDebuggee(mainId: string, debuggeeId: string): Promise<AxiosResponse> {
+  async getAmdpDebuggee(
+    mainId: string,
+    debuggeeId: string,
+  ): Promise<AxiosResponse> {
     return getAmdpDebuggeeUtil(this.connection, mainId, debuggeeId);
   }
 
   /**
    * Get AMDP variable value
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @param debuggeeId - Debuggee ID
    * @param varname - Variable name
@@ -739,14 +829,21 @@ export class AdtRuntimeClient {
     debuggeeId: string,
     varname: string,
     offset?: number,
-    length?: number
+    length?: number,
   ): Promise<AxiosResponse> {
-    return getAmdpVariableUtil(this.connection, mainId, debuggeeId, varname, offset, length);
+    return getAmdpVariableUtil(
+      this.connection,
+      mainId,
+      debuggeeId,
+      varname,
+      offset,
+      length,
+    );
   }
 
   /**
    * Set AMDP variable value
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @param debuggeeId - Debuggee ID
    * @param varname - Variable name
@@ -757,48 +854,64 @@ export class AdtRuntimeClient {
     mainId: string,
     debuggeeId: string,
     varname: string,
-    setNull?: boolean
+    setNull?: boolean,
   ): Promise<AxiosResponse> {
-    return setAmdpVariableUtil(this.connection, mainId, debuggeeId, varname, setNull);
+    return setAmdpVariableUtil(
+      this.connection,
+      mainId,
+      debuggeeId,
+      varname,
+      setNull,
+    );
   }
 
   /**
    * Lookup objects/variables in AMDP debugger
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @param debuggeeId - Debuggee ID
    * @param name - Name to lookup
    * @returns Axios response with lookup results
    */
-  async lookupAmdp(mainId: string, debuggeeId: string, name?: string): Promise<AxiosResponse> {
+  async lookupAmdp(
+    mainId: string,
+    debuggeeId: string,
+    name?: string,
+  ): Promise<AxiosResponse> {
     return lookupAmdpUtil(this.connection, mainId, debuggeeId, name);
   }
 
   /**
    * Step over in AMDP debugger
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @param debuggeeId - Debuggee ID
    * @returns Axios response
    */
-  async stepOverAmdp(mainId: string, debuggeeId: string): Promise<AxiosResponse> {
+  async stepOverAmdp(
+    mainId: string,
+    debuggeeId: string,
+  ): Promise<AxiosResponse> {
     return stepOverAmdpUtil(this.connection, mainId, debuggeeId);
   }
 
   /**
    * Continue execution in AMDP debugger
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @param debuggeeId - Debuggee ID
    * @returns Axios response
    */
-  async stepContinueAmdp(mainId: string, debuggeeId: string): Promise<AxiosResponse> {
+  async stepContinueAmdp(
+    mainId: string,
+    debuggeeId: string,
+  ): Promise<AxiosResponse> {
     return stepContinueAmdpUtil(this.connection, mainId, debuggeeId);
   }
 
   /**
    * Get AMDP breakpoints
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @returns Axios response with breakpoints
    */
@@ -808,7 +921,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get AMDP breakpoints for LLang
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @returns Axios response with LLang breakpoints
    */
@@ -818,31 +931,37 @@ export class AdtRuntimeClient {
 
   /**
    * Get AMDP breakpoints for table functions
-   * 
+   *
    * @param mainId - Main debugger session ID
    * @returns Axios response with table function breakpoints
    */
-  async getAmdpBreakpointsTableFunctions(mainId: string): Promise<AxiosResponse> {
+  async getAmdpBreakpointsTableFunctions(
+    mainId: string,
+  ): Promise<AxiosResponse> {
     return getAmdpBreakpointsTableFunctionsUtil(this.connection, mainId);
   }
 
   /**
    * Get AMDP debugger data preview
-   * 
+   *
    * @param options - Data preview options
    * @returns Axios response with data preview
    */
-  async getAmdpDataPreview(options?: IGetAmdpDataPreviewOptions): Promise<AxiosResponse> {
+  async getAmdpDataPreview(
+    options?: IGetAmdpDataPreviewOptions,
+  ): Promise<AxiosResponse> {
     return getAmdpDataPreviewUtil(this.connection, options);
   }
 
   /**
    * Get cell substring from AMDP debugger data preview
-   * 
+   *
    * @param options - Cell substring options
    * @returns Axios response with cell substring
    */
-  async getAmdpCellSubstring(options?: IGetAmdpCellSubstringOptions): Promise<AxiosResponse> {
+  async getAmdpCellSubstring(
+    options?: IGetAmdpCellSubstringOptions,
+  ): Promise<AxiosResponse> {
     return getAmdpCellSubstringUtil(this.connection, options);
   }
 
@@ -852,35 +971,35 @@ export class AdtRuntimeClient {
 
   /**
    * Get application log object properties
-   * 
+   *
    * @param objectName - Application log object name
    * @param options - Optional parameters
    * @returns Axios response with application log object properties
    */
   async getApplicationLogObject(
     objectName: string,
-    options?: IGetApplicationLogObjectOptions
+    options?: IGetApplicationLogObjectOptions,
   ): Promise<AxiosResponse> {
     return getApplicationLogObjectUtil(this.connection, objectName, options);
   }
 
   /**
    * Get application log object source
-   * 
+   *
    * @param objectName - Application log object name
    * @param options - Optional parameters
    * @returns Axios response with application log object source
    */
   async getApplicationLogSource(
     objectName: string,
-    options?: IGetApplicationLogSourceOptions
+    options?: IGetApplicationLogSourceOptions,
   ): Promise<AxiosResponse> {
     return getApplicationLogSourceUtil(this.connection, objectName, options);
   }
 
   /**
    * Validate application log object name
-   * 
+   *
    * @param objectName - Application log object name to validate
    * @returns Axios response with validation result
    */
@@ -890,17 +1009,19 @@ export class AdtRuntimeClient {
 
   /**
    * Get ATC check failure logs
-   * 
+   *
    * @param options - Optional filters
    * @returns Axios response with check failure logs
    */
-  async getAtcCheckFailureLogs(options?: IGetCheckFailureLogsOptions): Promise<AxiosResponse> {
+  async getAtcCheckFailureLogs(
+    options?: IGetCheckFailureLogsOptions,
+  ): Promise<AxiosResponse> {
     return getCheckFailureLogsUtil(this.connection, options);
   }
 
   /**
    * Get ATC execution log
-   * 
+   *
    * @param executionId - Execution ID
    * @returns Axios response with execution log
    */
@@ -914,11 +1035,13 @@ export class AdtRuntimeClient {
 
   /**
    * Get DDIC activation graph with logs
-   * 
+   *
    * @param options - Optional parameters
    * @returns Axios response with activation graph
    */
-  async getDdicActivationGraph(options?: IGetActivationGraphOptions): Promise<AxiosResponse> {
+  async getDdicActivationGraph(
+    options?: IGetActivationGraphOptions,
+  ): Promise<AxiosResponse> {
     return getActivationGraphUtil(this.connection, options);
   }
 
@@ -928,7 +1051,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get ST05 trace state
-   * 
+   *
    * @returns Axios response with trace state
    */
   async getSt05TraceState(): Promise<AxiosResponse> {
@@ -937,7 +1060,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get ST05 trace directory
-   * 
+   *
    * @returns Axios response with trace directory information
    */
   async getSt05TraceDirectory(): Promise<AxiosResponse> {
@@ -950,7 +1073,7 @@ export class AdtRuntimeClient {
 
   /**
    * Get feeds
-   * 
+   *
    * @returns Axios response with feeds
    */
   async getFeeds(): Promise<AxiosResponse> {
@@ -959,11 +1082,10 @@ export class AdtRuntimeClient {
 
   /**
    * Get feed variants
-   * 
+   *
    * @returns Axios response with feed variants
    */
   async getFeedVariants(): Promise<AxiosResponse> {
     return getFeedVariantsUtil(this.connection);
   }
 }
-

@@ -5,17 +5,17 @@
  * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/search.test
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { createAbapConnection, SapConfig } from '@mcp-abap-adt/connection';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 
-const envPath = process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
+const envPath =
+  process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
@@ -57,8 +57,10 @@ function getConfig(): SapConfig {
     }
 
     const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId = process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
+    const uaaClientId =
+      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
+    const uaaClientSecret =
+      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
 
     if (uaaUrl) config.uaaUrl = uaaUrl;
     if (uaaClientId) config.uaaClientId = uaaClientId;
@@ -67,7 +69,9 @@ function getConfig(): SapConfig {
     const username = process.env.SAP_USERNAME;
     const password = process.env.SAP_PASSWORD;
     if (!username || !password) {
-      throw new Error('Missing SAP_USERNAME or SAP_PASSWORD for basic authentication');
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
+      );
     }
     config.username = username;
     config.password = password;
@@ -87,8 +91,10 @@ describe('Shared - searchObjects', () => {
       connection = createAbapConnection(config, testsLogger);
       client = new AdtClient(connection, testsLogger);
       hasConfig = true;
-    } catch (error) {
-      testsLogger.warn?.('⚠️ Skipping tests: No .env file or SAP configuration found');
+    } catch (_error) {
+      testsLogger.warn?.(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -101,24 +107,26 @@ describe('Shared - searchObjects', () => {
 
   it('should search objects by name pattern', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
     logBuilderTestStep('search objects by name pattern', testsLogger);
     testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
-    
+
     const result = await client.getUtils().searchObjects({
       query: 'CL_ABAP*',
-      maxResults: 10
+      maxResults: 10,
     });
-    
+
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
-    
+
     testsLogger.info?.('✅ Search completed');
     testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
-    
+
     // Parse and log number of results
     const matches = result.data?.match(/<objectReference/g);
     if (matches) {
@@ -128,25 +136,27 @@ describe('Shared - searchObjects', () => {
 
   it('should search objects with object type filter', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
     logBuilderTestStep('search objects with object type filter', testsLogger);
     testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
-    
+
     const result = await client.getUtils().searchObjects({
       query: 'T*',
       objectType: 'TABL',
-      maxResults: 10
+      maxResults: 10,
     });
-    
+
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
-    
+
     testsLogger.info?.('✅ Search completed');
     testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
-    
+
     // Parse and log number of results
     const matches = result.data?.match(/<objectReference/g);
     if (matches) {
@@ -156,16 +166,17 @@ describe('Shared - searchObjects', () => {
 
   it('should use default maxResults if not provided', async () => {
     if (!hasConfig) {
-      testsLogger.warn?.('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 
     logBuilderTestStep('search objects with default maxResults', testsLogger);
     const result = await client.getUtils().searchObjects({
-      query: 'CL_ABAP*'
+      query: 'CL_ABAP*',
     });
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
   }, 15000);
 });
-

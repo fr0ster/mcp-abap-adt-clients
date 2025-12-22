@@ -2,9 +2,8 @@
  * FunctionGroup check operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } from '../../utils/checkRun';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Check function group code (syntax, compilation, rules)
@@ -26,51 +25,71 @@ export async function checkFunctionGroup(
   connection: IAbapConnection,
   functionGroupName: string,
   version: 'active' | 'inactive',
-  sourceCode?: string
+  sourceCode?: string,
 ): Promise<AxiosResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
+    await import('../../utils/checkRun');
 
   let response: AxiosResponse;
 
   if (sourceCode) {
     // Validate hypothetical code (object doesn't need to exist)
-    response = await runCheckRunWithSource(connection, 'function_group', functionGroupName, sourceCode, version, 'abapCheckRun');
+    response = await runCheckRunWithSource(
+      connection,
+      'function_group',
+      functionGroupName,
+      sourceCode,
+      version,
+      'abapCheckRun',
+    );
   } else {
     // Validate existing object in SAP (reads from system)
-    response = await runCheckRun(connection, 'function_group', functionGroupName, version, 'abapCheckRun');
+    response = await runCheckRun(
+      connection,
+      'function_group',
+      functionGroupName,
+      version,
+      'abapCheckRun',
+    );
   }
 
   const checkResult = parseCheckRunResponse(response);
 
   // Check only for type E messages - HTTP 200 is normal, errors are in XML response
   if (checkResult.errors.length > 0) {
-    const errorTexts = checkResult.errors.map(err => err.text || '').join(' ').toLowerCase();
-    
+    const errorTexts = checkResult.errors
+      .map((err) => err.text || '')
+      .join(' ')
+      .toLowerCase();
+
     // WORKAROUND: Ignore Kerberos library not loaded error (test cloud issue)
     // This is a known issue in test environments where Kerberos library is not available
     const isKerberosError = errorTexts.includes('kerberos library not loaded');
-    
+
     // Ignore "has been checked" messages (normal, not an error)
-    const isAlreadyChecked = 
-      errorTexts.includes('has been checked') || 
+    const isAlreadyChecked =
+      errorTexts.includes('has been checked') ||
       errorTexts.includes('was checked');
-    
+
     // For newly created empty function groups (no function modules), these errors are expected
     // until function modules are added to the function group
-    const isEmptyFunctionGroupError = 
-      (errorTexts.includes('report') && errorTexts.includes('program statement is missing')) ||
+    const isEmptyFunctionGroupError =
+      (errorTexts.includes('report') &&
+        errorTexts.includes('program statement is missing')) ||
       errorTexts.includes('program type is include') ||
       errorTexts.includes('report/program statement is missing');
-    
-    const shouldIgnore = isKerberosError || isAlreadyChecked || isEmptyFunctionGroupError;
-    
+
+    const shouldIgnore =
+      isKerberosError || isAlreadyChecked || isEmptyFunctionGroupError;
+
     if (!shouldIgnore) {
       // Has type E errors that should not be ignored - throw error
-      const errorMessages = checkResult.errors.map(err => err.text).join('; ');
+      const errorMessages = checkResult.errors
+        .map((err) => err.text)
+        .join('; ');
       throw new Error(`Function group check failed: ${errorMessages}`);
     }
   }
 
   return response;
 }
-

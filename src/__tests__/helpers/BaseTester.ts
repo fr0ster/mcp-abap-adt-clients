@@ -1,22 +1,22 @@
 /**
  * BaseTester - Base class for testing IAdtObject implementations
- * 
+ *
  * Provides standardized test flow:
  * - flow_test: validation->create->lock->check(inactive, source/xml)->update->unlock->activate
  * - read_test: read-only operations
- * 
+ *
  * Provides setup methods:
  * - beforeAll: Setup connection and client
  * - beforeEach: Load test case and prepare config
  * - afterAll: Cleanup connection
  * - afterEach: Optional cleanup after each test
- * 
+ *
  * Guarantees:
  * - Cleanup parameter checking (cleanup_after_test, skip_cleanup, cleanup_session_after_test)
  * - Automatic unlock when object was locked
  * - Proper error handling and cleanup
  * - All logging handled internally
- * 
+ *
  * Logging:
  * - Logger is optional (can be undefined) - controlled by environment variables
  * - Use createTestsLogger(), createBuilderLogger(), createConnectionLogger() from testLogger.ts
@@ -26,18 +26,22 @@
  * - Structured test logging via builderTestLogger functions (logBuilderTestStart, logBuilderTestStep, etc.)
  */
 
-import type { IAdtObject, IAdtOperationOptions, ILogger, IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { LogLevel } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
 import {
-  logBuilderTestStart,
-  logBuilderTestSkip,
-  logBuilderTestSuccess,
-  logBuilderTestError,
+  getHttpStatusText,
   logBuilderTestEnd,
+  logBuilderTestError,
+  logBuilderTestSkip,
+  logBuilderTestStart,
   logBuilderTestStep,
   logBuilderTestStepError,
-  getHttpStatusText
+  logBuilderTestSuccess,
 } from './builderTestLogger';
 import { TestConfigResolver } from './TestConfigResolver';
 
@@ -68,7 +72,9 @@ export interface IBaseTesterSetupOptions {
   hasConfig: boolean;
   isCloudSystem: boolean;
   buildConfig: (testCase: any, resolver?: TestConfigResolver) => any;
-  ensureObjectReady?: (objectName: string) => Promise<{ success: boolean; reason?: string }>;
+  ensureObjectReady?: (
+    objectName: string,
+  ) => Promise<{ success: boolean; reason?: string }>;
   testDescription?: string;
 }
 
@@ -81,16 +87,21 @@ export class BaseTester<TConfig, TState> {
   private objectCreated: boolean = false;
   private objectLocked: boolean = false;
   private lockHandle: string | undefined;
-  
+
   // Setup state
   private connection?: IAbapConnection;
   private client?: any;
   private hasConfig: boolean = false;
   private isCloudSystem: boolean = false;
-  private buildConfigFn?: (testCase: any, resolver?: TestConfigResolver) => TConfig;
-  private ensureObjectReadyFn?: (objectName: string) => Promise<{ success: boolean; reason?: string }>;
+  private buildConfigFn?: (
+    testCase: any,
+    resolver?: TestConfigResolver,
+  ) => TConfig;
+  private ensureObjectReadyFn?: (
+    objectName: string,
+  ) => Promise<{ success: boolean; reason?: string }>;
   private testDescription: string = 'Full workflow';
-  
+
   // Test state
   private testCase: any = null;
   private config: TConfig | null = null;
@@ -112,7 +123,7 @@ export class BaseTester<TConfig, TState> {
     loggerPrefix: string,
     testCaseKey: string,
     testCaseName: string,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.adtObject = adtObject;
     this.loggerPrefix = loggerPrefix;
@@ -134,17 +145,19 @@ export class BaseTester<TConfig, TState> {
     const envConfig = getEnvironmentConfig();
     const cleanupAfterTest = envConfig.cleanup_after_test !== false; // Default: true if not set
     const globalSkipCleanup = envConfig.skip_cleanup === true;
-    const skipCleanup = testCaseParams?.skip_cleanup !== undefined
-      ? testCaseParams.skip_cleanup === true
-      : globalSkipCleanup;
+    const skipCleanup =
+      testCaseParams?.skip_cleanup !== undefined
+        ? testCaseParams.skip_cleanup === true
+        : globalSkipCleanup;
     const shouldCleanup = cleanupAfterTest && !skipCleanup;
-    const cleanupSessionAfterTest = envConfig.session_config?.cleanup_session_after_test !== false; // Default: true
+    const cleanupSessionAfterTest =
+      envConfig.session_config?.cleanup_session_after_test !== false; // Default: true
 
     return {
       cleanupAfterTest,
       skipCleanup,
       shouldCleanup,
-      cleanupSessionAfterTest
+      cleanupSessionAfterTest,
     };
   }
 
@@ -158,7 +171,7 @@ export class BaseTester<TConfig, TState> {
       return; // Logging disabled - logger is undefined
     }
     const prefixedMessage = `[${this.loggerPrefix}] ${message}`;
-    
+
     // Map LogLevel enum to logger methods
     switch (level) {
       case LogLevel.DEBUG:
@@ -179,7 +192,7 @@ export class BaseTester<TConfig, TState> {
   /**
    * Ensure object is unlocked if it was locked
    */
-  private async ensureUnlock(config: Partial<TConfig>): Promise<void> {
+  private async ensureUnlock(_config: Partial<TConfig>): Promise<void> {
     if (this.objectLocked && this.lockHandle) {
       try {
         this.log(LogLevel.WARN, 'Unlocking object during cleanup');
@@ -200,11 +213,18 @@ export class BaseTester<TConfig, TState> {
    * @param testCaseParams - Test case parameters (may contain operation_delays)
    * @returns Delay in milliseconds
    */
-  private getOperationDelay(operation: string, testCaseParams?: ITestCaseParams): number {
+  private getOperationDelay(
+    operation: string,
+    testCaseParams?: ITestCaseParams,
+  ): number {
     const { getEnvironmentConfig } = require('./test-helper');
     const envConfig = getEnvironmentConfig();
-    const testCase = this.testCase || { name: this.testCaseName, params: testCaseParams || {} };
-    const operationDelays = testCase?.params?.operation_delays || envConfig.operation_delays || {};
+    const testCase = this.testCase || {
+      name: this.testCaseName,
+      params: testCaseParams || {},
+    };
+    const operationDelays =
+      testCase?.params?.operation_delays || envConfig.operation_delays || {};
     return operationDelays[operation] || operationDelays.default || 3000; // Default 3 seconds
   }
 
@@ -215,8 +235,11 @@ export class BaseTester<TConfig, TState> {
    */
   private async waitDelay(delay: number, operation: string): Promise<void> {
     if (delay > 0) {
-      this.log(LogLevel.INFO, `Waiting ${delay}ms after ${operation} operation`);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      this.log(
+        LogLevel.INFO,
+        `Waiting ${delay}ms after ${operation} operation`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
@@ -226,92 +249,155 @@ export class BaseTester<TConfig, TState> {
   async flowTest(
     config: TConfig,
     testCaseParams?: ITestCaseParams,
-    options?: IFlowTestOptions
+    options?: IFlowTestOptions,
   ): Promise<TState> {
     const cleanupSettings = this.getCleanupSettings(testCaseParams);
     this.objectCreated = false;
     this.objectLocked = false;
     this.lockHandle = undefined;
 
-    const testName = `${this.loggerPrefix} - ${this.testDescription}`;
-    const testCase = this.testCase || { name: this.testCaseName, params: testCaseParams || {} };
+    const _testName = `${this.loggerPrefix} - ${this.testDescription}`;
+    const _testCase = this.testCase || {
+      name: this.testCaseName,
+      params: testCaseParams || {},
+    };
     let currentStep = '';
 
     try {
       // 1. Validate
       currentStep = 'validate';
       logBuilderTestStep(currentStep, this.logger);
-      const validationState = await this.adtObject.validate(config as Partial<TConfig>);
-      const validationResponse = (validationState as any)?.validationResponse || validationState;
-      
+      const validationState = await this.adtObject.validate(
+        config as Partial<TConfig>,
+      );
+      const validationResponse =
+        (validationState as any)?.validationResponse || validationState;
+
       // Check HTTP status
       if (validationResponse?.status !== 200) {
-        const errorData = typeof validationResponse?.data === 'string'
-          ? validationResponse.data
-          : JSON.stringify(validationResponse?.data);
-        const error = new Error(`Validation failed (HTTP ${validationResponse?.status}): ${errorData}`);
+        const errorData =
+          typeof validationResponse?.data === 'string'
+            ? validationResponse.data
+            : JSON.stringify(validationResponse?.data);
+        const error = new Error(
+          `Validation failed (HTTP ${validationResponse?.status}): ${errorData}`,
+        );
         logBuilderTestStepError(currentStep, error);
         throw error;
       }
-      
+
       // Check for error tables in validation response (even if HTTP 200)
       // Validation can return HTTP 200 but with error/warning tables in XML
-      if (validationResponse?.data && typeof validationResponse.data === 'string') {
+      if (
+        validationResponse?.data &&
+        typeof validationResponse.data === 'string'
+      ) {
         try {
           const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
           const parsed = parser.parse(validationResponse.data);
-          
+
           // Check for error table (adtcore:errorTable or similar)
-          const errorTable = parsed['adtcore:errorTable'] || parsed['errorTable'] || 
-                            parsed['adtcore:messageTable']?.['adtcore:message'] || 
-                            parsed['messageTable']?.['message'];
-          
+          const errorTable =
+            parsed['adtcore:errorTable'] ||
+            parsed.errorTable ||
+            parsed['adtcore:messageTable']?.['adtcore:message'] ||
+            parsed.messageTable?.message;
+
           // Check if there are error messages (type="E" or severity="ERROR")
-          const messages = Array.isArray(errorTable) ? errorTable : (errorTable ? [errorTable] : []);
+          const messages = Array.isArray(errorTable)
+            ? errorTable
+            : errorTable
+              ? [errorTable]
+              : [];
           const errorMessages = messages.filter((msg: any) => {
-            const type = msg['@_adtcore:type'] || msg['@_type'] || msg['type'] || '';
-            const severity = msg['@_adtcore:severity'] || msg['@_severity'] || msg['severity'] || '';
+            const type =
+              msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
+            const severity =
+              msg['@_adtcore:severity'] ||
+              msg['@_severity'] ||
+              msg.severity ||
+              '';
             return type === 'E' || severity === 'ERROR' || type === 'ERROR';
           });
-          
+
           if (errorMessages.length > 0) {
-            const errorTexts = errorMessages.map((msg: any) => {
-              return msg['@_adtcore:text'] || msg['@_text'] || msg['text'] || 
-                     msg['adtcore:text'] || msg['text'] || 
-                     msg['#text'] || JSON.stringify(msg);
-            }).filter(Boolean).join('; ');
-            
-            const error = new Error(`Validation failed with errors: ${errorTexts}`);
-            this.log(LogLevel.ERROR, `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`);
+            const errorTexts = errorMessages
+              .map((msg: any) => {
+                return (
+                  msg['@_adtcore:text'] ||
+                  msg['@_text'] ||
+                  msg.text ||
+                  msg['adtcore:text'] ||
+                  msg.text ||
+                  msg['#text'] ||
+                  JSON.stringify(msg)
+                );
+              })
+              .filter(Boolean)
+              .join('; ');
+
+            const error = new Error(
+              `Validation failed with errors: ${errorTexts}`,
+            );
+            this.log(
+              LogLevel.ERROR,
+              `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`,
+            );
             logBuilderTestStepError(currentStep, error);
             throw error;
           }
-          
+
           // Log warnings if present (but don't fail)
           const warningMessages = messages.filter((msg: any) => {
-            const type = msg['@_adtcore:type'] || msg['@_type'] || msg['type'] || '';
-            const severity = msg['@_adtcore:severity'] || msg['@_severity'] || msg['severity'] || '';
+            const type =
+              msg['@_adtcore:type'] || msg['@_type'] || msg.type || '';
+            const severity =
+              msg['@_adtcore:severity'] ||
+              msg['@_severity'] ||
+              msg.severity ||
+              '';
             return type === 'W' || severity === 'WARNING' || type === 'WARNING';
           });
-          
+
           if (warningMessages.length > 0) {
-            const warningTexts = warningMessages.map((msg: any) => {
-              return msg['@_adtcore:text'] || msg['@_text'] || msg['text'] || 
-                     msg['adtcore:text'] || msg['text'] || 
-                     msg['#text'] || JSON.stringify(msg);
-            }).filter(Boolean).join('; ');
-            this.log(LogLevel.WARN, `Validation returned warning table with ${warningMessages.length} warning(s): ${warningTexts}`);
+            const warningTexts = warningMessages
+              .map((msg: any) => {
+                return (
+                  msg['@_adtcore:text'] ||
+                  msg['@_text'] ||
+                  msg.text ||
+                  msg['adtcore:text'] ||
+                  msg.text ||
+                  msg['#text'] ||
+                  JSON.stringify(msg)
+                );
+              })
+              .filter(Boolean)
+              .join('; ');
+            this.log(
+              LogLevel.WARN,
+              `Validation returned warning table with ${warningMessages.length} warning(s): ${warningTexts}`,
+            );
           }
         } catch (parseError) {
           // If parsing fails, continue - validation might be in different format
           // But log the parse error for debugging
-          this.log(LogLevel.DEBUG, `Could not parse validation response for error tables: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          this.log(
+            LogLevel.DEBUG,
+            `Could not parse validation response for error tables: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+          );
         }
       }
-      
+
       // Delay after validate
-      await this.waitDelay(this.getOperationDelay('validate', testCaseParams), 'validate');
+      await this.waitDelay(
+        this.getOperationDelay('validate', testCaseParams),
+        'validate',
+      );
 
       // 2. Create
       currentStep = 'create';
@@ -320,12 +406,15 @@ export class BaseTester<TConfig, TState> {
         activateOnCreate: options?.activateOnCreate || false,
         timeout: options?.timeout,
         sourceCode: options?.sourceCode,
-        xmlContent: options?.xmlContent
+        xmlContent: options?.xmlContent,
       };
       await this.adtObject.create(config, createOptions);
       this.objectCreated = true;
       // Delay after create
-      await this.waitDelay(this.getOperationDelay('create', testCaseParams), 'create');
+      await this.waitDelay(
+        this.getOperationDelay('create', testCaseParams),
+        'create',
+      );
 
       // 2.5. Wait for object to be ready before update (read with long polling or delay)
       if (options?.updateConfig) {
@@ -333,8 +422,11 @@ export class BaseTester<TConfig, TState> {
         logBuilderTestStep(currentStep, this.logger);
         // Additional delay before update (already waited after create, but this is for object readiness)
         const createDelay = this.getOperationDelay('create', testCaseParams);
-        this.log(LogLevel.INFO, `Waiting ${createDelay}ms for object to be ready (fallback delay)`);
-        await new Promise(resolve => setTimeout(resolve, createDelay));
+        this.log(
+          LogLevel.INFO,
+          `Waiting ${createDelay}ms for object to be ready (fallback delay)`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, createDelay));
       }
 
       // 3. Update (if updateConfig provided)
@@ -345,33 +437,49 @@ export class BaseTester<TConfig, TState> {
           activateOnUpdate: options?.activateOnUpdate || false,
           sourceCode: options?.sourceCode,
           xmlContent: options?.xmlContent,
-          timeout: options?.timeout
+          timeout: options?.timeout,
         };
         await this.adtObject.update(
           { ...config, ...options.updateConfig } as Partial<TConfig>,
-          updateOptions
+          updateOptions,
         );
         // Delay after update
-        await this.waitDelay(this.getOperationDelay('update', testCaseParams), 'update');
+        await this.waitDelay(
+          this.getOperationDelay('update', testCaseParams),
+          'update',
+        );
       }
 
       // 4. Activate (if not activated during create/update)
       if (!options?.activateOnCreate && !options?.activateOnUpdate) {
         currentStep = 'activate';
         logBuilderTestStep(currentStep, this.logger);
-        const activateState = await this.adtObject.activate(config as Partial<TConfig>);
+        const activateState = await this.adtObject.activate(
+          config as Partial<TConfig>,
+        );
         // activate returns state object, check for errors
-        const activateResponse = (activateState as any)?.activateResponse || activateState;
-        if (activateResponse?.status && activateResponse.status !== 200 && activateResponse.status !== 204) {
-          const errorData = typeof activateResponse?.data === 'string'
-            ? activateResponse.data
-            : JSON.stringify(activateResponse?.data);
-          const error = new Error(`Activation failed (HTTP ${activateResponse.status}): ${errorData}`);
+        const activateResponse =
+          (activateState as any)?.activateResponse || activateState;
+        if (
+          activateResponse?.status &&
+          activateResponse.status !== 200 &&
+          activateResponse.status !== 204
+        ) {
+          const errorData =
+            typeof activateResponse?.data === 'string'
+              ? activateResponse.data
+              : JSON.stringify(activateResponse?.data);
+          const error = new Error(
+            `Activation failed (HTTP ${activateResponse.status}): ${errorData}`,
+          );
           logBuilderTestStepError(currentStep, error);
           throw error;
         }
         // Delay after activate
-        await this.waitDelay(this.getOperationDelay('activate', testCaseParams), 'activate');
+        await this.waitDelay(
+          this.getOperationDelay('activate', testCaseParams),
+          'activate',
+        );
       }
 
       // 5. Cleanup (if enabled)
@@ -381,12 +489,18 @@ export class BaseTester<TConfig, TState> {
         try {
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete
-          await this.waitDelay(this.getOperationDelay('delete', testCaseParams), 'delete');
+          await this.waitDelay(
+            this.getOperationDelay('delete', testCaseParams),
+            'delete',
+          );
         } catch (cleanupError) {
           this.log(LogLevel.WARN, 'delete failed:', cleanupError);
         }
       } else if (this.objectCreated) {
-        this.log(LogLevel.INFO, `⚠️ cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis`);
+        this.log(
+          LogLevel.INFO,
+          `⚠️ cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis`,
+        );
       }
 
       return validationState;
@@ -405,18 +519,27 @@ export class BaseTester<TConfig, TState> {
           logBuilderTestStep('delete (cleanup)', this.logger);
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete (cleanup on error)
-          await this.waitDelay(this.getOperationDelay('delete', testCaseParams), 'delete');
+          await this.waitDelay(
+            this.getOperationDelay('delete', testCaseParams),
+            'delete',
+          );
         } catch (cleanupError) {
           this.log(LogLevel.WARN, 'Cleanup after error failed:', cleanupError);
         }
       } else if (this.objectCreated && !cleanupSettings.shouldCleanup) {
-        this.log(LogLevel.INFO, `⚠️ Cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis after error`);
+        this.log(
+          LogLevel.INFO,
+          `⚠️ Cleanup skipped (cleanup_after_test=${cleanupSettings.cleanupAfterTest}, skip_cleanup=${cleanupSettings.skipCleanup}) - object left for analysis after error`,
+        );
       }
 
       const statusText = getHttpStatusText(error);
-      const enhancedError = statusText !== 'HTTP ?'
-        ? Object.assign(new Error(`[${statusText}] ${error.message}`), { stack: error.stack })
-        : error;
+      const enhancedError =
+        statusText !== 'HTTP ?'
+          ? Object.assign(new Error(`[${statusText}] ${error.message}`), {
+              stack: error.stack,
+            })
+          : error;
       throw enhancedError;
     }
   }
@@ -426,16 +549,18 @@ export class BaseTester<TConfig, TState> {
    */
   async readTest(
     config: Partial<TConfig>,
-    options?: IReadTestOptions
+    options?: IReadTestOptions,
   ): Promise<TState | undefined> {
     try {
       logBuilderTestStep('read', this.logger);
       const readState = await this.adtObject.read(
         config,
         options?.version || 'active',
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
-      
+
       if (!readState) {
         this.log(LogLevel.WARN, 'read failed: object not found');
         return undefined;
@@ -473,7 +598,7 @@ export class BaseTester<TConfig, TState> {
       this.configResolver = new TestConfigResolver({
         testCase: this.testCase,
         isCloud: this.isCloudSystem,
-        logger: this.logger
+        logger: this.logger,
       });
     }
     return this.configResolver;
@@ -508,12 +633,18 @@ export class BaseTester<TConfig, TState> {
    * @param objectType - Type of object ('class', 'domain', 'table', etc.)
    * @returns Object with name (and optional group for function modules) or null
    */
-  getStandardObject(objectType: string): { name: string; group?: string } | null {
+  getStandardObject(
+    objectType: string,
+  ): { name: string; group?: string } | null {
     const resolver = this.getConfigResolver();
     if (!resolver) {
       // Fallback to direct call if resolver not initialized
       const { resolveStandardObject } = require('./test-helper');
-      return resolveStandardObject(objectType, this.isCloudSystem, this.testCase);
+      return resolveStandardObject(
+        objectType,
+        this.isCloudSystem,
+        this.testCase,
+      );
     }
     // Use null testCase to prioritize standard_objects registry
     const { resolveStandardObject } = require('./test-helper');
@@ -585,17 +716,27 @@ export class BaseTester<TConfig, TState> {
         return;
       }
 
-      const { getEnabledTestCase, ensurePackageConfig } = require('./test-helper');
+      const {
+        getEnabledTestCase,
+        ensurePackageConfig,
+      } = require('./test-helper');
       const tc = getEnabledTestCase(this.testCaseKey, this.testCaseName);
       if (!tc) {
         this.skipReason = 'Test case disabled or not found';
-        this.log(LogLevel.WARN, 'beforeEach: Skipping - Test case disabled or not found');
+        this.log(
+          LogLevel.WARN,
+          'beforeEach: Skipping - Test case disabled or not found',
+        );
         return;
       }
 
-      const packageCheck = ensurePackageConfig(tc.params, `${this.loggerPrefix} - ${this.testDescription}`);
+      const packageCheck = ensurePackageConfig(
+        tc.params,
+        `${this.loggerPrefix} - ${this.testDescription}`,
+      );
       if (!packageCheck.success) {
-        this.skipReason = packageCheck.reason || 'Default package is not configured';
+        this.skipReason =
+          packageCheck.reason || 'Default package is not configured';
         this.log(LogLevel.WARN, `beforeEach: Skipping - ${this.skipReason}`);
         return;
       }
@@ -606,7 +747,7 @@ export class BaseTester<TConfig, TState> {
       this.configResolver = new TestConfigResolver({
         testCase: tc,
         isCloud: this.isCloudSystem,
-        logger: this.logger
+        logger: this.logger,
       });
 
       // Check if test is available for current environment
@@ -634,13 +775,15 @@ export class BaseTester<TConfig, TState> {
 
       // Ensure object ready (if function provided)
       if (this.ensureObjectReadyFn && this.config) {
-        const objectName = (this.config as any)[`${this.loggerPrefix.toLowerCase()}Name`] || 
-                          (this.config as any).name ||
-                          (this.config as any).objectName;
+        const objectName =
+          (this.config as any)[`${this.loggerPrefix.toLowerCase()}Name`] ||
+          (this.config as any).name ||
+          (this.config as any).objectName;
         if (objectName) {
           const cleanup = await this.ensureObjectReadyFn(objectName);
           if (!cleanup.success) {
-            this.skipReason = cleanup.reason || 'Failed to cleanup object before test';
+            this.skipReason =
+              cleanup.reason || 'Failed to cleanup object before test';
             this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
             this.testCase = null;
             this.config = null;
@@ -712,26 +855,41 @@ export class BaseTester<TConfig, TState> {
    */
   async flowTestAuto(options?: IFlowTestOptions): Promise<TState | undefined> {
     const testName = `${this.loggerPrefix} - ${this.testDescription}`;
-    const definition = this.getTestCaseDefinition() || { name: this.testCaseKey, params: {} };
+    const definition = this.getTestCaseDefinition() || {
+      name: this.testCaseKey,
+      params: {},
+    };
 
     if (this.shouldSkip()) {
       logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(this.logger, testName, this.skipReason || 'Test case not available');
+      logBuilderTestSkip(
+        this.logger,
+        testName,
+        this.skipReason || 'Test case not available',
+      );
       logBuilderTestEnd(this.logger, testName);
       return undefined;
     }
 
     if (!this.config) {
       logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(this.logger, testName, 'Config not available - ensure beforeEach() was called');
+      logBuilderTestSkip(
+        this.logger,
+        testName,
+        'Config not available - ensure beforeEach() was called',
+      );
       logBuilderTestEnd(this.logger, testName);
       return undefined;
     }
 
     logBuilderTestStart(this.logger, testName, definition);
-    
+
     try {
-      const result = await this.flowTest(this.config, this.testCase?.params, options);
+      const result = await this.flowTest(
+        this.config,
+        this.testCase?.params,
+        options,
+      );
       logBuilderTestSuccess(this.logger, testName);
       logBuilderTestEnd(this.logger, testName);
       return result;
@@ -748,24 +906,37 @@ export class BaseTester<TConfig, TState> {
    */
   async readTestAuto(options?: IReadTestOptions): Promise<TState | undefined> {
     const testName = `${this.loggerPrefix} - read standard object`;
-    const definition = this.getTestCaseDefinition() || { name: this.testCaseKey, params: {} };
+    const definition = this.getTestCaseDefinition() || {
+      name: this.testCaseKey,
+      params: {},
+    };
 
     if (this.shouldSkip()) {
       logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(this.logger, testName, this.skipReason || 'Test case not available');
+      logBuilderTestSkip(
+        this.logger,
+        testName,
+        this.skipReason || 'Test case not available',
+      );
       logBuilderTestEnd(this.logger, testName);
-      throw new Error(`Test skipped: ${this.skipReason || 'Test case not available'}`);
+      throw new Error(
+        `Test skipped: ${this.skipReason || 'Test case not available'}`,
+      );
     }
 
     if (!this.config) {
       logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(this.logger, testName, 'Config not available - ensure beforeEach() was called');
+      logBuilderTestSkip(
+        this.logger,
+        testName,
+        'Config not available - ensure beforeEach() was called',
+      );
       logBuilderTestEnd(this.logger, testName);
       throw new Error('Config not available - ensure beforeEach() was called');
     }
 
     logBuilderTestStart(this.logger, testName, definition);
-    
+
     try {
       const result = await this.readTest(this.config, options);
       logBuilderTestSuccess(this.logger, testName);

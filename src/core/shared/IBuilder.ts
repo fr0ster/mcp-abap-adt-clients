@@ -3,22 +3,21 @@
  * Ensures consistent API across all builder implementations
  */
 
-import { AxiosResponse } from 'axios';
-import type { IAdtObjectState, IAdtObjectConfig } from '@mcp-abap-adt/interfaces';
-import type { IDomainConfig } from '../domain/types';
+import type { AxiosResponse } from 'axios';
+import type { IBehaviorDefinitionConfig } from '../behaviorDefinition/types';
 import type { IClassConfig } from '../class/types';
-import type { IInterfaceConfig } from '../interface/types';
-import type { IProgramConfig } from '../program/types';
 import type { IDataElementConfig } from '../dataElement/types';
+import type { IDomainConfig } from '../domain/types';
+import type { IFunctionGroupConfig } from '../functionGroup/types';
+import type { IFunctionModuleConfig } from '../functionModule/types';
+import type { IInterfaceConfig } from '../interface/types';
+import type { IMetadataExtensionConfig } from '../metadataExtension/types';
+import type { IPackageConfig } from '../package/types';
+import type { IProgramConfig } from '../program/types';
+import type { IServiceDefinitionConfig } from '../serviceDefinition/types';
 import type { IStructureConfig } from '../structure/types';
 import type { ITableConfig } from '../table/types';
 import type { IViewConfig } from '../view/types';
-import type { IFunctionModuleConfig } from '../functionModule/types';
-import type { IFunctionGroupConfig } from '../functionGroup/types';
-import type { IPackageConfig } from '../package/types';
-import type { IBehaviorDefinitionConfig } from '../behaviorDefinition/types';
-import type { IMetadataExtensionConfig } from '../metadataExtension/types';
-import type { IServiceDefinitionConfig } from '../serviceDefinition/types';
 
 /**
  * Union type of all BuilderConfig types that can be returned by read() methods
@@ -123,7 +122,7 @@ export interface IBuilder<TState extends IAdtBaseState = IAdtBaseState> {
    */
   read(
     version?: 'active' | 'inactive',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<BuilderConfigUnion>;
 
   /**
@@ -157,4 +156,3 @@ export interface IBuilder<TState extends IAdtBaseState = IAdtBaseState> {
    */
   getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }>;
 }
-

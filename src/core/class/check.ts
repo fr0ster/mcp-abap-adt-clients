@@ -2,8 +2,8 @@
  * Class check operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 
 /**
  * Check class code (syntax, compilation, rules)
@@ -25,18 +25,32 @@ export async function checkClass(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive',
-  sourceCode?: string
+  sourceCode?: string,
 ): Promise<AxiosResponse> {
-  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } = await import('../../utils/checkRun');
+  const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
+    await import('../../utils/checkRun');
 
   let response: AxiosResponse;
 
   if (sourceCode) {
     // Validate hypothetical code (object doesn't need to exist)
-    response = await runCheckRunWithSource(connection, 'class', className, sourceCode, version, 'abapCheckRun');
+    response = await runCheckRunWithSource(
+      connection,
+      'class',
+      className,
+      sourceCode,
+      version,
+      'abapCheckRun',
+    );
   } else {
     // Validate existing object in SAP (reads from system)
-    response = await runCheckRun(connection, 'class', className, version, 'abapCheckRun');
+    response = await runCheckRun(
+      connection,
+      'class',
+      className,
+      version,
+      'abapCheckRun',
+    );
   }
 
   const checkResult = parseCheckRunResponse(response);
@@ -44,12 +58,19 @@ export async function checkClass(
   // Check only for type E messages - HTTP 200 is normal, errors are in XML response
   // Ignore "has been checked" messages (normal response, not an error)
   if (checkResult.errors.length > 0) {
-    const errorTexts = checkResult.errors.map(err => err.text || '').join(' ').toLowerCase();
-    const isCheckedMessage = errorTexts.includes('has been checked') || errorTexts.includes('was checked');
-    
+    const errorTexts = checkResult.errors
+      .map((err) => err.text || '')
+      .join(' ')
+      .toLowerCase();
+    const isCheckedMessage =
+      errorTexts.includes('has been checked') ||
+      errorTexts.includes('was checked');
+
     if (!isCheckedMessage) {
       // Has type E errors that are not "has been checked" - throw error
-      const errorMessages = checkResult.errors.map(err => err.text).join('; ');
+      const errorMessages = checkResult.errors
+        .map((err) => err.text)
+        .join('; ');
       throw new Error(`Class check failed: ${errorMessages}`);
     }
   }
@@ -74,7 +95,7 @@ export async function checkClassLocalTestClass(
   connection: IAbapConnection,
   className: string,
   testClassSource: string,
-  version: 'active' | 'inactive' = 'inactive'
+  version: 'active' | 'inactive' = 'inactive',
 ): Promise<AxiosResponse> {
   const { getTimeout } = await import('../../utils/timeouts');
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
@@ -99,8 +120,8 @@ export async function checkClassLocalTestClass(
 </chkrun:checkObjectList>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+    Accept: 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
@@ -110,15 +131,18 @@ export async function checkClassLocalTestClass(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 
   const checkResult = parseCheckRunResponse(response);
 
   // "has been checked" or "was checked" messages are normal responses, not errors
-  const hasCheckedMessage = checkResult.message?.toLowerCase().includes('has been checked') ||
-                            checkResult.message?.toLowerCase().includes('was checked') ||
-                            checkResult.errors.some((err: any) => (err.text || '').toLowerCase().includes('has been checked'));
+  const hasCheckedMessage =
+    checkResult.message?.toLowerCase().includes('has been checked') ||
+    checkResult.message?.toLowerCase().includes('was checked') ||
+    checkResult.errors.some((err: any) =>
+      (err.text || '').toLowerCase().includes('has been checked'),
+    );
 
   if (hasCheckedMessage && !checkResult.has_errors) {
     return response; // "has been checked" with no errors is a normal response
@@ -126,7 +150,9 @@ export async function checkClassLocalTestClass(
 
   // Throw error if there are actual problems (ERROR type)
   if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err: any) => err.text).join('; ');
+    const errorMessages = checkResult.errors
+      .map((err: any) => err.text)
+      .join('; ');
     throw new Error(`Test class check failed: ${errorMessages}`);
   }
 
@@ -150,9 +176,16 @@ export async function checkClassLocalTypes(
   connection: IAbapConnection,
   className: string,
   localTypesSource: string,
-  version: 'active' | 'inactive' = 'inactive'
+  version: 'active' | 'inactive' = 'inactive',
 ): Promise<AxiosResponse> {
-  return checkClassInclude(connection, className, localTypesSource, 'implementations', version, 'Local types');
+  return checkClassInclude(
+    connection,
+    className,
+    localTypesSource,
+    'implementations',
+    version,
+    'Local types',
+  );
 }
 
 /**
@@ -172,9 +205,16 @@ export async function checkClassDefinitions(
   connection: IAbapConnection,
   className: string,
   definitionsSource: string,
-  version: 'active' | 'inactive' = 'inactive'
+  version: 'active' | 'inactive' = 'inactive',
 ): Promise<AxiosResponse> {
-  return checkClassInclude(connection, className, definitionsSource, 'definitions', version, 'Definitions');
+  return checkClassInclude(
+    connection,
+    className,
+    definitionsSource,
+    'definitions',
+    version,
+    'Definitions',
+  );
 }
 
 /**
@@ -194,9 +234,16 @@ export async function checkClassMacros(
   connection: IAbapConnection,
   className: string,
   macrosSource: string,
-  version: 'active' | 'inactive' = 'inactive'
+  version: 'active' | 'inactive' = 'inactive',
 ): Promise<AxiosResponse> {
-  return checkClassInclude(connection, className, macrosSource, 'macros', version, 'Macros');
+  return checkClassInclude(
+    connection,
+    className,
+    macrosSource,
+    'macros',
+    version,
+    'Macros',
+  );
 }
 
 /**
@@ -217,7 +264,7 @@ async function checkClassInclude(
   includeSource: string,
   includeType: 'implementations' | 'definitions' | 'macros' | 'testclasses',
   version: 'active' | 'inactive' = 'inactive',
-  includeName: string
+  includeName: string,
 ): Promise<AxiosResponse> {
   const { getTimeout } = await import('../../utils/timeouts');
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
@@ -242,8 +289,8 @@ async function checkClassInclude(
 </chkrun:checkObjectList>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+    Accept: 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
@@ -253,15 +300,18 @@ async function checkClassInclude(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 
   const checkResult = parseCheckRunResponse(response);
 
   // "has been checked" or "was checked" messages are normal responses, not errors
-  const hasCheckedMessage = checkResult.message?.toLowerCase().includes('has been checked') ||
-                            checkResult.message?.toLowerCase().includes('was checked') ||
-                            checkResult.errors.some((err: any) => (err.text || '').toLowerCase().includes('has been checked'));
+  const hasCheckedMessage =
+    checkResult.message?.toLowerCase().includes('has been checked') ||
+    checkResult.message?.toLowerCase().includes('was checked') ||
+    checkResult.errors.some((err: any) =>
+      (err.text || '').toLowerCase().includes('has been checked'),
+    );
 
   if (hasCheckedMessage && !checkResult.has_errors) {
     return response; // "has been checked" with no errors is a normal response
@@ -269,7 +319,9 @@ async function checkClassInclude(
 
   // Throw error if there are actual problems (ERROR type)
   if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors.map((err: any) => err.text).join('; ');
+    const errorMessages = checkResult.errors
+      .map((err: any) => err.text)
+      .join('; ');
     throw new Error(`${includeName} check failed: ${errorMessages}`);
   }
 

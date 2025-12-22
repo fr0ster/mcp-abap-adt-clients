@@ -2,13 +2,18 @@
  * Behavior Implementation operations - exports
  */
 
-import { IAdtObject } from '@mcp-abap-adt/interfaces';
-import { IBehaviorImplementationConfig, IBehaviorImplementationState } from './types';
+import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type {
+  IBehaviorImplementationConfig,
+  IBehaviorImplementationState,
+} from './types';
 
-export * from './types';
-export { BehaviorImplementationBuilder } from './BehaviorImplementationBuilder';
 export { AdtBehaviorImplementation } from './AdtBehaviorImplementation';
+export { BehaviorImplementationBuilder } from './BehaviorImplementationBuilder';
+export * from './types';
 
 // Type alias for AdtBehaviorImplementation
-export type AdtBehaviorImplementationType = IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState>;
-
+export type AdtBehaviorImplementationType = IAdtObject<
+  IBehaviorImplementationConfig,
+  IBehaviorImplementationState
+>;

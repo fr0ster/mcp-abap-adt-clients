@@ -3,14 +3,14 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import {
-  ICheckEnhancementParams,
-  EnhancementType,
+  type EnhancementType,
   getEnhancementUri,
-  supportsSourceCode
+  type ICheckEnhancementParams,
+  supportsSourceCode,
 } from './types';
 
 /**
@@ -22,9 +22,14 @@ import {
  */
 export async function checkEnhancement(
   connection: IAbapConnection,
-  params: ICheckEnhancementParams
+  params: ICheckEnhancementParams,
 ): Promise<AxiosResponse> {
-  const { enhancement_name, enhancement_type, version = 'inactive', source_code } = params;
+  const {
+    enhancement_name,
+    enhancement_type,
+    version = 'inactive',
+    source_code,
+  } = params;
 
   if (!enhancement_name) {
     throw new Error('enhancement_name is required');
@@ -68,8 +73,8 @@ export async function checkEnhancement(
 </chkrun:checkRunRequest>`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.adt.checkrun.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkrun.v1+xml'
+    Accept: 'application/vnd.sap.adt.checkrun.v1+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkrun.v1+xml',
   };
 
   return connection.makeAdtRequest({
@@ -77,7 +82,7 @@ export async function checkEnhancement(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlPayload,
-    headers
+    headers,
   });
 }
 
@@ -96,12 +101,12 @@ export async function check(
   enhancementType: EnhancementType,
   enhancementName: string,
   version: 'active' | 'inactive' = 'inactive',
-  sourceCode?: string
+  sourceCode?: string,
 ): Promise<AxiosResponse> {
   return checkEnhancement(connection, {
     enhancement_name: enhancementName,
     enhancement_type: enhancementType,
     version,
-    source_code: sourceCode
+    source_code: sourceCode,
   });
 }

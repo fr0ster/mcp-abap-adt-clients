@@ -2,8 +2,8 @@
  * Class module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 
 // Low-level function parameters (snake_case)
 export interface ICreateClassParams {

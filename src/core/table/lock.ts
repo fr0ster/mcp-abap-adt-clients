@@ -3,10 +3,9 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Acquire lock handle for the table by locking it for modification
@@ -18,7 +17,8 @@ export async function acquireTableLockHandle(
   const url = `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
-    'Accept': 'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9'
+    Accept:
+      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
   };
 
   const response = await connection.makeAdtRequest({
@@ -26,7 +26,7 @@ export async function acquireTableLockHandle(
     method: 'POST',
     timeout: getTimeout('default'),
     data: null,
-    headers
+    headers,
   });
 
   const parser = new XMLParser({
@@ -35,7 +35,7 @@ export async function acquireTableLockHandle(
   });
 
   const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.['DATA']?.['LOCK_HANDLE'];
+  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
 
   if (!lockHandle) {
     throw new Error('Failed to obtain lock handle from SAP response');
@@ -43,4 +43,3 @@ export async function acquireTableLockHandle(
 
   return lockHandle;
 }
-

@@ -4,25 +4,30 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from './timeouts';
-import { AxiosResponse } from 'axios';
 
 /**
  * Get system information from SAP ADT (for cloud systems)
  * Returns systemID and userName if available
  */
 export async function getSystemInformation(
-  connection: IAbapConnection
-): Promise<{ systemID?: string; userName?: string; client?: string; language?: string; userFullName?: string } | null> {
+  connection: IAbapConnection,
+): Promise<{
+  systemID?: string;
+  userName?: string;
+  client?: string;
+  language?: string;
+  userFullName?: string;
+} | null> {
   try {
     const url = `/sap/bc/adt/core/http/systeminformation`;
 
     const headers = {
-      'Accept': 'application/vnd.sap.adt.core.http.systeminformation.v1+json'
+      Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
     };
 
     // Add cache busting parameter like Eclipse does
     const params = {
-      '_': Date.now()
+      _: Date.now(),
     };
 
     const response = await connection.makeAdtRequest({
@@ -30,7 +35,7 @@ export async function getSystemInformation(
       method: 'GET',
       timeout: getTimeout('default'),
       headers,
-      params
+      params,
     });
 
     // Parse response - can be JSON or XML
@@ -51,12 +56,12 @@ export async function getSystemInformation(
         userName: data.userName,
         userFullName: data.userFullName,
         client: data.client,
-        language: data.language
+        language: data.language,
       };
     }
 
     return null;
-  } catch (error) {
+  } catch (_error) {
     // If endpoint doesn't exist (on-premise) or returns error, return null
     return null;
   }
@@ -67,8 +72,9 @@ export async function getSystemInformation(
  * Returns true if the systeminformation endpoint is available (cloud system)
  * Returns false if the endpoint doesn't exist (on-premise system)
  */
-export async function isCloudEnvironment(connection: IAbapConnection): Promise<boolean> {
+export async function isCloudEnvironment(
+  connection: IAbapConnection,
+): Promise<boolean> {
   const systemInfo = await getSystemInformation(connection);
   return systemInfo !== null;
 }
-

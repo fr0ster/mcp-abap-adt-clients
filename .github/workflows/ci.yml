@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop, master ]
+  pull_request:
+    branches: [ main, develop, master ]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Biome lint
+        run: npx biome check src --diagnostic-level=error
+      
+      - name: Type check
+        run: npx tsc -p tsconfig.json --noEmit
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ All checks passed!"
+          echo "- Biome lint: OK"
+          echo "- TypeScript: OK"
+          echo "- Build: OK"

@@ -8,8 +8,8 @@
  */
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { getConfig } from '../helpers/sessionConfig';
 import { CrudClient } from '../../clients/CrudClient';
+import { getConfig } from '../helpers/sessionConfig';
 
 describe('Example: Session Persistence', () => {
   let connection: any;

@@ -2,7 +2,7 @@
  * Structure module type definitions
  */
 
-import { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 export interface IStructureField {
   name: string;

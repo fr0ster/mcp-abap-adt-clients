@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { EnhancementType, getEnhancementUri } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import { type EnhancementType, getEnhancementUri } from './types';
 
 /**
  * Unlock enhancement
@@ -25,7 +25,7 @@ export async function unlockEnhancement(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   const url = `${getEnhancementUri(enhancementType, encodedName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
@@ -34,6 +34,6 @@ export async function unlockEnhancement(
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    data: null
+    data: null,
   });
 }

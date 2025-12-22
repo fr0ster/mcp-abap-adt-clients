@@ -40,7 +40,10 @@
   "scripts": {
     "chrono": "./tools/version-stats.sh",
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
-    "build": "npm run --silent clean && npx tsc -p tsconfig.json",
+    "lint": "npx biome check --write src",
+    "lint:check": "npx biome check src",
+    "format": "npx biome format --write src",
+    "build": "npm run --silent clean && npx biome check src --diagnostic-level=error && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "test": "jest --runInBand",
     "test:check": "npx tsc --noEmit --project tsconfig.test.json",
@@ -64,6 +67,7 @@
     "yaml": "^2.3.4"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.3.10",
     "@mcp-abap-adt/connection": "^0.2.4",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.2.1",

@@ -1,20 +1,19 @@
 /**
  * ClassUnitTestBuilder - Builder for class unit tests (test includes)
- * 
+ *
  * Handles test include operations: lock, update, unlock, activate
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IClassBuilderConfig } from '../class';
-import {
-  lockClassTestClasses,
-  updateClassTestInclude,
-  unlockClassTestClasses,
-  activateClassTestClasses
-} from './classTest';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IClassBuilderConfig } from '../class';
 import { BaseUnitTestBuilder } from './BaseUnitTestBuilder';
-import { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './types';
+import {
+  activateClassTestClasses,
+  lockClassTestClasses,
+  unlockClassTestClasses,
+  updateClassTestInclude,
+} from './classTest';
+import type { ClassUnitTestDefinition, ClassUnitTestRunOptions } from './types';
 
 export interface ClassUnitTestBuilderConfig {
   className: string;
@@ -26,14 +25,14 @@ export interface ClassUnitTestBuilderConfig {
 
 /**
  * Builder for class unit tests (test includes)
- * 
+ *
  * @example
  * ```typescript
  * const builder = new ClassUnitTestBuilder(connection, logger, {
  *   className: 'ZCL_TEST',
  *   testClassName: 'LTC_ZCL_TEST'
  * });
- * 
+ *
  * await builder
  *   .lockTestClasses()
  *   .then(b => b.updateTestClass('CLASS ltc_zcl_test...'))
@@ -52,7 +51,7 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
   constructor(
     connection: IAbapConnection,
     config: ClassUnitTestBuilderConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     // Create ClassBuilderConfig for base class
     const classConfig: IClassBuilderConfig = {
@@ -60,10 +59,10 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
       description: '',
       packageName: config.packageName,
       transportRequest: config.transportRequest,
-      testClassCode: config.testClassSource
+      testClassCode: config.testClassSource,
     };
     super(connection, classConfig, logger);
-    
+
     this.config = config;
     this.testClassSource = config.testClassSource;
   }
@@ -76,7 +75,9 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
 
   setTestClassSource(sourceCode: string): this {
     this.testClassSource = sourceCode;
-    this.logger?.debug(`'Test class source set  length:' ${`sourceCode.length`}`);
+    this.logger?.debug(
+      `'Test class source set  length:' ${`sourceCode.length`}`,
+    );
     return this;
   }
 
@@ -84,8 +85,11 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
     try {
       this.logger?.info('Locking test classes for:', this.config.className);
       this.connection.setSessionType('stateful');
-      
-      const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
+
+      const lockHandle = await lockClassTestClasses(
+        this.connection,
+        this.config.className,
+      );
       this.testLockHandle = lockHandle;
 
       this.logger?.info('Test classes locked successfully');
@@ -94,7 +98,7 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
       this.unitTestState.errors.push({
         method: 'lockTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock test classes failed:', error);
       throw error;
@@ -119,17 +123,17 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
       await unlockClassTestClasses(
         this.connection,
         this.config.className,
-        this.testLockHandle!
+        this.testLockHandle!,
       );
       this.testLockHandle = undefined;
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Test classes unlocked successfully');
       return this;
     } catch (error: any) {
       this.unitTestState.errors.push({
         method: 'unlockTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock test classes failed:', error);
       throw error;
@@ -145,7 +149,7 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
       await activateClassTestClasses(
         this.connection,
         this.config.className,
-        this.config.testClassName
+        this.config.testClassName,
       );
       this.logger?.info('Test classes activated successfully');
       return this;
@@ -153,7 +157,7 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
       this.unitTestState.errors.push({
         method: 'activateTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate test classes failed:', error);
       throw error;
@@ -164,8 +168,11 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
     try {
       this.logger?.info('Clearing test classes for:', this.config.className);
       this.connection.setSessionType('stateful');
-      
-      const lockHandle = await lockClassTestClasses(this.connection, this.config.className);
+
+      const lockHandle = await lockClassTestClasses(
+        this.connection,
+        this.config.className,
+      );
       this.testLockHandle = lockHandle;
 
       const emptyTestSource = '';
@@ -174,20 +181,24 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
         this.config.className,
         emptyTestSource,
         lockHandle,
-        this.config.transportRequest
+        this.config.transportRequest,
       );
 
-      await unlockClassTestClasses(this.connection, this.config.className, lockHandle);
+      await unlockClassTestClasses(
+        this.connection,
+        this.config.className,
+        lockHandle,
+      );
       this.testLockHandle = undefined;
 
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
       this.logger?.info('Test classes cleared successfully');
       return this;
     } catch (error: any) {
       this.unitTestState.errors.push({
         method: 'clearTestClasses',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Clear test classes failed:', error);
       throw error;
@@ -196,7 +207,7 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
 
   async runForClass(
     tests: ClassUnitTestDefinition[],
-    options?: ClassUnitTestRunOptions
+    options?: ClassUnitTestRunOptions,
   ): Promise<this> {
     return super.runForClass(tests, options);
   }
@@ -204,9 +215,13 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
   async forceUnlock(): Promise<void> {
     if (this.testLockHandle) {
       try {
-        await unlockClassTestClasses(this.connection, this.config.className, this.testLockHandle);
+        await unlockClassTestClasses(
+          this.connection,
+          this.config.className,
+          this.testLockHandle,
+        );
         this.testLockHandle = undefined;
-        this.connection.setSessionType("stateless");
+        this.connection.setSessionType('stateless');
         this.logger?.info('Force unlock successful');
       } catch (error: any) {
         this.logger?.warn('Force unlock failed:', error);
@@ -220,4 +235,3 @@ export class ClassUnitTestBuilder extends BaseUnitTestBuilder {
     return this.testLockHandle;
   }
 }
-

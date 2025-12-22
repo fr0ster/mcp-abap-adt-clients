@@ -3,10 +3,10 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
+import type { AxiosResponse } from 'axios';
 import { encodeSapObjectName } from '../../utils/internalUtils';
-import { IUpdateStructureParams } from './types';
+import { getTimeout } from '../../utils/timeouts';
+import type { IUpdateStructureParams } from './types';
 
 /**
  * Upload structure DDL code (low-level - uses existing lockHandle)
@@ -16,14 +16,14 @@ import { IUpdateStructureParams } from './types';
 export async function upload(
   connection: IAbapConnection,
   params: IUpdateStructureParams,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   const structureNameEncoded = encodeSapObjectName(params.structureName);
   const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${lockHandle}${params.transportRequest ? `&corrNr=${params.transportRequest}` : ''}`;
 
   const headers = {
-    'Accept': 'application/xml, application/json, text/plain, */*',
-    'Content-Type': 'text/plain; charset=utf-8'
+    Accept: 'application/xml, application/json, text/plain, */*',
+    'Content-Type': 'text/plain; charset=utf-8',
   };
 
   return connection.makeAdtRequest({
@@ -31,7 +31,7 @@ export async function upload(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: params.ddlCode,
-    headers
+    headers,
   });
 }
 
@@ -40,7 +40,7 @@ export async function upload(
  */
 export async function updateStructure(
   connection: IAbapConnection,
-  params: IUpdateStructureParams & { lockHandle: string }
+  params: IUpdateStructureParams & { lockHandle: string },
 ): Promise<AxiosResponse> {
   return upload(connection, params, params.lockHandle);
 }

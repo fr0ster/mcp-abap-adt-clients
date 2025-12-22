@@ -2,11 +2,11 @@
  * Domain check operations
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import { runCheckRun, parseCheckRunResponse } from '../../utils/checkRun';
-import { getTimeout } from '../../utils/timeouts';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
+import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Check domain syntax
@@ -16,14 +16,14 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  * @param version - 'active' (activated version) or 'inactive' (saved but not activated)
  * @param xmlContent - Optional XML content to validate (same format as PUT body). If provided, check validates this content instead of saved version.
  * @returns Check result with errors/warnings
- * 
+ *
  * Note: When xmlContent is provided, it should be the same XML that will be sent in PUT request.
  */
 export async function checkDomainSyntax(
   connection: IAbapConnection,
   domainName: string,
   version: 'active' | 'inactive',
-  xmlContent?: string
+  xmlContent?: string,
 ): Promise<AxiosResponse> {
   let response: AxiosResponse;
 
@@ -45,8 +45,8 @@ export async function checkDomainSyntax(
 </chkrun:checkObjectList>`;
 
     const headers = {
-      'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+      Accept: 'application/vnd.sap.adt.checkmessages+xml',
+      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
     };
 
     const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
@@ -56,11 +56,18 @@ export async function checkDomainSyntax(
       method: 'POST',
       timeout: getTimeout('default'),
       data: xmlBody,
-      headers
+      headers,
     });
   } else {
     // Check saved version (without XML content)
-    response = await runCheckRun(connection, 'domain', domainName, version, 'abapCheckRun', undefined);
+    response = await runCheckRun(
+      connection,
+      'domain',
+      domainName,
+      version,
+      'abapCheckRun',
+      undefined,
+    );
   }
 
   const checkResult = parseCheckRunResponse(response);
@@ -69,13 +76,18 @@ export async function checkDomainSyntax(
     // "has been checked" is a non-critical warning - domain was already checked
     const errorMessage = checkResult.message || '';
     // Check both message and errors array for "has been checked" message
-    const hasCheckedMessage = errorMessage.toLowerCase().includes('has been checked') ||
-      checkResult.errors.some((err: any) => (err.text || '').toLowerCase().includes('has been checked'));
+    const hasCheckedMessage =
+      errorMessage.toLowerCase().includes('has been checked') ||
+      checkResult.errors.some((err: any) =>
+        (err.text || '').toLowerCase().includes('has been checked'),
+      );
 
     if (hasCheckedMessage) {
       // This is expected behavior - domain was already checked, return response anyway
       if (process.env.DEBUG_ADT_LIBS === 'true') {
-        console.warn(`Check warning for domain ${domainName}: ${errorMessage} (domain was already checked)`);
+        console.warn(
+          `Check warning for domain ${domainName}: ${errorMessage} (domain was already checked)`,
+        );
       }
       return response; // Return response anyway
     }
@@ -84,4 +96,3 @@ export async function checkDomainSyntax(
 
   return response;
 }
-

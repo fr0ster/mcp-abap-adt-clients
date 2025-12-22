@@ -1,38 +1,47 @@
 /**
  * AdtStructure - High-level CRUD operations for Structure objects
- * 
+ *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
- * 
+ *
  * Uses low-level functions directly (not Builder classes).
- * 
+ *
  * Session management:
  * - stateful: only when doing lock/update/unlock operations
  * - stateless: obligatory after unlock
  * - If no lock/unlock, no stateful needed
  * - activate uses same session/cookies (no stateful needed)
- * 
+ *
  * Operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
-import { IStructureConfig, IStructureState } from './types';
-import { validateStructureName } from './validation';
-import { create as createStructure } from './create';
-import { checkStructure } from './check';
-import { lockStructure } from './lock';
-import { upload } from './update';
-import { unlockStructure } from './unlock';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  IAdtOperationOptions,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateStructure } from './activation';
+import { checkStructure } from './check';
+import { create as createStructure } from './create';
 import { checkDeletion, deleteStructure } from './delete';
-import { getStructureSource, getStructureMetadata, getStructureTransport } from './read';
+import { lockStructure } from './lock';
+import {
+  getStructureMetadata,
+  getStructureSource,
+  getStructureTransport,
+} from './read';
+import type { IStructureConfig, IStructureState } from './types';
+import { unlockStructure } from './unlock';
+import { upload } from './update';
+import { validateStructureName } from './validation';
 
-export class AdtStructure implements IAdtObject<IStructureConfig, IStructureState> {
+export class AdtStructure
+  implements IAdtObject<IStructureConfig, IStructureState>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   public readonly objectType: string = 'Structure';
@@ -53,17 +62,21 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
     const state: IStructureState = { errors: [] };
     try {
       const response = await validateStructureName(
-      this.connection,
-      config.structureName,
-      config.description
-    );
-    state.validationResponse = response;
-    return state;
-  } catch (error: any) {
-    state.errors.push({ method: 'validate', error: error instanceof Error ? error : new Error(String(error)), timestamp: new Date() });
-    this.logger?.error('validate failed:', error);
-    throw error;
-  }
+        this.connection,
+        config.structureName,
+        config.description,
+      );
+      state.validationResponse = response;
+      return state;
+    } catch (error: any) {
+      state.errors.push({
+        method: 'validate',
+        error: error instanceof Error ? error : new Error(String(error)),
+        timestamp: new Date(),
+      });
+      this.logger?.error('validate failed:', error);
+      throw error;
+    }
   }
 
   /**
@@ -72,7 +85,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
    */
   async create(
     config: IStructureConfig,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
@@ -86,7 +99,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
 
     let objectCreated = false;
     const state: IStructureState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -96,7 +109,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         structureName: config.structureName,
         packageName: config.packageName,
         transportRequest: config.transportRequest,
-        description: config.description
+        description: config.description,
       });
       objectCreated = true;
       this.logger?.info?.('Structure created');
@@ -108,10 +121,13 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
           this.logger?.warn?.('Deleting structure after failure');
           await deleteStructure(this.connection, {
             structure_name: config.structureName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete structure after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete structure after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -126,7 +142,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
   async read(
     config: Partial<IStructureConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IStructureState | undefined> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
@@ -137,11 +153,13 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         this.connection,
         config.structureName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -156,26 +174,36 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
    */
   async readMetadata(
     config: Partial<IStructureConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IStructureState> {
     const state: IStructureState = { errors: [] };
     if (!config.structureName) {
       const error = new Error('Structure name is required');
-      state.errors.push({ method: 'readMetadata', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getStructureMetadata(
         this.connection,
         config.structureName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.metadataResult = response;
       this.logger?.info?.('Structure metadata read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readMetadata', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readMetadata',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readMetadata', err);
       throw err;
     }
@@ -186,26 +214,36 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
    */
   async readTransport(
     config: Partial<IStructureConfig>,
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IStructureState> {
     const state: IStructureState = { errors: [] };
     if (!config.structureName) {
       const error = new Error('Structure name is required');
-      state.errors.push({ method: 'readTransport', error, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error,
+        timestamp: new Date(),
+      });
       throw error;
     }
     try {
       const response = await getStructureTransport(
         this.connection,
         config.structureName,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       state.transportResult = response;
       this.logger?.info?.('Structure transport request read successfully');
       return state;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      state.errors.push({ method: 'readTransport', error: err, timestamp: new Date() });
+      state.errors.push({
+        method: 'readTransport',
+        error: err,
+        timestamp: new Date(),
+      });
       this.logger?.error('readTransport', err);
       throw err;
     }
@@ -218,7 +256,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
    */
   async update(
     config: Partial<IStructureConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
@@ -231,20 +269,22 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         throw new Error('Source code (ddlCode) is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await upload(
         this.connection,
         {
           structureName: config.structureName,
           ddlCode: codeToUpdate,
-          transportRequest: config.transportRequest
+          transportRequest: config.transportRequest,
         },
-        options.lockHandle
+        options.lockHandle,
       );
       this.logger?.info?.('Structure updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
@@ -260,8 +300,15 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       // 2. Check inactive with code for update (from options or config)
       const codeToCheck = options?.sourceCode || config.ddlCode;
       if (codeToCheck) {
-        this.logger?.info?.('Step 2: Checking inactive version with update content');
-        await checkStructure(this.connection, config.structureName, 'inactive', codeToCheck);
+        this.logger?.info?.(
+          'Step 2: Checking inactive version with update content',
+        );
+        await checkStructure(
+          this.connection,
+          config.structureName,
+          'inactive',
+          codeToCheck,
+        );
         this.logger?.info?.('Check inactive with update content passed');
       }
 
@@ -273,23 +320,24 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
           {
             structureName: config.structureName,
             ddlCode: codeToCheck,
-            transportRequest: config.transportRequest
+            transportRequest: config.transportRequest,
           },
-          lockHandle
+          lockHandle,
         );
         this.logger?.info?.('Structure updated');
 
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
-            { structureName: config.structureName },
-            'active',
-            { withLongPolling: true }
-          );
+          await this.read({ structureName: config.structureName }, 'active', {
+            withLongPolling: true,
+          });
           this.logger?.info?.('object is ready after update');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after update:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after update:',
+            readError,
+          );
           // Continue anyway - unlock might still work
         }
       }
@@ -297,7 +345,11 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking structure');
-        await unlockStructure(this.connection, config.structureName, lockHandle);
+        await unlockStructure(
+          this.connection,
+          config.structureName,
+          lockHandle,
+        );
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Structure unlocked');
@@ -311,8 +363,14 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating structure');
-        const activateResponse = await activateStructure(this.connection, config.structureName);
-        this.logger?.info?.('Structure activated, status:', activateResponse.status);
+        const activateResponse = await activateStructure(
+          this.connection,
+          config.structureName,
+        );
+        this.logger?.info?.(
+          'Structure activated, status:',
+          activateResponse.status,
+        );
 
         // 6.5. Read with long polling to ensure object is ready after activation
         this.logger?.info?.('read (wait for object ready after activation)');
@@ -320,31 +378,38 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
           const readState = await this.read(
             { structureName: config.structureName },
             'active',
-            { withLongPolling: true }
+            { withLongPolling: true },
           );
           if (readState) {
             return {
               activateResult: activateResponse,
               readResult: readState.readResult,
-              errors: []
+              errors: [],
             };
           }
           this.logger?.info?.('object is ready after activation');
         } catch (readError) {
-          this.logger?.warn?.('read with long polling failed after activation:', readError);
+          this.logger?.warn?.(
+            'read with long polling failed after activation:',
+            readError,
+          );
           // Continue anyway - activation was successful
         }
         return {
           activateResult: activateResponse,
-          errors: []
+          errors: [],
         };
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getStructureSource(this.connection, config.structureName, 'inactive');
+      const readResponse = await getStructureSource(
+        this.connection,
+        config.structureName,
+        'inactive',
+      );
       return {
         readResult: readResponse,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
@@ -352,7 +417,11 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
         try {
           this.logger?.warn?.('Unlocking structure during error cleanup');
           // We're already in stateful after lock, just unlock and set stateless
-          await unlockStructure(this.connection, config.structureName, lockHandle);
+          await unlockStructure(
+            this.connection,
+            config.structureName,
+            lockHandle,
+          );
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
           this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
@@ -368,10 +437,13 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
           // No stateful needed - delete doesn't use lock/unlock
           await deleteStructure(this.connection, {
             structure_name: config.structureName,
-            transport_request: config.transportRequest
+            transport_request: config.transportRequest,
           });
         } catch (deleteError) {
-          this.logger?.warn?.('Failed to delete structure after failure:', deleteError);
+          this.logger?.warn?.(
+            'Failed to delete structure after failure:',
+            deleteError,
+          );
         }
       }
 
@@ -393,7 +465,7 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       this.logger?.info?.('Checking structure for deletion');
       await checkDeletion(this.connection, {
         structure_name: config.structureName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('Deletion check passed');
 
@@ -401,13 +473,13 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
       this.logger?.info?.('Deleting structure');
       const result = await deleteStructure(this.connection, {
         structure_name: config.structureName,
-        transport_request: config.transportRequest
+        transport_request: config.transportRequest,
       });
       this.logger?.info?.('Structure deleted');
 
       return {
         deleteResult: result,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       this.logger?.error('Delete failed:', error);
@@ -425,10 +497,13 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
     }
 
     try {
-      const result = await activateStructure(this.connection, config.structureName);
+      const result = await activateStructure(
+        this.connection,
+        config.structureName,
+      );
       return {
         activateResult: result,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       this.logger?.error('Activate failed:', error);
@@ -441,17 +516,22 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
    */
   async check(
     config: Partial<IStructureConfig>,
-    status?: string
+    status?: string,
   ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
 
     // Map status to version
-    const version: 'active' | 'inactive' = status === 'active' ? 'active' : 'inactive';
+    const version: 'active' | 'inactive' =
+      status === 'active' ? 'active' : 'inactive';
     return {
-      checkResult: await checkStructure(this.connection, config.structureName, version),
-      errors: []
+      checkResult: await checkStructure(
+        this.connection,
+        config.structureName,
+        version,
+      ),
+      errors: [],
     };
   }
 
@@ -470,16 +550,23 @@ export class AdtStructure implements IAdtObject<IStructureConfig, IStructureStat
   /**
    * Unlock structure
    */
-  async unlock(config: Partial<IStructureConfig>, lockHandle: string): Promise<IStructureState> {
+  async unlock(
+    config: Partial<IStructureConfig>,
+    lockHandle: string,
+  ): Promise<IStructureState> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
     }
 
-    const result = await unlockStructure(this.connection, config.structureName, lockHandle);
+    const result = await unlockStructure(
+      this.connection,
+      config.structureName,
+      lockHandle,
+    );
     this.connection.setSessionType('stateless');
     return {
       unlockResult: result,
-      errors: []
+      errors: [],
     };
   }
 }

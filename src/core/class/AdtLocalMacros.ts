@@ -1,18 +1,16 @@
 /**
  * AdtLocalMacros - High-level CRUD operations for Local Macros
- * 
+ *
  * Local macros are defined in the macros include of an ABAP class.
  * Note: Macros are supported in older ABAP versions but not in newer ones.
  * All operations require the parent class to be locked.
  */
 
-import { IAbapConnection, IAdtObject, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { AdtClass } from './AdtClass';
 import { checkClassMacros } from './check';
 import { updateClassMacros } from './includes';
-import { AdtClass } from './AdtClass';
-import { IClassState } from './types';
+import type { IClassState } from './types';
 
 export interface ILocalMacrosConfig {
   className: string;
@@ -22,10 +20,6 @@ export interface ILocalMacrosConfig {
 
 export class AdtLocalMacros extends AdtClass {
   public readonly objectType: string = 'LocalMacros';
-
-  constructor(connection: IAbapConnection, logger?: ILogger) {
-    super(connection, logger);
-  }
 
   /**
    * Validate local macros code
@@ -42,12 +36,12 @@ export class AdtLocalMacros extends AdtClass {
       this.connection,
       config.className,
       config.macrosCode,
-      'inactive'
+      'inactive',
     );
 
     return {
       validationResponse: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 
@@ -57,7 +51,7 @@ export class AdtLocalMacros extends AdtClass {
    */
   async create(
     config: Partial<ILocalMacrosConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -68,7 +62,7 @@ export class AdtLocalMacros extends AdtClass {
 
     let lockHandle: string | undefined;
     const state: IClassState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -86,7 +80,7 @@ export class AdtLocalMacros extends AdtClass {
           this.connection,
           config.className,
           codeToCheck,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local macros check passed');
@@ -99,14 +93,17 @@ export class AdtLocalMacros extends AdtClass {
         config.className,
         codeToCheck!,
         lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local macros created');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      const unlockState = await super.unlock(
+        { className: config.className },
+        lockHandle,
+      );
       state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
@@ -118,7 +115,10 @@ export class AdtLocalMacros extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -132,7 +132,7 @@ export class AdtLocalMacros extends AdtClass {
    */
   async read(
     config: Partial<ILocalMacrosConfig>,
-    version: 'active' | 'inactive' = 'active'
+    version: 'active' | 'inactive' = 'active',
   ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -140,10 +140,14 @@ export class AdtLocalMacros extends AdtClass {
 
     try {
       const { getClassMacrosInclude } = await import('./read');
-      const response = await getClassMacrosInclude(this.connection, config.className, version);
+      const response = await getClassMacrosInclude(
+        this.connection,
+        config.className,
+        version,
+      );
       return {
         readResult: response,
-        errors: []
+        errors: [],
       };
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -160,7 +164,7 @@ export class AdtLocalMacros extends AdtClass {
    */
   async update(
     config: Partial<ILocalMacrosConfig>,
-    options?: IAdtOperationOptions
+    options?: IAdtOperationOptions,
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -176,24 +180,26 @@ export class AdtLocalMacros extends AdtClass {
         throw new Error('Macros code is required for update');
       }
 
-      this.logger?.info?.('Low-level update: performing update only (lockHandle provided)');
+      this.logger?.info?.(
+        'Low-level update: performing update only (lockHandle provided)',
+      );
       const updateResponse = await updateClassMacros(
         this.connection,
         config.className,
         codeToUpdate,
         options.lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       this.logger?.info?.('Local macros updated (low-level)');
       return {
         updateResult: updateResponse,
-        errors: []
+        errors: [],
       };
     }
 
     let lockHandle: string | undefined;
     const state: IClassState = {
-      errors: []
+      errors: [],
     };
 
     try {
@@ -211,7 +217,7 @@ export class AdtLocalMacros extends AdtClass {
           this.connection,
           config.className,
           codeToCheck,
-          'inactive'
+          'inactive',
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local macros check passed');
@@ -224,14 +230,17 @@ export class AdtLocalMacros extends AdtClass {
         config.className,
         codeToCheck!,
         lockHandle,
-        config.transportRequest
+        config.transportRequest,
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local macros updated');
 
       // 4. Unlock parent class (obligatory stateless after unlock)
       this.logger?.info?.('Step 4: Unlocking parent class');
-      const unlockState = await super.unlock({ className: config.className }, lockHandle);
+      const unlockState = await super.unlock(
+        { className: config.className },
+        lockHandle,
+      );
       state.unlockResult = unlockState.unlockResult;
       lockHandle = undefined;
 
@@ -243,7 +252,10 @@ export class AdtLocalMacros extends AdtClass {
           this.logger?.warn?.('Unlocking parent class during error cleanup');
           await super.unlock({ className: config.className }, lockHandle);
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock parent class after error:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock parent class after error:',
+            unlockError,
+          );
         }
       }
 
@@ -264,7 +276,7 @@ export class AdtLocalMacros extends AdtClass {
     // Delete by updating with empty code
     return await this.update({
       ...config,
-      macrosCode: ''
+      macrosCode: '',
     });
   }
 
@@ -284,7 +296,7 @@ export class AdtLocalMacros extends AdtClass {
    */
   async check(
     config: Partial<ILocalMacrosConfig>,
-    version: 'active' | 'inactive' = 'inactive'
+    version: 'active' | 'inactive' = 'inactive',
   ): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -297,12 +309,12 @@ export class AdtLocalMacros extends AdtClass {
       this.connection,
       config.className,
       config.macrosCode,
-      version
+      version,
     );
 
     return {
       checkResult: checkResponse,
-      errors: []
+      errors: [],
     };
   }
 }

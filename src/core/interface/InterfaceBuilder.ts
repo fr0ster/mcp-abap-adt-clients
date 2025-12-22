@@ -9,21 +9,23 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosResponse } from 'axios';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { ILogger } from '@mcp-abap-adt/interfaces';
-import { validateInterfaceName } from './validation';
-import { create as createInterfaceObject, generateInterfaceTemplate } from './create';
-import { lockInterface } from './lock';
-import { checkInterface } from './check';
-import { unlockInterface } from './unlock';
+import type { IBuilder } from '../shared/IBuilder';
 import { activateInterface } from './activation';
+import { checkInterface } from './check';
+import { create as createInterfaceObject } from './create';
 import { deleteInterface } from './delete';
+import { lockInterface } from './lock';
 import { getInterfaceSource } from './read';
-import { get } from 'http';
-import { ICreateInterfaceParams, IInterfaceConfig, IInterfaceState } from './types';
-import { IBuilder } from '../shared/IBuilder';
+import type {
+  ICreateInterfaceParams,
+  IInterfaceConfig,
+  IInterfaceState,
+} from './types';
+import { unlockInterface } from './unlock';
+import { validateInterfaceName } from './validation';
 
 export class InterfaceBuilder implements IBuilder<IInterfaceState> {
   private connection: IAbapConnection;
@@ -36,14 +38,14 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
   constructor(
     connection: IAbapConnection,
     config: IInterfaceConfig,
-    logger?: ILogger
+    logger?: ILogger,
   ) {
     this.connection = connection;
     this.logger = logger || (undefined as unknown as ILogger);
     this.config = { ...config };
     this.sourceCode = config.sourceCode;
     this.state = {
-      errors: []
+      errors: [],
     };
   }
 
@@ -85,9 +87,9 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
         this.connection,
         this.config.interfaceName,
         this.config.packageName,
-        this.config.description
+        this.config.description,
       );
-      
+
       // Store raw response for backward compatibility
       this.state.validationResponse = response;
       this.logger?.info('Validation successful');
@@ -96,18 +98,20 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       // For validation, HTTP 400 might indicate object exists - store response for analysis
       if (error.response && error.response.status === 400) {
         this.state.validationResponse = error.response;
-        this.logger?.info('Interface validation returned 400 - object may already exist');
+        this.logger?.info(
+          'Interface validation returned 400 - object may already exist',
+        );
         return error.response;
       }
       // Store error response if available
       if (error.response) {
         this.state.validationResponse = error.response;
       }
-      
+
       this.state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Validation failed:', error);
       throw error;
@@ -119,27 +123,34 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       if (!this.config.packageName) {
         throw new Error('Package name is required');
       }
-      this.logger?.info('Creating interface object:', this.config.interfaceName);
-      
-      const finalDescription = this.config.description || this.config.interfaceName;
-      
+      this.logger?.info(
+        'Creating interface object:',
+        this.config.interfaceName,
+      );
+
+      const finalDescription =
+        this.config.description || this.config.interfaceName;
+
       // Call low-level function
       const params: ICreateInterfaceParams = {
         interfaceName: this.config.interfaceName,
         description: finalDescription,
         packageName: this.config.packageName,
-        transportRequest: this.config.transportRequest
+        transportRequest: this.config.transportRequest,
       };
       const result = await createInterfaceObject(this.connection, params);
-      
+
       this.state.createResult = result;
-      this.logger?.info('Interface object created successfully:', result.status);
+      this.logger?.info(
+        'Interface object created successfully:',
+        result.status,
+      );
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'create',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Create failed:', error);
       throw error;
@@ -149,13 +160,13 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
   async lock(): Promise<this> {
     try {
       this.logger?.info('Locking interface:', this.config.interfaceName);
-      
+
       // Enable stateful session mode
-      this.connection.setSessionType("stateful");
+      this.connection.setSessionType('stateful');
 
       const lockData = await lockInterface(
         this.connection,
-        this.config.interfaceName
+        this.config.interfaceName,
       );
       this.lockHandle = lockData.lockHandle;
       this.state.lockHandle = lockData.lockHandle;
@@ -171,7 +182,7 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       this.state.errors.push({
         method: 'lock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Lock failed:', error);
       throw error; // Interrupts chain
@@ -181,14 +192,21 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
   async update(sourceCode?: string): Promise<this> {
     try {
       if (!this.lockHandle) {
-        throw new Error('Interface must be locked before update. Call lock() first.');
+        throw new Error(
+          'Interface must be locked before update. Call lock() first.',
+        );
       }
       const code = sourceCode || this.sourceCode;
       if (!code) {
-        throw new Error('Source code is required. Use setCode() or pass as parameter.');
+        throw new Error(
+          'Source code is required. Use setCode() or pass as parameter.',
+        );
       }
-      this.logger?.info('Updating interface source:', this.config.interfaceName);
-      
+      this.logger?.info(
+        'Updating interface source:',
+        this.config.interfaceName,
+      );
+
       const encodedName = this.config.interfaceName.toLowerCase();
       let url = `/sap/bc/adt/oo/interfaces/${encodedName}/source/main?lockHandle=${this.lockHandle}`;
       if (this.config.transportRequest) {
@@ -197,11 +215,17 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
 
       const headers = {
         'Content-Type': 'text/plain; charset=utf-8',
-        'Accept': 'text/plain'
+        Accept: 'text/plain',
       };
 
-      const result = await this.connection.makeAdtRequest({url, method: 'PUT', timeout: getTimeout(), data: code, headers});
-      
+      const result = await this.connection.makeAdtRequest({
+        url,
+        method: 'PUT',
+        timeout: getTimeout(),
+        data: code,
+        headers,
+      });
+
       this.state.updateResult = result;
       this.logger?.info('Interface updated successfully:', result.status);
       return this;
@@ -209,22 +233,27 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       this.state.errors.push({
         method: 'update',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Update failed:', error);
       throw error;
     }
   }
 
-  async check(version: 'active' | 'inactive' = 'inactive', sourceCode?: string): Promise<AxiosResponse> {
+  async check(
+    version: 'active' | 'inactive' = 'inactive',
+    sourceCode?: string,
+  ): Promise<AxiosResponse> {
     try {
       const codeToCheck = sourceCode || this.config.sourceCode;
-      this.logger?.info(`'Checking interface:'  this.config.interfaceName  'version:' ${`version, codeToCheck ? 'with source code' : 'saved version'`}`);
+      this.logger?.info(
+        `'Checking interface:'  this.config.interfaceName  'version:' ${`version, codeToCheck ? 'with source code' : 'saved version'`}`,
+      );
       const result = await checkInterface(
         this.connection,
         this.config.interfaceName,
         version,
-        codeToCheck
+        codeToCheck,
       );
       // Store result for backward compatibility
       this.state.checkResult = result;
@@ -234,7 +263,7 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       this.state.errors.push({
         method: 'check',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Check failed:', error);
       throw error;
@@ -250,22 +279,22 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       const result = await unlockInterface(
         this.connection,
         this.config.interfaceName,
-        this.lockHandle
+        this.lockHandle,
       );
       this.state.unlockResult = result;
       this.lockHandle = undefined;
       this.state.lockHandle = undefined;
       this.logger?.info('Interface unlocked successfully');
-      
+
       // Enable stateless session mode
-      this.connection.setSessionType("stateless");
+      this.connection.setSessionType('stateless');
 
       return this;
     } catch (error: any) {
       this.state.errors.push({
         method: 'unlock',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Unlock failed:', error);
       throw error; // Interrupts chain
@@ -277,7 +306,7 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       this.logger?.info('Activating interface:', this.config.interfaceName);
       const result = await activateInterface(
         this.connection,
-        this.config.interfaceName
+        this.config.interfaceName,
       );
       this.state.activateResult = result;
       this.logger?.info('Interface activated successfully:', result.status);
@@ -286,24 +315,20 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       this.state.errors.push({
         method: 'activate',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Activate failed:', error);
       throw error; // Interrupts chain
     }
   }
 
-
   async delete(): Promise<this> {
     try {
       this.logger?.info('Deleting interface:', this.config.interfaceName);
-      const result = await deleteInterface(
-        this.connection,
-        {
-          interface_name: this.config.interfaceName,
-          transport_request: this.config.transportRequest
-        }
-      );
+      const result = await deleteInterface(this.connection, {
+        interface_name: this.config.interfaceName,
+        transport_request: this.config.transportRequest,
+      });
       this.state.deleteResult = result;
       this.logger?.info('Interface deleted successfully:', result.status);
       return this;
@@ -311,7 +336,7 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       this.state.errors.push({
         method: 'delete',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Delete failed:', error);
       throw error; // Interrupts chain
@@ -320,7 +345,7 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
 
   async read(
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean }
+    options?: { withLongPolling?: boolean },
   ): Promise<IInterfaceConfig | undefined> {
     try {
       this.logger?.info('Reading interface:', this.config.interfaceName);
@@ -328,26 +353,29 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
         this.connection,
         this.config.interfaceName,
         version,
-        options?.withLongPolling !== undefined ? { withLongPolling: options.withLongPolling } : undefined
+        options?.withLongPolling !== undefined
+          ? { withLongPolling: options.withLongPolling }
+          : undefined,
       );
       // Store raw response for backward compatibility
       this.state.readResult = result;
       this.logger?.info('Interface read successfully:', result.status);
-      
+
       // Parse and return config directly
-      const sourceCode = typeof result.data === 'string'
-        ? result.data
-        : JSON.stringify(result.data);
-      
+      const sourceCode =
+        typeof result.data === 'string'
+          ? result.data
+          : JSON.stringify(result.data);
+
       return {
         interfaceName: this.config.interfaceName,
-        sourceCode
+        sourceCode,
       };
     } catch (error: any) {
       this.state.errors.push({
         method: 'read',
         error: error instanceof Error ? error : new Error(String(error)),
-        timestamp: new Date()
+        timestamp: new Date(),
       });
       this.logger?.error('Read failed:', error);
       throw error;
@@ -362,9 +390,12 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       await unlockInterface(
         this.connection,
         this.config.interfaceName,
-        this.lockHandle
+        this.lockHandle,
       );
-      this.logger?.info('Force unlock successful for', this.config.interfaceName);
+      this.logger?.info(
+        'Force unlock successful for',
+        this.config.interfaceName,
+      );
     } catch (error: any) {
       this.logger?.warn('Force unlock failed:', error);
     } finally {
@@ -414,7 +445,6 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
     return this.state.activateResult;
   }
 
-
   getDeleteResult(): AxiosResponse | undefined {
     return this.state.deleteResult;
   }
@@ -425,17 +455,22 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
     }
 
     // Interface read() returns source code (plain text)
-    const sourceCode = typeof this.state.readResult.data === 'string'
-      ? this.state.readResult.data
-      : JSON.stringify(this.state.readResult.data);
+    const sourceCode =
+      typeof this.state.readResult.data === 'string'
+        ? this.state.readResult.data
+        : JSON.stringify(this.state.readResult.data);
 
     return {
       interfaceName: this.config.interfaceName,
-      sourceCode
+      sourceCode,
     };
   }
 
-  getErrors(): ReadonlyArray<{ method: string; error: Error; timestamp: Date }> {
+  getErrors(): ReadonlyArray<{
+    method: string;
+    error: Error;
+    timestamp: Date;
+  }> {
     return [...this.state.errors];
   }
 
@@ -462,8 +497,7 @@ export class InterfaceBuilder implements IBuilder<IInterfaceState> {
       delete: this.state.deleteResult,
       read: this.state.readResult,
       lockHandle: this.lockHandle,
-      errors: [...this.state.errors]
+      errors: [...this.state.errors],
     };
   }
 }
-

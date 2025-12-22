@@ -22,4 +22,3 @@ export function encodeSapObjectName(objectName: string): string {
 export function limitDescription(description: string): string {
   return description.length > 60 ? description.substring(0, 60) : description;
 }
-

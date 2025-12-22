@@ -3,18 +3,24 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
+import {
+  encodeSapObjectName,
+  limitDescription,
+} from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName, limitDescription } from '../../utils/internalUtils';
-import { ICreatePackageParams } from './types';
+import type { ICreatePackageParams } from './types';
 
 /**
  * Build XML for package update (similar to create)
  * Note: masterSystem and responsible should only be included for cloud systems
  */
-async function buildUpdatePackageXml(connection: IAbapConnection, args: ICreatePackageParams): Promise<string> {
+async function buildUpdatePackageXml(
+  connection: IAbapConnection,
+  args: ICreatePackageParams,
+): Promise<string> {
   const { getSystemInformation } = await import('../../utils/systemInfo');
-  
+
   // Get system information - only for cloud systems
   const systemInfo = await getSystemInformation(connection);
   const username = systemInfo?.userName || '';
@@ -22,10 +28,14 @@ async function buildUpdatePackageXml(connection: IAbapConnection, args: ICreateP
 
   // Only add masterSystem and responsible for cloud systems
   const masterSystem = systemInfo ? systemId : '';
-  const responsible = systemInfo ? (args.responsible || username) : '';
+  const responsible = systemInfo ? args.responsible || username : '';
 
-  const masterSystemAttr = masterSystem ? ` adtcore:masterSystem="${masterSystem}"` : '';
-  const responsibleAttr = responsible ? ` adtcore:responsible="${responsible}"` : '';
+  const masterSystemAttr = masterSystem
+    ? ` adtcore:masterSystem="${masterSystem}"`
+    : '';
+  const responsibleAttr = responsible
+    ? ` adtcore:responsible="${responsible}"`
+    : '';
 
   const softwareComponentName = args.software_component || 'HOME';
   const transportLayerXml = args.transport_layer
@@ -69,13 +79,13 @@ export interface UpdatePackageParams extends ICreatePackageParams {
 
 /**
  * Update package with new data
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updatePackage(
   connection: IAbapConnection,
   params: UpdatePackageParams,
-  lockHandle: string
+  lockHandle: string,
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('package_name is required');
@@ -88,7 +98,8 @@ export async function updatePackage(
 
   const headers = {
     'Content-Type': 'application/vnd.sap.adt.packages.v2+xml',
-    'Accept': 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml'
+    Accept:
+      'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
   };
 
   return await connection.makeAdtRequest({
@@ -96,14 +107,14 @@ export async function updatePackage(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 }
 
 /**
  * Update only package description (safe update - only modifiable field)
  * Generates minimal XML with updated description without reading current package
- * 
+ *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
 export async function updatePackageDescription(
@@ -111,7 +122,7 @@ export async function updatePackageDescription(
   packageName: string,
   description: string,
   lockHandle: string,
-  superPackage?: string
+  superPackage?: string,
 ): Promise<AxiosResponse> {
   if (!packageName) {
     throw new Error('package_name is required');
@@ -122,17 +133,16 @@ export async function updatePackageDescription(
 
   // Description is limited to 60 characters in SAP ADT
   const limitedDescription = limitDescription(description);
-  
+
   // Generate minimal package XML with just description update
   // We don't need to GET the full package - SAP will merge this with existing data
   const params: UpdatePackageParams = {
     package_name: packageName,
     super_package: superPackage || '',
     description: limitedDescription,
-    package_type: 'development' // Default, SAP will use existing if not changing
+    package_type: 'development', // Default, SAP will use existing if not changing
   };
-  
+
   // Use the full updatePackage which doesn't do GET
   return updatePackage(connection, params, lockHandle);
 }
-

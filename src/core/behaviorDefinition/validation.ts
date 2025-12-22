@@ -1,18 +1,18 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { AxiosResponse } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { IBehaviorDefinitionValidationParams } from './types';
+import type { IBehaviorDefinitionValidationParams } from './types';
 
 /**
  * Validate behavior definition parameters before creation
- * 
+ *
  * Endpoint: POST /sap/bc/adt/bo/behaviordefinitions/validation
- * 
+ *
  * @param connection - ABAP connection instance
  * @param params - Validation parameters
  * @param sessionId - Session ID for request tracking
  * @returns Axios response with validation result
- * 
+ *
  * @example
  * ```typescript
  * const result = await validate(connection, {
@@ -22,7 +22,7 @@ import { IBehaviorDefinitionValidationParams } from './types';
  *   package: 'Z_PACKAGE',
  *   implementationType: 'Managed'
  * }, sessionId);
- * 
+ *
  * // Check validation result
  * const severity = result.data.match(/<SEVERITY>([^<]+)<\/SEVERITY>/)?.[1];
  * if (severity === 'OK') {
@@ -31,33 +31,33 @@ import { IBehaviorDefinitionValidationParams } from './types';
  * ```
  */
 export async function validate(
-    connection: IAbapConnection,
-    params: IBehaviorDefinitionValidationParams
+  connection: IAbapConnection,
+  params: IBehaviorDefinitionValidationParams,
 ): Promise<AxiosResponse> {
-    try {
-        const queryParams = new URLSearchParams({
-            objname: params.objname,
-            rootEntity: params.rootEntity,
-            description: params.description,
-            package: params.package,
-            implementationType: params.implementationType
-        });
+  try {
+    const queryParams = new URLSearchParams({
+      objname: params.objname,
+      rootEntity: params.rootEntity,
+      description: params.description,
+      package: params.package,
+      implementationType: params.implementationType,
+    });
 
-        const url = `/sap/bc/adt/bo/behaviordefinitions/validation?${queryParams.toString()}`;
+    const url = `/sap/bc/adt/bo/behaviordefinitions/validation?${queryParams.toString()}`;
 
-        const response = await connection.makeAdtRequest({
-            url,
-            method: 'POST',
-            timeout: getTimeout('default'),
-            headers: {
-                'Accept': 'application/vnd.sap.as+xml'
-            }
-        });
+    const response = await connection.makeAdtRequest({
+      url,
+      method: 'POST',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: 'application/vnd.sap.as+xml',
+      },
+    });
 
-        return response;
-    } catch (error: any) {
-        throw new Error(
-            `Failed to validate behavior definition ${params.objname}: ${error.message}`
-        );
-    }
+    return response;
+  } catch (error: any) {
+    throw new Error(
+      `Failed to validate behavior definition ${params.objname}: ${error.message}`,
+    );
+  }
 }

@@ -3,19 +3,19 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { getTimeout } from '../../utils/timeouts';
-import { AxiosResponse } from 'axios';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import type { AxiosResponse } from 'axios';
 import { parseCheckRunResponse } from '../../utils/checkRun';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 
 /**
  * Build check run XML payload for function module
  */
 function buildCheckRunXml(
-  functionGroupName: string, 
-  functionModuleName: string, 
-  version: string, 
-  sourceCode?: string
+  functionGroupName: string,
+  functionModuleName: string,
+  version: string,
+  sourceCode?: string,
 ): string {
   const encodedGroup = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModule = encodeSapObjectName(functionModuleName).toLowerCase();
@@ -62,12 +62,17 @@ export async function checkFunctionModule(
   functionGroupName: string,
   functionModuleName: string,
   version: 'active' | 'inactive',
-  sourceCode?: string
+  sourceCode?: string,
 ): Promise<AxiosResponse> {
-  const xmlBody = buildCheckRunXml(functionGroupName, functionModuleName, version, sourceCode);
+  const xmlBody = buildCheckRunXml(
+    functionGroupName,
+    functionModuleName,
+    version,
+    sourceCode,
+  );
   const headers = {
-    'Accept': 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml'
+    Accept: 'application/vnd.sap.adt.checkmessages+xml',
+    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
   };
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
 
@@ -76,7 +81,7 @@ export async function checkFunctionModule(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers
+    headers,
   });
 
   const checkResult = parseCheckRunResponse(response);
@@ -87,8 +92,9 @@ export async function checkFunctionModule(
   // Only throw error if there are actual ERROR or WARNING messages
 
   // If message indicates object was already checked, it's OK (even if has errors/warnings)
-  const isAlreadyChecked = checkResult.message?.toLowerCase().includes('has been checked') ||
-                          checkResult.message?.toLowerCase().includes('was checked');
+  const isAlreadyChecked =
+    checkResult.message?.toLowerCase().includes('has been checked') ||
+    checkResult.message?.toLowerCase().includes('was checked');
 
   if (isAlreadyChecked) {
     return response; // Object was already checked - this is OK
@@ -96,18 +102,23 @@ export async function checkFunctionModule(
 
   // Problems: ERROR (errors) and WARNING (warnings)
   if (checkResult.errors.length > 0) {
-    throw new Error(`Function module check failed: ${checkResult.message || 'Unknown error'}`);
+    throw new Error(
+      `Function module check failed: ${checkResult.message || 'Unknown error'}`,
+    );
   }
 
   if (checkResult.warnings.length > 0) {
-    throw new Error(`Function module check failed: ${checkResult.message || 'Warnings found'}`);
+    throw new Error(
+      `Function module check failed: ${checkResult.message || 'Warnings found'}`,
+    );
   }
 
   // If status is 'notProcessed', it's an error
   if (checkResult.status === 'notProcessed') {
-    throw new Error(`Function module check failed: ${checkResult.message || 'Object could not be processed'}`);
+    throw new Error(
+      `Function module check failed: ${checkResult.message || 'Object could not be processed'}`,
+    );
   }
 
   return response;
 }
-
