@@ -5,6 +5,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.6] - 2025-12-22
+
+### Added
+- **Biome Linter**: Replaced ESLint with Biome for faster, more efficient linting
+  - 10-20x faster than ESLint
+  - Single tool for linting and formatting (replaces ESLint + Prettier)
+  - Added `biome.json` configuration with TypeScript rules
+  - New npm scripts: `lint`, `lint:check`, `format`
+  - Integrated into build process to catch issues before compilation
+
+- **CI Workflow**: Added GitHub Actions CI workflow for continuous validation
+  - Runs on every push and pull request
+  - Validates with Biome lint (error-level diagnostics only)
+  - Type checks with TypeScript compiler
+  - Verifies successful build
+  - Faster CI runs thanks to Biome performance
+
+### Fixed
+- **Code Quality**: Fixed 7 lint errors found by Biome
+  - Removed unreachable code after throw statements in `AdtMetadataExtension.ts`
+  - Fixed `forEach` callbacks returning values in `snapshots.ts`
+  - Added explicit type for `RegExpExecArray | null` in `tableContents.ts`
+  - Fixed assignment in expression pattern in while loop
+
+- **TypeScript Errors**: Fixed 5 compilation errors
+  - Added missing `logger` property in `AdtRuntimeClient`
+  - Added missing `adtView` property in `AdtCdsUnitTest`
+  - Added missing `logger` property in `AdtUtils`
+  - Fixed `string | undefined` type issues in `create.ts` and `update.ts` for data elements
+
+### Changed
+- **Build Process**: Build now runs Biome lint before TypeScript compilation
+  - Catches lint issues early in development
+  - Ensures code quality standards before type checking
+  - Prevents common errors from reaching production
+
 ## [0.2.5] - 2025-12-21
 
 ### Changed
