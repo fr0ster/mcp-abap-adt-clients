@@ -333,4 +333,12 @@ export class AdtLocalTestClass extends AdtClass {
       errors: [],
     };
   }
+
+  // TODO: Investigate lock/unlock/delete operations for local test classes
+  // - Currently uses parent class lock (lockClass) for update operations
+  // - There is a separate lockClassTestClasses() function that locks /includes/testclasses endpoint
+  // - Eclipse ADT logs show parent class lock is used before updating local includes
+  // - Need to verify if /includes/testclasses?_action=LOCK endpoint exists in ADT discovery
+  // - Delete operation currently uses update() with empty code, but validation prevents empty strings
+  // - Consider: Should delete() bypass validation or use a different approach?
 }

@@ -317,4 +317,10 @@ export class AdtLocalTypes extends AdtClass {
       errors: [],
     };
   }
+
+  // TODO: Investigate lock/unlock/delete operations for local types
+  // - Currently uses parent class lock (lockClass) for all operations
+  // - Eclipse ADT logs show parent class lock is used before updating local includes
+  // - Delete operation currently uses update() with empty code, but validation prevents empty strings
+  // - Consider: Should delete() bypass validation or use a different approach?
 }
