@@ -12,6 +12,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT) with a **Builder and Cli
 - ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
 - ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
 - ✅ **TypeScript-first** – full type safety with comprehensive interfaces
+- ✅ **Response headers are normalized** – ADT response headers can be non-string; normalize before parsing in contributors’ code
 
 ## Responsibilities and Design Principles
 
