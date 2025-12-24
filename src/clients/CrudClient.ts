@@ -5,7 +5,7 @@
  * Methods return `this` for chaining. Results stored in state and accessible via getters.
  */
 
-import type { AxiosResponse } from 'axios';
+import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
 import {
   BehaviorDefinitionBuilder,
   type IBehaviorDefinitionConfig,
@@ -51,6 +51,7 @@ import { type IStructureConfig, StructureBuilder } from '../core/structure';
 import { type ITableConfig, TableBuilder } from '../core/table';
 import { TransportBuilder } from '../core/transport';
 import { type IViewConfig, ViewBuilder } from '../core/view';
+import { headerValueToString } from '../utils/internalUtils';
 import { ReadOnlyClient } from './ReadOnlyClient';
 
 interface CrudClientState {
@@ -529,9 +530,9 @@ export class CrudClient extends ReadOnlyClient {
     );
     this.crudState.abapUnitRunResponse = response;
     const location =
-      response.headers?.location ||
-      response.headers?.['content-location'] ||
-      response.headers?.['sap-adt-location'];
+      headerValueToString(response.headers?.location) ||
+      headerValueToString(response.headers?.['content-location']) ||
+      headerValueToString(response.headers?.['sap-adt-location']);
     if (location) {
       const runId = location.split('/').pop();
       if (runId) {

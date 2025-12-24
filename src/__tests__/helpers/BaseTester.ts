@@ -804,7 +804,7 @@ export class BaseTester<TConfig, TState> {
     return async () => {
       if (this.connection) {
         this.log(LogLevel.INFO, 'afterAll: Resetting connection');
-        this.connection.reset();
+        (this.connection as any).reset();
       }
     };
   }

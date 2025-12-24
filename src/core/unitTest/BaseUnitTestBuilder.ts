@@ -5,7 +5,10 @@
  */
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import {
+  encodeSapObjectName,
+  headerValueToString,
+} from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IClassBuilderConfig } from '../class';
 import { ClassBuilder } from '../class/ClassBuilder';
@@ -196,9 +199,13 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
 
       // Extract run ID from response headers
       const runId =
-        response.headers?.location?.split('/').pop() ||
-        response.headers?.['content-location']?.split('/').pop() ||
-        response.headers?.['sap-adt-location']?.split('/').pop();
+        headerValueToString(response.headers?.location)?.split('/').pop() ||
+        headerValueToString(response.headers?.['content-location'])
+          ?.split('/')
+          .pop() ||
+        headerValueToString(response.headers?.['sap-adt-location'])
+          ?.split('/')
+          .pop();
 
       if (!runId) {
         throw new Error('Failed to extract run ID from response');
@@ -235,9 +242,13 @@ export abstract class BaseUnitTestBuilder extends ClassBuilder {
 
       // Extract run ID from response headers
       const runId =
-        response.headers?.location?.split('/').pop() ||
-        response.headers?.['content-location']?.split('/').pop() ||
-        response.headers?.['sap-adt-location']?.split('/').pop();
+        headerValueToString(response.headers?.location)?.split('/').pop() ||
+        headerValueToString(response.headers?.['content-location'])
+          ?.split('/')
+          .pop() ||
+        headerValueToString(response.headers?.['sap-adt-location'])
+          ?.split('/')
+          .pop();
 
       if (!runId) {
         throw new Error('Failed to extract run ID from response');

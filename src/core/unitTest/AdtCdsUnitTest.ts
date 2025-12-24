@@ -10,8 +10,12 @@
  * Uses AdtClass for test class lifecycle operations and AdtUnitTest for test execution.
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import { headerValueToString } from '../../utils/internalUtils';
 import { startClassUnitTestRunByObject } from '../class/run';
 import type { IClassState } from '../class/types';
 import { AdtView } from '../view/AdtView';
@@ -301,9 +305,13 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           options,
         );
         const runId =
-          response.headers?.location?.split('/').pop() ||
-          response.headers?.['content-location']?.split('/').pop() ||
-          response.headers?.['sap-adt-location']?.split('/').pop() ||
+          headerValueToString(response.headers?.location)?.split('/').pop() ||
+          headerValueToString(response.headers?.['content-location'])
+            ?.split('/')
+            .pop() ||
+          headerValueToString(response.headers?.['sap-adt-location'])
+            ?.split('/')
+            .pop() ||
           this.extractRunId(response);
         if (!runId) {
           throw new Error('Failed to extract run ID from response');

@@ -2,8 +2,10 @@
  * Domain activation operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 

@@ -102,7 +102,7 @@ describe('Shared - readMetadata', () => {
 
   afterEach(async () => {
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
   });
 

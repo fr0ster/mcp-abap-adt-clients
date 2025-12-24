@@ -17,8 +17,10 @@
  * the generic /sap/bc/adt/functions/validation endpoint.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
 

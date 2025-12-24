@@ -2,8 +2,10 @@
  * Group Deletion operations - delete multiple objects with session support
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IObjectReference } from './types';

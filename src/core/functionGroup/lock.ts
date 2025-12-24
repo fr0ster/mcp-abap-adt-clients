@@ -2,9 +2,12 @@
  * Lock Function Group operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { headerValueToString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -35,7 +38,7 @@ export async function lockFunctionGroup(
   });
 
   // Extract lock handle from response header
-  const lockHandle = response.headers['sap-adt-lm-handle'];
+  const lockHandle = headerValueToString(response.headers['sap-adt-lm-handle']);
   if (!lockHandle) {
     // Try parsing from XML body if header not present
     const parser = new XMLParser({

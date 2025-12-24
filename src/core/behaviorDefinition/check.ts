@@ -2,8 +2,10 @@
  * Behavior Definition check operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import type { CheckReporter } from './types';
 

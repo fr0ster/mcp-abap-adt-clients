@@ -3,6 +3,10 @@
  * These are private utilities used internally by client classes
  */
 
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+
+type AdtHeaderValue = IAdtResponse['headers'][string];
+
 /**
  * Encodes SAP object names for use in URLs
  * Handles namespaces with forward slashes that need to be URL encoded
@@ -21,4 +25,22 @@ export function encodeSapObjectName(objectName: string): string {
  */
 export function limitDescription(description: string): string {
   return description.length > 60 ? description.substring(0, 60) : description;
+}
+
+export function headerValueToString(
+  value: AdtHeaderValue | undefined,
+): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return undefined;
+    }
+    return String(value[0]);
+  }
+  if (typeof value === 'object') {
+    return undefined;
+  }
+  return String(value);
 }

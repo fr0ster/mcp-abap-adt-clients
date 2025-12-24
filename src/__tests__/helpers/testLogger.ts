@@ -12,7 +12,7 @@
  *   DEBUG_ADT_E2E_TESTS=true               - Enable E2E test logging
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger, LogLevel } from '@mcp-abap-adt/interfaces';
 // Import only what we need to avoid side effects from pinoLogger initialization
 // When importing from '@mcp-abap-adt/logger', it executes: export const pinoLogger = new PinoLogger()
 // This causes an error if 'pino' is not installed, even though we don't use pinoLogger
@@ -55,7 +55,7 @@ export function isDebugEnabled(scope: DebugScope): boolean {
  * Get current log level (for debugging)
  * Uses getLogLevel from @mcp-abap-adt/logger which respects AUTH_LOG_LEVEL
  */
-export function getCurrentLogLevel() {
+export function getCurrentLogLevel(): LogLevel {
   return getLogLevel();
 }
 

@@ -2,7 +2,7 @@
  * ServiceDefinition module type definitions
  */
 
-import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { IAdtObjectState, IAdtResponse } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
 export interface ICreateServiceDefinitionParams {
@@ -34,7 +34,7 @@ export interface IServiceDefinitionConfig {
 }
 
 export interface IServiceDefinitionState extends IAdtObjectState {
-  readSourceResult?: import('axios').AxiosResponse;
+  readSourceResult?: IAdtResponse;
   // All operation results are in IAdtObjectState:
   // validationResponse, createResult, lockHandle, updateResult, checkResult,
   // unlockResult, activateResult, deleteResult, readResult, transportResult, errors

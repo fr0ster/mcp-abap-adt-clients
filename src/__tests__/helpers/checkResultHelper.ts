@@ -6,7 +6,7 @@
  * Warnings (type "W") are considered acceptable.
  */
 
-import type { AxiosResponse } from 'axios';
+import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse } from '../../utils/checkRun';
 
 /**

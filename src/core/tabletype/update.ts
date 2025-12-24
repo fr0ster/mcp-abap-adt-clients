@@ -6,8 +6,10 @@
  * 2. Classic DDIC TableType - via XML format with rowType and typeName (like Domain/DataElement)
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import {
   encodeSapObjectName,
   limitDescription,

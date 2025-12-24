@@ -4,8 +4,10 @@
  * Uses standard ABAP check run endpoint
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { runCheckRun } from '../../utils/checkRun';
 
 /**

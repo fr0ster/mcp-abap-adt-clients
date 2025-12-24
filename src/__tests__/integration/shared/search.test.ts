@@ -101,7 +101,7 @@ describe('Shared - searchObjects', () => {
 
   afterEach(async () => {
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
   });
 

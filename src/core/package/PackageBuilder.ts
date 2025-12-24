@@ -27,8 +27,11 @@
  * ```
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { checkPackage } from './check';
 import { createPackage } from './create';

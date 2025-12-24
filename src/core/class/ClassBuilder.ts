@@ -34,8 +34,11 @@
  * ```
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activateClass } from './activation';
 import { checkClass } from './check';
 import { create as createClassObject } from './create';

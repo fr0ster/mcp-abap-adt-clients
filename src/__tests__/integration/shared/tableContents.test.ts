@@ -98,7 +98,7 @@ describe('Shared - getTableContents', () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, testsLogger);
-      await connection.connect();
+      await (connection as any).connect();
       client = new AdtClient(connection, testsLogger);
       hasConfig = true;
       // Check if this is a cloud system using system information endpoint
@@ -113,7 +113,7 @@ describe('Shared - getTableContents', () => {
 
   afterEach(async () => {
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
   });
 

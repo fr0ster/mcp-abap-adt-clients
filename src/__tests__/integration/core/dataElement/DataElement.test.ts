@@ -93,7 +93,7 @@ describe('DataElementBuilder (using AdtClient)', () => {
 
   afterAll(async () => {
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
   });
 

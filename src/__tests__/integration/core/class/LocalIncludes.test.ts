@@ -244,7 +244,7 @@ describe('Class local includes (using BaseTester)', () => {
       return definitionsTester.afterAll()();
     }
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
     return Promise.resolve();
   });

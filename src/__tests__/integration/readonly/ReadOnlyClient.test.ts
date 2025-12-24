@@ -165,7 +165,7 @@ describe('ReadOnlyClient', () => {
           expect(result?.[groupParamName] || result?.group).toBe(groupName);
         }
         expect(getReadResultFn()).toBeDefined();
-        expect(client?.getReadResult()).toBeDefined();
+        expect(client!.getReadResult()).toBeDefined();
 
         logBuilderTestSuccess(testsLogger, `ReadOnlyClient - ${testName}`);
       } catch (error) {
@@ -183,8 +183,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readProgram',
         'program',
-        (name) => client?.readProgram(name),
-        () => client?.getProgramReadResult(),
+        (name) => client!.readProgram(name),
+        () => client!.getProgramReadResult(),
         'programName',
         undefined,
         'read_program',
@@ -200,8 +200,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readClass',
         'class',
-        (name) => client?.readClass(name),
-        () => client?.getClassReadResult(),
+        (name) => client!.readClass(name),
+        () => client!.getClassReadResult(),
         'className',
         undefined,
         'read_class',
@@ -217,8 +217,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readInterface',
         'interface',
-        (name) => client?.readInterface(name),
-        () => client?.getInterfaceReadResult(),
+        (name) => client!.readInterface(name),
+        () => client!.getInterfaceReadResult(),
         'interfaceName',
         undefined,
         'read_interface',
@@ -234,8 +234,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readDomain',
         'domain',
-        (name) => client?.readDomain(name),
-        () => client?.getDomainReadResult(),
+        (name) => client!.readDomain(name),
+        () => client!.getDomainReadResult(),
         'domainName',
         undefined,
         'read_domain',
@@ -251,8 +251,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readDataElement',
         'dataElement',
-        (name) => client?.readDataElement(name),
-        () => client?.getDataElementReadResult(),
+        (name) => client!.readDataElement(name),
+        () => client!.getDataElementReadResult(),
         'dataElementName',
         undefined,
         'read_data_element',
@@ -268,8 +268,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readStructure',
         'structure',
-        (name) => client?.readStructure(name),
-        () => client?.getStructureReadResult(),
+        (name) => client!.readStructure(name),
+        () => client!.getStructureReadResult(),
         'structureName',
         undefined,
         'read_structure',
@@ -419,8 +419,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readView',
         'view',
-        (name) => client?.readView(name),
-        () => client?.getViewReadResult(),
+        (name) => client!.readView(name),
+        () => client!.getViewReadResult(),
         'viewName',
         undefined,
         'read_view',
@@ -436,8 +436,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readFunctionGroup',
         'function_group',
-        (name) => client?.readFunctionGroup(name),
-        () => client?.getFunctionGroupReadResult(),
+        (name) => client!.readFunctionGroup(name),
+        () => client!.getFunctionGroupReadResult(),
         'functionGroupName',
         undefined,
         'read_function_group',
@@ -453,8 +453,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readFunctionModule',
         'function_module',
-        (name, group) => client?.readFunctionModule(name, group!),
-        () => client?.getFunctionModuleReadResult(),
+        (name, group) => client!.readFunctionModule(name, group!),
+        () => client!.getFunctionModuleReadResult(),
         'functionModuleName',
         'functionGroupName',
         'read_function_module',
@@ -470,8 +470,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readPackage',
         'package',
-        (name) => client?.readPackage(name),
-        () => client?.getPackageReadResult(),
+        (name) => client!.readPackage(name),
+        () => client!.getPackageReadResult(),
         'packageName',
         undefined,
         'read_package',
@@ -487,8 +487,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readServiceDefinition',
         'serviceDefinition',
-        (name) => client?.readServiceDefinition(name),
-        () => client?.getServiceDefinitionReadResult(),
+        (name) => client!.readServiceDefinition(name),
+        () => client!.getServiceDefinitionReadResult(),
         'serviceDefinitionName',
         undefined,
         'read_service_definition',

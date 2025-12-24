@@ -79,7 +79,7 @@ describe('Group Activation (SharedBuilder)', () => {
 
   afterAll(async () => {
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
   });
 

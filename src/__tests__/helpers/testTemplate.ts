@@ -48,7 +48,7 @@ describe('Module - Operation', () => {
 
   afterAll(async () => {
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
   });
 

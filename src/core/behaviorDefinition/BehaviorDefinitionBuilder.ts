@@ -9,8 +9,11 @@
  * - Chain interruption: chain stops on first error (standard Promise behavior)
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { activate } from './activation';
 import { checkAbap, checkImplementation } from './check';
 import { create } from './create';

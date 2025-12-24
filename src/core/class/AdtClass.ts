@@ -17,6 +17,7 @@
  * - Delete: check(deletion) → delete
  */
 
+import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
 import {
   AdtObjectErrorCodes,
   type IAbapConnection,
@@ -24,7 +25,6 @@ import {
   type IAdtOperationOptions,
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
 import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
 import { create as createClass } from './create';
@@ -382,14 +382,12 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
       if (options?.activateOnUpdate) {
         this.logger?.info?.('Step 6: Activating class');
-        state.activateResult = await activateClass(
+        const activateResult = await activateClass(
           this.connection,
           config.className,
         );
-        this.logger?.info?.(
-          'Class activated, status:',
-          state.activateResult.status,
-        );
+        state.activateResult = activateResult;
+        this.logger?.info?.('Class activated, status:', activateResult.status);
 
         // 6.5. Read with long polling to ensure object is ready after activation
         this.logger?.info?.('read (wait for object ready after activation)');

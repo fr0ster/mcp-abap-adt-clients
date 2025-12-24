@@ -3,8 +3,10 @@
  * All activation and check methods are implemented here once and reused by clients
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { getTimeout } from './timeouts';
 
 /**

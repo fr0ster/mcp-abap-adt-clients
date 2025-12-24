@@ -76,19 +76,6 @@ npm install -g @mcp-abap-adt/adt-clients
 npm install @mcp-abap-adt/adt-clients
 ```
 
-### CLI Tools
-
-After global installation, you get 6 CLI commands:
-
-- `adt-lock-object` - Lock an object and save session
-- `adt-unlock-object` - Unlock using saved session
-- `adt-manage-locks` - View/manage lock registry
-- `adt-manage-sessions` - View/manage session files
-- `adt-unlock-objects` - Cleanup test objects
-- `adt-backup` - Backup and restore ADT objects
-
-See [CLI Tools documentation](./bin/README.md) for details.
-
 ## Architecture
 
 ### Three-Layer API
@@ -318,55 +305,6 @@ await builder
   .then(b => b.unlock())            // Unlock
   .then(b => b.activate());        // Activate
 ```
-
-## CLI Tools
-
-After installation, the following commands are available:
-
-### Manage Locks
-
-```bash
-# List all active locks
-adt-manage-locks list
-
-# Clean up stale locks
-adt-manage-locks cleanup
-
-# Unlock specific object
-adt-manage-locks unlock class ZCL_TEST
-```
-
-### Manage Sessions
-
-```bash
-# List all sessions
-adt-manage-sessions list
-
-# Show session details
-adt-manage-sessions info <sessionId>
-
-# Clean up stale sessions
-adt-manage-sessions cleanup
-```
-
-### Backup and Restore
-
-```bash
-# Create editable YAML backup from a package (recursive)
-adt-backup backup --package ZPKG_TEST --output backup.yaml
-
-# Restore in dependency-aware order
-adt-backup restore --input backup.yaml --mode upsert --activate
-
-# Preview lightweight tree without codeBase64 payloads
-adt-backup tree --package ZPKG_TEST --output tree.yaml
-
-# Extract/patch encoded payload for a single object
-adt-backup extract --input backup.yaml --object class:ZCL_TEST --out ZCL_TEST.abap
-adt-backup patch --input backup.yaml --object class:ZCL_TEST --file ZCL_TEST.abap
-```
-
-See [bin/README.md](bin/README.md) for details.
 
 ## Developer Tools
 

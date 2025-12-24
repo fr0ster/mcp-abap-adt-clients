@@ -1,4 +1,4 @@
-import type { AxiosResponse } from 'axios';
+import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
 
 /**
  * Implementation type for Behavior Definition

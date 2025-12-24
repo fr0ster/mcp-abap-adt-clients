@@ -37,7 +37,7 @@ describe('Example: Session Persistence', () => {
 
   afterAll(async () => {
     if (connection) {
-      connection.reset();
+      (connection as any).reset();
     }
   });
 

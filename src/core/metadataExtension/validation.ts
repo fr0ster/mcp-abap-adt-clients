@@ -5,8 +5,11 @@
  * Uses ADT validation endpoint: /sap/bc/adt/ddic/ddlx/sources/validation
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { AxiosError, type AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
+import { AxiosError } from 'axios';
 import { getTimeout } from '../../utils/timeouts';
 import type { IMetadataExtensionValidationParams } from './types';
 

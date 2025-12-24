@@ -3,7 +3,7 @@
  * Ensures consistent API across all builder implementations
  */
 
-import type { AxiosResponse } from 'axios';
+import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
 import type { IBehaviorDefinitionConfig } from '../behaviorDefinition/types';
 import type { IClassConfig } from '../class/types';
 import type { IDataElementConfig } from '../dataElement/types';

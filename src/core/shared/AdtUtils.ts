@@ -28,8 +28,11 @@
  * ```
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinition/read';
 import { getEnhancementMetadata } from '../enhancement/read';
 import { getPackageContents } from '../package/read';

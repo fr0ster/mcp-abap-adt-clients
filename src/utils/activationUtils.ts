@@ -6,8 +6,10 @@
  * 2. Group activation: /sap/bc/adt/activation/runs (for multiple objects)
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
 

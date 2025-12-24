@@ -20,12 +20,13 @@
  */
 
 import type {
+  IAdtResponse as AxiosResponse,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import { headerValueToString } from '../../utils/internalUtils';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
 import { startClassUnitTestRun } from './run';
@@ -327,9 +328,9 @@ export class AdtUnitTest
   protected extractRunId(response: AxiosResponse): string | undefined {
     // First, try to extract from response headers (most reliable)
     const locationHeader =
-      response.headers?.location ||
-      response.headers?.['content-location'] ||
-      response.headers?.['sap-adt-location'];
+      headerValueToString(response.headers?.location) ||
+      headerValueToString(response.headers?.['content-location']) ||
+      headerValueToString(response.headers?.['sap-adt-location']);
     if (locationHeader) {
       const runIdMatch = locationHeader.match(/\/runs\/([^/]+)/);
       if (runIdMatch) {

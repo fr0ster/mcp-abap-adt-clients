@@ -2,10 +2,13 @@
  * Group Activation operations - activate multiple objects with session support
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { buildObjectUri } from '../../utils/activationUtils';
+import { headerValueToString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IObjectReference } from './types';
 
@@ -15,12 +18,15 @@ const xmlParser = new XMLParser({
   parseAttributeValue: false,
 });
 
+type AdtHeaderValue = AxiosResponse['headers'][string];
+
 /**
  * Extract run ID from location header
  */
-function extractRunId(location: string | undefined): string | null {
-  if (!location) return null;
-  const match = location.match(/\/activation\/runs\/([^/]+)/);
+function extractRunId(location: AdtHeaderValue | undefined): string | null {
+  const locationValue = headerValueToString(location);
+  if (!locationValue) return null;
+  const match = locationValue.match(/\/activation\/runs\/([^/]+)/);
   return match ? match[1] : null;
 }
 
@@ -165,10 +171,10 @@ ${objectReferences}
 
   // Extract run ID from location header
   const location =
-    startResponse.headers?.location ||
-    startResponse.headers?.Location ||
-    startResponse.headers?.['content-location'] ||
-    startResponse.headers?.['Content-Location'];
+    headerValueToString(startResponse.headers?.location) ||
+    headerValueToString(startResponse.headers?.Location) ||
+    headerValueToString(startResponse.headers?.['content-location']) ||
+    headerValueToString(startResponse.headers?.['Content-Location']);
 
   const runId = extractRunId(location);
   if (!runId) {

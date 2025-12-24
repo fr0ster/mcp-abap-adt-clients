@@ -3,8 +3,10 @@
  * Uses ADT validation endpoint: /sap/bc/adt/functions/groups/validation
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
 import {
   encodeSapObjectName,
   limitDescription,

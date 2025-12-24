@@ -77,19 +77,6 @@ describe('My Test', () => {
    - Can unlock objects after test failures
    - Cross-process lock tracking
 
-3. **CLI Management**
-   ```bash
-   # View sessions
-   adt-manage-sessions list
-   
-   # View locks
-   adt-manage-locks list
-   
-   # Cleanup stale sessions/locks
-   adt-manage-sessions cleanup
-   adt-manage-locks cleanup
-   ```
-
 ## Files Generated
 
 ### Session Files

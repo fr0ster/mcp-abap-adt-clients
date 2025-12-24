@@ -29,8 +29,11 @@
  * ```
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
-import type { AxiosResponse } from 'axios';
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import type { IBuilder } from '../shared/IBuilder';
 import { activateTable } from './activation';
 import { runTableCheckRun } from './check';
