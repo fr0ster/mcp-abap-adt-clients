@@ -58,6 +58,7 @@ import { getSqlQuery } from './sqlQuery';
 import { getTableContents } from './tableContents';
 import { getTransaction } from './transaction';
 import { getTypeInfo as getTypeInfoUtil } from './typeInfo';
+import { getVirtualFoldersContents } from './virtualFolders';
 import {
   getWhereUsed,
   getWhereUsedScope,
@@ -73,6 +74,7 @@ import {
 import type {
   IGetSqlQueryParams,
   IGetTableContentsParams,
+  IGetVirtualFoldersContentsParams,
   IGetWhereUsedParams,
   IGetWhereUsedScopeParams,
   IInactiveObjectsResponse,
@@ -97,6 +99,18 @@ export class AdtUtils {
    */
   async searchObjects(params: ISearchObjectsParams): Promise<AxiosResponse> {
     return searchObjects(this.connection, params);
+  }
+
+  /**
+   * Fetch virtual folder contents for hierarchical browsing.
+   *
+   * @param params - Virtual folder request parameters
+   * @returns Virtual folder contents in XML format
+   */
+  async getVirtualFoldersContents(
+    params: IGetVirtualFoldersContentsParams,
+  ): Promise<AxiosResponse> {
+    return getVirtualFoldersContents(this.connection, params);
   }
 
   /**scope configuration (Step 1: prepare search)

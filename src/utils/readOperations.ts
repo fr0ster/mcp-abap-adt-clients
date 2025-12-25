@@ -199,7 +199,10 @@ export async function fetchNodeStructure(
 </asx:values>
 </asx:abap>`;
 
-  return makeAdtRequest(connection, url, 'POST', 'default', xmlBody, params);
+  return makeAdtRequest(connection, url, 'POST', 'default', xmlBody, params, {
+    Accept:
+      'application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
+  });
 }
 
 /**

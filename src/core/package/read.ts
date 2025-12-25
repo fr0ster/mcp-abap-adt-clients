@@ -93,7 +93,8 @@ export async function getPackageContents(
     timeout: getTimeout('default'),
     params,
     headers: {
-      Accept: 'application/xml',
+      Accept:
+        'application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
     },
   });
 }

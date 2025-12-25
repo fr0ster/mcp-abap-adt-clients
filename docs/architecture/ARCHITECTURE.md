@@ -63,7 +63,7 @@ Separation of ADT endpoint functionality into four main client classes to enable
 │   │   │   ├── core/             # Core object type tests (class, program, domain, table, etc.)
 │   │   │   ├── runtime/          # Runtime module tests (debugger, traces, memory, logs, feeds)
 │   │   │   ├── readonly/         # ReadOnlyClient tests
-│   │   │   └── shared/           # Shared utility tests (search, whereUsed, groupActivation, tableContents, sqlQuery, etc.)
+│   │   │   └── shared/           # Shared utility tests (search, whereUsed, groupActivation, tableContents, sqlQuery, objectStructure, nodeStructure, etc.)
 │   │   ├── examples/             # Example usage code
 │   │   └── e2e/                  # End-to-end tests
 │   └── index.ts                  # Main package exports
@@ -819,6 +819,7 @@ describe('ClassBuilder (using AdtClient)', () => {
   - `available_in: ["cloud", "onprem"]` or omit - run on both environments
 - Flow tests (CRUD operations) automatically skip if `available_in` doesn't match current environment
 - Read tests use `standard_objects` registry with `available_in` filter for environment-specific object names
+- Some ADT endpoints are system-specific; tests skip with 406 when unsupported (e.g., objectstructure/nodestructure)
 
 ### TestConfigResolver Class
 

@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.8] - 2025-12-25
+
+### Added
+- **Shared Tests**: Added BaseTester-based integration tests for `getObjectStructure` and `fetchNodeStructure` with YAML-driven params
+
+### Changed
+- **ADT Headers**: Prefer vendor media types for objectstructure/nodestructure Accept headers with XML fallback
+
+### Fixed
+- **Test Stability**: Soft-skip 406 responses for objectstructure/nodestructure tests when endpoints are not supported
+
 ## [0.2.7] - 2025-12-24
 
 ### Fixed

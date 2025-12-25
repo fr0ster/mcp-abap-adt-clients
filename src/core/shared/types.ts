@@ -74,3 +74,22 @@ export interface IGetWhereUsedParams {
    */
   scopeXml?: string;
 }
+
+/**
+ * Virtual folders preselection entry
+ */
+export interface IVirtualFoldersPreselection {
+  facet: string;
+  values: string[];
+}
+
+/**
+ * Virtual folders contents parameters
+ */
+export interface IGetVirtualFoldersContentsParams {
+  objectSearchPattern?: string;
+  preselection?: IVirtualFoldersPreselection[];
+  facetOrder?: string[];
+  withVersions?: boolean;
+  ignoreShortDescriptions?: boolean;
+}

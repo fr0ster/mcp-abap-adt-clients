@@ -26,11 +26,13 @@ import { getTableContents } from './tableContents';
 import type {
   IGetSqlQueryParams,
   IGetTableContentsParams,
+  IGetVirtualFoldersContentsParams,
   IGetWhereUsedParams,
   IInactiveObjectsResponse,
   IObjectReference,
   ISearchObjectsParams,
 } from './types';
+import { getVirtualFoldersContents } from './virtualFolders';
 import { getWhereUsed } from './whereUsed';
 
 interface SharedBuilderState {
@@ -44,6 +46,7 @@ interface SharedBuilderState {
   whereUsedResult?: AxiosResponse;
   sqlQueryResult?: AxiosResponse;
   tableContentsResult?: AxiosResponse;
+  virtualFoldersContentsResult?: AxiosResponse;
 }
 
 /**
@@ -100,6 +103,10 @@ export class SharedBuilder {
 
   getTableContentsResult(): AxiosResponse | undefined {
     return this.state.tableContentsResult;
+  }
+
+  getVirtualFoldersContentsResult(): AxiosResponse | undefined {
+    return this.state.virtualFoldersContentsResult;
   }
 
   /**
@@ -227,6 +234,19 @@ export class SharedBuilder {
    */
   async tableContents(params: IGetTableContentsParams): Promise<this> {
     this.state.tableContentsResult = await getTableContents(
+      this.connection,
+      params,
+    );
+    return this;
+  }
+
+  /**
+   * Fetch virtual folder contents for hierarchical browsing.
+   */
+  async virtualFoldersContents(
+    params: IGetVirtualFoldersContentsParams,
+  ): Promise<this> {
+    this.state.virtualFoldersContentsResult = await getVirtualFoldersContents(
       this.connection,
       params,
     );

@@ -1036,6 +1036,41 @@ group_activation:
 # SHARED TESTS (Utility functions - AdtUtils)
 # ============================================================================
 
+# Virtual Folders Contents (getVirtualFoldersContents)
+virtual_folders_contents:
+  test_cases:
+    - name: "fetch_virtual_folders_contents"
+      enabled: false  # Set to true to enable test
+      description: "Test getVirtualFoldersContents for package browsing"
+      params:
+        # package_names: ["ZPKG1", "ZPKG2"]  # Optional: overrides package_name/default_package
+        # package_name: "<YOUR_PACKAGE_NAME>"  # Uses environment.default_package if omitted
+        object_search_pattern: "*"
+        facet_order: ["package", "group", "type"]
+
+# Object Structure (getObjectStructure)
+object_structure:
+  test_cases:
+    - name: "get_object_structure"
+      enabled: false  # Set to true to enable test
+      description: "Test getObjectStructure for a standard class"
+      params:
+        object_type: "CLAS/OC"
+        # object_name: Uses standard_objects.classes if not specified
+        # class_name: Optional alias; uses standard_objects.classes if omitted
+
+# Node Structure (fetchNodeStructure)
+node_structure:
+  test_cases:
+    - name: "fetch_node_structure"
+      enabled: false  # Set to true to enable test
+      description: "Test fetchNodeStructure for a standard class"
+      params:
+        parent_type: "CLAS/OC"
+        # parent_name: Uses standard_objects.classes if not specified
+        # node_id: "0000"
+        # with_short_descriptions: true
+
 # Table Contents (getTableContents)
 # ⚠️ ABAP Cloud Limitation: Table contents reading is only available on on-premise systems
 # On cloud systems, 99% of tables are not readable via ADT Data Preview endpoint

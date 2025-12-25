@@ -135,6 +135,7 @@ export type {
 export type {
   GetSqlQueryParams,
   GetTableContentsParams,
+  GetVirtualFoldersContentsParams,
   GetWhereUsedParams,
   InactiveObjectsResponse,
   ObjectReference,

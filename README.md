@@ -620,6 +620,11 @@ See [docs/DEBUG.md](docs/DEBUG.md) for detailed debugging guide.
 
 See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
 
+## Tests
+
+Integration tests use YAML configuration (`src/__tests__/helpers/test-config.yaml`) and the `BaseTester` pattern.  
+Some ADT endpoints are system-specific; shared tests may skip with 406 when the endpoint is not supported (e.g., objectstructure/nodestructure).
+
 ## License
 
 MIT

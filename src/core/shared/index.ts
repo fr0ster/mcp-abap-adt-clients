@@ -18,9 +18,11 @@ export { getTransaction } from './transaction';
 export type {
   IGetSqlQueryParams as GetSqlQueryParams,
   IGetTableContentsParams as GetTableContentsParams,
+  IGetVirtualFoldersContentsParams as GetVirtualFoldersContentsParams,
   IGetWhereUsedParams as GetWhereUsedParams,
   IGetWhereUsedScopeParams as GetWhereUsedScopeParams,
   IInactiveObjectsResponse as InactiveObjectsResponse,
   IObjectReference as ObjectReference,
   ISearchObjectsParams as SearchObjectsParams,
+  IVirtualFoldersPreselection as VirtualFoldersPreselection,
 } from './types';
