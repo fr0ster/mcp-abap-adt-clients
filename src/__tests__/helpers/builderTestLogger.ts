@@ -46,6 +46,10 @@ function extractErrorMessage(error: unknown): string {
     const data = axiosError.response?.data;
 
     let message = `HTTP ${status || '?'}`;
+    if (status === 406) {
+      message +=
+        ' Not Acceptable (Accept header rejected or endpoint unsupported)';
+    }
     if (statusText) {
       message += ` ${statusText}`;
     }

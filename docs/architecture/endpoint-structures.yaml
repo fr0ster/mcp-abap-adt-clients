@@ -1,0 +1,38 @@
+# Endpoint XML structures for ADT discovery
+# Keys use "METHOD /path" format (e.g., "POST /sap/bc/adt/repository/nodestructure").
+# Add request/response XML samples to validate old/new endpoint wrappers.
+
+POST /sap/bc/adt/repository/nodestructure:
+  notes: Eclipse ADT uses ASX payload with TV_NODEKEY for node structure queries.
+  request_xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+      <asx:values>
+        <DATA>
+          <TV_NODEKEY>000000</TV_NODEKEY>
+        </DATA>
+      </asx:values>
+    </asx:abap>
+  response_xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+      <asx:values>
+        <DATA>
+          <TREE_CONTENT/>
+          <CATEGORIES>
+            <SEU_ADT_OBJECT_CATEGORY_INFO>
+              <CATEGORY>apsiam</CATEGORY>
+              <CATEGORY_LABEL>Authorizations</CATEGORY_LABEL>
+            </SEU_ADT_OBJECT_CATEGORY_INFO>
+          </CATEGORIES>
+          <OBJECT_TYPES>
+            <SEU_ADT_OBJECT_TYPE_INFO>
+              <OBJECT_TYPE>SUSH</OBJECT_TYPE>
+              <CATEGORY_TAG>apsiam</CATEGORY_TAG>
+              <OBJECT_TYPE_LABEL>Authorization Default Value</OBJECT_TYPE_LABEL>
+              <NODE_ID>000002</NODE_ID>
+            </SEU_ADT_OBJECT_TYPE_INFO>
+          </OBJECT_TYPES>
+        </DATA>
+      </asx:values>
+    </asx:abap>

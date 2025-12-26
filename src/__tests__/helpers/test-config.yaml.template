@@ -31,6 +31,7 @@ test_settings:
   retry_on_failure: false
   max_retries: 1
   cleanup_after_test: false
+  allow_406: false  # Allow 406 Not Acceptable to be treated as skip (override per test case)
   # Timeouts for different operations (in milliseconds)
   timeouts:
     default: 60000

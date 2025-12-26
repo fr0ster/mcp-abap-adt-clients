@@ -16,6 +16,7 @@ import {
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
+const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -148,7 +149,9 @@ describe('Shared - readSource', () => {
     testsLogger.info?.(`📋 Object: ${className} (class)`);
     testsLogger.info?.('📖 Reading source code...');
 
-    const result = await client.getUtils().readObjectSource('class', className);
+    const result = await withAcceptHandling(
+      client.getUtils().readObjectSource('class', className),
+    );
 
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -173,9 +176,9 @@ describe('Shared - readSource', () => {
       'read class source code (inactive version)',
       testsLogger,
     );
-    const result = await client
-      .getUtils()
-      .readObjectSource('class', className, undefined, 'inactive');
+    const result = await withAcceptHandling(
+      client.getUtils().readObjectSource('class', className, undefined, 'inactive'),
+    );
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
   }, 15000);

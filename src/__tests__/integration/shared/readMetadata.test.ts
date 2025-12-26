@@ -21,6 +21,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const testsLogger = createTestsLogger();
+const { isHttpStatusAllowed } = require('../../helpers/test-helper');
 
 function getConfig(): SapConfig {
   const rawUrl = process.env.SAP_URL;
@@ -132,6 +133,12 @@ describe('Shared - readMetadata', () => {
       testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
     } catch (error: any) {
       if (error.response?.status === 406) {
+        if (isHttpStatusAllowed(406, { params: {} })) {
+          testsLogger.warn?.(
+            '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
+          );
+          return;
+        }
         throw new Error(
           `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
         );
@@ -166,6 +173,12 @@ describe('Shared - readMetadata', () => {
       testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
     } catch (error: any) {
       if (error.response?.status === 406) {
+        if (isHttpStatusAllowed(406, { params: {} })) {
+          testsLogger.warn?.(
+            '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
+          );
+          return;
+        }
         throw new Error(
           `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
         );
@@ -193,6 +206,12 @@ describe('Shared - readMetadata', () => {
       expect(result.data).toBeDefined();
     } catch (error: any) {
       if (error.response?.status === 406) {
+        if (isHttpStatusAllowed(406, { params: {} })) {
+          testsLogger.warn?.(
+            '⚠️ Skipping test: 406 Not Acceptable (Accept header not supported)',
+          );
+          return;
+        }
         throw new Error(
           `406 Not Acceptable: The server cannot produce a response matching the Accept header. This may indicate an issue with the Accept header format or the object may not be accessible. Error: ${error.message}`,
         );

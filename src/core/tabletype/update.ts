@@ -99,7 +99,7 @@ export async function updateTableType(
                 adtcore:description="${description}"
                 adtcore:name="${tableTypeName}"
                 adtcore:type="TTYP/DA"
-                adtcore:version="new"
+                adtcore:version="active"
                 adtcore:language="EN"
                 adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>${packageRefXml}
   <ttyp:rowType>

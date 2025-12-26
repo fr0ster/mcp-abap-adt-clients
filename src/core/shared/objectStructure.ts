@@ -49,7 +49,7 @@ export async function getObjectStructure(
     timeout: getTimeout('default'),
     headers: {
       Accept:
-        'application/vnd.sap.adt.repository.objectstructure.v1+xml, application/xml',
+        'application/vnd.sap.adt.projectexplorer.objectstructure+xml, application/xml',
     },
   });
 }

@@ -21,6 +21,7 @@ import {
 } from '../../helpers/builderTestLogger';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
+const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -168,10 +169,12 @@ describe('Shared - getSqlQuery', () => {
     const rowNumber = resolver.getParam('row_number', 10);
 
     logBuilderTestStep('execute SQL query', testsLogger);
-    const result = await client.getUtils().getSqlQuery({
-      sql_query: sqlQuery,
-      row_number: rowNumber,
-    });
+    const result = await withAcceptHandling(
+      client.getUtils().getSqlQuery({
+        sql_query: sqlQuery,
+        row_number: rowNumber,
+      }),
+    );
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
   }, 30000);
@@ -225,9 +228,11 @@ describe('Shared - getSqlQuery', () => {
       'execute SQL query with default row_number',
       testsLogger,
     );
-    const result = await client.getUtils().getSqlQuery({
-      sql_query: sqlQuery,
-    });
+    const result = await withAcceptHandling(
+      client.getUtils().getSqlQuery({
+        sql_query: sqlQuery,
+      }),
+    );
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
   }, 30000);

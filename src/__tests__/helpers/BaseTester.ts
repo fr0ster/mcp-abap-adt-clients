@@ -533,11 +533,18 @@ export class BaseTester<TConfig, TState> {
         );
       }
 
+      if (error?.response?.status === 406) {
+        error.message =
+          `406 Not Acceptable: Accept header rejected or endpoint unsupported. ` +
+          `${error.message}`;
+      }
+
       const statusText = getHttpStatusText(error);
       const enhancedError =
         statusText !== 'HTTP ?'
           ? Object.assign(new Error(`[${statusText}] ${error.message}`), {
               stack: error.stack,
+              response: error.response,
             })
           : error;
       throw enhancedError;
@@ -569,6 +576,11 @@ export class BaseTester<TConfig, TState> {
       return readState;
     } catch (error: any) {
       this.log(LogLevel.ERROR, 'read failed:', error);
+      if (error?.response?.status === 406) {
+        error.message =
+          `406 Not Acceptable: Accept header rejected or endpoint unsupported. ` +
+          `${error.message}`;
+      }
       throw error;
     }
   }

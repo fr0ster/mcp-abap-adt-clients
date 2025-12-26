@@ -37,6 +37,7 @@ import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinitio
 import { getEnhancementMetadata } from '../enhancement/read';
 import { getPackageContents } from '../package/read';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
+import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
 import { getEnhancements } from './enhancements';
 import { getInactiveObjects } from './getInactiveObjects';
@@ -79,6 +80,7 @@ import type {
   IGetWhereUsedScopeParams,
   IInactiveObjectsResponse,
   IObjectReference,
+  IGetDiscoveryParams,
   ISearchObjectsParams,
 } from './types';
 
@@ -369,6 +371,16 @@ export class AdtUtils {
     params: IGetTableContentsParams,
   ): Promise<AxiosResponse> {
     return getTableContents(this.connection, params);
+  }
+
+  /**
+   * Fetch ADT discovery document with endpoint catalog
+   *
+   * @param params - Optional request/timeout options
+   * @returns Axios response with discovery XML
+   */
+  async discovery(params: IGetDiscoveryParams = {}): Promise<AxiosResponse> {
+    return getDiscoveryUtil(this.connection, params);
   }
 
   /**

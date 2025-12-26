@@ -332,13 +332,14 @@ npm run discovery:markdown -- --env /path/to/.env
 
 **What it does:**
 1. Connects to the SAP system using credentials from `.env` file
-2. Fetches the discovery endpoint: `GET /sap/bc/adt/discovery`
+2. Fetches the discovery endpoint: `GET /sap/bc/adt/discovery` (via `AdtUtils.discovery()`)
 3. Parses the XML response
 4. Converts it to readable markdown with endpoint categories, HTTP methods, URLs, content types, and descriptions
+5. Saves the pretty-printed discovery XML next to the markdown output
 
 **Output:** 
-- Default: `docs/architecture/discovery.md`
-- Custom: Path specified via `--output` option
+- Default: `docs/architecture/discovery.md` and `docs/architecture/discovery.xml`
+- Custom: Path specified via `--output` option, plus `discovery.xml` in the same directory
 
 **Environment Variables:**
 The script uses the same environment variables as the main package:
@@ -623,7 +624,7 @@ See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
 ## Tests
 
 Integration tests use YAML configuration (`src/__tests__/helpers/test-config.yaml`) and the `BaseTester` pattern.  
-Some ADT endpoints are system-specific; shared tests may skip with 406 when the endpoint is not supported (e.g., objectstructure/nodestructure).
+Some ADT endpoints are system-specific; 406 is treated as an Accept/header support issue and can be explicitly allowed via `test_settings.allow_406` or per-test `params.allow_406` (e.g., objectstructure/nodestructure).
 
 ## License
 

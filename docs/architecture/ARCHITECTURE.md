@@ -819,7 +819,7 @@ describe('ClassBuilder (using AdtClient)', () => {
   - `available_in: ["cloud", "onprem"]` or omit - run on both environments
 - Flow tests (CRUD operations) automatically skip if `available_in` doesn't match current environment
 - Read tests use `standard_objects` registry with `available_in` filter for environment-specific object names
-- Some ADT endpoints are system-specific; tests skip with 406 when unsupported (e.g., objectstructure/nodestructure)
+- Some ADT endpoints are system-specific; 406 is treated as an Accept/header support issue and can be explicitly allowed via `test_settings.allow_406` or per-test `params.allow_406` (e.g., objectstructure/nodestructure)
 
 ### TestConfigResolver Class
 

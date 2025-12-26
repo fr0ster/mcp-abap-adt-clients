@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.10] - 2025-12-26
+
+### Added
+- **ADT Discovery**: Added `AdtUtils.discovery()` with required headers and request id generation
+- **Discovery Tests**: Added integration test for ADT discovery in shared utils
+
+### Changed
+- **Discovery Tooling**: `discovery-to-markdown` now uses `AdtUtils.discovery()`, writes pretty-printed XML next to `discovery.md`, and lists `Accept` media types per collection when present
+- **TableType Update**: Use `adtcore:version="active"` to avoid create conflicts during update
+
+## [0.2.9] - 2025-12-26
+
+### Changed
+- **Node Structure Request**: Send Eclipse-compatible ASX payload and add `parent_tech_name`, plus prefer `application/vnd.sap.as+xml` media type with fallback to existing vendor XML for node structure reads
+- **Object Structure Accept**: Prefer `application/vnd.sap.adt.projectexplorer.objectstructure+xml` media type for object structure reads
+
+### Fixed
+- **Test Diagnostics**: Treat 406 responses as Accept-header issues and surface them consistently across shared integration tests
+
 ## [0.2.8] - 2025-12-25
 
 ### Added

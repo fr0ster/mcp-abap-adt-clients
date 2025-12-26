@@ -6,7 +6,7 @@ This directory contains utility scripts for development and maintenance of the A
 
 ### 1. Discovery to Markdown Converter
 
-**`discovery-to-markdown.ts`** - Fetches ADT discovery endpoint and converts XML to readable markdown documentation.
+**`discovery-to-markdown.ts`** - Fetches ADT discovery endpoint and converts XML to readable markdown documentation (also saves pretty XML).
 
 **Purpose:** Generates markdown documentation from the ADT discovery endpoint (`/sap/bc/adt/discovery`) that lists all available ADT API endpoints.
 
@@ -50,7 +50,7 @@ The script automatically loads variables from a `.env` file in the project root 
 
 **What it does:**
 1. Connects to the SAP system using the provided credentials
-2. Fetches the discovery endpoint: `GET /sap/bc/adt/discovery`
+2. Fetches the discovery endpoint: `GET /sap/bc/adt/discovery` (via `AdtUtils.discovery()`)
 3. Parses the XML response
 4. Converts it to readable markdown with:
    - Endpoint categories
@@ -58,10 +58,11 @@ The script automatically loads variables from a `.env` file in the project root 
    - Endpoint URLs
    - Content types
    - Descriptions
+5. Saves the pretty-printed discovery XML next to the markdown output
 
 **Output:** 
-- Default: `docs/architecture/discovery.md` (if `--output` is not specified)
-- Custom: Path specified via `--output` option
+- Default: `docs/architecture/discovery.md` and `docs/architecture/discovery.xml` (if `--output` is not specified)
+- Custom: Path specified via `--output` option, plus `discovery.xml` in the same directory
 
 The script automatically creates the output directory if it doesn't exist.
 

@@ -16,6 +16,7 @@ export {
 export { SharedBuilder } from './SharedBuilder';
 export { getTransaction } from './transaction';
 export type {
+  IGetDiscoveryParams as GetDiscoveryParams,
   IGetSqlQueryParams as GetSqlQueryParams,
   IGetTableContentsParams as GetTableContentsParams,
   IGetVirtualFoldersContentsParams as GetVirtualFoldersContentsParams,

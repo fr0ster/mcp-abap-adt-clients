@@ -1,8 +1,8 @@
 /**
- * Unit test for searchObjects shared function
- * Tests searchObjects function using AdtClient/AdtUtils
+ * Integration test for ADT discovery shared function
+ * Tests discovery endpoint using AdtClient/AdtUtils
  *
- * Enable debug logs: DEBUG_TESTS=true npm test -- unit/shared/search.test
+ * Enable debug logs: DEBUG_TESTS=true npm test -- integration/shared/discovery.test
  */
 
 import * as fs from 'node:fs';
@@ -51,7 +51,6 @@ function getConfig(): SapConfig {
     }
     config.jwtToken = jwtToken;
 
-    // Add refresh credentials for auto-refresh (if available)
     const refreshToken = process.env.SAP_REFRESH_TOKEN;
     if (refreshToken) {
       config.refreshToken = refreshToken;
@@ -81,7 +80,7 @@ function getConfig(): SapConfig {
   return config;
 }
 
-describe('Shared - searchObjects', () => {
+describe('Shared - discovery', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
@@ -106,7 +105,7 @@ describe('Shared - searchObjects', () => {
     }
   });
 
-  it('should search objects by name pattern', async () => {
+  it('should fetch ADT discovery document', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
@@ -114,76 +113,20 @@ describe('Shared - searchObjects', () => {
       return;
     }
 
-    logBuilderTestStep('search objects by name pattern', testsLogger);
-    testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
+    logBuilderTestStep('fetch ADT discovery document', testsLogger);
 
     const result = await withAcceptHandling(
-      client.getUtils().searchObjects({
-      query: 'CL_ABAP*',
-      maxResults: 10,
-      }),
+      client.getUtils().discovery(),
     );
 
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
 
-    testsLogger.info?.('✅ Search completed');
-    testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
+    const xml = String(result.data);
+    expect(xml.length).toBeGreaterThan(0);
+    expect(xml).toMatch(/<app:service|<service/);
 
-    // Parse and log number of results
-    const matches = result.data?.match(/<objectReference/g);
-    if (matches) {
-      testsLogger.info?.(`🎯 Found ${matches.length} objects`);
-    }
-  }, 15000);
-
-  it('should search objects with object type filter', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
-
-    logBuilderTestStep('search objects with object type filter', testsLogger);
-    testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
-
-    const result = await withAcceptHandling(
-      client.getUtils().searchObjects({
-      query: 'T*',
-      objectType: 'TABL',
-      maxResults: 10,
-      }),
-    );
-
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
-
-    testsLogger.info?.('✅ Search completed');
-    testsLogger.info?.(`📊 Response size: ${result.data?.length || 0} bytes`);
-
-    // Parse and log number of results
-    const matches = result.data?.match(/<objectReference/g);
-    if (matches) {
-      testsLogger.info?.(`🎯 Found ${matches.length} tables`);
-    }
-  }, 15000);
-
-  it('should use default maxResults if not provided', async () => {
-    if (!hasConfig) {
-      testsLogger.warn?.(
-        '⚠️ Skipping test: No .env file or SAP configuration found',
-      );
-      return;
-    }
-
-    logBuilderTestStep('search objects with default maxResults', testsLogger);
-    const result = await withAcceptHandling(
-      client.getUtils().searchObjects({
-      query: 'CL_ABAP*',
-      }),
-    );
-    expect(result.status).toBe(200);
-    expect(result.data).toBeDefined();
+    testsLogger.info?.('✅ Discovery fetched');
+    testsLogger.info?.(`📊 Response size: ${xml.length} bytes`);
   }, 15000);
 });

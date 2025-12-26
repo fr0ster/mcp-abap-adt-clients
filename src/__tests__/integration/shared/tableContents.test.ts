@@ -21,6 +21,7 @@ import {
 } from '../../helpers/builderTestLogger';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
+const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -164,10 +165,12 @@ describe('Shared - getTableContents', () => {
     const maxRows = resolver.getParam('max_rows', 10);
 
     logBuilderTestStep('get table contents', testsLogger);
-    const result = await client.getUtils().getTableContents({
-      table_name: tableName,
-      max_rows: maxRows,
-    });
+    const result = await withAcceptHandling(
+      client.getUtils().getTableContents({
+        table_name: tableName,
+        max_rows: maxRows,
+      }),
+    );
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
   }, 30000);
@@ -214,9 +217,11 @@ describe('Shared - getTableContents', () => {
     const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
 
     logBuilderTestStep('get table contents with default max_rows', testsLogger);
-    const result = await client.getUtils().getTableContents({
-      table_name: tableName,
-    });
+    const result = await withAcceptHandling(
+      client.getUtils().getTableContents({
+        table_name: tableName,
+      }),
+    );
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
   }, 30000);

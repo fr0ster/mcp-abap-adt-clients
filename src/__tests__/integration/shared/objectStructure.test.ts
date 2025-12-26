@@ -36,7 +36,7 @@ interface IObjectStructureParams {
   object_name: string;
 }
 
-const { getTimeout } = require('../../helpers/test-helper');
+const { getTimeout, isHttpStatusAllowed } = require('../../helpers/test-helper');
 
 const connectionLogger: ILogger = createConnectionLogger();
 const builderLogger: ILogger = createBuilderLogger();
@@ -238,13 +238,23 @@ describe('Shared - getObjectStructure', () => {
         logBuilderTestSuccess(testsLogger, testName);
       } catch (error: any) {
         if (error?.response?.status === 406) {
-          logBuilderTestSkip(
+          if (isHttpStatusAllowed(406, testCase)) {
+            logBuilderTestSkip(
+              testsLogger,
+              testName,
+              'Endpoint not supported or Accept header not accepted (406)',
+            );
+            logBuilderTestEnd(testsLogger, testName);
+            return;
+          }
+          logBuilderTestError(
             testsLogger,
             testName,
-            'Endpoint not supported or Accept header not accepted (406)',
+            new Error(
+              '406 Not Acceptable: endpoint not supported or Accept header rejected',
+            ),
           );
-          logBuilderTestEnd(testsLogger, testName);
-          return;
+          throw error;
         }
         logBuilderTestError(testsLogger, testName, error);
         throw error;

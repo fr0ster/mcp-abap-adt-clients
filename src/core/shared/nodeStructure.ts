@@ -41,6 +41,7 @@ export async function fetchNodeStructure(
   const params: Record<string, any> = {
     parent_type: parentType,
     parent_name: parentName,
+    parent_tech_name: parentName,
     withShortDescriptions: withShortDescriptions,
   };
 
@@ -48,14 +49,23 @@ export async function fetchNodeStructure(
     params.node_id = nodeId;
   }
 
+  const nodeKey = nodeId || '000000';
+  const xmlBody =
+    `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">` +
+    `<asx:values><DATA><TV_NODEKEY>${nodeKey}</TV_NODEKEY></DATA></asx:values>` +
+    `</asx:abap>`;
+
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
     params,
+    data: xmlBody,
     headers: {
       Accept:
-        'application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
+        'application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
+      'Content-Type': 'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
     },
   });
 }

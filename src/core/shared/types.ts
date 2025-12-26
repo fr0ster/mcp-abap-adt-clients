@@ -55,6 +55,14 @@ export interface IGetTableContentsParams {
 }
 
 /**
+ * ADT discovery request parameters
+ */
+export interface IGetDiscoveryParams {
+  requestId?: string;
+  timeout?: number;
+}
+
+/**
  * Where-used scope parameters (Step 1: get available object types)
  */
 export interface IGetWhereUsedScopeParams {

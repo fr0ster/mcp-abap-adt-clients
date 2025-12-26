@@ -2,6 +2,7 @@
  * ADT Discovery to Markdown Converter
  * 
  * Fetches ADT discovery endpoint and converts XML to readable markdown documentation.
+ * Saves raw XML alongside the generated markdown.
  * 
  * Usage:
  *   npm run discovery:markdown
@@ -20,10 +21,12 @@
  */
 
 import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLBuilder, XMLParser } from 'fast-xml-parser';
+import { parse as parseYaml } from 'yaml';
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { AdtClient } from '../src/clients/AdtClient';
 
 interface DiscoveryEntry {
   rel?: string;
@@ -38,6 +41,14 @@ interface DiscoveryCategory {
   description?: string;
   entries?: DiscoveryEntry[];
 }
+
+interface EndpointXmlStructure {
+  request_xml?: string;
+  response_xml?: string;
+  notes?: string;
+}
+
+type EndpointXmlStructureMap = Record<string, EndpointXmlStructure>;
 
 /**
  * Get SAP configuration from environment variables
@@ -96,6 +107,69 @@ function getConfig(): SapConfig {
 }
 
 /**
+ * Load endpoint XML structures (optional)
+ */
+function loadEndpointXmlStructures(
+  structurePath?: string,
+): EndpointXmlStructureMap {
+  const defaultPath = path.resolve(
+    __dirname,
+    '../docs/architecture/endpoint-structures.yaml',
+  );
+  const targetPath = structurePath
+    ? path.resolve(structurePath)
+    : defaultPath;
+
+  if (!fs.existsSync(targetPath)) {
+    const template = `# Endpoint XML structures for ADT discovery
+# Keys use "METHOD /path" format (e.g., "POST /sap/bc/adt/repository/nodestructure").
+# Add request/response XML samples to validate old/new endpoint wrappers.
+
+POST /sap/bc/adt/repository/nodestructure:
+  notes: Eclipse ADT uses ASX payload with TV_NODEKEY for node structure queries.
+  request_xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+      <asx:values>
+        <DATA>
+          <TV_NODEKEY>000000</TV_NODEKEY>
+        </DATA>
+      </asx:values>
+    </asx:abap>
+  response_xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+      <asx:values>
+        <DATA>
+          <TREE_CONTENT/>
+          <CATEGORIES>
+            <SEU_ADT_OBJECT_CATEGORY_INFO>
+              <CATEGORY>apsiam</CATEGORY>
+              <CATEGORY_LABEL>Authorizations</CATEGORY_LABEL>
+            </SEU_ADT_OBJECT_CATEGORY_INFO>
+          </CATEGORIES>
+          <OBJECT_TYPES>
+            <SEU_ADT_OBJECT_TYPE_INFO>
+              <OBJECT_TYPE>SUSH</OBJECT_TYPE>
+              <CATEGORY_TAG>apsiam</CATEGORY_TAG>
+              <OBJECT_TYPE_LABEL>Authorization Default Value</OBJECT_TYPE_LABEL>
+              <NODE_ID>000002</NODE_ID>
+            </SEU_ADT_OBJECT_TYPE_INFO>
+          </OBJECT_TYPES>
+        </DATA>
+      </asx:values>
+    </asx:abap>
+`;
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.writeFileSync(targetPath, template, 'utf8');
+  }
+
+  const content = fs.readFileSync(targetPath, 'utf8');
+  const parsed = parseYaml(content) || {};
+  return parsed as EndpointXmlStructureMap;
+}
+
+/**
  * Parse discovery XML response
  */
 function parseDiscoveryXml(xmlData: string): any {
@@ -114,10 +188,33 @@ function parseDiscoveryXml(xmlData: string): any {
 }
 
 /**
+ * Convert parsed discovery XML into a pretty-printed XML string
+ */
+function formatDiscoveryXml(parsed: any): string {
+  const builder = new XMLBuilder({
+    ignoreAttributes: false,
+    attributeNamePrefix: '@_',
+    textNodeName: '#text',
+    format: true,
+    indentBy: '  ',
+  });
+
+  const xmlBody = builder.build(parsed);
+  const hasDeclaration = xmlBody.trimStart().startsWith('<?xml');
+  return hasDeclaration
+    ? xmlBody
+    : `<?xml version="1.0" encoding="utf-8"?>\n${xmlBody}`;
+}
+
+/**
  * Convert discovery XML to markdown
  * Based on the structure: app:service -> app:workspace -> app:collection -> adtcomp:templateLinks -> adtcomp:templateLink
  */
-function convertToMarkdown(parsed: any, baseUrl: string): string {
+function convertToMarkdown(
+  parsed: any,
+  baseUrl: string,
+  endpointStructures: EndpointXmlStructureMap,
+): string {
   const lines: string[] = [];
   
   lines.push('# ADT Discovery Endpoints');
@@ -183,6 +280,32 @@ function convertToMarkdown(parsed: any, baseUrl: string): string {
         lines.push('');
       }
 
+      const acceptNodes = coll['app:accept'] || coll['accept'];
+      const acceptArray = Array.isArray(acceptNodes)
+        ? acceptNodes
+        : (acceptNodes ? [acceptNodes] : []);
+      const accepts = acceptArray
+        .map((entry: any) => {
+          if (typeof entry === 'string') {
+            return entry;
+          }
+          if (entry && typeof entry === 'object') {
+            return entry['#text'] || entry['text'] || '';
+          }
+          return '';
+        })
+        .map((value: string) => value.trim().replace(/^['"]|['"]$/g, ''))
+        .filter(Boolean);
+
+      if (accepts.length > 0) {
+        lines.push('**Accept:**');
+        lines.push('');
+        for (const value of accepts) {
+          lines.push(`- \`${value}\``);
+        }
+        lines.push('');
+      }
+
       // Extract template links (operations)
       const templateLinks = coll['adtcomp:templateLinks'] || coll['templateLinks'];
       if (templateLinks) {
@@ -242,6 +365,13 @@ function convertToMarkdown(parsed: any, baseUrl: string): string {
         lines.push('| Method | Endpoint | Type | Description |');
         lines.push('|--------|----------|------|-------------|');
         
+        const endpointRows: Array<{
+          method: string;
+          endpoint: string;
+          type: string;
+          description: string;
+        }> = [];
+
         for (const link of linkArray) {
           const rel = link['@_rel'] || link['rel'] || '';
           const href = link['@_href'] || link['href'] || '';
@@ -278,9 +408,53 @@ function convertToMarkdown(parsed: any, baseUrl: string): string {
           const escapeTable = (text: string) => text.replace(/\|/g, '\\|').replace(/\n/g, ' ');
           
           lines.push(`| ${method} | \`${escapeTable(endpoint)}\` | ${escapeTable(type || '-')} | ${escapeTable(description || title || rel || '-')} |`);
+          endpointRows.push({
+            method,
+            endpoint,
+            type: type || '-',
+            description: description || title || rel || '-',
+          });
         }
         
         lines.push('');
+
+        const structuredRows = endpointRows.filter((row) => {
+          const key = `${row.method} ${row.endpoint}`;
+          return Boolean(endpointStructures[key]);
+        });
+
+        if (structuredRows.length > 0) {
+          lines.push('#### XML Structures');
+          lines.push('');
+
+          for (const row of structuredRows) {
+            const key = `${row.method} ${row.endpoint}`;
+            const structure = endpointStructures[key];
+            if (!structure) {
+              continue;
+            }
+
+            lines.push(`- **${row.method} ${row.endpoint}**`);
+            if (structure.notes) {
+              lines.push(`  - Notes: ${structure.notes}`);
+            }
+            if (structure.request_xml) {
+              lines.push('  - Request XML:');
+              lines.push('');
+              lines.push('```xml');
+              lines.push(structure.request_xml.trim());
+              lines.push('```');
+            }
+            if (structure.response_xml) {
+              lines.push('  - Response XML:');
+              lines.push('');
+              lines.push('```xml');
+              lines.push(structure.response_xml.trim());
+              lines.push('```');
+            }
+            lines.push('');
+          }
+        }
       }
     }
   }
@@ -303,6 +477,7 @@ async function main() {
     let outputFile: string | undefined;
     let customUrl: string | undefined;
     let envFile: string | undefined;
+    let structureFile: string | undefined;
 
     for (let i = 0; i < args.length; i++) {
       if (args[i] === '--output' && i + 1 < args.length) {
@@ -314,6 +489,9 @@ async function main() {
       } else if ((args[i] === '--env' || args[i] === '--config') && i + 1 < args.length) {
         envFile = args[i + 1];
         i++;
+      } else if (args[i] === '--structures' && i + 1 < args.length) {
+        structureFile = args[i + 1];
+        i++;
       } else if (args[i] === '--help' || args[i] === '-h') {
         console.log(`
 ADT Discovery to Markdown Converter
@@ -323,12 +501,14 @@ Usage:
   npm run discovery:markdown -- --output discovery.md
   npm run discovery:markdown -- --output discovery.md --url https://your-system.com
   npm run discovery:markdown -- --env /path/to/.env
+  npm run discovery:markdown -- --structures docs/architecture/endpoint-structures.yaml
 
 Options:
   --output <file>    Output markdown file path (default: docs/architecture/discovery.md)
   --url <url>        Override SAP_URL from environment
   --env <file>       Path to .env file with connection parameters
   --config <file>    Alias for --env
+  --structures <file> Path to endpoint XML structures YAML (default: docs/architecture/endpoint-structures.yaml)
   --help, -h         Show this help message
 
 Environment variables (can be set in .env file or environment):
@@ -382,18 +562,18 @@ Environment variables (can be set in .env file or environment):
     });
 
     // Connect
-    await connection.connect();
+    await (connection as any).connect();
     console.log('✓ Connected to SAP system');
 
     // Fetch discovery endpoint
     console.log('Fetching discovery endpoint...');
-    // Don't specify custom headers - let connection use defaults
-    // Discovery endpoint should work with default Accept header
-    const response = await connection.makeAdtRequest({
-      url: '/sap/bc/adt/discovery',
-      method: 'GET',
-      timeout: 30000
+    const client = new AdtClient(connection, {
+      debug: () => {},
+      info: (msg: string) => console.log(`[INFO] ${msg}`),
+      warn: (msg: string) => console.warn(`[WARN] ${msg}`),
+      error: (msg: string) => console.error(`[ERROR] ${msg}`),
     });
+    const response = await client.getUtils().discovery({ timeout: 30000 });
 
     if (response.status !== 200) {
       throw new Error(`Failed to fetch discovery: HTTP ${response.status}`);
@@ -413,7 +593,8 @@ Environment variables (can be set in .env file or environment):
 
     // Convert to markdown
     console.log('Converting to markdown...');
-    const markdown = convertToMarkdown(parsed, config.url);
+    const endpointStructures = loadEndpointXmlStructures(structureFile);
+    const markdown = convertToMarkdown(parsed, config.url, endpointStructures);
     console.log('✓ Markdown generated');
 
     // Determine output path
@@ -439,8 +620,14 @@ Environment variables (can be set in .env file or environment):
     fs.writeFileSync(outputPath, markdown, 'utf-8');
     console.log(`✓ Markdown written to: ${outputPath}`);
 
+    // Write raw XML next to markdown
+    const xmlPath = path.join(path.dirname(outputPath), 'discovery.xml');
+    const prettyXml = formatDiscoveryXml(parsed);
+    fs.writeFileSync(xmlPath, prettyXml, 'utf-8');
+    console.log(`✓ Discovery XML written to: ${xmlPath}`);
+
     // Disconnect
-    connection.reset();
+    (connection as any).reset();
     console.log('✓ Disconnected');
 
   } catch (error) {
@@ -454,4 +641,3 @@ Environment variables (can be set in .env file or environment):
 
 // Run the script
 main().catch(console.error);
-

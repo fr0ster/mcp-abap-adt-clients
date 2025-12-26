@@ -13,6 +13,7 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
+const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -118,10 +119,12 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
     const utils = client.getUtils();
-    const scopeResponse = await utils.getWhereUsedScope({
-      object_name: 'CL_ABAP_CHAR_UTILITIES',
-      object_type: 'class',
-    });
+    const scopeResponse = await withAcceptHandling(
+      utils.getWhereUsedScope({
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class',
+      }),
+    );
 
     expect(scopeResponse.status).toBe(200);
     expect(scopeResponse.data).toBeDefined();
@@ -130,11 +133,13 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(
       '🔍 Step 2: Executing where-used search with UNMODIFIED scope...',
     );
-    const result = await utils.getWhereUsed({
-      object_name: 'CL_ABAP_CHAR_UTILITIES',
-      object_type: 'class',
-      scopeXml: scopeResponse.data, // Pass scope as-is, no modifications
-    });
+    const result = await withAcceptHandling(
+      utils.getWhereUsed({
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class',
+        scopeXml: scopeResponse.data, // Pass scope as-is, no modifications
+      }),
+    );
 
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -161,10 +166,12 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
     const utils = client.getUtils();
-    const scopeResponse = await utils.getWhereUsedScope({
-      object_name: 'CL_ABAP_CHAR_UTILITIES',
-      object_type: 'class',
-    });
+    const scopeResponse = await withAcceptHandling(
+      utils.getWhereUsedScope({
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class',
+      }),
+    );
 
     expect(scopeResponse.status).toBe(200);
 
@@ -197,11 +204,13 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(
       '🔍 Step 3: Executing where-used search with ALL types...',
     );
-    const result = await utils.getWhereUsed({
-      object_name: 'CL_ABAP_CHAR_UTILITIES',
-      object_type: 'class',
-      scopeXml: modifiedScope,
-    });
+    const result = await withAcceptHandling(
+      utils.getWhereUsed({
+        object_name: 'CL_ABAP_CHAR_UTILITIES',
+        object_type: 'class',
+        scopeXml: modifiedScope,
+      }),
+    );
 
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();
@@ -229,10 +238,12 @@ describe('Shared - getWhereUsed', () => {
       testsLogger.info?.('📋 Object: T000 (table)');
       testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
-      const result = await client.getUtils().getWhereUsed({
-        object_name: 'T000',
-        object_type: 'table',
-      });
+      const result = await withAcceptHandling(
+        client.getUtils().getWhereUsed({
+          object_name: 'T000',
+          object_type: 'table',
+        }),
+      );
 
       expect(result.status).toBe(200);
       expect(result.data).toBeDefined();

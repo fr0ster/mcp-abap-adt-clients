@@ -34,7 +34,8 @@ docs/
 ├── README.md                          # This file - documentation index
 ├── architecture/
 │   ├── ARCHITECTURE.md               # System architecture and design
-│   └── discovery.md                  # ADT Discovery documentation
+│   ├── discovery.md                  # ADT Discovery documentation
+│   └── discovery.xml                 # Pretty-printed ADT discovery XML
 ├── usage/
 │   ├── CLIENT_API_REFERENCE.md       # Client API reference
 │   ├── STATEFUL_SESSION_GUIDE.md     # Session management

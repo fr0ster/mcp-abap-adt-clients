@@ -1,7 +1,7 @@
 # ADT Discovery Endpoints
 
 Generated from: https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap.us10.hana.ondemand.com/sap/bc/adt/discovery
-Generated at: 2025-12-12T12:27:39.698Z
+Generated at: 2025-12-26T08:04:14.794Z
 
 ## BOPF
 
@@ -117,9 +117,21 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/abapgit/repos`
 
+**Accept:**
+
+- `application/abapgit.adt.repo.v1+xml`
+- `application/abapgit.adt.repo.v2+xml`
+- `application/abapgit.adt.repo.v3+xml`
+- `application/abapgit.adt.repo.v4+xml`
+
 ### External Repository Info
 
 **URL:** `/sap/bc/adt/abapgit/externalrepoinfo`
+
+**Accept:**
+
+- `application/abapgit.adt.repo.info.ext.request.v1+xml`
+- `application/abapgit.adt.repo.info.ext.request.v2+xml`
 
 ## Data Preview
 
@@ -265,6 +277,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/testcodegen/dependencies/doubledata`
 
+**Accept:**
+
+- `application/vnd.sap.adt.oo.cds.codgen.v1+xml`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/cdstestcodegeneration/doubledata**
@@ -281,11 +297,19 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ideactions/runtime`
 
+**Accept:**
+
+- `application/vnd.sap.adt.ideactions.runtime.input.v1+xml`
+
 ## AMDP Debugger for ADT
 
 ### AMDP Debugger Main
 
 **URL:** `/sap/bc/adt/amdp/debugger/main`
+
+**Accept:**
+
+- `application/vnd.sap.adt.amdp.dbg.main.v4+xml`
 
 **Operations:**
 
@@ -343,6 +367,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/apack/gitmanifests`
 
+**Accept:**
+
+- `application/apack.adt.gitmanifest.request.v1+xml`
+
 ### APACK manifests of installed repositories on this system
 
 **URL:** `/sap/bc/adt/apack/manifests`
@@ -356,6 +384,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Notifications
 
 **URL:** `/sap/bc/adt/ato/notifications`
+
+**Accept:**
+
+- `application/vnd.sap.adt.ato.notification.v1+xml`
+- `application/vnd.sap.adt.ato.notification.v1+json`
 
 ## ABAP Profiler
 
@@ -415,13 +448,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/abapdaemons/applications/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/abapdaemons/applications/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/abapdaemons/applications/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### ABAP Daemon Name Validation
 
@@ -432,6 +477,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Deployment Scenario
 
 **URL:** `/sap/bc/adt/aif/aifdtyp`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -447,13 +497,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aif/aifdtyp/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aif/aifdtyp/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aif/aifdtyp/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Deployment Scenario Name Validation
 
@@ -462,6 +524,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Application Interface
 
 **URL:** `/sap/bc/adt/aif/aifityp`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -497,13 +564,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aif/aifityp/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aif/aifityp/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aif/aifityp/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -512,6 +591,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Namespace
 
 **URL:** `/sap/bc/adt/aif/aifntyp`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -543,13 +627,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aif/aifntyp/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aif/aifntyp/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aif/aifntyp/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -558,6 +654,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Recipient
 
 **URL:** `/sap/bc/adt/aif/aifrtyp`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -589,13 +690,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aif/aifrtyp/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aif/aifrtyp/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aif/aifrtyp/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -635,13 +748,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aif/check/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aif/check/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aif/check/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -681,13 +806,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aif/fixvalue/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aif/fixvalue/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aif/fixvalue/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -698,6 +835,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Review Booklet
 
 **URL:** `/sap/bc/adt/analytics/reviewbooklets`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -713,13 +855,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/analytics/reviewbooklets/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/analytics/reviewbooklets/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/analytics/reviewbooklets/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Review Booklet Name Validation
 
@@ -730,6 +884,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Application Job Catalog Entry
 
 **URL:** `/sap/bc/adt/applicationjob/catalogs`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -761,13 +920,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/applicationjob/catalogs/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/applicationjob/catalogs/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/applicationjob/catalogs/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -776,6 +947,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Application Job Template
 
 **URL:** `/sap/bc/adt/applicationjob/templates`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -803,13 +979,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/applicationjob/templates/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/applicationjob/templates/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/applicationjob/templates/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -820,6 +1008,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Application Log Object
 
 **URL:** `/sap/bc/adt/applicationlog/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -835,13 +1028,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/applicationlog/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/applicationlog/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/applicationlog/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Application Log Object Name Validation
 
@@ -871,13 +1076,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/applicationobjects/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/applicationobjects/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/applicationobjects/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Application Object Name Validation
 
@@ -888,6 +1105,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Communication Scenario
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco1`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -927,6 +1149,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco1/inboundService/detail`
 
+**Accept:**
+
+- `application/vnd.sap.adt.com.ibsdetail+xml`
+
 ### Outbound Service Value Help
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco1/outboundService/valueHelp`
@@ -934,6 +1160,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Outbound Service Details
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco1/outboundService/detail`
+
+**Accept:**
+
+- `application/vnd.sap.adt.com.obsdetail+xml`
 
 ### Allowed values for allowed instances
 
@@ -979,9 +1209,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco1/auth/detail`
 
+**Accept:**
+
+- `application/vnd.sap.adt.aps.common.authdetail+xml`
+
 ### Activity Details
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco1/actvt/detail`
+
+**Accept:**
+
+- `application/vnd.sap.adt.aps.common.actvtdetail+xml`
 
 ### Authorization Objects
 
@@ -1003,6 +1241,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco2`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 ### Allowed values for Inbound Service Type
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco2/ibstype/values`
@@ -1014,6 +1257,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Outbound Service
 
 **URL:** `/sap/bc/adt/aps/cloud/com/sco3`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 ### Allowed values for Outbound Service Type
 
@@ -1042,6 +1290,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Business Catalog
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia1`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1073,6 +1326,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia1/restrictionType/valueHelp`
 
+**Accept:**
+
+- `application/vnd.sap.adt.aps.common.restrictionsvh+xml`
+
 ### Title Value Help
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia1/title/valueHelp`
@@ -1080,6 +1337,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Details for Restriction Types
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia1/restrictionType/details`
+
+**Accept:**
+
+- `application/vnd.sap.adt.common.restrictiontypedetails+xml`
 
 ### Allowed Business Catalogs
 
@@ -1092,6 +1353,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Restriction Type
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia2`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1119,9 +1385,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia2/restrictionfield/details`
 
+**Accept:**
+
+- `application/vnd.sap.adt.iam.sia2authfielddetails+xml`
+
 ### Details for Authorization Object Extensions
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia2/authobjectextension/details`
+
+**Accept:**
+
+- `application/vnd.sap.adt.iam.sia2authfielddetails+xml`
 
 ### Restriction Type Name Validation
 
@@ -1130,6 +1404,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Restriction Field
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia5`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1149,6 +1428,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 ### App Types
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/apptype/values`
@@ -1156,6 +1440,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### App Creation Types
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/appcreationtype/values`
+
+**Accept:**
+
+- `application/vnd.sap.adt.aps.iam.appcreationtypes+xml`
 
 ### Service Types
 
@@ -1173,25 +1461,49 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/service/detail`
 
+**Accept:**
+
+- `application/vnd.sap.adt.iam.servicedetail+xml`
+
 ### Authorization Object Details
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/auth/detail`
+
+**Accept:**
+
+- `application/vnd.sap.adt.aps.common.authdetail+xml`
 
 ### Activity Details
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/actvt/detail`
 
+**Accept:**
+
+- `application/vnd.sap.adt.aps.common.actvtdetail+xml`
+
 ### Uiad Details
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/uiad/detail`
+
+**Accept:**
+
+- `application/vnd.sap.adt.iam.uiaddetail+xml`
 
 ### Transaction Code Details
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/tcode/detail`
 
+**Accept:**
+
+- `application/vnd.sap.adt.iam.tcodedetail+xml`
+
 ### Publish Locally
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/publish`
+
+**Accept:**
+
+- `application/vnd.sap.adt.iam.publishing+xml`
 
 ### Authorization Fields
 
@@ -1209,6 +1521,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/app/status`
 
+**Accept:**
+
+- `application/vnd.sap.adt.iam.status+xml`
+
 ### Transaction codes
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/tcode/values`
@@ -1217,13 +1533,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/restrictionType/valueHelp`
 
+**Accept:**
+
+- `application/vnd.sap.adt.aps.common.restrictionsvh+xml`
+
 ### Restriction Type Proposal
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/restrictionType/proposal`
 
+**Accept:**
+
+- `application/vnd.sap.adt.sia6.restrictiontypeproposal+xml`
+
 ### Details for Restriction Types
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia6/restrictionType/details`
+
+**Accept:**
+
+- `application/vnd.sap.adt.common.restrictiontypedetails+xml`
 
 ### IAM App Name Validation
 
@@ -1232,6 +1560,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Busines Catalog IAM App Assignment
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia7`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1246,6 +1579,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Business Role Template
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia8`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1269,6 +1607,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia9`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 ### Business Role Template Catalog Assignment Name Validation
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/sia9/validation`
@@ -1276,6 +1619,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Business Role Templ. – Launchpad Space Templ. Assignment
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/siad`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1295,13 +1643,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/siad/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/siad/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aps/cloud/iam/siad/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Business Role Templ. – Launchpad Space Templ. Assignment Name Validation
 
@@ -1310,6 +1670,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### API Package
 
 **URL:** `/sap/bc/adt/aps/com/sod1`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1348,6 +1713,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### API Package Assignment
 
 **URL:** `/sap/bc/adt/aps/com/sod2`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1409,6 +1779,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/auth`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **authobjects**
@@ -1435,6 +1810,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/auth/authcolsearchhelp`
 
+**Accept:**
+
+- `application/vnd.sap.adt.auth.authcolsearchhelp+xml`
+
 ### Allowed Authorization Fields
 
 **URL:** `/sap/bc/adt/aps/iam/auth/authField/valueHelp`
@@ -1443,9 +1822,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/auth/objfldsearchhelp`
 
+**Accept:**
+
+- `application/vnd.sap.adt.auth.objfldsearchhelp+xml`
+
 ### Data Element allowed
 
 **URL:** `/sap/bc/adt/aps/iam/auth/authdtelallowed`
+
+**Accept:**
+
+- `application/vnd.sap.adt.auth.authdtelallowed+xml`
 
 ### Authorization Field Name Validation
 
@@ -1489,13 +1876,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/suco/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aps/iam/suco/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aps/iam/suco/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -1504,6 +1903,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Authorization Default (TADIR)
 
 **URL:** `/sap/bc/adt/aps/iam/sush`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 ### Maintenance Mode Value Help
 
@@ -1541,6 +1945,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/sush/su22newobject/values`
 
+**Accept:**
+
+- `application/vnd.sap.adt.sush.newobjectlist+xml`
+
 ### Value help to get hash of applications
 
 **URL:** `/sap/bc/adt/aps/iam/sush/su22hash/values`
@@ -1549,9 +1957,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/sush/su22authobject/detail`
 
+**Accept:**
+
+- `application/vnd.sap.adt.sush.authobjdetail+xml`
+
 ### synchronize SUSH object
 
 **URL:** `/sap/bc/adt/aps/iam/sush/sush/synchronize`
+
+**Accept:**
+
+- `application/vnd.sap.adt.sush.synchronize+xml`
 
 ### no default values
 
@@ -1564,6 +1980,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Authorization Default (External)
 
 **URL:** `/sap/bc/adt/aps/iam/susi`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1583,13 +2004,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/susi/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/aps/iam/susi/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/aps/iam/susi/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Authorization Default (External) Name Validation
 
@@ -1599,6 +2032,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/suso`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 ### Allowed Object Class Values
 
 **URL:** `/sap/bc/adt/aps/iam/suso/objectclass/values`
@@ -1606,6 +2044,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Allowed Authorization Object Classes
 
 **URL:** `/sap/bc/adt/aps/iam/suso/objectclass/listvalues`
+
+**Accept:**
+
+- `application/vnd.sap.adt.suso.objectclasslist+xml`
 
 ### Allowed Authorization Fields
 
@@ -1619,9 +2061,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/suso/activity/details`
 
+**Accept:**
+
+- `application/vnd.sap.adt.suso.activitydetails+xml`
+
 ### Allowed Activities
 
 **URL:** `/sap/bc/adt/aps/iam/suso/activity/listvalues`
+
+**Accept:**
+
+- `application/vnd.sap.adt.suso.activitylist+xml`
 
 ### Allowed SU22 trace level
 
@@ -1651,6 +2101,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/suso/searchhelp`
 
+**Accept:**
+
+- `application/vnd.sap.adt.suso.searchhelp+xml`
+
 ### Allowed SearchHelp Values
 
 **URL:** `/sap/bc/adt/aps/iam/suso/searchhelp/list`
@@ -1659,9 +2113,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/aps/iam/suso/abaplanguageversion`
 
+**Accept:**
+
+- `application/vnd.sap.adt.suso.abaplanguageversion+xml`
+
 ### Basis Object
 
 **URL:** `/sap/bc/adt/aps/iam/suso/susobasisobject`
+
+**Accept:**
+
+- `application/vnd.sap.adt.suso.susobasisobject+xml`
 
 ### Authorization Object Name Validation
 
@@ -1672,6 +2134,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Archiving Object
 
 **URL:** `/sap/bc/adt/archivingobjects/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1691,13 +2158,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/archivingobjects/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/archivingobjects/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/archivingobjects/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Archiving Object Name Validation
 
@@ -1708,6 +2187,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### ATC Check Category
 
 **URL:** `/sap/bc/adt/atc/checkcategories`
+
+**Accept:**
+
+- `application/vnd.sap.adt.chkcv1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1723,6 +2207,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/atc/checkexemptions`
 
+**Accept:**
+
+- `application/vnd.sap.adt.chkev2+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/atc/chketyp/properties**
@@ -1736,6 +2225,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### ATC Check
 
 **URL:** `/sap/bc/adt/atc/checks`
+
+**Accept:**
+
+- `application/vnd.sap.adt.chkov1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1758,6 +2252,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### ATC Check Variant
 
 **URL:** `/sap/bc/adt/atc/checkvariants`
+
+**Accept:**
+
+- `application/vnd.sap.adt.chkvv4+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1787,6 +2286,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/bct/scp1bcs`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/bct/scp1bcs/properties**
@@ -1805,13 +2309,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/bct/scp1bcs/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/bct/scp1bcs/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/bct/scp1bcs/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Business Configuration Set Name Validation
 
@@ -1820,6 +2336,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Business Configuration Maintenance Object
 
 **URL:** `/sap/bc/adt/bct/smbctyp`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1839,13 +2360,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/bct/smbctyp/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/bct/smbctyp/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/bct/smbctyp/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Business Configuration Maintenance Object Name Validation
 
@@ -1856,6 +2389,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Background Processing Context
 
 **URL:** `/sap/bc/adt/bgqc/bgprocessingcontexts`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1871,13 +2409,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/bgqc/bgprocessingcontexts/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/bgqc/bgprocessingcontexts/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/bgqc/bgprocessingcontexts/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Background Processing Context Name Validation
 
@@ -1888,6 +2438,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Behavior Definition
 
 **URL:** `/sap/bc/adt/bo/behaviordefinitions`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1919,9 +2474,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/bo/behaviordefinitions/parser/info`
 
+**Accept:**
+
+- `application/vnd.sap.adt.bdef.parserinfo.v1+xml`
+
 ### Source Formatter
 
 **URL:** `/sap/bc/adt/bo/behaviordefinitions/source/formatter`
+
+**Accept:**
+
+- `text/plain`
 
 ### Behavior Definition Validation
 
@@ -1932,6 +2495,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### SAP Object Node Type
 
 **URL:** `/sap/bc/adt/businessobjects/nontnot`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -1963,13 +2531,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessobjects/nontnot/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/businessobjects/nontnot/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/businessobjects/nontnot/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -1978,6 +2558,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### SAP Object Type
 
 **URL:** `/sap/bc/adt/businessobjects/rontrot`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2013,13 +2598,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessobjects/rontrot/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/businessobjects/rontrot/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/businessobjects/rontrot/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -2030,6 +2627,13 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Service Binding
 
 **URL:** `/sap/bc/adt/businessservices/bindings`
+
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.servicebinding.v2+xml`
+- `text/html`
+- `application/json`
+- `text/plain`
 
 **Operations:**
 
@@ -2061,21 +2665,44 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessservices/bindings/bindingtypes/ina1`
 
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.ina.v1+xml`
+
 ### Unnamed Collection
 
 **URL:** `/sap/bc/adt/businessservices/bindings/bindingtypes/sql1`
+
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.sql.v1+xml`
 
 ### Unnamed Collection
 
 **URL:** `/sap/bc/adt/businessservices/bindings/uiconfig`
 
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.uiconfig.v1+json`
+
 ### Unnamed Collection
 
 **URL:** `/sap/bc/adt/businessservices/bindings/schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.schema.v1+json`
+
 ### Service Consumption Model
 
 **URL:** `/sap/bc/adt/businessservices/consmodels`
+
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.serviceconsumptionmodel.v6+xml`
+- `text/html`
+- `application/json`
+- `text/plain`
 
 **Operations:**
 
@@ -2123,6 +2750,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessservices/eeecevc`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/eventconsumptionmodel/eeecevc/properties**
@@ -2153,13 +2785,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessservices/eeecevc/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/businessservices/eeecevc/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/businessservices/eeecevc/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -2176,6 +2820,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Event Binding
 
 **URL:** `/sap/bc/adt/businessservices/evtbevb`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2199,13 +2848,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessservices/evtbevb/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/businessservices/evtbevb/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/businessservices/evtbevb/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Event Binding Name Validation
 
@@ -2214,6 +2875,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Event Object
 
 **URL:** `/sap/bc/adt/businessservices/evtoevo`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2245,13 +2911,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessservices/evtoevo/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/businessservices/evtoevo/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/businessservices/evtoevo/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -2260,6 +2938,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### SOAP Provider Model
 
 **URL:** `/sap/bc/adt/businessservices/servprovs`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2287,13 +2970,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/businessservices/servprovs/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/businessservices/servprovs/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/businessservices/servprovs/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -2304,6 +2999,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Change Document Object
 
 **URL:** `/sap/bc/adt/changedocuments/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2319,13 +3019,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/changedocuments/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/changedocuments/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/changedocuments/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Change Document Object Name Validation
 
@@ -2357,6 +3069,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/conn/commtargets`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/commtargetobjects/cotatyp/properties**
@@ -2375,13 +3092,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/conn/commtargets/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/conn/commtargets/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/conn/commtargets/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Communication Target Name Validation
 
@@ -2392,6 +3121,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Core Schema Notation Model
 
 **URL:** `/sap/bc/adt/csn/csnm`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2415,17 +3149,33 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/csn/csnm/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/csn/csnm/$schema`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
 
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/csn/csnm/$configuration`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
+
 ### Unnamed Collection
 
 **URL:** `/sap/bc/adt/csn/csnm/files`
+
+**Accept:**
+
+- `application/json`
 
 **Operations:**
 
@@ -2436,6 +3186,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Unnamed Collection
 
 **URL:** `/sap/bc/adt/csn/csnm/last-generation-run`
+
+**Accept:**
+
+- `application/json`
 
 **Operations:**
 
@@ -2467,13 +3221,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/customfields/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/customfields/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/customfields/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Custom Field Name Validation
 
@@ -2484,6 +3250,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Customer Data Browser Object
 
 **URL:** `/sap/bc/adt/databrowser/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2511,13 +3282,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/databrowser/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/databrowser/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/databrowser/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -2543,13 +3326,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/datacategories/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/datacategories/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/datacategories/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Data Category Name Validation
 
@@ -2560,6 +3355,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Data Element
 
 **URL:** `/sap/bc/adt/ddic/dataelements`
+
+**Accept:**
+
+- `application/vnd.sap.adt.dataelements.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2583,6 +3383,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/db/indexes`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/dictionary/tabldti/properties**
@@ -2601,13 +3406,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/db/indexes/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/ddic/db/indexes/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/ddic/db/indexes/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Table Index Name Validation
 
@@ -2616,6 +3433,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Technical Table Settings
 
 **URL:** `/sap/bc/adt/ddic/db/settings`
+
+**Accept:**
+
+- `application/vnd.sap.adt.table.settings.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2669,6 +3491,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/ddlx/sources`
 
+**Accept:**
+
+- `application/vnd.sap.adt.ddic.ddlx.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/cds/ddlxex/properties**
@@ -2687,6 +3514,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/desd`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/cds/desdtyp/properties**
@@ -2701,13 +3533,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/desd/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/ddic/desd/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/ddic/desd/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Logical External Schema Name Validation
 
@@ -2716,6 +3560,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Domain
 
 **URL:** `/sap/bc/adt/ddic/domains`
+
+**Accept:**
+
+- `application/vnd.sap.adt.domains.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2730,6 +3579,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Aspect
 
 **URL:** `/sap/bc/adt/ddic/dras/sources`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 ### Grammar metadata for type Aspect
 
@@ -2769,6 +3623,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/drty/sources`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/dictionary/drtysty/properties**
@@ -2798,6 +3657,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Formatter for type DRTY
 
 **URL:** `/sap/bc/adt/ddic/drty/sources/$formatter`
+
+**Accept:**
+
+- `text/plain`
 
 ### Element Info for type DRTY
 
@@ -2843,6 +3706,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/dsfd/sources`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/dictionary/dsfdscf/properties**
@@ -2873,6 +3741,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/dsfd/sources/$formatter`
 
+**Accept:**
+
+- `text/plain`
+
 ### Element Info for type DSFD
 
 **URL:** `/sap/bc/adt/ddic/dsfd/sources/$elementinfo`
@@ -2898,6 +3770,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Scalar Function Implementation Reference
 
 **URL:** `/sap/bc/adt/ddic/dsfi`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2925,13 +3802,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/dsfi/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/ddic/dsfi/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/ddic/dsfi/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -2940,6 +3829,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Dynamic Cache
 
 **URL:** `/sap/bc/adt/ddic/dtdc/sources`
+
+**Accept:**
+
+- `application/vnd.sap.adt.ddic.dtdc.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2958,6 +3852,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Entity Buffer
 
 **URL:** `/sap/bc/adt/ddic/dteb/sources`
+
+**Accept:**
+
+- `application/vnd.sap.adt.ddic.dteb.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -2993,6 +3892,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/extensionindexes`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/dictionary/xinxdtx/properties**
@@ -3011,13 +3915,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/extensionindexes/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/ddic/extensionindexes/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/ddic/extensionindexes/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Extension Index Name Validation
 
@@ -3026,6 +3942,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Lock Object
 
 **URL:** `/sap/bc/adt/ddic/lockobjects/sources`
+
+**Accept:**
+
+- `application/vnd.sap.adt.lockobjects.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3040,6 +3961,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Service Definition
 
 **URL:** `/sap/bc/adt/ddic/srvd/sources`
+
+**Accept:**
+
+- `application/vnd.sap.adt.ddic.srvd.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3059,9 +3985,18 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/structures`
 
+**Accept:**
+
+- `application/vnd.sap.adt.structures.v2+xml`
+- `text/html`
+
 ### Structure Parser Info
 
 **URL:** `/sap/bc/adt/ddic/structures/parser/info`
+
+**Accept:**
+
+- `application/vnd.sap.adt.tabl.parserinfo.v1+xml`
 
 ### Structure Name Validation
 
@@ -3071,9 +4006,18 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/tables`
 
+**Accept:**
+
+- `application/vnd.sap.adt.tables.v2+xml`
+- `text/html`
+
 ### Table Parser Info
 
 **URL:** `/sap/bc/adt/ddic/tables/parser/info`
+
+**Accept:**
+
+- `application/vnd.sap.adt.tabl.parserinfo.v1+xml`
 
 ### Database Table Name Validation
 
@@ -3082,6 +4026,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Table Type
 
 **URL:** `/sap/bc/adt/ddic/tabletypes`
+
+**Accept:**
+
+- `application/vnd.sap.adt.tabletype.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3098,6 +4047,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Data Destruction Object
 
 **URL:** `/sap/bc/adt/destructionobjects/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3125,13 +4079,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/destructionobjects/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/destructionobjects/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/destructionobjects/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -3142,6 +4108,13 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Knowledge Transfer Document
 
 **URL:** `/sap/bc/adt/documentation/ktd/documents`
+
+**Accept:**
+
+- `application/vnd.sap.adt.sktdv2+xml`
+- `text/html`
+- `application/json`
+- `text/plain`
 
 **Operations:**
 
@@ -3219,6 +4192,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/emailtemplates/templates`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/smtg/smtg/properties**
@@ -3233,13 +4211,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/emailtemplates/templates/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/emailtemplates/templates/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/emailtemplates/templates/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Email Template Name Validation
 
@@ -3264,6 +4254,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### BAdI Implementation
 
 **URL:** `/sap/bc/adt/enhancements/enhoxhb`
+
+**Accept:**
+
+- `application/vnd.sap.adt.enh.enhoxhb.v4+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3311,6 +4306,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/enhancements/enhsxsb`
 
+**Accept:**
+
+- `application/vnd.sap.adt.enh.enhs.v2+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/enhancements/enhsxsb/properties**
@@ -3330,6 +4330,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Launchpad App Descriptor Item
 
 **URL:** `/sap/bc/adt/fiori/uiad`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3365,13 +4370,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/fiori/uiad/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/fiori/uiad/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/fiori/uiad/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -3380,6 +4397,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Launchpad Page Template
 
 **URL:** `/sap/bc/adt/fiori/uipgtyp`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3415,13 +4437,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/fiori/uipgtyp/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/fiori/uipgtyp/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/fiori/uipgtyp/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -3430,6 +4464,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Launchpad Space Template
 
 **URL:** `/sap/bc/adt/fiori/uisttop`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3461,13 +4500,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/fiori/uisttop/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/fiori/uisttop/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/fiori/uisttop/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -3478,6 +4529,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Form
 
 **URL:** `/sap/bc/adt/formobjects/sfpf5f`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3497,13 +4553,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/formobjects/sfpf5f/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/formobjects/sfpf5f/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/formobjects/sfpf5f/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Form Name Validation
 
@@ -3571,6 +4639,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ideactions/objects`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/ideactions/saiatyp/properties**
@@ -3589,13 +4662,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ideactions/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/ideactions/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/ideactions/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### IDE Action Name Validation
 
@@ -3606,6 +4691,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### ILM Object
 
 **URL:** `/sap/bc/adt/ilmobjects/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3637,13 +4727,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ilmobjects/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/ilmobjects/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/ilmobjects/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -3654,6 +4756,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Intelligent Scenario Model
 
 **URL:** `/sap/bc/adt/islm/intelligentmodel`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3689,13 +4796,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/islm/intelligentmodel/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/islm/intelligentmodel/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/islm/intelligentmodel/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -3704,6 +4823,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Intelligent Scenario
 
 **URL:** `/sap/bc/adt/islm/intelligentscenario`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3735,13 +4859,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/islm/intelligentscenario/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/islm/intelligentscenario/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/islm/intelligentscenario/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -3767,6 +4903,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/metricproviders`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/metricprovider/gsmp/properties**
@@ -3781,13 +4922,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/metricproviders/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/metricproviders/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/metricproviders/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Metric Provider Name Validation
 
@@ -3798,6 +4951,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Note Type Assignment
 
 **URL:** `/sap/bc/adt/notebasic/assignments`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3813,13 +4971,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/notebasic/assignments/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/notebasic/assignments/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/notebasic/assignments/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Note Type Assignment Name Validation
 
@@ -3828,6 +4998,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Note Type
 
 **URL:** `/sap/bc/adt/notebasic/notetypes`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3843,13 +5018,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/notebasic/notetypes/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/notebasic/notetypes/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/notebasic/notetypes/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Note Type Name Validation
 
@@ -3860,6 +5047,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Number Range Object
 
 **URL:** `/sap/bc/adt/numberranges/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -3875,13 +5067,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/numberranges/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/numberranges/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/numberranges/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Number Range Object Name Validation
 
@@ -3937,6 +5141,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/packages`
 
+**Accept:**
+
+- `application/vnd.sap.adt.packages.v2+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/packages/devck/properties**
@@ -3979,15 +5188,29 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/packages/$constraints`
 
+**Accept:**
+
+- `application/softwareComponent.v1+json`
+- `application/packageConstraints.v1+json`
+
 ### Package Settings
 
 **URL:** `/sap/bc/adt/packages/settings`
+
+**Accept:**
+
+- `application/vnd.sap.adt.packages.settings.v2+xml`
 
 ## Extensibility
 
 ### Predefined Field Enabling
 
 **URL:** `/sap/bc/adt/predefinedfields/objects`
+
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v1+xml`
+- `text/html`
 
 **Operations:**
 
@@ -4011,13 +5234,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/predefinedfields/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/predefinedfields/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/predefinedfields/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Predefined Field Enabling Name Validation
 
@@ -4103,13 +5338,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/sfw/featuretoggles/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/sfw/featuretoggles/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/sfw/featuretoggles/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Attribute Keys Value Help
 
@@ -4147,6 +5394,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/swc/relations`
 
+**Accept:**
+
+- `application/vnd.sap.adt.blues.v2+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/wbobj/softwarecomponent/swcrtyp/properties**
@@ -4181,13 +5433,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/swc/relations/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/swc/relations/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/swc/relations/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Object Name Validation
 
@@ -4213,13 +5477,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/transportobject/objects/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/transportobject/objects/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/transportobject/objects/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### Transport Object Definition Name Validation
 
@@ -4301,6 +5577,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ucon/httpservices`
 
+**Accept:**
+
+- `application/vnd.sap.adt.uconn.http.v1+xml`
+- `text/html`
+
 **Operations:**
 
 - **http://www.sap.com/adt/connectivity/http/properties**
@@ -4335,13 +5616,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/wbobj/apictyp/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/wbobj/apictyp/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/wbobj/apictyp/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### API Catalog Name Validation
 
@@ -4367,13 +5660,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/wmpc/applications/source/formatter`
 
+**Accept:**
+
+- `application/json`
+
 ### Server driven framework - Schema
 
 **URL:** `/sap/bc/adt/wmpc/applications/$schema`
 
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.schema.v1+json; framework=objectTypes.v1`
+
 ### Server driven framework - Configuration
 
 **URL:** `/sap/bc/adt/wmpc/applications/$configuration`
+
+**Accept:**
+
+- `application/vnd.sap.adt.serverdriven.configuration.v1+json; framework=objectTypes.v1`
 
 ### WMPC Application Name Validation
 
@@ -4384,6 +5689,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Analytical custom query
 
 **URL:** `/sap/bc/adt/ana/aqd`
+
+**Accept:**
+
+- `application/vnd.sap.adt.ddlSource+xml`
 
 **Operations:**
 
@@ -4577,6 +5886,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/acm/dcl/sources`
 
+**Accept:**
+
+- `application/vnd.sap.adt.dclSource+xml`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/acm/dclsources/properties**
@@ -4603,6 +5916,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/sadl/gw/annopush/prepare`
 
+**Accept:**
+
+- `application/xml`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/sadl/gw/annopush/prepare**
@@ -4612,6 +5929,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### SADL: Annotation Pushdown Push
 
 **URL:** `/sap/bc/adt/sadl/gw/annopush/push`
+
+**Accept:**
+
+- `application/xml`
 
 **Operations:**
 
@@ -4623,6 +5944,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/sadl/gw/annopush/finalize`
 
+**Accept:**
+
+- `application/xml`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/sadl/gw/annopush/finalize**
@@ -4632,6 +5957,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### SADL: Annotation Pushdown Validate
 
 **URL:** `/sap/bc/adt/sadl/gw/annopush/validate`
+
+**Accept:**
+
+- `application/xml`
+- `application/xml`
 
 **Operations:**
 
@@ -4644,6 +5974,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### SADL: Annotation Pushdown Metadata Extentions
 
 **URL:** `/sap/bc/adt/sadl/gw/mde`
+
+**Accept:**
+
+- `application/xml`
 
 ## Feed Repository
 
@@ -4911,9 +6245,20 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/atc/autoqf/worklist`
 
+**Accept:**
+
+- `application/vnd.sap.adt.atc.objectreferences.v1+xml`
+- `application/vnd.sap.adt.atc.autoqf.proposal.v1+xml`
+- `application/vnd.sap.adt.atc.autoqf.selection.v1+xml`
+- `application/vnd.sap.adt.atc.genericrefactoring.v1+xml`
+
 ### ATC Remarks
 
 **URL:** `/sap/bc/adt/atc/remarks`
+
+**Accept:**
+
+- `application/vnd.sap.adt.atc.remarks.v1+xml`
 
 ### List of Approvers
 
@@ -4981,6 +6326,14 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/abapunit/testruns`
 
+**Accept:**
+
+- `application/vnd.sap.adt.abapunit.testruns.config.v1+xml`
+- `application/vnd.sap.adt.abapunit.testruns.config.v2+xml`
+- `application/vnd.sap.adt.abapunit.testruns.config.v3+xml`
+- `application/vnd.sap.adt.abapunit.testruns.config.v4+xml`
+- `application/xml`
+
 ### ABAP Unit Metadata
 
 **URL:** `/sap/bc/adt/abapunit/metadata`
@@ -4989,9 +6342,19 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/abapunit/testruns/evaluation`
 
+**Accept:**
+
+- `application/vnd.sap.adt.abapunit.testruns.evaluation.config.v1+xml`
+- `application/vnd.sap.adt.abapunit.testruns.evaluation.config.v2+xml`
+- `application/vnd.sap.adt.abapunit.testruns.evaluation.config.v3+xml`
+
 ### ABAP Unit Explain Tool
 
 **URL:** `/sap/bc/adt/abapunit/explain`
+
+**Accept:**
+
+- `application/vnd.sap.adt.aunit.explain.request.v1+asjson`
 
 **Operations:**
 
@@ -5012,6 +6375,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### /abapunit/ai/chat/action
 
 **URL:** `/sap/bc/adt/abapunit/ai/chat/action`
+
+**Accept:**
+
+- `application/vnd.sap.adt.aunit.chat.action.v1+asjson`
 
 **Operations:**
 
@@ -5105,6 +6472,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/classifications`
 
+**Accept:**
+
+- `application/vnd.sap.adt.classification+xml`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/classifications**
@@ -5121,6 +6492,13 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/cts/transports`
 
+**Accept:**
+
+- `application/vnd.sap.as+xml;charset=utf-8;dataname=com.sap.adt.transport.service.checkData`
+- `application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.CreateCorrectionRequest`
+- `application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.CreateCorrectionRequest.v1`
+- `application/vnd.sap.adt.transports.search.v1+xml`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/cts/transports/search**
@@ -5134,6 +6512,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Transport Management
 
 **URL:** `/sap/bc/adt/cts/transportrequests`
+
+**Accept:**
+
+- `application/vnd.sap.adt.transportorganizer.v1+xml`
 
 **Operations:**
 
@@ -5205,6 +6587,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/ddla/formatter/identifiers`
 
+**Accept:**
+
+- `text/plain`
+
 ### DDLA Language Help Resource
 
 **URL:** `/sap/bc/adt/docu/ddla/langu`
@@ -5269,6 +6655,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/ddl/elementinfo`
 
+**Accept:**
+
+- `text/plain`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/ddic/ddl/elementinfo**
@@ -5311,6 +6701,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/ddl/sources`
 
+**Accept:**
+
+- `application/vnd.sap.adt.ddlSource+xml`
+
 **Operations:**
 
 - **http://www.sap.com/adt/categories/ddic/ddlsources/properties**
@@ -5324,6 +6718,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### DDL Case Preserving Formatter for Identifiers
 
 **URL:** `/sap/bc/adt/ddic/ddl/formatter/identifiers`
+
+**Accept:**
+
+- `text/plain`
 
 ### DDL pretty printer configuration
 
@@ -5377,9 +6775,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/ddl/migration/validation`
 
+**Accept:**
+
+- `application/vnd.sap.adt.ddl.migrationobjects.v2+xml`
+
 ### Run Migration in Background
 
 **URL:** `/sap/bc/adt/ddic/ddl/migration/bgruns`
+
+**Accept:**
+
+- `application/vnd.sap.adt.ddl.migrationobjects.v2+xml`
 
 ### Get Migration Log Details
 
@@ -5400,6 +6806,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### DDLX Case Preserving Formatter for Identifiers
 
 **URL:** `/sap/bc/adt/ddic/ddlx/formatter/identifiers`
+
+**Accept:**
+
+- `text/plain`
 
 ### DDLX Language Help Resource
 
@@ -5519,6 +6929,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/dteb/formatter`
 
+**Accept:**
+
+- `text/plain`
+
 ### Entity Buffer Code Completion
 
 **URL:** `/sap/bc/adt/ddic/dteb/codecompletion/proposal`
@@ -5597,6 +7011,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/ddic/srvd/formatter/identifiers`
 
+**Accept:**
+
+- `text/plain`
+
 ### SRVD Source Types
 
 **URL:** `/sap/bc/adt/ddic/srvd/sourceTypes`
@@ -5645,6 +7063,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/abapsource/codecompletion/elementinfo`
 
+**Accept:**
+
+- `text/plain`
+
 **Operations:**
 
 - **http://www.sap.com/adt/relations/elementinfo**
@@ -5669,6 +7091,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/abapsource/typehierarchy`
 
+**Accept:**
+
+- `application/vnd.sap.adt.typehierachy.result.v1+xml`
+
 ### Pretty Printer
 
 **URL:** `/sap/bc/adt/abapsource/prettyprinter`
@@ -5676,6 +7102,13 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Pretty Printer Settings
 
 **URL:** `/sap/bc/adt/abapsource/prettyprinter/settings`
+
+**Accept:**
+
+- `application/vnd.sap.adt.ppsettings.v2+xml`
+- `application/vnd.sap.adt.ppsettings.v3+xml`
+- `application/vnd.sap.adt.ppsettings.v4+xml`
+- `application/vnd.sap.adt.ppsettings.v5+xml`
 
 ### Cleanup
 
@@ -5693,11 +7126,20 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/abapsource/abapdoc/exportjobs`
 
+**Accept:**
+
+- `application/vnd.sap.adt.abapsource.abapdoc.exportjobs.v1+xml`
+
 ## Navigation
 
 ### Navigation
 
 **URL:** `/sap/bc/adt/navigation/target`
+
+**Accept:**
+
+- `application/xml`
+- `semantic.navigation.v1`
 
 **Operations:**
 
@@ -5771,13 +7213,25 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/textelements/programs`
 
+**Accept:**
+
+- `application/vnd.sap.adt.textelements.v1+xml`
+
 ### Text Elements
 
 **URL:** `/sap/bc/adt/textelements/functiongroups`
 
+**Accept:**
+
+- `application/vnd.sap.adt.textelements.v1+xml`
+
 ### Text Elements
 
 **URL:** `/sap/bc/adt/textelements/classes`
+
+**Accept:**
+
+- `application/vnd.sap.adt.textelements.v1+xml`
 
 ## Classes and Interfaces
 
@@ -5785,9 +7239,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/oo/classes`
 
+**Accept:**
+
+- `application/vnd.sap.adt.oo.classes.v4+xml`
+
 ### Interfaces
 
 **URL:** `/sap/bc/adt/oo/interfaces`
+
+**Accept:**
+
+- `application/vnd.sap.adt.oo.interfaces.v5+xml`
 
 ### Validation of Object Name
 
@@ -5821,9 +7283,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/deletion/delete`
 
+**Accept:**
+
+- `application/vnd.sap.adt.deletion.request.v1+xml`
+
 ### Deletion check
 
 **URL:** `/sap/bc/adt/deletion/check`
+
+**Accept:**
+
+- `application/vnd.sap.adt.deletion.check.request.v1+xml`
 
 ## Activation
 
@@ -5848,6 +7318,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Activation in background
 
 **URL:** `/sap/bc/adt/activation/runs`
+
+**Accept:**
+
+- `application/vnd.sap.adt.activationrun.v1+xml`
 
 **Operations:**
 
@@ -5910,6 +7384,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Function Groups
 
 **URL:** `/sap/bc/adt/functions/groups`
+
+**Accept:**
+
+- `application/vnd.sap.adt.functions.groups.v3+xml`
 
 **Operations:**
 
@@ -5998,6 +7476,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Quickfixes
 
 **URL:** `/sap/bc/adt/quickfixes/evaluation`
+
+**Accept:**
+
+- `application/vnd.sap.adt.quickfixes.evaluation+xml;version=1.0.0`
 
 ## Refactorings
 
@@ -6119,9 +7601,17 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/repository/informationsystem/virtualfolders`
 
+**Accept:**
+
+- `application/vnd.sap.adt.repository.virtualfolders.result.v1+xml`
+
 ### Virtual Folders Contents
 
 **URL:** `/sap/bc/adt/repository/informationsystem/virtualfolders/contents`
+
+**Accept:**
+
+- `application/vnd.sap.adt.repository.virtualfolders.result.v1+xml`
 
 **Operations:**
 
@@ -6241,17 +7731,33 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/objectrelations/network`
 
+**Accept:**
+
+- `application/vnd.sap.adt.objectrelations.request.v1+xml`
+
 ### Object relations
 
 **URL:** `/sap/bc/adt/objectrelations/components`
+
+**Accept:**
+
+- `application/vnd.sap.adt.objectrelations.request.v1+xml`
 
 ### References in Object Relation
 
 **URL:** `/sap/bc/adt/objectrelations/references`
 
+**Accept:**
+
+- `application/vnd.sap.adt.objectrelations.request.references.v1+xml`
+
 ### References in Object Relation
 
 **URL:** `/sap/bc/adt/objectrelations`
+
+**Accept:**
+
+- `application/vnd.sap.adt.objectrelations.request.sets.v1+xml`
 
 **Operations:**
 
@@ -6264,6 +7770,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### OData V4
 
 **URL:** `/sap/bc/adt/businessservices/odatav4`
+
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.odatav4.v2+xml`
 
 **Operations:**
 
@@ -6294,6 +7804,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### OData V2
 
 **URL:** `/sap/bc/adt/businessservices/odatav2`
+
+**Accept:**
+
+- `application/vnd.sap.adt.businessservices.odatav2.v3+xml`
 
 **Operations:**
 
@@ -6699,6 +8213,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 
 **URL:** `/sap/bc/adt/crosstrace/traces`
 
+**Accept:**
+
+- `application/vnd.sap.adt.crosstrace.trace.full.v1+json`
+
 **Operations:**
 
 - **traces**
@@ -6724,6 +8242,11 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### ABAP Cross Trace: Activations
 
 **URL:** `/sap/bc/adt/crosstrace/activations`
+
+**Accept:**
+
+- `application/vnd.sap.adt.crosstrace.activations.v1+xml`
+- `application/vnd.sap.adt.crosstrace.activations.v1.b+xml`
 
 **Operations:**
 
@@ -6774,6 +8297,10 @@ Generated at: 2025-12-12T12:27:39.698Z
 ### Transformation
 
 **URL:** `/sap/bc/adt/xslt/transformations`
+
+**Accept:**
+
+- `application/vnd.sap.adt.transformations+xml`
 
 **Operations:**
 

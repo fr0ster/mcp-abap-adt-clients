@@ -39,6 +39,7 @@ test_settings:
     test: 300000      # Timeout for full workflow tests (ms)
     read: 60000       # Timeout for read tests (ms)
     default: 30000    # Default timeout (ms)
+  allow_406: false    # Allow 406 Not Acceptable to be treated as skip (override per test case params.allow_406)
 ```
 
 ## Environment Configuration
@@ -570,4 +571,3 @@ Use `scripts/verify-builder-tests.js` to validate:
 **Related Documentation:**
 - [BUILDER_TEST_PATTERN.md](./BUILDER_TEST_PATTERN.md) - Integration test pattern documentation (BaseTester with AdtClient)
 - [ARCHITECTURE.md](../architecture/ARCHITECTURE.md#test-infrastructure) - Test infrastructure overview
-
