@@ -1,18 +1,20 @@
 # @mcp-abap-adt/adt-clients
 
-TypeScript clients for SAP ABAP Development Tools (ADT) with a **Builder and Client API architecture**.
+TypeScript clients for SAP ABAP Development Tools (ADT).
 
 ## Features
 
-- ✅ **Builder API** – fluent interface for complex workflows with method chaining (`ClassBuilder`, `BehaviorImplementationBuilder`, `ProgramBuilder`, `UnitTestBuilder`, etc.)
 - ✅ **Client API** – simplified interface for common operations:
+  - `AdtClient` – high-level CRUD API with automatic operation chains
+  - `AdtRuntimeClient` – runtime operations (debugger, traces, memory, logs)
   - `ReadOnlyClient` – read operations for all object types
   - `CrudClient` – full CRUD operations with method chaining and state management
-- ✅ **ABAP Unit test support** – `UnitTestBuilder` for running and managing ABAP Unit tests (class and CDS view tests)
+- ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
 - ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
 - ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
 - ✅ **TypeScript-first** – full type safety with comprehensive interfaces
 - ✅ **Response headers are normalized** – ADT response headers can be non-string; normalize before parsing in contributors’ code
+- ✅ **Public API is clients + supporting types** – internal builders and low-level utilities are not exported from the package root
 
 ## Responsibilities and Design Principles
 
@@ -36,16 +38,14 @@ This principle ensures:
 
 This package is responsible for:
 
-1. **ADT operations**: Provides high-level and low-level APIs for interacting with SAP ABAP Development Tools (ADT)
+1. **ADT operations**: Provides high-level and low-level client APIs for interacting with SAP ABAP Development Tools (ADT)
 2. **Object management**: CRUD operations for ABAP objects (classes, interfaces, programs, etc.)
-3. **Builder pattern**: Fluent interface for complex workflows with method chaining
-4. **Session management**: Maintains session state across operations using `sap-adt-connection-id`
-5. **Lock management**: Handles object locking with persistent registry
+3. **Session management**: Maintains session state across operations using `sap-adt-connection-id`
+4. **Lock management**: Handles object locking with persistent registry
 
 #### What This Package Does
 
 - **Provides ADT clients**: `ReadOnlyClient`, `CrudClient`, and specialized clients for ADT operations
-- **Implements builders**: Builder classes for different ABAP object types with method chaining
 - **Manages locks**: Lock registry with persistent storage and CLI tools
 - **Handles requests**: Makes HTTP requests to SAP ADT endpoints through connection interface
 - **Manages state**: Maintains object state across chained operations
@@ -79,7 +79,7 @@ npm install @mcp-abap-adt/adt-clients
 
 ## Architecture
 
-### Three-Layer API
+### Public API
 
 1. **AdtClient** (High-level, recommended)
    - Simplified CRUD operations with automatic operation chains
@@ -88,27 +88,22 @@ npm install @mcp-abap-adt/adt-clients
    - Utility functions via `client.getUtils()`
    - Example: `await client.getClass().create({...}, { activateOnCreate: true })`
 
-2. **Builders** (Low-level, flexible)
-   - Direct access to all ADT operations
-   - Method chaining with Promise support
-   - Fine-grained control over workflow
-   - Example: `ProgramBuilder`, `ClassBuilder`, `InterfaceBuilder`
+2. **AdtRuntimeClient**
+   - Runtime operations for debugging, traces, memory analysis, and logs
+   - Example: `await runtimeClient.getDebugger(...)`
 
-3. **Clients** (Legacy API)
-   - **ReadOnlyClient** – simple read operations
-   - **CrudClient** – unified CRUD operations with chaining
+3. **ReadOnlyClient** (Legacy API)
+   - Simple read operations
+
+4. **CrudClient** (Legacy API)
+   - Unified CRUD operations with chaining
    - State management with getters
    - Example: `client.createProgram(...).lockProgram(...).updateProgram(...)`
 
-4. **Specialized Clients**
-   - `ManagementClient` – activation, syntax checking
-   - `LockClient` – lock/unlock with registry
-   - `ValidationClient` – object name validation
-
 ## Supported Object Types
 
-| Object Type | Builder | CrudClient | ReadOnlyClient |
-|------------|---------|------------|----------------|
+| Object Type | AdtClient | CrudClient | ReadOnlyClient |
+|------------|-----------|------------|----------------|
 | Classes (CLAS) | ✅ | ✅ | ✅ |
 | Behavior Implementations (CLAS) | ✅ | ✅ | ✅ |
 | Behavior Definitions (BDEF) | ✅ | ✅ | ✅ |
@@ -163,7 +158,7 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 - ✅ Separation of CRUD operations and utility functions
 - ✅ Long polling support for object readiness
 
-### Using CrudClient (Builder-based API)
+### Using CrudClient (Low-level API)
 
 ```typescript
 import { createAbapConnection } from '@mcp-abap-adt/connection';
@@ -244,37 +239,6 @@ await client.getClass().update({
 
 **Note:** Long polling is automatically used in `create()` and `update()` methods of all `AdtObject` implementations to ensure objects are ready before proceeding with subsequent operations.
 
-### Using Builders (Advanced workflows)
-
-```typescript
-import { ClassBuilder } from '@mcp-abap-adt/adt-clients/core';
-
-const builder = new ClassBuilder(connection, console, {
-  className: 'ZCL_MY_CLASS',
-  packageName: 'ZADT_BLD_PKG01',
-  description: 'Demo builder class',
-  transportRequest: 'E19K900001'
-});
-
-await builder
-  .setCode(`CLASS zcl_my_class DEFINITION PUBLIC.
-  PUBLIC SECTION.
-    METHODS: hello.
-ENDCLASS.
-
-CLASS zcl_my_class IMPLEMENTATION.
-  METHOD hello.
-    WRITE: 'Hello from builder'.
-  ENDMETHOD.
-ENDCLASS.`)
-  .validate()
-  .then(b => b.create())
-  .then(b => b.lock())
-  .then(b => b.update())
-  .then(b => b.unlock())
-  .then(b => b.activate());
-```
-
 ### Creating Behavior Implementation Classes
 
 ```typescript
@@ -291,20 +255,6 @@ await client.createBehaviorImplementation({
   transportRequest: 'E19K900001'
 });
 
-// Or use builder directly for more control
-const builder = client.getBehaviorImplementationBuilderInstance({
-  className: 'ZBP_OK_I_CDS_TEST',
-  behaviorDefinition: 'ZOK_I_CDS_TEST'
-});
-
-await builder
-  .createBehaviorImplementation()  // Full workflow
-  .then(b => b.read())              // Read class source
-  .then(b => b.lock())              // Lock for modification
-  .then(b => b.updateMainSource())  // Update main source
-  .then(b => b.updateImplementations()) // Update implementations include
-  .then(b => b.unlock())            // Unlock
-  .then(b => b.activate());        // Activate
 ```
 
 ## Developer Tools

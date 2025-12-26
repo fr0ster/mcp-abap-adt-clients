@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-12-26
+
+### Changed
+- **Public API**: Root exports now include only client classes plus supporting types; internal builders and low-level utilities are no longer exported
+- **Docs**: Updated README to reflect client-only public surface and usage
+
 ## [0.2.11] - 2025-12-26
 
 ### Added
