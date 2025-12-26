@@ -1,6 +1,6 @@
 /**
  * Structure unlock operations
- * NOTE: Builder should call connection.setSessionType("stateless") after unlocking
+ * NOTE: Caller should call connection.setSessionType("stateless") after unlocking
  */
 
 import type {

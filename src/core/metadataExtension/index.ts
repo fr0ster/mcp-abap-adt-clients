@@ -9,7 +9,6 @@ import type {
 } from './types';
 
 export { AdtMetadataExtension } from './AdtMetadataExtension';
-export { MetadataExtensionBuilder } from './MetadataExtensionBuilder';
 export * from './types';
 
 // Type alias for AdtMetadataExtension

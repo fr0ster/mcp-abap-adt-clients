@@ -13,7 +13,6 @@ export {
   UnsupportedUpdateOperationError,
   UnsupportedValidateOperationError,
 } from './errors';
-export { SharedBuilder } from './SharedBuilder';
 export { getTransaction } from './transaction';
 export type {
   IGetDiscoveryParams as GetDiscoveryParams,

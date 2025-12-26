@@ -229,6 +229,13 @@ describe('AdtUnitTest (using AdtClient)', () => {
           expect(readState?.runId).toBe(runId);
           expect(readState?.runStatus).toBeDefined();
 
+          const metadataState = await client
+            .getUnitTest()
+            .readMetadata(readConfig);
+          expect(metadataState).toBeDefined();
+          expect(metadataState.runId).toBe(runId);
+          expect(metadataState.runStatus).toBeDefined();
+
           // Log detailed status information
           if (readState?.runStatus) {
             const status = readState.runStatus;

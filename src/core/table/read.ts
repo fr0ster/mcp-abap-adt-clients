@@ -7,9 +7,13 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
-import { readObjectMetadata } from '../shared/readMetadata';
-import { readObjectSource } from '../shared/readSource';
+import { AdtUtils } from '../shared/AdtUtils';
+
+function getUtils(connection: IAbapConnection): AdtUtils {
+  return new AdtUtils(connection, noopLogger);
+}
 
 /**
  * Get ABAP table metadata (without source code)
@@ -19,7 +23,12 @@ export async function getTableMetadata(
   tableName: string,
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'table', tableName, undefined, options);
+  return getUtils(connection).readObjectMetadata(
+    'table',
+    tableName,
+    undefined,
+    options,
+  );
 }
 
 /**
@@ -31,8 +40,7 @@ export async function getTableSource(
   version: 'active' | 'inactive' = 'active',
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(
-    connection,
+  return getUtils(connection).readObjectSource(
     'table',
     tableName,
     undefined,

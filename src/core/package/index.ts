@@ -6,7 +6,6 @@ import type { IAdtObject } from '@mcp-abap-adt/interfaces';
 import type { IPackageConfig, IPackageState } from './types';
 
 export { AdtPackage } from './AdtPackage';
-export { PackageBuilder } from './PackageBuilder';
 export * from './types';
 
 // Type alias for AdtPackage

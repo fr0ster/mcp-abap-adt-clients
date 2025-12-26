@@ -8,7 +8,7 @@
  * - Logs analysis
  * - Feed reader operations
  *
- * This is a standalone client for runtime operations, similar to ReadOnlyClient and CrudClient.
+ * This is a standalone client for runtime operations, similar to AdtClient.
  *
  * Usage:
  * ```typescript

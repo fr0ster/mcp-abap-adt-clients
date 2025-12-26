@@ -1,10 +1,10 @@
 /**
- * Integration test for ReadOnlyClient
- * Tests read-only operations for all object types
+ * Integration test for AdtClient read operations
+ * Tests read/readMetadata for all object types
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
- *   DEBUG_ADT_LIBS=true        - ReadOnlyClient library logs
+ *   DEBUG_ADT_LIBS=true        - ADT library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
  * Run: npm test -- --testPathPattern=readonly/ReadOnlyClient
@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { ReadOnlyClient } from '../../../clients/ReadOnlyClient';
+import { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
   logBuilderTestEnd,
@@ -45,9 +45,9 @@ const connectionLogger: ILogger = createConnectionLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-describe('ReadOnlyClient', () => {
+describe('AdtClient read operations', () => {
   let connection: IAbapConnection | null = null;
-  let client: ReadOnlyClient | null = null;
+  let client: AdtClient | null = null;
   let hasConfig = false;
   let isCloud = false;
 
@@ -63,12 +63,12 @@ describe('ReadOnlyClient', () => {
 
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new ReadOnlyClient(connection, connectionLogger);
+      client = new AdtClient(connection, connectionLogger);
       hasConfig = true;
       isCloud = await isCloudEnvironment(connection);
 
       testsLogger.info?.(
-        `✅ ReadOnlyClient test environment setup complete (${isCloud ? 'cloud' : 'onprem'})`,
+        `✅ AdtClient read test environment setup complete (${isCloud ? 'cloud' : 'onprem'})`,
       );
     } catch (error: any) {
       testsLogger.error?.('❌ Failed to setup test environment:', error);
@@ -79,18 +79,16 @@ describe('ReadOnlyClient', () => {
   afterAll(async () => {
     if (connection) {
       // Connection cleanup is handled by @mcp-abap-adt/connection
-      testsLogger.info?.('✅ ReadOnlyClient test environment cleanup complete');
+      testsLogger.info?.('✅ AdtClient read test environment cleanup complete');
     }
   });
 
-  // Helper function to create a read test
+  // Helper function to create a read/readMetadata test
   function createReadTest(
     testName: string,
     objectType: string,
-    readFn: (name: string, group?: string) => Promise<any>,
-    getReadResultFn: () => any,
-    paramName: string,
-    groupParamName?: string,
+    buildConfig: (name: string, group?: string) => any,
+    getAdtObject: () => any,
     handlerName?: string,
     testCaseName?: string,
   ) {
@@ -98,7 +96,7 @@ describe('ReadOnlyClient', () => {
       if (!hasConfig || !client) {
         logBuilderTestSkip(
           testsLogger,
-          `ReadOnlyClient - ${testName}`,
+          `AdtClient - ${testName}`,
           'No SAP configuration',
         );
         return;
@@ -112,30 +110,16 @@ describe('ReadOnlyClient', () => {
         testCaseName: testCaseName || `readonly_read_${objectType}`,
       });
 
-      // Check if test is available for current environment
-      if (!resolver.isAvailableForEnvironment()) {
-        logBuilderTestStart(testsLogger, `ReadOnlyClient - ${testName}`, {
-          name: `readonly_read_${objectType}`,
-          params: {},
-        });
-        logBuilderTestSkip(
-          testsLogger,
-          `ReadOnlyClient - ${testName}`,
-          `Test not available for ${isCloud ? 'cloud' : 'on-premise'} environment (check available_in in test-config.yaml)`,
-        );
-        return;
-      }
-
       const standardObject = resolver.getStandardObject(objectType);
 
       if (!standardObject) {
-        logBuilderTestStart(testsLogger, `ReadOnlyClient - ${testName}`, {
+        logBuilderTestStart(testsLogger, `AdtClient - ${testName}`, {
           name: `readonly_read_${objectType}`,
           params: {},
         });
         logBuilderTestSkip(
           testsLogger,
-          `ReadOnlyClient - ${testName}`,
+          `AdtClient - ${testName}`,
           `Standard ${objectType} not configured for ${isCloud ? 'cloud' : 'on-premise'} environment`,
         );
         return;
@@ -143,36 +127,31 @@ describe('ReadOnlyClient', () => {
 
       const objectName = standardObject.name;
       const groupName = standardObject.group;
-      const params: any = { [paramName]: objectName };
-      if (groupParamName && groupName) {
-        params[groupParamName] = groupName;
-      }
+      const params = buildConfig(objectName, groupName);
 
-      logBuilderTestStart(testsLogger, `ReadOnlyClient - ${testName}`, {
+      logBuilderTestStart(testsLogger, `AdtClient - ${testName}`, {
         name: `readonly_read_${objectType}`,
         params,
       });
 
       try {
-        const result =
-          groupParamName && groupName
-            ? await readFn(objectName, groupName)
-            : await readFn(objectName);
+        const adtObject = getAdtObject();
+        const readState = await adtObject.read(params);
+        expect(readState).toBeDefined();
+        expect(readState?.readResult).toBeDefined();
 
-        expect(result).toBeDefined();
-        expect(result?.[paramName] || result?.name).toBe(objectName);
-        if (groupParamName && groupName) {
-          expect(result?.[groupParamName] || result?.group).toBe(groupName);
-        }
-        expect(getReadResultFn()).toBeDefined();
-        expect(client!.getReadResult()).toBeDefined();
+        const metadataState = await adtObject.readMetadata(params);
+        expect(metadataState).toBeDefined();
+        expect(
+          metadataState?.metadataResult || metadataState?.readResult,
+        ).toBeDefined();
 
-        logBuilderTestSuccess(testsLogger, `ReadOnlyClient - ${testName}`);
+        logBuilderTestSuccess(testsLogger, `AdtClient - ${testName}`);
       } catch (error) {
-        logBuilderTestError(testsLogger, `ReadOnlyClient - ${testName}`, error);
+        logBuilderTestError(testsLogger, `AdtClient - ${testName}`, error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, `ReadOnlyClient - ${testName}`);
+        logBuilderTestEnd(testsLogger, `AdtClient - ${testName}`);
       }
     };
   }
@@ -183,10 +162,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readProgram',
         'program',
-        (name) => client!.readProgram(name),
-        () => client!.getProgramReadResult(),
-        'programName',
-        undefined,
+        (name) => ({ programName: name }),
+        () => client!.getProgram(),
         'read_program',
         'readonly_read_program',
       ),
@@ -200,10 +177,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readClass',
         'class',
-        (name) => client!.readClass(name),
-        () => client!.getClassReadResult(),
-        'className',
-        undefined,
+        (name) => ({ className: name }),
+        () => client!.getClass(),
         'read_class',
         'readonly_read_class',
       ),
@@ -217,10 +192,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readInterface',
         'interface',
-        (name) => client!.readInterface(name),
-        () => client!.getInterfaceReadResult(),
-        'interfaceName',
-        undefined,
+        (name) => ({ interfaceName: name }),
+        () => client!.getInterface(),
         'read_interface',
         'readonly_read_interface',
       ),
@@ -234,10 +207,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readDomain',
         'domain',
-        (name) => client!.readDomain(name),
-        () => client!.getDomainReadResult(),
-        'domainName',
-        undefined,
+        (name) => ({ domainName: name }),
+        () => client!.getDomain(),
         'read_domain',
         'readonly_read_domain',
       ),
@@ -251,10 +222,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readDataElement',
         'dataElement',
-        (name) => client!.readDataElement(name),
-        () => client!.getDataElementReadResult(),
-        'dataElementName',
-        undefined,
+        (name) => ({ dataElementName: name }),
+        () => client!.getDataElement(),
         'read_data_element',
         'readonly_read_data_element',
       ),
@@ -268,10 +237,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readStructure',
         'structure',
-        (name) => client!.readStructure(name),
-        () => client!.getStructureReadResult(),
-        'structureName',
-        undefined,
+        (name) => ({ structureName: name }),
+        () => client!.getStructure(),
         'read_structure',
         'readonly_read_structure',
       ),
@@ -286,7 +253,7 @@ describe('ReadOnlyClient', () => {
         if (!hasConfig || !client) {
           logBuilderTestSkip(
             testsLogger,
-            'ReadOnlyClient - readTable',
+            'AdtClient - readTable',
             'No SAP configuration',
           );
           return;
@@ -300,22 +267,6 @@ describe('ReadOnlyClient', () => {
           testCaseName: 'readonly_read_table',
         });
 
-        // Check if test is available for current environment
-        if (!resolver.isAvailableForEnvironment()) {
-          logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
-            name: 'readonly_read_table',
-            params: {},
-          });
-          logBuilderTestSkip(
-            testsLogger,
-            'ReadOnlyClient - readTable',
-            `Test not available for ${isCloud ? 'cloud' : 'on-premise'} environment. ` +
-              `Note: On cloud systems, 99% of tables are not readable via ADT. ` +
-              `Set available_in: ["onprem"] in test-config.yaml to skip on cloud.`,
-          );
-          return;
-        }
-
         // Cloud systems: 99% of tables are not readable via ADT, endpoint cannot read tables
         // On-premise: most tables are readable via ADT
         if (isCloud) {
@@ -323,13 +274,13 @@ describe('ReadOnlyClient', () => {
           const standardView = resolver.getStandardObject('view');
 
           if (!standardView) {
-            logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+            logBuilderTestStart(testsLogger, 'AdtClient - readTable', {
               name: 'readonly_read_table',
               params: {},
             });
             logBuilderTestSkip(
               testsLogger,
-              'ReadOnlyClient - readTable',
+              'AdtClient - readTable',
               'Standard CDS view not configured for cloud environment. ' +
                 'Note: On cloud systems, 99% of tables are not readable via ADT, use CDS views instead.',
             );
@@ -337,7 +288,7 @@ describe('ReadOnlyClient', () => {
           }
 
           const viewName = standardView.name;
-          logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+          logBuilderTestStart(testsLogger, 'AdtClient - readTable', {
             name: 'readonly_read_table',
             params: {
               viewName,
@@ -346,66 +297,66 @@ describe('ReadOnlyClient', () => {
           });
 
           try {
-            const result = await client.readView(viewName);
-            expect(result).toBeDefined();
-            expect(result?.viewName).toBe(viewName);
-            expect(client.getViewReadResult()).toBeDefined();
-            expect(client.getReadResult()).toBeDefined();
+            const viewClient = client.getView();
+            const readState = await viewClient.read({ viewName });
+            expect(readState).toBeDefined();
+            expect(readState?.readResult).toBeDefined();
+            const metadataState = await viewClient.readMetadata({ viewName });
+            expect(metadataState).toBeDefined();
+            expect(
+              metadataState?.metadataResult || metadataState?.readResult,
+            ).toBeDefined();
 
             logBuilderTestSuccess(
               testsLogger,
-              'ReadOnlyClient - readTable (CDS view on cloud)',
+              'AdtClient - readTable (CDS view on cloud)',
             );
           } catch (error) {
-            logBuilderTestError(
-              testsLogger,
-              'ReadOnlyClient - readTable',
-              error,
-            );
+            logBuilderTestError(testsLogger, 'AdtClient - readTable', error);
             throw error;
           } finally {
-            logBuilderTestEnd(testsLogger, 'ReadOnlyClient - readTable');
+            logBuilderTestEnd(testsLogger, 'AdtClient - readTable');
           }
         } else {
           // On-premise: use standard table
           const standardTable = resolver.getStandardObject('table');
 
           if (!standardTable) {
-            logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+            logBuilderTestStart(testsLogger, 'AdtClient - readTable', {
               name: 'readonly_read_table',
               params: {},
             });
             logBuilderTestSkip(
               testsLogger,
-              'ReadOnlyClient - readTable',
+              'AdtClient - readTable',
               'Standard table not configured for on-premise environment',
             );
             return;
           }
 
           const tableName = standardTable.name;
-          logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTable', {
+          logBuilderTestStart(testsLogger, 'AdtClient - readTable', {
             name: 'readonly_read_table',
             params: { tableName },
           });
 
           try {
-            const result = await client.readTable(tableName);
-            expect(result).toBeDefined();
-            expect(result?.tableName).toBe(tableName);
-            expect(client.getTableReadResult()).toBeDefined();
-            expect(client.getReadResult()).toBeDefined();
+            const tableClient = client.getTable();
+            const readState = await tableClient.read({ tableName });
+            expect(readState).toBeDefined();
+            expect(readState?.readResult).toBeDefined();
+            const metadataState = await tableClient.readMetadata({ tableName });
+            expect(metadataState).toBeDefined();
+            expect(
+              metadataState?.metadataResult || metadataState?.readResult,
+            ).toBeDefined();
 
-            logBuilderTestSuccess(testsLogger, 'ReadOnlyClient - readTable');
+            logBuilderTestSuccess(testsLogger, 'AdtClient - readTable');
           } catch (error) {
-            logBuilderTestError(
-              testsLogger,
-              'ReadOnlyClient - readTable',
-              error,
-            );
+            logBuilderTestError(testsLogger, 'AdtClient - readTable', error);
             throw error;
           } finally {
-            logBuilderTestEnd(testsLogger, 'ReadOnlyClient - readTable');
+            logBuilderTestEnd(testsLogger, 'AdtClient - readTable');
           }
         }
       },
@@ -419,10 +370,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readView',
         'view',
-        (name) => client!.readView(name),
-        () => client!.getViewReadResult(),
-        'viewName',
-        undefined,
+        (name) => ({ viewName: name }),
+        () => client!.getView(),
         'read_view',
         'readonly_read_view',
       ),
@@ -436,10 +385,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readFunctionGroup',
         'function_group',
-        (name) => client!.readFunctionGroup(name),
-        () => client!.getFunctionGroupReadResult(),
-        'functionGroupName',
-        undefined,
+        (name) => ({ functionGroupName: name }),
+        () => client!.getFunctionGroup(),
         'read_function_group',
         'readonly_read_function_group',
       ),
@@ -453,10 +400,11 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readFunctionModule',
         'function_module',
-        (name, group) => client!.readFunctionModule(name, group!),
-        () => client!.getFunctionModuleReadResult(),
-        'functionModuleName',
-        'functionGroupName',
+        (name, group) => ({
+          functionModuleName: name,
+          functionGroupName: group,
+        }),
+        () => client!.getFunctionModule(),
         'read_function_module',
         'readonly_read_function_module',
       ),
@@ -470,10 +418,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readPackage',
         'package',
-        (name) => client!.readPackage(name),
-        () => client!.getPackageReadResult(),
-        'packageName',
-        undefined,
+        (name) => ({ packageName: name }),
+        () => client!.getPackage(),
         'read_package',
         'readonly_read_package',
       ),
@@ -487,10 +433,8 @@ describe('ReadOnlyClient', () => {
       createReadTest(
         'readServiceDefinition',
         'serviceDefinition',
-        (name) => client!.readServiceDefinition(name),
-        () => client!.getServiceDefinitionReadResult(),
-        'serviceDefinitionName',
-        undefined,
+        (name) => ({ serviceDefinitionName: name }),
+        () => client!.getServiceDefinition(),
         'read_service_definition',
         'readonly_read_service_definition',
       ),
@@ -505,7 +449,7 @@ describe('ReadOnlyClient', () => {
         if (!hasConfig || !client) {
           logBuilderTestSkip(
             testsLogger,
-            'ReadOnlyClient - readTransport',
+            'AdtClient - readTransport',
             'No SAP configuration',
           );
           return;
@@ -520,43 +464,42 @@ describe('ReadOnlyClient', () => {
         const transportRequest = resolver.getTransportRequest();
 
         if (!transportRequest) {
-          logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTransport', {
+          logBuilderTestStart(testsLogger, 'AdtClient - readTransport', {
             name: 'readonly_read_transport',
             params: {},
           });
           logBuilderTestSkip(
             testsLogger,
-            'ReadOnlyClient - readTransport',
+            'AdtClient - readTransport',
             'Transport request not configured in test-config.yaml (required for transport read test)',
           );
           return;
         }
 
-        logBuilderTestStart(testsLogger, 'ReadOnlyClient - readTransport', {
+        logBuilderTestStart(testsLogger, 'AdtClient - readTransport', {
           name: 'readonly_read_transport',
           params: { transport_request: transportRequest },
         });
 
         try {
-          const result = await client.readTransport(transportRequest);
+          const requestClient = client.getRequest();
+          const readState = await requestClient.read({
+            transportNumber: transportRequest,
+          });
+          expect(readState).toBeDefined();
+          expect(readState?.readResult).toBeDefined();
+          const metadataState = await requestClient.readMetadata({
+            transportNumber: transportRequest,
+          });
+          expect(metadataState).toBeDefined();
+          expect(metadataState?.readResult).toBeDefined();
 
-          expect(result).toBeDefined();
-          expect(result).toBe(client); // readTransport returns this for chaining
-          const readResult = client.getReadResult();
-          expect(readResult).toBeDefined();
-          // Verify that the transport request was read successfully
-          expect(readResult?.data).toBeDefined();
-
-          logBuilderTestSuccess(testsLogger, 'ReadOnlyClient - readTransport');
+          logBuilderTestSuccess(testsLogger, 'AdtClient - readTransport');
         } catch (error) {
-          logBuilderTestError(
-            testsLogger,
-            'ReadOnlyClient - readTransport',
-            error,
-          );
+          logBuilderTestError(testsLogger, 'AdtClient - readTransport', error);
           throw error;
         } finally {
-          logBuilderTestEnd(testsLogger, 'ReadOnlyClient - readTransport');
+          logBuilderTestEnd(testsLogger, 'AdtClient - readTransport');
         }
       },
       getTimeout('test'),

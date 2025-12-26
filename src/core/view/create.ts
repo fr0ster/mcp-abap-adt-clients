@@ -64,7 +64,7 @@ async function createDDLSObject(
 /**
  * Create ABAP view (CDS DDLS object)
  * Low-level: Only creates the DDLS object metadata, does NOT lock/upload/activate
- * For complete workflow, use ViewBuilder
+ * For complete workflow, use AdtView
  */
 export async function createView(
   connection: IAbapConnection,

@@ -33,6 +33,8 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
 import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinition/read';
 import { getEnhancementMetadata } from '../enhancement/read';
 import { getPackageContents } from '../package/read';
@@ -47,12 +49,6 @@ import { getInclude as getIncludeUtil } from './include';
 import { getIncludesList } from './includesList';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
-import { readObjectMetadata } from './readMetadata';
-import {
-  getObjectSourceUri,
-  readObjectSource,
-  supportsSourceCode,
-} from './readSource';
 // Import utility functions
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
@@ -281,19 +277,30 @@ export class AdtUtils {
    * @param objectType - Object type (e.g., 'CLAS', 'PROG', 'INTF')
    * @param objectName - Object name
    * @param functionGroup - Function group (required for function modules)
+   * @param options - Optional read options
+   * @param options.withLongPolling - If true, adds ?withLongPolling=true to wait for object to become available
    * @returns Metadata response
    */
   async readObjectMetadata(
     objectType: string,
     objectName: string,
     functionGroup?: string,
+    options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse> {
-    return readObjectMetadata(
-      this.connection,
-      objectType,
-      objectName,
-      functionGroup,
-    );
+    let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+    if (options?.withLongPolling) {
+      uri += '?withLongPolling=true';
+    }
+    const acceptHeader = getMetadataAcceptHeader(objectType);
+
+    return this.connection.makeAdtRequest({
+      url: uri,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: acceptHeader,
+      },
+    });
   }
 
   /**
@@ -304,6 +311,8 @@ export class AdtUtils {
    * @param objectName - Object name
    * @param functionGroup - Function group (required for function modules)
    * @param version - 'active' or 'inactive'
+   * @param options - Optional read options
+   * @param options.withLongPolling - If true, adds ?withLongPolling=true to wait for object to become available
    * @returns Source code response
    */
   async readObjectSource(
@@ -311,14 +320,33 @@ export class AdtUtils {
     objectName: string,
     functionGroup?: string,
     version: 'active' | 'inactive' = 'active',
+    options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse> {
-    return readObjectSource(
-      this.connection,
+    if (!supportsSourceCode(objectType)) {
+      throw new Error(
+        `Object type ${objectType} does not support source code reading`,
+      );
+    }
+
+    let uri = getObjectSourceUri(
       objectType,
       objectName,
       functionGroup,
       version,
     );
+    if (options?.withLongPolling) {
+      const separator = uri.includes('?') ? '&' : '?';
+      uri += `${separator}withLongPolling=true`;
+    }
+
+    return this.connection.makeAdtRequest({
+      url: uri,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: 'text/plain',
+      },
+    });
   }
 
   /**
@@ -656,4 +684,171 @@ export class AdtUtils {
   ): Promise<AxiosResponse> {
     return getAllTypesUtil(this.connection, maxItemCount, name, data);
   }
+}
+
+function getObjectMetadataUri(
+  objectType: string,
+  objectName: string,
+  functionGroup?: string,
+): string {
+  const encodedName = encodeSapObjectName(objectName);
+
+  switch (objectType.toLowerCase()) {
+    case 'class':
+    case 'clas/oc':
+      return `/sap/bc/adt/oo/classes/${encodedName}`;
+    case 'program':
+    case 'prog/p':
+      return `/sap/bc/adt/programs/programs/${encodedName}`;
+    case 'interface':
+    case 'intf/if':
+      return `/sap/bc/adt/oo/interfaces/${encodedName}`;
+    case 'functionmodule':
+    case 'fugr/ff': {
+      if (!functionGroup) {
+        throw new Error('Function group is required for function module');
+      }
+      const encodedGroup = encodeSapObjectName(functionGroup);
+      return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}`;
+    }
+    case 'view':
+    case 'ddls/df':
+      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
+    case 'structure':
+    case 'stru/dt':
+      return `/sap/bc/adt/ddic/structures/${encodedName}`;
+    case 'table':
+    case 'tabl/dt':
+      return `/sap/bc/adt/ddic/tables/${encodedName}`;
+    case 'tabletype':
+    case 'ttyp/df':
+      return `/sap/bc/adt/ddic/tabletypes/${encodedName}`;
+    case 'domain':
+    case 'doma/dd':
+      return `/sap/bc/adt/ddic/domains/${encodedName}`;
+    case 'dataelement':
+    case 'dtel':
+      return `/sap/bc/adt/ddic/dataelements/${encodedName}`;
+    case 'functiongroup':
+    case 'fugr':
+      return `/sap/bc/adt/functions/groups/${encodedName}`;
+    case 'package':
+    case 'devc/k':
+      return `/sap/bc/adt/packages/${encodedName}`;
+    default:
+      throw new Error(`Unsupported object type for metadata: ${objectType}`);
+  }
+}
+
+function getMetadataAcceptHeader(objectType: string): string {
+  const type = objectType.toLowerCase();
+
+  switch (type) {
+    case 'class':
+    case 'clas/oc':
+      return 'application/vnd.sap.adt.oo.classes.v4+xml, application/vnd.sap.adt.oo.classes.v3+xml, application/vnd.sap.adt.oo.classes.v2+xml, application/vnd.sap.adt.oo.classes.v1+xml';
+    case 'interface':
+    case 'intf/if':
+      return 'application/vnd.sap.adt.oo.interfaces.v5+xml, application/vnd.sap.adt.oo.interfaces.v4+xml, application/vnd.sap.adt.oo.interfaces.v3+xml, application/vnd.sap.adt.oo.interfaces.v2+xml, application/vnd.sap.adt.oo.interfaces+xml';
+    case 'table':
+    case 'tabl/dt':
+      return 'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml';
+    case 'tabletype':
+    case 'ttyp/df':
+      return 'application/vnd.sap.adt.tabletypes.v2+xml, application/vnd.sap.adt.tabletypes.v1+xml, application/vnd.sap.adt.blues.v1+xml';
+    case 'domain':
+    case 'doma/dd':
+      return 'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml';
+    case 'dataelement':
+    case 'dtel':
+      return 'application/vnd.sap.adt.dataelements.v2+xml, application/vnd.sap.adt.dataelements.v1+xml';
+    case 'structure':
+    case 'stru/dt':
+      return 'application/vnd.sap.adt.structures.v2+xml, application/vnd.sap.adt.structures.v1+xml';
+    case 'view':
+    case 'ddls/df':
+      return 'application/vnd.sap.adt.ddlSource+xml';
+    case 'program':
+    case 'prog/p':
+      return 'application/vnd.sap.adt.programs.programs.v2+xml, application/vnd.sap.adt.programs.programs.v1+xml';
+    case 'functiongroup':
+    case 'fugr':
+      return 'application/vnd.sap.adt.functions.groups.v2+xml, application/vnd.sap.adt.functions.groups.v1+xml';
+    case 'functionmodule':
+    case 'fugr/ff':
+      return 'application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml';
+    case 'package':
+    case 'devc/k':
+      return 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml';
+    default:
+      return 'application/xml';
+  }
+}
+
+function getObjectSourceUri(
+  objectType: string,
+  objectName: string,
+  functionGroup?: string,
+  version: 'active' | 'inactive' = 'active',
+): string {
+  const encodedName = encodeSapObjectName(objectName);
+  const versionParam = version === 'inactive' ? '?version=inactive' : '';
+
+  switch (objectType.toLowerCase()) {
+    case 'class':
+    case 'clas/oc':
+      return `/sap/bc/adt/oo/classes/${encodedName}/source/main${versionParam}`;
+    case 'program':
+    case 'prog/p':
+      return `/sap/bc/adt/programs/programs/${encodedName}/source/main`;
+    case 'interface':
+    case 'intf/if':
+      return `/sap/bc/adt/oo/interfaces/${encodedName}/source/main${versionParam}`;
+    case 'functionmodule':
+    case 'fugr/ff': {
+      if (!functionGroup) {
+        throw new Error('Function group is required for function module');
+      }
+      const encodedGroup = encodeSapObjectName(functionGroup);
+      return `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedName}/source/main${versionParam}`;
+    }
+    case 'view':
+    case 'ddls/df':
+      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
+    case 'structure':
+    case 'stru/dt':
+      return `/sap/bc/adt/ddic/structures/${encodedName}/source/main`;
+    case 'table':
+    case 'tabl/dt':
+      return `/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
+    case 'tabletype':
+    case 'ttyp/df':
+      return `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main`;
+    default:
+      throw new Error(
+        `Object type ${objectType} does not support source code reading`,
+      );
+  }
+}
+
+function supportsSourceCode(objectType: string): boolean {
+  const supportedTypes = [
+    'class',
+    'clas/oc',
+    'program',
+    'prog/p',
+    'interface',
+    'intf/if',
+    'functionmodule',
+    'fugr/ff',
+    'view',
+    'ddls/df',
+    'structure',
+    'stru/dt',
+    'table',
+    'tabl/dt',
+    'tabletype',
+    'ttyp/df',
+  ];
+  return supportedTypes.includes(objectType.toLowerCase());
 }

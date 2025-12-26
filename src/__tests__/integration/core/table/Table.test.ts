@@ -136,11 +136,16 @@ describe('TableBuilder (using AdtClient)', () => {
     it(
       'should execute full workflow and store all results',
       async () => {
-        if (!hasConfig || !tester) {
+        if (!tester) {
+          return;
+        }
+        if (!hasConfig) {
+          await tester.flowTestAuto();
           return;
         }
         const config = tester.getConfig();
         if (!config) {
+          await tester.flowTestAuto();
           return;
         }
 

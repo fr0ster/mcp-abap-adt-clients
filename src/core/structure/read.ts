@@ -7,9 +7,13 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
-import { readObjectMetadata } from '../shared/readMetadata';
-import { readObjectSource } from '../shared/readSource';
+import { AdtUtils } from '../shared/AdtUtils';
+
+function getUtils(connection: IAbapConnection): AdtUtils {
+  return new AdtUtils(connection, noopLogger);
+}
 
 /**
  * Get ABAP structure metadata (without source code)
@@ -19,12 +23,11 @@ export async function getStructureMetadata(
   structureName: string,
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(
-    connection,
+  return getUtils(connection).readObjectMetadata(
     'structure',
     structureName,
     undefined,
-    options ? { withLongPolling: options.withLongPolling } : undefined,
+    options,
   );
 }
 
@@ -37,8 +40,7 @@ export async function getStructureSource(
   version: 'active' | 'inactive' = 'active',
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(
-    connection,
+  return getUtils(connection).readObjectSource(
     'structure',
     structureName,
     undefined,

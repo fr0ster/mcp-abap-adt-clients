@@ -155,16 +155,23 @@ extend view ${targetEntity} with "${extName}"
     it(
       'should execute full workflow and store all results',
       async () => {
-        if (!hasConfig || !tester) {
+        if (!tester) {
+          return;
+        }
+        if (!hasConfig) {
+          await tester.flowTestAuto();
           return;
         }
         const config = tester.getConfig();
         if (!config) {
+          await tester.flowTestAuto();
           return;
         }
 
         await tester.flowTestAuto({
           sourceCode: config.sourceCode,
+          readMetadata: true,
+          readMetadataOptions: { withLongPolling: true },
           updateConfig: {
             name: config.name,
             sourceCode: config.sourceCode,

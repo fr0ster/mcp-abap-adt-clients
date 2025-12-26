@@ -4,8 +4,7 @@
  * Provides simplified CRUD operations with automatic operation chains,
  * error handling, and resource cleanup.
  *
- * Unlike CrudClient which provides low-level operations, AdtClient provides
- * high-level methods that encapsulate complex operation chains:
+ * AdtClient provides high-level methods that encapsulate complex operation chains:
  * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete

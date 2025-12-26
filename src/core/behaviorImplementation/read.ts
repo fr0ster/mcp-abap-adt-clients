@@ -6,8 +6,12 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { readObjectMetadata } from '../shared/readMetadata';
-import { readObjectSource } from '../shared/readSource';
+import { noopLogger } from '../../utils/noopLogger';
+import { AdtUtils } from '../shared/AdtUtils';
+
+function getUtils(connection: IAbapConnection): AdtUtils {
+  return new AdtUtils(connection, noopLogger);
+}
 
 /**
  * Get behavior implementation class metadata (without source code)
@@ -19,7 +23,12 @@ export async function getBehaviorImplementationMetadata(
   className: string,
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'class', className, undefined, options);
+  return getUtils(connection).readObjectMetadata(
+    'class',
+    className,
+    undefined,
+    options,
+  );
 }
 
 /**
@@ -34,8 +43,7 @@ export async function getBehaviorImplementationSource(
   version: 'active' | 'inactive' = 'active',
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(
-    connection,
+  return getUtils(connection).readObjectSource(
     'class',
     className,
     undefined,

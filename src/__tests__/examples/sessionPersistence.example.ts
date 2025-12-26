@@ -8,19 +8,19 @@
  */
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { CrudClient } from '../../clients/CrudClient';
+import { AdtClient } from '../../clients/AdtClient';
 import { getConfig } from '../helpers/sessionConfig';
 
 describe('Example: Session Persistence', () => {
   let connection: any;
-  let client: CrudClient;
+  let client: AdtClient;
 
   beforeAll(async () => {
     // Create connection using helper
     const config = getConfig();
     connection = createAbapConnection(config, console);
     await (connection as any).connect();
-    client = new CrudClient(connection);
+    client = new AdtClient(connection);
 
     // Session persistence is configured in src/__tests__/helpers/test-config.yaml:
     // session_config:
@@ -44,16 +44,18 @@ describe('Example: Session Persistence', () => {
   it('should persist session across requests', async () => {
     // Example: Create a class
     // Session and lock state are automatically managed based on test-config.yaml
-    await client.createClass({
+    await client.getClass().create({
       className: 'ZCL_EXAMPLE',
       packageName: 'ZPACKAGE',
       description: 'Example class',
     });
 
     // Get the result from client
-    const result = client.getCreateResult();
+    const result = await client.getClass().read({
+      className: 'ZCL_EXAMPLE',
+    });
     expect(result).toBeDefined();
-    expect(result?.status).toBeDefined();
+    expect(result?.readResult).toBeDefined();
 
     // Session is automatically saved to:
     // .sessions/{testName}_{timestamp}.json

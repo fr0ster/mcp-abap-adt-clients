@@ -1,6 +1,6 @@
 /**
  * DataElement lock operations
- * NOTE: Builder should call connection.setSessionType("stateful") before locking
+ * NOTE: Caller should call connection.setSessionType("stateful") before locking
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';

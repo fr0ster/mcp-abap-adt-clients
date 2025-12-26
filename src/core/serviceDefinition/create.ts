@@ -1,6 +1,6 @@
 /**
  * ServiceDefinition create operations - Low-level functions
- * NOTE: Builder should call connection.setSessionType("stateful") before creating
+ * NOTE: Caller should call connection.setSessionType("stateful") before creating
  */
 
 import type {

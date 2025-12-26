@@ -235,7 +235,9 @@ describe('Shared - getObjectStructure', () => {
       }
 
       try {
-        const result = await tester.readTest(config);
+        const result = await tester.readTest(config, {
+          skipReadMetadata: true,
+        });
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
         logBuilderTestSuccess(testsLogger, testName);

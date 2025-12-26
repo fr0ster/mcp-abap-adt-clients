@@ -9,7 +9,6 @@ import type {
 } from './types';
 
 export { AdtServiceDefinition } from './AdtServiceDefinition';
-export { ServiceDefinitionBuilder } from './ServiceDefinitionBuilder';
 export * from './types';
 
 // Type alias for AdtServiceDefinition

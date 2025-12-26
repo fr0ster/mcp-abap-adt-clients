@@ -236,7 +236,14 @@ describe('View (using AdtClient)', () => {
     it(
       'should execute full workflow and store all results',
       async () => {
-        if (!hasConfig || !tester) {
+        if (!tester) {
+          testsLogger.warn?.(
+            'Skipping test: hasConfig=false or tester is undefined (check beforeAll errors above)',
+          );
+          return;
+        }
+        if (!hasConfig) {
+          await tester.flowTestAuto();
           testsLogger.warn?.(
             'Skipping test: hasConfig=false or tester is undefined (check beforeAll errors above)',
           );
@@ -245,6 +252,7 @@ describe('View (using AdtClient)', () => {
 
         const config = tester.getConfig();
         if (!config) {
+          await tester.flowTestAuto();
           const skipReason = tester.getSkipReason() || 'Config is null';
           testsLogger.warn?.(`Skipping test: ${skipReason}`);
           return;
@@ -252,6 +260,7 @@ describe('View (using AdtClient)', () => {
 
         const testCase = tester.getTestCaseDefinition();
         if (!testCase) {
+          await tester.flowTestAuto();
           testsLogger.warn?.(
             'Skipping test: Test case not found in test-config.yaml',
           );

@@ -298,7 +298,7 @@ export async function updateDataElementInternal(
 /**
  * Update data element - atomic PUT operation
  * NOTE: Requires object to be locked first via lockDataElement()
- * NOTE: Builder should call connection.setSessionType("stateful") before locking
+ * NOTE: Caller should call connection.setSessionType("stateful") before locking
  */
 export async function updateDataElement(
   connection: IAbapConnection,

@@ -249,6 +249,12 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           expect(readState).toBeDefined();
           expect(readState?.readResult).toBeDefined();
           testsLogger.info?.('CDS unit test class read successfully');
+          const metadataState = await client
+            .getClass()
+            .readMetadata({ className });
+          expect(metadataState).toBeDefined();
+          expect(metadataState.metadataResult).toBeDefined();
+          testsLogger.info?.('CDS unit test class metadata read successfully');
 
           // Step 5: Create unit test configuration
           logBuilderTestStep('create (unit test)');

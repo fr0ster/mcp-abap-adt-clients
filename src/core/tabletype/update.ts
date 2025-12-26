@@ -19,7 +19,7 @@ import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateTableTypeParams } from './types';
 
 /**
- * Update table type using existing lock/session (Builder workflow)
+ * Update table type using existing lock/session (AdtDdicTableType workflow)
  * Supports both DDL format (CDS) and XML format (classic DDIC)
  */
 export async function updateTableType(

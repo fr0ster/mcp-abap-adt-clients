@@ -1,5 +1,5 @@
 /**
- * FunctionModule update operations - low-level functions for FunctionModuleBuilder
+ * FunctionModule update operations - low-level functions for AdtFunctionModule
  */
 
 import type {
@@ -13,7 +13,7 @@ import type { IUpdateFunctionModuleParams } from './types';
 /**
  * Upload function module source code (low-level - uses existing lockHandle)
  * This function does NOT lock/unlock - it assumes the object is already locked
- * Used internally by FunctionModuleBuilder
+ * Used internally by AdtFunctionModule
  */
 export async function update(
   connection: IAbapConnection,

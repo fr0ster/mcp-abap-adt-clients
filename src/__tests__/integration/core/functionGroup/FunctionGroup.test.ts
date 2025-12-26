@@ -120,11 +120,16 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
     it(
       'should execute full workflow and store all results',
       async () => {
-        if (!hasConfig || !tester) {
+        if (!tester) {
+          return;
+        }
+        if (!hasConfig) {
+          await tester.flowTestAuto();
           return;
         }
         const config = tester.getConfig();
         if (!config) {
+          await tester.flowTestAuto();
           return;
         }
 
@@ -189,9 +194,9 @@ describe('FunctionGroupBuilder (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await client
-            .getFunctionGroup()
-            .read({ functionGroupName: standardFunctionGroupName });
+          const resultState = await tester.readTest({
+            functionGroupName: standardFunctionGroupName,
+          });
           expect(resultState).toBeDefined();
           expect(resultState?.readResult).toBeDefined();
           // FunctionGroup read returns function group config - check if functionGroupName is present

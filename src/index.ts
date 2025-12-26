@@ -2,24 +2,20 @@
  * ADT Clients Package - Main exports
  *
  * Client APIs (Public API):
- * - ReadOnlyClient: Read-only operations (read* methods)
- * - CrudClient: Full CRUD operations (read* + create*, lock*, unlock*, update*, activate*, check*, validate*)
+ * - AdtClient: High-level CRUD operations (validate/create/read/update/delete/activate/check)
+ * - AdtRuntimeClient: Runtime operations (debugger, logs, feeds, etc.)
  *
  * @example
  * ```typescript
- * import { ReadOnlyClient, CrudClient } from '@mcp-abap-adt/adt-clients';
+ * import { AdtClient } from '@mcp-abap-adt/adt-clients';
  *
- * // Using ReadOnlyClient for read operations
- * const readClient = new ReadOnlyClient(connection);
- * await readClient.readProgram('ZTEST');
- *
- * // Using CrudClient for CRUD operations
- * const crudClient = new CrudClient(connection);
- * await crudClient.createProgram('ZTEST', 'Test program', 'ZPACKAGE');
- * const lockHandle = await crudClient.lockProgram('ZTEST');
- * await crudClient.updateProgram('ZTEST', 'WRITE: / "Hello".', lockHandle);
- * await crudClient.unlockProgram('ZTEST', lockHandle);
- * await crudClient.activateProgram('ZTEST');
+ * const client = new AdtClient(connection);
+ * await client.getProgram().create({
+ *   programName: 'ZTEST',
+ *   packageName: 'ZPACKAGE',
+ *   description: 'Test program',
+ * });
+ * await client.getProgram().read({ programName: 'ZTEST' });
  * ```
  */
 
@@ -33,9 +29,6 @@ export type {
 } from '@mcp-abap-adt/interfaces';
 export { AdtClient } from './clients/AdtClient';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
-export { CrudClient } from './clients/CrudClient';
-// Client APIs (Public API)
-export { ReadOnlyClient } from './clients/ReadOnlyClient';
 export type {
   AdtBehaviorDefinitionType,
   BehaviorDefinitionImplementationType,
@@ -59,8 +52,6 @@ export type {
   AdtClassType,
   ClassUnitTestDefinition,
   ClassUnitTestRunOptions,
-  IClassBuilderConfig,
-  IClassBuilderState,
   IClassConfig,
   IClassState,
   ILocalDefinitionsConfig,

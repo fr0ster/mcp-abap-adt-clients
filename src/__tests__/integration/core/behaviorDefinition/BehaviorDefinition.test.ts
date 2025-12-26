@@ -1,5 +1,5 @@
 /**
- * Integration test for BehaviorDefinitionBuilder
+ * Integration test for BehaviorDefinition
  * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
@@ -51,7 +51,7 @@ const builderLogger: ILogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
+describe('BehaviorDefinition (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let _connectionConfig: any = null;
@@ -117,11 +117,16 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
     it(
       'should execute full workflow and store all results',
       async () => {
-        if (!hasConfig || !tester) {
+        if (!tester) {
+          return;
+        }
+        if (!hasConfig) {
+          await tester.flowTestAuto();
           return;
         }
         const config = tester.getConfig();
         if (!config) {
+          await tester.flowTestAuto();
           return;
         }
 
@@ -131,6 +136,8 @@ describe('BehaviorDefinitionBuilder (using AdtClient)', () => {
 
         await tester.flowTestAuto({
           sourceCode: sourceCode,
+          readMetadata: true,
+          readMetadataOptions: { withLongPolling: true },
           updateConfig: {
             name: config.name,
             packageName: config.packageName,

@@ -6,7 +6,6 @@ import type { IAdtObject } from '@mcp-abap-adt/interfaces';
 import type { IStructureConfig, IStructureState } from './types';
 
 export { AdtStructure } from './AdtStructure';
-export { StructureBuilder } from './StructureBuilder';
 export * from './types';
 
 // Type alias for AdtStructure

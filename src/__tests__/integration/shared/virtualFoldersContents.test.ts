@@ -17,7 +17,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
-import type { IGetVirtualFoldersContentsParams } from '../../../core/shared/types';
+import type { GetVirtualFoldersContentsParams } from '../../../index';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
@@ -48,7 +48,7 @@ const builderLogger: ILogger = createBuilderLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class VirtualFoldersContentsObject
-  implements IAdtObject<IGetVirtualFoldersContentsParams, AxiosResponse>
+  implements IAdtObject<GetVirtualFoldersContentsParams, AxiosResponse>
 {
   private client: AdtClient;
 
@@ -65,74 +65,74 @@ class VirtualFoldersContentsObject
   }
 
   validate(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('validate');
   }
 
   create(
-    _config: IGetVirtualFoldersContentsParams,
+    _config: GetVirtualFoldersContentsParams,
     _options?: IAdtOperationOptions,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('create');
   }
 
   read(
-    config: Partial<IGetVirtualFoldersContentsParams>,
+    config: Partial<GetVirtualFoldersContentsParams>,
     _version?: 'active' | 'inactive',
     _options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse | undefined> {
     return this.client
       .getUtils()
-      .getVirtualFoldersContents(config as IGetVirtualFoldersContentsParams);
+      .getVirtualFoldersContents(config as GetVirtualFoldersContentsParams);
   }
 
   readMetadata(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
     _options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('readMetadata');
   }
 
   update(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
     _options?: IAdtOperationOptions,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('update');
   }
 
   delete(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('delete');
   }
 
   activate(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('activate');
   }
 
   check(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
     _status?: string,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('check');
   }
 
   readTransport(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
     _options?: { withLongPolling?: boolean },
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('readTransport');
   }
 
-  lock(_config: Partial<IGetVirtualFoldersContentsParams>): Promise<string> {
+  lock(_config: Partial<GetVirtualFoldersContentsParams>): Promise<string> {
     return this.rejectUnsupported('lock');
   }
 
   unlock(
-    _config: Partial<IGetVirtualFoldersContentsParams>,
+    _config: Partial<GetVirtualFoldersContentsParams>,
     _lockHandle: string,
   ): Promise<AxiosResponse> {
     return this.rejectUnsupported('unlock');
@@ -144,7 +144,7 @@ describe('Shared - getVirtualFoldersContents', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let tester: BaseTester<IGetVirtualFoldersContentsParams, AxiosResponse>;
+  let tester: BaseTester<GetVirtualFoldersContentsParams, AxiosResponse>;
 
   beforeAll(async () => {
     try {
@@ -276,7 +276,9 @@ describe('Shared - getVirtualFoldersContents', () => {
       }
 
       try {
-        const result = await tester.readTest(config);
+        const result = await tester.readTest(config, {
+          skipReadMetadata: true,
+        });
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
         expect(result?.data).toContain('virtualFoldersResult');

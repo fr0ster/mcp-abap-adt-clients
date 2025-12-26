@@ -1,7 +1,7 @@
 /**
  * Interface create operations - Low-level functions (1 function = 1 HTTP request)
  *
- * NOTE: Builder should call connection.setSessionType("stateful") before creating
+ * NOTE: Caller should call connection.setSessionType("stateful") before creating
  */
 
 import type {

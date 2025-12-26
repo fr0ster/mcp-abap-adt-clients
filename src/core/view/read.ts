@@ -7,9 +7,13 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
-import { readObjectMetadata } from '../shared/readMetadata';
-import { readObjectSource } from '../shared/readSource';
+import { AdtUtils } from '../shared/AdtUtils';
+
+function getUtils(connection: IAbapConnection): AdtUtils {
+  return new AdtUtils(connection, noopLogger);
+}
 
 /**
  * Get ABAP view metadata (without source code)
@@ -19,7 +23,12 @@ export async function getViewMetadata(
   viewName: string,
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectMetadata(connection, 'view', viewName, undefined, options);
+  return getUtils(connection).readObjectMetadata(
+    'view',
+    viewName,
+    undefined,
+    options,
+  );
 }
 
 /**
@@ -31,8 +40,7 @@ export async function getViewSource(
   version: 'active' | 'inactive' = 'active',
   options?: { withLongPolling?: boolean },
 ): Promise<AxiosResponse> {
-  return readObjectSource(
-    connection,
+  return getUtils(connection).readObjectSource(
     'view',
     viewName,
     undefined,

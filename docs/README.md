@@ -13,7 +13,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 
 ## Usage Guides
 
-- [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `AdtClient`, `ReadOnlyClient`, and `CrudClient`
+- [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `AdtClient`
 - [**STATEFUL_SESSION_GUIDE.md**](usage/STATEFUL_SESSION_GUIDE.md) - Guide for stateful session management
 - [**CHECK_LOCAL_TEST_CLASS.md**](usage/CHECK_LOCAL_TEST_CLASS.md) - Guide for validating ABAP Unit test classes
 - [**DEBUG.md**](usage/DEBUG.md) - Debugging and troubleshooting guide
@@ -21,8 +21,6 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 - [**OPERATION_DELAYS_SUMMARY.md**](usage/OPERATION_DELAYS_SUMMARY.md) - Quick reference for operation delays
 
 ## Development
-
-- [**BUILDER_TEST_PATTERN.md**](development/BUILDER_TEST_PATTERN.md) - Testing patterns for Builder classes
 - [**TEST_CONFIG_SCHEMA.md**](development/TEST_CONFIG_SCHEMA.md) - Test configuration schema and guidelines
 - [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
 - [**BASE_TESTER_MIGRATION.md**](development/archive/roadmaps/BASE_TESTER_MIGRATION.md) - BaseTester migration status and roadmap (completed, archived)
@@ -44,7 +42,6 @@ docs/
 │   ├── OPERATION_DELAYS.md           # Operation delays (detailed)
 │   └── OPERATION_DELAYS_SUMMARY.md   # Operation delays (summary)
 └── development/
-    ├── BUILDER_TEST_PATTERN.md       # Testing patterns
     ├── TEST_CONFIG_SCHEMA.md         # Test configuration
     ├── UPDATE_CONTENT_TYPES.md       # Update content types reference
     └── archive/
@@ -56,11 +53,10 @@ docs/
 
 ### Client Classes
 
-The package provides three main client classes:
+The package provides the main client classes:
 
 - **AdtClient** - High-level CRUD API with automatic operation chains (recommended)
-- **ReadOnlyClient** - For read-only operations (metadata retrieval)
-- **CrudClient** - For full CRUD operations with state management (extends ReadOnlyClient)
+- **AdtRuntimeClient** - Runtime operations (debugger, logs, feeds)
 
 See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method documentation.
 
@@ -78,17 +74,11 @@ const utils = client.getUtils();
 await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
 ```
 
-**Using ReadOnlyClient:**
-```typescript
-const client = new ReadOnlyClient(connection);
-const program = await client.readProgram('Z_MY_PROGRAM');
-```
-
 ### Type System
 
 The package uses a dual naming convention:
 - **snake_case** - Low-level ADT parameters
-- **camelCase** - Builder configuration and high-level APIs
+- **camelCase** - Adt* configuration and high-level APIs
 
 See [ARCHITECTURE.md](architecture/ARCHITECTURE.md#type-system-organization) for details.
 

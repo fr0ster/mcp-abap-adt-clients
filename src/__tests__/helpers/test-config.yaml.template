@@ -1,6 +1,6 @@
 # Test Configuration Template for @mcp-abap-adt/adt-clients
 # Copy this file to test-config.yaml and configure for your environment
-# Builder Tests Configuration
+# AdtClient Tests Configuration
 #
 # Usage:
 #   cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml
@@ -181,62 +181,62 @@ standard_objects:
 #     params: {}
 # ============================================================================
 
-# Read Program (ReadOnlyClient)
+# Read Program (AdtClient)
 # Uses standard_objects.programs with available_in filter
 read_program:
   test_cases:
     - name: "readonly_read_program"
       enabled: false  # Set to true to enable read test
       available_in: ["onprem"]  # Programs are not supported in cloud systems (BTP ABAP Environment)
-      description: "Read existing program using ReadOnlyClient (uses standard_objects.programs). Programs are not supported in cloud systems."
+      description: "Read existing program using AdtClient (uses standard_objects.programs). Programs are not supported in cloud systems."
       params: {}  # No params needed - automatically uses standard_objects.programs filtered by available_in
 
-# Read Class (ReadOnlyClient)
+# Read Class (AdtClient)
 # Uses standard_objects.classes with available_in filter
 read_class:
   test_cases:
     - name: "readonly_read_class"
       enabled: false  # Set to true to enable read test
-      description: "Read existing class using ReadOnlyClient (uses standard_objects.classes)"
+      description: "Read existing class using AdtClient (uses standard_objects.classes)"
       params: {}  # No params needed - automatically uses standard_objects.classes filtered by available_in
 
-# Read Interface (ReadOnlyClient)
+# Read Interface (AdtClient)
 # Uses standard_objects.interfaces with available_in filter
 read_interface:
   test_cases:
     - name: "readonly_read_interface"
       enabled: false  # Set to true to enable read test
-      description: "Read existing interface using ReadOnlyClient (uses standard_objects.interfaces)"
+      description: "Read existing interface using AdtClient (uses standard_objects.interfaces)"
       params: {}  # No params needed - automatically uses standard_objects.interfaces filtered by available_in
 
-# Read Domain (ReadOnlyClient)
+# Read Domain (AdtClient)
 # Uses standard_objects.domains with available_in filter
 read_domain:
   test_cases:
     - name: "readonly_read_domain"
       enabled: false  # Set to true to enable read test
-      description: "Read existing domain using ReadOnlyClient (uses standard_objects.domains)"
+      description: "Read existing domain using AdtClient (uses standard_objects.domains)"
       params: {}  # No params needed - automatically uses standard_objects.domains filtered by available_in
 
-# Read Data Element (ReadOnlyClient)
+# Read Data Element (AdtClient)
 # Uses standard_objects.data_elements with available_in filter
 read_data_element:
   test_cases:
     - name: "readonly_read_data_element"
       enabled: false  # Set to true to enable read test
-      description: "Read existing data element using ReadOnlyClient (uses standard_objects.data_elements)"
+      description: "Read existing data element using AdtClient (uses standard_objects.data_elements)"
       params: {}  # No params needed - automatically uses standard_objects.data_elements filtered by available_in
 
-# Read Structure (ReadOnlyClient)
+# Read Structure (AdtClient)
 # Uses standard_objects.structures with available_in filter
 read_structure:
   test_cases:
     - name: "readonly_read_structure"
       enabled: false  # Set to true to enable read test
-      description: "Read existing structure using ReadOnlyClient (uses standard_objects.structures)"
+      description: "Read existing structure using AdtClient (uses standard_objects.structures)"
       params: {}  # No params needed - automatically uses standard_objects.structures filtered by available_in
 
-# Read Table (ReadOnlyClient)
+# Read Table (AdtClient)
 # Uses standard_objects.tables with available_in filter
 # Note: On cloud systems, 99% of tables are not readable via ADT endpoint
 read_table:
@@ -244,52 +244,52 @@ read_table:
     - name: "readonly_read_table"
       enabled: false  # Set to true to enable read test
       available_in: ["onprem"]  # Only available on on-premise (tables endpoint cannot read tables on cloud)
-      description: "Read existing table using ReadOnlyClient (uses standard_objects.tables). On cloud, 99% of tables are not readable via ADT."
+      description: "Read existing table using AdtClient (uses standard_objects.tables). On cloud, 99% of tables are not readable via ADT."
       params: {}  # No params needed - automatically uses standard_objects.tables filtered by available_in
 
-# Read View (ReadOnlyClient)
+# Read View (AdtClient)
 # Uses standard_objects.views with available_in filter
 read_view:
   test_cases:
     - name: "readonly_read_view"
       enabled: false  # Set to true to enable read test
-      description: "Read existing view using ReadOnlyClient (uses standard_objects.views)"
+      description: "Read existing view using AdtClient (uses standard_objects.views)"
       params: {}  # No params needed - automatically uses standard_objects.views filtered by available_in
 
-# Read Function Group (ReadOnlyClient)
+# Read Function Group (AdtClient)
 # Uses standard_objects.function_groups with available_in filter
 read_function_group:
   test_cases:
     - name: "readonly_read_function_group"
       enabled: false  # Set to true to enable read test
-      description: "Read existing function group using ReadOnlyClient (uses standard_objects.function_groups)"
+      description: "Read existing function group using AdtClient (uses standard_objects.function_groups)"
       params: {}  # No params needed - automatically uses standard_objects.function_groups filtered by available_in
 
-# Read Function Module (ReadOnlyClient)
+# Read Function Module (AdtClient)
 # Uses standard_objects.function_modules with available_in filter
 read_function_module:
   test_cases:
     - name: "readonly_read_function_module"
       enabled: false  # Set to true to enable read test
-      description: "Read existing function module using ReadOnlyClient (uses standard_objects.function_modules)"
+      description: "Read existing function module using AdtClient (uses standard_objects.function_modules)"
       params: {}  # No params needed - automatically uses standard_objects.function_modules filtered by available_in
 
-# Read Package (ReadOnlyClient)
+# Read Package (AdtClient)
 # Uses standard_objects.packages with available_in filter
 read_package:
   test_cases:
     - name: "readonly_read_package"
       enabled: false  # Set to true to enable read test
-      description: "Read existing package using ReadOnlyClient (uses standard_objects.packages)"
+      description: "Read existing package using AdtClient (uses standard_objects.packages)"
       params: {}  # No params needed - automatically uses standard_objects.packages filtered by available_in
 
-# Read Service Definition (ReadOnlyClient)
+# Read Service Definition (AdtClient)
 # Uses standard_objects.service_definitions with available_in filter
 read_service_definition:
   test_cases:
     - name: "readonly_read_service_definition"
       enabled: false  # Set to true to enable read test
-      description: "Read existing service definition using ReadOnlyClient (uses standard_objects.service_definitions)"
+      description: "Read existing service definition using AdtClient (uses standard_objects.service_definitions)"
       params: {}  # No params needed - automatically uses standard_objects.service_definitions filtered by available_in
     - name: "read_standard_service_definition"
       enabled: false  # Set to true and configure params below to enable read test
@@ -301,17 +301,17 @@ read_service_definition:
         # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
         # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
 
-# Read Transport Request (ReadOnlyClient)
+# Read Transport Request (AdtClient)
 read_transport:
   test_cases:
     - name: "readonly_read_transport"
       enabled: false  # Set to true and configure params below to enable read test
-      description: "Read existing transport request using ReadOnlyClient"
+      description: "Read existing transport request using AdtClient"
       params:
         transport_request: ""  # Replace with existing transport request in your system
 
 # ============================================================================
-# FLOW TESTS (Create/Update/Delete operations - Builder tests)
+# FLOW TESTS (Create/Update/Delete operations - AdtClient tests)
 # ============================================================================
 #
 # Flow tests support available_in parameter to conditionally enable/disable tests
@@ -332,10 +332,10 @@ create_class:
   test_cases:
     - name: "adt_class"
       enabled: true
-      description: "Create test class for ClassBuilder tests"
+      description: "Create test class for AdtClass tests"
       params:
         class_name: "ZADT_BLD_CLS01"
-        description: "ClassBuilder workflow class"
+        description: "AdtClass workflow class"
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
@@ -507,12 +507,12 @@ create_package:
   test_cases:
     - name: "adt_package"
       enabled: true
-      description: "Package reserved for PackageBuilder tests"
+      description: "Package reserved for AdtPackage tests"
       params:
         package_name: "ZADT_BLD_PKG01"          # Parent package (existing)
         test_package: "ZADT_BLD_INNER_PKG01"    # Package created by the test
-        description: "PackageBuilder workflow package"
-        updated_description: "PackageBuilder workflow package - updated"  # Description for update operation
+        description: "AdtPackage workflow package"
+        updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
         # software_component: "HOME"            # Optional: Software component name (can be empty)
         # transport_layer: ""                   # Optional: Transport layer (can be empty)
@@ -523,10 +523,10 @@ create_domain:
   test_cases:
     - name: "adt_domain"
       enabled: true
-      description: "Domain used by DomainBuilder workflow tests"
+      description: "Domain used by AdtDomain workflow tests"
       params:
         domain_name: "ZADT_BLD_DOM01"
-        description: "DomainBuilder workflow domain"
+        description: "AdtDomain workflow domain"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         datatype: "CHAR"
@@ -540,10 +540,10 @@ create_data_element:
   test_cases:
     - name: "adt_data_element"
       enabled: true
-      description: "Data element reserved for DataElementBuilder tests"
+      description: "Data element reserved for AdtDataElement tests"
       params:
         data_element_name: "ZADT_BLD_DTEL01"
-        description: "DataElementBuilder workflow data element"
+        description: "AdtDataElement workflow data element"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         # Allowed type_kind values:
@@ -556,20 +556,20 @@ create_data_element:
         data_type: "CHAR"
         length: 100
         decimals: 0
-        short_label: "Builder"
-        medium_label: "Builder Data"
-        long_label: "Builder Data Element"
-        heading_label: "Builder Data Element"
+        short_label: "Adt"
+        medium_label: "Adt Data"
+        long_label: "Adt Data Element"
+        heading_label: "Adt Data Element"
 
 # Create Interface
 create_interface:
   test_cases:
     - name: "adt_interface"
       enabled: true
-      description: "Interface reserved for InterfaceBuilder tests"
+      description: "Interface reserved for AdtInterface tests"
       params:
         interface_name: "ZADT_BLD_IF01"
-        description: "InterfaceBuilder workflow interface"
+        description: "AdtInterface workflow interface"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         source_code: |
@@ -590,32 +590,32 @@ create_program:
     - name: "adt_program"
       enabled: true
       available_in: ["onprem"]  # Programs are not supported in cloud systems
-      description: "Program reserved for ProgramBuilder tests. Only available on on-premise systems."
+      description: "Program reserved for AdtProgram tests. Only available on on-premise systems."
       params:
         program_name: "ZADT_BLD_PROG01"
-        description: "ProgramBuilder workflow report"
+        description: "AdtProgram workflow report"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         program_type: "executable"
         source_code: |
           REPORT ZADT_BLD_PROG01.
-          WRITE: / 'Builder test program'.
+          WRITE: / 'Adt test program'.
 
 # Create Table
 create_table:
   test_cases:
     - name: "adt_table"
       enabled: true
-      description: "Table reserved for TableBuilder tests"
+      description: "Table reserved for AdtTable tests"
       params:
         table_name: "ZADT_BLD_TAB01"
-        description: "TableBuilder workflow table"
+        description: "AdtTable workflow table"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         delivery_class: "A"
         data_class: "APPL0"
         ddl_code: |
-          @EndUserText.label: 'Builder test table'
+          @EndUserText.label: 'Adt test table'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
           @AbapCatalog.tableCategory: #TRANSPARENT
           @AbapCatalog.deliveryClass: #A
@@ -653,14 +653,14 @@ create_structure:
   test_cases:
     - name: "adt_structure"
       enabled: true
-      description: "Structure reserved for StructureBuilder tests"
+      description: "Structure reserved for AdtStructure tests"
       params:
         structure_name: "ZADT_BLD_STRU01"
-        description: "StructureBuilder workflow structure"
+        description: "AdtStructure workflow structure"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         ddl_code: |
-          @EndUserText.label: 'StructureBuilder workflow structure'
+          @EndUserText.label: 'AdtStructure workflow structure'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
           define structure ZADT_BLD_STRU01 {
             mandt : abap.clnt;
@@ -672,16 +672,16 @@ create_view:
   test_cases:
     - name: "adt_view"
       enabled: true
-      description: "View reserved for ViewBuilder tests"
+      description: "View reserved for AdtView tests"
       params:
         package_name: "ZADT_BLD_PKG01"
         table_name: "ZADT_VIEW_TBL01"
         view_name: "ZADT_BLD_VIEW01"
-        description: "ViewBuilder workflow view"
+        description: "AdtView workflow view"
         transport_request: ""
         # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
         table_source: |
-          @EndUserText.label: 'Builder view test table'
+          @EndUserText.label: 'Adt view test table'
           @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
           @AbapCatalog.tableCategory : #TRANSPARENT
           @AbapCatalog.deliveryClass : #A
@@ -694,7 +694,7 @@ create_view:
             created_at : abap.dats;
           }
         ddl_source: |
-          @EndUserText.label: 'Builder view on custom table'
+          @EndUserText.label: 'Adt view on custom table'
           @AccessControl.authorizationCheck: #NOT_REQUIRED
           define view entity ZADT_BLD_VIEW01
             as select from zadt_view_tbl01
@@ -710,14 +710,14 @@ create_service_definition:
   test_cases:
     - name: "adt_service_definition"
       enabled: false  # Set to true and configure params below to enable tests
-      description: "Service definition reserved for ServiceDefinitionBuilder tests"
+      description: "Service definition reserved for AdtServiceDefinition tests"
       params:
         service_definition_name: "ZADT_BLD_SRVD01"  # Replace with your service definition name
-        description: "ServiceDefinitionBuilder workflow service definition"
+        description: "AdtServiceDefinition workflow service definition"
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
-          @EndUserText.label: 'ServiceDefinitionBuilder workflow service definition'
+          @EndUserText.label: 'AdtServiceDefinition workflow service definition'
           define service ZADT_BLD_SRVD01 {
             expose ZOK_C_CDS_TEST;  # Replace with your CDS view name
           }
@@ -726,10 +726,10 @@ create_function_group:
   test_cases:
     - name: "adt_function_group"
       enabled: true
-      description: "Function group reserved for FunctionGroupBuilder tests"
+      description: "Function group reserved for AdtFunctionGroup tests"
       params:
         function_group_name: "ZADT_BLD_FGR_EMPTY"
-        description: "FunctionGroupBuilder workflow FUGR"
+        description: "AdtFunctionGroup workflow FUGR"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
 
@@ -738,11 +738,11 @@ create_function_module:
   test_cases:
     - name: "adt_function_module"
       enabled: true
-      description: "Function module reserved for FunctionModuleBuilder tests"
+      description: "Function module reserved for AdtFunctionModule tests"
       params:
         function_module_name: "Z_ADT_BLD_FM01"  # Must start with Z_ or Y_ (with underscore)
-        function_group_name: "ZADT_BLD_FGR02"  # Different from FunctionGroupBuilder test (ZADT_BLD_FGR01)
-        description: "FunctionModuleBuilder workflow FM"
+        function_group_name: "ZADT_BLD_FGR02"  # Different from AdtFunctionGroup test (ZADT_BLD_FGR01)
+        description: "AdtFunctionModule workflow FM"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         source_code: |
@@ -759,9 +759,9 @@ create_transport:
   test_cases:
     - name: "adt_transport"
       enabled: true
-      description: "Transport reserved for TransportBuilder tests"
+      description: "Transport reserved for AdtRequest tests"
       params:
-        description: "TransportBuilder workflow transport"
+        description: "AdtRequest workflow transport"
         # package_name: "ZADT_BLD_PKG01"
 
 # Create Behavior Definition
@@ -769,7 +769,7 @@ create_behavior_definition:
   test_cases:
     - name: "adt_behavior_definition"
       enabled: true
-      description: "Create test behavior definition for BehaviorDefinitionBuilder tests"
+      description: "Create test behavior definition for AdtBehaviorDefinition tests"
       params:
         bdef_name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"  # e.g., ZADT_BLD_BDEF01
         description: "Behavior Definition for <YOUR_CDS_VIEW_NAME>"
@@ -796,7 +796,7 @@ create_metadata_extension:
   test_cases:
     - name: "adt_metadata_extension"
       enabled: true
-      description: "Create test metadata extension for MetadataExtensionBuilder tests"
+      description: "Create test metadata extension for AdtMetadataExtension tests"
       params:
         ext_name: "<YOUR_METADATA_EXTENSION_NAME>"  # e.g., ZADT_BLD_MEXT01
         description: "Metadata Extension for <YOUR_CDS_VIEW_NAME>"
@@ -816,7 +816,7 @@ create_behavior_implementation:
   test_cases:
     - name: "adt_behavior_implementation"
       enabled: true
-      description: "Create test behavior implementation class for BehaviorImplementationBuilder tests"
+      description: "Create test behavior implementation class for AdtBehaviorImplementation tests"
       params:
         class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"  # e.g., ZBP_<your_cds_view_name>
         description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
@@ -882,7 +882,7 @@ run_unit_test:
         # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         unit_test_options:
           title: "<YOUR_TEST_CLASS_NAME>"
-          context: "Builder Class ABAP Unit"
+          context: "Adt Class ABAP Unit"
           scope:
             own_tests: true
             foreign_tests: false
@@ -911,7 +911,7 @@ create_cds_unit_test:
         package_name: "ZADT_BLD_PKG01"
         # view_name: CDS view name that must exist and be active (created manually)
         view_name: "<YOUR_CDS_VIEW_NAME>"  # e.g., ZOK_I_CDS_TEST
-        description: "ViewBuilder CDS unit test view"
+        description: "AdtView CDS unit test view"
         transport_request: ""
         # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         # Note: CDS view and table must be created manually before running this test

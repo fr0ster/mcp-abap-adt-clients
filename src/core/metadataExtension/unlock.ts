@@ -3,7 +3,7 @@
  *
  * Endpoint: POST /sap/bc/adt/ddic/ddlx/sources/{name}?_action=UNLOCK&lockHandle={lockHandle}
  *
- * NOTE: Builder should call connection.setSessionType("stateless") after unlocking
+ * NOTE: Caller should call connection.setSessionType("stateless") after unlocking
  */
 
 import type {

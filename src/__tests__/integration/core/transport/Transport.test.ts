@@ -1,13 +1,13 @@
 /**
- * Unit test for TransportBuilder
- * Tests fluent API with Promise chaining, error handling, and result storage
+ * Unit test for AdtRequest
+ * Tests create/read operations for transport requests
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Integration test execution logs
- *   DEBUG_ADT_LIBS=true        - TransportBuilder library logs
+ *   DEBUG_ADT_LIBS=true        - ADT library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=transport/TransportBuilder
+ * Run: npm test -- --testPathPattern=transport/Transport
  */
 
 import * as fs from 'node:fs';
@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { TransportBuilder } from '../../../../core/transport/TransportBuilder';
+import { AdtClient } from '../../../../clients/AdtClient';
 import {
   logBuilderTestEnd,
   logBuilderTestError,
@@ -52,8 +52,9 @@ const builderLogger: ILogger = createBuilderLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-describe('TransportBuilder', () => {
+describe('AdtRequest', () => {
   let connection: IAbapConnection;
+  let client: AdtClient;
   let hasConfig = false;
 
   beforeAll(async () => {
@@ -61,6 +62,7 @@ describe('TransportBuilder', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      client = new AdtClient(connection, builderLogger);
       hasConfig = true;
     } catch (_error) {
       testsLogger.warn?.(
@@ -138,14 +140,14 @@ describe('TransportBuilder', () => {
         const definition = getBuilderTestDefinition();
         logBuilderTestStart(
           testsLogger,
-          'TransportBuilder - full workflow',
+          'AdtRequest - full workflow',
           definition,
         );
 
         if (skipReason) {
           logBuilderTestSkip(
             testsLogger,
-            'TransportBuilder - full workflow',
+            'AdtRequest - full workflow',
             skipReason,
           );
           return;
@@ -154,34 +156,27 @@ describe('TransportBuilder', () => {
         if (!testCase) {
           logBuilderTestSkip(
             testsLogger,
-            'TransportBuilder - full workflow',
+            'AdtRequest - full workflow',
             skipReason || 'Test case not available',
           );
           return;
         }
 
-        const builder = new TransportBuilder(
-          connection,
-          buildBuilderConfig(testCase) as any,
-          builderLogger,
-        );
         let transportNumber: string | null = null;
 
         try {
           logBuilderTestStep('create');
-          await builder.create();
+          const createState = await client
+            .getRequest()
+            .create(buildBuilderConfig(testCase) as any);
 
-          const state = builder.getState();
-          expect(state.createResult).toBeDefined();
-          expect(state.transportNumber).toBeDefined();
-          expect(state.errors.length).toBe(0);
+          expect(createState.createResult).toBeDefined();
+          expect(createState.transportNumber).toBeDefined();
+          expect(createState.errors.length).toBe(0);
 
-          transportNumber = state.transportNumber || null;
+          transportNumber = createState.transportNumber || null;
 
-          logBuilderTestSuccess(
-            testsLogger,
-            'TransportBuilder - full workflow',
-          );
+          logBuilderTestSuccess(testsLogger, 'AdtRequest - full workflow');
         } catch (error: any) {
           // If username not found or user doesn't exist, skip test instead of failing
           const errorMsg = error.message || '';
@@ -200,29 +195,28 @@ describe('TransportBuilder', () => {
           ) {
             logBuilderTestSkip(
               testsLogger,
-              'TransportBuilder - full workflow',
+              'AdtRequest - full workflow',
               'Username not found or user does not exist in system',
             );
             return; // Skip test
           }
-          logBuilderTestError(
-            testsLogger,
-            'TransportBuilder - full workflow',
-            error,
-          );
+          logBuilderTestError(testsLogger, 'AdtRequest - full workflow', error);
           throw error;
         } finally {
           // Read the created transport before cleanup (using transportNumber from state)
           if (transportNumber) {
             try {
               logBuilderTestStep('read');
-              // Read without parameter - uses transportNumber from state
-              await builder.read();
-
-              const readResult = builder.getReadResult();
-              expect(readResult).toBeDefined();
-              expect(readResult?.status).toBe(200);
-              expect(readResult?.data).toBeDefined();
+              const readState = await client.getRequest().read({
+                transportNumber,
+              });
+              expect(readState).toBeDefined();
+              expect(readState?.readResult).toBeDefined();
+              const metadataState = await client.getRequest().readMetadata({
+                transportNumber,
+              });
+              expect(metadataState).toBeDefined();
+              expect(metadataState.readResult).toBeDefined();
             } catch (readError: any) {
               testsLogger.warn?.(
                 `Failed to read transport ${transportNumber}:`,
@@ -232,7 +226,7 @@ describe('TransportBuilder', () => {
             }
           }
 
-          logBuilderTestEnd(testsLogger, 'TransportBuilder - full workflow');
+          logBuilderTestEnd(testsLogger, 'AdtRequest - full workflow');
         }
       },
       getTimeout('test'),

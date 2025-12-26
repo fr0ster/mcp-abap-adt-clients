@@ -111,6 +111,7 @@ describe('ClassBuilder (using AdtClient)', () => {
               .getClass()
               .read({ className });
             if (existingClass) {
+              await cleanupClient.getClass().readMetadata({ className });
               try {
                 // Use BaseTester's config resolver to get transport request (allows overriding global params)
                 const transportRequest = tester.getTransportRequest();
@@ -151,11 +152,16 @@ describe('ClassBuilder (using AdtClient)', () => {
     it(
       'should execute full workflow and store all results',
       async () => {
-        if (!hasConfig || !tester) {
+        if (!tester) {
+          return;
+        }
+        if (!hasConfig) {
+          await tester.flowTestAuto();
           return;
         }
         const config = tester.getConfig();
         if (!config) {
+          await tester.flowTestAuto();
           return;
         }
 
@@ -224,12 +230,12 @@ describe('ClassBuilder (using AdtClient)', () => {
         }
 
         try {
-          const result = await client
-            .getClass()
-            .read({ className: standardClassName });
-          expect(result).toBeDefined();
+          const resultState = await tester.readTest({
+            className: standardClassName,
+          });
+          expect(resultState).toBeDefined();
           // IClassState doesn't have className directly, check readResult
-          expect(result?.readResult).toBeDefined();
+          expect(resultState?.readResult).toBeDefined();
 
           logBuilderTestSuccess(testsLogger, 'Class - read standard object');
         } catch (error) {
@@ -328,6 +334,14 @@ describe('ClassBuilder (using AdtClient)', () => {
           expect(
             result?.transportNumber ||
               result?.readResult?.data?.transport_request,
+          ).toBe(transportRequest);
+          const metadataState = await client
+            .getRequest()
+            .readMetadata({ transportNumber: transportRequest });
+          expect(metadataState).toBeDefined();
+          expect(
+            metadataState.transportNumber ||
+              metadataState.readResult?.data?.transport_request,
           ).toBe(transportRequest);
 
           logBuilderTestSuccess(testsLogger, 'Class - read transport request');

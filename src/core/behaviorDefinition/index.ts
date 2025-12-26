@@ -9,7 +9,6 @@ import type {
 } from './types';
 
 export { AdtBehaviorDefinition } from './AdtBehaviorDefinition';
-export { BehaviorDefinitionBuilder } from './BehaviorDefinitionBuilder';
 export * from './types';
 
 // Type alias for AdtBehaviorDefinition

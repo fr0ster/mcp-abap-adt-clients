@@ -7,8 +7,6 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API with automatic operation chains
   - `AdtRuntimeClient` – runtime operations (debugger, traces, memory, logs)
-  - `ReadOnlyClient` – read operations for all object types
-  - `CrudClient` – full CRUD operations with method chaining and state management
 - ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
 - ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
 - ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
@@ -45,7 +43,7 @@ This package is responsible for:
 
 #### What This Package Does
 
-- **Provides ADT clients**: `ReadOnlyClient`, `CrudClient`, and specialized clients for ADT operations
+- **Provides ADT clients**: `AdtClient` and specialized clients for ADT operations
 - **Manages locks**: Lock registry with persistent storage and CLI tools
 - **Handles requests**: Makes HTTP requests to SAP ADT endpoints through connection interface
 - **Manages state**: Maintains object state across chained operations
@@ -92,33 +90,25 @@ npm install @mcp-abap-adt/adt-clients
    - Runtime operations for debugging, traces, memory analysis, and logs
    - Example: `await runtimeClient.getDebugger(...)`
 
-3. **ReadOnlyClient** (Legacy API)
-   - Simple read operations
-
-4. **CrudClient** (Legacy API)
-   - Unified CRUD operations with chaining
-   - State management with getters
-   - Example: `client.createProgram(...).lockProgram(...).updateProgram(...)`
-
 ## Supported Object Types
 
-| Object Type | AdtClient | CrudClient | ReadOnlyClient |
-|------------|-----------|------------|----------------|
-| Classes (CLAS) | ✅ | ✅ | ✅ |
-| Behavior Implementations (CLAS) | ✅ | ✅ | ✅ |
-| Behavior Definitions (BDEF) | ✅ | ✅ | ✅ |
-| Interfaces (INTF) | ✅ | ✅ | ✅ |
-| Programs (PROG) | ✅ | ✅ | ✅ |
-| Function Groups (FUGR) | ✅ | ✅ | ✅ |
-| Function Modules (FUGR/FF) | ✅ | ✅ | ✅ |
-| Domains (DOMA) | ✅ | ✅ | ✅ |
-| Data Elements (DTEL) | ✅ | ✅ | ✅ |
-| Structures (TABL/DS) | ✅ | ✅ | ✅ |
-| Tables (TABL/DT) | ✅ | ✅ | ✅ |
-| Views (DDLS) | ✅ | ✅ | ✅ |
-| Metadata Extensions (DDLX) | ✅ | ✅ | ✅ |
-| Packages (DEVC) | ✅ | ✅ | ✅ |
-| Transports (TRNS) | ✅ | ✅ | ✅ |
+| Object Type | AdtClient |
+|------------|-----------|
+| Classes (CLAS) | ✅ |
+| Behavior Implementations (CLAS) | ✅ |
+| Behavior Definitions (BDEF) | ✅ |
+| Interfaces (INTF) | ✅ |
+| Programs (PROG) | ✅ |
+| Function Groups (FUGR) | ✅ |
+| Function Modules (FUGR/FF) | ✅ |
+| Domains (DOMA) | ✅ |
+| Data Elements (DTEL) | ✅ |
+| Structures (TABL/DS) | ✅ |
+| Tables (TABL/DT) | ✅ |
+| Views (DDLS) | ✅ |
+| Metadata Extensions (DDLX) | ✅ |
+| Packages (DEVC) | ✅ |
+| Transports (TRNS) | ✅ |
 
 ## Quick Start
 
@@ -157,49 +147,6 @@ await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 - ✅ Consistent error handling and resource cleanup
 - ✅ Separation of CRUD operations and utility functions
 - ✅ Long polling support for object readiness
-
-### Using CrudClient (Low-level API)
-
-```typescript
-import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
-
-const connection = createAbapConnection({
-  url: 'https://your-sap-system.example.com',
-  client: '100',
-  authType: 'basic',
-  username: process.env.SAP_USERNAME!,
-  password: process.env.SAP_PASSWORD!
-}, console);
-
-const client = new CrudClient(connection);
-
-// Method chaining with state management
-await client
-  .createInterface('ZIF_TEST', 'Test Interface', 'ZPACKAGE', 'TREQ123')
-  .lockInterface('ZIF_TEST')
-  .updateInterface('ZIF_TEST', sourceCode)
-  .unlockInterface('ZIF_TEST')
-  .activateInterface('ZIF_TEST');
-
-// Access results via getters
-const createResult = client.getCreateResult();
-const lockHandle = client.getLockHandle();
-const activateResult = client.getActivateResult();
-```
-
-### Using ReadOnlyClient
-
-```typescript
-import { ReadOnlyClient } from '@mcp-abap-adt/adt-clients';
-
-const client = new ReadOnlyClient(connection);
-
-// Simple read operations
-const programSource = await client.readProgram('ZTEST_PROGRAM');
-const classDefinition = await client.readClass('ZCL_TEST_CLASS');
-const interfaceCode = await client.readInterface('ZIF_TEST_INTERFACE');
-```
 
 ### Using Long Polling for Object Readiness
 
@@ -242,19 +189,20 @@ await client.getClass().update({
 ### Creating Behavior Implementation Classes
 
 ```typescript
-import { CrudClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
-const client = new CrudClient(connection);
+const client = new AdtClient(connection);
 
-// Full workflow: create, lock, update main source, update implementations, unlock, activate
-await client.createBehaviorImplementation({
-  className: 'ZBP_OK_I_CDS_TEST',
-  packageName: 'ZOK_TEST_PKG_01',
-  behaviorDefinition: 'ZOK_I_CDS_TEST',
-  description: 'Behavior Implementation for ZOK_I_CDS_TEST',
-  transportRequest: 'E19K900001'
-});
-
+await client.getBehaviorImplementation().create(
+  {
+    className: 'ZBP_OK_I_CDS_TEST',
+    packageName: 'ZOK_TEST_PKG_01',
+    behaviorDefinition: 'ZOK_I_CDS_TEST',
+    description: 'Behavior Implementation for ZOK_I_CDS_TEST',
+    transportRequest: 'E19K900001'
+  },
+  { activateOnCreate: true }
+);
 ```
 
 ## Developer Tools
@@ -310,53 +258,11 @@ See [Tools Documentation](tools/README.md) for complete details and options.
 
 ## API Reference
 
-### CrudClient Methods
+### AdtClient Overview
 
-**Create Operations:**
-- `createProgram(name, description, package, transport?)` → `Promise<this>`
-- `createClass(name, description, package, transport?)` → `Promise<this>`
-- `createBehaviorImplementation(config)` → `Promise<this>` – creates behavior implementation class with full workflow (create, lock, update main source, update implementations, unlock, activate)
-- `createInterface(name, description, package, transport?)` → `Promise<this>`
-- And more for all object types...
-
-**Lock Operations:**
-- `lockProgram(name)` → `Promise<this>` (stores lockHandle in state)
-- `unlockProgram(name, lockHandle?)` → `Promise<this>`
-- Similar for all object types...
-
-**Update Operations:**
-- `updateProgram(name, sourceCode, lockHandle?)` → `Promise<this>`
-- `updateClass(name, sourceCode, lockHandle?)` → `Promise<this>`
-- And more...
-
-**Activation:**
-- `activateProgram(name)` → `Promise<this>`
-- `activateClass(name)` → `Promise<this>`
-- And more...
-
-**State Getters:**
-- `getCreateResult()` → `AxiosResponse | undefined`
-- `getLockHandle()` → `string | undefined`
-- `getUnlockResult()` → `AxiosResponse | undefined`
-- `getUpdateResult()` → `AxiosResponse | undefined`
-- `getActivateResult()` → `AxiosResponse | undefined`
-- `getCheckResult()` → `AxiosResponse | undefined`
-- `getValidationResult()` → `any | undefined`
-
-### ReadOnlyClient Methods
-
-- `readProgram(name)` → `Promise<AxiosResponse>`
-- `readClass(name)` → `Promise<AxiosResponse>`
-- `readInterface(name)` → `Promise<AxiosResponse>`
-- `readDataElement(name)` → `Promise<AxiosResponse>`
-- `readDomain(name)` → `Promise<AxiosResponse>`
-- `readStructure(name)` → `Promise<AxiosResponse>`
-- `readTable(name)` → `Promise<AxiosResponse>`
-- `readView(name)` → `Promise<AxiosResponse>`
-- `readFunctionGroup(name)` → `Promise<AxiosResponse>`
-- `readFunctionModule(name, functionGroup)` → `Promise<AxiosResponse>`
-- `readPackage(name)` → `Promise<AxiosResponse>`
-- `readTransport(transportRequest)` → `Promise<AxiosResponse>`
+- Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getView()`, `client.getTable()`, `client.getRequest()`, `client.getUtils()`, etc.
+- Each accessor returns an `Adt*` object implementing `IAdtObject` operations.
+- See `src/index.ts` for the full type exports and object configs.
 
 ### AdtObject Methods (with Long Polling Support)
 
@@ -395,11 +301,10 @@ All type definitions are centralized in module-specific `types.ts` files:
 
 ```typescript
 // Import types from module exports
-import { 
-  CreateClassParams,      // Low-level function parameters
-  ClassBuilderConfig,     // Builder configuration
-  ClassBuilderState,      // Builder state
-  ClassBuilder            // Builder class
+import type {
+  IClassConfig,
+  IClassState,
+  IProgramConfig
 } from '@mcp-abap-adt/adt-clients';
 ```
 
@@ -409,23 +314,14 @@ The package uses **dual naming conventions** to distinguish API layers:
 
 #### Low-Level Parameters (snake_case)
 
-Used by internal ADT API functions:
+Used by internal ADT API functions.
+
+#### AdtObject Configuration (camelCase)
+
+Used by `AdtClient` and `Adt*` object configs:
 
 ```typescript
-interface CreateClassParams {
-  class_name: string;
-  package_name: string;
-  transport_request?: string;
-  description?: string;
-}
-```
-
-#### Builder Configuration (camelCase)
-
-Used by Builder classes providing fluent API:
-
-```typescript
-interface ClassBuilderConfig {
+interface IClassConfig {
   className: string;
   packageName?: string;
   transportRequest?: string;
@@ -475,44 +371,15 @@ await client.getClass().read(
 - More reliable - server-driven waiting ensures object is available
 - Automatic in `create()` and `update()` methods
 
-### From v0.1.0 to v0.2.0
+### Builderless API
 
-**Breaking Changes:**
-
-1. **Low-level functions removed from exports**
-   ```typescript
-   // ❌ Before
-   import { createProgram } from '@mcp-abap-adt/adt-clients/core/program';
-   
-   // ✅ After - Use Builder
-   import { ProgramBuilder } from '@mcp-abap-adt/adt-clients/core';
-   
-   // ✅ Or use CrudClient
-   import { CrudClient } from '@mcp-abap-adt/adt-clients';
-   const client = new CrudClient(connection);
-   await client.createProgram(...);
-   ```
-
-2. **Client classes removed**
-   ```typescript
-   // ❌ Before
-   import { InterfaceClient } from '@mcp-abap-adt/adt-clients';
-   
-   // ✅ After
-   import { CrudClient } from '@mcp-abap-adt/adt-clients';
-   const client = new CrudClient(connection);
-   ```
-
-**Non-breaking:**
-- Builders continue to work as before
-- Specialized clients (ManagementClient, LockClient, ValidationClient) unchanged
+- `CrudClient`, `ReadOnlyClient`, and Builder classes are removed in the builderless API.
+- Use `AdtClient` and the `Adt*` objects (`client.getClass()`, `client.getView()`, etc.).
 
 ## Documentation
 
-- **[Stateful Session Guide](docs/STATEFUL_SESSION_GUIDE.md)** – how Builders and clients manage `sessionId`, `lockHandle`, and the lock registry
 - **[Operation Delays](docs/OPERATION_DELAYS.md)** – configurable delays for SAP operations in tests (sequential execution, timing issues)
 - **[Architecture](docs/architecture/ARCHITECTURE.md)** – package structure and design decisions
-- **[Builder Test Pattern](docs/BUILDER_TEST_PATTERN.md)** – test structure and patterns for contributors
 - **[Test Configuration Schema](docs/TEST_CONFIG_SCHEMA.md)** – YAML test configuration reference
 
 ## Logging and Debugging
@@ -525,10 +392,10 @@ The library uses a **5-tier granular debug flag system** for different code laye
 # Connection package logs (HTTP, sessions, CSRF tokens)
 DEBUG_CONNECTORS=true npm test
 
-# Builder implementation and core library logs
+# Core library logs
 DEBUG_ADT_LIBS=true npm test
 
-# Builder test execution logs
+# Integration test execution logs
 DEBUG_ADT_TESTS=true npm test
 
 # E2E integration test logs
@@ -543,24 +410,21 @@ DEBUG_ADT_TESTS=true npm test
 
 ### Logger Interface
 
-All Builders use a unified `IAdtLogger` interface:
+All clients accept a unified `ILogger` interface:
 
 ```typescript
-import { IAdtLogger, emptyLogger } from '@mcp-abap-adt/adt-clients';
+import type { ILogger } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 
 // Custom logger example
-const logger: IAdtLogger = {
+const logger: ILogger = {
   debug: (msg, ...args) => console.debug(msg, ...args),
   info: (msg, ...args) => console.info(msg, ...args),
   warn: (msg, ...args) => console.warn(msg, ...args),
   error: (msg, ...args) => console.error(msg, ...args),
 };
 
-// Use with Builders
-const builder = new ClassBuilder(connection, config, logger);
-
-// Or use emptyLogger for silent operation
-const silentBuilder = new ClassBuilder(connection, config, emptyLogger);
+const client = new AdtClient(connection, logger);
 ```
 
 **Note:** All logger methods are optional. Lock handles are always logged in full (not truncated).

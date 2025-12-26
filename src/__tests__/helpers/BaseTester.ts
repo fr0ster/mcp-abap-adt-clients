@@ -58,12 +58,15 @@ export interface IFlowTestOptions {
   activateOnCreate?: boolean;
   activateOnUpdate?: boolean;
   timeout?: number;
+  readMetadata?: boolean;
+  readMetadataOptions?: { withLongPolling?: boolean };
 }
 
 export interface IReadTestOptions {
   version?: 'active' | 'inactive';
   timeout?: number;
   withLongPolling?: boolean;
+  skipReadMetadata?: boolean;
 }
 
 export interface IBaseTesterSetupOptions {
@@ -482,6 +485,15 @@ export class BaseTester<TConfig, TState> {
         );
       }
 
+      if (options?.readMetadata) {
+        currentStep = 'readMetadata';
+        logBuilderTestStep(currentStep, this.logger);
+        await this.adtObject.readMetadata(
+          config as Partial<TConfig>,
+          options.readMetadataOptions,
+        );
+      }
+
       // 5. Cleanup (if enabled)
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         currentStep = 'delete (cleanup)';
@@ -571,6 +583,32 @@ export class BaseTester<TConfig, TState> {
       if (!readState) {
         this.log(LogLevel.WARN, 'read failed: object not found');
         return undefined;
+      }
+
+      if (options?.skipReadMetadata) {
+        return readState;
+      }
+
+      logBuilderTestStep('readMetadata', this.logger);
+      try {
+        await this.adtObject.readMetadata(
+          config,
+          options?.withLongPolling !== undefined
+            ? { withLongPolling: options.withLongPolling }
+            : undefined,
+        );
+      } catch (error: any) {
+        if (error?.response?.status === 406) {
+          const { isHttpStatusAllowed } = require('./test-helper');
+          if (isHttpStatusAllowed(406, this.testCase)) {
+            this.log(
+              LogLevel.WARN,
+              'readMetadata skipped: 406 Not Acceptable (allowed by config)',
+            );
+            return readState;
+          }
+        }
+        throw error;
       }
 
       return readState;

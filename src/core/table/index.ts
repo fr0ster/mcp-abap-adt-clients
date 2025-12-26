@@ -6,7 +6,6 @@ import type { IAdtObject } from '@mcp-abap-adt/interfaces';
 import type { ITableConfig, ITableState } from './types';
 
 export { AdtTable } from './AdtTable';
-export { TableBuilder } from './TableBuilder';
 export * from './types';
 
 // Type alias for AdtTable

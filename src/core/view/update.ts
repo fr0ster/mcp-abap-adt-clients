@@ -12,7 +12,7 @@ import { getTimeout } from '../../utils/timeouts';
 /**
  * Update view DDL source code
  * Low-level: Only uploads DDL source with lock handle, does NOT lock/unlock/activate
- * For complete workflow, use ViewBuilder
+ * For complete workflow, use AdtView
  */
 export async function updateView(
   connection: IAbapConnection,

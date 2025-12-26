@@ -144,11 +144,16 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
     it(
       'should execute full workflow and store all results',
       async () => {
-        if (!hasConfig || !tester) {
+        if (!tester) {
+          return;
+        }
+        if (!hasConfig) {
+          await tester.flowTestAuto();
           return;
         }
         const config = tester.getConfig();
         if (!config) {
+          await tester.flowTestAuto();
           return;
         }
 
@@ -277,13 +282,20 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
         }
 
         try {
-          const resultState = await client
-            .getServiceDefinition()
-            .read({ serviceDefinitionName: serviceDefinitionName });
-          expect(resultState).toBeDefined();
-          expect(resultState?.readResult).toBeDefined();
+          const resultState = await tester.readTest({
+            serviceDefinitionName: serviceDefinitionName,
+          });
+          if (!resultState) {
+            logBuilderTestSkip(
+              testsLogger,
+              'ServiceDefinitionBuilder - read standard object',
+              `Standard service definition ${serviceDefinitionName} not found in system`,
+            );
+            return;
+          }
+          expect(resultState.readResult).toBeDefined();
           // ServiceDefinition read returns service definition config - check if serviceDefinitionName is present
-          const serviceDefinitionConfig = resultState?.readResult;
+          const serviceDefinitionConfig = resultState.readResult;
           if (
             serviceDefinitionConfig &&
             typeof serviceDefinitionConfig === 'object' &&
@@ -299,15 +311,6 @@ describe('ServiceDefinitionBuilder (using AdtClient)', () => {
             'ServiceDefinitionBuilder - read standard object',
           );
         } catch (error: any) {
-          // If object doesn't exist (404), skip the test instead of failing
-          if (error.response?.status === 404) {
-            logBuilderTestSkip(
-              testsLogger,
-              'ServiceDefinitionBuilder - read standard object',
-              `Standard service definition ${serviceDefinitionName} not found in system`,
-            );
-            return;
-          }
           logBuilderTestError(
             testsLogger,
             'ServiceDefinitionBuilder - read standard object',

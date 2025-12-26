@@ -13,7 +13,7 @@ import type { IUpdateStructureParams } from './types';
 /**
  * Upload structure DDL code (low-level - uses existing lockHandle)
  * This function does NOT lock/unlock - it assumes the object is already locked
- * Used internally by StructureBuilder
+ * Used internally by AdtStructure
  */
 export async function upload(
   connection: IAbapConnection,

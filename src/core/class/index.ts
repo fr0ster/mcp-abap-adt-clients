@@ -5,12 +5,8 @@
 import type { IAdtObject } from '@mcp-abap-adt/interfaces';
 import type { IClassConfig, IClassState } from './types';
 
-export * from './types';
-// Legacy type aliases for backward compatibility
-export type IClassBuilderConfig = IClassConfig;
-export type IClassBuilderState = IClassState;
 export { AdtClass } from './AdtClass';
-export { ClassBuilder } from './ClassBuilder';
+export * from './types';
 
 // Type alias for AdtClass
 export type AdtClassType = IAdtObject<IClassConfig, IClassState>;

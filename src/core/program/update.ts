@@ -1,5 +1,5 @@
 /**
- * Program update operations - low-level functions for ProgramBuilder
+ * Program update operations - low-level functions for AdtProgram
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
@@ -9,7 +9,7 @@ import { getTimeout } from '../../utils/timeouts';
 /**
  * Upload program source code (low-level - uses existing lockHandle)
  * This function does NOT lock/unlock - it assumes the object is already locked
- * Used internally by ProgramBuilder
+ * Used internally by AdtProgram
  */
 export async function uploadProgramSource(
   connection: IAbapConnection,

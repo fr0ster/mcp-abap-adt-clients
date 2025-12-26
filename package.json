@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
   "version": "0.3.0",
-  "description": "ADT clients for SAP ABAP systems - Read-only and CRUD operations",
+  "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -20,8 +20,7 @@
     "sap",
     "adt",
     "clients",
-    "read-only",
-    "crud",
+    "runtime",
     "mcp"
   ],
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",

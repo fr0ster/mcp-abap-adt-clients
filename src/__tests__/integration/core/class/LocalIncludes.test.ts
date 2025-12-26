@@ -78,6 +78,7 @@ describe('Class local includes (using BaseTester)', () => {
         .getClass()
         .read({ className: config.className });
       if (existing) {
+        await client.getClass().readMetadata({ className: config.className });
         return { success: true, created: false };
       }
 
@@ -577,6 +578,9 @@ describe('Class local includes (using BaseTester)', () => {
           logBuilderTestEnd(testsLogger, testName);
           return;
         }
+        await client
+          .getLocalMacros()
+          .readMetadata({ className: config.className });
 
         const tc = localMacrosTester.getTestCase();
         const params = tc?.params || {};
