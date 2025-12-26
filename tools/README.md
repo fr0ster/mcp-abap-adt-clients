@@ -86,3 +86,27 @@ The script automatically creates the output directory if it doesn't exist.
 - To generate documentation for ADT API
 - To understand the structure of ADT discovery responses
 - To verify endpoint availability on a specific SAP system
+
+### 2. ADT Object Handlers Generator
+
+**`adt-object-handlers.js`** - Generates a mapping of ADT object types to the core classes and client methods that handle them.
+
+**Purpose:** Produces a markdown summary of which ADT objects are supported and which classes/methods implement their handling.
+
+**Usage:**
+```bash
+npm run adt:handlers
+# or
+npm run adt:handlers -- --output docs/usage/ADT_OBJECT_HANDLERS.md
+```
+
+**Options:**
+- `--output <file>` - Output markdown file path (default: `docs/usage/ADT_OBJECT_HANDLERS.md`)
+- `--help, -h` - Show help message
+
+**Output:**
+- Default: `docs/usage/ADT_OBJECT_HANDLERS.md`
+
+**When to use:**
+- To quickly see which ADT objects are covered
+- To keep user-facing documentation aligned with implementation

@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.11] - 2025-12-26
+
+### Added
+- **Tooling**: `tools/adt-object-handlers.js` generator for ADT object handlers
+- **Docs**: Generated `docs/usage/ADT_OBJECT_HANDLERS.md`
+
+### Changed
+- **Tools README**: Updated usage documentation for ADT handlers
+- **Scripts**: Use `adt:handlers` for the new generator
+
+### Removed
+- **Legacy DDIC Handlers**: Removed outdated DDIC handlers documentation and alias
+
 ## [0.2.10] - 2025-12-26
 
 ### Fixed

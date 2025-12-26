@@ -53,6 +53,7 @@
     "test:module": "node scripts/test-module.js",
     "test:long-polling-read": "npx ts-node scripts/test-long-polling-read.ts",
     "discovery:markdown": "npx ts-node tools/discovery-to-markdown.ts",
+    "adt:handlers": "node tools/adt-object-handlers.js",
     "pretest": "npm run test:check:integration",
     "prepublishOnly": "npm run build"
   },
