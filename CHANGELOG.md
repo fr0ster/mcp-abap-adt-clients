@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-12-27
+
+### Changed
+- **Builderless API**: Removed Builder classes and legacy ReadOnly/Crud clients in favor of `AdtClient` + `Adt*` objects
+- **Shared Utilities**: Moved metadata/source helpers into `AdtUtils` and routed internal read helpers through it
+- **Tests**: Standardized read tests to include `readMetadata`, added flow read-metadata step, and restored skip logging
+- **Accept Headers**: Updated metadata Accept headers for interface, function module, table, and view endpoints
+- **Docs**: Refreshed architecture/usage/dev docs and removed archived/deprecated documentation
+
 ## [0.3.0] - 2025-12-26
 
 ### Changed
