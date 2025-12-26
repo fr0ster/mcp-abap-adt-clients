@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.2.10] - 2025-12-26
+
+### Fixed
+- **Linter**: Formatting cleanup
+
 ## [0.2.9] - 2025-12-26
 
 ### Changed

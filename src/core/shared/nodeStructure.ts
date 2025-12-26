@@ -65,7 +65,8 @@ export async function fetchNodeStructure(
     headers: {
       Accept:
         'application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
-      'Content-Type': 'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
+      'Content-Type':
+        'application/vnd.sap.as+xml; charset=UTF-8; dataname=null',
     },
   });
 }

@@ -73,6 +73,7 @@ import {
 
 // Import types
 import type {
+  IGetDiscoveryParams,
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
@@ -80,7 +81,6 @@ import type {
   IGetWhereUsedScopeParams,
   IInactiveObjectsResponse,
   IObjectReference,
-  IGetDiscoveryParams,
   ISearchObjectsParams,
 } from './types';
 

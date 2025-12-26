@@ -13,6 +13,7 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
+
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
@@ -115,9 +116,7 @@ describe('Shared - discovery', () => {
 
     logBuilderTestStep('fetch ADT discovery document', testsLogger);
 
-    const result = await withAcceptHandling(
-      client.getUtils().discovery(),
-    );
+    const result = await withAcceptHandling(client.getUtils().discovery());
 
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();

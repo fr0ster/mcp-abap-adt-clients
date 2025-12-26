@@ -13,6 +13,7 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
+
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
@@ -119,8 +120,8 @@ describe('Shared - searchObjects', () => {
 
     const result = await withAcceptHandling(
       client.getUtils().searchObjects({
-      query: 'CL_ABAP*',
-      maxResults: 10,
+        query: 'CL_ABAP*',
+        maxResults: 10,
       }),
     );
 
@@ -150,9 +151,9 @@ describe('Shared - searchObjects', () => {
 
     const result = await withAcceptHandling(
       client.getUtils().searchObjects({
-      query: 'T*',
-      objectType: 'TABL',
-      maxResults: 10,
+        query: 'T*',
+        objectType: 'TABL',
+        maxResults: 10,
       }),
     );
 
@@ -180,7 +181,7 @@ describe('Shared - searchObjects', () => {
     logBuilderTestStep('search objects with default maxResults', testsLogger);
     const result = await withAcceptHandling(
       client.getUtils().searchObjects({
-      query: 'CL_ABAP*',
+        query: 'CL_ABAP*',
       }),
     );
     expect(result.status).toBe(200);

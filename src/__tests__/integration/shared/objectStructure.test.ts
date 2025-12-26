@@ -36,7 +36,10 @@ interface IObjectStructureParams {
   object_name: string;
 }
 
-const { getTimeout, isHttpStatusAllowed } = require('../../helpers/test-helper');
+const {
+  getTimeout,
+  isHttpStatusAllowed,
+} = require('../../helpers/test-helper');
 
 const connectionLogger: ILogger = createConnectionLogger();
 const builderLogger: ILogger = createBuilderLogger();

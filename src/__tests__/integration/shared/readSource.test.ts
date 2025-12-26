@@ -16,6 +16,7 @@ import {
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
+
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
@@ -177,7 +178,9 @@ describe('Shared - readSource', () => {
       testsLogger,
     );
     const result = await withAcceptHandling(
-      client.getUtils().readObjectSource('class', className, undefined, 'inactive'),
+      client
+        .getUtils()
+        .readObjectSource('class', className, undefined, 'inactive'),
     );
     expect(result.status).toBe(200);
     expect(result.data).toBeDefined();

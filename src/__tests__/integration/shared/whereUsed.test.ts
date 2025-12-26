@@ -13,6 +13,7 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
+
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
 const envPath =
