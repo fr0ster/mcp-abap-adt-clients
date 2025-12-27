@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.4] - 2025-12-27
+
+### Changed
+- **Create Results**: Populate `createResult` for function modules, views, structures, tables, table types, service definitions, metadata extensions, transports, and unit tests (including CDS unit tests)
+- **Test Logging**: Unit test and transport integration tests now log steps consistently
+- **Docs**: Documented create/read result fields in usage and README
+
 ## [0.3.3] - 2025-12-27
 
 ### Added
@@ -16,8 +23,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Changed
 - **Clients**: `AdtClient` and `AdtRuntimeClient` support `enableAcceptCorrection` and respect `ADT_ACCEPT_CORRECTION`
 - **Read Endpoints**: Read/readMetadata helpers accept optional `accept` overrides and use updated defaults for class includes
-- **Test Logging**: Unit test and transport integration tests now log steps consistently
-- **Create Results**: Populate `createResult` for function modules, views, structures, tables, table types, service definitions, metadata extensions, transports, and unit tests (including CDS unit tests)
 
 ## [0.3.2] - 2025-12-27
 
