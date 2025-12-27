@@ -1072,6 +1072,35 @@ node_structure:
         # node_id: "0000"
         # with_short_descriptions: true
 
+# Package Hierarchy (getPackageHierarchy)
+package_hierarchy:
+  test_cases:
+    - name: "get_package_hierarchy"
+      enabled: false  # Set to true to enable test
+      description: "Test getPackageHierarchy for a package"
+      # package_name: "<YOUR_PACKAGE_NAME>"  # Uses environment.default_package if omitted
+      params: {}
+
+# Read Accept (read methods should return 2xx; 406 is error)
+read_accept:
+  test_cases:
+    - name: "read_accept"
+      enabled: false  # Set to true to enable test
+      description: "Read Accept headers for all read methods (expects 2xx)"
+      params:
+        # Optional overrides (if standard_objects registry doesn't cover these)
+        program_name: ""
+        view_name: ""
+        tabletype_name: ""
+        service_definition_name: ""
+        behavior_definition_name: ""
+        behavior_implementation_class_name: ""
+        metadata_extension_name: ""
+        enhancement_name: ""
+        enhancement_type: ""
+        function_group_name: ""
+        function_module_name: ""
+
 # Table Contents (getTableContents)
 # ⚠️ ABAP Cloud Limitation: Table contents reading is only available on on-premise systems
 # On cloud systems, 99% of tables are not readable via ADT Data Preview endpoint

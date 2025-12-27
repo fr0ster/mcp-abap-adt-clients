@@ -320,6 +320,7 @@ describe('Class local includes (using BaseTester)', () => {
 
         await definitionsTester.flowTestAuto({
           updateConfig: { definitionsCode: updateCode },
+          readMetadata: true,
         });
       },
       getTimeout('test'),
@@ -396,6 +397,7 @@ describe('Class local includes (using BaseTester)', () => {
 
         await localTypesTester.flowTestAuto({
           updateConfig: { localTypesCode: updateCode },
+          readMetadata: true,
         });
       },
       getTimeout('test'),
@@ -472,6 +474,7 @@ describe('Class local includes (using BaseTester)', () => {
 
         await localTestClassTester.flowTestAuto({
           updateConfig: { testClassCode: updateCode },
+          readMetadata: true,
         });
       },
       getTimeout('test'),
@@ -578,9 +581,6 @@ describe('Class local includes (using BaseTester)', () => {
           logBuilderTestEnd(testsLogger, testName);
           return;
         }
-        await client
-          .getLocalMacros()
-          .readMetadata({ className: config.className });
 
         const tc = localMacrosTester.getTestCase();
         const params = tc?.params || {};
@@ -588,6 +588,7 @@ describe('Class local includes (using BaseTester)', () => {
 
         await localMacrosTester.flowTestAuto({
           updateConfig: { macrosCode: updateCode },
+          readMetadata: true,
         });
       },
       getTimeout('test'),

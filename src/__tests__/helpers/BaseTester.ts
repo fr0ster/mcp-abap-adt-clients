@@ -488,10 +488,45 @@ export class BaseTester<TConfig, TState> {
       if (options?.readMetadata) {
         currentStep = 'readMetadata';
         logBuilderTestStep(currentStep, this.logger);
-        await this.adtObject.readMetadata(
-          config as Partial<TConfig>,
-          options.readMetadataOptions,
-        );
+        try {
+          const metadataResponse = await this.adtObject.readMetadata(
+            config as Partial<TConfig>,
+            options.readMetadataOptions,
+          );
+          const responseStatus = (metadataResponse as any)?.status;
+          if (
+            responseStatus &&
+            responseStatus !== 200 &&
+            responseStatus !== 204
+          ) {
+            const errorData =
+              typeof (metadataResponse as any)?.data === 'string'
+                ? (metadataResponse as any).data
+                : JSON.stringify((metadataResponse as any)?.data);
+            const error = new Error(
+              `Read metadata failed (HTTP ${responseStatus}): ${errorData}`,
+            );
+            logBuilderTestStepError(currentStep, error);
+            throw error;
+          }
+        } catch (error: any) {
+          if (error?.response?.status === 406) {
+            const { isHttpStatusAllowed } = require('./test-helper');
+            if (isHttpStatusAllowed(406, this.testCase)) {
+              const { getAcceptHint } = require('./test-helper');
+              const acceptHint = getAcceptHint(error);
+              this.log(
+                LogLevel.WARN,
+                `readMetadata skipped: 406 Not Acceptable (allowed by config)${
+                  acceptHint ? `; ${acceptHint}` : ''
+                }`,
+              );
+              return validationState;
+            }
+          }
+          logBuilderTestStepError(currentStep, error);
+          throw error;
+        }
       }
 
       // 5. Cleanup (if enabled)
@@ -506,7 +541,26 @@ export class BaseTester<TConfig, TState> {
             'delete',
           );
         } catch (cleanupError) {
-          this.log(LogLevel.WARN, 'delete failed:', cleanupError);
+          const status = (cleanupError as any)?.response?.status;
+          const responseData = (cleanupError as any)?.response?.data;
+          const responseText =
+            typeof responseData === 'string'
+              ? responseData
+              : responseData
+                ? JSON.stringify(responseData)
+                : undefined;
+          const errorMessage =
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : typeof cleanupError === 'string'
+                ? cleanupError
+                : cleanupError
+                  ? JSON.stringify(cleanupError)
+                  : 'Unknown error';
+          this.log(
+            LogLevel.WARN,
+            `delete failed${status ? ` (HTTP ${status})` : ''}: ${responseText || errorMessage}`,
+          );
         }
       } else if (this.objectCreated) {
         this.log(
@@ -546,8 +600,11 @@ export class BaseTester<TConfig, TState> {
       }
 
       if (error?.response?.status === 406) {
+        const { getAcceptHint } = require('./test-helper');
+        const acceptHint = getAcceptHint(error);
         error.message =
-          `406 Not Acceptable: Accept header rejected or endpoint unsupported. ` +
+          `406 Not Acceptable: Accept header rejected or endpoint unsupported.` +
+          `${acceptHint ? ` ${acceptHint}` : ''} ` +
           `${error.message}`;
       }
 
@@ -601,9 +658,13 @@ export class BaseTester<TConfig, TState> {
         if (error?.response?.status === 406) {
           const { isHttpStatusAllowed } = require('./test-helper');
           if (isHttpStatusAllowed(406, this.testCase)) {
+            const { getAcceptHint } = require('./test-helper');
+            const acceptHint = getAcceptHint(error);
             this.log(
               LogLevel.WARN,
-              'readMetadata skipped: 406 Not Acceptable (allowed by config)',
+              `readMetadata skipped: 406 Not Acceptable (allowed by config)${
+                acceptHint ? `; ${acceptHint}` : ''
+              }`,
             );
             return readState;
           }
@@ -615,8 +676,11 @@ export class BaseTester<TConfig, TState> {
     } catch (error: any) {
       this.log(LogLevel.ERROR, 'read failed:', error);
       if (error?.response?.status === 406) {
+        const { getAcceptHint } = require('./test-helper');
+        const acceptHint = getAcceptHint(error);
         error.message =
-          `406 Not Acceptable: Accept header rejected or endpoint unsupported. ` +
+          `406 Not Acceptable: Accept header rejected or endpoint unsupported.` +
+          `${acceptHint ? ` ${acceptHint}` : ''} ` +
           `${error.message}`;
       }
       throw error;

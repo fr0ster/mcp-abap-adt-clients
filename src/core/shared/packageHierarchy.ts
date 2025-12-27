@@ -1,100 +1,186 @@
 /**
  * Package hierarchy operations
  *
- * Builds a tree of package contents and subpackages from node structure.
+ * Builds a tree of package contents using virtual folders.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import { getPackageContents } from '../package/read';
 import type { IPackageHierarchyNode } from './types';
+import { getVirtualFoldersContents } from './virtualFolders';
 
 type NodeValue = Record<string, unknown> | unknown[] | string | number | null;
 type NodeRecord = Record<string, NodeValue>;
+
+interface IVirtualFolderEntry {
+  name?: string;
+  displayName?: string;
+  facet?: string;
+  text?: string;
+  type?: string;
+}
+
+interface IVirtualObjectEntry {
+  name?: string;
+  type?: string;
+  text?: string;
+  packageName?: string;
+}
+
+interface IInternalHierarchyNode extends IPackageHierarchyNode {
+  packageName?: string;
+}
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
 });
 
-const isNodeRecord = (value: NodeValue): value is NodeRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+const debugEnabled =
+  process.env.DEBUG_ADT_TESTS === 'true' ||
+  process.env.DEBUG_ADT_TEST === 'true' ||
+  process.env.DEBUG_TESTS === 'true';
 
-const getAttribute = (node: NodeRecord, keys: string[]): string | undefined => {
-  for (const key of keys) {
-    const value = node[key];
-    if (typeof value === 'string') {
-      return value;
+const readAttr = (node: NodeRecord, name: string): string | undefined => {
+  const value = node[`@_${name}`];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return undefined;
+};
+
+const asArray = <T>(value: T | T[] | undefined): T[] => {
+  if (!value) {
+    return [];
+  }
+  return Array.isArray(value) ? value : [value];
+};
+
+const findVirtualFoldersResult = (value: NodeValue): NodeRecord | undefined => {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const found = findVirtualFoldersResult(entry as NodeValue);
+      if (found) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+  const record = value as NodeRecord;
+  for (const [key, entry] of Object.entries(record)) {
+    if (
+      key === 'virtualFoldersResult' ||
+      key.endsWith(':virtualFoldersResult')
+    ) {
+      return entry as NodeRecord;
+    }
+    const found = findVirtualFoldersResult(entry);
+    if (found) {
+      return found;
     }
   }
   return undefined;
 };
 
-const getNodeName = (node: NodeRecord): string | undefined =>
-  getAttribute(node, ['@_adtcore:name', '@_name', 'adtcore:name', 'name']);
-
-const getNodeType = (node: NodeRecord): string | undefined =>
-  getAttribute(node, ['@_adtcore:type', '@_type', 'adtcore:type', 'type']);
-
-const getNodeDescription = (node: NodeRecord): string | undefined =>
-  getAttribute(node, [
-    '@_adtcore:description',
-    '@_description',
-    'adtcore:description',
-    'description',
-  ]);
-
-const collectNodeObjects = (value: NodeValue): NodeRecord[] => {
-  if (!value || typeof value !== 'object') {
-    return [];
+const parseVirtualFoldersXml = (
+  xml: string,
+): { folders: IVirtualFolderEntry[]; objects: IVirtualObjectEntry[] } => {
+  const parsed = xmlParser.parse(xml) as NodeRecord;
+  const root = findVirtualFoldersResult(parsed);
+  if (!root) {
+    throw new Error('Failed to parse virtual folders result');
   }
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => collectNodeObjects(entry as NodeValue));
-  }
-  const record = value as NodeRecord;
-  const results: NodeRecord[] = [];
-  if (isNodeRecord(record) && record['adtcore:node']) {
-    results.push(record);
-  }
-  for (const entry of Object.values(record)) {
-    results.push(...collectNodeObjects(entry));
-  }
-  return results;
-};
-
-const collectChildNodes = (node: NodeRecord): NodeRecord[] => {
-  const nodes: NodeRecord[] = [];
-  const children = node['adtcore:node'] as NodeValue | undefined;
-  if (children) {
-    nodes.push(...collectNodeObjects(children));
-  }
-  return nodes;
-};
-
-const findNodeByName = (
-  value: NodeValue,
-  name: string,
-): NodeRecord | undefined => {
-  const candidates = collectNodeObjects(value);
-  return candidates.find(
-    (node) => getNodeName(node)?.toUpperCase() === name.toUpperCase(),
+  const folderNodes = asArray(
+    (root['vfs:virtualFolder'] as NodeRecord | NodeRecord[] | undefined) ||
+      (root.virtualFolder as NodeRecord | NodeRecord[] | undefined),
   );
+  const objectNodes = asArray(
+    (root['vfs:object'] as NodeRecord | NodeRecord[] | undefined) ||
+      (root.object as NodeRecord | NodeRecord[] | undefined),
+  );
+
+  return {
+    folders: folderNodes.map((node) => ({
+      name: readAttr(node, 'name'),
+      displayName: readAttr(node, 'displayName'),
+      facet: readAttr(node, 'facet'),
+      text: readAttr(node, 'text'),
+      type: readAttr(node, 'type'),
+    })),
+    objects: objectNodes.map((node) => ({
+      name: readAttr(node, 'name'),
+      type: readAttr(node, 'type'),
+      text: readAttr(node, 'text'),
+      packageName:
+        readAttr(node, 'packageName') ||
+        readAttr(node, 'package') ||
+        readAttr(node, 'devclass') ||
+        undefined,
+    })),
+  };
 };
 
-const parseNodeTree = (node: NodeRecord): IPackageHierarchyNode => {
-  const name = getNodeName(node) || 'UNKNOWN';
-  const adtType = getNodeType(node);
-  const description = getNodeDescription(node);
-  const treeNode: IPackageHierarchyNode = {
-    name,
-    adtType,
-    description,
-  };
-  const children = collectChildNodes(node);
-  if (children.length > 0) {
-    treeNode.children = children.map(parseNodeTree);
+const collectObjectNodes = (
+  node: IInternalHierarchyNode,
+  out: IInternalHierarchyNode[],
+): void => {
+  if (node.adtType) {
+    out.push(node);
   }
-  return treeNode;
+  if (node.children && node.children.length > 0) {
+    for (const child of node.children) {
+      collectObjectNodes(child as IInternalHierarchyNode, out);
+    }
+  }
+};
+
+const groupTreeByPackage = (
+  root: IInternalHierarchyNode,
+): IPackageHierarchyNode => {
+  if (!root.children || root.children.length === 0) {
+    return root;
+  }
+
+  const rootName = root.name.toUpperCase();
+  const objectNodes: IInternalHierarchyNode[] = [];
+  for (const child of root.children) {
+    collectObjectNodes(child as IInternalHierarchyNode, objectNodes);
+  }
+
+  const packageNodes = new Map<string, IPackageHierarchyNode>();
+  const rootObjects: IPackageHierarchyNode[] = [];
+
+  for (const node of objectNodes) {
+    const packageName = node.packageName?.toUpperCase();
+    if (packageName && packageName !== rootName) {
+      let packageNode = packageNodes.get(packageName);
+      if (!packageNode) {
+        packageNode = {
+          name: packageName,
+          adtType: 'DEVC/K',
+          children: [],
+        };
+        packageNodes.set(packageName, packageNode);
+      }
+      packageNode.children = [...(packageNode.children || []), node];
+      continue;
+    }
+    rootObjects.push(node);
+  }
+
+  return {
+    ...root,
+    children: [...packageNodes.values(), ...rootObjects],
+  };
 };
 
 export async function getPackageHierarchy(
@@ -102,20 +188,108 @@ export async function getPackageHierarchy(
   packageName: string,
 ): Promise<IPackageHierarchyNode> {
   const packageNameUpper = packageName.toUpperCase();
-  const response = await getPackageContents(connection, packageNameUpper);
-  const xml =
-    typeof response.data === 'string'
-      ? response.data
-      : JSON.stringify(response.data);
-  const parsed = xmlParser.parse(xml);
-  const rootNodeObject =
-    findNodeByName(parsed, packageNameUpper) || collectNodeObjects(parsed)[0];
 
-  if (!rootNodeObject) {
-    throw new Error(
-      `Failed to parse package hierarchy for ${packageNameUpper}`,
+  const baseSelection = [{ facet: 'PACKAGE', values: [packageNameUpper] }];
+  const groupResponse = await getVirtualFoldersContents(connection, {
+    objectSearchPattern: '*',
+    preselection: baseSelection,
+    facetOrder: ['GROUP'],
+  });
+  const groupXml =
+    typeof groupResponse.data === 'string'
+      ? groupResponse.data
+      : JSON.stringify(groupResponse.data);
+  if (debugEnabled) {
+    console.log('[AdtUtils.getPackageHierarchy] GROUP XML:', groupXml);
+  }
+  const groupResult = parseVirtualFoldersXml(groupXml);
+  const groups = groupResult.folders.filter(
+    (entry) => entry.facet?.toUpperCase() === 'GROUP',
+  );
+
+  const rootTree: IInternalHierarchyNode = {
+    name: packageNameUpper,
+    adtType: 'DEVC/K',
+    children: [],
+  };
+
+  for (const group of groups) {
+    const groupSelection = group.name || group.displayName || 'GROUP';
+    const groupLabel = group.displayName || group.name || 'GROUP';
+    const groupNode: IInternalHierarchyNode = {
+      name: groupLabel,
+      description: groupLabel !== groupSelection ? groupSelection : undefined,
+      children: [],
+    };
+
+    const typeResponse = await getVirtualFoldersContents(connection, {
+      objectSearchPattern: '*',
+      preselection: [
+        ...baseSelection,
+        { facet: 'GROUP', values: [groupSelection] },
+      ],
+      facetOrder: ['TYPE'],
+    });
+    const typeXml =
+      typeof typeResponse.data === 'string'
+        ? typeResponse.data
+        : JSON.stringify(typeResponse.data);
+    if (debugEnabled) {
+      console.log(
+        `[AdtUtils.getPackageHierarchy] TYPE XML (group=${groupSelection}):`,
+        typeXml,
+      );
+    }
+    const typeResult = parseVirtualFoldersXml(typeXml);
+    const types = typeResult.folders.filter(
+      (entry) => entry.facet?.toUpperCase() === 'TYPE',
     );
+
+    for (const type of types) {
+      const typeSelection = type.name || type.displayName || 'TYPE';
+      const typeLabel = type.displayName || type.name || 'TYPE';
+      const typeNode: IInternalHierarchyNode = {
+        name: typeLabel,
+        description: typeLabel !== typeSelection ? typeSelection : undefined,
+        children: [],
+      };
+
+      const objectResponse = await getVirtualFoldersContents(connection, {
+        objectSearchPattern: '*',
+        preselection: [
+          ...baseSelection,
+          { facet: 'GROUP', values: [groupSelection] },
+          { facet: 'TYPE', values: [typeSelection] },
+        ],
+        facetOrder: [],
+      });
+      const objectXml =
+        typeof objectResponse.data === 'string'
+          ? objectResponse.data
+          : JSON.stringify(objectResponse.data);
+      if (debugEnabled) {
+        console.log(
+          `[AdtUtils.getPackageHierarchy] OBJECT XML (group=${groupSelection}, type=${typeSelection}):`,
+          objectXml,
+        );
+      }
+      const objectResult = parseVirtualFoldersXml(objectXml);
+
+      typeNode.children = objectResult.objects
+        .filter((entry) => entry.name)
+        .map((entry) => ({
+          name: entry.name || '',
+          adtType: entry.type,
+          description: entry.text,
+          packageName: entry.packageName,
+          children: [],
+        }));
+
+      groupNode.children?.push(typeNode);
+    }
+
+    rootTree.children?.push(groupNode);
   }
 
-  return parseNodeTree(rootNodeObject);
+  return groupTreeByPackage(rootTree);
 }
