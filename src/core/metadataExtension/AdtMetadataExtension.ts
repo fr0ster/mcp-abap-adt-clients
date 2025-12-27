@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateMetadataExtension } from './activate';
 import { checkMetadataExtension } from './check';
 import { createMetadataExtension } from './create';
@@ -134,7 +135,7 @@ export class AdtMetadataExtension
   async read(
     config: Partial<IMetadataExtensionConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IMetadataExtensionState | undefined> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
@@ -148,9 +149,8 @@ export class AdtMetadataExtension
         this.connection,
         config.name,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       const _sourceCode =
         typeof response.data === 'string'
@@ -177,7 +177,7 @@ export class AdtMetadataExtension
    */
   async readMetadata(
     config: Partial<IMetadataExtensionConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IMetadataExtensionState> {
     const state: IMetadataExtensionState = { errors: [] };
     if (!config.name) {
@@ -193,9 +193,8 @@ export class AdtMetadataExtension
       const response = await readMetadataExtension(
         this.connection,
         config.name,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.metadataResult = response;
       this.logger?.info?.('Metadata extension metadata read successfully');

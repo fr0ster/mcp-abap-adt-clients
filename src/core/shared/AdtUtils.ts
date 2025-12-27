@@ -33,6 +33,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinition/read';
@@ -79,6 +80,7 @@ import type {
   IInactiveObjectsResponse,
   IObjectReference,
   IPackageHierarchyNode,
+  IReadOptions,
   ISearchObjectsParams,
 } from './types';
 
@@ -281,28 +283,34 @@ export class AdtUtils {
    * @param functionGroup - Function group (required for function modules)
    * @param options - Optional read options
    * @param options.withLongPolling - If true, adds ?withLongPolling=true to wait for object to become available
+   * @param options.accept - Optional Accept override for the metadata request
    * @returns Metadata response
    */
   async readObjectMetadata(
     objectType: string,
     objectName: string,
     functionGroup?: string,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<AxiosResponse> {
     let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
     if (options?.withLongPolling) {
       uri += '?withLongPolling=true';
     }
-    const acceptHeader = getMetadataAcceptHeader(objectType);
-
-    return this.connection.makeAdtRequest({
-      url: uri,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: acceptHeader,
+    const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
+    return makeAdtRequestWithAcceptNegotiation(
+      this.connection,
+      {
+        url: uri,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: acceptHeader,
+        },
       },
-    });
+      {
+        logger: this.logger,
+      },
+    );
   }
 
   /**
@@ -315,6 +323,7 @@ export class AdtUtils {
    * @param version - 'active' or 'inactive'
    * @param options - Optional read options
    * @param options.withLongPolling - If true, adds ?withLongPolling=true to wait for object to become available
+   * @param options.accept - Optional Accept override for the source request
    * @returns Source code response
    */
   async readObjectSource(
@@ -322,7 +331,7 @@ export class AdtUtils {
     objectName: string,
     functionGroup?: string,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<AxiosResponse> {
     if (!supportsSourceCode(objectType)) {
       throw new Error(
@@ -341,14 +350,21 @@ export class AdtUtils {
       uri += `${separator}withLongPolling=true`;
     }
 
-    return this.connection.makeAdtRequest({
-      url: uri,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'text/plain',
+    const acceptHeader = options?.accept ?? 'text/plain';
+    return makeAdtRequestWithAcceptNegotiation(
+      this.connection,
+      {
+        url: uri,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: acceptHeader,
+        },
       },
-    });
+      {
+        logger: this.logger,
+      },
+    );
   }
 
   /**
@@ -680,7 +696,13 @@ export class AdtUtils {
    * ```
    */
   async getEnhancementSpot(enhancementSpot: string): Promise<AxiosResponse> {
-    return getEnhancementMetadata(this.connection, 'enhsxsb', enhancementSpot);
+    return getEnhancementMetadata(
+      this.connection,
+      'enhsxsb',
+      enhancementSpot,
+      undefined,
+      this.logger,
+    );
   }
 
   /**

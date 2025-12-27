@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateStructure } from './activation';
 import { checkStructure } from './check';
 import { create as createStructure } from './create';
@@ -142,7 +143,7 @@ export class AdtStructure
   async read(
     config: Partial<IStructureConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IStructureState | undefined> {
     if (!config.structureName) {
       throw new Error('Structure name is required');
@@ -153,9 +154,7 @@ export class AdtStructure
         this.connection,
         config.structureName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       return {
         readResult: response,
@@ -174,7 +173,7 @@ export class AdtStructure
    */
   async readMetadata(
     config: Partial<IStructureConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IStructureState> {
     const state: IStructureState = { errors: [] };
     if (!config.structureName) {
@@ -190,9 +189,7 @@ export class AdtStructure
       const response = await getStructureMetadata(
         this.connection,
         config.structureName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       state.metadataResult = response;
       this.logger?.info?.('Structure metadata read successfully');

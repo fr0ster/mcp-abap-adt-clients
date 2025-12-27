@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateTable } from './activation';
 import { runTableCheckRun } from './check';
 import { createTable } from './create';
@@ -123,7 +124,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   async read(
     config: Partial<ITableConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<ITableState> {
     if (!config.tableName) {
       throw new Error('Table name is required');
@@ -134,9 +135,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.connection,
         config.tableName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       return { readResult, errors: [] };
     } catch (error: any) {
@@ -152,7 +151,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async readMetadata(
     config: Partial<ITableConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<ITableState> {
     const state: ITableState = { errors: [] };
     if (!config.tableName) {
@@ -168,9 +167,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       const response = await getTableMetadata(
         this.connection,
         config.tableName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       state.metadataResult = response;
       this.logger?.info?.('Table metadata read successfully');

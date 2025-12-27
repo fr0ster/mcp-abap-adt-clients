@@ -6,6 +6,7 @@
  */
 
 import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
 import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
@@ -132,6 +133,7 @@ export class AdtLocalTypes extends AdtClass {
   async read(
     config: Partial<ILocalTypesConfig>,
     version: 'active' | 'inactive' = 'active',
+    options?: IReadOptions,
   ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -143,6 +145,8 @@ export class AdtLocalTypes extends AdtClass {
         this.connection,
         config.className,
         version,
+        this.logger,
+        options,
       );
       return {
         readResult: response,

@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
 import { checkProgram } from './check';
 import { create as createProgram } from './create';
@@ -160,7 +161,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   async read(
     config: Partial<IProgramConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IProgramState | undefined> {
     if (!config.programName) {
       throw new Error('Program name is required');
@@ -171,9 +172,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         this.connection,
         config.programName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       return {
         readResult: response,
@@ -192,7 +191,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async readMetadata(
     config: Partial<IProgramConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IProgramState> {
     const state: IProgramState = { errors: [] };
     if (!config.programName) {
@@ -208,9 +207,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       const response = await getProgramMetadata(
         this.connection,
         config.programName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       state.metadataResult = response;
       this.logger?.info?.('Program metadata read successfully');

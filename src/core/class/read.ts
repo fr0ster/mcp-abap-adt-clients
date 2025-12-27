@@ -5,11 +5,14 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from '../shared/AdtUtils';
+import type { IReadOptions } from '../shared/types';
 
 function getUtils(connection: IAbapConnection): AdtUtils {
   return new AdtUtils(connection, noopLogger);
@@ -23,7 +26,7 @@ function getUtils(connection: IAbapConnection): AdtUtils {
 export async function getClassMetadata(
   connection: IAbapConnection,
   className: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectMetadata(
     'class',
@@ -43,7 +46,7 @@ export async function getClassSource(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(
     'class',
@@ -78,7 +81,7 @@ export async function getClass(
 export async function getClassTransport(
   connection: IAbapConnection,
   className: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   let url = `/sap/bc/adt/oo/classes/${encodedName}/transport`;
@@ -91,7 +94,8 @@ export async function getClassTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept:
+        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
     },
   });
 }
@@ -106,19 +110,25 @@ export async function getClassDefinitionsInclude(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
+  logger?: ILogger,
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/definitions?version=${versionParam}`;
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'text/plain; charset=utf-8',
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: options?.accept ?? 'text/plain',
+      },
     },
-  });
+    { logger },
+  );
 }
 
 /**
@@ -131,19 +141,25 @@ export async function getClassMacrosInclude(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
+  logger?: ILogger,
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/macros?version=${versionParam}`;
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'text/plain; charset=utf-8',
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: options?.accept ?? 'text/plain',
+      },
     },
-  });
+    { logger },
+  );
 }
 
 /**
@@ -156,19 +172,25 @@ export async function getClassTestClassesInclude(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
+  logger?: ILogger,
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?version=${versionParam}`;
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'text/plain; charset=utf-8',
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: options?.accept ?? 'text/plain',
+      },
     },
-  });
+    { logger },
+  );
 }
 
 /**
@@ -181,17 +203,23 @@ export async function getClassImplementationsInclude(
   connection: IAbapConnection,
   className: string,
   version: 'active' | 'inactive' = 'active',
+  logger?: ILogger,
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(className);
   const versionParam = version === 'inactive' ? 'workingArea' : 'active';
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?version=${versionParam}`;
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'text/plain; charset=utf-8',
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: options?.accept ?? 'text/plain',
+      },
     },
-  });
+    { logger },
+  );
 }

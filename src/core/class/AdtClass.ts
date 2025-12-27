@@ -25,6 +25,7 @@ import {
   type IAdtOperationOptions,
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
 import { create as createClass } from './create';
@@ -173,7 +174,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   async read(
     config: Partial<IClassConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IClassState | undefined> {
     if (!config.className) {
       throw new Error('Class name is required');
@@ -231,7 +232,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
    */
   async readMetadata(
     config: Partial<IClassConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IClassState> {
     const state: IClassState = { errors: [] };
     if (!config.className) {

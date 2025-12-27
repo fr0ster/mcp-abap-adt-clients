@@ -8,8 +8,11 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { getTimeout } from '../../utils/timeouts';
+import type { IReadOptions } from '../shared/types';
 
 /**
  * Read metadata extension metadata
@@ -26,22 +29,27 @@ import { getTimeout } from '../../utils/timeouts';
 export async function readMetadataExtension(
   connection: IAbapConnection,
   name: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}${query}`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.ddic.ddlx.v1+xml',
+    Accept: options?.accept ?? 'application/vnd.sap.adt.ddic.ddlx.v1+xml',
   };
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers,
-  });
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers,
+    },
+    { logger },
+  );
 }
 
 /**
@@ -62,7 +70,8 @@ export async function readMetadataExtensionSource(
   connection: IAbapConnection,
   name: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
   const versionQuery = version === 'inactive' ? '?version=inactive' : '';
@@ -74,15 +83,19 @@ export async function readMetadataExtensionSource(
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main${versionQuery}${longPollingQuery}`;
 
   const headers = {
-    Accept: 'text/plain',
+    Accept: options?.accept ?? 'text/plain',
   };
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers,
-  });
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers,
+    },
+    { logger },
+  );
 }
 
 /**
@@ -94,14 +107,15 @@ export async function readMetadataExtensionSource(
 export async function getMetadataExtensionTransport(
   connection: IAbapConnection,
   name: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/transport${query}`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    Accept:
+      options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
   };
 
   return connection.makeAdtRequest({

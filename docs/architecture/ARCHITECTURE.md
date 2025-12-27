@@ -75,6 +75,24 @@ Each `Adt*` object implements `IAdtObject<TConfig, TState>` with methods:
 - Group activation/deletion, inactive objects.
 - Object metadata/source helpers for internal use.
 
+## Accept Negotiation
+
+ADT endpoints can return different `Accept` requirements across systems. To reduce 406 failures, the client can optionally
+negotiate `Accept` headers by retrying with supported values returned in the 406 response.
+
+Behavior:
+- Disabled by default.
+- When enabled, `makeAdtRequest` is wrapped to intercept 406 responses and retry once with supported `Accept` values.
+- The supported values are cached per method+URL to avoid repeated 406s.
+- The retry is scoped to the same endpoint and request; other errors are rethrown.
+
+Configuration:
+- Constructor option: `enableAcceptCorrection` on `AdtClient` and `AdtRuntimeClient`.
+- Environment override: `ADT_ACCEPT_CORRECTION=true` (applied when no explicit option is provided).
+
+Per-call overrides:
+- Read operations accept `ReadOptions` with `accept?: string` to override the default `Accept` for a specific request.
+
 ## Testing
 
 - Integration tests live in `src/__tests__/integration/*`.

@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateFunctionModule } from './activation';
 import { checkFunctionModule } from './check';
 import { create as createFunctionModule } from './create';
@@ -142,7 +143,7 @@ export class AdtFunctionModule
   async read(
     config: Partial<IFunctionModuleConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IFunctionModuleState | undefined> {
     if (!config.functionModuleName) {
       throw new Error('Function module name is required');
@@ -157,9 +158,7 @@ export class AdtFunctionModule
         config.functionModuleName,
         config.functionGroupName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       return {
         readResult: response,
@@ -178,7 +177,7 @@ export class AdtFunctionModule
    */
   async readMetadata(
     config: Partial<IFunctionModuleConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IFunctionModuleState> {
     const state: IFunctionModuleState = { errors: [] };
     if (!config.functionModuleName) {
@@ -204,9 +203,7 @@ export class AdtFunctionModule
         this.connection,
         config.functionModuleName,
         config.functionGroupName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       state.metadataResult = response;
       this.logger?.info?.('Function module metadata read successfully');

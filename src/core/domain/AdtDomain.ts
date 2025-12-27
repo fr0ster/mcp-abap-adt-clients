@@ -25,6 +25,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { getSystemInformation } from '../../utils/systemInfo';
+import type { IReadOptions } from '../shared/types';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
 import { create as createDomain } from './create';
@@ -150,7 +151,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   async read(
     config: Partial<IDomainConfig>,
     _version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IDomainState | undefined> {
     if (!config.domainName) {
       throw new Error('Domain name is required');
@@ -181,7 +182,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
    */
   async readMetadata(
     config: Partial<IDomainConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IDomainState> {
     const state: IDomainState = { errors: [] };
     if (!config.domainName) {

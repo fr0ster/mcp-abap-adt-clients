@@ -11,6 +11,14 @@ export interface IObjectReference {
 }
 
 /**
+ * Read options for source/metadata operations
+ */
+export interface IReadOptions {
+  withLongPolling?: boolean;
+  accept?: string;
+}
+
+/**
  * Response from getInactiveObjects
  */
 export interface IInactiveObjectsResponse {

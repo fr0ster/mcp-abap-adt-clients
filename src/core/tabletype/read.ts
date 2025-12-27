@@ -5,9 +5,12 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IReadOptions } from '../shared/types';
 
 /**
  * Get ABAP table type metadata (without source code)
@@ -15,21 +18,28 @@ import { getTimeout } from '../../utils/timeouts';
 export async function getTableTypeMetadata(
   connection: IAbapConnection,
   tableTypeName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${query}`;
+  const acceptHeader =
+    options?.accept ?? 'application/vnd.sap.adt.tabletype.v1+xml';
 
   try {
-    return await connection.makeAdtRequest({
-      url,
-      method: 'GET',
-      timeout: getTimeout('default'),
-      headers: {
-        Accept: 'application/vnd.sap.adt.tabletype.v1+xml',
+    return await makeAdtRequestWithAcceptNegotiation(
+      connection,
+      {
+        url,
+        method: 'GET',
+        timeout: getTimeout('default'),
+        headers: {
+          Accept: acceptHeader,
+        },
       },
-    });
+      { logger },
+    );
   } catch (error: any) {
     // Output full error response as-is for debugging
     const status = error.response?.status || 'unknown';
@@ -50,7 +60,7 @@ HTTP Status: ${status} ${statusText}
 Response Headers: ${responseHeaders}
 Response Data: ${responseData}
 Request URL: ${url}
-Request Headers: ${JSON.stringify({ Accept: 'application/vnd.sap.adt.tabletype.v1+xml' }, null, 2)}`;
+Request Headers: ${JSON.stringify({ Accept: acceptHeader }, null, 2)}`;
 
     process.stderr.write('\n=== getTableTypeMetadata Error ===\n');
     process.stderr.write(fullError);
@@ -71,7 +81,8 @@ export async function getTableTypeSource(
   connection: IAbapConnection,
   tableTypeName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const versionParam = version === 'inactive' ? 'version=inactive' : '';
@@ -86,14 +97,18 @@ export async function getTableTypeSource(
 
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main${query}`;
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'text/plain',
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: options?.accept ?? 'text/plain',
+      },
     },
-  });
+    { logger },
+  );
 }
 
 /**
@@ -116,7 +131,7 @@ export async function getTableType(
 export async function getTableTypeTransport(
   connection: IAbapConnection,
   tableTypeName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -127,7 +142,8 @@ export async function getTableTypeTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept:
+        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
     },
   });
 }

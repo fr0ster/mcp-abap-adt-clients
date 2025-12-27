@@ -27,6 +27,7 @@ export type {
   IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+export type { IAdtClientOptions } from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export type {
@@ -119,6 +120,7 @@ export type {
   InactiveObjectsResponse,
   ObjectReference,
   PackageHierarchyNode,
+  ReadOptions,
   SearchObjectsParams,
 } from './core/shared';
 export type {

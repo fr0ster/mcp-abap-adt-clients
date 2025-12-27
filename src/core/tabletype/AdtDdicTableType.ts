@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateTableType } from './activation';
 import { runTableTypeCheckRun } from './check';
 import { createTableType } from './create';
@@ -126,7 +127,7 @@ export class AdtDdicTableType
   async read(
     config: Partial<ITableTypeConfig>,
     _version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<ITableTypeState> {
     if (!config.tableTypeName) {
       throw new Error('Table type name is required');
@@ -137,9 +138,8 @@ export class AdtDdicTableType
       const readResult = await getTableTypeMetadata(
         this.connection,
         config.tableTypeName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       return { readResult, errors: [] };
     } catch (error: any) {
@@ -156,7 +156,7 @@ export class AdtDdicTableType
    */
   async readMetadata(
     config: Partial<ITableTypeConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<ITableTypeState> {
     const state: ITableTypeState = { errors: [] };
     if (!config.tableTypeName) {
@@ -172,9 +172,8 @@ export class AdtDdicTableType
       const response = await getTableTypeMetadata(
         this.connection,
         config.tableTypeName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.metadataResult = response;
       this.logger?.info?.('Table type metadata read successfully');

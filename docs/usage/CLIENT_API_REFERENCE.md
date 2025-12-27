@@ -24,6 +24,31 @@ await client.getClass().create({
 const readState = await client.getClass().read({ className: 'ZCL_TEST' });
 ```
 
+### Accept Negotiation
+
+The client can optionally auto-correct `Accept` headers after a 406 response:
+
+```typescript
+const client = new AdtClient(connection, console, {
+  enableAcceptCorrection: true,
+});
+```
+
+You can also override the `Accept` header per read call:
+
+```typescript
+await client.getClass().read(
+  { className: 'ZCL_TEST' },
+  'active',
+  { accept: 'text/plain' }
+);
+
+await client.getClass().readMetadata(
+  { className: 'ZCL_TEST' },
+  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml' }
+);
+```
+
 ## AdtRuntimeClient
 
 ```typescript

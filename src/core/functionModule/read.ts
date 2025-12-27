@@ -10,6 +10,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from '../shared/AdtUtils';
+import type { IReadOptions } from '../shared/types';
 
 function getUtils(connection: IAbapConnection): AdtUtils {
   return new AdtUtils(connection, noopLogger);
@@ -22,7 +23,7 @@ export async function getFunctionMetadata(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectMetadata(
     'functionmodule',
@@ -44,7 +45,7 @@ export async function getFunctionSource(
   functionName: string,
   functionGroup: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(
     'functionmodule',
@@ -79,7 +80,7 @@ export async function getFunctionModuleTransport(
   connection: IAbapConnection,
   functionName: string,
   functionGroup: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedGroup = encodeSapObjectName(functionGroup);
   const encodedName = encodeSapObjectName(functionName);
@@ -91,7 +92,8 @@ export async function getFunctionModuleTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept:
+        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
     },
   });
 }

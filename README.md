@@ -285,6 +285,43 @@ await adtObject.readTransport(config, { withLongPolling: true });
 - After `activate()` operations - wait for object to be available in active version
 - In tests - replace fixed `setTimeout` delays with long polling for better reliability
 
+### Accept Negotiation (Optional)
+
+Some ADT endpoints return `406` when the `Accept` header does not match the system’s supported media types. The client can
+optionally auto-correct `Accept` by retrying with supported values returned in the 406 response.
+
+**Enable globally:**
+```typescript
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
+
+const client = new AdtClient(connection, console, {
+  enableAcceptCorrection: true,
+});
+```
+
+**Enable via environment:**
+```bash
+ADT_ACCEPT_CORRECTION=true npm test
+```
+
+**Override per read call:**
+```typescript
+await client.getClass().read(
+  { className: 'ZCL_TEST' },
+  'active',
+  { accept: 'text/plain' }
+);
+
+await client.getClass().readMetadata(
+  { className: 'ZCL_TEST' },
+  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml' }
+);
+```
+
+Notes:
+- Disabled by default.
+- Correction retries once and caches the supported `Accept` per endpoint.
+
 ### Specialized Clients
 
 - **ManagementClient**: batch activation + check operations

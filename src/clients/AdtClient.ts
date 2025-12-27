@@ -118,11 +118,19 @@ import {
 } from '../core/unitTest';
 import { AdtView, type IViewConfig, type IViewState } from '../core/view';
 
+export interface IAdtClientOptions {
+  enableAcceptCorrection?: boolean;
+}
+
 export class AdtClient {
   private connection: IAbapConnection;
   private logger: ILogger;
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    options?: IAdtClientOptions,
+  ) {
     this.connection = connection;
     this.logger = logger ?? {
       debug: () => {},
@@ -130,6 +138,27 @@ export class AdtClient {
       warn: () => {},
       error: () => {},
     };
+    if (options?.enableAcceptCorrection !== undefined) {
+      const {
+        setAcceptCorrectionEnabled,
+        wrapConnectionAcceptNegotiation,
+        getAcceptCorrectionEnabled,
+      } = require('../utils/acceptNegotiation');
+      setAcceptCorrectionEnabled(options.enableAcceptCorrection);
+      const shouldWrap =
+        options.enableAcceptCorrection ?? getAcceptCorrectionEnabled();
+      if (shouldWrap) {
+        wrapConnectionAcceptNegotiation(this.connection, this.logger);
+      }
+    } else {
+      const {
+        getAcceptCorrectionEnabled,
+        wrapConnectionAcceptNegotiation,
+      } = require('../utils/acceptNegotiation');
+      if (getAcceptCorrectionEnabled()) {
+        wrapConnectionAcceptNegotiation(this.connection, this.logger);
+      }
+    }
   }
 
   /**

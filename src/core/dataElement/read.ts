@@ -8,6 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IReadOptions } from '../shared/types';
 
 /**
  * Get ABAP data element
@@ -15,7 +16,7 @@ import { getTimeout } from '../../utils/timeouts';
 export async function getDataElement(
   connection: IAbapConnection,
   dataElementName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -25,7 +26,7 @@ export async function getDataElement(
     url,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: {},
+    headers: options?.accept ? { Accept: options.accept } : {},
   });
 }
 
@@ -38,7 +39,7 @@ export async function getDataElement(
 export async function getDataElementTransport(
   connection: IAbapConnection,
   dataElementName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(dataElementName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -49,7 +50,8 @@ export async function getDataElementTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept:
+        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
     },
   });
 }

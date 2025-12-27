@@ -5,8 +5,11 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { getTimeout } from '../../utils/timeouts';
+import type { IReadOptions } from '../shared/types';
 
 /**
  * Read behavior definition metadata
@@ -30,21 +33,26 @@ export async function read(
   name: string,
   _sessionId: string,
   version: string = 'inactive',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const query = options?.withLongPolling ? `&withLongPolling=true` : '';
   const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?version=${version}${query}`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.blues.v1+xml',
+    Accept: options?.accept ?? 'application/vnd.sap.adt.blues.v1+xml',
   };
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers,
-  });
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers,
+    },
+    { logger },
+  );
 }
 
 /**
@@ -68,21 +76,26 @@ export async function readSource(
   connection: IAbapConnection,
   name: string,
   version: string = 'inactive',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const query = options?.withLongPolling ? `&withLongPolling=true` : '';
   const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main?version=${version}${query}`;
 
   const headers = {
-    Accept: 'text/plain',
+    Accept: options?.accept ?? 'text/plain',
   };
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers,
-  });
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers,
+    },
+    { logger },
+  );
 }
 
 /**
@@ -94,13 +107,14 @@ export async function readSource(
 export async function getBehaviorDefinitionTransport(
   connection: IAbapConnection,
   name: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/transport${query}`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    Accept:
+      options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
   };
 
   return connection.makeAdtRequest({

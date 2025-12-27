@@ -27,6 +27,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
 import { create as createFunctionGroup } from './create';
@@ -241,7 +242,7 @@ export class AdtFunctionGroup
   async read(
     config: Partial<IFunctionGroupConfig>,
     _version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IFunctionGroupState | undefined> {
     if (!config.functionGroupName) {
       throw new Error('Function group name is required');
@@ -251,9 +252,7 @@ export class AdtFunctionGroup
       const response = await getFunctionGroup(
         this.connection,
         config.functionGroupName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       return {
         readResult: response,
@@ -273,7 +272,7 @@ export class AdtFunctionGroup
    */
   async readMetadata(
     config: Partial<IFunctionGroupConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IFunctionGroupState> {
     const state: IFunctionGroupState = { errors: [] };
     if (!config.functionGroupName) {

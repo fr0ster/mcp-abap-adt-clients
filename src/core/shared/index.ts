@@ -24,6 +24,7 @@ export type {
   IInactiveObjectsResponse as InactiveObjectsResponse,
   IObjectReference as ObjectReference,
   IPackageHierarchyNode as PackageHierarchyNode,
+  IReadOptions as ReadOptions,
   ISearchObjectsParams as SearchObjectsParams,
   IVirtualFoldersPreselection as VirtualFoldersPreselection,
 } from './types';

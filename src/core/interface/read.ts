@@ -10,6 +10,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from '../shared/AdtUtils';
+import type { IReadOptions } from '../shared/types';
 
 function getUtils(connection: IAbapConnection): AdtUtils {
   return new AdtUtils(connection, noopLogger);
@@ -21,7 +22,7 @@ function getUtils(connection: IAbapConnection): AdtUtils {
 export async function getInterfaceMetadata(
   connection: IAbapConnection,
   interfaceName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectMetadata(
     'interface',
@@ -39,7 +40,7 @@ export async function getInterfaceSource(
   connection: IAbapConnection,
   interfaceName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(
     'interface',
@@ -70,7 +71,7 @@ export async function getInterface(
 export async function getInterfaceTransport(
   connection: IAbapConnection,
   interfaceName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(interfaceName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -81,7 +82,8 @@ export async function getInterfaceTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept:
+        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
     },
   });
 }

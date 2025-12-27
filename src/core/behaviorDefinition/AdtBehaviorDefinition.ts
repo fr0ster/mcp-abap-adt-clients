@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activate } from './activation';
 import { check as checkBehaviorDefinition } from './check';
 import { create as createBehaviorDefinition } from './create';
@@ -185,7 +186,7 @@ export class AdtBehaviorDefinition
   async read(
     config: Partial<IBehaviorDefinitionConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IBehaviorDefinitionState | undefined> {
     const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
@@ -199,9 +200,8 @@ export class AdtBehaviorDefinition
         this.connection,
         config.name,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.readResult = response;
       return state;
@@ -221,7 +221,7 @@ export class AdtBehaviorDefinition
    */
   async readMetadata(
     config: Partial<IBehaviorDefinitionConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IBehaviorDefinitionState> {
     const state: IBehaviorDefinitionState = { errors: [] };
     if (!config.name) {
@@ -240,9 +240,8 @@ export class AdtBehaviorDefinition
         config.name,
         '',
         'inactive',
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.metadataResult = response;
       this.logger?.info?.('Behavior definition metadata read successfully');
@@ -451,7 +450,13 @@ export class AdtBehaviorDefinition
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await readSource(this.connection, config.name);
+      const readResponse = await readSource(
+        this.connection,
+        config.name,
+        'inactive',
+        undefined,
+        this.logger,
+      );
       state.readResult = readResponse;
 
       return state;

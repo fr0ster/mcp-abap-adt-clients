@@ -28,6 +28,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { getSystemInformation } from '../../utils/systemInfo';
+import type { IReadOptions } from '../shared/types';
 import { checkPackage } from './check';
 import { createPackage } from './create';
 import { checkPackageDeletion, deletePackage } from './delete';
@@ -196,7 +197,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   async read(
     config: Partial<IPackageConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IPackageState | undefined> {
     if (!config.packageName) {
       throw new Error('Package name is required');
@@ -207,9 +208,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         this.connection,
         config.packageName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       return {
         readResult: response,
@@ -229,7 +229,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async readMetadata(
     config: Partial<IPackageConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IPackageState> {
     const state: IPackageState = { errors: [] };
     if (!config.packageName) {
@@ -247,9 +247,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         this.connection,
         config.packageName,
         'active',
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.metadataResult = response;
       state.readResult = response;

@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.3] - 2025-12-27
+
+### Added
+- **Accept Negotiation**: Optional auto-correction of `Accept` headers on 406 responses, with per-endpoint caching
+- **Read Options**: `accept` override in read/readMetadata options for targeted header control
+- **Package Hierarchy**: `AdtUtils.getPackageHierarchy()` builds a package/subpackage/object tree from virtual folders
+- **Tests**: New integration coverage for package hierarchy and read Accept handling (corrected + uncorrected flows)
+
+### Changed
+- **Clients**: `AdtClient` and `AdtRuntimeClient` support `enableAcceptCorrection` and respect `ADT_ACCEPT_CORRECTION`
+- **Read Endpoints**: Read/readMetadata helpers accept optional `accept` overrides and use updated defaults for class includes
+- **Test Logging**: Unit test and transport integration tests now log steps consistently
+
 ## [0.3.2] - 2025-12-27
 
 ### Changed

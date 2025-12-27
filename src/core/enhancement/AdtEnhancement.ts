@@ -31,6 +31,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateEnhancement } from './activation';
 import { check as checkEnhancement } from './check';
 import { create as createEnhancement } from './create';
@@ -183,7 +184,7 @@ export class AdtEnhancement
   async read(
     config: Partial<IEnhancementConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IEnhancementState | undefined> {
     const state: IEnhancementState = {
       errors: [],
@@ -210,6 +211,7 @@ export class AdtEnhancement
           config.enhancementName,
           version,
           options,
+          this.logger,
         );
         state.readResult = response;
         state.sourceCode = response.data;
@@ -219,6 +221,7 @@ export class AdtEnhancement
           config.enhancementType,
           config.enhancementName,
           options,
+          this.logger,
         );
         state.readResult = response;
       }
@@ -239,7 +242,7 @@ export class AdtEnhancement
    */
   async readMetadata(
     config: Partial<IEnhancementConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IEnhancementState> {
     const state: IEnhancementState = {
       errors: [],
@@ -271,6 +274,7 @@ export class AdtEnhancement
         config.enhancementType,
         config.enhancementName,
         options,
+        this.logger,
       );
       state.metadataResult = response;
       this.logger?.info?.('Enhancement metadata read successfully');

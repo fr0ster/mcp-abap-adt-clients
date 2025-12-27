@@ -10,6 +10,7 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
 import { AdtUtils } from '../shared/AdtUtils';
+import type { IReadOptions } from '../shared/types';
 
 function getUtils(connection: IAbapConnection): AdtUtils {
   return new AdtUtils(connection, noopLogger);
@@ -21,7 +22,7 @@ function getUtils(connection: IAbapConnection): AdtUtils {
 export async function getViewMetadata(
   connection: IAbapConnection,
   viewName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectMetadata(
     'view',
@@ -38,7 +39,7 @@ export async function getViewSource(
   connection: IAbapConnection,
   viewName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(
     'view',
@@ -69,7 +70,7 @@ export async function getView(
 export async function getViewTransport(
   connection: IAbapConnection,
   viewName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(viewName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
@@ -80,7 +81,8 @@ export async function getViewTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept:
+        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
     },
   });
 }

@@ -201,7 +201,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
         try {
           // Step 1: Validate CDS view for unit test doubles
           if (viewName) {
-            logBuilderTestStep('validate');
+            logBuilderTestStep('validate', testsLogger);
             testsLogger.info?.(
               'Validating CDS view for unit test doubles:',
               viewName,
@@ -215,7 +215,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           }
 
           // Step 2: Create CDS unit test class
-          logBuilderTestStep('create');
+          logBuilderTestStep('create', testsLogger);
           const cdsUnitTestConfigForCreate: ICdsUnitTestConfig = {
             className,
             packageName,
@@ -235,7 +235,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test class created successfully');
 
           // Step 3: Activate class
-          logBuilderTestStep('activate');
+          logBuilderTestStep('activate', testsLogger);
           const activateState = await client.getClass().activate({
             className,
             transportRequest,
@@ -244,7 +244,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test class activated');
 
           // Step 4: Read the created test class
-          logBuilderTestStep('read');
+          logBuilderTestStep('read', testsLogger);
           const readState = await client.getClass().read({ className });
           expect(readState).toBeDefined();
           expect(readState?.readResult).toBeDefined();
@@ -257,7 +257,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test class metadata read successfully');
 
           // Step 5: Create unit test configuration
-          logBuilderTestStep('create (unit test)');
+          logBuilderTestStep('create (unit test)', testsLogger);
           const unitTestConfig: IUnitTestConfig = {
             tests: [
               {
@@ -270,11 +270,11 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test configuration created');
 
           // Step 6: Update unit test (if needed - for now just prepare)
-          logBuilderTestStep('update (unit test)');
+          logBuilderTestStep('update (unit test)', testsLogger);
           testsLogger.info?.('CDS unit test configuration prepared');
 
           // Step 7: Run unit test (start test execution)
-          logBuilderTestStep('run (unit test)');
+          logBuilderTestStep('run (unit test)', testsLogger);
           const unitTest = client.getUnitTest() as any;
           const runId = await unitTest.run(
             unitTestConfig.tests!,
@@ -284,7 +284,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test run started, run ID:', runId);
 
           // Step 8: Read status (with long polling if configured)
-          logBuilderTestStep('read (status)');
+          logBuilderTestStep('read (status)', testsLogger);
           const statusConfig: IUnitTestConfig = {
             runId: runId,
             status: testCase.params.unit_test_status || {},
@@ -298,7 +298,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test status:', statusState?.runStatus);
 
           // Step 9: Read result
-          logBuilderTestStep('read (result)');
+          logBuilderTestStep('read (result)', testsLogger);
           const _resultConfig: IUnitTestConfig = {
             runId: runId,
             result: testCase.params.unit_test_result || {},
@@ -317,7 +317,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           const skipCleanup = testCase.params.skip_cleanup === true;
           if (!skipCleanup && className) {
             try {
-              logBuilderTestStep('delete (cleanup)');
+              logBuilderTestStep('delete (cleanup)', testsLogger);
               testsLogger.info?.('Cleaning up CDS unit test class:', className);
               await client.getClass().delete({
                 className,

@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateServiceDefinition } from './activation';
 import { checkServiceDefinition } from './check';
 import { create as createServiceDefinition } from './create';
@@ -134,7 +135,7 @@ export class AdtServiceDefinition
   async read(
     config: Partial<IServiceDefinitionConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IServiceDefinitionState | undefined> {
     const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
@@ -148,9 +149,8 @@ export class AdtServiceDefinition
         this.connection,
         config.serviceDefinitionName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.readResult = response;
       return state;
@@ -167,7 +167,7 @@ export class AdtServiceDefinition
    */
   async readMetadata(
     config: Partial<IServiceDefinitionConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IServiceDefinitionState> {
     const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
@@ -184,9 +184,8 @@ export class AdtServiceDefinition
         this.connection,
         config.serviceDefinitionName,
         'inactive',
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.metadataResult = response;
       this.logger?.info?.('Service definition metadata read successfully');

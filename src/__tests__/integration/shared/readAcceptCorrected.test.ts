@@ -1,6 +1,6 @@
 /**
- * Integration test for read methods (Accept headers)
- * Ensures read endpoints return 2xx (406 should fail)
+ * Integration test for read methods (Accept headers) with correction enabled
+ * Ensures read endpoints return 2xx with Accept auto-correction on 406
  *
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/shared/readAccept.test
  */
@@ -96,7 +96,7 @@ async function runReadMetadataWithAcceptLogging<T>(
   }
 }
 
-describe('Shared - read Accept headers', () => {
+describe('Shared - read Accept headers (corrected)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
@@ -113,7 +113,7 @@ describe('Shared - read Accept headers', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       client = new AdtClient(connection, builderLogger, {
-        enableAcceptCorrection: false,
+        enableAcceptCorrection: true,
       });
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);

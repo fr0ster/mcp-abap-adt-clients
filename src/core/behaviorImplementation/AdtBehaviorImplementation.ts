@@ -32,6 +32,7 @@ import type {
 import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class';
 import { updateClass } from '../class/update';
+import type { IReadOptions } from '../shared/types';
 import {
   getBehaviorImplementationMetadata,
   getBehaviorImplementationSource,
@@ -155,7 +156,7 @@ export class AdtBehaviorImplementation
   async read(
     config: Partial<IBehaviorImplementationConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IBehaviorImplementationState | undefined> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
@@ -169,9 +170,8 @@ export class AdtBehaviorImplementation
         this.connection,
         config.className,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.readResult = response;
       return state;
@@ -191,7 +191,7 @@ export class AdtBehaviorImplementation
    */
   async readMetadata(
     config: Partial<IBehaviorImplementationConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IBehaviorImplementationState> {
     const state: IBehaviorImplementationState = { errors: [] };
     if (!config.className) {
@@ -207,9 +207,8 @@ export class AdtBehaviorImplementation
       const response = await getBehaviorImplementationMetadata(
         this.connection,
         config.className,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
+        this.logger,
       );
       state.metadataResult = response;
       this.logger?.info?.('Behavior implementation metadata read successfully');

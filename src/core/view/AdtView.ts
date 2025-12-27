@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateDDLS } from './activation';
 import { checkView } from './check';
 import { createView } from './create';
@@ -142,7 +143,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   async read(
     config: Partial<IViewConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IViewState | undefined> {
     if (!config.viewName) {
       throw new Error('View name is required');
@@ -153,9 +154,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.connection,
         config.viewName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       return {
         readResult: response,
@@ -174,7 +173,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    */
   async readMetadata(
     config: Partial<IViewConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IViewState> {
     const state: IViewState = { errors: [] };
     if (!config.viewName) {
@@ -190,9 +189,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       const response = await getViewMetadata(
         this.connection,
         config.viewName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       state.metadataResult = response;
       this.logger?.info?.('View metadata read successfully');

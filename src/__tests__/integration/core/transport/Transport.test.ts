@@ -165,7 +165,7 @@ describe('AdtRequest', () => {
         let transportNumber: string | null = null;
 
         try {
-          logBuilderTestStep('create');
+          logBuilderTestStep('create', testsLogger);
           const createState = await client
             .getRequest()
             .create(buildBuilderConfig(testCase) as any);
@@ -206,7 +206,7 @@ describe('AdtRequest', () => {
           // Read the created transport before cleanup (using transportNumber from state)
           if (transportNumber) {
             try {
-              logBuilderTestStep('read');
+              logBuilderTestStep('read', testsLogger);
               const readState = await client.getRequest().read({
                 transportNumber,
               });

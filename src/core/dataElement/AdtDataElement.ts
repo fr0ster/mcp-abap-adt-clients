@@ -25,6 +25,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { getSystemInformation } from '../../utils/systemInfo';
+import type { IReadOptions } from '../shared/types';
 import { activateDataElement } from './activation';
 import { checkDataElement } from './check';
 import { create as createDataElement } from './create';
@@ -153,7 +154,7 @@ export class AdtDataElement
   async read(
     config: Partial<IDataElementConfig>,
     _version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IDataElementState | undefined> {
     if (!config.dataElementName) {
       throw new Error('Data element name is required');
@@ -186,7 +187,7 @@ export class AdtDataElement
    */
   async readMetadata(
     config: Partial<IDataElementConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IDataElementState> {
     const state: IDataElementState = { errors: [] };
     if (!config.dataElementName) {

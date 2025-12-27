@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IReadOptions } from '../shared/types';
 import { activateInterface } from './activation';
 import { checkInterface } from './check';
 import { create as createInterface } from './create';
@@ -140,7 +141,7 @@ export class AdtInterface
   async read(
     config: Partial<IInterfaceConfig>,
     version: 'active' | 'inactive' = 'active',
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IInterfaceState | undefined> {
     if (!config.interfaceName) {
       throw new Error('Interface name is required');
@@ -151,9 +152,7 @@ export class AdtInterface
         this.connection,
         config.interfaceName,
         version,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       return {
         readResult: response,
@@ -173,7 +172,7 @@ export class AdtInterface
    */
   async readMetadata(
     config: Partial<IInterfaceConfig>,
-    options?: { withLongPolling?: boolean },
+    options?: IReadOptions,
   ): Promise<IInterfaceState> {
     const state: IInterfaceState = { errors: [] };
     if (!config.interfaceName) {
@@ -189,9 +188,7 @@ export class AdtInterface
       const response = await getInterfaceMetadata(
         this.connection,
         config.interfaceName,
-        options?.withLongPolling !== undefined
-          ? { withLongPolling: options.withLongPolling }
-          : undefined,
+        options,
       );
       state.metadataResult = response;
       this.logger?.info?.('Interface metadata read successfully');

@@ -1087,19 +1087,19 @@ read_accept:
     - name: "read_accept"
       enabled: false  # Set to true to enable test
       description: "Read Accept headers for all read methods (expects 2xx)"
-      params:
+      params: {}
         # Optional overrides (if standard_objects registry doesn't cover these)
-        program_name: ""
-        view_name: ""
-        tabletype_name: ""
-        service_definition_name: ""
-        behavior_definition_name: ""
-        behavior_implementation_class_name: ""
-        metadata_extension_name: ""
-        enhancement_name: ""
-        enhancement_type: ""
-        function_group_name: ""
-        function_module_name: ""
+        # program_name: ""
+        # view_name: ""
+        # tabletype_name: ""
+        # service_definition_name: ""
+        # behavior_definition_name: ""
+        # behavior_implementation_class_name: ""
+        # metadata_extension_name: ""
+        # enhancement_name: ""
+        # enhancement_type: ""
+        # function_group_name: ""
+        # function_module_name: ""
 
 # Table Contents (getTableContents)
 # ⚠️ ABAP Cloud Limitation: Table contents reading is only available on on-premise systems

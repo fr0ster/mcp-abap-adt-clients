@@ -5,9 +5,12 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IReadOptions } from '../shared/types';
 import {
   type EnhancementType,
   getEnhancementUri,
@@ -27,7 +30,8 @@ export async function getEnhancementMetadata(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   let url = getEnhancementUri(enhancementType, encodedName);
@@ -36,14 +40,20 @@ export async function getEnhancementMetadata(
     url += '?withLongPolling=true';
   }
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'application/vnd.sap.adt.enhancements.v1+xml, application/xml',
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept:
+          options?.accept ??
+          'application/vnd.sap.adt.enhancements.v1+xml, application/xml',
+      },
     },
-  });
+    { logger },
+  );
 }
 
 /**
@@ -62,7 +72,8 @@ export async function getEnhancementSource(
   enhancementType: EnhancementType,
   enhancementName: string,
   version: 'active' | 'inactive' = 'active',
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   if (!supportsSourceCode(enhancementType)) {
     throw new Error(
@@ -78,14 +89,18 @@ export async function getEnhancementSource(
     url += '&withLongPolling=true';
   }
 
-  return connection.makeAdtRequest({
-    url,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: {
-      Accept: 'text/plain; charset=utf-8',
+  return makeAdtRequestWithAcceptNegotiation(
+    connection,
+    {
+      url,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: options?.accept ?? 'text/plain; charset=utf-8',
+      },
     },
-  });
+    { logger },
+  );
 }
 
 /**
@@ -101,7 +116,7 @@ export async function getEnhancementTransport(
   connection: IAbapConnection,
   enhancementType: EnhancementType,
   enhancementName: string,
-  options?: { withLongPolling?: boolean },
+  options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(enhancementName).toLowerCase();
   let url = `${getEnhancementUri(enhancementType, encodedName)}/transport`;
@@ -115,7 +130,8 @@ export async function getEnhancementTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept:
+        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
     },
   });
 }
