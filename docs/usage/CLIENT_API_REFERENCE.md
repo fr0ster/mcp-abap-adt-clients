@@ -24,6 +24,18 @@ await client.getClass().create({
 const readState = await client.getClass().read({ className: 'ZCL_TEST' });
 ```
 
+Operation results are stored in the returned state:
+
+```typescript
+const createState = await client.getFunctionModule().create({
+  functionGroupName: 'ZFGROUP',
+  functionModuleName: 'ZFM_TEST',
+  description: 'Test FM',
+});
+
+console.log(createState.createResult?.status);
+```
+
 ### Accept Negotiation
 
 The client can optionally auto-correct `Accept` headers after a 406 response:

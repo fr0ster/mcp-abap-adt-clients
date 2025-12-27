@@ -101,7 +101,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
     try {
       // Create view
       this.logger?.info?.('Creating view');
-      await createView(this.connection, {
+      const createResponse = await createView(this.connection, {
         view_name: config.viewName,
         package_name: config.packageName,
         transport_request: config.transportRequest,
@@ -109,6 +109,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         ddl_source: options?.sourceCode || config.ddlSource,
       });
       objectCreated = true;
+      state.createResult = createResponse;
       this.logger?.info?.('View created');
 
       return state;

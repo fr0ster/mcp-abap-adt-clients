@@ -101,13 +101,14 @@ export class AdtFunctionModule
     try {
       // Create function module
       this.logger?.info?.('Creating function module');
-      await createFunctionModule(this.connection, {
+      const createResult = await createFunctionModule(this.connection, {
         functionGroupName: config.functionGroupName,
         functionModuleName: config.functionModuleName,
         transportRequest: config.transportRequest,
         description: config.description,
       });
       objectCreated = true;
+      state.createResult = createResult;
       this.logger?.info?.('Function module created');
 
       return state;

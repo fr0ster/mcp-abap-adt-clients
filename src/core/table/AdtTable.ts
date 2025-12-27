@@ -84,13 +84,14 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     try {
       // Create table
       this.logger?.info?.('Creating table');
-      await createTable(this.connection, {
+      const createResponse = await createTable(this.connection, {
         table_name: config.tableName,
         package_name: config.packageName,
         transport_request: config.transportRequest,
         ddl_code: options?.sourceCode || config.ddlCode,
       });
       objectCreated = true;
+      state.createResult = createResponse;
       this.logger?.info?.('Table created');
 
       return state;

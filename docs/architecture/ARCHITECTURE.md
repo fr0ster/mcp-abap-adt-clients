@@ -65,6 +65,7 @@ Each `Adt*` object implements `IAdtObject<TConfig, TState>` with methods:
 
 - `validate`, `create`, `read`, `readMetadata`, `readTransport`, `update`, `delete`, `activate`, `check`.
 - Long polling is supported in read operations with `withLongPolling` where applicable.
+- Operation results are stored in the returned state (`validationResponse`, `createResult`, `updateResult`, `checkResult`, etc.).
 
 ## Shared Utilities (AdtUtils)
 

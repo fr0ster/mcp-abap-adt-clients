@@ -106,13 +106,14 @@ export class AdtStructure
     try {
       // Create structure
       this.logger?.info?.('Creating structure');
-      await createStructure(this.connection, {
+      const createResponse = await createStructure(this.connection, {
         structureName: config.structureName,
         packageName: config.packageName,
         transportRequest: config.transportRequest,
         description: config.description,
       });
       objectCreated = true;
+      state.createResult = createResponse;
       this.logger?.info?.('Structure created');
 
       return state;

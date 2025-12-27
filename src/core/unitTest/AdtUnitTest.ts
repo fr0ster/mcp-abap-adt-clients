@@ -133,6 +133,7 @@ export class AdtUnitTest
       this.state.runId = runId;
 
       return {
+        createResult: response,
         runId,
         errors: [],
       };

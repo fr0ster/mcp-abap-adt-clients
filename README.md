@@ -285,6 +285,18 @@ await adtObject.readTransport(config, { withLongPolling: true });
 - After `activate()` operations - wait for object to be available in active version
 - In tests - replace fixed `setTimeout` delays with long polling for better reliability
 
+Operation results are stored on the returned state (`createResult`, `updateResult`, `checkResult`, etc.):
+
+```typescript
+const createState = await client.getFunctionModule().create({
+  functionGroupName: 'ZFGROUP',
+  functionModuleName: 'ZFM_TEST',
+  description: 'Test FM',
+});
+
+console.log(createState.createResult?.status);
+```
+
 ### Accept Negotiation (Optional)
 
 Some ADT endpoints return `406` when the `Accept` header does not match the system’s supported media types. The client can

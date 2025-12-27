@@ -91,6 +91,7 @@ export class AdtRequest
       this.logger?.info?.('Transport request created:', transportNumber);
 
       return {
+        createResult: response,
         transportNumber,
         errors: [],
       };

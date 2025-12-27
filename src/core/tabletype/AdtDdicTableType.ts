@@ -87,13 +87,14 @@ export class AdtDdicTableType
       // Create empty table type (XML-based entity like Domain/DataElement)
       // rowType is added via update() method
       this.logger?.info?.('Creating table type');
-      await createTableType(this.connection, {
+      const createResponse = await createTableType(this.connection, {
         tabletype_name: config.tableTypeName,
         package_name: config.packageName,
         description: config.description,
         transport_request: config.transportRequest,
       });
       objectCreated = true;
+      state.createResult = createResponse;
       this.logger?.info?.('Table type created');
 
       return state;

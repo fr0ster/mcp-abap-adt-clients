@@ -178,6 +178,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
         );
 
         return {
+          createResult: createState.createResult,
           testClassState: {
             ...createState,
             ...testClassState,

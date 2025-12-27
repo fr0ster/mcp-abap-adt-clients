@@ -113,13 +113,14 @@ export class AdtServiceDefinition
     try {
       // Create service definition
       this.logger?.info?.('Creating service definition');
-      await createServiceDefinition(this.connection, {
+      const createResponse = await createServiceDefinition(this.connection, {
         service_definition_name: config.serviceDefinitionName,
         package_name: config.packageName,
         transport_request: config.transportRequest,
         description: config.description,
         source_code: options?.sourceCode || config.sourceCode,
       });
+      state.createResult = createResponse;
       this.logger?.info?.('Service definition created');
 
       return state;

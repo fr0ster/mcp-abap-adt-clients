@@ -111,7 +111,7 @@ export class AdtMetadataExtension
     try {
       // Create metadata extension
       this.logger?.info?.('Creating metadata extension');
-      await createMetadataExtension(this.connection, {
+      const createResponse = await createMetadataExtension(this.connection, {
         name: config.name,
         packageName: config.packageName,
         transportRequest: config.transportRequest,
@@ -120,6 +120,7 @@ export class AdtMetadataExtension
         masterSystem: config.masterSystem,
         responsible: config.responsible,
       });
+      state.createResult = createResponse;
       this.logger?.info?.('Metadata extension created');
 
       return state;
