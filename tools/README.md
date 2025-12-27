@@ -87,25 +87,25 @@ The script automatically creates the output directory if it doesn't exist.
 - To understand the structure of ADT discovery responses
 - To verify endpoint availability on a specific SAP system
 
-### 2. ADT Object Handlers Generator
+### 2. ADT Object Entities Generator
 
-**`adt-object-handlers.js`** - Generates a mapping of ADT object types to the core classes and client methods that handle them.
+**`adt-object-entities.js`** - Generates a mapping of ADT object entities to the core classes and client methods that support them.
 
-**Purpose:** Produces a markdown summary of which ADT objects are supported and which classes/methods implement their handling.
+**Purpose:** Produces a markdown summary of which ADT objects are supported and which classes/methods implement them.
 
 **Usage:**
 ```bash
-npm run adt:handlers
+npm run adt:entities
 # or
-npm run adt:handlers -- --output docs/usage/ADT_OBJECT_HANDLERS.md
+npm run adt:entities -- --output docs/usage/ADT_OBJECT_ENTITIES.md
 ```
 
 **Options:**
-- `--output <file>` - Output markdown file path (default: `docs/usage/ADT_OBJECT_HANDLERS.md`)
+- `--output <file>` - Output markdown file path (default: `docs/usage/ADT_OBJECT_ENTITIES.md`)
 - `--help, -h` - Show help message
 
 **Output:**
-- Default: `docs/usage/ADT_OBJECT_HANDLERS.md`
+- Default: `docs/usage/ADT_OBJECT_ENTITIES.md`
 
 **When to use:**
 - To quickly see which ADT objects are covered

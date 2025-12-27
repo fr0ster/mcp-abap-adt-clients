@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-12-27
+
+### Changed
+- **Tooling**: Renamed ADT object mapping generator to entities (`adt:entities`, `tools/adt-object-entities.js`)
+- **Docs**: Renamed generated output to `docs/usage/ADT_OBJECT_ENTITIES.md`
+
 ## [0.3.1] - 2025-12-27
 
 ### Changed
