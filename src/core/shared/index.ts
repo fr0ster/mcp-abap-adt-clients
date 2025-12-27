@@ -23,6 +23,7 @@ export type {
   IGetWhereUsedScopeParams as GetWhereUsedScopeParams,
   IInactiveObjectsResponse as InactiveObjectsResponse,
   IObjectReference as ObjectReference,
+  IPackageHierarchyNode as PackageHierarchyNode,
   ISearchObjectsParams as SearchObjectsParams,
   IVirtualFoldersPreselection as VirtualFoldersPreselection,
 } from './types';

@@ -49,6 +49,7 @@ import { getInclude as getIncludeUtil } from './include';
 import { getIncludesList } from './includesList';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
+import { getPackageHierarchy } from './packageHierarchy';
 // Import utility functions
 import { searchObjects } from './search';
 import { getSqlQuery } from './sqlQuery';
@@ -77,6 +78,7 @@ import type {
   IGetWhereUsedScopeParams,
   IInactiveObjectsResponse,
   IObjectReference,
+  IPackageHierarchyNode,
   ISearchObjectsParams,
 } from './types';
 
@@ -559,6 +561,26 @@ export class AdtUtils {
    */
   async getPackageContents(packageName: string): Promise<AxiosResponse> {
     return getPackageContents(this.connection, packageName);
+  }
+
+  /**
+   * Get package hierarchy as a tree structure
+   *
+   * Builds a tree of package contents and subpackages using node structure.
+   *
+   * @param packageName - Package name
+   * @returns Root tree node for the package hierarchy
+   *
+   * @example
+   * ```typescript
+   * const tree = await utils.getPackageHierarchy('ZMY_PACKAGE');
+   * // tree contains package, subpackages, and objects in a hierarchy
+   * ```
+   */
+  async getPackageHierarchy(
+    packageName: string,
+  ): Promise<IPackageHierarchyNode> {
+    return getPackageHierarchy(this.connection, packageName);
   }
 
   /**

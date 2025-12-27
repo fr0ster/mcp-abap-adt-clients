@@ -101,3 +101,10 @@ export interface IGetVirtualFoldersContentsParams {
   withVersions?: boolean;
   ignoreShortDescriptions?: boolean;
 }
+
+export interface IPackageHierarchyNode {
+  name: string;
+  adtType?: string;
+  description?: string;
+  children?: IPackageHierarchyNode[];
+}

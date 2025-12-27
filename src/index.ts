@@ -118,6 +118,7 @@ export type {
   GetWhereUsedParams,
   InactiveObjectsResponse,
   ObjectReference,
+  PackageHierarchyNode,
   SearchObjectsParams,
 } from './core/shared';
 export type {
