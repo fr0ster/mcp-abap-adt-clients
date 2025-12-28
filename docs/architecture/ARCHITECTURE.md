@@ -76,6 +76,11 @@ Each `Adt*` object implements `IAdtObject<TConfig, TState>` with methods:
 - Group activation/deletion, inactive objects.
 - Object metadata/source helpers for internal use.
 
+Where-used flow in `AdtUtils`:
+- Step 1: `getWhereUsedScope` fetches scope XML (available object types + defaults).
+- Optional: `modifyWhereUsedScope` tweaks the XML locally (no ADT call).
+- Step 2: `getWhereUsed` executes the search using the scope (defaults if omitted).
+
 ## Accept Negotiation
 
 ADT endpoints can return different `Accept` requirements across systems. To reduce 406 failures, the client can optionally

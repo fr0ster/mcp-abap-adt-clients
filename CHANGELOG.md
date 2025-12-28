@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.9] - 2025-12-27
+
+### Changed
+- **Docs**: Clarified where-used flow in `AdtUtils` (scope fetch, optional scope edit, search execution) and cross-linked usage/architecture notes
+
 ## [0.3.8] - 2025-12-27
 
 ### Fixed

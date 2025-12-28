@@ -493,6 +493,7 @@ See [docs/DEBUG.md](docs/DEBUG.md) for detailed debugging guide.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
+Latest (0.3.9): clarified where-used flow docs and cross-links in usage/architecture.
 
 ## Tests
 

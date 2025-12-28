@@ -76,6 +76,36 @@ await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
 await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST');
 ```
 
+### AdtUtils (Where-used)
+
+Where-used is a two-step flow:
+
+1) `getWhereUsedScope` fetches scope XML (available object types + default selections).
+2) `getWhereUsed` executes the search with that scope (defaults to server selection if scope is omitted).
+
+`modifyWhereUsedScope` is a local helper that edits the scope XML (no ADT call).
+
+See `docs/architecture/ARCHITECTURE.md` for the architectural overview.
+
+```typescript
+const utils = client.getUtils();
+
+const scopeResponse = await utils.getWhereUsedScope({
+  object_name: 'ZMY_CLASS',
+  object_type: 'class',
+});
+
+const scopeXml = utils.modifyWhereUsedScope(scopeResponse.data, {
+  enableOnly: ['CLAS/OC', 'INTF/OI'],
+});
+
+const result = await utils.getWhereUsed({
+  object_name: 'ZMY_CLASS',
+  object_type: 'class',
+  scopeXml,
+});
+```
+
 ## AdtRuntimeClient
 
 ```typescript

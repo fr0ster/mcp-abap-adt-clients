@@ -118,7 +118,12 @@ export class AdtUtils {
     return getVirtualFoldersContents(this.connection, params);
   }
 
-  /**scope configuration (Step 1: prepare search)
+  /**
+   * Where-used Step 1: fetch scope configuration.
+   *
+   * ADT exposes where-used as a two-step flow. First you request the "scope" XML
+   * (available object types + default selections). You can then modify that XML
+   * to include/exclude types before executing the search.
    *
    * Returns available object types that can be searched for where-used references.
    * Consumer can parse the XML response, present options to user, and modify selections.
@@ -152,9 +157,11 @@ export class AdtUtils {
   }
 
   /**
-   * Modify where-used scope to enable/disable object types
+   * Where-used helper: modify scope XML.
    *
-   * Helper function to modify isSelected flags in scope XML before executing search.
+   * This is a local helper (no ADT call). It toggles `isSelected` flags in the scope
+   * XML produced by `getWhereUsedScope`, so you can control which object types are
+   * included when you call `getWhereUsed`.
    *
    * @param scopeXml - Scope XML from getWhereUsedScope()
    * @param options - Modification options
@@ -189,11 +196,14 @@ export class AdtUtils {
   }
 
   /**
-   * Get where-used references for ABAP object (Step 2: execute search)
+   * Where-used Step 2: execute search.
    *
-   * This function performs a two-step ADT operation:
-   * 1. Fetches scope configuration (if not provided)
-   * 2. Executes where-used search with the scope
+   * This performs the where-used search for an object using a scope XML. If you
+   * do not pass a scope, the server's default selection is used.
+   *
+   * Two-step ADT operation:
+   * 1. Fetch scope configuration (if not provided)
+   * 2. Execute where-used search with the scope
    *
    * @param params - Where-used parameters
    * @param params.object_name - Name of the object to search
