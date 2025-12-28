@@ -124,19 +124,23 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       // Create class (requires stateful)
       this.logger?.info?.('Creating class');
       this.connection.setSessionType('stateful');
-      state.createResult = await createClass(this.connection, {
-        class_name: config.className,
-        package_name: config.packageName,
-        transport_request: config.transportRequest,
-        description: config.description,
-        superclass: config.superclass,
-        final: config.final,
-        abstract: config.abstract,
-        create_protected: config.createProtected,
-        master_system: config.masterSystem,
-        responsible: config.responsible,
-        template_xml: config.classTemplate,
-      }, this.logger);
+      state.createResult = await createClass(
+        this.connection,
+        {
+          class_name: config.className,
+          package_name: config.packageName,
+          transport_request: config.transportRequest,
+          description: config.description,
+          superclass: config.superclass,
+          final: config.final,
+          abstract: config.abstract,
+          create_protected: config.createProtected,
+          master_system: config.masterSystem,
+          responsible: config.responsible,
+          template_xml: config.classTemplate,
+        },
+        this.logger,
+      );
       objectCreated = true;
       this.connection.setSessionType('stateless');
       this.logger?.info?.('Class created');

@@ -98,12 +98,16 @@ export class AdtInterface
     try {
       // Create interface
       this.logger?.info?.('Creating interface');
-      const createResponse = await createInterface(this.connection, {
-        interfaceName: config.interfaceName,
-        packageName: config.packageName,
-        transportRequest: config.transportRequest,
-        description: config.description,
-      }, this.logger);
+      const createResponse = await createInterface(
+        this.connection,
+        {
+          interfaceName: config.interfaceName,
+          packageName: config.packageName,
+          transportRequest: config.transportRequest,
+          description: config.description,
+        },
+        this.logger,
+      );
       state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Interface created');

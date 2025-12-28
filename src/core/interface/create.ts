@@ -121,7 +121,10 @@ export async function create(
       logger?.error?.(
         `[ERROR] Create interface failed - StatusText: ${error.response.statusText}`,
       );
-      logger?.error?.(`[ERROR] Create interface failed - Response data:`, errorData);
+      logger?.error?.(
+        `[ERROR] Create interface failed - Response data:`,
+        errorData,
+      );
     }
     throw error;
   }

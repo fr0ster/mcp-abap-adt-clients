@@ -131,11 +131,15 @@ export async function updateEnhancement(
   transportRequest?: string,
   logger?: ILogger,
 ): Promise<AxiosResponse> {
-  return update(connection, {
-    enhancement_name: enhancementName,
-    enhancement_type: enhancementType,
-    source_code: sourceCode,
-    lock_handle: lockHandle,
-    transport_request: transportRequest,
-  }, logger);
+  return update(
+    connection,
+    {
+      enhancement_name: enhancementName,
+      enhancement_type: enhancementType,
+      source_code: sourceCode,
+      lock_handle: lockHandle,
+      transport_request: transportRequest,
+    },
+    logger,
+  );
 }

@@ -198,10 +198,13 @@ const buildTreeFromNodes = (
   includeDescriptions: boolean,
   logger?: ILogger,
 ): IPackageHierarchyNode[] => {
-  const nodeMap = new Map<string, IPackageHierarchyNode & {
-    _nodeId?: string;
-    _parentNodeId?: string;
-  }>();
+  const nodeMap = new Map<
+    string,
+    IPackageHierarchyNode & {
+      _nodeId?: string;
+      _parentNodeId?: string;
+    }
+  >();
   const orderedKeys: string[] = [];
   let hasHierarchy = false;
 

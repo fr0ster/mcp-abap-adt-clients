@@ -123,12 +123,16 @@ export class AdtFunctionGroup
 
       // 2. Create (no stateful needed)
       this.logger?.info?.('Step 2: Creating function group');
-      await createFunctionGroup(this.connection, {
-        functionGroupName: config.functionGroupName,
-        packageName: config.packageName,
-        transportRequest: config.transportRequest,
-        description: config.description,
-      }, this.logger);
+      await createFunctionGroup(
+        this.connection,
+        {
+          functionGroupName: config.functionGroupName,
+          packageName: config.packageName,
+          transportRequest: config.transportRequest,
+          description: config.description,
+        },
+        this.logger,
+      );
       this.logger?.info?.('Function group created');
 
       // 2.5. Read with long polling to ensure object is ready

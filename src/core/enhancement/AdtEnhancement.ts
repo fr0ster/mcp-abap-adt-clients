@@ -132,15 +132,19 @@ export class AdtEnhancement
     try {
       // Create enhancement
       this.logger?.info?.('Creating enhancement');
-      const createResponse = await createEnhancement(this.connection, {
-        enhancement_name: config.enhancementName,
-        enhancement_type: config.enhancementType,
-        package_name: config.packageName,
-        description: config.description,
-        transport_request: config.transportRequest,
-        enhancement_spot: config.enhancementSpot,
-        badi_definition: config.badiDefinition,
-      }, this.logger);
+      const createResponse = await createEnhancement(
+        this.connection,
+        {
+          enhancement_name: config.enhancementName,
+          enhancement_type: config.enhancementType,
+          package_name: config.packageName,
+          description: config.description,
+          transport_request: config.transportRequest,
+          enhancement_spot: config.enhancementSpot,
+          badi_definition: config.badiDefinition,
+        },
+        this.logger,
+      );
       state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Enhancement created');
@@ -388,13 +392,17 @@ export class AdtEnhancement
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await update(this.connection, {
-        enhancement_name: config.enhancementName,
-        enhancement_type: config.enhancementType,
-        source_code: codeToUpdate,
-        lock_handle: options.lockHandle,
-        transport_request: config.transportRequest,
-      }, this.logger);
+      const updateResponse = await update(
+        this.connection,
+        {
+          enhancement_name: config.enhancementName,
+          enhancement_type: config.enhancementType,
+          source_code: codeToUpdate,
+          lock_handle: options.lockHandle,
+          transport_request: config.transportRequest,
+        },
+        this.logger,
+      );
       this.logger?.info?.('Enhancement updated (low-level)');
       return {
         updateResult: updateResponse,
@@ -437,13 +445,17 @@ export class AdtEnhancement
       // 3. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 3: Updating enhancement');
-        const updateResponse = await update(this.connection, {
-          enhancement_name: config.enhancementName,
-          enhancement_type: config.enhancementType,
-          source_code: codeToCheck,
-          lock_handle: lockHandle,
-          transport_request: config.transportRequest,
-        }, this.logger);
+        const updateResponse = await update(
+          this.connection,
+          {
+            enhancement_name: config.enhancementName,
+            enhancement_type: config.enhancementType,
+            source_code: codeToCheck,
+            lock_handle: lockHandle,
+            transport_request: config.transportRequest,
+          },
+          this.logger,
+        );
         state.updateResult = updateResponse;
         this.logger?.info?.('Enhancement updated');
 
