@@ -15,6 +15,8 @@ export {
 } from './errors';
 export { getTransaction } from './transaction';
 export type {
+  AdtObjectType,
+  AdtSourceObjectType,
   IGetDiscoveryParams as GetDiscoveryParams,
   IGetPackageHierarchyOptions as GetPackageHierarchyOptions,
   IGetSqlQueryParams as GetSqlQueryParams,
@@ -28,8 +30,6 @@ export type {
   IReadOptions as ReadOptions,
   ISearchObjectsParams as SearchObjectsParams,
   IVirtualFoldersPreselection as VirtualFoldersPreselection,
-  AdtObjectType,
-  AdtSourceObjectType,
   PackageHierarchyCodeFormat,
   PackageHierarchySupportedType,
 } from './types';
