@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
@@ -12,10 +13,6 @@ import { getTimeout } from '../../utils/timeouts';
 import type { ICreateClassParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
 
 /**
  * Low-level: Create class object with metadata (POST)
@@ -26,6 +23,7 @@ const logger = {
 export async function create(
   connection: IAbapConnection,
   args: ICreateClassParams,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
@@ -95,14 +93,16 @@ export async function create(
   };
 
   // Log request details for debugging authorization issues
-  logger.debug(`[DEBUG] Creating class - URL: ${url}`);
-  logger.debug(`[DEBUG] Creating class - Method: POST`);
-  logger.debug(
-    `[DEBUG] Creating class - Headers: ${JSON.stringify(headers, null, 2)}`,
-  );
-  logger.debug(
-    `[DEBUG] Creating class - Body (first 500 chars): ${metadataXml.substring(0, 500)}`,
-  );
+  if (debugEnabled) {
+    logger?.debug?.(`[DEBUG] Creating class - URL: ${url}`);
+    logger?.debug?.(`[DEBUG] Creating class - Method: POST`);
+    logger?.debug?.(
+      `[DEBUG] Creating class - Headers: ${JSON.stringify(headers, null, 2)}`,
+    );
+    logger?.debug?.(
+      `[DEBUG] Creating class - Body (first 500 chars): ${metadataXml.substring(0, 500)}`,
+    );
+  }
 
   try {
     const response = await connection.makeAdtRequest({
@@ -115,17 +115,17 @@ export async function create(
     return response;
   } catch (error: any) {
     // Log error details for debugging
-    if (error.response) {
-      logger.error(
+    if (error.response && debugEnabled) {
+      logger?.error?.(
         `[ERROR] Create class failed - Status: ${error.response.status}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create class failed - StatusText: ${error.response.statusText}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create class failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create class failed - Response data (first 1000 chars):`,
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)

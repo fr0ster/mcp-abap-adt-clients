@@ -9,6 +9,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
   encodeSapObjectName,
@@ -26,6 +27,7 @@ export async function updateTableType(
   connection: IAbapConnection,
   params: IUpdateTableTypeParams,
   lockHandle: string,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   if (!params.tabletype_name) {
     throw new Error('tabletype_name is required');
@@ -80,6 +82,8 @@ export async function updateTableType(
       const metadataResponse = await getTableTypeMetadata(
         connection,
         tableTypeName,
+        undefined,
+        logger,
       );
       const metadataXml =
         typeof metadataResponse.data === 'string' ? metadataResponse.data : '';
@@ -208,14 +212,7 @@ Request Body:
 ${xmlBody}`;
 
       // Output to stderr (always visible)
-      process.stderr.write('\n=== TableType Update Error ===\n');
-      process.stderr.write(fullError);
-      process.stderr.write('\n=== End Error ===\n\n');
-
-      // Also output via console (for Jest)
-      console.error('\n=== TableType Update Error ===');
-      console.error(fullError);
-      console.error('=== End Error ===\n');
+      logger?.error?.(fullError);
 
       throw new Error(fullError);
     }

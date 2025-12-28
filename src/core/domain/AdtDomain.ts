@@ -303,6 +303,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
           config.domainName,
           'inactive',
           xmlToCheck,
+          this.logger,
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('checked(inactive)');
@@ -370,6 +371,8 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         this.connection,
         config.domainName,
         'inactive',
+        undefined,
+        this.logger,
       );
       state.checkResult = checkResponse2;
       this.logger?.info?.('checked(inactive)');
@@ -536,6 +539,8 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.connection,
       config.domainName,
       version,
+      undefined,
+      this.logger,
     );
     state.checkResult = checkResponse;
     return state;

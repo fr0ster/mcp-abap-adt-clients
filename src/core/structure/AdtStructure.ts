@@ -306,6 +306,7 @@ export class AdtStructure
           config.structureName,
           'inactive',
           codeToCheck,
+          this.logger,
         );
         this.logger?.info?.('Check inactive with update content passed');
       }
@@ -355,7 +356,13 @@ export class AdtStructure
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkStructure(this.connection, config.structureName, 'inactive');
+      await checkStructure(
+        this.connection,
+        config.structureName,
+        'inactive',
+        undefined,
+        this.logger,
+      );
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
@@ -528,6 +535,8 @@ export class AdtStructure
         this.connection,
         config.structureName,
         version,
+        undefined,
+        this.logger,
       ),
       errors: [],
     };

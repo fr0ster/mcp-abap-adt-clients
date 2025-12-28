@@ -128,7 +128,7 @@ export class AdtFunctionGroup
         packageName: config.packageName,
         transportRequest: config.transportRequest,
         description: config.description,
-      });
+      }, this.logger);
       this.logger?.info?.('Function group created');
 
       // 2.5. Read with long polling to ensure object is ready

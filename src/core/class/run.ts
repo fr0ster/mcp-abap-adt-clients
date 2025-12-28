@@ -12,7 +12,7 @@ import { getTimeout } from '../../utils/timeouts';
 /**
  * Run an ABAP class that implements if_oo_adt_classrun interface.
  *
- * This executes the class's main() method and returns console output.
+ * This executes the class's main() method and returns execution output.
  * The class must implement if_oo_adt_classrun interface to be executable.
  *
  * Endpoint: POST /sap/bc/adt/oo/classrun/{className}
@@ -27,7 +27,7 @@ import { getTimeout } from '../../utils/timeouts';
  * @param className - Name of the class to run (must implement if_oo_adt_classrun)
  * @param runnable - Optional flag to check if class is runnable (default: true, throws error if false)
  * @param sessionId - Optional session ID for session-based requests
- * @returns Response with console output from the class execution
+ * @returns Response with execution output from the class execution
  * @throws Error if runnable is false, or if class doesn't implement if_oo_adt_classrun or execution fails
  *
  * @example
@@ -45,7 +45,6 @@ import { getTimeout } from '../../utils/timeouts';
  * // ENDCLASS.
  *
  * const result = await runClass(connection, 'ZCL_TEST', true);
- * console.log(result.data); // Console output from the class
  *
  * // Check if class is runnable before attempting to run
  * if (classConfig.runnable) {

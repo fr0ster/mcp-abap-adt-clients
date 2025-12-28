@@ -288,6 +288,7 @@ export class AdtDataElement
           set_get_parameter: config.setGetParameter,
         },
         options.lockHandle,
+        this.logger,
       );
       this.logger?.info?.('Data element updated (low-level)');
       return {
@@ -352,6 +353,7 @@ export class AdtDataElement
             set_get_parameter: config.setGetParameter,
           },
           lockHandle,
+          this.logger,
         );
         // updateDataElement returns void, so we don't store it in state
         this.logger?.info?.('Data element updated');

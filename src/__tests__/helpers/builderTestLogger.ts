@@ -106,7 +106,7 @@ function extractErrorMessage(error: unknown): string {
   }
 }
 
-// Force immediate output (Jest buffers console.log)
+// Force immediate output for sequential test logs
 function logImmediate(message: string): void {
   // Use synchronous write to ensure messages appear in order
   // This ensures test logs are not interleaved when tests run sequentially
@@ -130,7 +130,7 @@ export function logBuilderTestStart(
     totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
   const startMessage = `${progress} ▶ START ${testName} :: ${testCase.name}`;
 
-  // Use logImmediate for synchronous output (Jest buffers console.log)
+  // Use logImmediate for synchronous output
   logImmediate(startMessage);
   // Also log via logger if provided (uses DefaultLogger which is synchronous)
   const testLogger = getTestLogger(logger);
@@ -170,7 +170,7 @@ export function logBuilderTestSkip(
       : `[${currentCounter}]`;
   const message = `${progress} ⏭ SKIP ${testName} – ${reason}`;
 
-  // Use logImmediate for synchronous output (Jest buffers console.log)
+  // Use logImmediate for synchronous output
   logImmediate(message);
   // Also log via logger if provided (uses DefaultLogger which is synchronous)
   if (logger && 'info' in logger) {
@@ -193,7 +193,7 @@ export function logBuilderTestSuccess(
       totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
     const message = `${progress} ✓ PASS ${testName}${duration}`;
 
-    // Use logImmediate for synchronous output (Jest buffers console.log)
+    // Use logImmediate for synchronous output
     logImmediate(message);
     // Also log via logger if provided (uses DefaultLogger which is synchronous)
     if (logger && 'info' in logger) {
@@ -258,7 +258,7 @@ export function logBuilderTestError(
   const errorMessage = extractErrorMessage(error);
   const message = `${progress} ✗ FAIL ${testName}${duration}: ${errorMessage}`;
 
-  // Use logImmediate for synchronous output (Jest buffers console.log)
+  // Use logImmediate for synchronous output
   logImmediate(message);
 
   if (debugLogsEnabled) {
@@ -294,7 +294,7 @@ export function logBuilderTestStep(
   logger?: BuilderTestLogger | undefined,
 ): void {
   const message = `  → ${step}`;
-  // Use logImmediate for synchronous output (Jest buffers console.log)
+  // Use logImmediate for synchronous output
   logImmediate(message);
   // Also log via logger if provided (uses DefaultLogger which is synchronous)
   if (logger && 'info' in logger) {

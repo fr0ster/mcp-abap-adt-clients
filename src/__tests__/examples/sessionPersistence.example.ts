@@ -10,6 +10,7 @@
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { AdtClient } from '../../clients/AdtClient';
 import { getConfig } from '../helpers/sessionConfig';
+import { createConnectionLogger } from '../helpers/testLogger';
 
 describe('Example: Session Persistence', () => {
   let connection: any;
@@ -18,7 +19,7 @@ describe('Example: Session Persistence', () => {
   beforeAll(async () => {
     // Create connection using helper
     const config = getConfig();
-    connection = createAbapConnection(config, console);
+    connection = createAbapConnection(config, createConnectionLogger());
     await (connection as any).connect();
     client = new AdtClient(connection);
 

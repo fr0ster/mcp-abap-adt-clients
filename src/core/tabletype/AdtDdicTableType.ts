@@ -268,6 +268,7 @@ export class AdtDdicTableType
           transport_request: config.transportRequest,
         },
         options.lockHandle,
+        this.logger,
       );
       this.logger?.info?.('Table type updated (low-level)');
       return {
@@ -312,6 +313,7 @@ export class AdtDdicTableType
               transport_request: config.transportRequest,
             },
             lockHandle,
+            this.logger,
           );
           this.logger?.info?.('Table type updated');
         } catch (updateError: any) {

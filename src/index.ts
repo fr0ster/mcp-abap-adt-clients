@@ -113,13 +113,16 @@ export type {
   IServiceDefinitionState,
 } from './core/serviceDefinition';
 export type {
+  GetPackageHierarchyOptions,
   GetSqlQueryParams,
   GetTableContentsParams,
   GetVirtualFoldersContentsParams,
   GetWhereUsedParams,
   InactiveObjectsResponse,
   ObjectReference,
+  PackageHierarchyCodeFormat,
   PackageHierarchyNode,
+  PackageHierarchySupportedType,
   ReadOptions,
   SearchObjectsParams,
 } from './core/shared';

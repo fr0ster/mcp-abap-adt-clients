@@ -304,6 +304,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           config.viewName,
           'inactive',
           codeToCheck,
+          this.logger,
         );
         this.logger?.info?.('Check inactive with update content passed');
       }
@@ -347,7 +348,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkView(this.connection, config.viewName, 'inactive');
+      await checkView(
+        this.connection,
+        config.viewName,
+        'inactive',
+        undefined,
+        this.logger,
+      );
       this.logger?.info?.('Final check passed');
 
       // 6. Activate (if requested, no stateful needed - uses same session/cookies)
@@ -517,6 +524,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         config.viewName,
         version,
         sourceCode,
+        this.logger,
       ),
       errors: [],
     };

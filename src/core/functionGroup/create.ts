@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
@@ -12,10 +13,6 @@ import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionGroupParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
 
 /**
  * Create function group metadata via POST
@@ -24,6 +21,7 @@ const logger = {
 export async function create(
   connection: IAbapConnection,
   params: ICreateFunctionGroupParams,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
@@ -57,17 +55,19 @@ export async function create(
 
   // Log systemInfo to help diagnose Kerberos errors
   // Use logger.debug (controlled by DEBUG_ADT_LIBS)
-  logger.debug('[FunctionGroup create] systemInfo:', {
-    hasSystemInfo: !!systemInfo,
-    systemID: systemInfo?.systemID,
-    userName: systemInfo?.userName,
-    finalMasterSystem,
-    finalResponsible,
-    willIncludeMasterSystem: !!finalMasterSystem,
-    willIncludeResponsible: !!finalResponsible,
-    masterSystemAttr: masterSystemAttr || '(not included)',
-    responsibleAttr: responsibleAttr || '(not included)',
-  });
+  if (debugEnabled) {
+    logger?.debug?.('[FunctionGroup create] systemInfo:', {
+      hasSystemInfo: !!systemInfo,
+      systemID: systemInfo?.systemID,
+      userName: systemInfo?.userName,
+      finalMasterSystem,
+      finalResponsible,
+      willIncludeMasterSystem: !!finalMasterSystem,
+      willIncludeResponsible: !!finalResponsible,
+      masterSystemAttr: masterSystemAttr || '(not included)',
+      responsibleAttr: responsibleAttr || '(not included)',
+    });
+  }
 
   // Also log to test logger if available (controlled by DEBUG_ADT_TESTS)
   // Try to import test logger conditionally to avoid circular dependencies
@@ -107,14 +107,16 @@ export async function create(
   };
 
   // Log request details for debugging authorization issues (same as class/create.ts)
-  logger.debug(`[DEBUG] Creating FunctionGroup - URL: ${url}`);
-  logger.debug(`[DEBUG] Creating FunctionGroup - Method: POST`);
-  logger.debug(
-    `[DEBUG] Creating FunctionGroup - Headers: ${JSON.stringify(headers, null, 2)}`,
-  );
-  logger.debug(
-    `[DEBUG] Creating FunctionGroup - Body (first 500 chars): ${xmlPayload.substring(0, 500)}`,
-  );
+  if (debugEnabled) {
+    logger?.debug?.(`[DEBUG] Creating FunctionGroup - URL: ${url}`);
+    logger?.debug?.(`[DEBUG] Creating FunctionGroup - Method: POST`);
+    logger?.debug?.(
+      `[DEBUG] Creating FunctionGroup - Headers: ${JSON.stringify(headers, null, 2)}`,
+    );
+    logger?.debug?.(
+      `[DEBUG] Creating FunctionGroup - Body (first 500 chars): ${xmlPayload.substring(0, 500)}`,
+    );
+  }
 
   try {
     const response = await connection.makeAdtRequest({
@@ -136,7 +138,7 @@ export async function create(
           : JSON.stringify(error.response.data);
 
       if (errorData.includes('Kerberos library not loaded')) {
-        logger.debug(
+        logger?.debug?.(
           `[WARN] FunctionGroup create returned Kerberos error, but object may have been created - ignoring error`,
         );
         // Return a mock successful response (status 201)
@@ -150,17 +152,17 @@ export async function create(
     }
 
     // Log error details for debugging (same as class/create.ts)
-    if (error.response) {
-      logger.error(
+    if (error.response && debugEnabled) {
+      logger?.error?.(
         `[ERROR] Create FunctionGroup failed - Status: ${error.response.status}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create FunctionGroup failed - StatusText: ${error.response.statusText}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create FunctionGroup failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create FunctionGroup failed - Response data (first 1000 chars):`,
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)

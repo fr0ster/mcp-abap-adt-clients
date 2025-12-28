@@ -9,6 +9,10 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { getConfig } from '../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createTestsLogger,
+} from '../helpers/testLogger';
 
 const {
   getEnabledTestCase,
@@ -21,14 +25,8 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath, quiet: true });
 }
 
-const debugEnabled = process.env.DEBUG_TESTS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  info: debugEnabled ? console.log : () => {},
-  warn: debugEnabled ? console.warn : () => {},
-  error: debugEnabled ? console.error : () => {},
-  csrfToken: debugEnabled ? console.log : () => {},
-};
+const connectionLogger = createConnectionLogger();
+const testsLogger = createTestsLogger();
 
 describe('Module - Operation', () => {
   let connection: IAbapConnection;
@@ -37,11 +35,13 @@ describe('Module - Operation', () => {
   beforeAll(async () => {
     try {
       const config = getConfig();
-      connection = createAbapConnection(config, logger);
+      connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       hasConfig = true;
     } catch (_error) {
-      logger.warn('⚠️ Skipping tests: No .env file or SAP configuration found');
+      testsLogger.warn(
+        '⚠️ Skipping tests: No .env file or SAP configuration found',
+      );
       hasConfig = false;
     }
   });
@@ -54,7 +54,9 @@ describe('Module - Operation', () => {
 
   it('should perform operation', async () => {
     if (!hasConfig) {
-      logger.warn('⚠️ Skipping test: No .env file or SAP configuration found');
+      testsLogger.warn(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
       return;
     }
 

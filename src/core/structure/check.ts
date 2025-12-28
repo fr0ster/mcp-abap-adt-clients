@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 
@@ -18,6 +19,7 @@ export async function checkStructure(
   structureName: string,
   version: string = 'active',
   sourceCode?: string,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const response = await runCheckRun(
     connection,
@@ -43,7 +45,7 @@ export async function checkStructure(
     if (hasCheckedMessage) {
       // This is expected behavior - structure was already checked, return response anyway
       if (process.env.DEBUG_ADT_LIBS === 'true') {
-        console.warn(
+        logger?.warn?.(
           `Check warning for structure ${structureName}: ${errorMessage} (structure was already checked)`,
         );
       }
@@ -59,7 +61,7 @@ export async function checkStructure(
       // This is expected behavior for DDIC objects - check may not be fully supported
       // Return response without throwing - test chain can continue
       if (process.env.DEBUG_ADT_LIBS === 'true') {
-        console.warn(
+        logger?.warn?.(
           `Check warning for structure ${structureName}: ${errorMessage} (check may not be fully supported for DDIC objects)`,
         );
       }

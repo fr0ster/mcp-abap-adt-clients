@@ -62,13 +62,7 @@ Response Data: ${responseData}
 Request URL: ${url}
 Request Headers: ${JSON.stringify({ Accept: acceptHeader }, null, 2)}`;
 
-    process.stderr.write('\n=== getTableTypeMetadata Error ===\n');
-    process.stderr.write(fullError);
-    process.stderr.write('\n=== End Error ===\n\n');
-
-    console.error('\n=== getTableTypeMetadata Error ===');
-    console.error(fullError);
-    console.error('=== End Error ===\n');
+    logger?.error?.(fullError);
 
     throw error;
   }

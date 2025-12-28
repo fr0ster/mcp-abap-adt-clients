@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -16,10 +17,6 @@ import {
 } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
 
 /**
  * Low-level: Update enhancement source code (PUT)
@@ -34,6 +31,7 @@ const logger = {
 export async function update(
   connection: IAbapConnection,
   args: IUpdateEnhancementParams,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   if (!args.enhancement_name) {
     throw new Error('enhancement_name is required');
@@ -71,14 +69,16 @@ export async function update(
     Accept: 'text/plain',
   };
 
-  logger.debug(`[DEBUG] Updating enhancement - URL: ${url}`);
-  logger.debug(`[DEBUG] Updating enhancement - Method: PUT`);
-  logger.debug(
-    `[DEBUG] Updating enhancement - Headers: ${JSON.stringify(headers, null, 2)}`,
-  );
-  logger.debug(
-    `[DEBUG] Updating enhancement - Source code length: ${args.source_code.length}`,
-  );
+  if (debugEnabled) {
+    logger?.debug?.(`[DEBUG] Updating enhancement - URL: ${url}`);
+    logger?.debug?.(`[DEBUG] Updating enhancement - Method: PUT`);
+    logger?.debug?.(
+      `[DEBUG] Updating enhancement - Headers: ${JSON.stringify(headers, null, 2)}`,
+    );
+    logger?.debug?.(
+      `[DEBUG] Updating enhancement - Source code length: ${args.source_code.length}`,
+    );
+  }
 
   try {
     const response = await connection.makeAdtRequest({
@@ -90,17 +90,17 @@ export async function update(
     });
     return response;
   } catch (error: any) {
-    if (error.response) {
-      logger.error(
+    if (error.response && debugEnabled) {
+      logger?.error?.(
         `[ERROR] Update enhancement failed - Status: ${error.response.status}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Update enhancement failed - StatusText: ${error.response.statusText}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Update enhancement failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Update enhancement failed - Response data (first 1000 chars):`,
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)
@@ -129,6 +129,7 @@ export async function updateEnhancement(
   sourceCode: string,
   lockHandle: string,
   transportRequest?: string,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   return update(connection, {
     enhancement_name: enhancementName,
@@ -136,5 +137,5 @@ export async function updateEnhancement(
     source_code: sourceCode,
     lock_handle: lockHandle,
     transport_request: transportRequest,
-  });
+  }, logger);
 }

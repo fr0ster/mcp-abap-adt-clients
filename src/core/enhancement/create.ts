@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
@@ -17,10 +18,6 @@ import {
 } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
-const logger = {
-  debug: debugEnabled ? console.log : () => {},
-  error: debugEnabled ? console.error : () => {},
-};
 
 /**
  * Build XML payload for enhancement creation based on type
@@ -79,6 +76,7 @@ function buildCreateXml(
 export async function create(
   connection: IAbapConnection,
   args: ICreateEnhancementParams,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   if (!args.enhancement_name) {
     throw new Error('enhancement_name is required');
@@ -111,14 +109,16 @@ export async function create(
     'Content-Type': 'application/vnd.sap.adt.enhancements.v1+xml',
   };
 
-  logger.debug(`[DEBUG] Creating enhancement - URL: ${url}`);
-  logger.debug(`[DEBUG] Creating enhancement - Method: POST`);
-  logger.debug(
-    `[DEBUG] Creating enhancement - Headers: ${JSON.stringify(headers, null, 2)}`,
-  );
-  logger.debug(
-    `[DEBUG] Creating enhancement - Body (first 500 chars): ${metadataXml.substring(0, 500)}`,
-  );
+  if (debugEnabled) {
+    logger?.debug?.(`[DEBUG] Creating enhancement - URL: ${url}`);
+    logger?.debug?.(`[DEBUG] Creating enhancement - Method: POST`);
+    logger?.debug?.(
+      `[DEBUG] Creating enhancement - Headers: ${JSON.stringify(headers, null, 2)}`,
+    );
+    logger?.debug?.(
+      `[DEBUG] Creating enhancement - Body (first 500 chars): ${metadataXml.substring(0, 500)}`,
+    );
+  }
 
   try {
     const response = await connection.makeAdtRequest({
@@ -130,17 +130,17 @@ export async function create(
     });
     return response;
   } catch (error: any) {
-    if (error.response) {
-      logger.error(
+    if (error.response && debugEnabled) {
+      logger?.error?.(
         `[ERROR] Create enhancement failed - Status: ${error.response.status}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create enhancement failed - StatusText: ${error.response.statusText}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create enhancement failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`,
       );
-      logger.error(
+      logger?.error?.(
         `[ERROR] Create enhancement failed - Response data (first 1000 chars):`,
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)

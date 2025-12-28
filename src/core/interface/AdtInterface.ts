@@ -103,7 +103,7 @@ export class AdtInterface
         packageName: config.packageName,
         transportRequest: config.transportRequest,
         description: config.description,
-      });
+      }, this.logger);
       state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Interface created');

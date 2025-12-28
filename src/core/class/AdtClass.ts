@@ -136,7 +136,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         master_system: config.masterSystem,
         responsible: config.responsible,
         template_xml: config.classTemplate,
-      });
+      }, this.logger);
       objectCreated = true;
       this.connection.setSessionType('stateless');
       this.logger?.info?.('Class created');

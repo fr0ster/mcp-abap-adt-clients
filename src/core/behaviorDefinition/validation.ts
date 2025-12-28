@@ -28,7 +28,6 @@ import type { IBehaviorDefinitionValidationParams } from './types';
  * // Check validation result
  * const severity = result.data.match(/<SEVERITY>([^<]+)<\/SEVERITY>/)?.[1];
  * if (severity === 'OK') {
- *   console.log('Validation successful');
  * }
  * ```
  */

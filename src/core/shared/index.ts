@@ -16,6 +16,7 @@ export {
 export { getTransaction } from './transaction';
 export type {
   IGetDiscoveryParams as GetDiscoveryParams,
+  IGetPackageHierarchyOptions as GetPackageHierarchyOptions,
   IGetSqlQueryParams as GetSqlQueryParams,
   IGetTableContentsParams as GetTableContentsParams,
   IGetVirtualFoldersContentsParams as GetVirtualFoldersContentsParams,
@@ -23,7 +24,9 @@ export type {
   IGetWhereUsedScopeParams as GetWhereUsedScopeParams,
   IInactiveObjectsResponse as InactiveObjectsResponse,
   IObjectReference as ObjectReference,
+  PackageHierarchyCodeFormat,
   IPackageHierarchyNode as PackageHierarchyNode,
+  PackageHierarchySupportedType,
   IReadOptions as ReadOptions,
   ISearchObjectsParams as SearchObjectsParams,
   IVirtualFoldersPreselection as VirtualFoldersPreselection,

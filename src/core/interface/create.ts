@@ -7,6 +7,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
@@ -38,6 +39,7 @@ ENDINTERFACE.`;
 export async function create(
   connection: IAbapConnection,
   params: ICreateInterfaceParams,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   // Get system information - only for cloud systems
   const systemInfo = await getSystemInformation(connection);
@@ -96,10 +98,10 @@ export async function create(
         typeof response.data === 'string'
           ? response.data.substring(0, 1000)
           : JSON.stringify(response.data).substring(0, 1000);
-      console.error(
+      logger?.error?.(
         `[ERROR] Create interface returned unexpected status - Status: ${response.status}`,
       );
-      console.error(`[ERROR] Create interface - Response data:`, errorData);
+      logger?.error?.(`[ERROR] Create interface - Response data:`, errorData);
       throw new Error(
         `Interface creation returned status ${response.status} instead of 201`,
       );
@@ -113,16 +115,13 @@ export async function create(
         typeof error.response.data === 'string'
           ? error.response.data.substring(0, 1000)
           : JSON.stringify(error.response.data).substring(0, 1000);
-      console.error(
+      logger?.error?.(
         `[ERROR] Create interface failed - Status: ${error.response.status}`,
       );
-      console.error(
+      logger?.error?.(
         `[ERROR] Create interface failed - StatusText: ${error.response.statusText}`,
       );
-      console.error(
-        `[ERROR] Create interface failed - Response data:`,
-        errorData,
-      );
+      logger?.error?.(`[ERROR] Create interface failed - Response data:`, errorData);
     }
     throw error;
   }

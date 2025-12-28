@@ -140,7 +140,7 @@ export class AdtEnhancement
         transport_request: config.transportRequest,
         enhancement_spot: config.enhancementSpot,
         badi_definition: config.badiDefinition,
-      });
+      }, this.logger);
       state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Enhancement created');
@@ -394,7 +394,7 @@ export class AdtEnhancement
         source_code: codeToUpdate,
         lock_handle: options.lockHandle,
         transport_request: config.transportRequest,
-      });
+      }, this.logger);
       this.logger?.info?.('Enhancement updated (low-level)');
       return {
         updateResult: updateResponse,
@@ -443,7 +443,7 @@ export class AdtEnhancement
           source_code: codeToCheck,
           lock_handle: lockHandle,
           transport_request: config.transportRequest,
-        });
+        }, this.logger);
         state.updateResult = updateResponse;
         this.logger?.info?.('Enhancement updated');
 

@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -26,6 +27,7 @@ export async function checkDomainSyntax(
   domainName: string,
   version: 'active' | 'inactive',
   xmlContent?: string,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   let response: AxiosResponse;
 
@@ -87,7 +89,7 @@ export async function checkDomainSyntax(
     if (hasCheckedMessage) {
       // This is expected behavior - domain was already checked, return response anyway
       if (process.env.DEBUG_ADT_LIBS === 'true') {
-        console.warn(
+        logger?.warn?.(
           `Check warning for domain ${domainName}: ${errorMessage} (domain was already checked)`,
         );
       }

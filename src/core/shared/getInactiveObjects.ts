@@ -25,7 +25,6 @@ const xmlParser = new XMLParser({
  * @example
  * ```typescript
  * const result = await getInactiveObjects(connection);
- * console.log(`Found ${result.objects.length} inactive objects`);
  *
  * // Objects can be directly passed to activateObjectsGroup
  * await activateObjectsGroup(connection, result.objects);

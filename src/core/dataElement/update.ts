@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -14,6 +15,8 @@ import {
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateDataElementParams } from './types';
+
+const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
 
 /**
  * Get domain info to extract dataType, length, decimals
@@ -101,6 +104,7 @@ export async function updateDataElementInternal(
   lockHandle: string,
   username: string,
   _domainInfo: { dataType: string; length: number; decimals: number },
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   const dataElementNameEncoded = encodeSapObjectName(
     args.data_element_name.toLowerCase(),
@@ -262,8 +266,8 @@ export async function updateDataElementInternal(
   };
 
   // Debug: log XML when DEBUG_ADT_LIBS is enabled (formatted for readability)
-  if (process.env.DEBUG_ADT_LIBS === 'true') {
-    console.log('[UPDATE XML]');
+  if (debugEnabled) {
+    logger?.debug?.('[UPDATE XML]');
     // Format XML with indentation for readability
     try {
       const { XMLParser, XMLBuilder } = require('fast-xml-parser');
@@ -279,10 +283,10 @@ export async function updateDataElementInternal(
       });
       const parsed = parser.parse(xmlBody);
       const formatted = builder.build(parsed);
-      console.log(formatted);
+      logger?.debug?.(formatted);
     } catch {
       // If formatting fails, just log as-is
-      console.log(xmlBody);
+      logger?.debug?.(xmlBody);
     }
   }
 
@@ -304,6 +308,7 @@ export async function updateDataElement(
   connection: IAbapConnection,
   params: IUpdateDataElementParams,
   lockHandle: string,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   if (!params.data_element_name) {
     throw new Error('Data element name is required');
@@ -334,5 +339,6 @@ export async function updateDataElement(
     lockHandle,
     username,
     domainInfo,
+    logger,
   );
 }

@@ -72,6 +72,7 @@ import {
 // Import types
 import type {
   IGetDiscoveryParams,
+  IGetPackageHierarchyOptions,
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
@@ -585,18 +586,29 @@ export class AdtUtils {
    * Builds a tree of package contents and subpackages using node structure.
    *
    * @param packageName - Package name
+   * @param options - Optional hierarchy options
    * @returns Root tree node for the package hierarchy
    *
    * @example
    * ```typescript
-   * const tree = await utils.getPackageHierarchy('ZMY_PACKAGE');
+   * const tree = await utils.getPackageHierarchy('ZMY_PACKAGE', {
+   *   includeSubpackages: true,
+   *   maxDepth: 5,
+   *   includeDescriptions: true,
+   * });
    * // tree contains package, subpackages, and objects in a hierarchy
    * ```
    */
   async getPackageHierarchy(
     packageName: string,
+    options?: IGetPackageHierarchyOptions,
   ): Promise<IPackageHierarchyNode> {
-    return getPackageHierarchy(this.connection, packageName);
+    return getPackageHierarchy(
+      this.connection,
+      packageName,
+      options,
+      this.logger,
+    );
   }
 
   /**

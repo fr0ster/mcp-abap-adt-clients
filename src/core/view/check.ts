@@ -5,6 +5,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
 
@@ -33,6 +34,7 @@ export async function checkView(
   viewName: string,
   version: string = 'active',
   sourceCode?: string,
+  logger?: ILogger,
 ): Promise<AxiosResponse> {
   let attempt = 0;
   // Allow one retry when system did not materialize inactive version yet
@@ -57,7 +59,7 @@ export async function checkView(
 
       if (hasCheckedMessage) {
         if (process.env.DEBUG_ADT_LIBS === 'true') {
-          console.warn(
+          logger?.warn?.(
             `Check warning for view ${viewName}: ${errorMessage} (view was already checked)`,
           );
         }
@@ -66,7 +68,7 @@ export async function checkView(
 
       if (attempt === 0 && shouldRetryMissingVersion(checkResult)) {
         if (process.env.DEBUG_ADT_LIBS === 'true') {
-          console.warn(
+          logger?.warn?.(
             `Check retry for view ${viewName}: ${errorMessage} (waiting for inactive version)`,
           );
         }
@@ -77,7 +79,7 @@ export async function checkView(
 
       if (shouldRetryMissingVersion(checkResult)) {
         if (process.env.DEBUG_ADT_LIBS === 'true') {
-          console.warn(
+          logger?.warn?.(
             `Check warning for view ${viewName}: ${errorMessage} (version not available, continue)`,
           );
         }

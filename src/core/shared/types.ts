@@ -110,9 +110,39 @@ export interface IGetVirtualFoldersContentsParams {
   ignoreShortDescriptions?: boolean;
 }
 
+export interface IGetPackageHierarchyOptions {
+  includeSubpackages?: boolean;
+  maxDepth?: number;
+  includeDescriptions?: boolean;
+}
+
+export type PackageHierarchySupportedType =
+  | 'package'
+  | 'domain'
+  | 'dataElement'
+  | 'structure'
+  | 'table'
+  | 'tableType'
+  | 'view'
+  | 'class'
+  | 'interface'
+  | 'program'
+  | 'functionGroup'
+  | 'functionModule'
+  | 'serviceDefinition'
+  | 'metadataExtension'
+  | 'behaviorDefinition'
+  | 'behaviorImplementation';
+
+export type PackageHierarchyCodeFormat = 'source' | 'xml';
+
 export interface IPackageHierarchyNode {
   name: string;
   adtType?: string;
+  type?: PackageHierarchySupportedType;
   description?: string;
+  is_package: boolean;
+  codeFormat?: PackageHierarchyCodeFormat;
+  restoreStatus?: 'ok' | 'not-implemented';
   children?: IPackageHierarchyNode[];
 }
