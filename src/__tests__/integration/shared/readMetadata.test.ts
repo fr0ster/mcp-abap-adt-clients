@@ -11,6 +11,7 @@ import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtObjectType } from '../../../core/shared/types';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 
@@ -233,7 +234,13 @@ describe('Shared - readMetadata', () => {
       testsLogger,
     );
     await expect(
-      client.getUtils().readObjectMetadata('unsupported_type', 'TEST'),
+      client
+        .getUtils()
+        // Force runtime validation for invalid inputs.
+        .readObjectMetadata(
+          'unsupported_type' as unknown as AdtObjectType,
+          'TEST',
+        ),
     ).rejects.toThrow('Unsupported object type for metadata');
   });
 });

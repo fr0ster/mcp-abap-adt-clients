@@ -113,6 +113,8 @@ export type {
   IServiceDefinitionState,
 } from './core/serviceDefinition';
 export type {
+  AdtObjectType,
+  AdtSourceObjectType,
   GetPackageHierarchyOptions,
   GetSqlQueryParams,
   GetTableContentsParams,

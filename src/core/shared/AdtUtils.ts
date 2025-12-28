@@ -71,6 +71,8 @@ import {
 
 // Import types
 import type {
+  AdtObjectType,
+  AdtSourceObjectType,
   IGetDiscoveryParams,
   IGetPackageHierarchyOptions,
   IGetSqlQueryParams,
@@ -288,7 +290,7 @@ export class AdtUtils {
    * @returns Metadata response
    */
   async readObjectMetadata(
-    objectType: string,
+    objectType: AdtObjectType,
     objectName: string,
     functionGroup?: string,
     options?: IReadOptions,
@@ -328,7 +330,7 @@ export class AdtUtils {
    * @returns Source code response
    */
   async readObjectSource(
-    objectType: string,
+    objectType: AdtSourceObjectType,
     objectName: string,
     functionGroup?: string,
     version: 'active' | 'inactive' = 'active',
@@ -374,7 +376,7 @@ export class AdtUtils {
    * @param objectType - Object type to check
    * @returns true if object type supports source code reading
    */
-  supportsSourceCode(objectType: string): boolean {
+  supportsSourceCode(objectType: AdtObjectType): boolean {
     return supportsSourceCode(objectType);
   }
 
@@ -388,7 +390,7 @@ export class AdtUtils {
    * @returns Source URI
    */
   getObjectSourceUri(
-    objectType: string,
+    objectType: AdtSourceObjectType,
     objectName: string,
     functionGroup?: string,
     version: 'active' | 'inactive' = 'active',
@@ -743,7 +745,7 @@ export class AdtUtils {
 }
 
 function getObjectMetadataUri(
-  objectType: string,
+  objectType: AdtObjectType,
   objectName: string,
   functionGroup?: string,
 ): string {
@@ -796,7 +798,7 @@ function getObjectMetadataUri(
   }
 }
 
-function getMetadataAcceptHeader(objectType: string): string {
+function getMetadataAcceptHeader(objectType: AdtObjectType): string {
   const type = objectType.toLowerCase();
 
   switch (type) {
@@ -842,7 +844,7 @@ function getMetadataAcceptHeader(objectType: string): string {
 }
 
 function getObjectSourceUri(
-  objectType: string,
+  objectType: AdtSourceObjectType,
   objectName: string,
   functionGroup?: string,
   version: 'active' | 'inactive' = 'active',
@@ -887,7 +889,7 @@ function getObjectSourceUri(
   }
 }
 
-function supportsSourceCode(objectType: string): boolean {
+function supportsSourceCode(objectType: AdtObjectType): boolean {
   const supportedTypes = [
     'class',
     'clas/oc',

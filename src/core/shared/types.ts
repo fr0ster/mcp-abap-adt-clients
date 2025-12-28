@@ -2,6 +2,56 @@
  * Shared types for cross-cutting ADT operations
  */
 
+export type AdtObjectTypeLower =
+  | 'class'
+  | 'clas/oc'
+  | 'program'
+  | 'prog/p'
+  | 'interface'
+  | 'intf/if'
+  | 'functionmodule'
+  | 'fugr/ff'
+  | 'view'
+  | 'ddls/df'
+  | 'structure'
+  | 'stru/dt'
+  | 'table'
+  | 'tabl/dt'
+  | 'tabletype'
+  | 'ttyp/df'
+  | 'domain'
+  | 'doma/dd'
+  | 'dataelement'
+  | 'dtel'
+  | 'functiongroup'
+  | 'fugr'
+  | 'package'
+  | 'devc/k';
+
+export type AdtObjectType = AdtObjectTypeLower | Uppercase<AdtObjectTypeLower>;
+
+export type AdtSourceObjectTypeLower =
+  | 'class'
+  | 'clas/oc'
+  | 'program'
+  | 'prog/p'
+  | 'interface'
+  | 'intf/if'
+  | 'functionmodule'
+  | 'fugr/ff'
+  | 'view'
+  | 'ddls/df'
+  | 'structure'
+  | 'stru/dt'
+  | 'table'
+  | 'tabl/dt'
+  | 'tabletype'
+  | 'ttyp/df';
+
+export type AdtSourceObjectType =
+  | AdtSourceObjectTypeLower
+  | Uppercase<AdtSourceObjectTypeLower>;
+
 /**
  * Object reference for group activation and inactive objects
  */

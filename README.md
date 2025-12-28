@@ -141,6 +141,16 @@ await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
 await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
 ```
 
+**AdtUtils read type safety:**
+`readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.
+
+```typescript
+import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/adt-clients';
+
+await utils.readObjectMetadata('DDLS/DF' satisfies AdtObjectType, 'ZOK_I_CDS_TEST');
+await utils.readObjectSource('view' satisfies AdtSourceObjectType, 'ZOK_I_CDS_TEST');
+```
+
 **Benefits:**
 - ✅ Simplified API - no manual lock/unlock management
 - ✅ Automatic operation chains (validate → create → check → lock → update → unlock → activate)

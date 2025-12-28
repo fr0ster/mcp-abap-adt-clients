@@ -61,6 +61,21 @@ await client.getClass().readMetadata(
 );
 ```
 
+### AdtUtils (Object Metadata/Source)
+
+`AdtUtils.readObjectMetadata` and `AdtUtils.readObjectSource` enforce strict object types to prevent invalid inputs like `view:ZOBJ`.
+
+```typescript
+import type { AdtObjectType, AdtSourceObjectType } from '@mcp-abap-adt/adt-clients';
+
+const utils = client.getUtils();
+const metadataType: AdtObjectType = 'DDLS/DF';
+const sourceType: AdtSourceObjectType = 'view';
+
+await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
+await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST');
+```
+
 ## AdtRuntimeClient
 
 ```typescript

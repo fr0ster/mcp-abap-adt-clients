@@ -11,6 +11,7 @@ import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtSourceObjectType } from '../../../core/shared/types';
 import { logBuilderTestStep } from '../../helpers/builderTestLogger';
 import {
   createConnectionLogger,
@@ -199,7 +200,10 @@ describe('Shared - readSource', () => {
       testsLogger,
     );
     await expect(
-      client.getUtils().readObjectSource('domain', 'MANDT'),
+      client
+        .getUtils()
+        // Force runtime validation for invalid inputs.
+        .readObjectSource('domain' as unknown as AdtSourceObjectType, 'MANDT'),
     ).rejects.toThrow('does not support source code reading');
   });
 });

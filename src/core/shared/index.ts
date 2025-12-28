@@ -28,6 +28,8 @@ export type {
   IReadOptions as ReadOptions,
   ISearchObjectsParams as SearchObjectsParams,
   IVirtualFoldersPreselection as VirtualFoldersPreselection,
+  AdtObjectType,
+  AdtSourceObjectType,
   PackageHierarchyCodeFormat,
   PackageHierarchySupportedType,
 } from './types';
