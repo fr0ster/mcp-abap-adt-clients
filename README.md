@@ -285,6 +285,9 @@ await adtObject.read(config, 'active', { withLongPolling: true });
 // Read metadata with long polling
 await adtObject.readMetadata(config, { withLongPolling: true });
 
+// Read metadata with explicit version
+await adtObject.readMetadata(config, { version: 'active' });
+
 // Read transport info with long polling
 await adtObject.readTransport(config, { withLongPolling: true });
 ```
@@ -336,8 +339,11 @@ await client.getClass().read(
 
 await client.getClass().readMetadata(
   { className: 'ZCL_TEST' },
-  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml' }
+  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml', version: 'active' }
 );
+
+// Read source without version (initial post-create state)
+await client.getClass().read({ className: 'ZCL_TEST' }, undefined);
 ```
 
 Notes:

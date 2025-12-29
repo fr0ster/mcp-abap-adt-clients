@@ -20,6 +20,12 @@ import type {
   ICdsUnitTestConfig,
   IUnitTestConfig,
 } from '../../../../core/unitTest';
+import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 import {
   logTestEnd,
   logTestError,
@@ -28,12 +34,6 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
-import { getConfig } from '../../../helpers/sessionConfig';
-import {
-  createLibraryLogger,
-  createConnectionLogger,
-  createTestsLogger,
-} from '../../../helpers/testLogger';
 
 const {
   getTestCaseDefinition,
@@ -175,19 +175,15 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           return;
         }
 
-        logTestStart(
-          testsLogger,
-          'CdsUnitTest - create CDS unit test class',
-          {
-            name: 'create_cds_unit_test',
-            params: {
-              class_name: className,
-              test_class_name: testClassName,
-              view_name: viewName,
-              package_name: packageName,
-            },
+        logTestStart(testsLogger, 'CdsUnitTest - create CDS unit test class', {
+          name: 'create_cds_unit_test',
+          params: {
+            class_name: className,
+            test_class_name: testClassName,
+            view_name: viewName,
+            package_name: packageName,
           },
-        );
+        });
 
         if (!hasConfig) {
           logTestSkip(
@@ -348,10 +344,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           );
           throw error;
         } finally {
-          logTestEnd(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-          );
+          logTestEnd(testsLogger, 'CdsUnitTest - create CDS unit test class');
         }
       },
       getTimeout('test'),

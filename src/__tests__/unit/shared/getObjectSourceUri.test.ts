@@ -6,8 +6,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { noopLogger } from '../../../utils/noopLogger';
-import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 describe('AdtUtils.getObjectSourceUri', () => {
   const testsLogger = createTestsLogger();

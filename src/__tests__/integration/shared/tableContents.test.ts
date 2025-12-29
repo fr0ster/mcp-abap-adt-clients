@@ -14,13 +14,13 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
+import { createTestsLogger } from '../../helpers/testLogger';
 import {
   logTestSkip,
   logTestStart,
   logTestStep,
 } from '../../helpers/testProgressLogger';
-import { TestConfigResolver } from '../../helpers/TestConfigResolver';
-import { createTestsLogger } from '../../helpers/testLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 

@@ -12,11 +12,11 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import type { AdtSourceObjectType } from '../../../core/shared/types';
-import { logTestStep } from '../../helpers/testProgressLogger';
 import {
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
@@ -122,10 +122,7 @@ describe('Shared - readSource', () => {
       );
       return;
     }
-    logTestStep(
-      'check if object type supports source code',
-      testsLogger,
-    );
+    logTestStep('check if object type supports source code', testsLogger);
     const utils = client.getUtils();
     expect(utils.supportsSourceCode('class')).toBe(true);
     expect(utils.supportsSourceCode('program')).toBe(true);
@@ -174,10 +171,7 @@ describe('Shared - readSource', () => {
     }
 
     const className = 'CL_ABAP_CHAR_UTILITIES';
-    logTestStep(
-      'read class source code (inactive version)',
-      testsLogger,
-    );
+    logTestStep('read class source code (inactive version)', testsLogger);
     const result = await withAcceptHandling(
       client
         .getUtils()

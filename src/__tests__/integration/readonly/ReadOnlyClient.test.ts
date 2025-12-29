@@ -17,6 +17,12 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { getConfig } from '../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
+import {
+  createConnectionLogger,
+  createTestsLogger,
+} from '../../helpers/testLogger';
 import {
   logTestEnd,
   logTestError,
@@ -25,12 +31,6 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../helpers/testProgressLogger';
-import { getConfig } from '../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../helpers/TestConfigResolver';
-import {
-  createConnectionLogger,
-  createTestsLogger,
-} from '../../helpers/testLogger';
 
 const { getTimeout } = require('../../helpers/test-helper');
 
@@ -385,10 +385,7 @@ describe('AdtClient read operations', () => {
               testsLogger,
             );
 
-            logTestStep(
-              'read metadata (active, cloud view)',
-              testsLogger,
-            );
+            logTestStep('read metadata (active, cloud view)', testsLogger);
             const metadataActiveState = await viewClient.readMetadata(
               { viewName },
               { version: 'active' },
@@ -408,10 +405,7 @@ describe('AdtClient read operations', () => {
               testsLogger,
             );
 
-            logTestStep(
-              'read metadata (inactive, cloud view)',
-              testsLogger,
-            );
+            logTestStep('read metadata (inactive, cloud view)', testsLogger);
             const metadataInactiveState = await viewClient.readMetadata(
               { viewName },
               { version: 'inactive' },

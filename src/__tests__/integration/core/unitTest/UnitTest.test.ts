@@ -17,6 +17,12 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
 import type { IUnitTestConfig } from '../../../../core/unitTest';
+import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 import {
   logTestEnd,
   logTestError,
@@ -25,12 +31,6 @@ import {
   logTestStep,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
-import { getConfig } from '../../../helpers/sessionConfig';
-import {
-  createLibraryLogger,
-  createConnectionLogger,
-  createTestsLogger,
-} from '../../../helpers/testLogger';
 
 const {
   getTestCaseDefinition,

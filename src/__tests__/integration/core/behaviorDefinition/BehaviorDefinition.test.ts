@@ -19,8 +19,8 @@ import type {
 import { BaseTester } from '../../../helpers/BaseTester';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  createLibraryLogger,
   createConnectionLogger,
+  createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
 

@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.10] - 2025-12-29
+
+### Changed
+- **Read Versions**: Source and metadata reads now support explicit `version` selection while allowing no-version reads for initial post-create state.
+- **Flow Tests**: Added active/inactive read verification with XML-aware comparison for XML-based objects.
+- **Test Logging**: Renamed builder test logger utilities and removed “Builder” labels from test logs.
+
 ## [0.3.9] - 2025-12-27
 
 ### Changed

@@ -34,6 +34,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { LogLevel } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
+import { TestConfigResolver } from './TestConfigResolver';
 import {
   getHttpStatusText,
   logTestEnd,
@@ -44,7 +45,6 @@ import {
   logTestStepError,
   logTestSuccess,
 } from './testProgressLogger';
-import { TestConfigResolver } from './TestConfigResolver';
 
 export interface ITestCaseParams {
   skip_cleanup?: boolean;
@@ -289,13 +289,28 @@ export class BaseTester<TConfig, TState> {
 
       const configAny = config as any;
       if (configAny.className) {
-        return utils.getObjectSourceUri('class', configAny.className, undefined, version);
+        return utils.getObjectSourceUri(
+          'class',
+          configAny.className,
+          undefined,
+          version,
+        );
       }
       if (configAny.interfaceName) {
-        return utils.getObjectSourceUri('interface', configAny.interfaceName, undefined, version);
+        return utils.getObjectSourceUri(
+          'interface',
+          configAny.interfaceName,
+          undefined,
+          version,
+        );
       }
       if (configAny.programName) {
-        return utils.getObjectSourceUri('program', configAny.programName, undefined, version);
+        return utils.getObjectSourceUri(
+          'program',
+          configAny.programName,
+          undefined,
+          version,
+        );
       }
       if (configAny.functionModuleName && configAny.functionGroupName) {
         return utils.getObjectSourceUri(
@@ -306,13 +321,28 @@ export class BaseTester<TConfig, TState> {
         );
       }
       if (configAny.viewName) {
-        return utils.getObjectSourceUri('view', configAny.viewName, undefined, version);
+        return utils.getObjectSourceUri(
+          'view',
+          configAny.viewName,
+          undefined,
+          version,
+        );
       }
       if (configAny.structureName) {
-        return utils.getObjectSourceUri('structure', configAny.structureName, undefined, version);
+        return utils.getObjectSourceUri(
+          'structure',
+          configAny.structureName,
+          undefined,
+          version,
+        );
       }
       if (configAny.tableName) {
-        return utils.getObjectSourceUri('table', configAny.tableName, undefined, version);
+        return utils.getObjectSourceUri(
+          'table',
+          configAny.tableName,
+          undefined,
+          version,
+        );
       }
       if (configAny.tableTypeName) {
         return utils.getObjectSourceUri(
@@ -484,10 +514,13 @@ export class BaseTester<TConfig, TState> {
       if (value && typeof value === 'object') {
         return Object.keys(value)
           .sort()
-          .reduce((acc, key) => {
-            acc[key] = sortObjectKeys(value[key]);
-            return acc;
-          }, {} as Record<string, any>);
+          .reduce(
+            (acc, key) => {
+              acc[key] = sortObjectKeys(value[key]);
+              return acc;
+            },
+            {} as Record<string, any>,
+          );
       }
       return value;
     };
@@ -502,7 +535,9 @@ export class BaseTester<TConfig, TState> {
         return false;
       }
       const targetSubset = pickShape(referenceParsed, targetParsed);
-      const referenceNormalized = JSON.stringify(sortObjectKeys(referenceParsed));
+      const referenceNormalized = JSON.stringify(
+        sortObjectKeys(referenceParsed),
+      );
       const targetNormalized = JSON.stringify(sortObjectKeys(targetSubset));
       return referenceNormalized === targetNormalized;
     };

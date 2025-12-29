@@ -13,13 +13,13 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { clearAcceptCache } from '../../../utils/acceptNegotiation';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { logTestStep } from '../../helpers/testProgressLogger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
-  createLibraryLogger,
   createConnectionLogger,
+  createLibraryLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');

@@ -20,6 +20,13 @@ import type { IProgramConfig, IProgramState } from '../../../../core/program';
 import { getProgramSource } from '../../../../core/program/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { getConfig } from '../../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 import {
   logTestEnd,
   logTestError,
@@ -27,13 +34,6 @@ import {
   logTestStart,
   logTestSuccess,
 } from '../../../helpers/testProgressLogger';
-import { getConfig } from '../../../helpers/sessionConfig';
-import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
-import {
-  createLibraryLogger,
-  createConnectionLogger,
-  createTestsLogger,
-} from '../../../helpers/testLogger';
 
 const {
   resolvePackageName,
@@ -240,11 +240,7 @@ describe('Program (using AdtClient)', () => {
 
           logTestSuccess(testsLogger, 'Program - read standard object');
         } catch (error) {
-          logTestError(
-            testsLogger,
-            'Program - read standard object',
-            error,
-          );
+          logTestError(testsLogger, 'Program - read standard object', error);
           throw error;
         } finally {
           logTestEnd(testsLogger, 'Program - read standard object');

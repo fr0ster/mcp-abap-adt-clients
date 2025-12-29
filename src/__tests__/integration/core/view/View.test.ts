@@ -20,8 +20,8 @@ import type { IViewConfig, IViewState } from '../../../../core/view';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  createLibraryLogger,
   createConnectionLogger,
+  createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
 

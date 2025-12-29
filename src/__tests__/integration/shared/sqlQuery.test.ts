@@ -14,13 +14,13 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
+import { createTestsLogger } from '../../helpers/testLogger';
 import {
   logTestSkip,
   logTestStart,
   logTestStep,
 } from '../../helpers/testProgressLogger';
-import { TestConfigResolver } from '../../helpers/TestConfigResolver';
-import { createTestsLogger } from '../../helpers/testLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
@@ -121,11 +121,7 @@ describe('Shared - getSqlQuery', () => {
 
   it('should execute SQL query', async () => {
     if (!hasConfig) {
-      logTestSkip(
-        testsLogger,
-        'Shared - getSqlQuery',
-        'No SAP configuration',
-      );
+      logTestSkip(testsLogger, 'Shared - getSqlQuery', 'No SAP configuration');
       return;
     }
 
@@ -182,11 +178,7 @@ describe('Shared - getSqlQuery', () => {
 
   it('should use default row_number if not provided', async () => {
     if (!hasConfig) {
-      logTestSkip(
-        testsLogger,
-        'Shared - getSqlQuery',
-        'No SAP configuration',
-      );
+      logTestSkip(testsLogger, 'Shared - getSqlQuery', 'No SAP configuration');
       return;
     }
 
@@ -225,10 +217,7 @@ describe('Shared - getSqlQuery', () => {
       sqlQuery = `SELECT * FROM ${tableName}`;
     }
 
-    logTestStep(
-      'execute SQL query with default row_number',
-      testsLogger,
-    );
+    logTestStep('execute SQL query with default row_number', testsLogger);
     const result = await withAcceptHandling(
       client.getUtils().getSqlQuery({
         sql_query: sqlQuery,

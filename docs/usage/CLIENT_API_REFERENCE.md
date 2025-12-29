@@ -57,8 +57,11 @@ await client.getClass().read(
 
 await client.getClass().readMetadata(
   { className: 'ZCL_TEST' },
-  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml' }
+  { accept: 'application/vnd.sap.adt.oo.classes.v4+xml', version: 'active' }
 );
+
+// Read source without version (initial post-create state)
+await client.getClass().read({ className: 'ZCL_TEST' }, undefined);
 ```
 
 ### AdtUtils (Object Metadata/Source)
@@ -73,7 +76,7 @@ const metadataType: AdtObjectType = 'DDLS/DF';
 const sourceType: AdtSourceObjectType = 'view';
 
 await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
-await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST');
+await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST', undefined, 'active');
 ```
 
 ### AdtUtils (Where-used)

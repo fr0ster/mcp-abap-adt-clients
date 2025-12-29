@@ -11,8 +11,8 @@ import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
-import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 

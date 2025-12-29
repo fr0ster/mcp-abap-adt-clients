@@ -12,8 +12,8 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import type { AdtObjectType } from '../../../core/shared/types';
-import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -249,10 +249,7 @@ describe('Shared - readMetadata', () => {
       return;
     }
 
-    logTestStep(
-      'validate error for unsupported object type',
-      testsLogger,
-    );
+    logTestStep('validate error for unsupported object type', testsLogger);
     await expect(
       client
         .getUtils()

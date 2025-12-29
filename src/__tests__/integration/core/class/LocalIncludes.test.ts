@@ -16,17 +16,17 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
+import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  createConnectionLogger,
+  createLibraryLogger,
+  createTestsLogger,
+} from '../../../helpers/testLogger';
 import {
   logTestEnd,
   logTestSkip,
   logTestStart,
 } from '../../../helpers/testProgressLogger';
-import { getConfig } from '../../../helpers/sessionConfig';
-import {
-  createLibraryLogger,
-  createConnectionLogger,
-  createTestsLogger,
-} from '../../../helpers/testLogger';
 
 const {
   getTestCaseDefinition,
