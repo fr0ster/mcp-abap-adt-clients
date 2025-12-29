@@ -104,8 +104,8 @@ Example debug output with `DEBUG_TESTS=true`:
 
 Example debug output with `DEBUG_ADT_TESTS=true`:
 ```
-[1/3] ▶ ViewBuilder - full workflow :: builder_view
-  Params: {"view_name":"ZADT_BLD_VIEW02","description":"ViewBuilder workflow view",...}
+[1/3] ▶ View - full workflow :: view
+  Params: {"view_name":"ZADT_BLD_VIEW02","description":"View workflow view",...}
   → validate
   → create
   → lock
@@ -113,7 +113,7 @@ Example debug output with `DEBUG_ADT_TESTS=true`:
   → unlock
   → activate
   → delete (cleanup)
-[1/3] ✓ PASS ViewBuilder - full workflow (12.3s)
+[1/3] ✓ PASS View - full workflow (12.3s)
 ```
 
 ## Environment Variables

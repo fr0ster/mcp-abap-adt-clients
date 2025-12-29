@@ -15,10 +15,10 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestStep,
-} from '../../helpers/builderTestLogger';
+  logTestSkip,
+  logTestStart,
+  logTestStep,
+} from '../../helpers/testProgressLogger';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 
@@ -121,7 +121,7 @@ describe('Shared - getTableContents', () => {
 
   it('should get table contents', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         'No SAP configuration',
@@ -139,7 +139,7 @@ describe('Shared - getTableContents', () => {
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         'Test case not found or disabled',
@@ -148,11 +148,11 @@ describe('Shared - getTableContents', () => {
     }
 
     if (!resolver.isAvailableForEnvironment()) {
-      logBuilderTestStart(testsLogger, 'Shared - getTableContents', {
+      logTestStart(testsLogger, 'Shared - getTableContents', {
         name: 'get_table_contents',
         params: {},
       });
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
@@ -165,7 +165,7 @@ describe('Shared - getTableContents', () => {
     const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
     const maxRows = resolver.getParam('max_rows', 10);
 
-    logBuilderTestStep('get table contents', testsLogger);
+    logTestStep('get table contents', testsLogger);
     const result = await withAcceptHandling(
       client.getUtils().getTableContents({
         table_name: tableName,
@@ -178,7 +178,7 @@ describe('Shared - getTableContents', () => {
 
   it('should use default max_rows if not provided', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         'No SAP configuration',
@@ -196,7 +196,7 @@ describe('Shared - getTableContents', () => {
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         'Test case not found or disabled',
@@ -205,7 +205,7 @@ describe('Shared - getTableContents', () => {
     }
 
     if (!resolver.isAvailableForEnvironment()) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
@@ -217,7 +217,7 @@ describe('Shared - getTableContents', () => {
     // Get table name from params or standard_objects.tables
     const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
 
-    logBuilderTestStep('get table contents with default max_rows', testsLogger);
+    logTestStep('get table contents with default max_rows', testsLogger);
     const result = await withAcceptHandling(
       client.getUtils().getTableContents({
         table_name: tableName,
@@ -229,7 +229,7 @@ describe('Shared - getTableContents', () => {
 
   it('should throw error if table name is missing', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         'No SAP configuration',
@@ -246,7 +246,7 @@ describe('Shared - getTableContents', () => {
 
     const testCase = resolver.getTestCase();
     if (testCase && !resolver.isAvailableForEnvironment()) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getTableContents',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
@@ -255,7 +255,7 @@ describe('Shared - getTableContents', () => {
       return;
     }
 
-    logBuilderTestStep('validate error if table name is missing', testsLogger);
+    logTestStep('validate error if table name is missing', testsLogger);
     await expect(
       client.getUtils().getTableContents({
         table_name: '',

@@ -21,16 +21,16 @@ import type { GetVirtualFoldersContentsParams } from '../../../index';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
-  logBuilderTestEnd,
-  logBuilderTestError,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestSuccess,
-} from '../../helpers/builderTestLogger';
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestSuccess,
+} from '../../helpers/testProgressLogger';
 import { getConfig } from '../../helpers/sessionConfig';
 import type { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
@@ -44,7 +44,7 @@ if (fs.existsSync(envPath)) {
 const { getTimeout } = require('../../helpers/test-helper');
 
 const connectionLogger: ILogger = createConnectionLogger();
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class VirtualFoldersContentsObject
@@ -151,7 +151,7 @@ describe('Shared - getVirtualFoldersContents', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
@@ -234,7 +234,7 @@ describe('Shared - getVirtualFoldersContents', () => {
     'should fetch virtual folder contents for a package',
     async () => {
       if (!hasConfig) {
-        logBuilderTestSkip(
+        logTestSkip(
           testsLogger,
           'VirtualFoldersContents - fetch contents',
           'No SAP configuration',
@@ -243,7 +243,7 @@ describe('Shared - getVirtualFoldersContents', () => {
       }
 
       if (!tester) {
-        logBuilderTestSkip(
+        logTestSkip(
           testsLogger,
           'VirtualFoldersContents - fetch contents',
           'Tester not initialized',
@@ -256,22 +256,22 @@ describe('Shared - getVirtualFoldersContents', () => {
         name: 'fetch_virtual_folders_contents',
         params: {},
       };
-      logBuilderTestStart(testsLogger, testName, testCase);
+      logTestStart(testsLogger, testName, testCase);
 
       if (tester.shouldSkip()) {
-        logBuilderTestSkip(
+        logTestSkip(
           testsLogger,
           testName,
           tester.getSkipReason() || 'Test case not available',
         );
-        logBuilderTestEnd(testsLogger, testName);
+        logTestEnd(testsLogger, testName);
         return;
       }
 
       const config = tester.getConfig();
       if (!config) {
-        logBuilderTestSkip(testsLogger, testName, 'Config not available');
-        logBuilderTestEnd(testsLogger, testName);
+        logTestSkip(testsLogger, testName, 'Config not available');
+        logTestEnd(testsLogger, testName);
         return;
       }
 
@@ -282,12 +282,12 @@ describe('Shared - getVirtualFoldersContents', () => {
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
         expect(result?.data).toContain('virtualFoldersResult');
-        logBuilderTestSuccess(testsLogger, testName);
+        logTestSuccess(testsLogger, testName);
       } catch (error) {
-        logBuilderTestError(testsLogger, testName, error);
+        logTestError(testsLogger, testName, error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, testName);
+        logTestEnd(testsLogger, testName);
       }
     },
     getTimeout('test'),

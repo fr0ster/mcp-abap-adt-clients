@@ -17,16 +17,16 @@ import { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
 import {
-  logBuilderTestEnd,
-  logBuilderTestError,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestSuccess,
-} from '../../helpers/builderTestLogger';
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestSuccess,
+} from '../../helpers/testProgressLogger';
 import { getConfig } from '../../helpers/sessionConfig';
 import type { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
@@ -44,7 +44,7 @@ const {
 } = require('../../helpers/test-helper');
 
 const connectionLogger: ILogger = createConnectionLogger();
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 class NodeStructureObject
@@ -151,7 +151,7 @@ describe('Shared - fetchNodeStructure', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
@@ -209,7 +209,7 @@ describe('Shared - fetchNodeStructure', () => {
     'should fetch node structure',
     async () => {
       if (!hasConfig) {
-        logBuilderTestSkip(
+        logTestSkip(
           testsLogger,
           'NodeStructure - fetch',
           'No SAP configuration',
@@ -218,7 +218,7 @@ describe('Shared - fetchNodeStructure', () => {
       }
 
       if (!tester) {
-        logBuilderTestSkip(
+        logTestSkip(
           testsLogger,
           'NodeStructure - fetch',
           'Tester not initialized',
@@ -231,22 +231,22 @@ describe('Shared - fetchNodeStructure', () => {
         name: 'fetch_node_structure',
         params: {},
       };
-      logBuilderTestStart(testsLogger, testName, testCase);
+      logTestStart(testsLogger, testName, testCase);
 
       if (tester.shouldSkip()) {
-        logBuilderTestSkip(
+        logTestSkip(
           testsLogger,
           testName,
           tester.getSkipReason() || 'Test case not available',
         );
-        logBuilderTestEnd(testsLogger, testName);
+        logTestEnd(testsLogger, testName);
         return;
       }
 
       const config = tester.getConfig();
       if (!config) {
-        logBuilderTestSkip(testsLogger, testName, 'Config not available');
-        logBuilderTestEnd(testsLogger, testName);
+        logTestSkip(testsLogger, testName, 'Config not available');
+        logTestEnd(testsLogger, testName);
         return;
       }
 
@@ -256,19 +256,19 @@ describe('Shared - fetchNodeStructure', () => {
         });
         expect(result?.status).toBe(200);
         expect(result?.data).toBeDefined();
-        logBuilderTestSuccess(testsLogger, testName);
+        logTestSuccess(testsLogger, testName);
       } catch (error: any) {
         if (error?.response?.status === 406) {
           if (isHttpStatusAllowed(406, testCase)) {
-            logBuilderTestSkip(
+            logTestSkip(
               testsLogger,
               testName,
               'Endpoint not supported or Accept header not accepted (406)',
             );
-            logBuilderTestEnd(testsLogger, testName);
+            logTestEnd(testsLogger, testName);
             return;
           }
-          logBuilderTestError(
+          logTestError(
             testsLogger,
             testName,
             new Error(
@@ -277,10 +277,10 @@ describe('Shared - fetchNodeStructure', () => {
           );
           throw error;
         }
-        logBuilderTestError(testsLogger, testName, error);
+        logTestError(testsLogger, testName, error);
         throw error;
       } finally {
-        logBuilderTestEnd(testsLogger, testName);
+        logTestEnd(testsLogger, testName);
       }
     },
     getTimeout('test'),

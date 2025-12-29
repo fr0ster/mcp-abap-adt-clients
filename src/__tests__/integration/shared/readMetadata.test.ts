@@ -12,7 +12,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import type { AdtObjectType } from '../../../core/shared/types';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 
 const envPath =
@@ -119,7 +119,7 @@ describe('Shared - readMetadata', () => {
     // Use a standard SAP class that should exist
     const className = 'CL_ABAP_CHAR_UTILITIES';
     try {
-      logBuilderTestStep('read class metadata', testsLogger);
+      logTestStep('read class metadata', testsLogger);
       testsLogger.info?.(`📋 Object: ${className} (class)`);
       testsLogger.info?.('📖 Reading metadata...');
 
@@ -136,14 +136,14 @@ describe('Shared - readMetadata', () => {
 
       expect(activeResult.status).toBe(200);
       expect(activeResult.data).toBeDefined();
-      logBuilderTestStep(
+      logTestStep(
         `metadata active size: ${activeResult.data?.length || 0} bytes`,
         testsLogger,
       );
 
       expect(inactiveResult.status).toBe(200);
       expect(inactiveResult.data).toBeDefined();
-      logBuilderTestStep(
+      logTestStep(
         `metadata inactive size: ${inactiveResult.data?.length || 0} bytes`,
         testsLogger,
       );
@@ -176,7 +176,7 @@ describe('Shared - readMetadata', () => {
     // Use a standard SAP domain that should exist
     const domainName = 'MANDT';
     try {
-      logBuilderTestStep('read domain metadata', testsLogger);
+      logTestStep('read domain metadata', testsLogger);
       testsLogger.info?.(`📋 Object: ${domainName} (domain)`);
       testsLogger.info?.('📖 Reading metadata...');
 
@@ -188,7 +188,7 @@ describe('Shared - readMetadata', () => {
       expect(result.data).toBeDefined();
 
       testsLogger.info?.('✅ Metadata retrieved');
-      logBuilderTestStep(
+      logTestStep(
         `metadata size: ${result.data?.length || 0} bytes`,
         testsLogger,
       );
@@ -219,7 +219,7 @@ describe('Shared - readMetadata', () => {
     // Use a standard SAP table that should exist
     const tableName = 'T000';
     try {
-      logBuilderTestStep('read table metadata', testsLogger);
+      logTestStep('read table metadata', testsLogger);
       const result = await client
         .getUtils()
         .readObjectMetadata('table', tableName);
@@ -249,7 +249,7 @@ describe('Shared - readMetadata', () => {
       return;
     }
 
-    logBuilderTestStep(
+    logTestStep(
       'validate error for unsupported object type',
       testsLogger,
     );

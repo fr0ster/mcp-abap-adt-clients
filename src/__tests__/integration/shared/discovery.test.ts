@@ -11,7 +11,7 @@ import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
@@ -114,7 +114,7 @@ describe('Shared - discovery', () => {
       return;
     }
 
-    logBuilderTestStep('fetch ADT discovery document', testsLogger);
+    logTestStep('fetch ADT discovery document', testsLogger);
 
     const result = await withAcceptHandling(client.getUtils().discovery());
 

@@ -76,12 +76,12 @@ export function createConnectionLogger(): ILogger {
 }
 
 /**
- * Create a builder logger for library code
+ * Create a library logger for ADT client code
  * Uses DEBUG_ADT_LIBS flag
  * Returns DefaultLogger from @mcp-abap-adt/logger (synchronous, ideal for tests)
  * Logger respects AUTH_LOG_LEVEL environment variable for log level control
  */
-export function createBuilderLogger(): ILogger {
+export function createLibraryLogger(): ILogger {
   const enabled = isDebugEnabled('libs');
   if (!enabled) {
     return emptyLogger;

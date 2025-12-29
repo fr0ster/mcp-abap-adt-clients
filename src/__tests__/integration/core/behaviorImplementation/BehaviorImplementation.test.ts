@@ -19,7 +19,7 @@ import type {
 import { BaseTester } from '../../../helpers/BaseTester';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
@@ -43,7 +43,7 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code uses DEBUG_ADT_LIBS
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
@@ -64,7 +64,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
       _connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
 
       tester = new BaseTester(

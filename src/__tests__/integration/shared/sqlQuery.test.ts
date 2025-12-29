@@ -15,10 +15,10 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import {
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestStep,
-} from '../../helpers/builderTestLogger';
+  logTestSkip,
+  logTestStart,
+  logTestStep,
+} from '../../helpers/testProgressLogger';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 
@@ -121,7 +121,7 @@ describe('Shared - getSqlQuery', () => {
 
   it('should execute SQL query', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
         'No SAP configuration',
@@ -139,7 +139,7 @@ describe('Shared - getSqlQuery', () => {
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
         'Test case not found or disabled',
@@ -148,11 +148,11 @@ describe('Shared - getSqlQuery', () => {
     }
 
     if (!resolver.isAvailableForEnvironment()) {
-      logBuilderTestStart(testsLogger, 'Shared - getSqlQuery', {
+      logTestStart(testsLogger, 'Shared - getSqlQuery', {
         name: 'execute_sql_query',
         params: {},
       });
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
@@ -169,7 +169,7 @@ describe('Shared - getSqlQuery', () => {
     }
     const rowNumber = resolver.getParam('row_number', 10);
 
-    logBuilderTestStep('execute SQL query', testsLogger);
+    logTestStep('execute SQL query', testsLogger);
     const result = await withAcceptHandling(
       client.getUtils().getSqlQuery({
         sql_query: sqlQuery,
@@ -182,7 +182,7 @@ describe('Shared - getSqlQuery', () => {
 
   it('should use default row_number if not provided', async () => {
     if (!hasConfig) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
         'No SAP configuration',
@@ -200,7 +200,7 @@ describe('Shared - getSqlQuery', () => {
 
     const testCase = resolver.getTestCase();
     if (!testCase || !resolver.isEnabled()) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
         'Test case not found or disabled',
@@ -209,7 +209,7 @@ describe('Shared - getSqlQuery', () => {
     }
 
     if (!resolver.isAvailableForEnvironment()) {
-      logBuilderTestSkip(
+      logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
         `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
@@ -225,7 +225,7 @@ describe('Shared - getSqlQuery', () => {
       sqlQuery = `SELECT * FROM ${tableName}`;
     }
 
-    logBuilderTestStep(
+    logTestStep(
       'execute SQL query with default row_number',
       testsLogger,
     );
@@ -246,7 +246,7 @@ describe('Shared - getSqlQuery', () => {
       return;
     }
 
-    logBuilderTestStep('validate error if SQL query is missing', testsLogger);
+    logTestStep('validate error if SQL query is missing', testsLogger);
     await expect(
       client.getUtils().getSqlQuery({
         sql_query: '',

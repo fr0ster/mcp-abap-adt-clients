@@ -24,16 +24,16 @@ import { getTableType } from '../../../../core/tabletype/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
-  logBuilderTestEnd,
-  logBuilderTestError,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestSuccess,
-} from '../../../helpers/builderTestLogger';
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
 import { getConfig } from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
@@ -54,7 +54,7 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code uses DEBUG_ADT_LIBS
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
@@ -71,7 +71,7 @@ describe('TableType (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
@@ -188,11 +188,11 @@ describe('TableType (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('tabletype');
 
         if (!standardObject) {
-          logBuilderTestStart(testsLogger, 'TableType - read standard object', {
+          logTestStart(testsLogger, 'TableType - read standard object', {
             name: 'read_standard',
             params: {},
           });
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'TableType - read standard object',
             `Standard table type not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
@@ -201,13 +201,13 @@ describe('TableType (using AdtClient)', () => {
         }
 
         const standardTableTypeName = standardObject.name;
-        logBuilderTestStart(testsLogger, 'TableType - read standard object', {
+        logTestStart(testsLogger, 'TableType - read standard object', {
           name: 'read_standard',
           params: { tabletype_name: standardTableTypeName },
         });
 
         if (!hasConfig) {
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'TableType - read standard object',
             'No SAP configuration',
@@ -231,19 +231,19 @@ describe('TableType (using AdtClient)', () => {
             );
           }
 
-          logBuilderTestSuccess(
+          logTestSuccess(
             testsLogger,
             'TableType - read standard object',
           );
         } catch (error) {
-          logBuilderTestError(
+          logTestError(
             testsLogger,
             'TableType - read standard object',
             error,
           );
           throw error;
         } finally {
-          logBuilderTestEnd(testsLogger, 'TableType - read standard object');
+          logTestEnd(testsLogger, 'TableType - read standard object');
         }
       },
       getTimeout('test'),

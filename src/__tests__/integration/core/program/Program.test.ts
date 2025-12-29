@@ -21,16 +21,16 @@ import { getProgramSource } from '../../../../core/program/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
-  logBuilderTestEnd,
-  logBuilderTestError,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestSuccess,
-} from '../../../helpers/builderTestLogger';
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
 import { getConfig } from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
@@ -51,7 +51,7 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code (AdtClient) uses DEBUG_ADT_LIBS
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
@@ -68,7 +68,7 @@ describe('Program (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
@@ -146,7 +146,7 @@ describe('Program (using AdtClient)', () => {
         }
 
         if (isCloudSystem) {
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'Program - full workflow',
             'Programs are not supported in cloud systems (BTP ABAP Environment)',
@@ -184,7 +184,7 @@ describe('Program (using AdtClient)', () => {
       'should read standard SAP program',
       async () => {
         if (!hasConfig) {
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'Program - read standard object',
             'No SAP configuration',
@@ -193,7 +193,7 @@ describe('Program (using AdtClient)', () => {
         }
 
         if (isCloudSystem) {
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'Program - read standard object',
             'Programs are not supported in cloud systems (BTP ABAP Environment)',
@@ -209,11 +209,11 @@ describe('Program (using AdtClient)', () => {
         const standardObject = resolver.getStandardObject('program');
 
         if (!standardObject) {
-          logBuilderTestStart(testsLogger, 'Program - read standard object', {
+          logTestStart(testsLogger, 'Program - read standard object', {
             name: 'read_standard',
             params: {},
           });
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'Program - read standard object',
             'Standard program not configured for on-premise environment',
@@ -222,7 +222,7 @@ describe('Program (using AdtClient)', () => {
         }
 
         const standardProgramName = standardObject.name;
-        logBuilderTestStart(testsLogger, 'Program - read standard object', {
+        logTestStart(testsLogger, 'Program - read standard object', {
           name: 'read_standard',
           params: { program_name: standardProgramName },
         });
@@ -238,16 +238,16 @@ describe('Program (using AdtClient)', () => {
               : (resultState?.readResult as any)?.data || '';
           expect(typeof sourceCode).toBe('string');
 
-          logBuilderTestSuccess(testsLogger, 'Program - read standard object');
+          logTestSuccess(testsLogger, 'Program - read standard object');
         } catch (error) {
-          logBuilderTestError(
+          logTestError(
             testsLogger,
             'Program - read standard object',
             error,
           );
           throw error;
         } finally {
-          logBuilderTestEnd(testsLogger, 'Program - read standard object');
+          logTestEnd(testsLogger, 'Program - read standard object');
         }
       },
       getTimeout('test'),

@@ -17,13 +17,13 @@ import { AdtClient } from '../../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
-  logBuilderTestEnd,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-} from '../../../helpers/builderTestLogger';
+  logTestEnd,
+  logTestSkip,
+  logTestStart,
+} from '../../../helpers/testProgressLogger';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
@@ -42,7 +42,7 @@ if (fs.existsSync(envPath)) {
 }
 
 const connectionLogger: ILogger = createConnectionLogger();
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 type ParentClassConfig = {
@@ -65,9 +65,9 @@ describe('Class local includes (using BaseTester)', () => {
     reason: string,
   ): void {
     const definition = getTestCaseDefinition(definitionKey, definitionName);
-    logBuilderTestStart(testsLogger, testName, definition);
-    logBuilderTestSkip(testsLogger, testName, reason);
-    logBuilderTestEnd(testsLogger, testName);
+    logTestStart(testsLogger, testName, definition);
+    logTestSkip(testsLogger, testName, reason);
+    logTestEnd(testsLogger, testName);
   }
 
   async function ensureParentClassExists(
@@ -113,7 +113,7 @@ describe('Class local includes (using BaseTester)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
@@ -532,13 +532,13 @@ describe('Class local includes (using BaseTester)', () => {
             'local_macros',
           );
           const testName = 'Class - LocalMacros - full workflow';
-          logBuilderTestStart(testsLogger, testName, definition);
-          logBuilderTestSkip(
+          logTestStart(testsLogger, testName, definition);
+          logTestSkip(
             testsLogger,
             testName,
             'Macros are not supported in cloud systems (BTP ABAP Environment)',
           );
-          logBuilderTestEnd(testsLogger, testName);
+          logTestEnd(testsLogger, testName);
           return;
         }
 
@@ -572,13 +572,13 @@ describe('Class local includes (using BaseTester)', () => {
             'update_class_local_macros',
             'local_macros',
           );
-          logBuilderTestStart(testsLogger, testName, definition);
-          logBuilderTestSkip(
+          logTestStart(testsLogger, testName, definition);
+          logTestSkip(
             testsLogger,
             testName,
             'Macros include is not available in this system',
           );
-          logBuilderTestEnd(testsLogger, testName);
+          logTestEnd(testsLogger, testName);
           return;
         }
 

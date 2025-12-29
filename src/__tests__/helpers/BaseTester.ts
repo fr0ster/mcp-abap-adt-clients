@@ -19,11 +19,11 @@
  *
  * Logging:
  * - Logger is optional (can be undefined) - controlled by environment variables
- * - Use createTestsLogger(), createBuilderLogger(), createConnectionLogger() from testLogger.ts
+ * - Use createTestsLogger(), createLibraryLogger(), createConnectionLogger() from testLogger.ts
  * - These functions return ILogger from @mcp-abap-adt/logger or undefined based on DEBUG_* flags
  * - All logging uses optional chaining - safe to pass undefined
  * - Uses LogLevel enum from @mcp-abap-adt/logger for log level constants
- * - Structured test logging via builderTestLogger functions (logBuilderTestStart, logBuilderTestStep, etc.)
+ * - Structured test logging via testProgressLogger functions (logTestStart, logTestStep, etc.)
  */
 
 import type {
@@ -36,14 +36,14 @@ import { LogLevel } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 import {
   getHttpStatusText,
-  logBuilderTestEnd,
-  logBuilderTestError,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestStep,
-  logBuilderTestStepError,
-  logBuilderTestSuccess,
-} from './builderTestLogger';
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestStep,
+  logTestStepError,
+  logTestSuccess,
+} from './testProgressLogger';
 import { TestConfigResolver } from './TestConfigResolver';
 
 export interface ITestCaseParams {
@@ -118,7 +118,7 @@ export class BaseTester<TConfig, TState> {
    * @param testCaseKey - YAML test case key (e.g., "create_class")
    * @param testCaseName - YAML test case name (e.g., "adt_class")
    * @param logger - Optional logger (ILogger from @mcp-abap-adt/interfaces or undefined)
-   *                Use createTestsLogger(), createBuilderLogger(), etc. from testLogger.ts
+   *                Use createTestsLogger(), createLibraryLogger(), etc. from testLogger.ts
    *                Logger is undefined when logging is disabled via environment variables
    *                Uses LogLevel enum from @mcp-abap-adt/logger for log level constants
    */
@@ -331,10 +331,10 @@ export class BaseTester<TConfig, TState> {
       label: string,
       withLongPolling: boolean = false,
     ): Promise<string | undefined> => {
-      logBuilderTestStep(label, this.logger);
+      logTestStep(label, this.logger);
       const url = getSourceUrl(version);
       if (url) {
-        logBuilderTestStep(
+        logTestStep(
           `source url (${version ?? 'no version'}): ${url}`,
           this.logger,
         );
@@ -350,7 +350,7 @@ export class BaseTester<TConfig, TState> {
         const status = error?.response?.status;
         const errorText = error?.message || '';
         if (withLongPolling && status === 400) {
-          logBuilderTestStep(
+          logTestStep(
             `${label} retry without long polling (HTTP 400)`,
             this.logger,
           );
@@ -369,7 +369,7 @@ export class BaseTester<TConfig, TState> {
         throw new Error(`Read ${version} failed: no response`);
       }
       const payload = getPayloadText((readState as any)?.readResult?.data);
-      logBuilderTestStep(
+      logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
       );
@@ -380,7 +380,7 @@ export class BaseTester<TConfig, TState> {
       label: string,
       withLongPolling: boolean = false,
     ): Promise<string | undefined> => {
-      logBuilderTestStep(label, this.logger);
+      logTestStep(label, this.logger);
       const metadataState = await this.adtObject.readMetadata(
         config as Partial<TConfig>,
         withLongPolling ? { withLongPolling: true } : undefined,
@@ -389,7 +389,7 @@ export class BaseTester<TConfig, TState> {
         (metadataState as any)?.metadataResult ||
         (metadataState as any)?.readResult;
       const payload = getPayloadText(metadataResult?.data);
-      logBuilderTestStep(
+      logTestStep(
         `${label} length: ${payload?.length || 0} characters`,
         this.logger,
       );
@@ -406,7 +406,7 @@ export class BaseTester<TConfig, TState> {
       }
       const encodedUri = encodeURIComponent(sourceUrl);
       const url = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodedUri}`;
-      logBuilderTestStep(label, this.logger);
+      logTestStep(label, this.logger);
       try {
         const response = await this.connection.makeAdtRequest({
           url,
@@ -418,7 +418,7 @@ export class BaseTester<TConfig, TState> {
           },
         });
         const payload = getPayloadText(response?.data);
-        logBuilderTestStep(
+        logTestStep(
           `${label} length: ${payload?.length || 0} characters`,
           this.logger,
         );
@@ -427,7 +427,7 @@ export class BaseTester<TConfig, TState> {
           error?.message ||
           error?.response?.data ||
           'Unknown object properties error';
-        logBuilderTestStep(
+        logTestStep(
           `${label} failed: ${String(errorText).slice(0, 200)}`,
           this.logger,
         );
@@ -516,7 +516,7 @@ export class BaseTester<TConfig, TState> {
     try {
       // 1. Validate
       currentStep = 'validate';
-      logBuilderTestStep(currentStep, this.logger);
+      logTestStep(currentStep, this.logger);
       const validationState = await this.adtObject.validate(
         config as Partial<TConfig>,
       );
@@ -532,7 +532,7 @@ export class BaseTester<TConfig, TState> {
         const error = new Error(
           `Validation failed (HTTP ${validationResponse?.status}): ${errorData}`,
         );
-        logBuilderTestStepError(currentStep, error);
+        logTestStepError(currentStep, error);
         throw error;
       }
 
@@ -597,7 +597,7 @@ export class BaseTester<TConfig, TState> {
               LogLevel.ERROR,
               `Validation returned error table with ${errorMessages.length} error(s): ${errorTexts}`,
             );
-            logBuilderTestStepError(currentStep, error);
+            logTestStepError(currentStep, error);
             throw error;
           }
 
@@ -651,7 +651,7 @@ export class BaseTester<TConfig, TState> {
 
       // 2. Create
       currentStep = 'create';
-      logBuilderTestStep(currentStep, this.logger);
+      logTestStep(currentStep, this.logger);
       const createOptions: IAdtOperationOptions = {
         activateOnCreate: options?.activateOnCreate || false,
         timeout: options?.timeout,
@@ -669,7 +669,7 @@ export class BaseTester<TConfig, TState> {
       // 2.5. Wait for object to be ready before update (read with long polling or delay)
       if (options?.updateConfig) {
         currentStep = 'read (wait for object ready)';
-        logBuilderTestStep(currentStep, this.logger);
+        logTestStep(currentStep, this.logger);
         // Additional delay before update (already waited after create, but this is for object readiness)
         const createDelay = this.getOperationDelay('create', testCaseParams);
         this.log(
@@ -690,7 +690,7 @@ export class BaseTester<TConfig, TState> {
           'read object properties (post-create, no version)',
         );
         if (shouldSkipInitialSourceRead()) {
-          logBuilderTestStep(
+          logTestStep(
             'read initial (post-create, no version) skipped for class',
             this.logger,
           );
@@ -703,7 +703,7 @@ export class BaseTester<TConfig, TState> {
         }
 
         currentStep = 'update';
-        logBuilderTestStep(currentStep, this.logger);
+        logTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
           activateOnUpdate: options?.activateOnUpdate || false,
           sourceCode: options?.sourceCode,
@@ -732,7 +732,7 @@ export class BaseTester<TConfig, TState> {
       // 4. Activate (if not activated during create/update)
       if (!options?.activateOnCreate && !options?.activateOnUpdate) {
         currentStep = 'activate';
-        logBuilderTestStep(currentStep, this.logger);
+        logTestStep(currentStep, this.logger);
         const activateState = await this.adtObject.activate(
           config as Partial<TConfig>,
         );
@@ -751,7 +751,7 @@ export class BaseTester<TConfig, TState> {
           const error = new Error(
             `Activation failed (HTTP ${activateResponse.status}): ${errorData}`,
           );
-          logBuilderTestStepError(currentStep, error);
+          logTestStepError(currentStep, error);
           throw error;
         }
         // Delay after activate
@@ -839,7 +839,7 @@ export class BaseTester<TConfig, TState> {
 
       if (options?.readMetadata) {
         currentStep = 'readMetadata';
-        logBuilderTestStep(currentStep, this.logger);
+        logTestStep(currentStep, this.logger);
         try {
           const metadataResponse = await this.adtObject.readMetadata(
             config as Partial<TConfig>,
@@ -858,7 +858,7 @@ export class BaseTester<TConfig, TState> {
             const error = new Error(
               `Read metadata failed (HTTP ${responseStatus}): ${errorData}`,
             );
-            logBuilderTestStepError(currentStep, error);
+            logTestStepError(currentStep, error);
             throw error;
           }
         } catch (error: any) {
@@ -876,7 +876,7 @@ export class BaseTester<TConfig, TState> {
               return validationState;
             }
           }
-          logBuilderTestStepError(currentStep, error);
+          logTestStepError(currentStep, error);
           throw error;
         }
       }
@@ -884,7 +884,7 @@ export class BaseTester<TConfig, TState> {
       // 5. Cleanup (if enabled)
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         currentStep = 'delete (cleanup)';
-        logBuilderTestStep(currentStep, this.logger);
+        logTestStep(currentStep, this.logger);
         try {
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete
@@ -925,7 +925,7 @@ export class BaseTester<TConfig, TState> {
     } catch (error: any) {
       // Log step error with details before failing test
       if (currentStep) {
-        logBuilderTestStepError(currentStep, error);
+        logTestStepError(currentStep, error);
       }
 
       // Ensure unlock on error
@@ -934,7 +934,7 @@ export class BaseTester<TConfig, TState> {
       // Cleanup on error if enabled
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         try {
-          logBuilderTestStep('delete (cleanup)', this.logger);
+          logTestStep('delete (cleanup)', this.logger);
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete (cleanup on error)
           await this.waitDelay(
@@ -980,7 +980,7 @@ export class BaseTester<TConfig, TState> {
     options?: IReadTestOptions,
   ): Promise<TState | undefined> {
     try {
-      logBuilderTestStep('read', this.logger);
+      logTestStep('read', this.logger);
       const readState = await this.adtObject.read(
         config,
         options?.version || 'active',
@@ -998,7 +998,7 @@ export class BaseTester<TConfig, TState> {
         return readState;
       }
 
-      logBuilderTestStep('readMetadata', this.logger);
+      logTestStep('readMetadata', this.logger);
       try {
         await this.adtObject.readMetadata(
           config,
@@ -1327,28 +1327,28 @@ export class BaseTester<TConfig, TState> {
     };
 
     if (this.shouldSkip()) {
-      logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(
+      logTestStart(this.logger, testName, definition);
+      logTestSkip(
         this.logger,
         testName,
         this.skipReason || 'Test case not available',
       );
-      logBuilderTestEnd(this.logger, testName);
+      logTestEnd(this.logger, testName);
       return undefined;
     }
 
     if (!this.config) {
-      logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(
+      logTestStart(this.logger, testName, definition);
+      logTestSkip(
         this.logger,
         testName,
         'Config not available - ensure beforeEach() was called',
       );
-      logBuilderTestEnd(this.logger, testName);
+      logTestEnd(this.logger, testName);
       return undefined;
     }
 
-    logBuilderTestStart(this.logger, testName, definition);
+    logTestStart(this.logger, testName, definition);
 
     try {
       const result = await this.flowTest(
@@ -1356,12 +1356,12 @@ export class BaseTester<TConfig, TState> {
         this.testCase?.params,
         options,
       );
-      logBuilderTestSuccess(this.logger, testName);
-      logBuilderTestEnd(this.logger, testName);
+      logTestSuccess(this.logger, testName);
+      logTestEnd(this.logger, testName);
       return result;
     } catch (error: any) {
-      logBuilderTestError(this.logger, testName, error);
-      logBuilderTestEnd(this.logger, testName);
+      logTestError(this.logger, testName, error);
+      logTestEnd(this.logger, testName);
       throw error;
     }
   }
@@ -1378,39 +1378,39 @@ export class BaseTester<TConfig, TState> {
     };
 
     if (this.shouldSkip()) {
-      logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(
+      logTestStart(this.logger, testName, definition);
+      logTestSkip(
         this.logger,
         testName,
         this.skipReason || 'Test case not available',
       );
-      logBuilderTestEnd(this.logger, testName);
+      logTestEnd(this.logger, testName);
       throw new Error(
         `Test skipped: ${this.skipReason || 'Test case not available'}`,
       );
     }
 
     if (!this.config) {
-      logBuilderTestStart(this.logger, testName, definition);
-      logBuilderTestSkip(
+      logTestStart(this.logger, testName, definition);
+      logTestSkip(
         this.logger,
         testName,
         'Config not available - ensure beforeEach() was called',
       );
-      logBuilderTestEnd(this.logger, testName);
+      logTestEnd(this.logger, testName);
       throw new Error('Config not available - ensure beforeEach() was called');
     }
 
-    logBuilderTestStart(this.logger, testName, definition);
+    logTestStart(this.logger, testName, definition);
 
     try {
       const result = await this.readTest(this.config, options);
-      logBuilderTestSuccess(this.logger, testName);
-      logBuilderTestEnd(this.logger, testName);
+      logTestSuccess(this.logger, testName);
+      logTestEnd(this.logger, testName);
       return result;
     } catch (error: any) {
-      logBuilderTestError(this.logger, testName, error);
-      logBuilderTestEnd(this.logger, testName);
+      logTestError(this.logger, testName, error);
+      logTestEnd(this.logger, testName);
       throw error;
     }
   }

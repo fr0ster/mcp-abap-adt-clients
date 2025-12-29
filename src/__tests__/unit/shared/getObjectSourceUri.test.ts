@@ -6,7 +6,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from '../../../core/shared/AdtUtils';
 import { noopLogger } from '../../../utils/noopLogger';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 
 describe('AdtUtils.getObjectSourceUri', () => {
@@ -30,7 +30,7 @@ describe('AdtUtils.getObjectSourceUri', () => {
   ];
 
   it('adds version=inactive for inactive reads', () => {
-    logBuilderTestStep('build inactive uris', testsLogger);
+    logTestStep('build inactive uris', testsLogger);
     for (const { type, needsGroup } of sourceTypes) {
       const uri = utils.getObjectSourceUri(
         type,
@@ -44,7 +44,7 @@ describe('AdtUtils.getObjectSourceUri', () => {
   });
 
   it('adds version=active for active reads', () => {
-    logBuilderTestStep('build active uris', testsLogger);
+    logTestStep('build active uris', testsLogger);
     for (const { type, needsGroup } of sourceTypes) {
       const uri = utils.getObjectSourceUri(
         type,

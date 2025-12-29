@@ -12,7 +12,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import type { AdtSourceObjectType } from '../../../core/shared/types';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 import {
   createConnectionLogger,
   createTestsLogger,
@@ -122,7 +122,7 @@ describe('Shared - readSource', () => {
       );
       return;
     }
-    logBuilderTestStep(
+    logTestStep(
       'check if object type supports source code',
       testsLogger,
     );
@@ -147,7 +147,7 @@ describe('Shared - readSource', () => {
 
     // Use a standard SAP class that should exist
     const className = 'CL_ABAP_CHAR_UTILITIES';
-    logBuilderTestStep('read class source code', testsLogger);
+    logTestStep('read class source code', testsLogger);
     testsLogger.info?.(`📋 Object: ${className} (class)`);
     testsLogger.info?.('📖 Reading source code...');
 
@@ -174,7 +174,7 @@ describe('Shared - readSource', () => {
     }
 
     const className = 'CL_ABAP_CHAR_UTILITIES';
-    logBuilderTestStep(
+    logTestStep(
       'read class source code (inactive version)',
       testsLogger,
     );
@@ -196,12 +196,12 @@ describe('Shared - readSource', () => {
     }
 
     const className = 'CL_ABAP_CHAR_UTILITIES';
-    logBuilderTestStep(
+    logTestStep(
       'read class source code (active and inactive versions)',
       testsLogger,
     );
 
-    logBuilderTestStep('read class source (active)', testsLogger);
+    logTestStep('read class source (active)', testsLogger);
     const activeResult = await withAcceptHandling(
       client
         .getUtils()
@@ -209,12 +209,12 @@ describe('Shared - readSource', () => {
     );
     expect(activeResult.status).toBe(200);
     expect(activeResult.data).toBeDefined();
-    logBuilderTestStep(
+    logTestStep(
       `active source length: ${activeResult.data?.length || 0} characters`,
       testsLogger,
     );
 
-    logBuilderTestStep('read class source (inactive)', testsLogger);
+    logTestStep('read class source (inactive)', testsLogger);
     const inactiveResult = await withAcceptHandling(
       client
         .getUtils()
@@ -222,7 +222,7 @@ describe('Shared - readSource', () => {
     );
     expect(inactiveResult.status).toBe(200);
     expect(inactiveResult.data).toBeDefined();
-    logBuilderTestStep(
+    logTestStep(
       `inactive source length: ${inactiveResult.data?.length || 0} characters`,
       testsLogger,
     );
@@ -236,7 +236,7 @@ describe('Shared - readSource', () => {
       return;
     }
 
-    logBuilderTestStep(
+    logTestStep(
       'validate error for object type without source code',
       testsLogger,
     );

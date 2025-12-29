@@ -21,16 +21,16 @@ import type {
   IUnitTestConfig,
 } from '../../../../core/unitTest';
 import {
-  logBuilderTestEnd,
-  logBuilderTestError,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestStep,
-  logBuilderTestSuccess,
-} from '../../../helpers/builderTestLogger';
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestStep,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
@@ -53,7 +53,7 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code uses DEBUG_ADT_LIBS
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
@@ -68,7 +68,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
     } catch (_error) {
       hasConfig = false;
@@ -90,7 +90,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           'cds_unit_test',
         );
         if (!testCase?.params?.cds_unit_test) {
-          logBuilderTestStart(
+          logTestStart(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             {
@@ -98,7 +98,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
               params: {},
             },
           );
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             'CDS unit test configuration not found in test-config.yaml',
@@ -108,7 +108,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
         const packageName = resolvePackageName(testCase.params.package_name);
         if (!packageName) {
-          logBuilderTestStart(
+          logTestStart(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             {
@@ -116,7 +116,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
               params: {},
             },
           );
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             'Package name not configured',
@@ -126,7 +126,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
         const cdsUnitTestConfig = testCase.params.cds_unit_test;
         if (!cdsUnitTestConfig) {
-          logBuilderTestStart(
+          logTestStart(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             {
@@ -134,7 +134,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
               params: {},
             },
           );
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             'cds_unit_test configuration not found in test-config.yaml',
@@ -159,7 +159,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           !classTemplate ||
           !testClassSource
         ) {
-          logBuilderTestStart(
+          logTestStart(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             {
@@ -167,7 +167,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
               params: {},
             },
           );
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             'Required parameters missing: class_name, test_class_name, view_name, template_xml, or test_class_source',
@@ -175,7 +175,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           return;
         }
 
-        logBuilderTestStart(
+        logTestStart(
           testsLogger,
           'CdsUnitTest - create CDS unit test class',
           {
@@ -190,7 +190,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
         );
 
         if (!hasConfig) {
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             'No SAP configuration',
@@ -201,7 +201,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
         try {
           // Step 1: Validate CDS view for unit test doubles
           if (viewName) {
-            logBuilderTestStep('validate', testsLogger);
+            logTestStep('validate', testsLogger);
             testsLogger.info?.(
               'Validating CDS view for unit test doubles:',
               viewName,
@@ -215,7 +215,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           }
 
           // Step 2: Create CDS unit test class
-          logBuilderTestStep('create', testsLogger);
+          logTestStep('create', testsLogger);
           const cdsUnitTestConfigForCreate: ICdsUnitTestConfig = {
             className,
             packageName,
@@ -235,7 +235,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test class created successfully');
 
           // Step 3: Activate class
-          logBuilderTestStep('activate', testsLogger);
+          logTestStep('activate', testsLogger);
           const activateState = await client.getClass().activate({
             className,
             transportRequest,
@@ -244,7 +244,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test class activated');
 
           // Step 4: Read the created test class
-          logBuilderTestStep('read', testsLogger);
+          logTestStep('read', testsLogger);
           const readState = await client.getClass().read({ className });
           expect(readState).toBeDefined();
           expect(readState?.readResult).toBeDefined();
@@ -257,7 +257,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test class metadata read successfully');
 
           // Step 5: Create unit test configuration
-          logBuilderTestStep('create (unit test)', testsLogger);
+          logTestStep('create (unit test)', testsLogger);
           const unitTestConfig: IUnitTestConfig = {
             tests: [
               {
@@ -270,11 +270,11 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test configuration created');
 
           // Step 6: Update unit test (if needed - for now just prepare)
-          logBuilderTestStep('update (unit test)', testsLogger);
+          logTestStep('update (unit test)', testsLogger);
           testsLogger.info?.('CDS unit test configuration prepared');
 
           // Step 7: Run unit test (start test execution)
-          logBuilderTestStep('run (unit test)', testsLogger);
+          logTestStep('run (unit test)', testsLogger);
           const unitTest = client.getUnitTest() as any;
           const runId = await unitTest.run(
             unitTestConfig.tests!,
@@ -284,7 +284,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test run started, run ID:', runId);
 
           // Step 8: Read status (with long polling if configured)
-          logBuilderTestStep('read (status)', testsLogger);
+          logTestStep('read (status)', testsLogger);
           const statusConfig: IUnitTestConfig = {
             runId: runId,
             status: testCase.params.unit_test_status || {},
@@ -298,7 +298,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           testsLogger.info?.('CDS unit test status:', statusState?.runStatus);
 
           // Step 9: Read result
-          logBuilderTestStep('read (result)', testsLogger);
+          logTestStep('read (result)', testsLogger);
           const _resultConfig: IUnitTestConfig = {
             runId: runId,
             result: testCase.params.unit_test_result || {},
@@ -317,7 +317,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           const skipCleanup = testCase.params.skip_cleanup === true;
           if (!skipCleanup && className) {
             try {
-              logBuilderTestStep('delete (cleanup)', testsLogger);
+              logTestStep('delete (cleanup)', testsLogger);
               testsLogger.info?.('Cleaning up CDS unit test class:', className);
               await client.getClass().delete({
                 className,
@@ -336,19 +336,19 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             );
           }
 
-          logBuilderTestSuccess(
+          logTestSuccess(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
           );
         } catch (error) {
-          logBuilderTestError(
+          logTestError(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
             error,
           );
           throw error;
         } finally {
-          logBuilderTestEnd(
+          logTestEnd(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
           );

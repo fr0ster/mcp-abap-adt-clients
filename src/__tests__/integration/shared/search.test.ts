@@ -11,7 +11,7 @@ import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
@@ -115,7 +115,7 @@ describe('Shared - searchObjects', () => {
       return;
     }
 
-    logBuilderTestStep('search objects by name pattern', testsLogger);
+    logTestStep('search objects by name pattern', testsLogger);
     testsLogger.info?.('🔍 Query: CL_ABAP*, maxResults: 10');
 
     const result = await withAcceptHandling(
@@ -146,7 +146,7 @@ describe('Shared - searchObjects', () => {
       return;
     }
 
-    logBuilderTestStep('search objects with object type filter', testsLogger);
+    logTestStep('search objects with object type filter', testsLogger);
     testsLogger.info?.('🔍 Query: T*, objectType: TABL, maxResults: 10');
 
     const result = await withAcceptHandling(
@@ -178,7 +178,7 @@ describe('Shared - searchObjects', () => {
       return;
     }
 
-    logBuilderTestStep('search objects with default maxResults', testsLogger);
+    logTestStep('search objects with default maxResults', testsLogger);
     const result = await withAcceptHandling(
       client.getUtils().searchObjects({
         query: 'CL_ABAP*',

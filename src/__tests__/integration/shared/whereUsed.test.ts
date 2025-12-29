@@ -11,7 +11,7 @@ import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 import { createTestsLogger } from '../../helpers/testLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
@@ -115,7 +115,7 @@ describe('Shared - getWhereUsed', () => {
       );
       return;
     }
-    logBuilderTestStep('where-used with default scope', testsLogger);
+    logTestStep('where-used with default scope', testsLogger);
     testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
@@ -162,7 +162,7 @@ describe('Shared - getWhereUsed', () => {
       );
       return;
     }
-    logBuilderTestStep('where-used with ALL types enabled', testsLogger);
+    logTestStep('where-used with ALL types enabled', testsLogger);
     testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
@@ -235,7 +235,7 @@ describe('Shared - getWhereUsed', () => {
     }
 
     try {
-      logBuilderTestStep('get where-used for table', testsLogger);
+      logTestStep('get where-used for table', testsLogger);
       testsLogger.info?.('📋 Object: T000 (table)');
       testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
@@ -300,7 +300,7 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logBuilderTestStep('validate error if object name is missing', testsLogger);
+    logTestStep('validate error if object name is missing', testsLogger);
     await expect(
       client.getUtils().getWhereUsed({
         object_name: '',
@@ -317,7 +317,7 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
-    logBuilderTestStep('validate error if object type is missing', testsLogger);
+    logTestStep('validate error if object type is missing', testsLogger);
     await expect(
       client.getUtils().getWhereUsed({
         object_name: 'TEST',

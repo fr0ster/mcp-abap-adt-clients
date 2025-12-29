@@ -13,10 +13,10 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { clearAcceptCache } from '../../../utils/acceptNegotiation';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { logBuilderTestStep } from '../../helpers/builderTestLogger';
+import { logTestStep } from '../../helpers/testProgressLogger';
 import { getConfig } from '../../helpers/sessionConfig';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
@@ -35,7 +35,7 @@ const {
 } = require('../../helpers/test-helper');
 
 const connectionLogger: ILogger = createConnectionLogger();
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
 const isStatusOk = (status?: number): boolean =>
@@ -112,7 +112,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger, {
+      client = new AdtClient(connection, libraryLogger, {
         enableAcceptCorrection: true,
       });
       hasConfig = true;
@@ -145,7 +145,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read class source', testsLogger);
+    logTestStep('read class source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read class source',
       client.getClass().read({ className: standardClassName }, 'active'),
@@ -167,7 +167,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read local definitions', testsLogger);
+    logTestStep('read local definitions', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read local definitions',
       client
@@ -197,7 +197,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read local types', testsLogger);
+    logTestStep('read local types', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read local types',
       client.getLocalTypes().read({ className: standardClassName }, 'active'),
@@ -223,7 +223,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read local test classes', testsLogger);
+    logTestStep('read local test classes', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read local test classes',
       client
@@ -257,7 +257,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read local macros', testsLogger);
+    logTestStep('read local macros', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read local macros',
       client.getLocalMacros().read({ className: standardClassName }, 'active'),
@@ -287,7 +287,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read interface source', testsLogger);
+    logTestStep('read interface source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read interface source',
       client
@@ -321,7 +321,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read program source', testsLogger);
+    logTestStep('read program source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read program source',
       client.getProgram().read({ programName }, 'active'),
@@ -347,7 +347,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read domain', testsLogger);
+    logTestStep('read domain', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read domain',
       client.getDomain().read({ domainName }),
@@ -373,7 +373,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read data element', testsLogger);
+    logTestStep('read data element', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read data element',
       client.getDataElement().read({ dataElementName }),
@@ -403,7 +403,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read structure source', testsLogger);
+    logTestStep('read structure source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read structure source',
       client.getStructure().read({ structureName }, 'active'),
@@ -429,7 +429,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read table source', testsLogger);
+    logTestStep('read table source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read table source',
       client.getTable().read({ tableName }, 'active'),
@@ -455,7 +455,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read table type', testsLogger);
+    logTestStep('read table type', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read table type',
       client.getTableType().read({ tableTypeName }),
@@ -481,7 +481,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read view source', testsLogger);
+    logTestStep('read view source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read view source',
       client.getView().read({ viewName }, 'active'),
@@ -507,7 +507,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read function group', testsLogger);
+    logTestStep('read function group', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read function group',
       client.getFunctionGroup().read({ functionGroupName }),
@@ -544,7 +544,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read function module', testsLogger);
+    logTestStep('read function module', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read function module',
       client
@@ -579,7 +579,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read package', testsLogger);
+    logTestStep('read package', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read package',
       client.getPackage().read({ packageName }),
@@ -606,7 +606,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read service definition', testsLogger);
+    logTestStep('read service definition', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read service definition',
       client.getServiceDefinition().read({ serviceDefinitionName }, 'active'),
@@ -636,7 +636,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read behavior definition', testsLogger);
+    logTestStep('read behavior definition', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read behavior definition',
       client
@@ -668,7 +668,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read behavior implementation', testsLogger);
+    logTestStep('read behavior implementation', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read behavior implementation',
       client
@@ -704,7 +704,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read metadata extension', testsLogger);
+    logTestStep('read metadata extension', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read metadata extension',
       client
@@ -736,7 +736,7 @@ describe('Shared - read Accept headers (corrected)', () => {
       return;
     }
 
-    logBuilderTestStep('read enhancement', testsLogger);
+    logTestStep('read enhancement', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read enhancement',
       client.getEnhancement().read(

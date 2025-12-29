@@ -1,6 +1,6 @@
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 
-export interface BuilderTestLogger {
+export interface TestProgressLogger {
   info?: (...args: any[]) => void;
   warn?: (...args: any[]) => void;
   error?: (...args: any[]) => void;
@@ -113,7 +113,15 @@ function logImmediate(message: string): void {
   process.stdout.write(`${message}\n`);
 }
 
-export function logBuilderTestStart(
+function sanitizeLabel(label: string): string {
+  return label
+    .replace(/Builder/g, '')
+    .replace(/builder_/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+export function logTestStart(
   logger: ILogger | undefined,
   testName: string,
   testCase: any,
@@ -128,7 +136,9 @@ export function logBuilderTestStart(
 
   const progress =
     totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
-  const startMessage = `${progress} ▶ START ${testName} :: ${testCase.name}`;
+  const safeTestName = sanitizeLabel(testName);
+  const safeCaseName = sanitizeLabel(testCase.name || '');
+  const startMessage = `${progress} ▶ START ${safeTestName} :: ${safeCaseName}`;
 
   // Use logImmediate for synchronous output
   logImmediate(startMessage);
@@ -151,8 +161,8 @@ export function resetTestCounter(): void {
   testResults.clear();
 }
 
-export function logBuilderTestSkip(
-  logger: BuilderTestLogger | undefined,
+export function logTestSkip(
+  logger: TestProgressLogger | undefined,
   testName: string,
   reason: string,
   silent: boolean = false,
@@ -168,7 +178,8 @@ export function logBuilderTestSkip(
     totalTests > 0
       ? `[${currentCounter}/${totalTests}]`
       : `[${currentCounter}]`;
-  const message = `${progress} ⏭ SKIP ${testName} – ${reason}`;
+  const safeTestName = sanitizeLabel(testName);
+  const message = `${progress} ⏭ SKIP ${safeTestName} – ${reason}`;
 
   // Use logImmediate for synchronous output
   logImmediate(message);
@@ -180,8 +191,8 @@ export function logBuilderTestSkip(
   testResults.set(testName, 'SKIP');
 }
 
-export function logBuilderTestSuccess(
-  logger: BuilderTestLogger | undefined,
+export function logTestSuccess(
+  logger: TestProgressLogger | undefined,
   testName: string,
 ): void {
   try {
@@ -191,7 +202,8 @@ export function logBuilderTestSuccess(
       : '';
     const progress =
       totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
-    const message = `${progress} ✓ PASS ${testName}${duration}`;
+    const safeTestName = sanitizeLabel(testName);
+    const message = `${progress} ✓ PASS ${safeTestName}${duration}`;
 
     // Use logImmediate for synchronous output
     logImmediate(message);
@@ -208,8 +220,8 @@ export function logBuilderTestSuccess(
   }
 }
 
-export function logBuilderTestEnd(
-  logger: BuilderTestLogger | undefined,
+export function logTestEnd(
+  logger: TestProgressLogger | undefined,
   testName: string,
 ): void {
   // Always log test completion to show clear test boundaries
@@ -220,7 +232,8 @@ export function logBuilderTestEnd(
 
   if (result === 'PASS' || result === 'FAIL') {
     // Test already logged result, but we still log completion for clarity
-    const message = `${progress} ✓ END ${testName}`;
+    const safeTestName = sanitizeLabel(testName);
+    const message = `${progress} ✓ END ${safeTestName}`;
     logImmediate(message);
     // Add blank line after test completion for better readability
     logImmediate('');
@@ -233,7 +246,8 @@ export function logBuilderTestEnd(
   }
 
   // If test was skipped or ended without explicit result, log completion
-  const message = `${progress} ✓ END ${testName}`;
+  const safeTestName = sanitizeLabel(testName);
+  const message = `${progress} ✓ END ${safeTestName}`;
   logImmediate(message);
   // Add blank line after test completion for better readability
   logImmediate('');
@@ -244,8 +258,8 @@ export function logBuilderTestEnd(
   }
 }
 
-export function logBuilderTestError(
-  logger: BuilderTestLogger | undefined,
+export function logTestError(
+  logger: TestProgressLogger | undefined,
   testName: string,
   error: unknown,
 ): void {
@@ -256,7 +270,8 @@ export function logBuilderTestError(
   const progress =
     totalTests > 0 ? `[${testCounter}/${totalTests}]` : `[${testCounter}]`;
   const errorMessage = extractErrorMessage(error);
-  const message = `${progress} ✗ FAIL ${testName}${duration}: ${errorMessage}`;
+  const safeTestName = sanitizeLabel(testName);
+  const message = `${progress} ✗ FAIL ${safeTestName}${duration}: ${errorMessage}`;
 
   // Use logImmediate for synchronous output
   logImmediate(message);
@@ -289,9 +304,9 @@ export function logBuilderTestError(
   testResults.set(testName, 'FAIL');
 }
 
-export function logBuilderTestStep(
+export function logTestStep(
   step: string,
-  logger?: BuilderTestLogger | undefined,
+  logger?: TestProgressLogger | undefined,
 ): void {
   const message = `  → ${step}`;
   // Use logImmediate for synchronous output
@@ -303,7 +318,7 @@ export function logBuilderTestStep(
   }
 }
 
-export function logBuilderTestStepError(step: string, error: any): void {
+export function logTestStepError(step: string, error: any): void {
   if (error && typeof error === 'object' && 'response' in error) {
     const axiosError = error as any;
     const status = axiosError.response?.status;
@@ -358,7 +373,7 @@ export function logBuilderTestStepError(step: string, error: any): void {
 /**
  * Log systemInfo for debugging (used in FunctionGroup create and other operations)
  */
-export function logBuilderSystemInfo(
+export function logTestSystemInfo(
   systemInfo: any,
   finalValues: {
     masterSystem?: string;
@@ -398,7 +413,7 @@ export function logBuilderSystemInfo(
   }
 }
 
-export function logBuilderLockEvent(
+export function logTestLockEvent(
   objectType: string,
   objectName: string,
   sessionId: string,

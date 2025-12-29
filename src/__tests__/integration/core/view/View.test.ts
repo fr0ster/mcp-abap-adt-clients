@@ -20,7 +20,7 @@ import type { IViewConfig, IViewState } from '../../../../core/view';
 import { BaseTester } from '../../../helpers/BaseTester';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
@@ -45,7 +45,7 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code (View) uses DEBUG_ADT_LIBS
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
@@ -63,7 +63,7 @@ describe('View (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
 
       const envCheck = await checkDefaultTestEnvironment(connection);
@@ -193,7 +193,7 @@ describe('View (using AdtClient)', () => {
           };
 
           // Use AdtClient for dependency table creation
-          const tempAdtClient = new AdtClient(connection, builderLogger);
+          const tempAdtClient = new AdtClient(connection, libraryLogger);
           const tableResult = await createDependencyTable(
             tempAdtClient,
             tableConfig,

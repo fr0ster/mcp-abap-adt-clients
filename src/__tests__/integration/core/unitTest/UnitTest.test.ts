@@ -18,16 +18,16 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
 import type { IUnitTestConfig } from '../../../../core/unitTest';
 import {
-  logBuilderTestEnd,
-  logBuilderTestError,
-  logBuilderTestSkip,
-  logBuilderTestStart,
-  logBuilderTestStep,
-  logBuilderTestSuccess,
-} from '../../../helpers/builderTestLogger';
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestStep,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
-  createBuilderLogger,
+  createLibraryLogger,
   createConnectionLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
@@ -50,7 +50,7 @@ if (fs.existsSync(envPath)) {
 const connectionLogger: ILogger = createConnectionLogger();
 
 // Library code uses DEBUG_ADT_LIBS
-const builderLogger: ILogger = createBuilderLogger();
+const libraryLogger: ILogger = createLibraryLogger();
 
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
@@ -65,7 +65,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, builderLogger);
+      client = new AdtClient(connection, libraryLogger);
       hasConfig = true;
     } catch (_error) {
       hasConfig = false;
@@ -87,11 +87,11 @@ describe('AdtUnitTest (using AdtClient)', () => {
           'adt_unit_test',
         );
         if (!testCase?.params?.test_class?.run_unit_test) {
-          logBuilderTestStart(testsLogger, 'UnitTest - run unit test', {
+          logTestStart(testsLogger, 'UnitTest - run unit test', {
             name: 'run_unit_test',
             params: {},
           });
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'UnitTest - run unit test',
             'Unit test configuration not found in test-config.yaml',
@@ -116,7 +116,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
         const unitTestResult = testCase.params.unit_test_result || {};
         const skipCleanup = testCase.params.skip_cleanup === true;
 
-        logBuilderTestStart(testsLogger, 'UnitTest - run unit test', {
+        logTestStart(testsLogger, 'UnitTest - run unit test', {
           name: 'run_unit_test',
           params: {
             container_class: containerClass,
@@ -127,7 +127,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
         });
 
         if (!hasConfig) {
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'UnitTest - run unit test',
             'No SAP configuration',
@@ -136,7 +136,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
         }
 
         if (!packageName) {
-          logBuilderTestSkip(
+          logTestSkip(
             testsLogger,
             'UnitTest - run unit test',
             'Package name not configured',
@@ -146,7 +146,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
         try {
           // Step 1: Validate container class
-          logBuilderTestStep('validate', testsLogger);
+          logTestStep('validate', testsLogger);
           const validateState = await client.getClass().validate({
             className: containerClass,
             packageName,
@@ -156,7 +156,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           testsLogger.info?.('Container class validated');
 
           // Step 2: Create container class
-          logBuilderTestStep('create', testsLogger);
+          logTestStep('create', testsLogger);
           const createClassState = await client.getClass().create({
             className: containerClass,
             packageName,
@@ -168,7 +168,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           testsLogger.info?.('Container class created');
 
           // Step 3: Create local test class
-          logBuilderTestStep('create (test class)', testsLogger);
+          logTestStep('create (test class)', testsLogger);
           const createTestClassState = await client.getLocalTestClass().create({
             className: containerClass,
             testClassCode: testClassSource,
@@ -179,7 +179,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           testsLogger.info?.('Local test class created');
 
           // Step 4: Activate class
-          logBuilderTestStep('activate', testsLogger);
+          logTestStep('activate', testsLogger);
           const activateState = await client.getClass().activate({
             className: containerClass,
             transportRequest,
@@ -188,7 +188,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           testsLogger.info?.('Class activated');
 
           // Step 5: Create unit test configuration
-          logBuilderTestStep('create (unit test)', testsLogger);
+          logTestStep('create (unit test)', testsLogger);
           const unitTestConfig: IUnitTestConfig = {
             tests: [
               {
@@ -202,11 +202,11 @@ describe('AdtUnitTest (using AdtClient)', () => {
 
           // Step 6: Update unit test (if needed - for now just prepare)
           // Note: Unit test runs don't have update step, but we log the preparation
-          logBuilderTestStep('update (unit test)', testsLogger);
+          logTestStep('update (unit test)', testsLogger);
           testsLogger.info?.('Unit test configuration prepared');
 
           // Step 7: Run unit test (start test execution)
-          logBuilderTestStep('run (unit test)', testsLogger);
+          logTestStep('run (unit test)', testsLogger);
           const unitTest = client.getUnitTest() as any;
           const runId = await unitTest.run(
             unitTestConfig.tests!,
@@ -216,7 +216,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           testsLogger.info?.('Unit test run started, run ID:', runId);
 
           // Step 8: Read status (with long polling if configured)
-          logBuilderTestStep('read (status)', testsLogger);
+          logTestStep('read (status)', testsLogger);
           const readConfig: IUnitTestConfig = {
             runId: runId,
             status: unitTestStatus,
@@ -273,7 +273,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           }
 
           // Step 9: Read result
-          logBuilderTestStep('read (result)', testsLogger);
+          logTestStep('read (result)', testsLogger);
           const _resultConfig: IUnitTestConfig = {
             runId: runId,
             result: unitTestResult,
@@ -334,7 +334,7 @@ describe('AdtUnitTest (using AdtClient)', () => {
           // Step 10: Cleanup - delete class if configured
           if (!skipCleanup && containerClass) {
             try {
-              logBuilderTestStep('delete (cleanup)', testsLogger);
+              logTestStep('delete (cleanup)', testsLogger);
               testsLogger.info?.('Cleaning up test class:', containerClass);
               await client.getClass().delete({
                 className: containerClass,
@@ -350,12 +350,12 @@ describe('AdtUnitTest (using AdtClient)', () => {
             );
           }
 
-          logBuilderTestSuccess(testsLogger, 'UnitTest - run unit test');
+          logTestSuccess(testsLogger, 'UnitTest - run unit test');
         } catch (error) {
-          logBuilderTestError(testsLogger, 'UnitTest - run unit test', error);
+          logTestError(testsLogger, 'UnitTest - run unit test', error);
           throw error;
         } finally {
-          logBuilderTestEnd(testsLogger, 'UnitTest - run unit test');
+          logTestEnd(testsLogger, 'UnitTest - run unit test');
         }
       },
       getTimeout('test'),

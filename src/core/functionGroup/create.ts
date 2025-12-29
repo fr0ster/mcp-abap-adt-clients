@@ -78,9 +78,9 @@ export async function create(
       process.env.NODE_ENV === 'test'
     ) {
       const {
-        logBuilderSystemInfo,
-      } = require('../../__tests__/helpers/builderTestLogger');
-      logBuilderSystemInfo(systemInfo, {
+        logTestSystemInfo,
+      } = require('../../__tests__/helpers/testProgressLogger');
+      logTestSystemInfo(systemInfo, {
         masterSystem: finalMasterSystem,
         responsible: finalResponsible,
         willIncludeMasterSystem: !!finalMasterSystem,
