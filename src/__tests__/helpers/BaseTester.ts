@@ -332,13 +332,7 @@ export class BaseTester<TConfig, TState> {
       withLongPolling: boolean = false,
     ): Promise<string | undefined> => {
       logTestStep(label, this.logger);
-      const url = getSourceUrl(version);
-      if (url) {
-        logTestStep(
-          `source url (${version ?? 'no version'}): ${url}`,
-          this.logger,
-        );
-      }
+      // No source URL logging by default (keep logs concise)
       let readState: TState | undefined;
       try {
         readState = await this.adtObject.read(
