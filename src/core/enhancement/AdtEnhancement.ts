@@ -187,7 +187,7 @@ export class AdtEnhancement
    */
   async read(
     config: Partial<IEnhancementConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IEnhancementState | undefined> {
     const state: IEnhancementState = {

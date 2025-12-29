@@ -33,6 +33,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { LogLevel } from '@mcp-abap-adt/interfaces';
+import { getTimeout } from '../../utils/timeouts';
 import {
   getHttpStatusText,
   logBuilderTestEnd,
@@ -266,6 +267,252 @@ export class BaseTester<TConfig, TState> {
     };
     let currentStep = '';
 
+    const getPayloadText = (data: unknown): string | undefined => {
+      if (typeof data === 'string') return data;
+      if (data !== undefined && data !== null) {
+        try {
+          return JSON.stringify(data);
+        } catch {
+          return undefined;
+        }
+      }
+      return undefined;
+    };
+
+    const getSourceUrl = (
+      version: 'active' | 'inactive' | undefined,
+    ): string | undefined => {
+      const utils = this.client?.getUtils?.();
+      if (!utils || !config) {
+        return undefined;
+      }
+
+      const configAny = config as any;
+      if (configAny.className) {
+        return utils.getObjectSourceUri('class', configAny.className, undefined, version);
+      }
+      if (configAny.interfaceName) {
+        return utils.getObjectSourceUri('interface', configAny.interfaceName, undefined, version);
+      }
+      if (configAny.programName) {
+        return utils.getObjectSourceUri('program', configAny.programName, undefined, version);
+      }
+      if (configAny.functionModuleName && configAny.functionGroupName) {
+        return utils.getObjectSourceUri(
+          'functionmodule',
+          configAny.functionModuleName,
+          configAny.functionGroupName,
+          version,
+        );
+      }
+      if (configAny.viewName) {
+        return utils.getObjectSourceUri('view', configAny.viewName, undefined, version);
+      }
+      if (configAny.structureName) {
+        return utils.getObjectSourceUri('structure', configAny.structureName, undefined, version);
+      }
+      if (configAny.tableName) {
+        return utils.getObjectSourceUri('table', configAny.tableName, undefined, version);
+      }
+      if (configAny.tableTypeName) {
+        return utils.getObjectSourceUri(
+          'tabletype',
+          configAny.tableTypeName,
+          undefined,
+          version,
+        );
+      }
+
+      return undefined;
+    };
+
+    const readVersion = async (
+      version: 'active' | 'inactive' | undefined,
+      label: string,
+      withLongPolling: boolean = false,
+    ): Promise<string | undefined> => {
+      logBuilderTestStep(label, this.logger);
+      const url = getSourceUrl(version);
+      if (url) {
+        logBuilderTestStep(
+          `source url (${version ?? 'no version'}): ${url}`,
+          this.logger,
+        );
+      }
+      let readState: TState | undefined;
+      try {
+        readState = await this.adtObject.read(
+          config as Partial<TConfig>,
+          version,
+          withLongPolling ? { withLongPolling: true } : undefined,
+        );
+      } catch (error: any) {
+        const status = error?.response?.status;
+        const errorText = error?.message || '';
+        if (withLongPolling && status === 400) {
+          logBuilderTestStep(
+            `${label} retry without long polling (HTTP 400)`,
+            this.logger,
+          );
+          // Small delay before retry to allow ADT to finalize object state
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          readState = await this.adtObject.read(
+            config as Partial<TConfig>,
+            version,
+            undefined,
+          );
+        } else {
+          throw error;
+        }
+      }
+      if (!readState || !(readState as any)?.readResult) {
+        throw new Error(`Read ${version} failed: no response`);
+      }
+      const payload = getPayloadText((readState as any)?.readResult?.data);
+      logBuilderTestStep(
+        `${label} length: ${payload?.length || 0} characters`,
+        this.logger,
+      );
+      return payload;
+    };
+
+    const readMetadata = async (
+      label: string,
+      withLongPolling: boolean = false,
+    ): Promise<string | undefined> => {
+      logBuilderTestStep(label, this.logger);
+      const metadataState = await this.adtObject.readMetadata(
+        config as Partial<TConfig>,
+        withLongPolling ? { withLongPolling: true } : undefined,
+      );
+      const metadataResult =
+        (metadataState as any)?.metadataResult ||
+        (metadataState as any)?.readResult;
+      const payload = getPayloadText(metadataResult?.data);
+      logBuilderTestStep(
+        `${label} length: ${payload?.length || 0} characters`,
+        this.logger,
+      );
+      return payload;
+    };
+
+    const readObjectProperties = async (label: string): Promise<void> => {
+      if (!this.connection || !this.client) {
+        return;
+      }
+      const sourceUrl = getSourceUrl(undefined);
+      if (!sourceUrl) {
+        return;
+      }
+      const encodedUri = encodeURIComponent(sourceUrl);
+      const url = `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${encodedUri}`;
+      logBuilderTestStep(label, this.logger);
+      try {
+        const response = await this.connection.makeAdtRequest({
+          url,
+          method: 'GET',
+          timeout: getTimeout('default'),
+          headers: {
+            Accept:
+              'application/vnd.sap.adt.repository.objproperties.result.v1+xml, application/vnd.sap.adt.objectproperties+xml, application/xml',
+          },
+        });
+        const payload = getPayloadText(response?.data);
+        logBuilderTestStep(
+          `${label} length: ${payload?.length || 0} characters`,
+          this.logger,
+        );
+      } catch (error: any) {
+        const errorText =
+          error?.message ||
+          error?.response?.data ||
+          'Unknown object properties error';
+        logBuilderTestStep(
+          `${label} failed: ${String(errorText).slice(0, 200)}`,
+          this.logger,
+        );
+      }
+    };
+
+    const shouldSkipInitialSourceRead = (): boolean => {
+      const configAny = config as any;
+      return Boolean(configAny?.className);
+    };
+
+    let preUpdateActive: string | undefined;
+    let postUpdateInactive: string | undefined;
+    let postActivateActive: string | undefined;
+
+    const normalizeXml = (xmlText: string): any | undefined => {
+      try {
+        const { XMLParser } = require('fast-xml-parser');
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          attributeNamePrefix: '@_',
+        });
+        return parser.parse(xmlText);
+      } catch (error) {
+        this.log(
+          LogLevel.WARN,
+          `Failed to parse XML for comparison: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return undefined;
+      }
+    };
+
+    const pickShape = (shape: any, source: any): any => {
+      if (shape === null || shape === undefined) {
+        return shape;
+      }
+      if (Array.isArray(shape)) {
+        if (!Array.isArray(source)) {
+          return undefined;
+        }
+        return shape.map((item, index) => pickShape(item, source[index]));
+      }
+      if (typeof shape !== 'object') {
+        return source;
+      }
+      if (!source || typeof source !== 'object') {
+        return undefined;
+      }
+      const result: Record<string, any> = {};
+      for (const key of Object.keys(shape)) {
+        result[key] = pickShape(shape[key], source[key]);
+      }
+      return result;
+    };
+
+    const sortObjectKeys = (value: any): any => {
+      if (Array.isArray(value)) {
+        return value.map(sortObjectKeys);
+      }
+      if (value && typeof value === 'object') {
+        return Object.keys(value)
+          .sort()
+          .reduce((acc, key) => {
+            acc[key] = sortObjectKeys(value[key]);
+            return acc;
+          }, {} as Record<string, any>);
+      }
+      return value;
+    };
+
+    const compareXmlSubset = (
+      referenceXml: string,
+      targetXml: string,
+    ): boolean => {
+      const referenceParsed = normalizeXml(referenceXml);
+      const targetParsed = normalizeXml(targetXml);
+      if (!referenceParsed || !targetParsed) {
+        return false;
+      }
+      const targetSubset = pickShape(referenceParsed, targetParsed);
+      const referenceNormalized = JSON.stringify(sortObjectKeys(referenceParsed));
+      const targetNormalized = JSON.stringify(sortObjectKeys(targetSubset));
+      return referenceNormalized === targetNormalized;
+    };
+
     try {
       // 1. Validate
       currentStep = 'validate';
@@ -434,6 +681,27 @@ export class BaseTester<TConfig, TState> {
 
       // 3. Update (if updateConfig provided)
       if (options?.updateConfig) {
+        const updateContent =
+          options.sourceCode ||
+          options.xmlContent ||
+          options.updateConfig?.sourceCode ||
+          options.updateConfig?.xmlContent;
+        await readObjectProperties(
+          'read object properties (post-create, no version)',
+        );
+        if (shouldSkipInitialSourceRead()) {
+          logBuilderTestStep(
+            'read initial (post-create, no version) skipped for class',
+            this.logger,
+          );
+        } else {
+          preUpdateActive = await readVersion(
+            undefined,
+            'read initial (post-create, no version)',
+            false,
+          );
+        }
+
         currentStep = 'update';
         logBuilderTestStep(currentStep, this.logger);
         const updateOptions: IAdtOperationOptions = {
@@ -451,6 +719,14 @@ export class BaseTester<TConfig, TState> {
           this.getOperationDelay('update', testCaseParams),
           'update',
         );
+
+        if (!options?.activateOnUpdate) {
+          postUpdateInactive = await readVersion(
+            'inactive',
+            'read inactive (post-update)',
+            true,
+          );
+        }
       }
 
       // 4. Activate (if not activated during create/update)
@@ -483,6 +759,82 @@ export class BaseTester<TConfig, TState> {
           this.getOperationDelay('activate', testCaseParams),
           'activate',
         );
+
+        if (options?.updateConfig) {
+          postActivateActive = await readVersion(
+            'active',
+            'read active (post-activate)',
+            true,
+          );
+        }
+      }
+
+      if (options?.updateConfig) {
+        const updateContent =
+          options.sourceCode ||
+          options.xmlContent ||
+          options.updateConfig?.sourceCode ||
+          options.updateConfig?.xmlContent;
+        const updateContentKind = options.sourceCode
+          ? 'source'
+          : options.xmlContent
+            ? 'xml'
+            : options.updateConfig?.sourceCode
+              ? 'source'
+              : options.updateConfig?.xmlContent
+                ? 'xml'
+                : 'unknown';
+
+        if (preUpdateActive && postUpdateInactive) {
+          if (updateContentKind === 'source') {
+            if (updateContent && updateContent !== preUpdateActive) {
+              if (preUpdateActive === postUpdateInactive) {
+                throw new Error(
+                  'Expected inactive version to differ after update, but content is unchanged',
+                );
+              }
+            } else if (updateContent && updateContent === preUpdateActive) {
+              this.log(
+                LogLevel.WARN,
+                'Update content matches active version; skipping pre/post update difference check',
+              );
+            }
+          } else {
+            this.log(
+              LogLevel.INFO,
+              'Skipping pre/post update comparison for XML-based update content',
+            );
+          }
+        }
+
+        if (postUpdateInactive && postActivateActive) {
+          if (updateContentKind === 'source') {
+            if (postUpdateInactive !== postActivateActive) {
+              throw new Error(
+                'Expected inactive version to match active version after activation',
+              );
+            }
+          } else if (updateContentKind === 'xml' && updateContent) {
+            const inactiveMatches = compareXmlSubset(
+              updateContent,
+              postUpdateInactive,
+            );
+            const activeMatches = compareXmlSubset(
+              updateContent,
+              postActivateActive,
+            );
+            if (!inactiveMatches || !activeMatches) {
+              throw new Error(
+                'Expected XML-based update content to match inactive and active versions after activation',
+              );
+            }
+          } else {
+            this.log(
+              LogLevel.INFO,
+              'Skipping post-update vs post-activate comparison for XML-based update content',
+            );
+          }
+        }
       }
 
       if (options?.readMetadata) {

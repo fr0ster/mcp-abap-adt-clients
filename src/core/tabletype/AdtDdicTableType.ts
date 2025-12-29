@@ -127,7 +127,7 @@ export class AdtDdicTableType
    */
   async read(
     config: Partial<ITableTypeConfig>,
-    _version: 'active' | 'inactive' = 'active',
+    _version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<ITableTypeState> {
     if (!config.tableTypeName) {

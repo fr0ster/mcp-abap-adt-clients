@@ -124,7 +124,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
    */
   async read(
     config: Partial<ITableConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<ITableState> {
     if (!config.tableName) {

@@ -38,7 +38,7 @@ export async function getProgramMetadata(
 export async function getProgramSource(
   connection: IAbapConnection,
   programName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(

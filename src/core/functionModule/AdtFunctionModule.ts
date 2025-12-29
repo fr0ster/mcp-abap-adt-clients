@@ -143,7 +143,7 @@ export class AdtFunctionModule
    */
   async read(
     config: Partial<IFunctionModuleConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IFunctionModuleState | undefined> {
     if (!config.functionModuleName) {

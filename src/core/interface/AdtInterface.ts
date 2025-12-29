@@ -144,7 +144,7 @@ export class AdtInterface
    */
   async read(
     config: Partial<IInterfaceConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IInterfaceState | undefined> {
     if (!config.interfaceName) {

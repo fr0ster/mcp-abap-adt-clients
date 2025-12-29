@@ -135,7 +135,7 @@ export class AdtServiceDefinition
    */
   async read(
     config: Partial<IServiceDefinitionConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IServiceDefinitionState | undefined> {
     const state: IServiceDefinitionState = { errors: [] };

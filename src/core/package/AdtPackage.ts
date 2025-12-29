@@ -196,7 +196,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
    */
   async read(
     config: Partial<IPackageConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IPackageState | undefined> {
     if (!config.packageName) {

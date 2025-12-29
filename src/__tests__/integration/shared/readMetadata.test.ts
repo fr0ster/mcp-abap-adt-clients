@@ -123,15 +123,32 @@ describe('Shared - readMetadata', () => {
       testsLogger.info?.(`📋 Object: ${className} (class)`);
       testsLogger.info?.('📖 Reading metadata...');
 
-      const result = await client
+      const activeResult = await client
         .getUtils()
-        .readObjectMetadata('class', className);
+        .readObjectMetadata('class', className, undefined, {
+          version: 'active',
+        });
+      const inactiveResult = await client
+        .getUtils()
+        .readObjectMetadata('class', className, undefined, {
+          version: 'inactive',
+        });
 
-      expect(result.status).toBe(200);
-      expect(result.data).toBeDefined();
+      expect(activeResult.status).toBe(200);
+      expect(activeResult.data).toBeDefined();
+      logBuilderTestStep(
+        `metadata active size: ${activeResult.data?.length || 0} bytes`,
+        testsLogger,
+      );
+
+      expect(inactiveResult.status).toBe(200);
+      expect(inactiveResult.data).toBeDefined();
+      logBuilderTestStep(
+        `metadata inactive size: ${inactiveResult.data?.length || 0} bytes`,
+        testsLogger,
+      );
 
       testsLogger.info?.('✅ Metadata retrieved');
-      testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
     } catch (error: any) {
       if (error.response?.status === 406) {
         if (isHttpStatusAllowed(406, { params: {} })) {
@@ -171,7 +188,10 @@ describe('Shared - readMetadata', () => {
       expect(result.data).toBeDefined();
 
       testsLogger.info?.('✅ Metadata retrieved');
-      testsLogger.info?.(`📊 Metadata size: ${result.data?.length || 0} bytes`);
+      logBuilderTestStep(
+        `metadata size: ${result.data?.length || 0} bytes`,
+        testsLogger,
+      );
     } catch (error: any) {
       if (error.response?.status === 406) {
         if (isHttpStatusAllowed(406, { params: {} })) {

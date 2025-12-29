@@ -38,7 +38,7 @@ export async function getStructureMetadata(
 export async function getStructureSource(
   connection: IAbapConnection,
   structureName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(

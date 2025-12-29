@@ -160,7 +160,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
    */
   async read(
     config: Partial<IProgramConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IProgramState | undefined> {
     if (!config.programName) {

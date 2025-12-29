@@ -38,7 +38,7 @@ export async function getViewMetadata(
 export async function getViewSource(
   connection: IAbapConnection,
   viewName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(

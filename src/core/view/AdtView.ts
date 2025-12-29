@@ -143,7 +143,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    */
   async read(
     config: Partial<IViewConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IViewState | undefined> {
     if (!config.viewName) {

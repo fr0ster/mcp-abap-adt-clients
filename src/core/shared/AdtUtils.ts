@@ -306,8 +306,15 @@ export class AdtUtils {
     options?: IReadOptions,
   ): Promise<AxiosResponse> {
     let uri = getObjectMetadataUri(objectType, objectName, functionGroup);
+    const params = [];
+    if (options?.version) {
+      params.push(`version=${options.version}`);
+    }
     if (options?.withLongPolling) {
-      uri += '?withLongPolling=true';
+      params.push('withLongPolling=true');
+    }
+    if (params.length > 0) {
+      uri += `?${params.join('&')}`;
     }
     const acceptHeader = options?.accept ?? getMetadataAcceptHeader(objectType);
     return makeAdtRequestWithAcceptNegotiation(
@@ -343,7 +350,7 @@ export class AdtUtils {
     objectType: AdtSourceObjectType,
     objectName: string,
     functionGroup?: string,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<AxiosResponse> {
     if (!supportsSourceCode(objectType)) {
@@ -403,7 +410,7 @@ export class AdtUtils {
     objectType: AdtSourceObjectType,
     objectName: string,
     functionGroup?: string,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
   ): string {
     return getObjectSourceUri(objectType, objectName, functionGroup, version);
   }
@@ -857,10 +864,10 @@ function getObjectSourceUri(
   objectType: AdtSourceObjectType,
   objectName: string,
   functionGroup?: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
 ): string {
   const encodedName = encodeSapObjectName(objectName);
-  const versionParam = version === 'inactive' ? '?version=inactive' : '';
+  const versionParam = version ? `?version=${version}` : '';
 
   switch (objectType.toLowerCase()) {
     case 'class':
@@ -868,7 +875,7 @@ function getObjectSourceUri(
       return `/sap/bc/adt/oo/classes/${encodedName}/source/main${versionParam}`;
     case 'program':
     case 'prog/p':
-      return `/sap/bc/adt/programs/programs/${encodedName}/source/main`;
+      return `/sap/bc/adt/programs/programs/${encodedName}/source/main${versionParam}`;
     case 'interface':
     case 'intf/if':
       return `/sap/bc/adt/oo/interfaces/${encodedName}/source/main${versionParam}`;
@@ -882,16 +889,16 @@ function getObjectSourceUri(
     }
     case 'view':
     case 'ddls/df':
-      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
+      return `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main${versionParam}`;
     case 'structure':
     case 'stru/dt':
-      return `/sap/bc/adt/ddic/structures/${encodedName}/source/main`;
+      return `/sap/bc/adt/ddic/structures/${encodedName}/source/main${versionParam}`;
     case 'table':
     case 'tabl/dt':
-      return `/sap/bc/adt/ddic/tables/${encodedName}/source/main`;
+      return `/sap/bc/adt/ddic/tables/${encodedName}/source/main${versionParam}`;
     case 'tabletype':
     case 'ttyp/df':
-      return `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main`;
+      return `/sap/bc/adt/ddic/tabletypes/${encodedName}/source/main${versionParam}`;
     default:
       throw new Error(
         `Object type ${objectType} does not support source code reading`,

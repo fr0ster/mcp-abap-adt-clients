@@ -150,7 +150,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
    */
   async read(
     config: Partial<IDomainConfig>,
-    _version: 'active' | 'inactive' = 'active',
+    _version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IDomainState | undefined> {
     if (!config.domainName) {
@@ -196,7 +196,11 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     }
     try {
       // For objects without source code, read() already returns metadata
-      const readState = await this.read(config, 'active', options);
+      const readState = await this.read(
+        config,
+        options?.version ?? 'active',
+        options,
+      );
       if (readState) {
         state.metadataResult = readState.readResult;
         state.readResult = readState.readResult;

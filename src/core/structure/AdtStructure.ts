@@ -143,7 +143,7 @@ export class AdtStructure
    */
   async read(
     config: Partial<IStructureConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IStructureState | undefined> {
     if (!config.structureName) {

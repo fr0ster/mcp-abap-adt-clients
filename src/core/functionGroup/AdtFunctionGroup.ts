@@ -245,7 +245,7 @@ export class AdtFunctionGroup
    */
   async read(
     config: Partial<IFunctionGroupConfig>,
-    _version: 'active' | 'inactive' = 'active',
+    _version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IFunctionGroupState | undefined> {
     if (!config.functionGroupName) {
@@ -290,7 +290,11 @@ export class AdtFunctionGroup
     }
     try {
       // For objects without source code, read() already returns metadata
-      const readState = await this.read(config, 'active', options);
+      const readState = await this.read(
+        config,
+        options?.version ?? 'active',
+        options,
+      );
       if (readState) {
         state.metadataResult = readState.readResult;
         state.readResult = readState.readResult;

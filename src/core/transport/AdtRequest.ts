@@ -106,7 +106,7 @@ export class AdtRequest
    */
   async read(
     config: Partial<ITransportConfig>,
-    _version: 'active' | 'inactive' = 'active',
+    _version?: 'active' | 'inactive',
   ): Promise<ITransportState | undefined> {
     if (!config.transportNumber) {
       throw new Error('Transport request number is required');

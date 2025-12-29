@@ -135,7 +135,7 @@ export class AdtMetadataExtension
    */
   async read(
     config: Partial<IMetadataExtensionConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IMetadataExtensionState | undefined> {
     const state: IMetadataExtensionState = { errors: [] };

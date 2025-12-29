@@ -177,7 +177,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
    */
   async read(
     config: Partial<IClassConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IClassState | undefined> {
     if (!config.className) {

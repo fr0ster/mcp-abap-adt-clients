@@ -187,6 +187,47 @@ describe('Shared - readSource', () => {
     expect(result.data).toBeDefined();
   }, 15000);
 
+  it('should read class source code (active and inactive versions)', async () => {
+    if (!hasConfig) {
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    const className = 'CL_ABAP_CHAR_UTILITIES';
+    logBuilderTestStep(
+      'read class source code (active and inactive versions)',
+      testsLogger,
+    );
+
+    logBuilderTestStep('read class source (active)', testsLogger);
+    const activeResult = await withAcceptHandling(
+      client
+        .getUtils()
+        .readObjectSource('class', className, undefined, 'active'),
+    );
+    expect(activeResult.status).toBe(200);
+    expect(activeResult.data).toBeDefined();
+    logBuilderTestStep(
+      `active source length: ${activeResult.data?.length || 0} characters`,
+      testsLogger,
+    );
+
+    logBuilderTestStep('read class source (inactive)', testsLogger);
+    const inactiveResult = await withAcceptHandling(
+      client
+        .getUtils()
+        .readObjectSource('class', className, undefined, 'inactive'),
+    );
+    expect(inactiveResult.status).toBe(200);
+    expect(inactiveResult.data).toBeDefined();
+    logBuilderTestStep(
+      `inactive source length: ${inactiveResult.data?.length || 0} characters`,
+      testsLogger,
+    );
+  }, 15000);
+
   it('should throw error for object type without source code', async () => {
     if (!hasConfig) {
       testsLogger.warn?.(

@@ -38,7 +38,7 @@ export async function getTableMetadata(
 export async function getTableSource(
   connection: IAbapConnection,
   tableName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(

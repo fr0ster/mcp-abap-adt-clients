@@ -74,12 +74,12 @@ Request Headers: ${JSON.stringify({ Accept: acceptHeader }, null, 2)}`;
 export async function getTableTypeSource(
   connection: IAbapConnection,
   tableTypeName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(tableTypeName);
-  const versionParam = version === 'inactive' ? 'version=inactive' : '';
+  const versionParam = version ? `version=${version}` : '';
   const longPollingParam = options?.withLongPolling
     ? 'withLongPolling=true'
     : '';

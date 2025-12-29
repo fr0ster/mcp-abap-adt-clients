@@ -39,7 +39,7 @@ export async function getInterfaceMetadata(
 export async function getInterfaceSource(
   connection: IAbapConnection,
   interfaceName: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(

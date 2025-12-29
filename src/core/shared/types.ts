@@ -66,6 +66,7 @@ export interface IObjectReference {
 export interface IReadOptions {
   withLongPolling?: boolean;
   accept?: string;
+  version?: 'active' | 'inactive';
 }
 
 /**

@@ -44,7 +44,7 @@ export async function getBehaviorImplementationMetadata(
 export async function getBehaviorImplementationSource(
   connection: IAbapConnection,
   className: string,
-  version: 'active' | 'inactive' = 'active',
+  version?: 'active' | 'inactive',
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<AxiosResponse> {

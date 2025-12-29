@@ -155,7 +155,7 @@ export class AdtBehaviorImplementation
    */
   async read(
     config: Partial<IBehaviorImplementationConfig>,
-    version: 'active' | 'inactive' = 'active',
+    version?: 'active' | 'inactive',
     options?: IReadOptions,
   ): Promise<IBehaviorImplementationState | undefined> {
     const state: IBehaviorImplementationState = { errors: [] };
