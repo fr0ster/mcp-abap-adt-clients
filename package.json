@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -51,6 +51,7 @@
     "test:sequential": "node scripts/run-tests-sequential.js",
     "test:module": "node scripts/test-module.js",
     "test:long-polling-read": "npx ts-node scripts/test-long-polling-read.ts",
+    "package:contents": "npx ts-node scripts/show-package-contents.ts",
     "discovery:markdown": "npx ts-node tools/discovery-to-markdown.ts",
     "adt:entities": "node tools/adt-object-entities.js",
     "pretest": "npm run test:check:integration",

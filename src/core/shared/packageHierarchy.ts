@@ -172,24 +172,61 @@ const isRestoreImplemented = (
   return supported.has(type);
 };
 
-const parseNodeStructure = (xmlData: string, logger?: ILogger): any[] => {
+interface IObjectTypeInfo {
+  objectType: string;
+  nodeId: string;
+}
+
+interface IParsedNodeStructure {
+  nodes: any[];
+  objectTypes: IObjectTypeInfo[];
+}
+
+const parseNodeStructure = (
+  xmlData: string,
+  logger?: ILogger,
+): IParsedNodeStructure => {
+  const emptyResult: IParsedNodeStructure = { nodes: [], objectTypes: [] };
   try {
     if (!xmlData) {
-      return [];
+      return emptyResult;
     }
     const result = xmlParser.parse(xmlData) as Record<string, unknown>;
     const data = (result as any)?.['asx:abap']?.['asx:values']?.DATA;
+
+    // Parse TREE_CONTENT nodes
     const treeContent = data?.TREE_CONTENT;
-    const nodes = treeContent?.SEU_ADT_REPOSITORY_OBJ_NODE;
-    if (!nodes) {
-      return [];
+    const rawNodes = treeContent?.SEU_ADT_REPOSITORY_OBJ_NODE;
+    const nodes = rawNodes
+      ? Array.isArray(rawNodes)
+        ? rawNodes
+        : [rawNodes]
+      : [];
+
+    // Parse OBJECT_TYPES to get NODE_ID for each object type
+    const objectTypesData = data?.OBJECT_TYPES;
+    const rawTypes = objectTypesData?.SEU_ADT_OBJECT_TYPE_INFO;
+    const typeInfos = rawTypes
+      ? Array.isArray(rawTypes)
+        ? rawTypes
+        : [rawTypes]
+      : [];
+
+    const objectTypes: IObjectTypeInfo[] = [];
+    for (const typeInfo of typeInfos) {
+      const objectType = readNodeValue(typeInfo?.OBJECT_TYPE);
+      const nodeId = readNodeValue(typeInfo?.NODE_ID);
+      if (objectType && nodeId) {
+        objectTypes.push({ objectType, nodeId });
+      }
     }
-    return Array.isArray(nodes) ? nodes : [nodes];
+
+    return { nodes, objectTypes };
   } catch (error) {
     if (debugEnabled) {
       logger?.warn?.('Failed to parse node structure XML', error);
     }
-    return [];
+    return emptyResult;
   }
 };
 
@@ -323,6 +360,7 @@ const fetchPackageTreeRecursive = async (
     return createPackageNode(packageName, []);
   }
 
+  // Initial request - returns subpackages and OBJECT_TYPES with NODE_IDs
   const response = await fetchNodeStructure(
     connection,
     'DEVC/K',
@@ -334,13 +372,47 @@ const fetchPackageTreeRecursive = async (
     typeof response.data === 'string'
       ? response.data
       : JSON.stringify(response.data);
-  const nodes = parseNodeStructure(xml, logger);
+  const { nodes, objectTypes } = parseNodeStructure(xml, logger);
 
-  if (nodes.length === 0) {
+  // Collect all nodes including subpackages from initial response
+  const allNodes: any[] = [...nodes];
+
+  // Fetch objects for each non-package type using their NODE_ID
+  for (const typeInfo of objectTypes) {
+    // Skip DEVC/K as subpackages are already in initial response
+    if (isPackageType(typeInfo.objectType)) {
+      continue;
+    }
+
+    try {
+      const typeResponse = await fetchNodeStructure(
+        connection,
+        'DEVC/K',
+        packageName,
+        typeInfo.nodeId,
+        includeDescriptions,
+      );
+      const typeXml =
+        typeof typeResponse.data === 'string'
+          ? typeResponse.data
+          : JSON.stringify(typeResponse.data);
+      const { nodes: typeNodes } = parseNodeStructure(typeXml, logger);
+      allNodes.push(...typeNodes);
+    } catch (error) {
+      if (debugEnabled) {
+        logger?.warn?.(
+          `Failed to fetch objects of type ${typeInfo.objectType} for package ${packageName}`,
+          error,
+        );
+      }
+    }
+  }
+
+  if (allNodes.length === 0) {
     return createPackageNode(packageName, []);
   }
 
-  const children = buildTreeFromNodes(nodes, includeDescriptions, logger);
+  const children = buildTreeFromNodes(allNodes, includeDescriptions, logger);
   const packageNode = createPackageNode(packageName, children);
 
   if (currentDepth < maxDepth && children.length > 0) {
