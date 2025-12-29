@@ -92,6 +92,16 @@ export function createLibraryLogger(): ILogger {
 }
 
 /**
+ * Create a builder logger for ADT builder/library code
+ * Uses DEBUG_ADT_LIBS flag
+ * Returns DefaultLogger from @mcp-abap-adt/logger (synchronous, ideal for tests)
+ * Logger respects AUTH_LOG_LEVEL environment variable for log level control
+ */
+export function createBuilderLogger(): ILogger {
+  return createLibraryLogger();
+}
+
+/**
  * Create a test logger for integration tests
  * Uses DEBUG_ADT_TESTS flag
  * Returns DefaultLogger from @mcp-abap-adt/logger (synchronous, ideal for tests)
