@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.11] - 2025-12-29
+
+### Added
+- **CLAUDE.md**: Added project guidance file for Claude Code with build/test commands, architecture overview, and code standards
+
 ## [0.3.10] - 2025-12-29
 
 ### Changed
