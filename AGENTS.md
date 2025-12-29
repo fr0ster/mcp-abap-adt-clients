@@ -35,3 +35,4 @@
 - Do not commit credentials or SAP endpoints; rely on environment variables for ADT connection when running tests.
 - Respect `.locks/active-locks.json`; ensure tests and scripts release locks and document any manual steps.
 - When adding scripts, preserve sequential execution to avoid clashing with shared ABAP objects.
+- Deliver all repository artifacts (code, docs, scripts) in English, but keep conversational exchanges and contextual notes in Ukrainian.

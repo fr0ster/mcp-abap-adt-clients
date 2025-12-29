@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.13] - 2025-12-29
+
+### Added
+- **Package contents list**: `AdtUtils.getPackageContentsList()` returns a flat `IPackageContentItem[]` for a package, optionally traversing subpackages and preserving descriptions so callers can build tables or reports.
+- **Scripts**: Added `scripts/read-package-contents.ts` so consumers can dump package contents as a table, tree, or JSON output via CLI options such as `--subpackages`, `--json`, `--tree`, and `--depth`.
+
 ## [0.3.12] - 2025-12-29
 
 ### Fixed

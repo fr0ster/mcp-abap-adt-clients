@@ -197,3 +197,33 @@ export interface IPackageHierarchyNode {
   restoreStatus?: 'ok' | 'not-implemented';
   children?: IPackageHierarchyNode[];
 }
+
+/**
+ * Options for getPackageContentsList
+ */
+export interface IGetPackageContentsListOptions {
+  /** Include contents of subpackages recursively (default: false) */
+  includeSubpackages?: boolean;
+  /** Maximum depth for subpackage traversal (default: 5) */
+  maxDepth?: number;
+  /** Include object descriptions (default: true) */
+  includeDescriptions?: boolean;
+}
+
+/**
+ * Single item in package contents list
+ */
+export interface IPackageContentItem {
+  /** Object name */
+  name: string;
+  /** ADT object type (e.g., 'CLAS/OC', 'PROG/P') */
+  adtType: string;
+  /** Human-readable type name */
+  type?: PackageHierarchySupportedType;
+  /** Object description */
+  description?: string;
+  /** Package containing this object */
+  packageName: string;
+  /** Whether this item is a subpackage */
+  isPackage: boolean;
+}

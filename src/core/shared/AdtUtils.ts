@@ -38,7 +38,6 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { readSource as readBehaviorDefinitionSource } from '../behaviorDefinition/read';
 import { getEnhancementMetadata } from '../enhancement/read';
-import { getPackageContents } from '../package/read';
 import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
@@ -50,6 +49,7 @@ import { getInclude as getIncludeUtil } from './include';
 import { getIncludesList } from './includesList';
 import { fetchNodeStructure as fetchNodeStructureUtil } from './nodeStructure';
 import { getObjectStructure as getObjectStructureUtil } from './objectStructure';
+import { getPackageContentsList } from './packageContentsList';
 import { getPackageHierarchy } from './packageHierarchy';
 // Import utility functions
 import { searchObjects } from './search';
@@ -74,6 +74,7 @@ import type {
   AdtObjectType,
   AdtSourceObjectType,
   IGetDiscoveryParams,
+  IGetPackageContentsListOptions,
   IGetPackageHierarchyOptions,
   IGetSqlQueryParams,
   IGetTableContentsParams,
@@ -82,6 +83,7 @@ import type {
   IGetWhereUsedScopeParams,
   IInactiveObjectsResponse,
   IObjectReference,
+  IPackageContentItem,
   IPackageHierarchyNode,
   IReadOptions,
   ISearchObjectsParams,
@@ -582,9 +584,10 @@ export class AdtUtils {
   }
 
   /**
-   * Get package contents (list of objects in package)
+   * Get package contents as raw XML
    *
-   * Retrieves all objects contained in an ABAP package.
+   * Low-level method that retrieves package contents as raw XML response.
+   * For most use cases, prefer getPackageContentsList() or getPackageHierarchy().
    *
    * @param packageName - Package name
    * @returns Axios response with XML containing package contents
@@ -596,7 +599,44 @@ export class AdtUtils {
    * ```
    */
   async getPackageContents(packageName: string): Promise<AxiosResponse> {
-    return getPackageContents(this.connection, packageName);
+    return fetchNodeStructureUtil(
+      this.connection,
+      'DEVC/K',
+      packageName.toUpperCase(),
+    );
+  }
+
+  /**
+   * Get package contents as a flat list
+   *
+   * Returns all objects in a package as a flat array. This is a convenient
+   * wrapper that fetches all object categories and returns them in a single list.
+   *
+   * @param packageName - Package name
+   * @param options - Optional options for fetching
+   * @returns Array of package content items
+   *
+   * @example
+   * ```typescript
+   * const items = await utils.getPackageContentsList('ZMY_PACKAGE');
+   * // Returns: [{ name: 'ZCL_MY_CLASS', type: 'CLAS/OC', description: '...' }, ...]
+   *
+   * // Include subpackage contents recursively
+   * const allItems = await utils.getPackageContentsList('ZMY_PACKAGE', {
+   *   includeSubpackages: true,
+   * });
+   * ```
+   */
+  async getPackageContentsList(
+    packageName: string,
+    options?: IGetPackageContentsListOptions,
+  ): Promise<IPackageContentItem[]> {
+    return getPackageContentsList(
+      this.connection,
+      packageName,
+      options,
+      this.logger,
+    );
   }
 
   /**
