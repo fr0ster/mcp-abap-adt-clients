@@ -60,6 +60,7 @@ import { getTypeInfo as getTypeInfoUtil } from './typeInfo';
 import { getVirtualFoldersContents } from './virtualFolders';
 import {
   getWhereUsed,
+  getWhereUsedList,
   getWhereUsedScope,
   modifyWhereUsedScope,
 } from './whereUsed';
@@ -79,6 +80,7 @@ import type {
   IGetSqlQueryParams,
   IGetTableContentsParams,
   IGetVirtualFoldersContentsParams,
+  IGetWhereUsedListParams,
   IGetWhereUsedParams,
   IGetWhereUsedScopeParams,
   IInactiveObjectsResponse,
@@ -87,6 +89,7 @@ import type {
   IPackageHierarchyNode,
   IReadOptions,
   ISearchObjectsParams,
+  IWhereUsedListResult,
 } from './types';
 
 export class AdtUtils {
@@ -236,6 +239,35 @@ export class AdtUtils {
    */
   async getWhereUsed(params: IGetWhereUsedParams): Promise<AxiosResponse> {
     return getWhereUsed(this.connection, params);
+  }
+
+  /**
+   * Get where-used references with parsed results
+   *
+   * This is a convenience method that combines scope fetching, search execution,
+   * and XML parsing into a single call with structured output.
+   *
+   * @param params - Where-used list parameters
+   * @returns Parsed where-used results with references list
+   *
+   * @example
+   * ```typescript
+   * const result = await utils.getWhereUsedList({
+   *   object_name: 'ZMY_TABLE',
+   *   object_type: 'table',
+   *   enableAllTypes: true
+   * });
+   *
+   * console.log(`Found ${result.totalReferences} references`);
+   * for (const ref of result.references) {
+   *   console.log(`${ref.name} (${ref.type}) in package ${ref.packageName}`);
+   * }
+   * ```
+   */
+  async getWhereUsedList(
+    params: IGetWhereUsedListParams,
+  ): Promise<IWhereUsedListResult> {
+    return getWhereUsedList(this.connection, params);
   }
 
   /**

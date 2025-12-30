@@ -6,9 +6,22 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { XMLParser } from 'fast-xml-parser';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { IGetWhereUsedParams, IGetWhereUsedScopeParams } from './types';
+import type {
+  IGetWhereUsedListParams,
+  IGetWhereUsedParams,
+  IGetWhereUsedScopeParams,
+  IWhereUsedListResult,
+  IWhereUsedReference,
+} from './types';
+
+const xmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '@_',
+  parseAttributeValue: false,
+});
 
 /**
  * Modify where-used scope to enable/disable specific object types
@@ -265,4 +278,124 @@ export async function getWhereUsed(
         'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
     },
   });
+}
+
+/**
+ * Get where-used references with parsed results
+ *
+ * This is a convenience method that combines scope fetching, search execution,
+ * and XML parsing into a single call with structured output.
+ *
+ * @param connection - ABAP connection
+ * @param params - Where-used list parameters
+ * @returns Parsed where-used results with references list
+ *
+ * @example
+ * ```typescript
+ * const result = await getWhereUsedList(connection, {
+ *   object_name: 'ZMY_TABLE',
+ *   object_type: 'table',
+ *   enableAllTypes: true
+ * });
+ *
+ * console.log(`Found ${result.totalReferences} references`);
+ * for (const ref of result.references) {
+ *   console.log(`${ref.name} (${ref.type}) in package ${ref.packageName}`);
+ * }
+ * ```
+ */
+export async function getWhereUsedList(
+  connection: IAbapConnection,
+  params: IGetWhereUsedListParams,
+): Promise<IWhereUsedListResult> {
+  if (!params.object_name) {
+    throw new Error('Object name is required');
+  }
+  if (!params.object_type) {
+    throw new Error('Object type is required');
+  }
+
+  let scopeXml: string | undefined;
+
+  // If enableAllTypes, fetch scope and modify it
+  if (params.enableAllTypes) {
+    const scopeResponse = await getWhereUsedScope(connection, {
+      object_name: params.object_name,
+      object_type: params.object_type,
+    });
+    scopeXml = modifyWhereUsedScope(scopeResponse.data, { enableAll: true });
+  }
+
+  // Execute where-used search
+  const response = await getWhereUsed(connection, {
+    object_name: params.object_name,
+    object_type: params.object_type,
+    scopeXml,
+  });
+
+  const xml: string = response.data;
+
+  // Parse XML response
+  const parsed = xmlParser.parse(xml);
+  const root = parsed['usagereferences:usageReferenceResult'];
+
+  if (!root) {
+    return {
+      objectName: params.object_name,
+      objectType: params.object_type,
+      totalReferences: 0,
+      resultDescription: '',
+      references: [],
+      rawXml: params.includeRawXml ? xml : undefined,
+    };
+  }
+
+  const numberOfResults = parseInt(root['@_numberOfResults'] || '0', 10);
+  const resultDescription = root['@_resultDescription'] || '';
+
+  // Parse referenced objects
+  const references: IWhereUsedReference[] = [];
+  const referencedObjectsNode = root['usagereferences:referencedObjects'];
+
+  if (referencedObjectsNode) {
+    const refObjects =
+      referencedObjectsNode['usagereferences:referencedObject'];
+    const refArray = Array.isArray(refObjects)
+      ? refObjects
+      : refObjects
+        ? [refObjects]
+        : [];
+
+    for (const refObj of refArray) {
+      const adtObject = refObj['usagereferences:adtObject'];
+      if (!adtObject) continue;
+
+      // Skip packages (DEVC/K) - they are container nodes, not actual references
+      const objType = adtObject['@_adtcore:type'] || '';
+      if (objType === 'DEVC/K') continue;
+
+      const packageRef = adtObject['adtcore:packageRef'];
+
+      references.push({
+        uri: refObj['@_uri'] || '',
+        name: adtObject['@_adtcore:name'] || '',
+        type: objType,
+        parentUri: refObj['@_parentUri'],
+        packageName: packageRef?.['@_adtcore:name'],
+        responsible: adtObject['@_adtcore:responsible'],
+        isResult: refObj['@_isResult'] === 'true',
+        usageInformation: refObj['@_usageInformation'],
+        objectIdentifier: refObj['objectIdentifier'],
+      });
+    }
+  }
+
+  return {
+    objectName: params.object_name,
+    objectType: params.object_type,
+    totalReferences: numberOfResults,
+    resultDescription,
+    references,
+    rawXml: params.includeRawXml ? xml : undefined,
+  };
 }

@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.14] - 2025-12-30
+
+### Added
+- **Where-Used List**: `AdtUtils.getWhereUsedList()` returns parsed where-used references with structured `IWhereUsedListResult` instead of raw XML. Supports `enableAllTypes` for Eclipse "select all" behavior and optional `includeRawXml` for debugging.
+- **Types**: New `IWhereUsedReference`, `IWhereUsedListResult`, `IGetWhereUsedListParams` interfaces for typed where-used results
+
 ## [0.3.13] - 2025-12-29
 
 ### Added

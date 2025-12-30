@@ -138,7 +138,20 @@ await client.getClass().create({
 // Utility functions
 const utils = client.getUtils();
 await utils.searchObjects({ query: 'Z*', objectType: 'CLAS' });
-await utils.getWhereUsed({ objectName: 'ZCL_TEST', objectType: 'CLAS' });
+
+// Where-used with parsed results (recommended)
+const result = await utils.getWhereUsedList({
+  object_name: 'ZCL_TEST',
+  object_type: 'class',
+  enableAllTypes: true  // Eclipse "select all" behavior
+});
+console.log(`Found ${result.totalReferences} references`);
+for (const ref of result.references) {
+  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+}
+
+// Where-used with raw XML (legacy)
+await utils.getWhereUsed({ object_name: 'ZCL_TEST', object_type: 'class' });
 ```
 
 **AdtUtils read type safety:**
@@ -499,7 +512,7 @@ See [docs/DEBUG.md](docs/DEBUG.md) for detailed debugging guide.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for package-specific release notes.
-Latest (0.3.9): clarified where-used flow docs and cross-links in usage/architecture.
+Latest (0.3.14): added `getWhereUsedList()` for parsed where-used results.
 
 ## Tests
 

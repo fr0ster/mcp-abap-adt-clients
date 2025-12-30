@@ -325,4 +325,79 @@ describe('Shared - getWhereUsed', () => {
       }),
     ).rejects.toThrow('Object type is required');
   });
+
+  it('should get where-used list with parsed results', async () => {
+    if (!hasConfig) {
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    logTestStep('get where-used list with parsed results', testsLogger);
+    testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+    testsLogger.info?.('🔍 Fetching parsed where-used list...');
+
+    const utils = client.getUtils();
+    const result = await utils.getWhereUsedList({
+      object_name: 'CL_ABAP_CHAR_UTILITIES',
+      object_type: 'class',
+      enableAllTypes: true,
+    });
+
+    expect(result).toBeDefined();
+    expect(result.objectName).toBe('CL_ABAP_CHAR_UTILITIES');
+    expect(result.objectType).toBe('class');
+    expect(typeof result.totalReferences).toBe('number');
+    expect(Array.isArray(result.references)).toBe(true);
+
+    testsLogger.info?.(`🎯 Found ${result.totalReferences} references`);
+    testsLogger.info?.(
+      `📊 Parsed ${result.references.length} reference objects`,
+    );
+
+    // Verify reference structure
+    if (result.references.length > 0) {
+      const firstRef = result.references[0];
+      expect(firstRef.uri).toBeDefined();
+      expect(firstRef.name).toBeDefined();
+      expect(firstRef.type).toBeDefined();
+      expect(typeof firstRef.isResult).toBe('boolean');
+
+      testsLogger.info?.(
+        `📝 First reference: ${firstRef.name} (${firstRef.type}) in ${firstRef.packageName}`,
+      );
+    }
+
+    // Verify no packages in references (they should be filtered out)
+    const hasPackages = result.references.some((ref) => ref.type === 'DEVC/K');
+    expect(hasPackages).toBe(false);
+
+    testsLogger.info?.('✅ Test complete: parsed results received');
+  }, 30000);
+
+  it('should get where-used list with raw XML included', async () => {
+    if (!hasConfig) {
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    logTestStep('get where-used list with raw XML', testsLogger);
+
+    const utils = client.getUtils();
+    const result = await utils.getWhereUsedList({
+      object_name: 'CL_ABAP_CHAR_UTILITIES',
+      object_type: 'class',
+      includeRawXml: true,
+    });
+
+    expect(result).toBeDefined();
+    expect(result.rawXml).toBeDefined();
+    expect(result.rawXml).toContain('usageReferenceResult');
+
+    testsLogger.info?.(`📊 Raw XML size: ${result.rawXml?.length} bytes`);
+    testsLogger.info?.('✅ Test complete: raw XML included');
+  }, 30000);
 });

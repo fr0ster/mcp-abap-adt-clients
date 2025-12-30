@@ -143,6 +143,66 @@ export interface IGetWhereUsedParams {
 }
 
 /**
+ * Parameters for getWhereUsedList (parsed version)
+ */
+export interface IGetWhereUsedListParams {
+  object_name: string;
+  object_type: string;
+  /**
+   * If true, searches in all available object types (Eclipse 'select all' behavior)
+   * Default: false (uses SAP default scope)
+   */
+  enableAllTypes?: boolean;
+  /**
+   * Include raw XML in response
+   * Default: false
+   */
+  includeRawXml?: boolean;
+}
+
+/**
+ * Single where-used reference
+ */
+export interface IWhereUsedReference {
+  /** ADT URI of the referencing object */
+  uri: string;
+  /** Object name */
+  name: string;
+  /** ADT object type (e.g., 'CLAS/OC', 'DDLS/DF') */
+  type: string;
+  /** Parent URI (for hierarchical display) */
+  parentUri?: string;
+  /** Package name containing the object */
+  packageName?: string;
+  /** Responsible user */
+  responsible?: string;
+  /** Whether this is a direct result or container */
+  isResult: boolean;
+  /** Usage information (e.g., 'gradeDirect,includeProductive') */
+  usageInformation?: string;
+  /** Object identifier for navigation */
+  objectIdentifier?: string;
+}
+
+/**
+ * Result from getWhereUsedList
+ */
+export interface IWhereUsedListResult {
+  /** Object that was searched */
+  objectName: string;
+  /** Object type that was searched */
+  objectType: string;
+  /** Total number of references found */
+  totalReferences: number;
+  /** Result description from SAP */
+  resultDescription: string;
+  /** List of referencing objects (excluding packages) */
+  references: IWhereUsedReference[];
+  /** Raw XML response (if includeRawXml was true) */
+  rawXml?: string;
+}
+
+/**
  * Virtual folders preselection entry
  */
 export interface IVirtualFoldersPreselection {

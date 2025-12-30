@@ -119,6 +119,7 @@ export type {
   GetSqlQueryParams,
   GetTableContentsParams,
   GetVirtualFoldersContentsParams,
+  GetWhereUsedListParams,
   GetWhereUsedParams,
   InactiveObjectsResponse,
   ObjectReference,
@@ -127,6 +128,8 @@ export type {
   PackageHierarchySupportedType,
   ReadOptions,
   SearchObjectsParams,
+  WhereUsedListResult,
+  WhereUsedReference,
 } from './core/shared';
 export type {
   AdtStructureType,

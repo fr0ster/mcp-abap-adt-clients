@@ -23,6 +23,7 @@ export type {
   IGetSqlQueryParams as GetSqlQueryParams,
   IGetTableContentsParams as GetTableContentsParams,
   IGetVirtualFoldersContentsParams as GetVirtualFoldersContentsParams,
+  IGetWhereUsedListParams as GetWhereUsedListParams,
   IGetWhereUsedParams as GetWhereUsedParams,
   IGetWhereUsedScopeParams as GetWhereUsedScopeParams,
   IInactiveObjectsResponse as InactiveObjectsResponse,
@@ -32,6 +33,8 @@ export type {
   IReadOptions as ReadOptions,
   ISearchObjectsParams as SearchObjectsParams,
   IVirtualFoldersPreselection as VirtualFoldersPreselection,
+  IWhereUsedListResult as WhereUsedListResult,
+  IWhereUsedReference as WhereUsedReference,
   PackageHierarchyCodeFormat,
   PackageHierarchySupportedType,
 } from './types';
