@@ -7,6 +7,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API with automatic operation chains
   - `AdtRuntimeClient` – runtime operations (debugger, traces, memory, logs)
+  - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
 - ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
 - ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
 - ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
@@ -90,6 +91,11 @@ npm install @mcp-abap-adt/adt-clients
    - Runtime operations for debugging, traces, memory analysis, and logs
    - Example: `await runtimeClient.getDebugger(...)`
 
+3. **AdtClientsWS**
+   - Realtime request/event facade over `IWebSocketTransport`
+   - Includes debugger-session facade: listen, attach, step, stack, variables
+   - Example: `await wsClient.request('debugger.listen', { timeoutSeconds: 30 })`
+
 ## Supported Object Types
 
 | Object Type | AdtClient |
@@ -152,6 +158,24 @@ for (const ref of result.references) {
 
 // Where-used with raw XML (legacy)
 await utils.getWhereUsed({ object_name: 'ZCL_TEST', object_type: 'class' });
+```
+
+### Using AdtClientsWS (Realtime)
+
+```typescript
+import { AdtClientsWS } from '@mcp-abap-adt/adt-clients';
+import type { IWebSocketTransport } from '@mcp-abap-adt/adt-clients';
+
+const transport: IWebSocketTransport = createYourTransport();
+const wsClient = new AdtClientsWS(transport, console, {
+  requestTimeoutMs: 30000,
+});
+
+await wsClient.connect('wss://your-realtime-endpoint');
+
+const debuggerSession = wsClient.getDebuggerSessionClient();
+await debuggerSession.listen({ timeoutSeconds: 60 });
+await debuggerSession.step({ action: 'step_over' });
 ```
 
 **AdtUtils read type safety:**

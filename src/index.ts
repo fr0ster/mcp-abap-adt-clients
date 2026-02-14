@@ -26,10 +26,24 @@ export type {
   IAdtObject,
   IAdtResponse,
   ILogger,
+  IWebSocketCloseInfo,
+  IWebSocketConnectOptions,
+  IWebSocketMessageEnvelope,
+  IWebSocketMessageHandler,
+  IWebSocketTransport,
 } from '@mcp-abap-adt/interfaces';
 export type { IAdtClientOptions } from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
+export { AdtClientsWS } from './clients/AdtClientsWS';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
+export type {
+  DebuggerStepAction,
+  IDebuggerAttachParams,
+  IDebuggerGetVariablesParams,
+  IDebuggerListenParams,
+  IDebuggerStepParams,
+} from './clients/DebuggerSessionClient';
+export { DebuggerSessionClient } from './clients/DebuggerSessionClient';
 export type {
   AdtBehaviorDefinitionType,
   BehaviorDefinitionImplementationType,
