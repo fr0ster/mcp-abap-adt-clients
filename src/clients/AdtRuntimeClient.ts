@@ -4,11 +4,13 @@
  * Provides access to runtime-related ADT operations:
  * - Memory snapshots analysis
  * - Profiler traces
- * - Debugger operations
+ * - ABAP debugger operations
  * - Logs analysis
  * - Feed reader operations
  *
  * This is a standalone client for runtime operations, similar to AdtClient.
+ * Experimental runtime APIs (for example AMDP debugger) are provided separately
+ * in AdtRuntimeClientExperimental.
  *
  * Usage:
  * ```typescript
@@ -87,29 +89,14 @@ import {
   synchronizeBreakpoints as synchronizeBreakpointsUtil,
   validateBreakpoints as validateBreakpointsUtil,
 } from '../runtime/debugger/abap';
-// Import AMDP debugger functions
+// Import runtime dumps functions
 import {
-  getAmdpBreakpointsLlang as getAmdpBreakpointsLlangUtil,
-  getAmdpBreakpointsTableFunctions as getAmdpBreakpointsTableFunctionsUtil,
-  getAmdpBreakpoints as getAmdpBreakpointsUtil,
-  getAmdpDebuggee as getAmdpDebuggeeUtil,
-  getAmdpVariable as getAmdpVariableUtil,
-  type IStartAmdpDebuggerOptions,
-  lookupAmdp as lookupAmdpUtil,
-  resumeAmdpDebugger as resumeAmdpDebuggerUtil,
-  setAmdpVariable as setAmdpVariableUtil,
-  startAmdpDebugger as startAmdpDebuggerUtil,
-  stepContinueAmdp as stepContinueAmdpUtil,
-  stepOverAmdp as stepOverAmdpUtil,
-  terminateAmdpDebugger as terminateAmdpDebuggerUtil,
-} from '../runtime/debugger/amdp';
-// Import AMDP data preview functions
-import {
-  getAmdpCellSubstring as getAmdpCellSubstringUtil,
-  getAmdpDataPreview as getAmdpDataPreviewUtil,
-  type IGetAmdpCellSubstringOptions,
-  type IGetAmdpDataPreviewOptions,
-} from '../runtime/debugger/amdpDataPreview';
+  buildRuntimeDumpsUserQuery as buildRuntimeDumpsUserQueryUtil,
+  getRuntimeDumpByUri as getRuntimeDumpByUriUtil,
+  type IRuntimeDumpsListOptions,
+  listRuntimeDumpsByUser as listRuntimeDumpsByUserUtil,
+  listRuntimeDumps as listRuntimeDumpsUtil,
+} from '../runtime/dumps';
 // Import feed functions
 import {
   getFeeds as getFeedsUtil,
@@ -169,8 +156,8 @@ import {
 } from '../runtime/traces/st05';
 
 export class AdtRuntimeClient {
-  private connection: IAbapConnection;
-  private logger?: ILogger;
+  protected connection: IAbapConnection;
+  protected logger?: ILogger;
 
   constructor(
     connection: IAbapConnection,
@@ -886,211 +873,6 @@ export class AdtRuntimeClient {
   }
 
   // ============================================================================
-  // AMDP Debugger
-  // ============================================================================
-
-  /**
-   * Start AMDP debugger session
-   *
-   * @param options - Debugger start options
-   * @returns Axios response with debugger session
-   */
-  async startAmdpDebugger(
-    options?: IStartAmdpDebuggerOptions,
-  ): Promise<AxiosResponse> {
-    return startAmdpDebuggerUtil(this.connection, options);
-  }
-
-  /**
-   * Resume AMDP debugger session
-   *
-   * @param mainId - Main debugger session ID
-   * @returns Axios response with debugger session
-   */
-  async resumeAmdpDebugger(mainId: string): Promise<AxiosResponse> {
-    return resumeAmdpDebuggerUtil(this.connection, mainId);
-  }
-
-  /**
-   * Terminate AMDP debugger session
-   *
-   * @param mainId - Main debugger session ID
-   * @param hardStop - Whether to perform hard stop
-   * @returns Axios response
-   */
-  async terminateAmdpDebugger(
-    mainId: string,
-    hardStop?: boolean,
-  ): Promise<AxiosResponse> {
-    return terminateAmdpDebuggerUtil(this.connection, mainId, hardStop);
-  }
-
-  /**
-   * Get AMDP debuggee information
-   *
-   * @param mainId - Main debugger session ID
-   * @param debuggeeId - Debuggee ID
-   * @returns Axios response with debuggee information
-   */
-  async getAmdpDebuggee(
-    mainId: string,
-    debuggeeId: string,
-  ): Promise<AxiosResponse> {
-    return getAmdpDebuggeeUtil(this.connection, mainId, debuggeeId);
-  }
-
-  /**
-   * Get AMDP variable value
-   *
-   * @param mainId - Main debugger session ID
-   * @param debuggeeId - Debuggee ID
-   * @param varname - Variable name
-   * @param offset - Offset for variable value
-   * @param length - Length of variable value to retrieve
-   * @returns Axios response with variable value
-   */
-  async getAmdpVariable(
-    mainId: string,
-    debuggeeId: string,
-    varname: string,
-    offset?: number,
-    length?: number,
-  ): Promise<AxiosResponse> {
-    return getAmdpVariableUtil(
-      this.connection,
-      mainId,
-      debuggeeId,
-      varname,
-      offset,
-      length,
-    );
-  }
-
-  /**
-   * Set AMDP variable value
-   *
-   * @param mainId - Main debugger session ID
-   * @param debuggeeId - Debuggee ID
-   * @param varname - Variable name
-   * @param setNull - Whether to set variable to null
-   * @returns Axios response
-   */
-  async setAmdpVariable(
-    mainId: string,
-    debuggeeId: string,
-    varname: string,
-    setNull?: boolean,
-  ): Promise<AxiosResponse> {
-    return setAmdpVariableUtil(
-      this.connection,
-      mainId,
-      debuggeeId,
-      varname,
-      setNull,
-    );
-  }
-
-  /**
-   * Lookup objects/variables in AMDP debugger
-   *
-   * @param mainId - Main debugger session ID
-   * @param debuggeeId - Debuggee ID
-   * @param name - Name to lookup
-   * @returns Axios response with lookup results
-   */
-  async lookupAmdp(
-    mainId: string,
-    debuggeeId: string,
-    name?: string,
-  ): Promise<AxiosResponse> {
-    return lookupAmdpUtil(this.connection, mainId, debuggeeId, name);
-  }
-
-  /**
-   * Step over in AMDP debugger
-   *
-   * @param mainId - Main debugger session ID
-   * @param debuggeeId - Debuggee ID
-   * @returns Axios response
-   */
-  async stepOverAmdp(
-    mainId: string,
-    debuggeeId: string,
-  ): Promise<AxiosResponse> {
-    return stepOverAmdpUtil(this.connection, mainId, debuggeeId);
-  }
-
-  /**
-   * Continue execution in AMDP debugger
-   *
-   * @param mainId - Main debugger session ID
-   * @param debuggeeId - Debuggee ID
-   * @returns Axios response
-   */
-  async stepContinueAmdp(
-    mainId: string,
-    debuggeeId: string,
-  ): Promise<AxiosResponse> {
-    return stepContinueAmdpUtil(this.connection, mainId, debuggeeId);
-  }
-
-  /**
-   * Get AMDP breakpoints
-   *
-   * @param mainId - Main debugger session ID
-   * @returns Axios response with breakpoints
-   */
-  async getAmdpBreakpoints(mainId: string): Promise<AxiosResponse> {
-    return getAmdpBreakpointsUtil(this.connection, mainId);
-  }
-
-  /**
-   * Get AMDP breakpoints for LLang
-   *
-   * @param mainId - Main debugger session ID
-   * @returns Axios response with LLang breakpoints
-   */
-  async getAmdpBreakpointsLlang(mainId: string): Promise<AxiosResponse> {
-    return getAmdpBreakpointsLlangUtil(this.connection, mainId);
-  }
-
-  /**
-   * Get AMDP breakpoints for table functions
-   *
-   * @param mainId - Main debugger session ID
-   * @returns Axios response with table function breakpoints
-   */
-  async getAmdpBreakpointsTableFunctions(
-    mainId: string,
-  ): Promise<AxiosResponse> {
-    return getAmdpBreakpointsTableFunctionsUtil(this.connection, mainId);
-  }
-
-  /**
-   * Get AMDP debugger data preview
-   *
-   * @param options - Data preview options
-   * @returns Axios response with data preview
-   */
-  async getAmdpDataPreview(
-    options?: IGetAmdpDataPreviewOptions,
-  ): Promise<AxiosResponse> {
-    return getAmdpDataPreviewUtil(this.connection, options);
-  }
-
-  /**
-   * Get cell substring from AMDP debugger data preview
-   *
-   * @param options - Cell substring options
-   * @returns Axios response with cell substring
-   */
-  async getAmdpCellSubstring(
-    options?: IGetAmdpCellSubstringOptions,
-  ): Promise<AxiosResponse> {
-    return getAmdpCellSubstringUtil(this.connection, options);
-  }
-
-  // ============================================================================
   // Logs
   // ============================================================================
 
@@ -1190,6 +972,45 @@ export class AdtRuntimeClient {
    */
   async getSt05TraceDirectory(): Promise<AxiosResponse> {
     return getSt05TraceDirectoryUtil(this.connection);
+  }
+
+  // ============================================================================
+  // Runtime Dumps (ABAP Short Dump Analysis)
+  // ============================================================================
+
+  /**
+   * Build ADT runtime dumps query expression for user filtering.
+   *
+   * @example and( equals( user, CB9980000423 ) )
+   */
+  buildRuntimeDumpsUserQuery(user?: string): string | undefined {
+    return buildRuntimeDumpsUserQueryUtil(user);
+  }
+
+  /**
+   * List runtime dumps feed.
+   */
+  async listRuntimeDumps(
+    options: IRuntimeDumpsListOptions = {},
+  ): Promise<AxiosResponse> {
+    return listRuntimeDumpsUtil(this.connection, options);
+  }
+
+  /**
+   * List runtime dumps filtered by user.
+   */
+  async listRuntimeDumpsByUser(
+    user?: string,
+    options: Omit<IRuntimeDumpsListOptions, 'query'> = {},
+  ): Promise<AxiosResponse> {
+    return listRuntimeDumpsByUserUtil(this.connection, user, options);
+  }
+
+  /**
+   * Read a specific runtime dump by its ADT URI.
+   */
+  async getRuntimeDumpByUri(uri: string): Promise<AxiosResponse> {
+    return getRuntimeDumpByUriUtil(this.connection, uri);
   }
 
   // ============================================================================

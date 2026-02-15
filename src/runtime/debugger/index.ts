@@ -32,26 +32,3 @@ export {
   synchronizeBreakpoints,
   validateBreakpoints,
 } from './abap';
-
-export {
-  getAmdpBreakpoints,
-  getAmdpBreakpointsLlang,
-  getAmdpBreakpointsTableFunctions,
-  getAmdpDebuggee,
-  getAmdpVariable,
-  type IStartAmdpDebuggerOptions,
-  lookupAmdp,
-  resumeAmdpDebugger,
-  setAmdpVariable,
-  startAmdpDebugger,
-  stepContinueAmdp,
-  stepOverAmdp,
-  terminateAmdpDebugger,
-} from './amdp';
-
-export {
-  getAmdpCellSubstring,
-  getAmdpDataPreview,
-  type IGetAmdpCellSubstringOptions,
-  type IGetAmdpDataPreviewOptions,
-} from './amdpDataPreview';

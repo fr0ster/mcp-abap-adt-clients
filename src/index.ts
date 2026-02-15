@@ -3,7 +3,8 @@
  *
  * Client APIs (Public API):
  * - AdtClient: High-level CRUD operations (validate/create/read/update/delete/activate/check)
- * - AdtRuntimeClient: Runtime operations (debugger, logs, feeds, etc.)
+ * - AdtRuntimeClient: Runtime operations (stable APIs)
+ * - AdtRuntimeClientExperimental: Runtime APIs in progress (may change)
  *
  * @example
  * ```typescript
@@ -37,6 +38,7 @@ export { AdtClient } from './clients/AdtClient';
 export { AdtClientsWS } from './clients/AdtClientsWS';
 export { AdtExecutor } from './clients/AdtExecutor';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
+export { AdtRuntimeClientExperimental } from './clients/AdtRuntimeClientExperimental';
 export type {
   DebuggerStepAction,
   IDebuggerAttachParams,
