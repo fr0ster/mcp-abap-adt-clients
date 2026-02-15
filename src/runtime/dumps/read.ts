@@ -4,7 +4,7 @@
  * Provides functions for reading ABAP runtime dumps via ADT endpoints:
  * - List dumps feed with paging/query options
  * - List dumps by user
- * - Read dump by URI
+ * - Read dump by ID
  */
 
 import type {
@@ -88,19 +88,22 @@ export async function listRuntimeDumpsByUser(
 }
 
 /**
- * Read a specific runtime dump by its ADT URI.
+ * Read a specific runtime dump by its dump ID.
  */
-export async function getRuntimeDumpByUri(
+export async function getRuntimeDumpById(
   connection: IAbapConnection,
-  uri: string,
+  dumpId: string,
 ): Promise<AxiosResponse> {
-  const normalized = uri?.trim();
+  const normalized = dumpId?.trim();
   if (!normalized) {
-    throw new Error('Runtime dump URI is required');
+    throw new Error('Runtime dump ID is required');
+  }
+  if (normalized.includes('/')) {
+    throw new Error('Runtime dump ID must not contain "/"');
   }
 
   return connection.makeAdtRequest({
-    url: normalized,
+    url: `/sap/bc/adt/runtime/dumps/${normalized}`,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {

@@ -37,10 +37,10 @@ describe('AdtRuntimeClient dumps API', () => {
     );
   });
 
-  it('getRuntimeDumpByUri delegates to dumps endpoint', async () => {
+  it('getRuntimeDumpById delegates to dumps endpoint', async () => {
     const { client, connection } = createRuntimeClient();
 
-    await client.getRuntimeDumpByUri('/sap/bc/adt/runtime/dumps/DUMP123');
+    await client.getRuntimeDumpById('DUMP123');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({

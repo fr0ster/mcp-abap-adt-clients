@@ -4,7 +4,7 @@
 
 export {
   buildRuntimeDumpsUserQuery,
-  getRuntimeDumpByUri,
+  getRuntimeDumpById,
   type IRuntimeDumpsListOptions,
   listRuntimeDumps,
   listRuntimeDumpsByUser,

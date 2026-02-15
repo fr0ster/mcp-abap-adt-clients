@@ -127,7 +127,7 @@ const userDumps = await runtime.listRuntimeDumpsByUser('CB9980000423', {
   inlinecount: 'allpages',
   top: 50,
 });
-const dumpPayload = await runtime.getRuntimeDumpByUri('/sap/bc/adt/runtime/dumps/ABCDEF1234567890');
+const dumpPayload = await runtime.getRuntimeDumpById('ABCDEF1234567890');
 ```
 
 ### ABAP Debugger Step Operations (Batch Only)

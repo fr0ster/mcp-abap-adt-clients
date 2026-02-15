@@ -100,7 +100,7 @@ import {
 // Import runtime dumps functions
 import {
   buildRuntimeDumpsUserQuery as buildRuntimeDumpsUserQueryUtil,
-  getRuntimeDumpByUri as getRuntimeDumpByUriUtil,
+  getRuntimeDumpById as getRuntimeDumpByIdUtil,
   type IRuntimeDumpsListOptions,
   listRuntimeDumpsByUser as listRuntimeDumpsByUserUtil,
   listRuntimeDumps as listRuntimeDumpsUtil,
@@ -1076,10 +1076,10 @@ export class AdtRuntimeClient {
   }
 
   /**
-   * Read a specific runtime dump by its ADT URI.
+   * Read a specific runtime dump by its dump ID.
    */
-  async getRuntimeDumpByUri(uri: string): Promise<AxiosResponse> {
-    return getRuntimeDumpByUriUtil(this.connection, uri);
+  async getRuntimeDumpById(dumpId: string): Promise<AxiosResponse> {
+    return getRuntimeDumpByIdUtil(this.connection, dumpId);
   }
 
   // ============================================================================

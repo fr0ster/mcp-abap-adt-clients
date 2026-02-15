@@ -5,13 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.16] - 2026-02-15
+
+### Changed
+- Renamed runtime dump read API to ID-based access: `getRuntimeDumpById(dumpId)` now builds ADT dump URL internally and rejects URI input.
+
+
 ## [0.3.15] - 2026-02-15
 
 ### Added
 - Added `AdtClientsWS` realtime facade for `IWebSocketTransport` with request/response correlation and event handlers.
 - Added `DebuggerSessionClient` over WS operations (`debugger.listen`, `debugger.attach`, `debugger.detach`, `debugger.step`, `debugger.getStack`, `debugger.getVariables`).
 - Exported WS transport interfaces and new WS clients from package root.
-- Added runtime dumps API (`listRuntimeDumps`, `listRuntimeDumpsByUser`, `getRuntimeDumpByUri`) to `AdtRuntimeClient`.
+- Added runtime dumps API (`listRuntimeDumps`, `listRuntimeDumpsByUser`, `getRuntimeDumpById`) to `AdtRuntimeClient`.
 - Added `AdtRuntimeClientExperimental` and moved AMDP debugger/data preview APIs there as in-progress APIs.
 - Added ABAP debugger batch step API for `stepInto`, `stepOut`, `stepContinue` via `POST /sap/bc/adt/debugger/batch` with multipart payloads.
 - Added unit tests for runtime dumps and debugger batch-step payload/execution.

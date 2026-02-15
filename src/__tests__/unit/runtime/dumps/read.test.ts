@@ -1,7 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import {
   buildRuntimeDumpsUserQuery,
-  getRuntimeDumpByUri,
+  getRuntimeDumpById,
   listRuntimeDumps,
   listRuntimeDumpsByUser,
 } from '../../../../runtime/dumps/read';
@@ -66,17 +66,20 @@ describe('runtime/dumps/read', () => {
     );
   });
 
-  it('getRuntimeDumpByUri validates URI and requests dump payload', async () => {
+  it('getRuntimeDumpById validates ID and requests dump payload', async () => {
     const connection = createConnectionMock();
 
-    await expect(getRuntimeDumpByUri(connection, '   ')).rejects.toThrow(
-      'Runtime dump URI is required',
+    await expect(getRuntimeDumpById(connection, '   ')).rejects.toThrow(
+      'Runtime dump ID is required',
     );
+    await expect(
+      getRuntimeDumpById(
+        connection,
+        '/sap/bc/adt/runtime/dumps/ABCDEF1234567890',
+      ),
+    ).rejects.toThrow('Runtime dump ID must not contain "/"');
 
-    await getRuntimeDumpByUri(
-      connection,
-      '/sap/bc/adt/runtime/dumps/ABCDEF1234567890',
-    );
+    await getRuntimeDumpById(connection, 'ABCDEF1234567890');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
