@@ -6,7 +6,8 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API with automatic operation chains
-  - `AdtRuntimeClient` – runtime operations (debugger, traces, memory, logs)
+  - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, memory, logs, dumps)
+  - `AdtRuntimeClientExperimental` – runtime APIs in progress (for example AMDP debugger)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
 - ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
 - ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
@@ -88,10 +89,15 @@ npm install @mcp-abap-adt/adt-clients
    - Example: `await client.getClass().create({...}, { activateOnCreate: true })`
 
 2. **AdtRuntimeClient**
-   - Runtime operations for debugging, traces, memory analysis, and logs
+   - Stable runtime operations for ABAP debugging, traces, memory analysis, dumps, and logs
    - Example: `await runtimeClient.getDebugger(...)`
 
-3. **AdtClientsWS**
+3. **AdtRuntimeClientExperimental**
+   - Runtime APIs in progress that may change without backward-compatibility guarantees
+   - Current scope: AMDP debugger + AMDP data preview
+   - Example: `await experimentalRuntime.startAmdpDebugger(...)`
+
+4. **AdtClientsWS**
    - Realtime request/event facade over `IWebSocketTransport`
    - Includes debugger-session facade: listen, attach, step, stack, variables
    - Example: `await wsClient.request('debugger.listen', { timeoutSeconds: 30 })`
@@ -177,6 +183,26 @@ const debuggerSession = wsClient.getDebuggerSessionClient();
 await debuggerSession.listen({ timeoutSeconds: 60 });
 await debuggerSession.step({ action: 'step_over' });
 ```
+
+### ABAP Debugger Step Operations via Batch Endpoint
+
+`AdtRuntimeClient` executes step operations through debugger batch requests (`POST /sap/bc/adt/debugger/batch`) using `multipart/mixed` payloads.
+
+```typescript
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+
+const runtime = new AdtRuntimeClient(connection);
+
+// Executes stepInto + getStack in one batch request
+const batchResponse = await runtime.stepIntoDebuggerBatch();
+
+// Also available:
+await runtime.stepOutDebuggerBatch();
+await runtime.stepContinueDebuggerBatch();
+```
+
+For non-step actions keep using `executeDebuggerAction(action, value?)`.  
+Step actions (`stepInto`, `stepOut`, `stepContinue`) are reserved for batch-only execution.
 
 **AdtUtils read type safety:**
 `readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.

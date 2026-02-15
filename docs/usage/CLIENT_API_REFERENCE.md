@@ -3,7 +3,8 @@
 This project exposes two client classes:
 
 - `AdtClient` - high-level CRUD operations for ADT objects.
-- `AdtRuntimeClient` - runtime operations (debugger, logs, feeds, etc.).
+- `AdtRuntimeClient` - stable runtime operations (ABAP debugger, traces, dumps, logs, feeds, etc.).
+- `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 
 `ReadOnlyClient` and `CrudClient` have been removed in the builderless API.
 
@@ -117,3 +118,48 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 const runtime = new AdtRuntimeClient(connection);
 const feeds = await runtime.getFeeds();
 ```
+
+### Runtime Dumps
+
+```typescript
+const allDumps = await runtime.listRuntimeDumps({ top: 50 });
+const userDumps = await runtime.listRuntimeDumpsByUser('CB9980000423', {
+  inlinecount: 'allpages',
+  top: 50,
+});
+const dumpPayload = await runtime.getRuntimeDumpByUri('/sap/bc/adt/runtime/dumps/ABCDEF1234567890');
+```
+
+### ABAP Debugger Step Operations (Batch Only)
+
+Step operations are executed through debugger batch endpoint:
+- Endpoint: `POST /sap/bc/adt/debugger/batch`
+- Request content type: `multipart/mixed; boundary=...`
+- Response accept: `multipart/mixed`
+- Default batch pattern: `step*` + `getStack` in one request
+
+```typescript
+const stepIntoResult = await runtime.stepIntoDebuggerBatch();
+const stepOutResult = await runtime.stepOutDebuggerBatch();
+const continueResult = await runtime.stepContinueDebuggerBatch();
+```
+
+You can also build payloads manually:
+
+```typescript
+const payload = runtime.buildDebuggerStepWithStackBatchPayload('stepInto');
+const batchResult = await runtime.executeDebuggerStepBatch('stepInto');
+```
+
+`executeDebuggerAction(action)` must be used for non-step actions only.
+
+## AdtRuntimeClientExperimental
+
+```typescript
+import { AdtRuntimeClientExperimental } from '@mcp-abap-adt/adt-clients';
+
+const runtimeExperimental = new AdtRuntimeClientExperimental(connection);
+const session = await runtimeExperimental.startAmdpDebugger();
+```
+
+`AdtRuntimeClientExperimental` contains APIs marked in progress and may change between releases.

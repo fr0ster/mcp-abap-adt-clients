@@ -60,8 +60,11 @@ import {
 } from '../runtime/ddic/activationGraph';
 // Import ABAP debugger functions
 import {
+  buildDebuggerBatchPayload as buildDebuggerBatchPayloadUtil,
+  buildDebuggerStepWithStackBatchPayload as buildDebuggerStepWithStackBatchPayloadUtil,
   executeBatchRequest as executeBatchRequestUtil,
   executeDebuggerAction as executeDebuggerActionUtil,
+  executeDebuggerStepBatch as executeDebuggerStepBatchUtil,
   getBreakpointConditions as getBreakpointConditionsUtil,
   getBreakpointMessageTypes as getBreakpointMessageTypesUtil,
   getBreakpointStatements as getBreakpointStatementsUtil,
@@ -76,6 +79,8 @@ import {
   getVariableValueStatement as getVariableValueStatementUtil,
   getVitBreakpoints as getVitBreakpointsUtil,
   getWatchpoints as getWatchpointsUtil,
+  type IAbapDebuggerStepMethod,
+  type IDebuggerBatchPayload,
   type IGetDebuggerOptions,
   type IGetSystemAreaOptions,
   type IGetVariableAsCsvOptions,
@@ -85,6 +90,9 @@ import {
   type IStopDebuggerOptions,
   insertWatchpoint as insertWatchpointUtil,
   launchDebugger as launchDebuggerUtil,
+  stepContinueDebuggerBatch as stepContinueDebuggerBatchUtil,
+  stepIntoDebuggerBatch as stepIntoDebuggerBatchUtil,
+  stepOutDebuggerBatch as stepOutDebuggerBatchUtil,
   stopDebugger as stopDebuggerUtil,
   synchronizeBreakpoints as synchronizeBreakpointsUtil,
   validateBreakpoints as validateBreakpointsUtil,
@@ -870,6 +878,67 @@ export class AdtRuntimeClient {
    */
   async executeBatchRequest(requests: string): Promise<AxiosResponse> {
     return executeBatchRequestUtil(this.connection, requests);
+  }
+
+  /**
+   * Build multipart debugger batch payload from raw application/http parts.
+   *
+   * @param requests - Inner HTTP request parts for debugger batch
+   * @returns Boundary and multipart body
+   */
+  buildDebuggerBatchPayload(requests: string[]): IDebuggerBatchPayload {
+    return buildDebuggerBatchPayloadUtil(requests);
+  }
+
+  /**
+   * Build standard debugger batch payload: step operation + getStack.
+   *
+   * @param stepMethod - Step method to execute
+   * @returns Boundary and multipart body
+   */
+  buildDebuggerStepWithStackBatchPayload(
+    stepMethod: IAbapDebuggerStepMethod,
+  ): IDebuggerBatchPayload {
+    return buildDebuggerStepWithStackBatchPayloadUtil(stepMethod);
+  }
+
+  /**
+   * Execute debugger step operation via multipart batch and fetch stack in the same batch.
+   *
+   * @param stepMethod - Step method to execute
+   * @returns Axios response with multipart batch result
+   */
+  async executeDebuggerStepBatch(
+    stepMethod: IAbapDebuggerStepMethod,
+  ): Promise<AxiosResponse> {
+    return executeDebuggerStepBatchUtil(this.connection, stepMethod);
+  }
+
+  /**
+   * Execute debugger stepInto via multipart batch with stack fetch.
+   *
+   * @returns Axios response with multipart batch result
+   */
+  async stepIntoDebuggerBatch(): Promise<AxiosResponse> {
+    return stepIntoDebuggerBatchUtil(this.connection);
+  }
+
+  /**
+   * Execute debugger stepOut via multipart batch with stack fetch.
+   *
+   * @returns Axios response with multipart batch result
+   */
+  async stepOutDebuggerBatch(): Promise<AxiosResponse> {
+    return stepOutDebuggerBatchUtil(this.connection);
+  }
+
+  /**
+   * Execute debugger continue via multipart batch with stack fetch.
+   *
+   * @returns Axios response with multipart batch result
+   */
+  async stepContinueDebuggerBatch(): Promise<AxiosResponse> {
+    return stepContinueDebuggerBatchUtil(this.connection);
   }
 
   // ============================================================================

@@ -218,7 +218,7 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
   - Relation: `http://www.sap.com/adt/debugger/relations/action`
   - Method: `GET`
   - Template: `/sap/bc/adt/debugger/actions{?action,value}`
-  - Purpose: Execute debugger actions (step over, step into, continue, etc.)
+  - Purpose: Execute non-step debugger actions (settings, utility actions, etc.)
 
 #### Stack
 - **Get Call Stack**
@@ -241,7 +241,10 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 #### Batch Operations
 - **Debugger Batch Request**
   - URL: `/sap/bc/adt/debugger/batch`
-  - Purpose: Execute multiple debugger operations in batch
+  - Method: `POST`
+  - Content Type: `multipart/mixed; boundary=...`
+  - Purpose: Execute multiple debugger operations in one request (including step + stack)
+  - Note: step operations (`stepInto`, `stepOut`, `stepContinue`) should be executed through this endpoint
 
 ### 1.4 ADT IDE Actions (Runtime)
 
@@ -744,4 +747,3 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 | DDIC Activation Graph | 3 | ✅ Completed | 90% (tests pending) |
 
 **Total Progress:** 10/10 modules (100% - All modules completed, tests pending)
-

@@ -53,7 +53,8 @@ docs/
 The package provides the main client classes:
 
 - **AdtClient** - High-level CRUD API with automatic operation chains (recommended)
-- **AdtRuntimeClient** - Runtime operations (debugger, logs, feeds)
+- **AdtRuntimeClient** - Stable runtime operations (ABAP debugger, traces, dumps, logs, feeds)
+- **AdtRuntimeClientExperimental** - Runtime APIs in progress (AMDP debugger/data preview)
 
 See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method documentation.
 

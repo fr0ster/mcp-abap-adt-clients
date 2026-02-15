@@ -9,9 +9,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 - Added `AdtClientsWS` realtime facade for `IWebSocketTransport` with request/response correlation and event handlers.
 - Added `DebuggerSessionClient` over WS operations (`debugger.listen`, `debugger.attach`, `debugger.detach`, `debugger.step`, `debugger.getStack`, `debugger.getVariables`).
 - Exported WS transport interfaces and new WS clients from package root.
+- Added runtime dumps API (`listRuntimeDumps`, `listRuntimeDumpsByUser`, `getRuntimeDumpByUri`) to `AdtRuntimeClient`.
+- Added `AdtRuntimeClientExperimental` and moved AMDP debugger/data preview APIs there as in-progress APIs.
+- Added ABAP debugger batch step API for `stepInto`, `stepOut`, `stepContinue` via `POST /sap/bc/adt/debugger/batch` with multipart payloads.
+- Added unit tests for runtime dumps and debugger batch-step payload/execution.
 
 ### Changed
 - Updated dependency `@mcp-abap-adt/interfaces` to `^2.4.0`.
+- Restricted step actions in `executeDebuggerAction`: `stepInto`, `stepOut`, and `stepContinue` must use debugger batch API.
+- Updated README and docs to describe stable vs experimental runtime clients and debugger batch endpoint usage.
 
 ## [0.3.14] - 2025-12-30
 

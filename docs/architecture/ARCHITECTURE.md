@@ -5,7 +5,8 @@
 `@mcp-abap-adt/adt-clients` provides a builderless API for SAP ADT operations:
 
 - `AdtClient` for object CRUD and utility access.
-- `AdtRuntimeClient` for runtime/debug/traces/logs.
+- `AdtRuntimeClient` for stable runtime/debug/traces/logs/dumps.
+- `AdtRuntimeClientExperimental` for runtime APIs in progress.
 - `AdtUtils` for cross-cutting utilities (search, where-used, discovery, etc.).
 
 All external interactions are through interfaces from `@mcp-abap-adt/interfaces`.
@@ -25,6 +26,7 @@ src/
   clients/
     AdtClient.ts
     AdtRuntimeClient.ts
+    AdtRuntimeClientExperimental.ts
   core/
     class/                  # AdtClass + low-level functions
     program/
@@ -57,7 +59,13 @@ src/
 
 ### AdtRuntimeClient
 
-- Runtime-only operations (debugger, logs, traces, memory analysis, etc.).
+- Stable runtime-only operations (ABAP debugger, logs, traces, memory analysis, dumps, etc.).
+- ABAP debugger step operations are executed through `POST /sap/bc/adt/debugger/batch` (`multipart/mixed`) via dedicated batch-step methods.
+
+### AdtRuntimeClientExperimental
+
+- Runtime APIs marked as in progress.
+- Current scope: AMDP debugger and AMDP data preview.
 
 ## Adt Objects
 

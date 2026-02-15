@@ -620,6 +620,15 @@ export async function executeDebuggerAction(
   if (!action) {
     throw new Error('Action is required');
   }
+  if (
+    action === 'stepInto' ||
+    action === 'stepOut' ||
+    action === 'stepContinue'
+  ) {
+    throw new Error(
+      `Debugger action "${action}" must be executed via debugger batch (use stepIntoDebuggerBatch/stepOutDebuggerBatch/stepContinueDebuggerBatch)`,
+    );
+  }
 
   const url = `/sap/bc/adt/debugger/actions`;
   const params: Record<string, any> = { action };
@@ -742,4 +751,112 @@ export async function executeBatchRequest(
       Accept: 'application/xml',
     },
   });
+}
+
+export type IAbapDebuggerStepMethod = 'stepInto' | 'stepOut' | 'stepContinue';
+
+export interface IDebuggerBatchPayload {
+  boundary: string;
+  body: string;
+}
+
+function createBatchBoundary(): string {
+  const randomPart =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return `batch_${randomPart}`;
+}
+
+function createRequestId(): string {
+  const randomPart =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().replace(/-/g, '')
+      : `${Date.now()}${Math.random().toString(16).slice(2)}`;
+  return randomPart.slice(0, 32);
+}
+
+export function buildDebuggerBatchPayload(
+  requests: string[],
+  boundary = createBatchBoundary(),
+): IDebuggerBatchPayload {
+  if (!requests.length) {
+    throw new Error('At least one batch request is required');
+  }
+
+  const parts = requests
+    .map((request) => {
+      const trimmed = request.trim();
+      if (!trimmed) {
+        throw new Error('Batch request part must not be empty');
+      }
+      return [
+        `--${boundary}`,
+        'Content-Type: application/http',
+        'content-transfer-encoding: binary',
+        '',
+        trimmed,
+        '',
+      ].join('\r\n');
+    })
+    .join('');
+
+  return {
+    boundary,
+    body: `${parts}--${boundary}--\r\n`,
+  };
+}
+
+export function buildDebuggerStepWithStackBatchPayload(
+  stepMethod: IAbapDebuggerStepMethod,
+): IDebuggerBatchPayload {
+  const stepRequest = [
+    `POST /sap/bc/adt/debugger?method=${stepMethod} HTTP/1.1`,
+    `sap-adt-request-id:${createRequestId()}`,
+    'Accept:application/xml',
+  ].join('\r\n');
+
+  const stackRequest = [
+    'POST /sap/bc/adt/debugger?emode=_&semanticURIs=true&method=getStack HTTP/1.1',
+    `sap-adt-request-id:${createRequestId()}`,
+    'Accept:application/xml',
+  ].join('\r\n');
+
+  return buildDebuggerBatchPayload([stepRequest, stackRequest]);
+}
+
+export async function executeDebuggerStepBatch(
+  connection: IAbapConnection,
+  stepMethod: IAbapDebuggerStepMethod,
+): Promise<AxiosResponse> {
+  const payload = buildDebuggerStepWithStackBatchPayload(stepMethod);
+
+  return connection.makeAdtRequest({
+    url: '/sap/bc/adt/debugger/batch',
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: payload.body,
+    headers: {
+      'Content-Type': `multipart/mixed; boundary=${payload.boundary}`,
+      Accept: 'multipart/mixed',
+    },
+  });
+}
+
+export async function stepIntoDebuggerBatch(
+  connection: IAbapConnection,
+): Promise<AxiosResponse> {
+  return executeDebuggerStepBatch(connection, 'stepInto');
+}
+
+export async function stepOutDebuggerBatch(
+  connection: IAbapConnection,
+): Promise<AxiosResponse> {
+  return executeDebuggerStepBatch(connection, 'stepOut');
+}
+
+export async function stepContinueDebuggerBatch(
+  connection: IAbapConnection,
+): Promise<AxiosResponse> {
+  return executeDebuggerStepBatch(connection, 'stepContinue');
 }

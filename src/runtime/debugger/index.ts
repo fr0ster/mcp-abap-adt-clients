@@ -2,9 +2,13 @@
  * Runtime Debugger - Exports
  */
 
+export type { IAbapDebuggerStepMethod, IDebuggerBatchPayload } from './abap';
 export {
+  buildDebuggerBatchPayload,
+  buildDebuggerStepWithStackBatchPayload,
   executeBatchRequest,
   executeDebuggerAction,
+  executeDebuggerStepBatch,
   getBreakpointConditions,
   getBreakpointMessageTypes,
   getBreakpointStatements,
@@ -28,6 +32,9 @@ export {
   type IStopDebuggerOptions,
   insertWatchpoint,
   launchDebugger,
+  stepContinueDebuggerBatch,
+  stepIntoDebuggerBatch,
+  stepOutDebuggerBatch,
   stopDebugger,
   synchronizeBreakpoints,
   validateBreakpoints,
