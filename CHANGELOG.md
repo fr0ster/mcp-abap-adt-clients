@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.15] - 2026-02-15
+
 ### Added
 - Added `AdtClientsWS` realtime facade for `IWebSocketTransport` with request/response correlation and event handlers.
 - Added `DebuggerSessionClient` over WS operations (`debugger.listen`, `debugger.attach`, `debugger.detach`, `debugger.step`, `debugger.getStack`, `debugger.getVariables`).

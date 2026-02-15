@@ -2,8 +2,8 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import {
   buildDebuggerBatchPayload,
   buildDebuggerStepWithStackBatchPayload,
-  executeDebuggerStepBatch,
   executeDebuggerAction,
+  executeDebuggerStepBatch,
   stepContinueDebuggerBatch,
   stepIntoDebuggerBatch,
   stepOutDebuggerBatch,
@@ -83,9 +83,7 @@ describe('runtime/debugger/abap batch stepping', () => {
   it('blocks step actions via executeDebuggerAction', async () => {
     const connection = createConnectionMock();
 
-    await expect(
-      executeDebuggerAction(connection, 'stepInto'),
-    ).rejects.toThrow(
+    await expect(executeDebuggerAction(connection, 'stepInto')).rejects.toThrow(
       'Debugger action "stepInto" must be executed via debugger batch',
     );
   });
