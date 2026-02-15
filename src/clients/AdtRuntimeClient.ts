@@ -142,10 +142,21 @@ import {
 } from '../runtime/traces/crossTrace';
 // Import profiler trace functions
 import {
+  buildTraceParametersXml as buildTraceParametersXmlUtil,
+  createTraceParameters as createTraceParametersUtil,
+  DEFAULT_PROFILER_TRACE_PARAMETERS,
+  extractProfilerIdFromResponse as extractProfilerIdFromResponseUtil,
+  getTraceDbAccesses as getTraceDbAccessesUtil,
+  getTraceHitList as getTraceHitListUtil,
   getTraceParametersForAmdp as getTraceParametersForAmdpUtil,
   getTraceParametersForCallstack as getTraceParametersForCallstackUtil,
   getTraceParameters as getTraceParametersUtil,
   getTraceRequestsByUri as getTraceRequestsByUriUtil,
+  getTraceStatements as getTraceStatementsUtil,
+  type IProfilerTraceDbAccessesOptions,
+  type IProfilerTraceHitListOptions,
+  type IProfilerTraceParameters,
+  type IProfilerTraceStatementsOptions,
   listObjectTypes as listObjectTypesUtil,
   listProcessTypes as listProcessTypesUtil,
   listTraceFiles as listTraceFilesUtil,
@@ -411,6 +422,92 @@ export class AdtRuntimeClient {
    */
   async getProfilerTraceParametersForAmdp(): Promise<AxiosResponse> {
     return getTraceParametersForAmdpUtil(this.connection);
+  }
+
+  /**
+   * Build profiler trace parameters XML payload.
+   *
+   * @param options - Trace parameters options
+   * @returns XML payload used by ADT runtime trace parameters endpoint
+   */
+  buildProfilerTraceParametersXml(
+    options: IProfilerTraceParameters = {},
+  ): string {
+    return buildTraceParametersXmlUtil(options);
+  }
+
+  /**
+   * Create profiler trace parameters (returns response with profiler URI in headers).
+   *
+   * @param options - Trace parameters options
+   * @returns Axios response from ADT endpoint
+   */
+  async createProfilerTraceParameters(
+    options: IProfilerTraceParameters = {},
+  ): Promise<AxiosResponse> {
+    return createTraceParametersUtil(this.connection, options);
+  }
+
+  /**
+   * Extract profiler URI from createProfilerTraceParameters response headers.
+   *
+   * @param response - ADT response from createProfilerTraceParameters
+   * @returns Profiler URI usable as profilerId query parameter
+   */
+  extractProfilerIdFromResponse(response: AxiosResponse): string | undefined {
+    return extractProfilerIdFromResponseUtil(response);
+  }
+
+  /**
+   * Return default profiler parameters aligned with Eclipse defaults.
+   */
+  getDefaultProfilerTraceParameters(): Omit<
+    IProfilerTraceParameters,
+    'description'
+  > {
+    return { ...DEFAULT_PROFILER_TRACE_PARAMETERS };
+  }
+
+  /**
+   * Get profiler trace hitlist for a specific trace.
+   *
+   * @param traceIdOrUri - Trace ID or full trace URI
+   * @param options - Optional filters
+   * @returns Axios response with hitlist
+   */
+  async getProfilerTraceHitList(
+    traceIdOrUri: string,
+    options: IProfilerTraceHitListOptions = {},
+  ): Promise<AxiosResponse> {
+    return getTraceHitListUtil(this.connection, traceIdOrUri, options);
+  }
+
+  /**
+   * Get profiler trace statements for a specific trace.
+   *
+   * @param traceIdOrUri - Trace ID or full trace URI
+   * @param options - Optional statement filters
+   * @returns Axios response with statements
+   */
+  async getProfilerTraceStatements(
+    traceIdOrUri: string,
+    options: IProfilerTraceStatementsOptions = {},
+  ): Promise<AxiosResponse> {
+    return getTraceStatementsUtil(this.connection, traceIdOrUri, options);
+  }
+
+  /**
+   * Get profiler trace DB accesses for a specific trace.
+   *
+   * @param traceIdOrUri - Trace ID or full trace URI
+   * @param options - Optional filters
+   * @returns Axios response with DB accesses
+   */
+  async getProfilerTraceDbAccesses(
+    traceIdOrUri: string,
+    options: IProfilerTraceDbAccessesOptions = {},
+  ): Promise<AxiosResponse> {
+    return getTraceDbAccessesUtil(this.connection, traceIdOrUri, options);
   }
 
   /**

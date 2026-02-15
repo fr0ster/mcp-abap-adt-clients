@@ -35,6 +35,7 @@ export type {
 export type { IAdtClientOptions } from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
 export { AdtClientsWS } from './clients/AdtClientsWS';
+export { AdtExecutor } from './clients/AdtExecutor';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export type {
   DebuggerStepAction,
@@ -169,3 +170,11 @@ export type {
   IUnitTestState,
 } from './core/unitTest';
 export type { AdtViewType, IViewConfig, IViewState } from './core/view';
+export type {
+  IClassExecuteWithProfilerOptions,
+  IClassExecuteWithProfilingOptions,
+  IClassExecuteWithProfilingResult,
+  IClassExecutionTarget,
+  IClassExecutor,
+  IExecutor,
+} from './executors';

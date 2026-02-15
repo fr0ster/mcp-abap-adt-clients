@@ -14,23 +14,38 @@ export function getConfig(): SapConfig {
   const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
   const rawClient = process.env.SAP_CLIENT;
   const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
+  const rawAuthType = process.env.SAP_AUTH_TYPE;
+  const authType = rawAuthType
+    ? rawAuthType.split('#')[0].trim().toLowerCase()
+    : '';
 
   if (!url || !/^https?:\/\//.test(url)) {
     throw new Error(`Missing or invalid SAP_URL: ${url}`);
   }
 
+  // Keep tests compatible with both modes:
+  // - explicit SAP_AUTH_TYPE (basic|jwt|xsuaa)
+  // - implicit JWT mode when token is provided without SAP_AUTH_TYPE
+  const hasJwtToken = Boolean(process.env.SAP_JWT_TOKEN);
+  const effectiveAuthType: 'basic' | 'jwt' =
+    authType === 'jwt' || authType === 'xsuaa'
+      ? 'jwt'
+      : authType === 'basic'
+        ? 'basic'
+        : hasJwtToken
+          ? 'jwt'
+          : 'basic';
+
   const config: SapConfig = {
     url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
+    authType: effectiveAuthType,
   };
 
   if (client) {
     config.client = client;
   }
 
-  if (authType === 'jwt' || authType === 'xsuaa') {
+  if (effectiveAuthType === 'jwt') {
     const jwtToken = process.env.SAP_JWT_TOKEN;
     if (!jwtToken) {
       throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');

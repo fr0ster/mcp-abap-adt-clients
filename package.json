@@ -44,7 +44,7 @@
     "format": "npx biome format --write src",
     "build": "npm run --silent clean && npx biome check src --diagnostic-level=error && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
-    "test": "jest --runInBand",
+    "test": "NODE_OPTIONS=\"${NODE_OPTIONS:-} --localstorage-file=/tmp/mcp-abap-adt-jest-localstorage.json\" jest --runInBand",
     "test:check": "npx tsc --noEmit --project tsconfig.test.json",
     "test:type-check": "npm run test:check",
     "test:check:integration": "npx tsc --noEmit --project tsconfig.test.integration.json",
@@ -61,7 +61,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces": "^2.4.0",
+    "@mcp-abap-adt/interfaces": "^2.5.0",
     "@mcp-abap-adt/logger": "^0.1.3",
     "axios": "^1.11.0",
     "fast-xml-parser": "^5.3.3",

@@ -1142,3 +1142,45 @@ sql_query:
       description: "Test getSqlQuery with default row_number parameter. Uses standard_objects.tables filtered by available_in."
       params:
         # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
+
+# Execute Class (Executor API)
+execute_class:
+  test_cases:
+    - name: "adt_class_executor"
+      enabled: false
+      description: "Run class via AdtExecutor (with and without profiling)"
+      params:
+        class_name: "ZADT_BLD_CLS023"
+        source_code: |
+          CLASS {{CLASS_NAME}} DEFINITION PUBLIC FINAL CREATE PUBLIC.
+            PUBLIC SECTION.
+              INTERFACES if_oo_adt_classrun.
+              METHODS run_probe RETURNING VALUE(rv_result) TYPE i.
+          ENDCLASS.
+
+          CLASS {{CLASS_NAME}} IMPLEMENTATION.
+            METHOD run_probe.
+              rv_result = 1.
+            ENDMETHOD.
+
+            METHOD if_oo_adt_classrun~main.
+              out->write( |{{CLASS_NAME}}=>run_probe( ) = { run_probe( ) }| ).
+            ENDMETHOD.
+          ENDCLASS.
+        profiling:
+          enabled: true
+          parameters:
+            all_misc_abap_statements: false
+            all_procedural_units: true
+            all_internal_table_events: false
+            all_dynpro_events: false
+            description: "ZADT_BLD_CLS023"
+            aggregate: false
+            explicit_on_off: false
+            with_rfc_tracing: true
+            all_system_kernel_events: false
+            sql_trace: true
+            all_db_events: true
+            max_size_for_trace_file: 30720
+            amdp_trace: true
+            max_time_for_tracing: 1800
