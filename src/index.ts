@@ -39,7 +39,6 @@ export { AdtClientsWS } from './clients/AdtClientsWS';
 export { AdtExecutor } from './clients/AdtExecutor';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export { AdtRuntimeClientExperimental } from './clients/AdtRuntimeClientExperimental';
-export { AdtService } from './core/service';
 export type {
   DebuggerStepAction,
   IDebuggerAttachParams,
@@ -126,24 +125,25 @@ export type {
   IProgramState,
 } from './core/program';
 export type {
-  IAdtService,
+  GeneratedServiceType,
   IActivateServiceBindingParams,
+  IAdtService,
   ICheckServiceBindingParams,
+  IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
   ICreateServiceBindingParams,
   IGenerateServiceBindingParams,
-  IClassifyServiceBindingParams,
   IGetServiceBindingODataParams,
   IPublishODataV2Params,
   IReadServiceBindingParams,
   ITransportCheckServiceBindingParams,
-  IUpdateServiceBindingParams,
   IUnpublishODataV2Params,
+  IUpdateServiceBindingParams,
   IValidateServiceBindingParams,
-  GeneratedServiceType,
   ServiceBindingType,
   ServiceBindingVersion,
 } from './core/service';
+export { AdtService } from './core/service';
 export type {
   AdtServiceDefinitionType,
   IServiceDefinitionConfig,

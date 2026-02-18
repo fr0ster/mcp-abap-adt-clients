@@ -106,14 +106,22 @@ export interface IAdtService {
   transportCheckServiceBinding(
     params: ITransportCheckServiceBindingParams,
   ): Promise<IAdtResponse>;
-  createServiceBinding(params: ICreateServiceBindingParams): Promise<IAdtResponse>;
+  createServiceBinding(
+    params: ICreateServiceBindingParams,
+  ): Promise<IAdtResponse>;
   readServiceBinding(params: IReadServiceBindingParams): Promise<IAdtResponse>;
-  updateServiceBinding(params: IUpdateServiceBindingParams): Promise<IAdtResponse>;
-  checkServiceBinding(params: ICheckServiceBindingParams): Promise<IAdtResponse>;
+  updateServiceBinding(
+    params: IUpdateServiceBindingParams,
+  ): Promise<IAdtResponse>;
+  checkServiceBinding(
+    params: ICheckServiceBindingParams,
+  ): Promise<IAdtResponse>;
   activateServiceBinding(
     params: IActivateServiceBindingParams,
   ): Promise<IAdtResponse>;
-  generateServiceBinding(params: IGenerateServiceBindingParams): Promise<IAdtResponse>;
+  generateServiceBinding(
+    params: IGenerateServiceBindingParams,
+  ): Promise<IAdtResponse>;
   createAndGenerateServiceBinding(
     params: ICreateAndGenerateServiceBindingParams,
   ): Promise<{

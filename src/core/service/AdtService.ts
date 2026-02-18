@@ -3,24 +3,24 @@ import type {
   IAdtResponse,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { XMLParser } from 'fast-xml-parser';
 import { getTimeout } from '../../utils/timeouts';
 import type {
-  IAdtService,
   IActivateServiceBindingParams,
+  IAdtService,
   ICheckServiceBindingParams,
+  IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
   ICreateServiceBindingParams,
-  IClassifyServiceBindingParams,
   IGenerateServiceBindingParams,
   IGetServiceBindingODataParams,
   IPublishODataV2Params,
   IReadServiceBindingParams,
   ITransportCheckServiceBindingParams,
-  IUpdateServiceBindingParams,
   IUnpublishODataV2Params,
+  IUpdateServiceBindingParams,
   IValidateServiceBindingParams,
 } from './types';
-import { XMLParser } from 'fast-xml-parser';
 
 export class AdtService implements IAdtService {
   private readonly connection: IAbapConnection;
@@ -40,7 +40,9 @@ export class AdtService implements IAdtService {
     return encodeURIComponent(name.toLowerCase());
   }
 
-  private buildServiceBindingCreateXml(params: ICreateServiceBindingParams): string {
+  private buildServiceBindingCreateXml(
+    params: ICreateServiceBindingParams,
+  ): string {
     const bindingCategory = params.bindingCategory ?? '1';
     const masterLanguage = params.masterLanguage ?? 'EN';
     const masterSystem = params.masterSystem ?? '';
@@ -205,7 +207,8 @@ export class AdtService implements IAdtService {
       timeout: getTimeout('default'),
       params,
       headers: {
-        Accept: 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
+        Accept:
+          'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
       },
     });
   }
@@ -270,7 +273,8 @@ export class AdtService implements IAdtService {
       headers: {
         Accept:
           'application/vnd.sap.adt.businessservices.servicebinding.v1+xml, application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
-        'Content-Type': 'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
+        'Content-Type':
+          'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
       },
     });
   }
@@ -336,7 +340,11 @@ export class AdtService implements IAdtService {
           `Invalid state transition: cannot publish service binding ${params.bindingName}. allowedAction=${current.allowedAction ?? 'UNKNOWN'}`,
         );
       }
-      return this.publishByServiceType(serviceType, serviceName, serviceVersion);
+      return this.publishByServiceType(
+        serviceType,
+        serviceName,
+        serviceVersion,
+      );
     }
 
     if (params.desiredPublicationState === 'unpublished') {

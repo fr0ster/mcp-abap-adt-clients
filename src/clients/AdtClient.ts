@@ -86,10 +86,7 @@ import {
   type IProgramConfig,
   type IProgramState,
 } from '../core/program';
-import {
-  AdtService,
-  type IAdtService,
-} from '../core/service';
+import { AdtService, type IAdtService } from '../core/service';
 import {
   AdtServiceDefinition,
   type IServiceDefinitionConfig,

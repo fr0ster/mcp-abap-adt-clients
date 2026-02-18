@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.17] - 2026-02-18
+
+### Added
+- Added `IAdtService` facade and typed service-binding lifecycle operations for RAP BO service flows outside generic CRUD.
+- Added support for reading available service binding types via ADT (`GET /sap/bc/adt/businessservices/bindings/bindingtypes`).
+- Added dedicated methods for service binding create/read/update/check/activate/generate and create+generate orchestration.
+
+### Changed
+- Updated dependency `@mcp-abap-adt/interfaces` to `^2.6.0`.
+- Documented service lifecycle architecture and separation from `IAdtObject` CRUD in architecture docs.
+
 ## [0.3.16] - 2026-02-15
 
 ### Changed
