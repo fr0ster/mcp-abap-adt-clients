@@ -87,6 +87,10 @@ import {
   type IProgramState,
 } from '../core/program';
 import {
+  AdtService,
+  type IAdtService,
+} from '../core/service';
+import {
   AdtServiceDefinition,
   type IServiceDefinitionConfig,
   type IServiceDefinitionState,
@@ -266,6 +270,14 @@ export class AdtClient {
     IServiceDefinitionState
   > {
     return new AdtServiceDefinition(this.connection, this.logger);
+  }
+
+  /**
+   * Get non-CRUD service operations (service bindings, publish/unpublish, etc.)
+   * @returns IAdtService facade for service lifecycle operations that are outside IAdtObject CRUD contract
+   */
+  getService(): IAdtService {
+    return new AdtService(this.connection, this.logger);
   }
 
   /**

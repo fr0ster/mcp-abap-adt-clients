@@ -1,0 +1,20 @@
+export { AdtService } from './AdtService';
+export type {
+  IAdtService,
+  IActivateServiceBindingParams,
+  ICheckServiceBindingParams,
+  ICreateAndGenerateServiceBindingParams,
+  ICreateServiceBindingParams,
+  IGenerateServiceBindingParams,
+  IClassifyServiceBindingParams,
+  IGetServiceBindingODataParams,
+  IPublishODataV2Params,
+  IReadServiceBindingParams,
+  ITransportCheckServiceBindingParams,
+  IUpdateServiceBindingParams,
+  IUnpublishODataV2Params,
+  IValidateServiceBindingParams,
+  GeneratedServiceType,
+  ServiceBindingType,
+  ServiceBindingVersion,
+} from './types';

@@ -2,121 +2,190 @@
 
 ## Overview
 
-`@mcp-abap-adt/adt-clients` provides a builderless API for SAP ADT operations:
+`@mcp-abap-adt/adt-clients` is a TypeScript package that provides ADT client APIs over a shared `IAbapConnection` abstraction.
 
-- `AdtClient` for object CRUD and utility access.
-- `AdtRuntimeClient` for stable runtime/debug/traces/logs/dumps.
-- `AdtRuntimeClientExperimental` for runtime APIs in progress.
-- `AdtUtils` for cross-cutting utilities (search, where-used, discovery, etc.).
+Primary public entry points:
+- `AdtClient` - high-level CRUD-style object operations.
+- `AdtRuntimeClient` - stable runtime operations (debugger, traces, memory, dumps, logs, feeds, DDIC runtime helpers).
+- `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
+- `AdtClientsWS` - WebSocket request/event facade.
+- `AdtExecutor` - execution-oriented facade (currently class execution with optional profiling helpers).
 
-All external interactions are through interfaces from `@mcp-abap-adt/interfaces`.
+Design constraint:
+- External integrations are interface-driven via `@mcp-abap-adt/interfaces` (`IAbapConnection`, `ILogger`, `IAdtObject`, `IWebSocketTransport`, etc.).
 
-## High-Level Flow
+## Layered Structure
 
-1. Consumers create a connection via `@mcp-abap-adt/connection`.
-2. `AdtClient` exposes `getClass()`, `getProgram()`, `getView()`, etc.
-3. Each getter returns an `Adt*` object implementing `IAdtObject`.
-4. `Adt*` objects call low-level functions in `src/core/*` which call ADT endpoints.
-5. Shared utilities are accessed via `client.getUtils()` (AdtUtils).
-
-## Project Structure
-
+```text
+Consumer code
+  -> AdtClient / AdtRuntimeClient / AdtClientsWS / AdtExecutor
+    -> core/* object modules + core/shared (AdtUtils)
+    -> runtime/* endpoint functions
+    -> executors/* orchestration helpers
+      -> utils/* cross-cutting helpers (timeouts, accept negotiation, parsers)
+        -> IAbapConnection.makeAdtRequest(...) / IWebSocketTransport
+          -> SAP ADT endpoints
 ```
+
+## Source Layout
+
+```text
 src/
   clients/
     AdtClient.ts
     AdtRuntimeClient.ts
     AdtRuntimeClientExperimental.ts
+    AdtClientsWS.ts
+    DebuggerSessionClient.ts
+    AdtExecutor.ts
+
   core/
-    class/                  # AdtClass + low-level functions
-    program/
-    interface/
-    functionGroup/
-    functionModule/
-    table/
-    structure/
-    view/
-    domain/
-    dataElement/
-    package/
-    serviceDefinition/
-    behaviorDefinition/
-    behaviorImplementation/
-    metadataExtension/
-    transport/
-    unitTest/
-    shared/                 # AdtUtils + shared utilities
+    <object>/                 # class, program, package, table, ...
+      Adt<Object>.ts          # IAdtObject implementation
+      create.ts/read.ts/...   # low-level endpoint helpers
+      types.ts
+    shared/
+      AdtUtils.ts             # cross-cutting non-CRUD utilities
+      *.ts                    # discovery, search, where-used, etc.
+
+  runtime/
+    debugger/
+    traces/
+    memory/
+    dumps/
+    feeds/
+    applicationLog/
+    atc/
+    ddic/
+
+  executors/
+    class/ClassExecutor.ts
+
   utils/
+    acceptNegotiation.ts
+    readOperations.ts
+    validation.ts
+    managementOperations.ts
+    internalUtils.ts
+    ...
 ```
 
-## Clients
+## Public API Architecture
 
-### AdtClient
+### 1) `AdtClient` (object facade)
 
-- High-level CRUD operations for ADT objects.
-- Factory accessors: `client.getClass()`, `client.getProgram()`, `client.getView()`, etc.
-- Utilities: `client.getUtils()`.
+`AdtClient` is a factory of `IAdtObject` implementations and returns a new instance per call:
+- `getClass()`, `getProgram()`, `getInterface()`, `getDomain()`, `getDataElement()`, `getStructure()`, `getTable()`, `getTableType()`, `getView()`
+- `getFunctionGroup()`, `getFunctionModule()`, `getPackage()`, `getServiceDefinition()`
+- `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`, `getEnhancement()`
+- `getUnitTest()`, `getCdsUnitTest()`, `getRequest()`
+- class include helpers: `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()`
+- utilities: `getUtils()`
 
-### AdtRuntimeClient
+Each object module encapsulates its ADT endpoint specifics in `core/<object>/*.ts`, while `Adt<Object>.ts` provides an `IAdtObject` workflow API.
 
-- Stable runtime-only operations (ABAP debugger, logs, traces, memory analysis, dumps, etc.).
-- ABAP debugger step operations are executed through `POST /sap/bc/adt/debugger/batch` (`multipart/mixed`) via dedicated batch-step methods.
+### 2) `AdtRuntimeClient` / `AdtRuntimeClientExperimental`
 
-### AdtRuntimeClientExperimental
+Runtime clients are facades over pure runtime functions in `src/runtime/*`.
+- `AdtRuntimeClient`: stable APIs.
+- `AdtRuntimeClientExperimental`: extends stable runtime client and adds AMDP-in-progress APIs.
 
-- Runtime APIs marked as in progress.
-- Current scope: AMDP debugger and AMDP data preview.
+### 3) `AdtClientsWS`
 
-## Adt Objects
+WebSocket abstraction around `IWebSocketTransport`:
+- request/response with correlation IDs and timeout-based pending map.
+- event dispatch for unsolicited messages.
+- debugger session convenience facade via `DebuggerSessionClient`.
 
-Each `Adt*` object implements `IAdtObject<TConfig, TState>` with methods:
+### 4) `AdtExecutor`
 
+Execution-oriented facade (`getClassExecutor()` currently):
+- simple run of class execution target.
+- run with existing profiler.
+- run with profiling bootstrap + trace ID resolution flow.
+
+## Object Workflow Pattern (`IAdtObject`)
+
+Object implementations follow a common shape:
 - `validate`, `create`, `read`, `readMetadata`, `readTransport`, `update`, `delete`, `activate`, `check`.
-- Long polling is supported in read operations with `withLongPolling` where applicable.
-- Operation results are stored in the returned state (`validationResponse`, `createResult`, `updateResult`, `checkResult`, etc.).
+- typed `config` input + typed state/result object.
+- low-level mode for update in many objects when `options.lockHandle` is supplied.
 
-## Shared Utilities (AdtUtils)
+Typical update flow (object-dependent):
+1. Lock object in stateful session.
+2. Check inactive/source where required.
+3. Update source/XML.
+4. Unlock.
+5. Optional post-check/activate depending on options and implementation.
 
-`AdtUtils` provides cross-cutting endpoints that are not per-object CRUD:
+## Session and Locking Model
 
-- Discovery, search, where-used, object structure, node structure.
-- SQL query, table contents, virtual folders.
-- Group activation/deletion, inactive objects.
-- Object metadata/source helpers for internal use.
+Critical conventions used across object modules:
+- Session type switches through `connection.setSessionType('stateful' | 'stateless')`.
+- Lock endpoints return `lockHandle`, which must be passed to update/unlock/delete flows.
+- Stateful mode is scoped to lock-sensitive operations; code resets to stateless in success/error paths.
+- Long polling is supported on read-related endpoints where ADT supports `withLongPolling=true`.
 
-Where-used flow in `AdtUtils`:
-- Step 1: `getWhereUsedScope` fetches scope XML (available object types + defaults).
-- Optional: `modifyWhereUsedScope` tweaks the XML locally (no ADT call).
-- Step 2: `getWhereUsed` executes the search using the scope (defaults if omitted).
+## Cross-Cutting Utilities (`AdtUtils`)
 
-## Accept Negotiation
+`AdtUtils` (in `core/shared/AdtUtils.ts`) covers non-object CRUD operations:
+- discovery, search, where-used (including scope workflow), object/node/package structures.
+- SQL query and table contents.
+- group activation/deletion and inactive objects.
+- source/metadata helpers for supported object types.
 
-ADT endpoints can return different `Accept` requirements across systems. To reduce 406 failures, the client can optionally
-negotiate `Accept` headers by retrying with supported values returned in the 406 response.
+Notably, where-used supports:
+- scope fetch (`getWhereUsedScope`),
+- local scope mutation (`modifyWhereUsedScope`),
+- execution (`getWhereUsed`) and parsed convenience (`getWhereUsedList`).
 
-Behavior:
-- Disabled by default.
-- When enabled, `makeAdtRequest` is wrapped to intercept 406 responses and retry once with supported `Accept` values.
-- The supported values are cached per method+URL to avoid repeated 406s.
-- The retry is scoped to the same endpoint and request; other errors are rethrown.
+## Accept Negotiation (406 Recovery)
 
-Configuration:
-- Constructor option: `enableAcceptCorrection` on `AdtClient` and `AdtRuntimeClient`.
-- Environment override: `ADT_ACCEPT_CORRECTION=true` (applied when no explicit option is provided).
+`src/utils/acceptNegotiation.ts` provides optional request retry for ADT `406 Not Acceptable` cases:
+- Can wrap `connection.makeAdtRequest` once per connection.
+- Extracts supported accept values from headers/body.
+- Retries once with corrected `Accept` and caches per `METHOD + URL`.
+- Enabled by constructor option `enableAcceptCorrection` or env var `ADT_ACCEPT_CORRECTION=true`.
 
-Per-call overrides:
-- Read operations accept `ReadOptions` with `accept?: string` to override the default `Accept` for a specific request.
+## Error and Response Handling
 
-## Testing
+Common behaviors in implementations:
+- Preserve raw ADT responses for caller inspection.
+- Parse XML responses where lock handles/run states are needed.
+- Enrich thrown errors with operation context/status in many modules.
+- Some `read` methods return `undefined` for `404` (object-not-found semantics).
 
-- Integration tests live in `src/__tests__/integration/*`.
-- `BaseTester` provides standardized workflows for create/update/delete and read.
-- Read-only coverage is in `integration/readonly` and shared utilities in `integration/shared`.
+## Type System and Exports
 
-## Logging
+Package root (`src/index.ts`) exports:
+- client classes (`AdtClient`, runtime/ws/executor clients),
+- selected runtime/debugger types,
+- object config/state/type definitions,
+- shared utility type unions (`AdtObjectType`, `AdtSourceObjectType`, ...),
+- core interfaces re-exported from `@mcp-abap-adt/interfaces`.
 
-- `DEBUG_CONNECTORS` for connection-level logs.
-- `DEBUG_ADT_LIBS` for library-level logs.
-- `DEBUG_ADT_TESTS` for integration test logs.
+Internal low-level helpers are intentionally not part of root API.
 
-See `docs/usage/DEBUG.md` for details.
+## Testing Architecture
+
+Current test setup:
+- Jest + `ts-jest`, roots at `src/`.
+- Integration-heavy strategy against real SAP ADT system.
+- Sequential execution enforced (`maxWorkers: 1`, `maxConcurrency: 1`) to avoid shared-object contention.
+- `src/__tests__/helpers/BaseTester.ts` provides reusable flow/read test orchestration.
+- Integration type-check is part of `pretest`.
+
+## Extension Rules for New Features
+
+When adding a new ADT object type:
+1. Create `src/core/<object>/` low-level endpoint modules and types.
+2. Implement `Adt<Object>.ts` as `IAdtObject` facade.
+3. Add factory method in `AdtClient`.
+4. Export public types in `src/index.ts`.
+5. Add integration tests under `src/__tests__/integration/core/<object>/`.
+6. Keep stateful/lock cleanup semantics consistent.
+
+When adding runtime APIs:
+1. Add pure functions in `src/runtime/<domain>/`.
+2. Expose via `AdtRuntimeClient` (stable) or `AdtRuntimeClientExperimental` (in-progress).
+3. Add unit/integration tests depending on endpoint safety and availability.
