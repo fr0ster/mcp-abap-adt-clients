@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.19] - 2026-02-19
+
 ### Added
 - Added unit coverage for runtime profiler trace helpers and endpoint request builders (`runtime/traces/profiler`).
 - Added unit coverage for runtime memory snapshot request builders and validation (`runtime/memory/snapshots`).
