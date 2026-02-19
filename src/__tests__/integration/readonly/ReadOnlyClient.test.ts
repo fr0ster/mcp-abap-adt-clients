@@ -7,7 +7,7 @@
  *   DEBUG_ADT_LIBS=true        - ADT library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=readonly/ReadOnlyClient
+ * Run: npm test -- --testPathPatterns=readonly/ReadOnlyClient
  */
 
 import * as fs from 'node:fs';

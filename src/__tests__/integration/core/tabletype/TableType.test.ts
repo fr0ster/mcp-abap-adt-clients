@@ -7,7 +7,7 @@
  *   DEBUG_ADT_LIBS=true        - TableType library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=tabletype/TableType
+ * Run: npm test -- --testPathPatterns=tabletype/TableType
  */
 
 import * as fs from 'node:fs';

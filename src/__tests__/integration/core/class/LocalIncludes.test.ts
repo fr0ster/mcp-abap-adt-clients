@@ -5,7 +5,7 @@
  * - LocalTestClass (testclasses include: local ABAP Unit tests)
  * - LocalMacros (macros include: on-premise only; skipped on cloud)
  *
- * Run: npm test -- --testPathPattern=class/LocalIncludes
+ * Run: npm test -- --testPathPatterns=class/LocalIncludes
  */
 
 import * as fs from 'node:fs';

@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - FunctionModule library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=functionModule/FunctionModule
+ * Run: npm test -- --testPathPatterns=functionModule/FunctionModule
  */
 
 import * as fs from 'node:fs';

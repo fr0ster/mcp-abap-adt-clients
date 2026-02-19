@@ -125,17 +125,23 @@ export type {
   IProgramState,
 } from './core/program';
 export type {
+  AdtServiceBindingType,
+  DesiredPublicationState,
   GeneratedServiceType,
   IActivateServiceBindingParams,
   IAdtService,
+  IAdtServiceBinding,
   ICheckServiceBindingParams,
   IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
   ICreateServiceBindingParams,
+  IDeleteServiceBindingParams,
   IGenerateServiceBindingParams,
   IGetServiceBindingODataParams,
   IPublishODataV2Params,
   IReadServiceBindingParams,
+  IServiceBindingConfig,
+  IServiceBindingState,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
   IUpdateServiceBindingParams,
@@ -143,7 +149,7 @@ export type {
   ServiceBindingType,
   ServiceBindingVersion,
 } from './core/service';
-export { AdtService } from './core/service';
+export { AdtService, AdtServiceBinding } from './core/service';
 export type {
   AdtServiceDefinitionType,
   IServiceDefinitionConfig,

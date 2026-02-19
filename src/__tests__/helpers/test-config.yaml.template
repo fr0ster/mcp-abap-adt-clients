@@ -21,6 +21,7 @@
 # - Structures: ZADT_BLD_STRU01, ZADT_BLD_STRU02, etc.
 # - Views: ZADT_BLD_VIEW01, ZADT_BLD_VIEW02, etc.
 # - Service Definitions: ZADT_BLD_SRVD01, ZADT_BLD_SRVD02, etc.
+# - Service Bindings: ZADT_BLD_SRVB01, ZADT_BLD_SRVB02, etc.
 # - Packages: ZADT_BLD_PKG01, ZADT_BLD_PKG02, etc.
 #
 # Test settings
@@ -161,6 +162,11 @@ standard_objects:
       description: "Placeholder for on-premise service definition – replace with existing service definition"
       available_in: ["onprem"]
 
+  service_bindings:
+    - name: "ZPLACEHOLDER_SRVB"
+      description: "Placeholder for service binding – replace with existing service binding"
+      available_in: ["onprem", "cloud"]
+
   standard_criteria:
     note: "Update the entries above with objects that exist in your SAP system before running read tests."
 
@@ -300,6 +306,15 @@ read_service_definition:
         # Or use environment-specific parameters:
         # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
         # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
+
+# Read Service Binding (AdtClient)
+# Uses standard_objects.service_bindings with available_in filter
+read_service_binding:
+  test_cases:
+    - name: "readonly_read_service_binding"
+      enabled: false  # Set to true to enable read test
+      description: "Read existing service binding using AdtClient (uses standard_objects.service_bindings)"
+      params: {}  # No params needed - automatically uses standard_objects.service_bindings filtered by available_in
 
 # Read Transport Request (AdtClient)
 read_transport:
@@ -721,6 +736,28 @@ create_service_definition:
           define service ZADT_BLD_SRVD01 {
             expose ZOK_C_CDS_TEST;  # Replace with your CDS view name
           }
+
+# Create Service Binding
+create_service_binding:
+  test_cases:
+    - name: "adt_service_binding"
+      enabled: false  # Set to true and configure params below to enable tests
+      description: "Service binding reserved for AdtServiceBinding tests"
+      params:
+        binding_name: "ZADT_BLD_SRVB01"  # Replace with your service binding name
+        service_definition_name: "ZOK_CDS_TEST_SRV"  # Existing SRVD name used by ServiceBinding integration test
+        service_name: "ZOK_CDS_TEST_SRV"  # Usually same as service_definition_name
+        service_version: "0001"
+        binding_type: "ODATA"
+        binding_version: "V4"  # V2 or V4
+        service_type: "odatav4"  # odatav2 or odatav4 (must match binding_version)
+        desired_publication_state: "published"  # published | unpublished | unchanged
+        description: "AdtServiceBinding workflow service binding"
+        # software_component: "HOME"  # Optional; if omitted, inherited from parent package metadata
+        package_type: "development"
+        # parent_package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # test_subpackage_name: "ZADT_BLD_PKG01_SRVB"  # Created automatically if missing
+        # transport_request: ""  # Uses environment.default_transport if omitted
 # Create Function Group
 create_function_group:
   test_cases:

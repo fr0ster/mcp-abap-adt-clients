@@ -7,7 +7,7 @@
  *   DEBUG_ADT_LIBS=true        - UnitTest library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=unitTest/UnitTest
+ * Run: npm test -- --testPathPatterns=unitTest/UnitTest
  */
 
 import * as fs from 'node:fs';

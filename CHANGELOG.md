@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.18] - 2026-02-19
+
+### Added
+- Added dedicated integration coverage for `ServiceBinding` lifecycle (`create -> publish -> unpublish -> delete`) with YAML-driven configuration.
+- Added automatic test subpackage provisioning for ServiceBinding integration tests, including parent package metadata inheritance.
+
+### Changed
+- Refactored service binding API to `AdtServiceBinding` object model and added `AdtClient.getServiceBinding()`.
+- Aligned service binding operations with CRUD-style object flow; `create` now performs create + generate lifecycle.
+- Updated publish/unpublish implementation for service bindings to use `POST` with ADT `objectReferences` payload and ADT-compatible headers/content types.
+- Updated integration test run hints to Jest 30 syntax (`--testPathPatterns`).
+
+### Fixed
+- Added Service Binding delete operation via ADT deletion endpoint (`POST /sap/bc/adt/deletion/delete`) with pre-delete unpublish handling when binding is published.
+- Improved ServiceBinding integration reliability for package creation/read eventual consistency (409/404 recovery + retry reads).
+
+### Documentation
+- Updated architecture documentation to describe ServiceBinding CRUD/lifecycle behavior and publication-state transitions.
+
 ## [0.3.17] - 2026-02-18
 
 ### Added

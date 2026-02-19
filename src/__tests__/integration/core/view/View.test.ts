@@ -7,7 +7,7 @@
  *   DEBUG_ADT_LIBS=true        - View library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=view/View
+ * Run: npm test -- --testPathPatterns=view/View
  */
 
 import * as fs from 'node:fs';

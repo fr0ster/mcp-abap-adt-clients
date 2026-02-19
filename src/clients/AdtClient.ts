@@ -86,7 +86,7 @@ import {
   type IProgramConfig,
   type IProgramState,
 } from '../core/program';
-import { AdtService, type IAdtService } from '../core/service';
+import { AdtServiceBinding, type IAdtServiceBinding } from '../core/service';
 import {
   AdtServiceDefinition,
   type IServiceDefinitionConfig,
@@ -270,11 +270,18 @@ export class AdtClient {
   }
 
   /**
-   * Get non-CRUD service operations (service bindings, publish/unpublish, etc.)
-   * @returns IAdtService facade for service lifecycle operations that are outside IAdtObject CRUD contract
+   * Get high-level operations for ServiceBinding objects
+   * @returns IAdtServiceBinding instance for ServiceBinding CRUD and lifecycle operations
    */
-  getService(): IAdtService {
-    return new AdtService(this.connection, this.logger);
+  getServiceBinding(): IAdtServiceBinding {
+    return new AdtServiceBinding(this.connection, this.logger);
+  }
+
+  /**
+   * @deprecated Use getServiceBinding() instead.
+   */
+  getService(): IAdtServiceBinding {
+    return this.getServiceBinding();
   }
 
   /**

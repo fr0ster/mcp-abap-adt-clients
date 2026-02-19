@@ -2,7 +2,7 @@
  * Integration test for getVirtualFoldersContents shared function
  * Tests getVirtualFoldersContents using AdtClient/AdtUtils
  *
- * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- --testPathPattern=shared/virtualFoldersContents
+ * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- --testPathPatterns=shared/virtualFoldersContents
  */
 
 import * as fs from 'node:fs';

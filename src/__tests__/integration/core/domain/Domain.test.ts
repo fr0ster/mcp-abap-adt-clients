@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - Domain library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=domain/Domain
+ * Run: npm test -- --testPathPatterns=domain/Domain
  */
 
 import * as fs from 'node:fs';

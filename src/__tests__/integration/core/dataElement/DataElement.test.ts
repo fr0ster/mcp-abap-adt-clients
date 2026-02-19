@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - DataElement library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=dataElement/DataElement
+ * Run: npm test -- --testPathPatterns=dataElement/DataElement
  */
 
 import * as fs from 'node:fs';

@@ -1,9 +1,40 @@
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtObject,
+  IAdtObjectState,
+  IAdtOperationOptions,
+  IAdtResponse,
+} from '@mcp-abap-adt/interfaces';
 
 export type ServiceBindingType = 'ODATA' | 'INA' | 'SQL';
 export type ServiceBindingVersion = 'V2' | 'V4' | '0001' | '0000' | string;
 export type GeneratedServiceType = 'odatav2' | 'odatav4';
 export type DesiredPublicationState = 'published' | 'unpublished' | 'unchanged';
+
+export interface IServiceBindingConfig {
+  bindingName: string;
+  packageName?: string;
+  description?: string;
+  serviceDefinitionName?: string;
+  serviceName?: string;
+  serviceVersion?: string;
+  bindingType?: ServiceBindingType;
+  bindingVersion?: ServiceBindingVersion;
+  bindingCategory?: '0' | '1' | string;
+  masterLanguage?: string;
+  masterSystem?: string;
+  responsible?: string;
+  desiredPublicationState?: DesiredPublicationState;
+  serviceType?: GeneratedServiceType;
+  transportRequest?: string;
+  runTransportCheck?: boolean;
+}
+
+export interface IServiceBindingState extends IAdtObjectState {
+  serviceTypesResult?: IAdtResponse;
+  inactiveCheckResult?: IAdtResponse;
+  generatedInfoResult?: IAdtResponse;
+  activeCheckResult?: IAdtResponse;
+}
 
 export interface IValidateServiceBindingParams {
   objname: string;
@@ -59,10 +90,13 @@ export interface ICreateServiceBindingParams {
   masterLanguage?: string;
   masterSystem?: string;
   responsible?: string;
+  runTransportCheck?: boolean;
+  activateAfterCreate?: boolean;
 }
 
 export interface IReadServiceBindingParams {
   bindingName: string;
+  version?: 'active' | 'inactive';
 }
 
 export interface ICheckServiceBindingParams {
@@ -78,9 +112,14 @@ export interface IActivateServiceBindingParams {
 export interface IUpdateServiceBindingParams {
   bindingName: string;
   desiredPublicationState: DesiredPublicationState;
-  serviceType?: GeneratedServiceType;
-  serviceName?: string;
+  serviceType: GeneratedServiceType;
+  serviceName: string;
   serviceVersion?: string;
+}
+
+export interface IDeleteServiceBindingParams {
+  bindingName: string;
+  transportRequest?: string;
 }
 
 export interface IGenerateServiceBindingParams {
@@ -94,11 +133,10 @@ export interface IGenerateServiceBindingParams {
 export interface ICreateAndGenerateServiceBindingParams
   extends ICreateServiceBindingParams {
   serviceType: GeneratedServiceType;
-  runTransportCheck?: boolean;
-  activateAfterCreate?: boolean;
 }
 
-export interface IAdtService {
+export interface IAdtServiceBinding
+  extends IAdtObject<IServiceBindingConfig, IServiceBindingState> {
   getServiceBindingTypes(): Promise<IAdtResponse>;
   validateServiceBinding(
     params: IValidateServiceBindingParams,
@@ -118,6 +156,9 @@ export interface IAdtService {
   ): Promise<IAdtResponse>;
   activateServiceBinding(
     params: IActivateServiceBindingParams,
+  ): Promise<IAdtResponse>;
+  deleteServiceBinding(
+    params: IDeleteServiceBindingParams,
   ): Promise<IAdtResponse>;
   generateServiceBinding(
     params: IGenerateServiceBindingParams,
@@ -144,3 +185,14 @@ export interface IAdtService {
     params: IClassifyServiceBindingParams,
   ): Promise<IAdtResponse>;
 }
+
+export type AdtServiceBindingType = IAdtObject<
+  IServiceBindingConfig,
+  IServiceBindingState
+>;
+
+// Backward compatibility aliases
+export type IAdtService = IAdtServiceBinding;
+export type ICreateAndGenerateServiceBindingParamsLegacy =
+  ICreateAndGenerateServiceBindingParams;
+export type IAdtServiceOperationOptions = IAdtOperationOptions;

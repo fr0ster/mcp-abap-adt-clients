@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - Class library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=class/Class
+ * Run: npm test -- --testPathPatterns=class/Class
  */
 
 import * as fs from 'node:fs';

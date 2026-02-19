@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - ServiceDefinition library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=serviceDefinition/ServiceDefinition
+ * Run: npm test -- --testPathPatterns=serviceDefinition/ServiceDefinition
  */
 
 import * as fs from 'node:fs';

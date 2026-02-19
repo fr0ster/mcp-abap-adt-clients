@@ -1,16 +1,22 @@
-export { AdtService } from './AdtService';
+export { AdtService, AdtServiceBinding } from './AdtService';
 export type {
+  AdtServiceBindingType,
+  DesiredPublicationState,
   GeneratedServiceType,
   IActivateServiceBindingParams,
   IAdtService,
+  IAdtServiceBinding,
   ICheckServiceBindingParams,
   IClassifyServiceBindingParams,
   ICreateAndGenerateServiceBindingParams,
   ICreateServiceBindingParams,
+  IDeleteServiceBindingParams,
   IGenerateServiceBindingParams,
   IGetServiceBindingODataParams,
   IPublishODataV2Params,
   IReadServiceBindingParams,
+  IServiceBindingConfig,
+  IServiceBindingState,
   ITransportCheckServiceBindingParams,
   IUnpublishODataV2Params,
   IUpdateServiceBindingParams,

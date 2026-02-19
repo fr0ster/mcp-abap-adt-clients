@@ -3,7 +3,7 @@
  * Tests using AdtClient for unified CRUD operations
  *
  * Enable debug logs:
- * - DEBUG_ADT_TESTS=true npm test -- --testPathPattern=package  (ADT-clients logs)
+ * - DEBUG_ADT_TESTS=true npm test -- --testPathPatterns=package  (ADT-clients logs)
  */
 
 import * as fs from 'node:fs';

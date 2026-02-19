@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - Table library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=table/Table
+ * Run: npm test -- --testPathPatterns=table/Table
  */
 
 import * as fs from 'node:fs';

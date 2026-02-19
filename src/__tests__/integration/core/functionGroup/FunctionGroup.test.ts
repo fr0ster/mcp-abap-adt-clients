@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - FunctionGroup library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=functionGroup/FunctionGroup
+ * Run: npm test -- --testPathPatterns=functionGroup/FunctionGroup
  */
 
 import * as fs from 'node:fs';

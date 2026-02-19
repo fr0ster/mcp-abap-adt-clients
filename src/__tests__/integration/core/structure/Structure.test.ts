@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - Structure library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=structure/Structure
+ * Run: npm test -- --testPathPatterns=structure/Structure
  */
 
 import * as fs from 'node:fs';

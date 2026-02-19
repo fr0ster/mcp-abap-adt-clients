@@ -77,12 +77,20 @@ src/
 `AdtClient` is a factory of `IAdtObject` implementations and returns a new instance per call:
 - `getClass()`, `getProgram()`, `getInterface()`, `getDomain()`, `getDataElement()`, `getStructure()`, `getTable()`, `getTableType()`, `getView()`
 - `getFunctionGroup()`, `getFunctionModule()`, `getPackage()`, `getServiceDefinition()`
+- `getServiceBinding()` for RAP BO service binding CRUD + lifecycle
 - `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`, `getEnhancement()`
 - `getUnitTest()`, `getCdsUnitTest()`, `getRequest()`
 - class include helpers: `getLocalTestClass()`, `getLocalTypes()`, `getLocalDefinitions()`, `getLocalMacros()`
 - utilities: `getUtils()`
 
 Each object module encapsulates its ADT endpoint specifics in `core/<object>/*.ts`, while `Adt<Object>.ts` provides an `IAdtObject` workflow API.
+
+`ServiceBinding` follows the same factory pattern and exposes CRUD with ADT-specific lifecycle behavior:
+- `create` includes binding-type discovery and generation flow
+- `update` performs publish/unpublish transition with allowed-action validation
+: publication endpoints are executed as `POST` jobs with ADT `objectReferences` payload
+- `delete` uses ADT deletion API (`POST /sap/bc/adt/deletion/delete`)
+: if binding is published, delete flow executes unpublish pre-step before deletion
 
 ### 2) `AdtRuntimeClient` / `AdtRuntimeClientExperimental`
 

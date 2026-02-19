@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=shared/groupActivation
+ * Run: npm test -- --testPathPatterns=shared/groupActivation
  */
 
 import * as fs from 'node:fs';

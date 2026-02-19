@@ -7,7 +7,7 @@
  *  DEBUG_ADT_LIBS=true    - Interface library logs
  *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=interface/Interface
+ * Run: npm test -- --testPathPatterns=interface/Interface
  */
 
 import * as fs from 'node:fs';

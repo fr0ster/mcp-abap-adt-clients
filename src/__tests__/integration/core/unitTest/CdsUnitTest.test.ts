@@ -7,7 +7,7 @@
  *   DEBUG_ADT_LIBS=true        - CdsUnitTest library logs
  *   DEBUG_CONNECTORS=true      - Connection logs (@mcp-abap-adt/connection)
  *
- * Run: npm test -- --testPathPattern=unitTest/CdsUnitTest
+ * Run: npm test -- --testPathPatterns=unitTest/CdsUnitTest
  */
 
 import * as fs from 'node:fs';
