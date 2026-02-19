@@ -1180,6 +1180,29 @@ sql_query:
       params:
         # sql_query: Uses standard_objects.tables (T000 for onprem) if not specified - will be "SELECT * FROM T000"
 
+# Runtime dumps read operations (AdtRuntimeClient)
+runtime_dumps:
+  test_cases:
+    - name: "adt_runtime_dumps"
+      enabled: false  # Set to true to enable test
+      description: "Read runtime dumps feed and optionally read dump payload by ID"
+      params:
+        top: 20
+        inlinecount: "allpages"
+        user: ""      # Optional: ADT user for user-filtered dump feed
+        dump_id: ""   # Optional: when empty, test tries to discover ID from feed
+
+# Runtime memory snapshots read operations (AdtRuntimeClient)
+runtime_memory_snapshots:
+  test_cases:
+    - name: "adt_runtime_memory_snapshots"
+      enabled: false  # Set to true to enable test
+      description: "TODO: investigate endpoint/content-type support for runtime memory snapshots before enabling"
+      params:
+        user: ""          # Optional
+        original_user: "" # Optional
+        snapshot_id: ""   # Optional: when empty, test tries to discover ID from feed
+
 # Execute Class (Executor API)
 execute_class:
   test_cases:

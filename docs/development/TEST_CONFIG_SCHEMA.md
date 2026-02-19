@@ -9,6 +9,8 @@ This document summarizes the current schema used by `BaseTester` and `TestConfig
 - `environment` - default package/transport, cleanup settings.
 - `standard_objects` - registry of existing SAP objects for read-only tests.
 - `<handler_name>` - per-test definitions (e.g., `create_class`, `read_service_definition`).
+  - runtime handlers include `runtime_dumps` and `execute_class`.
+  - `runtime_memory_snapshots` is kept as TODO (disabled) until endpoint compatibility is finalized.
 
 ## test_settings
 
@@ -64,6 +66,29 @@ create_class:
         description: "Test"
         source_code: |
           CLASS ZADT_CLS01 DEFINITION.
+```
+
+Runtime examples:
+
+```yaml
+runtime_dumps:
+  test_cases:
+    - name: "adt_runtime_dumps"
+      enabled: true
+      params:
+        top: 20
+        inlinecount: "allpages"
+        user: ""
+        dump_id: ""
+
+runtime_memory_snapshots:
+  test_cases:
+    - name: "adt_runtime_memory_snapshots"
+      enabled: false
+      params:
+        user: ""
+        original_user: ""
+        snapshot_id: ""
 ```
 
 ### Common Params

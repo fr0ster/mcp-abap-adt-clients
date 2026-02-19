@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+- Added unit coverage for runtime profiler trace helpers and endpoint request builders (`runtime/traces/profiler`).
+- Added unit coverage for runtime memory snapshot request builders and validation (`runtime/memory/snapshots`).
+- Added integration tests for runtime dumps with YAML-driven configuration and standardized test progress logging.
+
+### Changed
+- Removed runtime memory snapshots from public `AdtRuntimeClient` API surface for this release.
+- Kept memory snapshots as internal/runtime-level implementation pending additional ADT compatibility validation.
+
+### Documentation
+- Extended runtime API reference with contract-level sections for profiling and dumps; documented memory snapshots as deferred.
+- Added runtime test coverage snapshot to architecture documentation.
+
 ## [0.3.18] - 2026-02-19
 
 ### Added

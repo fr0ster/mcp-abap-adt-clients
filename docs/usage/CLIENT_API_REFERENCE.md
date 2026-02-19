@@ -130,6 +130,41 @@ const userDumps = await runtime.listRuntimeDumpsByUser('CB9980000423', {
 const dumpPayload = await runtime.getRuntimeDumpById('ABCDEF1234567890');
 ```
 
+Contract notes:
+- `listRuntimeDumps(options?)` and `listRuntimeDumpsByUser(user?, options?)` are read-only feed operations.
+- `getRuntimeDumpById(dumpId)` requires plain dump ID (not full URI) and throws for empty/invalid IDs.
+- Methods return raw ADT payload (`IAdtResponse`) so consumers can parse XML according to their needs.
+
+### Runtime Memory Snapshots
+
+Memory snapshots are currently not exposed via the public `AdtRuntimeClient` API.
+They remain internal until endpoint/content-type behavior is validated across target systems.
+
+### Runtime Profiling (ABAP Traces)
+
+```typescript
+const params = await runtime.getProfilerTraceParameters();
+const created = await runtime.createProfilerTraceParameters({
+  description: 'CI trace run',
+  sqlTrace: true,
+  maxTimeForTracing: 1800,
+});
+const profilerId = runtime.extractProfilerIdFromResponse(created);
+
+const hitlist = await runtime.getProfilerTraceHitList(
+  '/sap/bc/adt/runtime/traces/abaptraces/ABCDEF1234567890',
+  { withSystemEvents: false },
+);
+```
+
+Contract notes:
+- Profiling API is split into:
+  - trace configuration (`get/createProfilerTraceParameters`)
+  - catalog/list endpoints (`listProfilerTraceFiles`, `listProfilerTraceRequests`, `listProfilerObjectTypes`, `listProfilerProcessTypes`)
+  - trace analysis endpoints (`getProfilerTraceHitList`, `getProfilerTraceStatements`, `getProfilerTraceDbAccesses`)
+- Trace-aware methods accept trace ID or full ADT trace URI.
+- `extractProfilerIdFromResponse()` and `extractTraceIdFromTraceRequestsResponse()` are helper parsers for ADT header/body responses.
+
 ### ABAP Debugger Step Operations (Batch Only)
 
 Step operations are executed through debugger batch endpoint:

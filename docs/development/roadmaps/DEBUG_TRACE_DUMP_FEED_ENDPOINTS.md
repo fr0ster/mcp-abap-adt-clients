@@ -365,6 +365,10 @@ Identify ADT endpoints from `discovery.md` that can be used to implement modules
 
 **Base URL:** `/sap/bc/adt/runtime/memory/snapshots`
 
+> TODO (release gate): keep Memory Snapshots out of public `AdtRuntimeClient` export
+> until endpoint/content-type behavior is validated on target landscapes (406 observed).
+> Continue release scope with profiler traces + runtime dumps.
+
 **Operations:**
 
 #### Snapshot Management

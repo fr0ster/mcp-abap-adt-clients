@@ -2,7 +2,6 @@
  * AdtRuntimeClient - Runtime Operations Client
  *
  * Provides access to runtime-related ADT operations:
- * - Memory snapshots analysis
  * - Profiler traces
  * - ABAP debugger operations
  * - Logs analysis
@@ -17,10 +16,6 @@
  * import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
  *
  * const client = new AdtRuntimeClient(connection, logger);
- *
- * // Memory snapshots
- * const snapshots = await client.listMemorySnapshots();
- * const snapshot = await client.getMemorySnapshot('snapshot-id');
  *
  * // Profiler traces
  * const traceFiles = await client.listProfilerTraceFiles();
@@ -110,22 +105,6 @@ import {
   getFeeds as getFeedsUtil,
   getFeedVariants as getFeedVariantsUtil,
 } from '../runtime/feeds';
-// Import memory snapshot functions
-import {
-  getSnapshotChildren as getSnapshotChildrenUtil,
-  getSnapshotDeltaChildren as getSnapshotDeltaChildrenUtil,
-  getSnapshotDeltaOverview as getSnapshotDeltaOverviewUtil,
-  getSnapshotDeltaRankingList as getSnapshotDeltaRankingListUtil,
-  getSnapshotDeltaReferences as getSnapshotDeltaReferencesUtil,
-  getSnapshotOverview as getSnapshotOverviewUtil,
-  getSnapshotRankingList as getSnapshotRankingListUtil,
-  getSnapshotReferences as getSnapshotReferencesUtil,
-  getSnapshot as getSnapshotUtil,
-  type ISnapshotChildrenOptions,
-  type ISnapshotRankingListOptions,
-  type ISnapshotReferencesOptions,
-  listSnapshots as listSnapshotsUtil,
-} from '../runtime/memory';
 // Import cross trace functions
 import {
   getCrossTraceActivations as getCrossTraceActivationsUtil,
@@ -200,183 +179,6 @@ export class AdtRuntimeClient {
         wrapConnectionAcceptNegotiation(this.connection, this.logger);
       }
     }
-  }
-
-  // ============================================================================
-  // Memory Snapshots
-  // ============================================================================
-
-  /**
-   * List memory snapshots
-   *
-   * @param user - Optional user filter
-   * @param originalUser - Optional original user filter
-   * @returns Axios response with list of snapshots
-   */
-  async listMemorySnapshots(
-    user?: string,
-    originalUser?: string,
-  ): Promise<AxiosResponse> {
-    return listSnapshotsUtil(this.connection, user, originalUser);
-  }
-
-  /**
-   * Get memory snapshot by ID
-   *
-   * @param snapshotId - Snapshot ID
-   * @returns Axios response with snapshot data
-   */
-  async getMemorySnapshot(snapshotId: string): Promise<AxiosResponse> {
-    return getSnapshotUtil(this.connection, snapshotId);
-  }
-
-  /**
-   * Get memory snapshot ranking list
-   *
-   * @param snapshotId - Snapshot ID
-   * @param options - Optional ranking list options
-   * @returns Axios response with ranking list
-   */
-  async getMemorySnapshotRankingList(
-    snapshotId: string,
-    options?: ISnapshotRankingListOptions,
-  ): Promise<AxiosResponse> {
-    return getSnapshotRankingListUtil(this.connection, snapshotId, options);
-  }
-
-  /**
-   * Get delta ranking list between two memory snapshots
-   *
-   * @param uri1 - URI of first snapshot
-   * @param uri2 - URI of second snapshot
-   * @param options - Optional ranking list options
-   * @returns Axios response with delta ranking list
-   */
-  async getMemorySnapshotDeltaRankingList(
-    uri1: string,
-    uri2: string,
-    options?: ISnapshotRankingListOptions,
-  ): Promise<AxiosResponse> {
-    return getSnapshotDeltaRankingListUtil(
-      this.connection,
-      uri1,
-      uri2,
-      options,
-    );
-  }
-
-  /**
-   * Get memory snapshot children
-   *
-   * @param snapshotId - Snapshot ID
-   * @param parentKey - Parent key
-   * @param options - Optional children options
-   * @returns Axios response with children data
-   */
-  async getMemorySnapshotChildren(
-    snapshotId: string,
-    parentKey: string,
-    options?: ISnapshotChildrenOptions,
-  ): Promise<AxiosResponse> {
-    return getSnapshotChildrenUtil(
-      this.connection,
-      snapshotId,
-      parentKey,
-      options,
-    );
-  }
-
-  /**
-   * Get delta children between two memory snapshots
-   *
-   * @param uri1 - URI of first snapshot
-   * @param uri2 - URI of second snapshot
-   * @param parentKey - Parent key
-   * @param options - Optional children options
-   * @returns Axios response with delta children
-   */
-  async getMemorySnapshotDeltaChildren(
-    uri1: string,
-    uri2: string,
-    parentKey: string,
-    options?: ISnapshotChildrenOptions,
-  ): Promise<AxiosResponse> {
-    return getSnapshotDeltaChildrenUtil(
-      this.connection,
-      uri1,
-      uri2,
-      parentKey,
-      options,
-    );
-  }
-
-  /**
-   * Get memory snapshot references
-   *
-   * @param snapshotId - Snapshot ID
-   * @param objectKey - Object key
-   * @param options - Optional references options
-   * @returns Axios response with references data
-   */
-  async getMemorySnapshotReferences(
-    snapshotId: string,
-    objectKey: string,
-    options?: ISnapshotReferencesOptions,
-  ): Promise<AxiosResponse> {
-    return getSnapshotReferencesUtil(
-      this.connection,
-      snapshotId,
-      objectKey,
-      options,
-    );
-  }
-
-  /**
-   * Get delta references between two memory snapshots
-   *
-   * @param uri1 - URI of first snapshot
-   * @param uri2 - URI of second snapshot
-   * @param objectKey - Object key
-   * @param options - Optional references options
-   * @returns Axios response with delta references
-   */
-  async getMemorySnapshotDeltaReferences(
-    uri1: string,
-    uri2: string,
-    objectKey: string,
-    options?: ISnapshotReferencesOptions,
-  ): Promise<AxiosResponse> {
-    return getSnapshotDeltaReferencesUtil(
-      this.connection,
-      uri1,
-      uri2,
-      objectKey,
-      options,
-    );
-  }
-
-  /**
-   * Get memory snapshot overview
-   *
-   * @param snapshotId - Snapshot ID
-   * @returns Axios response with snapshot overview
-   */
-  async getMemorySnapshotOverview(snapshotId: string): Promise<AxiosResponse> {
-    return getSnapshotOverviewUtil(this.connection, snapshotId);
-  }
-
-  /**
-   * Get delta overview between two memory snapshots
-   *
-   * @param uri1 - URI of first snapshot
-   * @param uri2 - URI of second snapshot
-   * @returns Axios response with delta overview
-   */
-  async getMemorySnapshotDeltaOverview(
-    uri1: string,
-    uri2: string,
-  ): Promise<AxiosResponse> {
-    return getSnapshotDeltaOverviewUtil(this.connection, uri1, uri2);
   }
 
   // ============================================================================

@@ -6,7 +6,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API with automatic operation chains
-  - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, memory, logs, dumps)
+  - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, logs, dumps)
   - `AdtRuntimeClientExperimental` – runtime APIs in progress (for example AMDP debugger)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
 - ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
@@ -89,7 +89,7 @@ npm install @mcp-abap-adt/adt-clients
    - Example: `await client.getClass().create({...}, { activateOnCreate: true })`
 
 2. **AdtRuntimeClient**
-   - Stable runtime operations for ABAP debugging, traces, memory analysis, dumps, and logs
+   - Stable runtime operations for ABAP debugging, traces, dumps, and logs
    - Example: `await runtimeClient.getDebugger(...)`
 
 3. **AdtRuntimeClientExperimental**

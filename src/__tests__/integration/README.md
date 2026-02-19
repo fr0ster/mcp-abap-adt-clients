@@ -13,7 +13,7 @@ These tests verify individual operations (create, read, update, delete, lock, un
 Tests are organized by module type:
 
 - **`core/`** - Tests for CRUD operations on main ABAP objects (class, program, table, view, etc.)
-- **`runtime/`** - Tests for runtime operations (memory snapshots, traces, debugger, logs, feeds)
+- **`runtime/`** - Tests for runtime operations (traces, debugger, logs, feeds, dumps)
 - **`shared/`** - Tests for shared utility functions (search, whereUsed, readMetadata, etc.)
 
 ## Features

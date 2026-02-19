@@ -6,7 +6,7 @@
 
 Primary public entry points:
 - `AdtClient` - high-level CRUD-style object operations.
-- `AdtRuntimeClient` - stable runtime operations (debugger, traces, memory, dumps, logs, feeds, DDIC runtime helpers).
+- `AdtRuntimeClient` - stable runtime operations (debugger, traces, dumps, logs, feeds, DDIC runtime helpers).
 - `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 - `AdtClientsWS` - WebSocket request/event facade.
 - `AdtExecutor` - execution-oriented facade (currently class execution with optional profiling helpers).
@@ -182,6 +182,21 @@ Current test setup:
 - Sequential execution enforced (`maxWorkers: 1`, `maxConcurrency: 1`) to avoid shared-object contention.
 - `src/__tests__/helpers/BaseTester.ts` provides reusable flow/read test orchestration.
 - Integration type-check is part of `pretest`.
+
+Runtime coverage snapshot:
+- `runtime/dumps`:
+  - unit: `src/__tests__/unit/runtime/dumps/read.test.ts`
+  - client delegation unit: `src/__tests__/unit/clients/AdtRuntimeClient.dumps.test.ts`
+  - integration: `src/__tests__/integration/runtime/dumps/RuntimeDumps.test.ts`
+- `runtime/traces/profiler`:
+  - unit: `src/__tests__/unit/runtime/traces/profiler.test.ts`
+  - integration (execution + trace analysis path): `src/__tests__/integration/executors/class/ClassExecutor.test.ts`
+- `runtime/memory/snapshots`:
+  - unit: `src/__tests__/unit/runtime/memory/snapshots.test.ts`
+  - note: public client exposure is deferred pending additional ADT compatibility validation
+- `runtime/debugger`:
+  - unit: `src/__tests__/unit/runtime/debugger/abap.batch.test.ts`
+  - integration WS/session: `src/__tests__/integration/runtime/debugger/DebuggerSessionWS.test.ts`
 
 ## Extension Rules for New Features
 
