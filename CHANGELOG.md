@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.20] - 2026-02-19
+
+### Changed
+- Updated runtime dependency `fast-xml-parser` to `^5.3.6`.
+- Updated dev dependency `@biomejs/biome` to `^2.4.2`.
+- Updated dev dependency `@mcp-abap-adt/connection` to `^1.1.0`.
+- Updated dev dependency `@types/node` to `^25.3.0`.
+- Updated dev dependency `dotenv` to `^17.3.1`.
+
 ## [0.3.19] - 2026-02-19
 
 ### Added
