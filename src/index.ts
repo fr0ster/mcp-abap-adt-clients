@@ -205,4 +205,9 @@ export type {
   IClassExecutionTarget,
   IClassExecutor,
   IExecutor,
+  IProgramExecuteWithProfilerOptions,
+  IProgramExecuteWithProfilingOptions,
+  IProgramExecuteWithProfilingResult,
+  IProgramExecutionTarget,
+  IProgramExecutor,
 } from './executors';

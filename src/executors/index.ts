@@ -7,3 +7,11 @@ export {
   type IClassExecutionTarget,
   type IClassExecutor,
 } from './class';
+export {
+  type IProgramExecuteWithProfilerOptions,
+  type IProgramExecuteWithProfilingOptions,
+  type IProgramExecuteWithProfilingResult,
+  type IProgramExecutionTarget,
+  type IProgramExecutor,
+  ProgramExecutor,
+} from './program';

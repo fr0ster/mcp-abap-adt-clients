@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.21] - 2026-02-19
+
+### Added
+- Added program execution API (`runProgram`) for ADT endpoint `POST /sap/bc/adt/programs/programrun/{program}`.
+- Added `ProgramExecutor` implementing `IExecutor` with methods `run`, `runWithProfiler`, and `runWithProfiling`.
+- Added `AdtExecutor.getProgramExecutor()` and exported related program executor types from package root.
+- Added integration coverage for program execution with profiling via `ProgramExecutor`.
+- Added `execute_program` integration test configuration in `test-config.yaml` and template.
+
+### Changed
+- Updated documentation to include `AdtExecutor` execution API and program execution examples.
+
 ## [0.3.20] - 2026-02-19
 
 ### Changed

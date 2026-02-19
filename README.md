@@ -6,6 +6,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API with automatic operation chains
+  - `AdtExecutor` – execution API via `IExecutor` contracts (class/program, with profiling)
   - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, logs, dumps)
   - `AdtRuntimeClientExperimental` – runtime APIs in progress (for example AMDP debugger)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
@@ -92,12 +93,19 @@ npm install @mcp-abap-adt/adt-clients
    - Stable runtime operations for ABAP debugging, traces, dumps, and logs
    - Example: `await runtimeClient.getDebugger(...)`
 
-3. **AdtRuntimeClientExperimental**
+3. **AdtExecutor**
+   - Typed execution API based on `IExecutor`
+   - Executors:
+     - `getClassExecutor()` for `classrun`
+     - `getProgramExecutor()` for `programrun` (on-premise systems)
+   - Methods: `run`, `runWithProfiler`, `runWithProfiling`
+
+4. **AdtRuntimeClientExperimental**
    - Runtime APIs in progress that may change without backward-compatibility guarantees
    - Current scope: AMDP debugger + AMDP data preview
    - Example: `await experimentalRuntime.startAmdpDebugger(...)`
 
-4. **AdtClientsWS**
+5. **AdtClientsWS**
    - Realtime request/event facade over `IWebSocketTransport`
    - Includes debugger-session facade: listen, attach, step, stack, variables
    - Example: `await wsClient.request('debugger.listen', { timeoutSeconds: 30 })`
@@ -203,6 +211,34 @@ await runtime.stepContinueDebuggerBatch();
 
 For non-step actions keep using `executeDebuggerAction(action, value?)`.  
 Step actions (`stepInto`, `stepOut`, `stepContinue`) are reserved for batch-only execution.
+
+### Using AdtExecutor (Execution API)
+
+```typescript
+import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+
+const executor = new AdtExecutor(connection, console);
+
+// Class execution
+await executor.getClassExecutor().run({ className: 'ZCL_MY_CLASSRUN' });
+
+// Program execution (on-premise)
+await executor.getProgramExecutor().run({ programName: 'ZMY_EXEC_REPORT' });
+
+// Program execution with profiling
+const runWithProfilingResult = await executor.getProgramExecutor().runWithProfiling(
+  { programName: 'ZMY_EXEC_REPORT' },
+  {
+    profilerParameters: {
+      allProceduralUnits: true,
+      sqlTrace: true,
+      allDbEvents: true,
+    },
+  },
+);
+
+console.log(runWithProfilingResult.traceId);
+```
 
 **AdtUtils read type safety:**
 `readObjectMetadata` and `readObjectSource` accept strict object type unions to prevent invalid inputs like `view:ZOBJ`.

@@ -1244,3 +1244,34 @@ execute_class:
             max_size_for_trace_file: 30720
             amdp_trace: true
             max_time_for_tracing: 1800
+
+# Execute Program (Executor API)
+execute_program:
+  test_cases:
+    - name: "adt_program_executor"
+      enabled: false
+      available_in: ["onprem"]
+      description: "Run program via AdtExecutor (with and without profiling)"
+      params:
+        program_name: "ZADT_BLD_PROG023"
+        source_code: |
+          REPORT {{PROGRAM_NAME}}.
+
+          WRITE: / 'PROGRAM_EXECUTOR_RUN_PROBE( ) = 1'.
+        profiling:
+          enabled: true
+          parameters:
+            all_misc_abap_statements: false
+            all_procedural_units: true
+            all_internal_table_events: false
+            all_dynpro_events: false
+            description: "ZADT_BLD_PROG023"
+            aggregate: false
+            explicit_on_off: false
+            with_rfc_tracing: true
+            all_system_kernel_events: false
+            sql_trace: true
+            all_db_events: true
+            max_size_for_trace_file: 30720
+            amdp_trace: true
+            max_time_for_tracing: 1800
