@@ -96,6 +96,7 @@ import {
 import {
   buildRuntimeDumpsUserQuery as buildRuntimeDumpsUserQueryUtil,
   getRuntimeDumpById as getRuntimeDumpByIdUtil,
+  type IRuntimeDumpReadOptions,
   type IRuntimeDumpsListOptions,
   listRuntimeDumpsByUser as listRuntimeDumpsByUserUtil,
   listRuntimeDumps as listRuntimeDumpsUtil,
@@ -879,9 +880,17 @@ export class AdtRuntimeClient {
 
   /**
    * Read a specific runtime dump by its dump ID.
+   *
+   * @param options.view Select dump representation:
+   * - `default` -> `/sap/bc/adt/runtime/dump/{id}`
+   * - `summary` -> `/sap/bc/adt/runtime/dump/{id}/summary`
+   * - `formatted` -> `/sap/bc/adt/runtime/dump/{id}/formatted`
    */
-  async getRuntimeDumpById(dumpId: string): Promise<AxiosResponse> {
-    return getRuntimeDumpByIdUtil(this.connection, dumpId);
+  async getRuntimeDumpById(
+    dumpId: string,
+    options: IRuntimeDumpReadOptions = {},
+  ): Promise<AxiosResponse> {
+    return getRuntimeDumpByIdUtil(this.connection, dumpId, options);
   }
 
   // ============================================================================

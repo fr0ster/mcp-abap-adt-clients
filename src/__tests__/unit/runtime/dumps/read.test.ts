@@ -83,7 +83,33 @@ describe('runtime/dumps/read', () => {
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/dumps/ABCDEF1234567890',
+        url: '/sap/bc/adt/runtime/dump/ABCDEF1234567890',
+        method: 'GET',
+      }),
+    );
+  });
+
+  it('getRuntimeDumpById supports summary and formatted views', async () => {
+    const connection = createConnectionMock();
+
+    await getRuntimeDumpById(connection, 'ABCDEF1234567890', {
+      view: 'summary',
+    });
+    await getRuntimeDumpById(connection, 'ABCDEF1234567890', {
+      view: 'formatted',
+    });
+
+    expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        url: '/sap/bc/adt/runtime/dump/ABCDEF1234567890/summary',
+        method: 'GET',
+      }),
+    );
+    expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        url: '/sap/bc/adt/runtime/dump/ABCDEF1234567890/formatted',
         method: 'GET',
       }),
     );

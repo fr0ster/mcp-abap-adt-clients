@@ -5,6 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [0.3.22] - 2026-02-20
+
+### Added
+- Added runtime dump read `view` option to `getRuntimeDumpById(dumpId, { view })` for `default`, `summary`, and `formatted` payloads.
+- Added integration flow that can generate an artificial dump (division by zero), discover generated dump IDs, and validate dump reads end-to-end.
+- Added explicit integration logs for dump discovery source and selected dump read mode.
+
+### Changed
+- Aligned runtime dump endpoints with ADT behavior:
+  - list via `/sap/bc/adt/runtime/dumps`
+  - read by ID via `/sap/bc/adt/runtime/dump/{id}` with `summary`/`formatted` views.
+- Aligned dump read `Accept` headers with ADT request patterns.
+- Simplified runtime dump consumer API to two operations:
+  - list dumps
+  - read dump by ID with `view` selector.
+- Added `X-sap-adt-profiling: server-time` header for class profiling execution parity with program profiling.
+- Stabilized executor integration tests for class/program run output matching and profiling startup timing.
+
 ## [0.3.21] - 2026-02-19
 
 ### Added

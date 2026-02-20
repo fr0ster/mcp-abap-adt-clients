@@ -37,14 +37,36 @@ describe('AdtRuntimeClient dumps API', () => {
     );
   });
 
-  it('getRuntimeDumpById delegates to dumps endpoint', async () => {
+  it('getRuntimeDumpById delegates to dump endpoint', async () => {
     const { client, connection } = createRuntimeClient();
 
     await client.getRuntimeDumpById('DUMP123');
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
-        url: '/sap/bc/adt/runtime/dumps/DUMP123',
+        url: '/sap/bc/adt/runtime/dump/DUMP123',
+        method: 'GET',
+      }),
+    );
+  });
+
+  it('getRuntimeDumpById supports view option', async () => {
+    const { client, connection } = createRuntimeClient();
+
+    await client.getRuntimeDumpById('DUMP123', { view: 'summary' });
+    await client.getRuntimeDumpById('DUMP123', { view: 'formatted' });
+
+    expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        url: '/sap/bc/adt/runtime/dump/DUMP123/summary',
+        method: 'GET',
+      }),
+    );
+    expect(connection.makeAdtRequest).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        url: '/sap/bc/adt/runtime/dump/DUMP123/formatted',
         method: 'GET',
       }),
     );

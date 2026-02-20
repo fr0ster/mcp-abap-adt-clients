@@ -172,6 +172,7 @@ export class ClassExecutor implements IClassExecutor {
       timeout: getTimeout('default'),
       headers: {
         Accept: 'text/plain',
+        'X-sap-adt-profiling': 'server-time',
       },
     });
   }

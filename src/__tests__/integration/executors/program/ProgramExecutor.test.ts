@@ -276,7 +276,7 @@ describe('ProgramExecutor (integration)', () => {
         expect(response.status).toBe(200);
         expect(response.data).toBeDefined();
         const runOutput = String(response.data);
-        expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\( \) = 1/i);
+        expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);
         logTestStep(`run output: ${toShortText(response.data)}`, testsLogger);
 
         logTestSuccess(testsLogger, testName);
@@ -351,7 +351,7 @@ describe('ProgramExecutor (integration)', () => {
 
         expect(result.response.status).toBe(200);
         const runOutput = String(result.response.data);
-        expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\( \) = 1/i);
+        expect(runOutput).toMatch(/PROGRAM_EXECUTOR_RUN_PROBE\(\s*\)\s*=\s*1/i);
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );

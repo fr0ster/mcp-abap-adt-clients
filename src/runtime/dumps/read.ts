@@ -4,7 +4,7 @@
  * Provides functions for reading ABAP runtime dumps via ADT endpoints:
  * - List dumps feed with paging/query options
  * - List dumps by user
- * - Read dump by ID
+ * - Read dump by ID (default/summary/formatted view)
  */
 
 import type {
@@ -19,6 +19,23 @@ export interface IRuntimeDumpsListOptions {
   top?: number;
   skip?: number;
   orderby?: string;
+}
+
+export type IRuntimeDumpReadView = 'default' | 'summary' | 'formatted';
+
+export interface IRuntimeDumpReadOptions {
+  view?: IRuntimeDumpReadView;
+}
+
+function normalizeDumpId(dumpId: string): string {
+  const normalized = dumpId?.trim();
+  if (!normalized) {
+    throw new Error('Runtime dump ID is required');
+  }
+  if (normalized.includes('/')) {
+    throw new Error('Runtime dump ID must not contain "/"');
+  }
+  return normalized;
 }
 
 function appendIfDefined(
@@ -93,21 +110,25 @@ export async function listRuntimeDumpsByUser(
 export async function getRuntimeDumpById(
   connection: IAbapConnection,
   dumpId: string,
+  options: IRuntimeDumpReadOptions = {},
 ): Promise<AxiosResponse> {
-  const normalized = dumpId?.trim();
-  if (!normalized) {
-    throw new Error('Runtime dump ID is required');
-  }
-  if (normalized.includes('/')) {
-    throw new Error('Runtime dump ID must not contain "/"');
-  }
+  const normalized = normalizeDumpId(dumpId);
+  const view = options.view || 'default';
+  const suffix =
+    view === 'summary' ? '/summary' : view === 'formatted' ? '/formatted' : '';
+  const accept =
+    view === 'summary'
+      ? 'text/html'
+      : view === 'formatted'
+        ? 'text/plain'
+        : 'application/vnd.sap.adt.runtime.dump.v1+xml';
 
   return connection.makeAdtRequest({
-    url: `/sap/bc/adt/runtime/dumps/${normalized}`,
+    url: `/sap/bc/adt/runtime/dump/${normalized}${suffix}`,
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: accept,
     },
   });
 }
