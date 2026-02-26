@@ -347,6 +347,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       masterLanguage: config.masterLanguage,
       masterSystem: config.masterSystem,
       responsible: config.responsible,
+      transportRequest: config.transportRequest,
     });
 
     state.inactiveCheckResult = await this.checkServiceBinding({
@@ -685,6 +686,10 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       responsible: params.responsible ?? systemInfo?.userName,
     };
 
+    const queryParams = params.transportRequest
+      ? { corrNr: params.transportRequest }
+      : undefined;
+
     return this.connection.makeAdtRequest({
       url: '/sap/bc/adt/businessservices/bindings',
       method: 'POST',
@@ -696,6 +701,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         'Content-Type':
           'application/vnd.sap.adt.businessservices.servicebinding.v2+xml',
       },
+      params: queryParams,
     });
   }
 

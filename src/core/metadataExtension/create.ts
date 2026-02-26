@@ -79,11 +79,16 @@ export async function createMetadataExtension(
     'Content-Type': 'application/vnd.sap.adt.ddic.ddlx.v1+xml',
   };
 
+  const queryParams = params.transportRequest
+    ? { corrNr: params.transportRequest }
+    : undefined;
+
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
     headers,
+    params: queryParams,
   });
 }

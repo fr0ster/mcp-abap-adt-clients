@@ -90,6 +90,7 @@ export interface ICreateServiceBindingParams {
   masterLanguage?: string;
   masterSystem?: string;
   responsible?: string;
+  transportRequest?: string;
   runTransportCheck?: boolean;
   activateAfterCreate?: boolean;
 }

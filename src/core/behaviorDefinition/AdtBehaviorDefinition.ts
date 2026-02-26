@@ -141,6 +141,7 @@ export class AdtBehaviorDefinition
         package: config.packageName,
         description: config.description,
         implementationType: config.implementationType,
+        transportRequest: config.transportRequest,
       });
       state.createResult = createResponse;
       objectCreated = true;

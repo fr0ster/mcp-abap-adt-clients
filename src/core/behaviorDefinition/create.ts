@@ -76,7 +76,7 @@ export async function create(
       'Content-Type': 'application/vnd.sap.adt.blues.v1+xml',
     };
 
-    const url = '/sap/bc/adt/bo/behaviordefinitions';
+    const url = `/sap/bc/adt/bo/behaviordefinitions${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
     const response = await connection.makeAdtRequest({
       url,

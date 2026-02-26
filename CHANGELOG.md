@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-02-26
+
+### Fixed
+- Added missing `corrNr` query parameter to create operations for `metadataExtension`, `behaviorDefinition`, and `serviceBinding`. Without it, SAP rejected creation of these objects in transportable packages with "Parameter corrNr could not be found" (HTTP 400).
+
 ## [1.0.2] - 2026-02-26
 
 ### Changed
