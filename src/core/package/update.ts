@@ -94,7 +94,10 @@ export async function updatePackage(
   }
 
   const packageNameEncoded = encodeSapObjectName(params.package_name);
-  const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${lockHandle}`;
+  const corrNrParam = params.transport_request
+    ? `&corrNr=${params.transport_request}`
+    : '';
+  const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${lockHandle}${corrNrParam}`;
 
   const xmlBody = await buildUpdatePackageXml(connection, params);
 

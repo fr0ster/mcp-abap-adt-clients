@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-02-26
+
+### Fixed
+- Added missing `corrNr` query parameter to package update operation (`updatePackage`). Without it, SAP rejected package updates in transportable packages with "Parameter corrNr could not be found" (HTTP 400).
+
 ## [1.0.3] - 2026-02-26
 
 ### Fixed
