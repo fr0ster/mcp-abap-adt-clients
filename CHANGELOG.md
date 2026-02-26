@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-02-26
+
+### Changed
+- Removed redundant post-create `getPackage()` read from `AdtPackage.create()`. Packages are containers with no active/inactive versioning — the final read caused transient 404 errors when SAP had not yet committed the object to the database.
+
 ## [1.0.1] - 2026-02-26
 
 ### Added

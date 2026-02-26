@@ -154,19 +154,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       await checkPackage(this.connection, config.packageName, 'inactive');
       this.logger?.info?.('Check after create passed');
 
-      // Note: Packages are containers - no source code to update after create
-      // Note: Packages don't have activate operation
-
-      // Read and return result (no stateful needed)
-      const readResponse = await getPackage(
-        this.connection,
-        config.packageName,
-        'active',
-      );
-      return {
-        createResult: readResponse,
-        errors: [],
-      };
+      // Packages are containers — no source code, no activation, no need to read back
+      return { errors: [] };
     } catch (error: any) {
       // Ensure stateless if needed
       this.connection.setSessionType('stateless');
