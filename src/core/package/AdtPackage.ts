@@ -129,6 +129,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         transport_request: config.transportRequest,
         application_component: config.applicationComponent,
         responsible: config.responsible,
+        record_changes: config.recordChanges,
       });
       this.logger?.info?.('Package created');
 
@@ -342,6 +343,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           description: config.description,
           package_type: config.packageType,
           responsible: config.responsible,
+          record_changes: config.recordChanges,
         },
         options.lockHandle,
       );
@@ -395,6 +397,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
             transport_request: config.transportRequest,
             application_component: config.applicationComponent,
             responsible: config.responsible || systemInfo?.userName,
+            record_changes: config.recordChanges,
           },
           lockHandle,
         );

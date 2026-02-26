@@ -75,7 +75,7 @@ export async function createPackage(
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${params.package_name}"/>
-  <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="false"/>
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="${params.record_changes ? 'true' : 'false'}"/>
   ${superPackageXml}
   ${applicationComponentXml}
   <pak:transport>

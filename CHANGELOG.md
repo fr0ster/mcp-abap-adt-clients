@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-02-26
+
+### Added
+- Added `recordChanges` option to `IPackageConfig` (and `record_changes` to `ICreatePackageParams`) for controlling the `pak:recordChanges` XML attribute on package create and update operations. Previously hardcoded to `"false"`, which prevented transport recording on created packages.
+
 ## [1.0.0] - 2026-02-26
 
 ### Added

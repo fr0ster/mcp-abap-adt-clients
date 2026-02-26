@@ -15,6 +15,7 @@ export interface ICreatePackageParams {
   transport_request?: string;
   application_component?: string;
   responsible?: string;
+  record_changes?: boolean;
 }
 
 // Builder configuration (camelCase)
@@ -31,6 +32,7 @@ export interface IPackageConfig {
   transportRequest?: string; // Only optional parameter
   applicationComponent?: string;
   responsible?: string;
+  recordChanges?: boolean;
   onLock?: (lockHandle: string) => void;
 }
 

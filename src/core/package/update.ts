@@ -50,7 +50,7 @@ async function buildUpdatePackageXml(
 
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 
-  <pak:attributes pak:isEncapsulated="false" pak:packageType="${args.package_type || 'development'}" pak:recordChanges="false"/>
+  <pak:attributes pak:isEncapsulated="false" pak:packageType="${args.package_type || 'development'}" pak:recordChanges="${args.record_changes ? 'true' : 'false'}"/>
 
   <pak:superPackage adtcore:name="${args.super_package}"/>
 
