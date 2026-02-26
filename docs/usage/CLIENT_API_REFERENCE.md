@@ -1,9 +1,11 @@
 # Client API Reference
 
-This project exposes two client classes:
+This project exposes the following client classes:
 
 - `AdtClient` - high-level CRUD operations for ADT objects.
+- `AdtClientBatch` - batch mode: multiple read operations in a single HTTP round-trip.
 - `AdtRuntimeClient` - stable runtime operations (ABAP debugger, traces, dumps, logs, feeds, etc.).
+- `AdtRuntimeClientBatch` - batch mode for runtime operations.
 - `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 
 `ReadOnlyClient` and `CrudClient` have been removed in the builderless API.
@@ -108,6 +110,73 @@ const result = await utils.getWhereUsed({
   object_type: 'class',
   scopeXml,
 });
+```
+
+## AdtClientBatch
+
+`AdtClientBatch` wraps `AdtClient` with a recording connection that collects requests
+and sends them in a single `multipart/mixed` HTTP request via `POST /sap/bc/adt/debugger/batch`.
+
+```typescript
+import { AdtClientBatch } from '@mcp-abap-adt/adt-clients';
+
+const batch = new AdtClientBatch(connection, logger);
+
+// Record operations — same factory API as AdtClient
+const classPromise = batch.getClass().readMetadata({ className: 'CL_ABAP_TYPEDESCR' });
+const domainPromise = batch.getDomain().readMetadata({ domainName: 'MANDT' });
+
+// Execute all recorded operations in one HTTP round-trip
+await batch.batchExecute();
+
+// Resolve individual results
+const classState = await classPromise;   // IClassState
+const domainState = await domainPromise; // IDomainState
+```
+
+### Batch-Safe Operations
+
+Only single-step operations are batch-compatible:
+- `read()`, `readMetadata()`, `readTransport()` — single GET
+- `check()`, `validate()`, `activate()` — single POST
+
+Multi-step chains (`create()`, `update()`, `delete()`) are **not** batch-safe because they
+perform multiple awaited requests internally.
+
+### Sequential Batches
+
+After `batchExecute()` the recorder is automatically reset, so the same instance
+can be reused for another batch:
+
+```typescript
+const batch = new AdtClientBatch(connection);
+
+// First batch
+batch.getClass().readMetadata({ className: 'CL_ABAP_TYPEDESCR' });
+await batch.batchExecute();
+
+// Second batch (recorder was auto-reset)
+batch.getDomain().readMetadata({ domainName: 'MANDT' });
+await batch.batchExecute();
+```
+
+### Reset Without Executing
+
+```typescript
+batch.getClass().readMetadata({ className: 'CL_ABAP_TYPEDESCR' });
+batch.reset(); // clears recorded requests, promises are never resolved
+```
+
+### AdtRuntimeClientBatch
+
+Same pattern for runtime operations:
+
+```typescript
+import { AdtRuntimeClientBatch } from '@mcp-abap-adt/adt-clients';
+
+const runtimeBatch = new AdtRuntimeClientBatch(connection, logger);
+// record runtime read operations...
+await runtimeBatch.batchExecute();
 ```
 
 ## AdtRuntimeClient

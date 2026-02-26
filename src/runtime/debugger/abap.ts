@@ -17,6 +17,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  createBatchBoundary,
+  createRequestId,
+} from '../../batch/buildBatchPayload';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -760,22 +764,6 @@ export interface IDebuggerBatchPayload {
   body: string;
 }
 
-function createBatchBoundary(): string {
-  const randomPart =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  return `batch_${randomPart}`;
-}
-
-function createRequestId(): string {
-  const randomPart =
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID().replace(/-/g, '')
-      : `${Date.now()}${Math.random().toString(16).slice(2)}`;
-  return randomPart.slice(0, 32);
-}
-
 export function buildDebuggerBatchPayload(
   requests: string[],
   boundary = createBatchBoundary(),
@@ -786,16 +774,16 @@ export function buildDebuggerBatchPayload(
 
   const parts = requests
     .map((request) => {
-      const trimmed = request.trim();
-      if (!trimmed) {
+      if (!request.trim()) {
         throw new Error('Batch request part must not be empty');
       }
+      // Do NOT trim — inner requests must preserve trailing \r\n\r\n
       return [
         `--${boundary}`,
         'Content-Type: application/http',
         'content-transfer-encoding: binary',
         '',
-        trimmed,
+        request,
         '',
       ].join('\r\n');
     })

@@ -26,7 +26,11 @@ export async function getDataElement(
     url,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: options?.accept ? { Accept: options.accept } : {},
+    headers: {
+      Accept:
+        options?.accept ??
+        'application/vnd.sap.adt.dataelements.v2+xml, application/vnd.sap.adt.dataelements.v1+xml',
+    },
   });
 }
 

@@ -31,7 +31,11 @@ export async function getDomain(
     url,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: options?.accept ? { Accept: options.accept } : {},
+    headers: {
+      Accept:
+        options?.accept ??
+        'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
+    },
   });
 }
 

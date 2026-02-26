@@ -24,6 +24,9 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 - [**TEST_CONFIG_SCHEMA.md**](development/TEST_CONFIG_SCHEMA.md) - Test configuration schema and guidelines
 - [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
 
+### Roadmaps
+- [**BATCH_REQUEST_SUPPORT.md**](development/roadmaps/BATCH_REQUEST_SUPPORT.md) - ADT batch request support (multipart/mixed)
+
 ## Documentation Structure
 
 ```
@@ -53,7 +56,9 @@ docs/
 The package provides the main client classes:
 
 - **AdtClient** - High-level CRUD API with automatic operation chains (recommended)
+- **AdtClientBatch** - Batch mode: multiple read operations in a single HTTP round-trip
 - **AdtRuntimeClient** - Stable runtime operations (ABAP debugger, traces, dumps, logs, feeds)
+- **AdtRuntimeClientBatch** - Batch mode for runtime operations
 - **AdtRuntimeClientExperimental** - Runtime APIs in progress (AMDP debugger/data preview)
 
 See [CLIENT_API_REFERENCE.md](usage/CLIENT_API_REFERENCE.md) for complete method documentation.

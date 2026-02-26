@@ -33,6 +33,14 @@ export type {
   IWebSocketMessageHandler,
   IWebSocketTransport,
 } from '@mcp-abap-adt/interfaces';
+export { AdtClientBatch } from './batch/AdtClientBatch';
+export { AdtRuntimeClientBatch } from './batch/AdtRuntimeClientBatch';
+export { BatchRecordingConnection } from './batch/BatchRecordingConnection';
+export type {
+  IBatchPayload,
+  IBatchRequestPart,
+  IBatchResponsePart,
+} from './batch/types';
 export type { IAdtClientOptions } from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
 export { AdtClientsWS } from './clients/AdtClientsWS';

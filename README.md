@@ -6,8 +6,10 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
 
 - ✅ **Client API** – simplified interface for common operations:
   - `AdtClient` – high-level CRUD API with automatic operation chains
+  - `AdtClientBatch` – batch mode: multiple read operations in a single HTTP round-trip
   - `AdtExecutor` – execution API via `IExecutor` contracts (class/program, with profiling)
   - `AdtRuntimeClient` – stable runtime operations (ABAP debugger, traces, logs, dumps)
+  - `AdtRuntimeClientBatch` – batch mode for runtime operations
   - `AdtRuntimeClientExperimental` – runtime APIs in progress (for example AMDP debugger)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
 - ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
@@ -110,6 +112,12 @@ npm install @mcp-abap-adt/adt-clients
    - Includes debugger-session facade: listen, attach, step, stack, variables
    - Example: `await wsClient.request('debugger.listen', { timeoutSeconds: 30 })`
 
+6. **AdtClientBatch** / **AdtRuntimeClientBatch**
+   - Execute multiple independent read operations in a single HTTP round-trip
+   - Uses SAP ADT batch endpoint (`POST /sap/bc/adt/debugger/batch`) with `multipart/mixed` payloads
+   - Same factory API as `AdtClient` / `AdtRuntimeClient` — record calls, then `batchExecute()`
+   - Example: `const batch = new AdtClientBatch(connection); batch.getClass().readMetadata({...}); await batch.batchExecute();`
+
 ## Supported Object Types
 
 | Object Type | AdtClient |
@@ -191,6 +199,35 @@ const debuggerSession = wsClient.getDebuggerSessionClient();
 await debuggerSession.listen({ timeoutSeconds: 60 });
 await debuggerSession.step({ action: 'step_over' });
 ```
+
+### Using AdtClientBatch (Batch Read Operations)
+
+`AdtClientBatch` sends multiple independent read operations in a single HTTP round-trip via `multipart/mixed` batch requests.
+
+```typescript
+import { AdtClientBatch } from '@mcp-abap-adt/adt-clients';
+
+const batch = new AdtClientBatch(connection, console);
+
+// Record operations (not yet executed)
+const classPromise = batch.getClass().readMetadata({ className: 'CL_ABAP_TYPEDESCR' });
+const domainPromise = batch.getDomain().readMetadata({ domainName: 'MANDT' });
+const dePromise = batch.getDataElement().readMetadata({ dataElementName: 'MANDT' });
+
+// Execute all in one HTTP request
+await batch.batchExecute();
+
+// Resolve individual results
+const classState = await classPromise;
+const domainState = await domainPromise;
+const deState = await dePromise;
+```
+
+**Batch-safe operations** (single-step, no chained awaits):
+- `read()`, `readMetadata()`, `readTransport()` — single GET
+- `check()`, `validate()`, `activate()` — single POST
+
+**NOT batch-safe** (multi-step chains): `create()`, `update()`, `delete()`.
 
 ### ABAP Debugger Step Operations via Batch Endpoint
 

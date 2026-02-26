@@ -5,6 +5,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-26
+
+### Added
+- **Batch request infrastructure** — new `src/batch/` module providing reusable multipart/mixed batch support for SAP ADT.
+- `AdtClientBatch` — batch-capable wrapper around `AdtClient`; record multiple independent read operations and execute them in a single HTTP round-trip via `POST /sap/bc/adt/debugger/batch`.
+- `AdtRuntimeClientBatch` — same batch pattern for `AdtRuntimeClient`.
+- `BatchRecordingConnection` — `IAbapConnection` proxy that intercepts `makeAdtRequest()` calls, collects them as batch parts, and resolves deferred promises after batch execution.
+- `buildBatchPayload()` / `parseBatchResponse()` — multipart/mixed request builder and response parser, extracted from debugger-only helpers into a reusable module.
+- Integration tests for batch operations: class+program, class+interface, domain+dataElement+structure metadata reads, reset, and sequential batch executions.
+- Batch types exported from package root: `IBatchRequestPart`, `IBatchPayload`, `IBatchResponsePart`.
+
+### Changed
+- Refactored `src/runtime/debugger/abap.ts` to import shared `createBatchBoundary()` and `createRequestId()` from `src/batch/buildBatchPayload.ts` instead of local duplicates.
+- Added explicit default `Accept` headers to `getDomain()` and `getDataElement()` read functions — required by the SAP ADT batch endpoint for inner GET requests.
+
+### Fixed
+- Fixed `.trim()` bug in `buildDebuggerBatchPayload()` that stripped the required `\r\n\r\n` terminator from inner HTTP requests.
+
+### Documentation
+- Updated README with `AdtClientBatch` / `AdtRuntimeClientBatch` in Features, Architecture, and Quick Start sections.
+- Added full `AdtClientBatch` API reference to `docs/usage/CLIENT_API_REFERENCE.md` (batch-safe operations, sequential batches, reset).
+- Updated `docs/README.md` index with batch client entries.
+
 ## [0.3.22] - 2026-02-20
 
 ### Added
