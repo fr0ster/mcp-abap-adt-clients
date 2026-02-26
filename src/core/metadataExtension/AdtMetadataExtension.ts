@@ -285,6 +285,7 @@ export class AdtMetadataExtension
         config.name,
         codeToUpdate,
         options.lockHandle,
+        config.transportRequest,
       );
       this.logger?.info?.('Metadata extension updated (low-level)');
       return {
@@ -325,6 +326,7 @@ export class AdtMetadataExtension
           config.name,
           codeToCheck,
           lockHandle,
+          config.transportRequest,
         );
         this.logger?.info?.('Metadata extension updated');
 

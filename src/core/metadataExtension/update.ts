@@ -38,9 +38,11 @@ export async function updateMetadataExtension(
   name: string,
   sourceCode: string,
   lockHandle: string,
+  transportRequest?: string,
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
-  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main?lockHandle=${lockHandle}`;
+  const corrNrParam = transportRequest ? `&corrNr=${transportRequest}` : '';
+  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main?lockHandle=${lockHandle}${corrNrParam}`;
 
   const headers = {
     Accept: 'text/plain',

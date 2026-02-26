@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-02-27
+
+### Fixed
+- Added missing `corrNr` query parameter to metadata extension update operation (`updateMetadataExtension`). Without it, SAP rejected updates in transportable packages with "Parameter corrNr could not be found" (HTTP 400).
+
 ## [1.0.5] - 2026-02-27
 
 ### Fixed
