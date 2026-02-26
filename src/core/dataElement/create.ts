@@ -74,8 +74,8 @@ export async function create(
   // When typeKind is 'domain', dataType should contain the domain name, and it goes to typeName in XML
   let typeName = '';
   if (typeKindXml === 'domain') {
-    // For domain type, typeName comes from dataType (or type_name if dataType not provided)
-    typeName = (args.data_type || args.type_name || '').toUpperCase();
+    // For domain type, typeName is the domain name (type_name), not the underlying data type
+    typeName = (args.type_name || args.data_type || '').toUpperCase();
   } else {
     // For other types, typeName comes from type_name parameter
     typeName = args.type_name ? args.type_name.toUpperCase() : '';

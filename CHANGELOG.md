@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-02-27
+
+### Fixed
+- Fixed `typeName` mapping for data elements with `typeKind: 'domain'`. The create and update operations incorrectly used `data_type` (underlying ABAP type, e.g. `CHAR`) instead of `type_name` (domain name, e.g. `ZD_ACTION`) for the `<dtel:typeName>` XML element, causing "No active domain CHAR available" errors.
+
 ## [1.0.4] - 2026-02-26
 
 ### Fixed
