@@ -58,6 +58,7 @@ export type AdtSourceObjectType =
 export interface IObjectReference {
   type: string;
   name: string;
+  parentName?: string;
 }
 
 /**

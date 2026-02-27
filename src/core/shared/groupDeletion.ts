@@ -48,7 +48,7 @@ export async function checkDeletionGroup(
   // Build object URIs
   const objectElements = objects
     .map((obj) => {
-      const uri = buildObjectUri(obj.name, obj.type);
+      const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
       return `  <del:object adtcore:uri="${uri}"/>`;
     })
     .join('\n');
@@ -115,7 +115,7 @@ export async function deleteObjectsGroup(
 
   const objectElements = objects
     .map((obj) => {
-      const uri = buildObjectUri(obj.name, obj.type);
+      const uri = buildObjectUri(obj.name, obj.type, obj.parentName);
       return `  <del:object adtcore:uri="${uri}">
     ${transportNumberTag}
   </del:object>`;

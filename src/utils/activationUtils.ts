@@ -19,9 +19,14 @@ import { getTimeout } from './timeouts';
  *
  * @param name - Object name (e.g., 'ZCL_MY_CLASS', 'Z_MY_PROGRAM')
  * @param type - Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')
+ * @param parentName - Parent object name (e.g., function group name for FUGR/FF)
  * @returns ADT URI for the object
  */
-export function buildObjectUri(name: string, type?: string): string {
+export function buildObjectUri(
+  name: string,
+  type?: string,
+  parentName?: string,
+): string {
   const lowerName = encodeSapObjectName(name).toLowerCase();
 
   if (!type) {
@@ -45,7 +50,16 @@ export function buildObjectUri(name: string, type?: string): string {
     case 'PROG':
       return `/sap/bc/adt/programs/programs/${lowerName}`;
 
+    case 'FUGR/FF': {
+      if (parentName) {
+        const lowerParent = encodeSapObjectName(parentName).toLowerCase();
+        return `/sap/bc/adt/functions/groups/${lowerParent}/fmodules/${lowerName}`;
+      }
+      return `/sap/bc/adt/functions/groups/${lowerName}/fmodules/${lowerName}`;
+    }
+
     case 'FUGR':
+    case 'FUGR/F':
     case 'FUNC':
       return `/sap/bc/adt/functions/groups/${lowerName}`;
 
@@ -77,6 +91,35 @@ export function buildObjectUri(name: string, type?: string): string {
     case 'INTF/OI':
     case 'INTF':
       return `/sap/bc/adt/oo/interfaces/${lowerName}`;
+
+    case 'TTYP/DF':
+    case 'TTYP/TT':
+    case 'TTYP':
+      return `/sap/bc/adt/ddic/tabletypes/${lowerName}`;
+
+    case 'SRVD/SRV':
+    case 'SRVD':
+      return `/sap/bc/adt/ddic/srvd/sources/${lowerName}`;
+
+    case 'SRVB/SVB':
+    case 'SRVB':
+      return `/sap/bc/adt/businessservices/bindings/${lowerName}`;
+
+    case 'DDLX/EX':
+    case 'DDLX':
+      return `/sap/bc/adt/ddic/ddlx/sources/${lowerName}`;
+
+    case 'BDEF/BDO':
+    case 'BDEF':
+      return `/sap/bc/adt/ddic/bdef/sources/${lowerName}`;
+
+    case 'DCLS/DL':
+    case 'DCLS':
+      return `/sap/bc/adt/acm/dcl/sources/${lowerName}`;
+
+    case 'ENHO/ENH':
+    case 'ENHO':
+      return `/sap/bc/adt/enhancements/${lowerName}`;
 
     default:
       // Fallback: try to construct URI from type

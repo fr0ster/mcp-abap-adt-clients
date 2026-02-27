@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-02-27
+
+### Fixed
+- Added missing URI mappings in `buildObjectUri` for group activation: DCLS/DL, TTYP, SRVD, SRVB, DDLX, BDEF, ENHO, FUGR/FF. Without them, `activateObjectsGroup` generated invalid ADT URIs causing "Failed to extract activation run ID" errors.
+- `IObjectReference` gains optional `parentName` for function module activation (FUGR/FF requires group name in URI).
+
+## [1.1.0] - 2026-02-27
+
+### Added
+- Full CRUD support for Access Control objects (DCLS/DL): `getAccessControl()` with `create`, `read`, `readMetadata`, `update`, `delete`, `activate`, `check`, `lock`, `unlock`.
+- `AdtClientBatch` for batching multiple read operations into a single HTTP request.
+
 ## [1.0.6] - 2026-02-27
 
 ### Fixed
