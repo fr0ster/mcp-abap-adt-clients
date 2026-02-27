@@ -56,6 +56,11 @@ export type {
 } from './clients/DebuggerSessionClient';
 export { DebuggerSessionClient } from './clients/DebuggerSessionClient';
 export type {
+  AdtAccessControlType,
+  IAccessControlConfig,
+  IAccessControlState,
+} from './core/accessControl';
+export type {
   AdtBehaviorDefinitionType,
   BehaviorDefinitionImplementationType,
   CheckReporter,

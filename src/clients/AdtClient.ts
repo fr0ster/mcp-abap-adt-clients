@@ -19,6 +19,11 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
+  AdtAccessControl,
+  type IAccessControlConfig,
+  type IAccessControlState,
+} from '../core/accessControl';
+import {
   AdtBehaviorDefinition,
   type IBehaviorDefinitionConfig,
   type IBehaviorDefinitionState,
@@ -256,6 +261,14 @@ export class AdtClient {
    */
   getPackage(): IAdtObject<IPackageConfig, IPackageState> {
     return new AdtPackage(this.connection, this.logger);
+  }
+
+  /**
+   * Get high-level operations for AccessControl objects
+   * @returns IAdtObject instance for AccessControl operations
+   */
+  getAccessControl(): IAdtObject<IAccessControlConfig, IAccessControlState> {
+    return new AdtAccessControl(this.connection, this.logger);
   }
 
   /**

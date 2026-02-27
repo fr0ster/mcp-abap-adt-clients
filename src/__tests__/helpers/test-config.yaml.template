@@ -162,6 +162,11 @@ standard_objects:
       description: "Placeholder for on-premise service definition – replace with existing service definition"
       available_in: ["onprem"]
 
+  access_controls:
+    - name: "ZPLACEHOLDER_DCLS"
+      description: "Placeholder for access control – replace with existing access control"
+      available_in: ["onprem", "cloud"]
+
   service_bindings:
     - name: "ZPLACEHOLDER_SRVB"
       description: "Placeholder for service binding – replace with existing service binding"
@@ -306,6 +311,20 @@ read_service_definition:
         # Or use environment-specific parameters:
         # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
         # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
+
+# Read Access Control (AdtClient)
+# Uses standard_objects.access_controls with available_in filter
+read_access_control:
+  test_cases:
+    - name: "read_standard_access_control"
+      enabled: false  # Set to true and configure params below to enable read test
+      description: "Read standard SAP access control"
+      params:
+        # Specify standard object name directly (overrides standard_objects registry)
+        # access_control_name: "ZPLACEHOLDER_DCLS"  # Replace with existing access control in your system
+        # Or use environment-specific parameters:
+        # access_control_name_cloud: "ZPLACEHOLDER_DCLS"  # For cloud systems only
+        # access_control_name_onprem: "ZPLACEHOLDER_DCLS"  # For on-premise systems only
 
 # Read Service Binding (AdtClient)
 # Uses standard_objects.service_bindings with available_in filter
@@ -735,6 +754,25 @@ create_service_definition:
           @EndUserText.label: 'AdtServiceDefinition workflow service definition'
           define service ZADT_BLD_SRVD01 {
             expose ZOK_C_CDS_TEST;  # Replace with your CDS view name
+          }
+
+# Create Access Control
+create_access_control:
+  test_cases:
+    - name: "adt_access_control"
+      enabled: false  # Set to true and configure params below to enable tests
+      description: "Access control reserved for AdtAccessControl tests"
+      params:
+        access_control_name: "ZADT_BLD_AC01"  # Replace with your access control name
+        description: "AdtAccessControl workflow access control"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        source_code: |
+          @EndUserText.label: 'AdtAccessControl workflow access control'
+          @MappingRole: true
+          define role ZADT_BLD_AC01 {
+            grant select on ZADT_BLD_AC01
+            where ( ) = aspect pfcg_auth( , , );
           }
 
 # Create Service Binding
