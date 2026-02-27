@@ -179,6 +179,48 @@ const runtimeBatch = new AdtRuntimeClientBatch(connection, logger);
 await runtimeBatch.batchExecute();
 ```
 
+## resolveTransport (standalone)
+
+`resolveTransport` is a standalone function (not part of `AdtClient`) that resolves transport
+request information for any object via `/sap/bc/adt/cts/transportchecks`.
+Use it before create/update to determine the correct transport request and prevent
+ABAP dumps when a wrong TR number is provided.
+
+```typescript
+import { resolveTransport } from '@mcp-abap-adt/adt-clients';
+
+const result = await resolveTransport(connection, {
+  pgmid: 'R3TR',
+  objectType: 'CLAS',
+  objectName: 'ZCL_MY_CLASS',
+  devclass: 'ZPACKAGE',
+  uri: '/sap/bc/adt/oo/classes/zcl_my_class',
+  operation: 'U', // 'I' for insert (create), 'U' for update
+});
+
+if (result.isLocal) {
+  // $TMP package — no transport needed
+}
+
+if (result.lockedInTransport) {
+  // Object is already assigned to this TR — use it
+  console.log(`Use TR: ${result.lockedInTransport}`);
+}
+
+// All available transports for this package
+console.log(result.availableTransports);
+```
+
+### IResolveTransportResult
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `success` | `boolean` | Whether the transport check succeeded |
+| `lockedInTransport` | `string?` | TR the object is already assigned to |
+| `availableTransports` | `string[]` | Available transport requests |
+| `isLocal` | `boolean` | `true` for `$TMP` packages (no transport needed) |
+| `recording` | `string?` | Raw RECORDING field value from SAP |
+
 ## AdtRuntimeClient
 
 ```typescript

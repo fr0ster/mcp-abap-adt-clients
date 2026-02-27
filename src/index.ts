@@ -200,9 +200,12 @@ export type {
 } from './core/tabletype';
 export type {
   AdtRequestType,
+  IResolveTransportParams,
+  IResolveTransportResult,
   ITransportConfig,
   ITransportState,
 } from './core/transport';
+export { resolveTransport } from './core/transport';
 export type {
   AdtUnitTestType,
   ICdsUnitTestConfig,

@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-27
+
+### Added
+- `resolveTransport(connection, params)` — resolve transport request for any object via `/sap/bc/adt/cts/transportchecks`. Returns locked transport, available transports, and local package flag. Supports both insert (`I`) and update (`U`) operations. Prevents ABAP dumps when a wrong transport request number is provided (issue #10).
+
 ## [1.1.1] - 2026-02-27
 
 ### Fixed
