@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-02-27
+
+### Fixed
+- Removed `$TMP` hardcode from `isLocal` check in `resolveTransport`. Now relies on SAP response to determine whether transport is needed, which works correctly for `$TMP`, `ZLOCAL`, and any other local package across on-prem and BTP ABAP Cloud.
+
 ## [1.2.0] - 2026-02-27
 
 ### Added

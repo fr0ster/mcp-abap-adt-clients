@@ -115,7 +115,9 @@ export async function resolveTransport(
 
   // Check if transport is needed (SAP decides, not us — works for $TMP, ZLOCAL, etc.)
   const recording = data?.RECORDING;
-  const isLocal = recording === '' || (!lockedInTransport && availableTransports.length === 0);
+  const isLocal =
+    recording === '' ||
+    (!lockedInTransport && availableTransports.length === 0);
 
   return {
     success: data?.RESULT === 'S',
