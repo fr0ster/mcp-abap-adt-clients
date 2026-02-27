@@ -5,15 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-02-27
+
+### Removed
+- Removed `resolveTransport` function (added in 1.2.0). The approach based on `/sap/bc/adt/cts/transportchecks` with `OPERATION` field was unreliable. Transport resolution is now handled at the MCP server level via `ListTransports` tool.
+
 ## [1.2.1] - 2026-02-27
 
 ### Fixed
-- Removed `$TMP` hardcode from `isLocal` check in `resolveTransport`. Now relies on SAP response to determine whether transport is needed, which works correctly for `$TMP`, `ZLOCAL`, and any other local package across on-prem and BTP ABAP Cloud.
+- Removed `$TMP` hardcode from `isLocal` check in `resolveTransport`.
 
 ## [1.2.0] - 2026-02-27
 
 ### Added
-- `resolveTransport(connection, params)` — resolve transport request for any object via `/sap/bc/adt/cts/transportchecks`. Returns locked transport, available transports, and local package flag. Supports both insert (`I`) and update (`U`) operations. Prevents ABAP dumps when a wrong transport request number is provided (issue #10).
+- `resolveTransport(connection, params)` — resolve transport request for any object via `/sap/bc/adt/cts/transportchecks`.
 
 ## [1.1.1] - 2026-02-27
 

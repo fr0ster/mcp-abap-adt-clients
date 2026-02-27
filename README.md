@@ -351,28 +351,6 @@ await client.getBehaviorImplementation().create(
 );
 ```
 
-### Resolving Transport Requests
-
-Use `resolveTransport` before create/update to determine the correct transport request.
-This prevents ABAP dumps when an object is already assigned to a different TR.
-
-```typescript
-import { resolveTransport } from '@mcp-abap-adt/adt-clients';
-
-const result = await resolveTransport(connection, {
-  pgmid: 'R3TR',
-  objectType: 'CLAS',
-  objectName: 'ZCL_MY_CLASS',
-  devclass: 'ZPACKAGE',
-  uri: '/sap/bc/adt/oo/classes/zcl_my_class',
-  operation: 'U',
-});
-
-// result.lockedInTransport — TR the object is already in
-// result.availableTransports — available TRs for the package
-// result.isLocal — true for $TMP (no transport needed)
-```
-
 ## Developer Tools
 
 ### ADT Discovery Script
