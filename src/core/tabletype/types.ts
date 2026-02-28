@@ -10,6 +10,8 @@ export interface ICreateTableTypeParams {
   package_name: string;
   description?: string;
   transport_request?: string;
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface IUpdateTableTypeParams {

@@ -124,13 +124,21 @@ import {
 } from '../core/unitTest';
 import { AdtView, type IViewConfig, type IViewState } from '../core/view';
 
+export interface IAdtSystemContext {
+  masterSystem?: string;
+  responsible?: string;
+}
+
 export interface IAdtClientOptions {
   enableAcceptCorrection?: boolean;
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export class AdtClient {
   private connection: IAbapConnection;
   private logger: ILogger;
+  private systemContext: IAdtSystemContext;
 
   constructor(
     connection: IAbapConnection,
@@ -143,6 +151,10 @@ export class AdtClient {
       info: () => {},
       warn: () => {},
       error: () => {},
+    };
+    this.systemContext = {
+      masterSystem: options?.masterSystem,
+      responsible: options?.responsible,
     };
     if (options?.enableAcceptCorrection !== undefined) {
       const {
@@ -172,7 +184,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Class operations
    */
   getClass(): IAdtObject<IClassConfig, IClassState> {
-    return new AdtClass(this.connection, this.logger);
+    return new AdtClass(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -180,7 +192,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Program operations
    */
   getProgram(): IAdtObject<IProgramConfig, IProgramState> {
-    return new AdtProgram(this.connection, this.logger);
+    return new AdtProgram(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -188,7 +200,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Interface operations
    */
   getInterface(): IAdtObject<IInterfaceConfig, IInterfaceState> {
-    return new AdtInterface(this.connection, this.logger);
+    return new AdtInterface(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -196,7 +208,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Domain operations
    */
   getDomain(): IAdtObject<IDomainConfig, IDomainState> {
-    return new AdtDomain(this.connection, this.logger);
+    return new AdtDomain(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -204,7 +216,7 @@ export class AdtClient {
    * @returns IAdtObject instance for DataElement operations
    */
   getDataElement(): IAdtObject<IDataElementConfig, IDataElementState> {
-    return new AdtDataElement(this.connection, this.logger);
+    return new AdtDataElement(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -212,7 +224,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Structure operations
    */
   getStructure(): IAdtObject<IStructureConfig, IStructureState> {
-    return new AdtStructure(this.connection, this.logger);
+    return new AdtStructure(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -220,7 +232,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Table operations
    */
   getTable(): IAdtObject<ITableConfig, ITableState> {
-    return new AdtTable(this.connection, this.logger);
+    return new AdtTable(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -228,7 +240,7 @@ export class AdtClient {
    * @returns IAdtObject instance for TableType operations
    */
   getTableType(): IAdtObject<ITableTypeConfig, ITableTypeState> {
-    return new AdtDdicTableType(this.connection, this.logger);
+    return new AdtDdicTableType(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -236,7 +248,7 @@ export class AdtClient {
    * @returns IAdtObject instance for View operations
    */
   getView(): IAdtObject<IViewConfig, IViewState> {
-    return new AdtView(this.connection, this.logger);
+    return new AdtView(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -244,7 +256,7 @@ export class AdtClient {
    * @returns IAdtObject instance for FunctionGroup operations
    */
   getFunctionGroup(): IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
-    return new AdtFunctionGroup(this.connection, this.logger);
+    return new AdtFunctionGroup(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -252,7 +264,7 @@ export class AdtClient {
    * @returns IAdtObject instance for FunctionModule operations
    */
   getFunctionModule(): IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
-    return new AdtFunctionModule(this.connection, this.logger);
+    return new AdtFunctionModule(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -260,7 +272,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Package operations
    */
   getPackage(): IAdtObject<IPackageConfig, IPackageState> {
-    return new AdtPackage(this.connection, this.logger);
+    return new AdtPackage(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -268,7 +280,7 @@ export class AdtClient {
    * @returns IAdtObject instance for AccessControl operations
    */
   getAccessControl(): IAdtObject<IAccessControlConfig, IAccessControlState> {
-    return new AdtAccessControl(this.connection, this.logger);
+    return new AdtAccessControl(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -279,7 +291,7 @@ export class AdtClient {
     IServiceDefinitionConfig,
     IServiceDefinitionState
   > {
-    return new AdtServiceDefinition(this.connection, this.logger);
+    return new AdtServiceDefinition(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -305,7 +317,7 @@ export class AdtClient {
     IBehaviorDefinitionConfig,
     IBehaviorDefinitionState
   > {
-    return new AdtBehaviorDefinition(this.connection, this.logger);
+    return new AdtBehaviorDefinition(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -327,7 +339,7 @@ export class AdtClient {
     IMetadataExtensionConfig,
     IMetadataExtensionState
   > {
-    return new AdtMetadataExtension(this.connection, this.logger);
+    return new AdtMetadataExtension(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -341,7 +353,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Enhancement operations
    */
   getEnhancement(): IAdtObject<IEnhancementConfig, IEnhancementState> {
-    return new AdtEnhancement(this.connection, this.logger);
+    return new AdtEnhancement(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -365,7 +377,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Request operations
    */
   getRequest(): IAdtObject<ITransportConfig, ITransportState> {
-    return new AdtRequest(this.connection, this.logger);
+    return new AdtRequest(this.connection, this.logger, this.systemContext);
   }
 
   /**

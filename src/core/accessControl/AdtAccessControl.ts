@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateAccessControl } from './activation';
 import { checkAccessControl } from './check';
@@ -45,11 +46,13 @@ export class AdtAccessControl
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'AccessControl';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -115,6 +118,8 @@ export class AdtAccessControl
         transport_request: config.transportRequest,
         description: config.description,
         source_code: options?.sourceCode || config.sourceCode,
+        masterSystem: this.systemContext.masterSystem,
+        responsible: this.systemContext.responsible,
       });
       state.createResult = createResponse;
       this.logger?.info?.('Access control created');

@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateDDLS } from './activation';
 import { checkView } from './check';
@@ -39,11 +40,13 @@ import { validateViewName } from './validation';
 export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'View';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -107,6 +110,8 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         transport_request: config.transportRequest,
         description: config.description,
         ddl_source: options?.sourceCode || config.ddlSource,
+        masterSystem: this.systemContext.masterSystem,
+        responsible: this.systemContext.responsible,
       });
       objectCreated = true;
       state.createResult = createResponse;

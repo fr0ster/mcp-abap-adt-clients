@@ -10,7 +10,6 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateInterfaceParams } from './types';
 
@@ -41,21 +40,8 @@ export async function create(
   params: ICreateInterfaceParams,
   logger?: ILogger,
 ): Promise<AxiosResponse> {
-  // Get system information - only for cloud systems
-  const systemInfo = await getSystemInformation(connection);
-
-  let finalMasterSystem = params.masterSystem;
-  let finalResponsible = params.responsible;
-
-  if (systemInfo) {
-    // Only for cloud systems - use systemInfo or provided values
-    finalMasterSystem = finalMasterSystem || systemInfo.systemID;
-    finalResponsible = finalResponsible || systemInfo.userName;
-  } else {
-    // For non-cloud systems - don't add these attributes
-    finalMasterSystem = '';
-    finalResponsible = '';
-  }
+  const finalMasterSystem = params.masterSystem || '';
+  const finalResponsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
   const limitedDescription = limitDescription(params.description);

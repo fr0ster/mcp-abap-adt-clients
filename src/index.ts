@@ -41,7 +41,7 @@ export type {
   IBatchRequestPart,
   IBatchResponsePart,
 } from './batch/types';
-export type { IAdtClientOptions } from './clients/AdtClient';
+export type { IAdtClientOptions, IAdtSystemContext } from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
 export { AdtClientsWS } from './clients/AdtClientsWS';
 export { AdtExecutor } from './clients/AdtExecutor';

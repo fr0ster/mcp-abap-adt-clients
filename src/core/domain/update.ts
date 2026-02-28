@@ -22,8 +22,6 @@ export async function updateDomain(
   connection: IAbapConnection,
   args: IUpdateDomainParams,
   lockHandle: string,
-  username: string,
-  masterSystem?: string,
 ): Promise<AxiosResponse> {
   const domainNameEncoded = encodeSapObjectName(args.domain_name.toLowerCase());
 
@@ -51,8 +49,11 @@ export async function updateDomain(
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.domain_name);
-  const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
+  const masterSystemAttr = args.masterSystem
+    ? ` adtcore:masterSystem="${args.masterSystem}"`
+    : '';
+  const responsibleAttr = args.responsible
+    ? ` adtcore:responsible="${args.responsible}"`
     : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
@@ -61,8 +62,7 @@ export async function updateDomain(
              adtcore:language="EN"
              adtcore:name="${args.domain_name.toUpperCase()}"
              adtcore:type="DOMA/DD"
-             adtcore:masterLanguage="EN"${masterSystemAttr}
-             adtcore:responsible="${username}">
+             adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
   <doma:content>
     <doma:typeInformation>

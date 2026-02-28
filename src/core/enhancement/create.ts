@@ -8,7 +8,6 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import {
   ENHANCEMENT_TYPE_CODES,
@@ -90,19 +89,7 @@ export async function create(
 
   const url = `${getEnhancementBaseUrl(args.enhancement_type)}${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  // Get masterSystem and responsible
-  let masterSystem: string | undefined;
-  let username: string | undefined;
-
-  const systemInfo = await getSystemInformation(connection);
-  if (systemInfo) {
-    masterSystem = systemInfo.systemID;
-    username = systemInfo.userName;
-  }
-
-  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
-
-  const metadataXml = buildCreateXml(args, masterSystem, username);
+  const metadataXml = buildCreateXml(args, args.masterSystem, args.responsible);
 
   const headers = {
     Accept: 'application/vnd.sap.adt.enhancements.v1+xml, application/xml',

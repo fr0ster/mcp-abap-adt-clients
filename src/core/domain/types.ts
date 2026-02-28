@@ -15,6 +15,8 @@ export interface ICreateDomainParams {
   description?: string;
   package_name: string;
   transport_request?: string;
+  masterSystem?: string;
+  responsible?: string;
   datatype?: string;
   length?: number;
   decimals?: number;
@@ -31,6 +33,8 @@ export interface IUpdateDomainParams {
   description?: string;
   package_name: string;
   transport_request?: string;
+  masterSystem?: string;
+  responsible?: string;
   datatype?: string;
   length?: number;
   decimals?: number;

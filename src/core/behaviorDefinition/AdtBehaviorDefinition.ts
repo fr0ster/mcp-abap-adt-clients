@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activate } from './activation';
 import { check as checkBehaviorDefinition } from './check';
@@ -48,11 +49,13 @@ export class AdtBehaviorDefinition
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'BehaviorDefinition';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -142,6 +145,8 @@ export class AdtBehaviorDefinition
         description: config.description,
         implementationType: config.implementationType,
         transportRequest: config.transportRequest,
+        masterSystem: this.systemContext.masterSystem,
+        responsible: this.systemContext.responsible,
       });
       state.createResult = createResponse;
       objectCreated = true;

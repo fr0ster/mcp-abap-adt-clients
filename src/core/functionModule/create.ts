@@ -10,7 +10,6 @@ import {
   encodeSapObjectName,
   limitDescription,
 } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionModuleParams } from './types';
 
@@ -28,21 +27,8 @@ export async function create(
 
   const url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
-  // Get masterSystem and responsible for both cloud and on-premise systems.
-  // Eclipse ADT always includes these attributes in the XML payload.
-  // Priority: params (caller) > systemInfo (cloud endpoint) > env vars
-  const systemInfo = await getSystemInformation(connection);
-  const masterSystem =
-    params.masterSystem ||
-    systemInfo?.systemID ||
-    process.env.SAP_SYSTEM_ID ||
-    undefined;
-  const username =
-    params.responsible ||
-    systemInfo?.userName ||
-    process.env.SAP_USER ||
-    process.env.SAP_USERNAME ||
-    undefined;
+  const masterSystem = params.masterSystem || undefined;
+  const username = params.responsible || undefined;
 
   // Description is limited to 60 characters in SAP ADT
   const limitedDescription = limitDescription(params.description);

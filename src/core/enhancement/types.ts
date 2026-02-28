@@ -44,6 +44,8 @@ export interface ICreateEnhancementParams {
   enhancement_spot?: string; // Required for implementations
   badi_definition?: string; // Required for BAdI implementations
   source_code?: string; // For enhoxhh only
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface IUpdateEnhancementParams {

@@ -10,6 +10,8 @@ export interface ICreateTableParams {
   package_name: string;
   transport_request?: string;
   ddl_code?: string; // Optional - can be added via update() later
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface IUpdateTableParams {

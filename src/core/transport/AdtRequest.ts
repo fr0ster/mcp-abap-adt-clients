@@ -25,6 +25,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { createTransport } from './create';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
@@ -34,11 +35,13 @@ export class AdtRequest
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Request';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -77,7 +80,7 @@ export class AdtRequest
           config.transportType === 'customizing' ? 'customizing' : 'workbench',
         description: config.description,
         target_system: config.targetSystem,
-        owner: config.owner,
+        owner: config.owner ?? this.systemContext.responsible,
       });
 
       const transportNumber = response.data?.transport_request;

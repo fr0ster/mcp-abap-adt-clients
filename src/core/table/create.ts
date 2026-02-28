@@ -7,7 +7,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTableParams } from './types';
 
@@ -27,14 +26,8 @@ export async function createTable(
     throw new Error('Package name is required');
   }
 
-  // Get system information - only for cloud systems
-  const systemInfo = await getSystemInformation(connection);
-  const username = systemInfo?.userName || '';
-  const systemId = systemInfo?.systemID || '';
-
-  // Only add masterSystem and responsible for cloud systems (when systemInfo is available)
-  const masterSystem = systemInfo ? systemId : '';
-  const responsible = systemInfo ? username : '';
+  const masterSystem = params.masterSystem || '';
+  const responsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(params.table_name);

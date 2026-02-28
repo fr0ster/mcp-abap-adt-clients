@@ -50,6 +50,8 @@ export interface IBehaviorDefinitionCreateParams {
   language?: string;
   /** Responsible user */
   responsible?: string;
+  /** Master system */
+  masterSystem?: string;
   /** Transport request number */
   transportRequest?: string;
 }

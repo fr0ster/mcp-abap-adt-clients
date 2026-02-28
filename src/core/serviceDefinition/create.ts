@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateServiceDefinitionParams } from './types';
 
@@ -22,11 +21,8 @@ export async function create(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/srvd/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  // Get system information for cloud systems
-  const systemInfo = await getSystemInformation(connection);
-  const username = systemInfo?.userName || '';
-  const masterSystem = systemInfo?.systemID || '';
-  const masterLanguage = systemInfo?.language || 'EN';
+  const username = args.responsible || '';
+  const masterSystem = args.masterSystem || '';
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
@@ -38,7 +34,7 @@ export async function create(
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${masterLanguage}" adtcore:name="${serviceDefinitionName}" adtcore:type="SRVD/SRV" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr} adtcore:responsible="${username}" srvd:srvdSourceType="S">
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${serviceDefinitionName}" adtcore:type="SRVD/SRV" adtcore:masterLanguage="EN"${masterSystemAttr} adtcore:responsible="${username}" srvd:srvdSourceType="S">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </srvd:srvdSource>`;
 

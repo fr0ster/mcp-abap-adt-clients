@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateInterface } from './activation';
 import { checkInterface } from './check';
@@ -45,11 +46,13 @@ export class AdtInterface
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Interface';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -105,6 +108,8 @@ export class AdtInterface
           packageName: config.packageName,
           transportRequest: config.transportRequest,
           description: config.description,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
         },
         this.logger,
       );

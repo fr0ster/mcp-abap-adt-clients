@@ -25,6 +25,7 @@ import {
   type IAdtOperationOptions,
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
@@ -44,11 +45,13 @@ import { validateClassName } from './validation';
 export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Class';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -135,8 +138,8 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           final: config.final,
           abstract: config.abstract,
           create_protected: config.createProtected,
-          master_system: config.masterSystem,
-          responsible: config.responsible,
+          master_system: config.masterSystem ?? this.systemContext.masterSystem,
+          responsible: config.responsible ?? this.systemContext.responsible,
           template_xml: config.classTemplate,
         },
         this.logger,

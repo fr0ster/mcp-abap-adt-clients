@@ -27,6 +27,8 @@ export interface ICreateStructureParams {
   description: string;
   packageName: string;
   transportRequest?: string;
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface IUpdateStructureParams {

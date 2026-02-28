@@ -24,7 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { getSystemInformation } from '../../utils/systemInfo';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateDataElement } from './activation';
 import { checkDataElement } from './check';
@@ -42,11 +42,13 @@ export class AdtDataElement
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'DataElement';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -117,6 +119,8 @@ export class AdtDataElement
         search_help: config.searchHelp,
         search_help_parameter: config.searchHelpParameter,
         set_get_parameter: config.setGetParameter,
+        masterSystem: this.systemContext.masterSystem,
+        responsible: this.systemContext.responsible,
       });
       state.createResult = createResponse;
       objectCreated = true;
@@ -258,13 +262,6 @@ export class AdtDataElement
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const systemInfo = await getSystemInformation(this.connection);
-      const _username =
-        systemInfo?.userName ||
-        process.env.SAP_USER ||
-        process.env.SAP_USERNAME ||
-        'MPCUSER';
-
       const _domainInfo = {
         dataType: config.dataType || '',
         length: config.length || 0,

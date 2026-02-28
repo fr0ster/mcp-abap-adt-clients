@@ -15,6 +15,7 @@ export interface ICreatePackageParams {
   transport_request?: string;
   application_component?: string;
   responsible?: string;
+  masterSystem?: string;
   record_changes?: boolean;
 }
 

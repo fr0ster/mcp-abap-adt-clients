@@ -7,7 +7,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
 
@@ -38,14 +37,8 @@ export async function createPackage(
   );
   const packageType = params.package_type || 'development';
 
-  const systemInfo = await getSystemInformation(connection);
-  const masterSystem = systemInfo?.systemID;
-  const responsibleUser =
-    params.responsible ||
-    systemInfo?.userName ||
-    process.env.SAP_USERNAME ||
-    process.env.SAP_USER ||
-    '';
+  const masterSystem = params.masterSystem;
+  const responsibleUser = params.responsible || '';
 
   // Software component is required for package creation
   if (!params.software_component) {

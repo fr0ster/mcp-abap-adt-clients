@@ -27,7 +27,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { getSystemInformation } from '../../utils/systemInfo';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { checkPackage } from './check';
 import { createPackage } from './create';
@@ -42,11 +42,13 @@ import { validatePackageBasic } from './validation';
 export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Package';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -128,7 +130,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         transport_layer: config.transportLayer,
         transport_request: config.transportRequest,
         application_component: config.applicationComponent,
-        responsible: config.responsible,
+        responsible: config.responsible ?? this.systemContext.responsible,
+        masterSystem: this.systemContext.masterSystem,
         record_changes: config.recordChanges,
       });
       this.logger?.info?.('Package created');
@@ -321,7 +324,6 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const _systemInfo = await getSystemInformation(this.connection);
       const updateResponse = await updatePackage(
         this.connection,
         {
@@ -344,7 +346,6 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     }
 
     let lockHandle: string | undefined;
-    const systemInfo = await getSystemInformation(this.connection);
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
@@ -385,7 +386,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
             transport_layer: config.transportLayer,
             transport_request: config.transportRequest,
             application_component: config.applicationComponent,
-            responsible: config.responsible || systemInfo?.userName,
+            responsible: config.responsible ?? this.systemContext.responsible,
             record_changes: config.recordChanges,
           },
           lockHandle,

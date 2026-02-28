@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
 import { checkProgram } from './check';
@@ -43,11 +44,13 @@ import { validateProgramName } from './validation';
 export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Program';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -123,6 +126,8 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         programType: config.programType,
         application: config.application,
         sourceCode: options?.sourceCode || config.sourceCode,
+        masterSystem: this.systemContext.masterSystem,
+        responsible: this.systemContext.responsible,
       });
       state.createResult = createResponse;
       objectCreated = true;

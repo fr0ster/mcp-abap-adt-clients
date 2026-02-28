@@ -10,7 +10,6 @@ import {
   encodeSapObjectName,
   limitDescription,
 } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateProgramParams } from './types';
 
@@ -85,21 +84,8 @@ export async function create(
   const application = args.application || '*';
   const url = `/sap/bc/adt/programs/programs${args.transportRequest ? `?corrNr=${args.transportRequest}` : ''}`;
 
-  // Get masterSystem and responsible (only for cloud systems)
-  // On cloud, getSystemInformation returns systemID and userName
-  // On on-premise, it returns null, so we don't add these attributes
-  let masterSystem = args.masterSystem;
-  let username = args.responsible;
-
-  const systemInfo = await getSystemInformation(connection);
-  if (systemInfo) {
-    masterSystem = masterSystem || systemInfo.systemID;
-    username = username || systemInfo.userName;
-  }
-
-  // Only use masterSystem from getSystemInformation (cloud), not from env
-  // username can fallback to env if not provided
-  username = username || process.env.SAP_USERNAME || process.env.SAP_USER || '';
+  const masterSystem = args.masterSystem || '';
+  const username = args.responsible || '';
 
   const masterSystemAttr = masterSystem
     ? ` adtcore:masterSystem="${masterSystem}"`

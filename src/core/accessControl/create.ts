@@ -3,7 +3,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateAccessControlParams } from './types';
 
@@ -17,11 +16,8 @@ export async function create(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/acm/dcl/sources${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  // Get system information for cloud systems
-  const systemInfo = await getSystemInformation(connection);
-  const username = systemInfo?.userName || '';
-  const masterSystem = systemInfo?.systemID || '';
-  const masterLanguage = systemInfo?.language || 'EN';
+  const username = args.responsible || '';
+  const masterSystem = args.masterSystem || '';
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
@@ -33,7 +29,7 @@ export async function create(
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><dcl:dclSource xmlns:dcl="http://www.sap.com/adt/acm/dclsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${masterLanguage}" adtcore:name="${accessControlName}" adtcore:type="DCLS/DL" adtcore:masterLanguage="${masterLanguage}"${masterSystemAttr} adtcore:responsible="${username}">
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><dcl:dclSource xmlns:dcl="http://www.sap.com/adt/acm/dclsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${accessControlName}" adtcore:type="DCLS/DL" adtcore:masterLanguage="EN"${masterSystemAttr} adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </dcl:dclSource>`;
 

@@ -18,17 +18,19 @@ import type { ICreateDomainParams } from './types';
 export async function create(
   connection: IAbapConnection,
   args: ICreateDomainParams,
-  username: string,
-  masterSystem?: string,
 ): Promise<AxiosResponse> {
   const corrNrParam = args.transport_request
     ? `?corrNr=${args.transport_request}`
     : '';
   const url = `/sap/bc/adt/ddic/domains${corrNrParam}`;
 
+  const masterSystem = args.masterSystem || '';
+  const username = args.responsible || '';
+
   const masterSystemAttr = masterSystem
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
+  const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
              xmlns:adtcore="http://www.sap.com/adt/core"
@@ -36,8 +38,7 @@ export async function create(
              adtcore:language="EN"
              adtcore:name="${args.domain_name.toUpperCase()}"
              adtcore:type="DOMA/DD"
-             adtcore:masterLanguage="EN"${masterSystemAttr}
-             adtcore:responsible="${username}">
+             adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </doma:domain>`;
 

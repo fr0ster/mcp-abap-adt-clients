@@ -24,6 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionModule } from './activation';
 import { checkFunctionModule } from './check';
@@ -45,11 +46,13 @@ export class AdtFunctionModule
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'FunctionModule';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -106,8 +109,8 @@ export class AdtFunctionModule
         functionModuleName: config.functionModuleName,
         transportRequest: config.transportRequest,
         description: config.description,
-        masterSystem: config.masterSystem,
-        responsible: config.responsible,
+        masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
+        responsible: config.responsible ?? this.systemContext.responsible,
       });
       objectCreated = true;
       state.createResult = createResult;

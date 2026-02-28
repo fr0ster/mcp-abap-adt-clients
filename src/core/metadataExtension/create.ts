@@ -9,7 +9,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { IMetadataExtensionCreateParams } from './types';
 
@@ -37,16 +36,10 @@ export async function createMetadataExtension(
 ): Promise<AxiosResponse> {
   const url = '/sap/bc/adt/ddic/ddlx/sources';
 
-  // Get system information - only for cloud systems
-  const systemInfo = await getSystemInformation(connection);
-  const username = systemInfo?.userName || '';
-  const systemId = systemInfo?.systemID || '';
-
   const masterLanguage = params.masterLanguage || 'EN';
 
-  // Only add masterSystem and responsible for cloud systems (when systemInfo is available)
-  const masterSystem = systemInfo ? params.masterSystem || systemId : '';
-  const responsible = systemInfo ? params.responsible || username : '';
+  const masterSystem = params.masterSystem || '';
+  const responsible = params.responsible || '';
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(params.description);

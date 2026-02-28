@@ -11,6 +11,8 @@ export interface ICreateViewParams {
   package_name: string;
   transport_request?: string;
   description?: string;
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface IUpdateViewSourceParams {

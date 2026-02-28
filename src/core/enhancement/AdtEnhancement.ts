@@ -31,6 +31,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateEnhancement } from './activation';
 import { check as checkEnhancement } from './check';
@@ -56,11 +57,13 @@ export class AdtEnhancement
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Enhancement';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -142,6 +145,8 @@ export class AdtEnhancement
           transport_request: config.transportRequest,
           enhancement_spot: config.enhancementSpot,
           badi_definition: config.badiDefinition,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
         },
         this.logger,
       );

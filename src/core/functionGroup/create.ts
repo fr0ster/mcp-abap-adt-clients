@@ -8,7 +8,6 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionGroupParams } from './types';
 
@@ -25,23 +24,9 @@ export async function create(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
-  // Get masterSystem and responsible for both cloud and on-premise systems.
-  // Eclipse ADT always includes these attributes in the XML payload.
-  // Priority: params (caller) > systemInfo (cloud endpoint) > env vars
-  const systemInfo = await getSystemInformation(connection);
+  const finalMasterSystem = params.masterSystem || undefined;
 
-  const finalMasterSystem: string | undefined =
-    params.masterSystem ||
-    systemInfo?.systemID ||
-    process.env.SAP_SYSTEM_ID ||
-    undefined;
-
-  let finalResponsible: string | undefined =
-    params.responsible ||
-    systemInfo?.userName ||
-    process.env.SAP_USER ||
-    process.env.SAP_USERNAME ||
-    undefined;
+  let finalResponsible = params.responsible || undefined;
 
   // Don't add responsible if it's empty - this can cause "Kerberos library not loaded" error
   if (finalResponsible && finalResponsible.trim() === '') {
@@ -57,13 +42,9 @@ export async function create(
     ? ` adtcore:responsible="${finalResponsible}"`
     : '';
 
-  // Log systemInfo to help diagnose Kerberos errors
-  // Use logger.debug (controlled by DEBUG_ADT_LIBS)
+  // Log to help diagnose Kerberos errors
   if (debugEnabled) {
-    logger?.debug?.('[FunctionGroup create] systemInfo:', {
-      hasSystemInfo: !!systemInfo,
-      systemID: systemInfo?.systemID,
-      userName: systemInfo?.userName,
+    logger?.debug?.('[FunctionGroup create] systemContext:', {
       finalMasterSystem,
       finalResponsible,
       willIncludeMasterSystem: !!finalMasterSystem,
@@ -71,30 +52,6 @@ export async function create(
       masterSystemAttr: masterSystemAttr || '(not included)',
       responsibleAttr: responsibleAttr || '(not included)',
     });
-  }
-
-  // Also log to test logger if available (controlled by DEBUG_ADT_TESTS)
-  // Try to import test logger conditionally to avoid circular dependencies
-  try {
-    // Only import if we're in test environment
-    if (
-      process.env.DEBUG_ADT_TESTS === 'true' ||
-      process.env.NODE_ENV === 'test'
-    ) {
-      const {
-        logTestSystemInfo,
-      } = require('../../__tests__/helpers/testProgressLogger');
-      logTestSystemInfo(systemInfo, {
-        masterSystem: finalMasterSystem,
-        responsible: finalResponsible,
-        willIncludeMasterSystem: !!finalMasterSystem,
-        willIncludeResponsible: !!finalResponsible,
-        masterSystemAttr,
-        responsibleAttr,
-      });
-    }
-  } catch (_e) {
-    // Ignore if test logger is not available (not in test environment)
   }
 
   // Description is limited to 60 characters in SAP ADT

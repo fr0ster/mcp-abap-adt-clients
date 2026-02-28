@@ -11,6 +11,8 @@ export interface ICreateServiceDefinitionParams {
   package_name: string;
   transport_request?: string;
   source_code?: string;
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface IUpdateServiceDefinitionParams {

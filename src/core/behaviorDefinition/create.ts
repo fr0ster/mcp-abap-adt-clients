@@ -7,7 +7,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { IBehaviorDefinitionCreateParams } from './types';
 
@@ -41,19 +40,8 @@ export async function create(
   try {
     const language = params.language || 'EN';
 
-    // Get system information (for cloud systems)
-    let masterSystem = 'TRL';
-    let responsible = params.responsible;
-
-    const systemInfo = await getSystemInformation(connection);
-    if (systemInfo) {
-      masterSystem = systemInfo.systemID || masterSystem;
-      responsible = responsible || systemInfo.userName;
-    }
-
-    // Fallback to env username if not provided
-    responsible =
-      responsible || process.env.SAP_USERNAME || process.env.SAP_USER || '';
+    const masterSystem = params.masterSystem || '';
+    const responsible = params.responsible || '';
 
     // Description is limited to 60 characters in SAP ADT
     const description = limitDescription(params.description);

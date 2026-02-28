@@ -27,6 +27,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
@@ -43,11 +44,13 @@ export class AdtFunctionGroup
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'FunctionGroup';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -146,8 +149,8 @@ export class AdtFunctionGroup
           packageName: config.packageName,
           transportRequest: config.transportRequest,
           description: config.description,
-          masterSystem: config.masterSystem,
-          responsible: config.responsible,
+          masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
+          responsible: config.responsible ?? this.systemContext.responsible,
         },
         this.logger,
       );

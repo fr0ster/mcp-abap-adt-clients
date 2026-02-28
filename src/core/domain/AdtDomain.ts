@@ -24,7 +24,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { getSystemInformation } from '../../utils/systemInfo';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import type { IReadOptions } from '../shared/types';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
@@ -40,11 +40,13 @@ import { validateDomainName } from './validation';
 export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Domain';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -86,9 +88,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     }
 
     let objectCreated = false;
-    const systemInfo = await getSystemInformation(this.connection);
-    const username = systemInfo?.userName || '';
-    const masterSystem = systemInfo?.systemID;
     const state: IDomainState = {
       errors: [],
     };
@@ -111,9 +110,9 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
           sign_exists: config.sign_exists,
           value_table: config.value_table,
           fixed_values: config.fixed_values,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
         },
-        username,
-        masterSystem,
       );
       state.createResult = createResponse;
       objectCreated = true;
@@ -247,13 +246,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const systemInfo = await getSystemInformation(this.connection);
-      const masterSystem = systemInfo?.systemID;
-      const username =
-        systemInfo?.userName ||
-        process.env.SAP_USER ||
-        process.env.SAP_USERNAME ||
-        'MPCUSER';
 
       const updateResponse = await updateDomain(
         this.connection,
@@ -270,10 +262,10 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
           sign_exists: config.sign_exists,
           value_table: config.value_table,
           fixed_values: config.fixed_values,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
         },
         options.lockHandle,
-        username,
-        masterSystem,
       );
       this.logger?.info?.('Domain updated (low-level)');
       return {
@@ -283,9 +275,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     }
 
     let lockHandle: string | undefined;
-    const systemInfo = await getSystemInformation(this.connection);
-    const username = systemInfo?.userName || '';
-    const masterSystem = systemInfo?.systemID;
     const state: IDomainState = {
       errors: [],
     };
@@ -331,10 +320,10 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
             sign_exists: config.sign_exists,
             value_table: config.value_table,
             fixed_values: config.fixed_values,
+            masterSystem: this.systemContext.masterSystem,
+            responsible: this.systemContext.responsible,
           },
           lockHandle,
-          username,
-          masterSystem,
         );
         // updateDomain returns void, so we don't store it in state
         this.logger?.info?.('updated');

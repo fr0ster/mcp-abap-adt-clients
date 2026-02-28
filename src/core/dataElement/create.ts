@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { limitDescription } from '../../utils/internalUtils';
-import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDataElementParams } from './types';
 
@@ -22,10 +21,8 @@ export async function create(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/dataelements${args.transport_request ? `?corrNr=${args.transport_request}` : ''}`;
 
-  // Get system information for cloud systems
-  const systemInfo = await getSystemInformation(connection);
-  const username = systemInfo?.userName || '';
-  const masterSystem = systemInfo?.systemID || '';
+  const username = args.responsible || '';
+  const masterSystem = args.masterSystem || '';
 
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
