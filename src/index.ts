@@ -224,3 +224,4 @@ export type {
   IProgramExecutionTarget,
   IProgramExecutor,
 } from './executors';
+export { getSystemInformation } from './utils/systemInfo';

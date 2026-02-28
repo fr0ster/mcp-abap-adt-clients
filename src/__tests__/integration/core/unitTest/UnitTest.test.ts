@@ -17,7 +17,11 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
 import type { IUnitTestConfig } from '../../../../core/unitTest';
-import { getConfig } from '../../../helpers/sessionConfig';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -65,7 +69,12 @@ describe('AdtUnitTest (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      client = new AdtClient(connection, libraryLogger, systemContext);
       hasConfig = true;
     } catch (_error) {
       hasConfig = false;
@@ -145,27 +154,56 @@ describe('AdtUnitTest (using AdtClient)', () => {
         }
 
         try {
-          // Step 1: Validate container class
-          logTestStep('validate', testsLogger);
-          const validateState = await client.getClass().validate({
-            className: containerClass,
-            packageName,
-            sourceCode,
-          });
-          expect(validateState).toBeDefined();
-          testsLogger.info?.('Container class validated');
+          // Step 0: Check if class already exists
+          let classExists = false;
+          try {
+            const existingClass = await client
+              .getClass()
+              .read({ className: containerClass });
+            if (existingClass?.readResult) {
+              classExists = true;
+              testsLogger.info?.(
+                `Class ${containerClass} already exists, will reuse`,
+              );
+            }
+          } catch {
+            testsLogger.info?.(
+              `Class ${containerClass} does not exist, will create`,
+            );
+          }
 
-          // Step 2: Create container class
-          logTestStep('create', testsLogger);
-          const createClassState = await client.getClass().create({
-            className: containerClass,
-            packageName,
-            transportRequest,
-            description: `Test container class for ${testClassName}`,
-            sourceCode,
-          });
-          expect(createClassState).toBeDefined();
-          testsLogger.info?.('Container class created');
+          // Step 1-2: Validate and create (only if class doesn't exist)
+          if (!classExists) {
+            logTestStep('validate', testsLogger);
+            const validateState = await client.getClass().validate({
+              className: containerClass,
+              packageName,
+              sourceCode,
+            });
+            expect(validateState).toBeDefined();
+            testsLogger.info?.('Container class validated');
+
+            logTestStep('create', testsLogger);
+            const createClassState = await client.getClass().create({
+              className: containerClass,
+              packageName,
+              transportRequest,
+              description: `Test container class for ${testClassName}`,
+              sourceCode,
+            });
+            expect(createClassState).toBeDefined();
+            testsLogger.info?.('Container class created');
+          } else {
+            // Update existing class source code
+            testsLogger.info?.('Updating existing class source code');
+            await client
+              .getClass()
+              .update(
+                { className: containerClass, sourceCode, transportRequest },
+                { sourceCode },
+              );
+            testsLogger.info?.('Existing class source updated');
+          }
 
           // Step 3: Create local test class
           logTestStep('create (test class)', testsLogger);

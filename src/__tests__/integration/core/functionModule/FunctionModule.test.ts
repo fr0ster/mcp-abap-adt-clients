@@ -23,7 +23,10 @@ import type {
 import { getFunction } from '../../../../core/functionModule/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -65,6 +68,7 @@ describe('FunctionModule (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
   let tester: BaseTester<IFunctionModuleConfig, IFunctionModuleState>;
 
   beforeAll(async () => {
@@ -72,9 +76,10 @@ describe('FunctionModule (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
-      hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      client = new AdtClient(connection, libraryLogger, systemContext);
+      hasConfig = true;
 
       tester = new BaseTester(
         client.getFunctionModule(),
@@ -201,7 +206,11 @@ describe('FunctionModule (using AdtClient)', () => {
 
     // Try to create (ignore "already exists" errors)
     try {
-      const tempClient = new AdtClient(connection, libraryLogger);
+      const tempClient = new AdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       await tempClient.getFunctionGroup().create(
         {
           functionGroupName: functionGroupName,
@@ -250,7 +259,11 @@ describe('FunctionModule (using AdtClient)', () => {
     // Delete Function Group (which automatically deletes all Function Modules inside)
     // Note: FM is already deleted in test chain if test succeeded
     try {
-      const tempClient = new AdtClient(connection, libraryLogger);
+      const tempClient = new AdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
       // Use BaseTester's config resolver for consistent parameter resolution
       const transportRequest = tester.getTransportRequest() || undefined;
       await tempClient.getFunctionGroup().delete({

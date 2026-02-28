@@ -17,7 +17,10 @@ import {
   type IProfilerTraceParameters,
 } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -147,10 +150,14 @@ describe('ProgramExecutor (integration)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
+      isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      client = new AdtClient(connection, libraryLogger, systemContext);
       executor = new AdtExecutor(connection, libraryLogger);
       hasConfig = true;
-      isCloudSystem = await isCloudEnvironment(connection);
       programNameForTest = null;
       transportRequestForCleanup = '';
     } catch (_error) {

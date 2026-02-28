@@ -16,7 +16,8 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
-import { getConfig } from '../../helpers/sessionConfig';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { getConfig, resolveSystemContext } from '../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -67,7 +68,12 @@ describe('Group Activation (Shared)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, testsLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      client = new AdtClient(connection, testsLogger, systemContext);
       hasConfig = true;
     } catch (_error) {
       testsLogger.warn?.(

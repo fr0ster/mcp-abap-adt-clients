@@ -5,6 +5,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-03-01
+
+### Added
+- Export `getSystemInformation` from public API (`src/index.ts`).
+- `resolveSystemContext()` helper in test infrastructure — resolves `masterSystem`/`responsible` for both cloud (systeminformation endpoint) and on-premise (test-config.yaml) systems.
+- `run_program` test section in test-config.yaml template for direct `runProgram()` testing.
+
+### Fixed
+- **UnitTest**: read-based existence check instead of delete-before-create — reuses existing class if present, avoids transport lock conflicts.
+- **CdsUnitTest**: full dependency management (table → CDS view → test class) with `ensureDependency` helper; 10-second delay after view activation for CDS metadata propagation.
+- **ReadOnlyClient**: check `resolver.isEnabled()` to properly skip disabled test cases (fixes `readView`/`readServiceDefinition` failures).
+- **Package**: added `resolveTransportRequest`, `recordChanges`, and `transport_layer`/`software_component` support; parent package must be structure/main type.
+- **BehaviorDefinition**: auto-create dependency chain (table → CDS view) with `ensureDependency` helper; uses `define root view entity` syntax.
+- **BehaviorImplementation**: auto-create full dependency chain (table → CDS view → BDEF → implementation class); uses `authorization master ( instance, global )`.
+- **MetadataExtension**: updated source code to use `annotate entity` syntax instead of `extend view`.
+- All integration tests: unified `systemContext` passing via `resolveSystemContext()` for consistent `masterSystem`/`responsible` resolution.
+
+### Changed
+- Updated test-config.yaml.template: all `transport_request` fields commented out (uses `default_transport` fallback), added `default_master_system` environment setting, added dependency sections for BDEF/BIMP/CDS tests, updated MetadataExtension syntax, added `run_program` section.
+- Template now uses `annotate entity` (modern syntax) for metadata extensions instead of `extend view`.
+
+## [2.0.0] - 2026-02-28
+
+### Changed
+- **BREAKING**: Moved `masterSystem`/`responsible` resolution from internal `create.ts` to caller. All `create()` calls now require explicit `masterSystem`/`responsible` in config for on-premise systems.
+
 ## [1.3.0] - 2026-02-28
 
 ### Fixed

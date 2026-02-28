@@ -19,7 +19,10 @@ import { AdtClient } from '../../../../clients/AdtClient';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -79,10 +82,13 @@ describe('DataElement (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
-      hasConfig = true;
-      // Check if this is a cloud system
       isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      client = new AdtClient(connection, libraryLogger, systemContext);
+      hasConfig = true;
     } catch (_error) {
       testsLogger.warn?.(
         '⚠️ Skipping tests: No .env file or SAP configuration found',

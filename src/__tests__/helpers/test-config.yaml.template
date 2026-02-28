@@ -31,7 +31,7 @@ test_settings:
   timeout: 60000  # Global test timeout (60 seconds)
   retry_on_failure: false
   max_retries: 1
-  cleanup_after_test: false
+  cleanup_after_test: true
   allow_406: false  # Allow 406 Not Acceptable to be treated as skip (override per test case)
   # Timeouts for different operations (in milliseconds)
   timeouts:
@@ -69,8 +69,9 @@ lock_config:
 
 # Environment configuration
 environment:
-  default_package: "ZADT_BLD_PKG01"  # Default package for creating objects (used if not specified in test case)
-  default_transport: ""  # Default transport request (used if not specified in test case)
+  default_package: "<YOUR_DEFAULT_PACKAGE>"  # Default package for creating objects (used if not specified in test case)
+  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Default transport request (used if not specified in test case)
+  default_master_system: "<YOUR_SYSTEM_ID>"  # SAP system ID for masterSystem attribute (on-prem only, cloud gets it from systeminformation endpoint)
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
 
 # Standard SAP objects registry for read-only tests
@@ -131,8 +132,8 @@ standard_objects:
       available_in: ["cloud"]
 
   programs:
-    - name: "SAPLSETB"
-      description: "Standard SAP settings program"
+    - name: "RSHOWTIM"
+      description: "Standard SAP show time program"
       available_in: ["onprem"]
 
   views:
@@ -197,7 +198,7 @@ standard_objects:
 read_program:
   test_cases:
     - name: "readonly_read_program"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       available_in: ["onprem"]  # Programs are not supported in cloud systems (BTP ABAP Environment)
       description: "Read existing program using AdtClient (uses standard_objects.programs). Programs are not supported in cloud systems."
       params: {}  # No params needed - automatically uses standard_objects.programs filtered by available_in
@@ -409,6 +410,24 @@ create_class:
             PRIVATE SECTION.
           ENDCLASS.
 
+          CLASS ZADT_BLD_CLS01 IMPLEMENTATION.
+            METHOD get_text.
+              rv_text = 'Hello from ZADT_BLD_CLS01'.
+            ENDMETHOD.
+
+            METHOD build_parent_data.
+              rt_parent = VALUE #(
+                ( fld1 = 'P001' fld2 = 'Parent 1' fld3 = '20240101' )
+              ).
+            ENDMETHOD.
+
+            METHOD build_child_data.
+              rt_child = VALUE #(
+                ( parent_id = 'P001' chld_id = 'C001' )
+              ).
+            ENDMETHOD.
+          ENDCLASS.
+
 # Update Class LocalDefinitions (definitions include: private types/data)
 update_class_local_definitions:
   test_cases:
@@ -543,14 +562,14 @@ create_package:
       enabled: true
       description: "Package reserved for AdtPackage tests"
       params:
-        package_name: "ZADT_BLD_PKG01"          # Parent package (existing)
+        package_name: "<YOUR_PARENT_PACKAGE>"    # Parent package (existing, must be structure/main type)
         test_package: "ZADT_BLD_INNER_PKG01"    # Package created by the test
         description: "AdtPackage workflow package"
         updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
-        # software_component: "HOME"            # Optional: Software component name (can be empty)
-        # transport_layer: ""                   # Optional: Transport layer (can be empty)
-        # transport_request: ""                 # Optional: Transport request number (used in query param, not in body)
+        software_component: "HOME"              # Software component name (required for package creation)
+        transport_layer: "<YOUR_TRANSPORT_LAYER>"  # Transport layer (required, e.g., "ZE19")
+        # transport_request: ""                 # Uses environment.default_transport if omitted
 
 # Create Domain
 create_domain:
@@ -634,6 +653,9 @@ create_program:
         source_code: |
           REPORT ZADT_BLD_PROG01.
           WRITE: / 'Adt test program'.
+        update_source_code: |
+          REPORT ZADT_BLD_PROG01.
+          WRITE: / 'Adt test program - updated'.
 
 # Create Table
 create_table:
@@ -708,11 +730,11 @@ create_view:
       enabled: true
       description: "View reserved for AdtView tests"
       params:
-        package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         table_name: "ZADT_VIEW_TBL01"
         view_name: "ZADT_BLD_VIEW01"
         description: "AdtView workflow view"
-        transport_request: ""
+        # transport_request: ""  # Uses environment.default_transport if omitted
         # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
         table_source: |
           @EndUserText.label: 'Adt view test table'
@@ -815,13 +837,13 @@ create_function_module:
       enabled: true
       description: "Function module reserved for AdtFunctionModule tests"
       params:
-        function_module_name: "Z_ADT_BLD_FM01"  # Must start with Z_ or Y_ (with underscore)
-        function_group_name: "ZADT_BLD_FGR02"  # Different from AdtFunctionGroup test (ZADT_BLD_FGR01)
+        function_module_name: "Z_ADT_BLD_FM03"  # Must start with Z_ or Y_ (with underscore)
+        function_group_name: "ZADT_BLD_FGR03"  # Different from AdtFunctionGroup test (ZADT_BLD_FGR_EMPTY)
         description: "AdtFunctionModule workflow FM"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
         source_code: |
-          FUNCTION Z_ADT_BLD_FM01
+          FUNCTION Z_ADT_BLD_FM03
             IMPORTING
               VALUE(IV_PARAM) TYPE STRING
             EXPORTING
@@ -848,7 +870,7 @@ create_behavior_definition:
       params:
         bdef_name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"  # e.g., ZADT_BLD_BDEF01
         description: "Behavior Definition for <YOUR_CDS_VIEW_NAME>"
-        package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         root_entity: "<YOUR_CDS_VIEW_NAME>"  # Root entity name (CDS view name)
         implementation_type: "Managed"  # Managed, Unmanaged, Abstract, or Projection
@@ -857,13 +879,41 @@ create_behavior_definition:
           strict ( 2 );
 
           define behavior for <YOUR_CDS_VIEW_NAME>
-          persistent table z_<your_cds_view_name_lowercase>
+          persistent table <your_table_name>
           lock master
           authorization master ( instance )
           {
             create;
             update;
             delete;
+          }
+        # Dependencies: table and CDS view are auto-created by the test
+        dep_table_name: "<YOUR_TABLE_NAME>"  # e.g., ZADT_BDEF_TBL01
+        dep_table_source: |
+          @EndUserText.label: 'Bdef test table'
+          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          @AbapCatalog.deliveryClass : #A
+          @AbapCatalog.dataMaintenance : #RESTRICTED
+          define table <your_table_name> {
+            key client : abap.clnt not null;
+            key id     : abap.char(10) not null;
+            name       : abap.char(50);
+            value      : abap.dec(10,2);
+            created_at : abap.dats;
+          }
+        dep_view_name: "<YOUR_CDS_VIEW_NAME>"
+        dep_view_description: "CDS view for BDEF test"
+        dep_view_ddl_source: |
+          @EndUserText.label: 'CDS view for BDEF test'
+          @AccessControl.authorizationCheck: #NOT_REQUIRED
+          define root view entity <YOUR_CDS_VIEW_NAME>
+            as select from <your_table_name>
+          {
+            key id,
+            name,
+            value,
+            created_at
           }
 
 # Create Metadata Extension
@@ -875,15 +925,17 @@ create_metadata_extension:
       params:
         ext_name: "<YOUR_METADATA_EXTENSION_NAME>"  # e.g., ZADT_BLD_MEXT01
         description: "Metadata Extension for <YOUR_CDS_VIEW_NAME>"
-        package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         target_entity: "<YOUR_CDS_VIEW_NAME>"  # Target CDS view name
         source_code: |
-          @Metadata.layer: layer
-          extend view <YOUR_CDS_VIEW_NAME> with "<YOUR_METADATA_EXTENSION_NAME>"
+          @Metadata.layer: #CORE
+          annotate entity <YOUR_CDS_VIEW_NAME> with
           {
-            @EndUserText.label: 'Sample Field'
-            SampleField;
+            @EndUserText.label: 'Identifier'
+            id;
+            @EndUserText.label: 'Name'
+            name;
           }
 
 # Create Behavior Implementation
@@ -895,9 +947,9 @@ create_behavior_implementation:
       params:
         class_name: "<YOUR_BEHAVIOR_IMPLEMENTATION_CLASS_NAME>"  # e.g., ZBP_<your_cds_view_name>
         description: "Behavior Implementation for <YOUR_BEHAVIOR_DEFINITION_NAME>"
-        package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
-        behavior_definition: "<YOUR_BEHAVIOR_DEFINITION_NAME>"  # Root entity name (BDEF name)
+        behavior_definition: "<YOUR_BEHAVIOR_DEFINITION_NAME>"  # Root entity name (BDEF name = CDS view name)
         source_code: |
           CLASS lhc_<your_behavior_definition_name> DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
@@ -919,6 +971,47 @@ create_behavior_implementation:
             ENDMETHOD.
 
           ENDCLASS.
+        # Dependencies: table, CDS view (root), and BDEF are auto-created by the test
+        dep_table_name: "<YOUR_TABLE_NAME>"  # e.g., ZADT_BIMP_TBL01
+        dep_table_source: |
+          @EndUserText.label: 'Bimp test table'
+          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          @AbapCatalog.deliveryClass : #A
+          @AbapCatalog.dataMaintenance : #RESTRICTED
+          define table <your_table_name> {
+            key client : abap.clnt not null;
+            key id     : abap.char(10) not null;
+            name       : abap.char(50);
+          }
+        dep_view_name: "<YOUR_CDS_VIEW_NAME>"
+        dep_view_description: "CDS view for BIMP test"
+        dep_view_ddl_source: |
+          @EndUserText.label: 'CDS view for BIMP test'
+          @AccessControl.authorizationCheck: #NOT_REQUIRED
+          define root view entity <YOUR_CDS_VIEW_NAME>
+            as select from <your_table_name>
+          {
+            key id,
+            name
+          }
+        dep_bdef_name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"
+        dep_bdef_description: "BDEF for BIMP test"
+        dep_bdef_root_entity: "<YOUR_CDS_VIEW_NAME>"
+        dep_bdef_implementation_type: "Managed"
+        dep_bdef_source_code: |
+          managed implementation in class <your_bimp_class_name> unique;
+          strict ( 2 );
+
+          define behavior for <YOUR_CDS_VIEW_NAME>
+          persistent table <your_table_name>
+          lock master
+          authorization master ( instance, global )
+          {
+            create;
+            update;
+            delete;
+          }
 
 # Run Unit Test
 run_unit_test:
@@ -927,8 +1020,8 @@ run_unit_test:
       enabled: true
       description: "Run unit test for class test class"
       params:
-        package_name: "<YOUR_PACKAGE_NAME>"  # e.g., ZADT_BLD_PKG01
-        transport_request: ""
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
           CLASS <YOUR_CONTAINER_CLASS_NAME> DEFINITION PUBLIC FINAL CREATE PUBLIC.
             PUBLIC SECTION.
@@ -952,8 +1045,8 @@ run_unit_test:
         test_class:
           enabled: true
           run_unit_test: true
-          container_class: "<YOUR_CONTAINER_CLASS_NAME>"  # e.g., ZADT_BLD_CLS01
-          name: "<YOUR_TEST_CLASS_NAME>"  # e.g., LTCL_ZADT_BLD_CLS01
+          container_class: "<YOUR_CONTAINER_CLASS_NAME>"  # e.g., ZADT_BLD_UTCL03
+          name: "<YOUR_TEST_CLASS_NAME>"  # e.g., LTCL_ZADT_BLD_UTCL03
         # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         unit_test_options:
           title: "<YOUR_TEST_CLASS_NAME>"
@@ -981,13 +1074,38 @@ create_cds_unit_test:
   test_cases:
     - name: "cds_unit_test"
       enabled: true
-      description: "CDS view with ABAP Unit verification (CDS view must be created manually before test)"
+      description: "CDS view with ABAP Unit verification (dependencies auto-created)"
       params:
-        package_name: "ZADT_BLD_PKG01"
-        # view_name: CDS view name that must exist and be active (created manually)
-        view_name: "<YOUR_CDS_VIEW_NAME>"  # e.g., ZOK_I_CDS_TEST
+        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        view_name: "<YOUR_CDS_VIEW_NAME>"  # e.g., ZADT_BLD_VIEW01
         description: "AdtView CDS unit test view"
-        transport_request: ""
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        # Dependencies: table and CDS view are auto-created by the test
+        dep_table_name: "<YOUR_TABLE_NAME>"  # e.g., ZADT_VIEW_TBL01
+        dep_table_source: |
+          @EndUserText.label: 'Adt view test table'
+          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+          @AbapCatalog.tableCategory : #TRANSPARENT
+          @AbapCatalog.deliveryClass : #A
+          @AbapCatalog.dataMaintenance : #RESTRICTED
+          define table <your_table_name> {
+            key client : abap.clnt not null;
+            key id     : abap.char(10) not null;
+            name       : abap.char(50);
+            value      : abap.dec(10,2);
+            created_at : abap.dats;
+          }
+        dep_view_ddl_source: |
+          @EndUserText.label: 'Adt view on custom table'
+          @AccessControl.authorizationCheck: #NOT_REQUIRED
+          define view entity <YOUR_CDS_VIEW_NAME>
+            as select from <your_table_name>
+          {
+            key id,
+            name,
+            value,
+            created_at
+          }
         # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         # Note: CDS view and table must be created manually before running this test
         unit_test_options:
@@ -1011,7 +1129,7 @@ create_cds_unit_test:
           class_name: "<YOUR_CDS_UNIT_TEST_CLASS_NAME>"  # e.g., ZADT_BLD_CDS_UT01
           test_class_name: "<YOUR_TEST_CLASS_NAME>"  # e.g., LTC_<YOUR_CDS_VIEW_NAME>
           description: "CDS unit test class"
-          transport_request: ""
+          # transport_request: ""  # Uses environment.default_transport if omitted
           template_xml: |
             <abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
               <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
@@ -1282,6 +1400,17 @@ execute_class:
             max_size_for_trace_file: 30720
             amdp_trace: true
             max_time_for_tracing: 1800
+
+# Run Program (direct runProgram call)
+# Requires: program must already exist and be activated
+run_program:
+  test_cases:
+    - name: "run_program"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Run existing program using runProgram() directly"
+      params:
+        program_name: "ZADT_BLD_PROG01"
 
 # Execute Program (Executor API)
 execute_program:

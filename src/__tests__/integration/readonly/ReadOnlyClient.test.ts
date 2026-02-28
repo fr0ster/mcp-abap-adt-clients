@@ -125,6 +125,19 @@ describe('AdtClient read operations', () => {
         testCaseName: testCaseName || `readonly_read_${objectType}`,
       });
 
+      if (!resolver.isEnabled()) {
+        logTestStart(testsLogger, `AdtClient - ${testName}`, {
+          name: `readonly_read_${objectType}`,
+          params: {},
+        });
+        logTestSkip(
+          testsLogger,
+          `AdtClient - ${testName}`,
+          `Test case disabled in test-config.yaml`,
+        );
+        return;
+      }
+
       const standardObject = resolver.getStandardObject(objectType);
 
       if (!standardObject) {

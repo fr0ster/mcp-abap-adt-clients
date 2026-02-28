@@ -23,7 +23,10 @@ import type {
 import { getAccessControl } from '../../../../core/accessControl/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -72,9 +75,13 @@ describe('AccessControl (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
-      hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      client = new AdtClient(connection, libraryLogger, systemContext);
+      hasConfig = true;
 
       tester = new BaseTester(
         client.getAccessControl(),

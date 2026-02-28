@@ -17,8 +17,12 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../../clients/AdtClient';
 import type { IViewConfig, IViewState } from '../../../../core/view';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -56,6 +60,7 @@ describe('View (using AdtClient)', () => {
   let hasConfig = false;
   let defaultPackage: string = '';
   let defaultTransport: string = '';
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
   let tester: BaseTester<IViewConfig, IViewState>;
 
   beforeAll(async () => {
@@ -63,7 +68,9 @@ describe('View (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      client = new AdtClient(connection, libraryLogger, systemContext);
       hasConfig = true;
 
       const envCheck = await checkDefaultTestEnvironment(connection);
@@ -193,7 +200,11 @@ describe('View (using AdtClient)', () => {
           };
 
           // Use AdtClient for dependency table creation
-          const tempAdtClient = new AdtClient(connection, libraryLogger);
+          const tempAdtClient = new AdtClient(
+            connection,
+            libraryLogger,
+            systemContext,
+          );
           const tableResult = await createDependencyTable(
             tempAdtClient,
             tableConfig,

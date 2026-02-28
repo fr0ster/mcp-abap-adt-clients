@@ -4,6 +4,9 @@
  */
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAdtClientOptions } from '../../clients/AdtClient';
+import { getSystemInformation } from '../../utils/systemInfo';
 
 /**
  * Get SAP configuration from environment variables
@@ -79,4 +82,28 @@ export function getConfig(): SapConfig {
   }
 
   return config;
+}
+
+/**
+ * Resolve masterSystem/responsible for AdtClient options.
+ * Cloud: from systeminformation endpoint.
+ * On-premise: masterSystem from test-config.yaml, responsible from SAP_USERNAME env var.
+ */
+export async function resolveSystemContext(
+  connection: IAbapConnection,
+  isCloud: boolean,
+): Promise<Pick<IAdtClientOptions, 'masterSystem' | 'responsible'>> {
+  if (isCloud) {
+    const systemInfo = await getSystemInformation(connection);
+    return {
+      masterSystem: systemInfo?.systemID,
+      responsible: systemInfo?.userName,
+    };
+  }
+  const { getEnvironmentConfig } = require('./test-helper');
+  const envConfig = getEnvironmentConfig();
+  return {
+    masterSystem: envConfig.default_master_system,
+    responsible: process.env.SAP_USERNAME,
+  };
 }

@@ -20,8 +20,12 @@ import type {
   IMetadataExtensionConfig,
   IMetadataExtensionState,
 } from '../../../../core/metadataExtension';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -74,7 +78,12 @@ extend view ${targetEntity} with "${extName}"
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      client = new AdtClient(connection, libraryLogger, systemContext);
       hasConfig = true;
 
       tester = new BaseTester(

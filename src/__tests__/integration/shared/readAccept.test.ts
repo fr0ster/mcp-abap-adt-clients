@@ -13,7 +13,7 @@ import * as dotenv from 'dotenv';
 import { AdtClient } from '../../../clients/AdtClient';
 import { clearAcceptCache } from '../../../utils/acceptNegotiation';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { getConfig } from '../../helpers/sessionConfig';
+import { getConfig, resolveSystemContext } from '../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -112,11 +112,16 @@ describe('Shared - read Accept headers', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
+      isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
       client = new AdtClient(connection, libraryLogger, {
+        ...systemContext,
         enableAcceptCorrection: false,
       });
       hasConfig = true;
-      isCloudSystem = await isCloudEnvironment(connection);
 
       testCase = getEnabledTestCase('read_accept', 'read_accept');
       hasTestCase = !!testCase;

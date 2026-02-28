@@ -20,7 +20,11 @@ import type {
   ICdsUnitTestConfig,
   IUnitTestConfig,
 } from '../../../../core/unitTest';
-import { getConfig } from '../../../helpers/sessionConfig';
+import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -58,17 +62,71 @@ const libraryLogger: ILogger = createLibraryLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Ensure a dependency object exists: create (if not exists) → update → activate → wait */
+const ensureDependency = async (
+  label: string,
+  createFn: () => Promise<any>,
+  updateFn: () => Promise<any>,
+  activateFn: () => Promise<any>,
+  waitForActiveFn: () => Promise<any>,
+): Promise<boolean> => {
+  try {
+    await createFn();
+    testsLogger.info?.(`Created ${label}`);
+    await delay(3000);
+  } catch (error: any) {
+    if (
+      error.message?.includes('409') ||
+      error.message?.includes('already exist')
+    ) {
+      testsLogger.info?.(`${label} already exists, reusing`);
+    } else {
+      testsLogger.warn?.(`Failed to create ${label}: ${error.message}`);
+    }
+  }
+  try {
+    await updateFn();
+    testsLogger.info?.(`Updated ${label}`);
+    await delay(3000);
+  } catch (error: any) {
+    testsLogger.warn?.(`Failed to update ${label}: ${error.message}`);
+  }
+  try {
+    await activateFn();
+    testsLogger.info?.(`Activation started for ${label}`);
+  } catch (error: any) {
+    testsLogger.warn?.(`Failed to activate ${label}: ${error.message}`);
+    return false;
+  }
+  try {
+    await waitForActiveFn();
+    testsLogger.info?.(`${label} is active and ready`);
+    return true;
+  } catch (error: any) {
+    testsLogger.warn?.(
+      `${label} may not be fully active yet: ${error.message}`,
+    );
+    await delay(5000);
+    return true;
+  }
+};
+
 describe('AdtCdsUnitTest (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
 
   beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
+      const isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      client = new AdtClient(connection, libraryLogger, systemContext);
       hasConfig = true;
     } catch (_error) {
       hasConfig = false;
@@ -125,23 +183,6 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
         }
 
         const cdsUnitTestConfig = testCase.params.cds_unit_test;
-        if (!cdsUnitTestConfig) {
-          logTestStart(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-            {
-              name: 'create_cds_unit_test',
-              params: {},
-            },
-          );
-          logTestSkip(
-            testsLogger,
-            'CdsUnitTest - create CDS unit test class',
-            'cds_unit_test configuration not found in test-config.yaml',
-          );
-          return;
-        }
-
         const className = cdsUnitTestConfig.class_name;
         const testClassName = cdsUnitTestConfig.test_class_name;
         const viewName = testCase.params.view_name;
@@ -194,7 +235,105 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           return;
         }
 
+        let tableCreated = false;
+        let viewCreated = false;
+        const depTableName = testCase.params.dep_table_name;
+        const depTableSource = testCase.params.dep_table_source;
+        const depViewDdlSource = testCase.params.dep_view_ddl_source;
+
         try {
+          // Dependency: Create table (if configured)
+          if (depTableName && depTableSource && packageName) {
+            const depClient = new AdtClient(
+              connection,
+              libraryLogger,
+              systemContext,
+            );
+            const tableHandler = depClient.getTable();
+            tableCreated = await ensureDependency(
+              `table ${depTableName}`,
+              () =>
+                tableHandler.create({
+                  tableName: depTableName,
+                  packageName,
+                  description: `Dependency table for CDS unit test`,
+                  ddlCode: depTableSource,
+                  transportRequest,
+                }),
+              () =>
+                tableHandler.update(
+                  {
+                    tableName: depTableName,
+                    ddlCode: depTableSource,
+                    transportRequest,
+                  },
+                  { sourceCode: depTableSource },
+                ),
+              () => tableHandler.activate({ tableName: depTableName }),
+              () =>
+                tableHandler.read({ tableName: depTableName }, 'active', {
+                  withLongPolling: true,
+                }),
+            );
+          }
+
+          // Dependency: Create CDS view (if configured)
+          if (depViewDdlSource && packageName) {
+            const depClient = new AdtClient(
+              connection,
+              libraryLogger,
+              systemContext,
+            );
+            const viewHandler = depClient.getView();
+            viewCreated = await ensureDependency(
+              `CDS view ${viewName}`,
+              () =>
+                viewHandler.create({
+                  viewName,
+                  packageName,
+                  description: `CDS view for unit test`,
+                  ddlSource: depViewDdlSource,
+                  transportRequest,
+                }),
+              () =>
+                viewHandler.update(
+                  {
+                    viewName,
+                    ddlSource: depViewDdlSource,
+                    transportRequest,
+                  },
+                  { sourceCode: depViewDdlSource },
+                ),
+              () => viewHandler.activate({ viewName }),
+              () =>
+                viewHandler.read({ viewName }, 'active', {
+                  withLongPolling: true,
+                }),
+            );
+          }
+
+          // Wait for CDS metadata to propagate after view activation
+          if (viewCreated) {
+            testsLogger.info?.(
+              'Waiting for CDS metadata to propagate after view activation...',
+            );
+            await delay(10000);
+          }
+
+          // Delete existing test class if it exists (idempotent test)
+          try {
+            await client.getClass().delete({
+              className,
+              transportRequest,
+            });
+            testsLogger.info?.(
+              'Deleted existing CDS unit test class:',
+              className,
+            );
+          } catch {
+            // Class doesn't exist — continue
+          }
+
           // Step 1: Validate CDS view for unit test doubles
           if (viewName) {
             logTestStep('validate', testsLogger);
@@ -295,11 +434,6 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
 
           // Step 9: Read result
           logTestStep('read (result)', testsLogger);
-          const _resultConfig: IUnitTestConfig = {
-            runId: runId,
-            result: testCase.params.unit_test_result || {},
-          };
-          // Use getResult() method to explicitly read the test result
           const resultResponse = await unitTest.getResult(runId, {
             withNavigationUris:
               testCase.params.unit_test_result?.with_navigation_uris || false,
@@ -309,27 +443,68 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           expect(resultResponse.data).toBeDefined();
           testsLogger.info?.('CDS unit test result retrieved successfully');
 
-          // Step 10: Cleanup - delete test class if configured
-          const skipCleanup = testCase.params.skip_cleanup === true;
-          if (!skipCleanup && className) {
-            try {
-              logTestStep('delete (cleanup)', testsLogger);
-              testsLogger.info?.('Cleaning up CDS unit test class:', className);
-              await client.getClass().delete({
-                className,
-                transportRequest,
-              });
-              testsLogger.info?.('CDS unit test class deleted successfully');
-            } catch (cleanupError) {
-              testsLogger.warn?.(
-                'Failed to cleanup CDS unit test class:',
-                cleanupError,
-              );
+          // Step 10: Cleanup
+          const envConfig = getEnvironmentConfig();
+          const skipCleanup =
+            testCase.params.skip_cleanup === true ||
+            envConfig.skip_cleanup === true;
+
+          if (!skipCleanup) {
+            // Cleanup test class
+            if (className) {
+              try {
+                logTestStep('delete (cleanup)', testsLogger);
+                testsLogger.info?.(
+                  'Cleaning up CDS unit test class:',
+                  className,
+                );
+                await client.getClass().delete({
+                  className,
+                  transportRequest,
+                });
+                testsLogger.info?.('CDS unit test class deleted successfully');
+              } catch (cleanupError: any) {
+                testsLogger.warn?.(
+                  `Failed to cleanup CDS unit test class: ${cleanupError.message}`,
+                );
+              }
             }
-          } else if (skipCleanup) {
-            testsLogger.info?.(
-              'Cleanup skipped - test class left for analysis',
-            );
+
+            // Cleanup CDS view dependency
+            if (viewCreated && viewName) {
+              try {
+                await client.getView().delete({
+                  viewName,
+                  transportRequest,
+                });
+                testsLogger.info?.(
+                  `Cleaned up dependency CDS view ${viewName}`,
+                );
+              } catch (error: any) {
+                testsLogger.warn?.(
+                  `Failed to cleanup CDS view ${viewName}: ${error.message}`,
+                );
+              }
+            }
+
+            // Cleanup table dependency
+            if (tableCreated && depTableName) {
+              try {
+                await client.getTable().delete({
+                  tableName: depTableName,
+                  transportRequest,
+                });
+                testsLogger.info?.(
+                  `Cleaned up dependency table ${depTableName}`,
+                );
+              } catch (error: any) {
+                testsLogger.warn?.(
+                  `Failed to cleanup table ${depTableName}: ${error.message}`,
+                );
+              }
+            }
+          } else {
+            testsLogger.info?.('Cleanup skipped - objects left for analysis');
           }
 
           logTestSuccess(

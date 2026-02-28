@@ -16,7 +16,10 @@ import type { IPackageConfig, IPackageState } from '../../../../core/package';
 import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -33,6 +36,7 @@ import {
 const {
   getTestCaseDefinition,
   resolvePackageName,
+  resolveTransportRequest,
   resolveStandardObject,
   getTimeout,
 } = require('../../../helpers/test-helper');
@@ -70,9 +74,13 @@ describe('Package (using AdtClient)', () => {
       _connectionConfig = config;
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
-      hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
+      const systemContext = await resolveSystemContext(
+        connection,
+        isCloudSystem,
+      );
+      client = new AdtClient(connection, libraryLogger, systemContext);
+      hasConfig = true;
 
       tester = new BaseTester(
         client.getPackage(),
@@ -110,9 +118,10 @@ describe('Package (using AdtClient)', () => {
             packageType: params.package_type || 'development',
             softwareComponent: params.software_component,
             transportLayer: params.transport_layer,
-            transportRequest: params.transport_request,
+            transportRequest: resolveTransportRequest(params.transport_request),
             applicationComponent: params.application_component,
             responsible: params.responsible,
+            recordChanges: params.record_changes !== false,
           };
         },
         ensureObjectReady: async (packageName: string) => {

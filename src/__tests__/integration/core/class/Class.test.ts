@@ -19,7 +19,10 @@ import { AdtClient } from '../../../../clients/AdtClient';
 import type { IClassConfig, IClassState } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
-import { getConfig } from '../../../helpers/sessionConfig';
+import {
+  getConfig,
+  resolveSystemContext,
+} from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -60,6 +63,7 @@ describe('Class (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
   let tester: BaseTester<IClassConfig, IClassState>;
 
   beforeAll(async () => {
@@ -67,9 +71,10 @@ describe('Class (using AdtClient)', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
-      hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
+      systemContext = await resolveSystemContext(connection, isCloudSystem);
+      client = new AdtClient(connection, libraryLogger, systemContext);
+      hasConfig = true;
 
       tester = new BaseTester(
         client.getClass(),
@@ -106,7 +111,11 @@ describe('Class (using AdtClient)', () => {
         ensureObjectReady: async (className: string) => {
           if (!connection) return { success: true };
           try {
-            const cleanupClient = new AdtClient(connection, libraryLogger);
+            const cleanupClient = new AdtClient(
+              connection,
+              libraryLogger,
+              systemContext,
+            );
             const existingClass = await cleanupClient
               .getClass()
               .read({ className });
