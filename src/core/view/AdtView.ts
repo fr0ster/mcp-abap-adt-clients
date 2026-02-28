@@ -43,7 +43,11 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'View';
 
-  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

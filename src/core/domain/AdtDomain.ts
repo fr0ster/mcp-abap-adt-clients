@@ -43,7 +43,11 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Domain';
 
-  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
@@ -95,25 +99,22 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     try {
       // Create domain
       this.logger?.info?.('Creating domain');
-      const createResponse = await createDomain(
-        this.connection,
-        {
-          domain_name: config.domainName,
-          package_name: config.packageName,
-          transport_request: config.transportRequest,
-          description: config.description,
-          datatype: config.datatype,
-          length: config.length,
-          decimals: config.decimals,
-          conversion_exit: config.conversion_exit,
-          lowercase: config.lowercase,
-          sign_exists: config.sign_exists,
-          value_table: config.value_table,
-          fixed_values: config.fixed_values,
-          masterSystem: this.systemContext.masterSystem,
-          responsible: this.systemContext.responsible,
-        },
-      );
+      const createResponse = await createDomain(this.connection, {
+        domain_name: config.domainName,
+        package_name: config.packageName,
+        transport_request: config.transportRequest,
+        description: config.description,
+        datatype: config.datatype,
+        length: config.length,
+        decimals: config.decimals,
+        conversion_exit: config.conversion_exit,
+        lowercase: config.lowercase,
+        sign_exists: config.sign_exists,
+        value_table: config.value_table,
+        fixed_values: config.fixed_values,
+        masterSystem: this.systemContext.masterSystem,
+        responsible: this.systemContext.responsible,
+      });
       state.createResult = createResponse;
       objectCreated = true;
       this.logger?.info?.('Domain created');

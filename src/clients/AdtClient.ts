@@ -240,7 +240,11 @@ export class AdtClient {
    * @returns IAdtObject instance for TableType operations
    */
   getTableType(): IAdtObject<ITableTypeConfig, ITableTypeState> {
-    return new AdtDdicTableType(this.connection, this.logger, this.systemContext);
+    return new AdtDdicTableType(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**
@@ -256,7 +260,11 @@ export class AdtClient {
    * @returns IAdtObject instance for FunctionGroup operations
    */
   getFunctionGroup(): IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
-    return new AdtFunctionGroup(this.connection, this.logger, this.systemContext);
+    return new AdtFunctionGroup(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**
@@ -264,7 +272,11 @@ export class AdtClient {
    * @returns IAdtObject instance for FunctionModule operations
    */
   getFunctionModule(): IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
-    return new AdtFunctionModule(this.connection, this.logger, this.systemContext);
+    return new AdtFunctionModule(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**
@@ -280,7 +292,11 @@ export class AdtClient {
    * @returns IAdtObject instance for AccessControl operations
    */
   getAccessControl(): IAdtObject<IAccessControlConfig, IAccessControlState> {
-    return new AdtAccessControl(this.connection, this.logger, this.systemContext);
+    return new AdtAccessControl(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**
@@ -291,7 +307,11 @@ export class AdtClient {
     IServiceDefinitionConfig,
     IServiceDefinitionState
   > {
-    return new AdtServiceDefinition(this.connection, this.logger, this.systemContext);
+    return new AdtServiceDefinition(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**
@@ -317,7 +337,11 @@ export class AdtClient {
     IBehaviorDefinitionConfig,
     IBehaviorDefinitionState
   > {
-    return new AdtBehaviorDefinition(this.connection, this.logger, this.systemContext);
+    return new AdtBehaviorDefinition(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**
@@ -339,7 +363,11 @@ export class AdtClient {
     IMetadataExtensionConfig,
     IMetadataExtensionState
   > {
-    return new AdtMetadataExtension(this.connection, this.logger, this.systemContext);
+    return new AdtMetadataExtension(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**

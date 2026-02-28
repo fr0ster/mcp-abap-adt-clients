@@ -48,7 +48,11 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Class';
 
-  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

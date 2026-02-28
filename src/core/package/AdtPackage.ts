@@ -45,7 +45,11 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Package';
 
-  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};

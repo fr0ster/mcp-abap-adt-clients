@@ -38,7 +38,11 @@ export class AdtRequest
   private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Request';
 
-  constructor(connection: IAbapConnection, logger?: ILogger, systemContext?: IAdtSystemContext) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
