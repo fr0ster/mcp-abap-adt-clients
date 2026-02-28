@@ -1,6 +1,7 @@
 /**
  * Function Group validation
- * Uses ADT validation endpoint: /sap/bc/adt/functions/groups/validation
+ * Uses ADT validation endpoint: /sap/bc/adt/functions/validation
+ * Matches Eclipse ADT behavior for on-premise and cloud systems
  */
 
 import type {
@@ -17,7 +18,8 @@ import { getTimeout } from '../../utils/timeouts';
  * Validate function group name
  * Returns raw response from ADT - consumer decides how to interpret it
  *
- * Endpoint: POST /sap/bc/adt/functions/groups/validation
+ * Endpoint: POST /sap/bc/adt/functions/validation
+ * (same endpoint for both function groups and function modules)
  *
  * Response format:
  * - Success: <SEVERITY>OK</SEVERITY>
@@ -29,11 +31,11 @@ export async function validateFunctionGroupName(
   packageName?: string,
   description?: string,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/functions/groups/validation`;
+  const url = `/sap/bc/adt/functions/validation`;
   const encodedName = encodeSapObjectName(functionGroupName);
 
   const queryParams = new URLSearchParams({
-    objtype: 'fugr',
+    objtype: 'FUGR/F',
     objname: encodedName,
   });
 
@@ -49,22 +51,11 @@ export async function validateFunctionGroupName(
     queryParams.append('description', limitedDescription);
   }
 
-  // XML body required for validation
-  const packageRef = packageName
-    ? `  <adtcore:packageRef adtcore:name="${encodeSapObjectName(packageName)}"/>`
-    : '';
-  const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${encodedName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN">
-${packageRef}
-</group:abapFunctionGroup>`;
-
   return connection.makeAdtRequest({
     url: `${url}?${queryParams.toString()}`,
     method: 'POST',
     timeout: getTimeout('default'),
-    data: xmlPayload,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.functions.groups.v2+xml',
       Accept: 'application/vnd.sap.as+xml',
     },
   });

@@ -25,23 +25,27 @@ export async function create(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
-  // Get masterSystem and responsible (only for cloud systems)
-  // On cloud, getSystemInformation returns systemID and userName
-  // On on-premise, it returns null, so we don't add these attributes
+  // Get masterSystem and responsible for both cloud and on-premise systems.
+  // Eclipse ADT always includes these attributes in the XML payload.
+  // Priority: params (caller) > systemInfo (cloud endpoint) > env vars
   const systemInfo = await getSystemInformation(connection);
 
-  let finalMasterSystem: string | undefined;
-  let finalResponsible: string | undefined;
+  const finalMasterSystem: string | undefined =
+    params.masterSystem ||
+    systemInfo?.systemID ||
+    process.env.SAP_SYSTEM_ID ||
+    undefined;
 
-  if (systemInfo) {
-    // Only for cloud systems - use systemInfo values only if they exist and are not empty
-    finalMasterSystem = systemInfo.systemID || undefined;
-    finalResponsible = systemInfo.userName || undefined;
+  let finalResponsible: string | undefined =
+    params.responsible ||
+    systemInfo?.userName ||
+    process.env.SAP_USER ||
+    process.env.SAP_USERNAME ||
+    undefined;
 
-    // Don't add responsible if it's empty - this can cause "Kerberos library not loaded" error
-    if (finalResponsible && finalResponsible.trim() === '') {
-      finalResponsible = undefined;
-    }
+  // Don't add responsible if it's empty - this can cause "Kerberos library not loaded" error
+  if (finalResponsible && finalResponsible.trim() === '') {
+    finalResponsible = undefined;
   }
 
   // Don't escape masterSystem and responsible - they are identifiers (like "TRL", "CB9980002377")

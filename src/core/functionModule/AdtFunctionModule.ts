@@ -106,6 +106,8 @@ export class AdtFunctionModule
         functionModuleName: config.functionModuleName,
         transportRequest: config.transportRequest,
         description: config.description,
+        masterSystem: config.masterSystem,
+        responsible: config.responsible,
       });
       objectCreated = true;
       state.createResult = createResult;

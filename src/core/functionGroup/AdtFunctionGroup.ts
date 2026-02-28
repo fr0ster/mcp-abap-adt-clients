@@ -96,12 +96,28 @@ export class AdtFunctionGroup
       // 1. Validate (no stateful needed)
       this.logger?.info?.('Step 1: Validating function group configuration');
       try {
-        await validateFunctionGroupName(
+        const validationResponse = await validateFunctionGroupName(
           this.connection,
           config.functionGroupName,
           config.packageName,
           config.description,
         );
+        // Check SEVERITY in response body (HTTP 200 can still contain validation errors)
+        const responseData =
+          typeof validationResponse.data === 'string'
+            ? validationResponse.data
+            : '';
+        const severityMatch = responseData.match(
+          /<SEVERITY>([^<]+)<\/SEVERITY>/,
+        );
+        if (severityMatch?.[1] === 'ERROR') {
+          const shortTextMatch = responseData.match(
+            /<SHORT_TEXT>([^<]+)<\/SHORT_TEXT>/,
+          );
+          throw new Error(
+            shortTextMatch?.[1] || 'Function group validation failed',
+          );
+        }
         this.logger?.info?.('Validation passed');
       } catch (error: any) {
         // Ignore "Kerberos library not loaded" error for FunctionGroup (test cloud issue)
@@ -130,6 +146,8 @@ export class AdtFunctionGroup
           packageName: config.packageName,
           transportRequest: config.transportRequest,
           description: config.description,
+          masterSystem: config.masterSystem,
+          responsible: config.responsible,
         },
         this.logger,
       );

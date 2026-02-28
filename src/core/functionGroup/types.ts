@@ -10,6 +10,8 @@ export interface ICreateFunctionGroupParams {
   description: string;
   packageName: string;
   transportRequest?: string;
+  masterSystem?: string;
+  responsible?: string;
 }
 
 export interface IUpdateFunctionGroupParams {
@@ -32,6 +34,8 @@ export interface IFunctionGroupConfig {
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
   description?: string; // Required for create/validate operations, optional for others
+  masterSystem?: string; // SAP system ID (e.g. "E19") — required on on-premise where systeminfo endpoint is unavailable
+  responsible?: string; // User responsible for the object — falls back to SAP_USERNAME env var
   sessionId?: string;
   onLock?: (lockHandle: string) => void;
 }

@@ -41,6 +41,7 @@ import {
 const {
   resolvePackageName,
   resolveTransportRequest,
+  resolveMasterSystem,
   getTimeout,
 } = require('../../../helpers/test-helper');
 
@@ -105,6 +106,8 @@ describe('FunctionModule (using AdtClient)', () => {
             transportRequest,
             description: params.description,
             sourceCode: params.source_code,
+            masterSystem: resolveMasterSystem(params.master_system),
+            responsible: process.env.SAP_USERNAME || process.env.SAP_USER,
           };
         },
         ensureObjectReady: async (functionModuleName: string) => {
@@ -205,6 +208,8 @@ describe('FunctionModule (using AdtClient)', () => {
           packageName: packageName,
           transportRequest: transportRequest,
           description: `Test function group for ${functionGroupName}`,
+          masterSystem: resolveMasterSystem(undefined),
+          responsible: process.env.SAP_USERNAME || process.env.SAP_USER,
         },
         { activateOnCreate: false },
       );
@@ -214,7 +219,15 @@ describe('FunctionModule (using AdtClient)', () => {
       if (error.response?.status === 409) {
         return { success: true };
       }
-      // Other errors - return failure
+      // Also handle validation "already exists" error (from SEVERITY check)
+      if (error.message?.includes('already exists')) {
+        return { success: true };
+      }
+      // Other errors - log and return failure
+      testsLogger.warn?.(
+        `ensureFunctionGroupExists failed for ${functionGroupName}:`,
+        error.message || error,
+      );
       return {
         success: false,
         reason: error.message || 'Failed to create function group',

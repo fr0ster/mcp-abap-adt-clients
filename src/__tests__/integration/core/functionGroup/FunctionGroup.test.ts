@@ -40,6 +40,7 @@ import {
 const {
   resolvePackageName,
   resolveTransportRequest,
+  resolveMasterSystem,
   getTimeout,
 } = require('../../../helpers/test-helper');
 
@@ -102,6 +103,8 @@ describe('FunctionGroup (using AdtClient)', () => {
             packageName,
             transportRequest,
             description: params.description,
+            masterSystem: resolveMasterSystem(params.master_system),
+            responsible: process.env.SAP_USERNAME || process.env.SAP_USER,
           };
         },
         ensureObjectReady: async () => ({ success: true }),

@@ -28,16 +28,21 @@ export async function create(
 
   const url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
-  // Get masterSystem and responsible (only for cloud systems)
-  // On cloud, getSystemInformation returns systemID and userName
-  // On on-premise, it returns null, so we don't add these attributes
+  // Get masterSystem and responsible for both cloud and on-premise systems.
+  // Eclipse ADT always includes these attributes in the XML payload.
+  // Priority: params (caller) > systemInfo (cloud endpoint) > env vars
   const systemInfo = await getSystemInformation(connection);
-  const masterSystem = systemInfo?.systemID;
+  const masterSystem =
+    params.masterSystem ||
+    systemInfo?.systemID ||
+    process.env.SAP_SYSTEM_ID ||
+    undefined;
   const username =
+    params.responsible ||
     systemInfo?.userName ||
     process.env.SAP_USER ||
     process.env.SAP_USERNAME ||
-    'MPCUSER';
+    undefined;
 
   // Description is limited to 60 characters in SAP ADT
   const limitedDescription = limitDescription(params.description);
