@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-02-28
+
+### Fixed
+- Fixed program validation: use `PROG/P` object type and pass `packagename` parameter to `/sap/bc/adt/programs/validation` endpoint. Previously used incorrect `prog` type causing "InvalidProgramName" on on-premise systems.
+- Fixed `isCloudEnvironment()` detection: check URL patterns first (`*.hana.ondemand.com` → cloud, `http:` with port → on-premise) before falling back to systeminformation endpoint. Modern on-premise systems expose the systeminformation endpoint too, causing false cloud detection.
+
+### Added
+- Program CRUD integration tests: full workflow (validate → create → update → activate → delete), read standard object, read transport request.
+- `run.test.ts` — self-contained `runProgram()` integration test (creates program, runs, cleans up).
+- Test infrastructure: `test-helper.js` with `isHttpStatusAllowed`, `getAcceptHint`, `withAcceptHandling` utilities for Accept header negotiation in tests.
+
+### Changed
+- Program test `ensureObjectReady` now performs active cleanup (deletes existing program) instead of silently skipping when test object already exists.
+- Program update test uses different source code for create vs update to verify actual content change.
+- Cross-platform `npm run clean` — uses Node.js `fs.rmSync` instead of `rm -rf`.
+- Simplified `npm test` script for Windows compatibility.
+
 ## [1.2.2] - 2026-02-27
 
 ### Removed

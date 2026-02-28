@@ -63,6 +63,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         this.connection,
         config.programName,
         config.description,
+        config.packageName,
       );
 
       return {

@@ -69,12 +69,37 @@ export async function getSystemInformation(
 
 /**
  * Check if the system is a BTP ABAP Cloud Environment
- * Returns true if the systeminformation endpoint is available (cloud system)
- * Returns false if the endpoint doesn't exist (on-premise system)
+ *
+ * Detection strategy (ordered by reliability):
+ * 1. URL pattern — cloud systems use *.hana.ondemand.com or *.abap.*.hana.ondemand.com
+ * 2. HTTP with explicit port — almost always on-premise
+ * 3. Fallback to systeminformation endpoint check
  */
 export async function isCloudEnvironment(
   connection: IAbapConnection,
 ): Promise<boolean> {
+  try {
+    const baseUrl = await connection.getBaseUrl();
+    if (baseUrl) {
+      // Cloud systems use specific domain patterns
+      if (/\.hana\.ondemand\.com/i.test(baseUrl)) {
+        return true;
+      }
+      // HTTP with explicit port is typically on-premise
+      try {
+        const parsed = new URL(baseUrl);
+        if (parsed.protocol === 'http:' && parsed.port) {
+          return false;
+        }
+      } catch {
+        // URL parsing failed — continue to fallback
+      }
+    }
+  } catch {
+    // getBaseUrl() failed — continue to fallback
+  }
+
+  // Fallback: check if systeminformation endpoint is available
   const systemInfo = await getSystemInformation(connection);
   return systemInfo !== null;
 }

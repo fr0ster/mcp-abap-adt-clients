@@ -24,14 +24,19 @@ export async function validateProgramName(
   connection: IAbapConnection,
   programName: string,
   description?: string,
+  packageName?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/programs/validation`;
   const encodedName = encodeSapObjectName(programName);
 
   const queryParams = new URLSearchParams({
-    objtype: 'prog',
     objname: encodedName,
+    objtype: 'PROG/P',
   });
+
+  if (packageName) {
+    queryParams.append('packagename', packageName);
+  }
 
   if (description) {
     queryParams.append('description', description);

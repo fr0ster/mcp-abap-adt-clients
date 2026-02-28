@@ -108,10 +108,21 @@ describe('Program (using AdtClient)', () => {
           if (!connection) return { success: true };
           try {
             await getProgramSource(connection, programName);
-            return {
-              success: false,
-              reason: `⚠️ SAFETY: Program ${programName} already exists!`,
-            };
+            // Program exists — delete it before test
+            try {
+              const transportRequest = tester.getTransportRequest();
+              const cleanupClient = new AdtClient(connection, libraryLogger);
+              await cleanupClient.getProgram().delete({
+                programName,
+                transportRequest,
+              });
+              await new Promise((resolve) => setTimeout(resolve, 3000));
+            } catch (cleanupError: any) {
+              return {
+                success: false,
+                reason: `Failed to delete existing program ${programName}: ${cleanupError.message}`,
+              };
+            }
           } catch (error: any) {
             if (error.response?.status !== 404) {
               return {
@@ -163,6 +174,8 @@ describe('Program (using AdtClient)', () => {
         const testCase = tester.getTestCaseDefinition();
         const sourceCode =
           testCase?.params?.source_code || config.sourceCode || '';
+        const updateSourceCode =
+          testCase?.params?.update_source_code || sourceCode;
 
         await tester.flowTestAuto({
           sourceCode: sourceCode,
@@ -171,7 +184,7 @@ describe('Program (using AdtClient)', () => {
             packageName: config.packageName,
             description: config.description || '',
             programType: config.programType,
-            sourceCode: sourceCode,
+            sourceCode: updateSourceCode,
           },
         });
       },
@@ -244,6 +257,87 @@ describe('Program (using AdtClient)', () => {
           throw error;
         } finally {
           logTestEnd(testsLogger, 'Program - read standard object');
+        }
+      },
+      getTimeout('test'),
+    );
+  });
+
+  describe('Read transport request', () => {
+    it(
+      'should read transport request for program',
+      async () => {
+        if (!hasConfig || !tester) {
+          logTestSkip(
+            testsLogger,
+            'Program - read transport request',
+            'No SAP configuration or tester not initialized',
+          );
+          return;
+        }
+
+        if (isCloudSystem) {
+          logTestSkip(
+            testsLogger,
+            'Program - read transport request',
+            'Programs are not supported in cloud systems (BTP ABAP Environment)',
+          );
+          return;
+        }
+
+        let transportRequest = '';
+        const resolver = new TestConfigResolver({
+          isCloud: isCloudSystem,
+          logger: testsLogger,
+        }).tryMultipleHandlers([
+          { handlerName: 'read_transport', testCaseName: 'read_transport' },
+          { handlerName: 'create_program', testCaseName: 'adt_program' },
+        ]);
+        transportRequest =
+          resolver?.getTransportRequest() || tester.getTransportRequest() || '';
+
+        if (!transportRequest) {
+          logTestStart(testsLogger, 'Program - read transport request', {
+            name: 'read_transport',
+            params: {},
+          });
+          logTestSkip(
+            testsLogger,
+            'Program - read transport request',
+            'transport_request not configured in test-config.yaml (required for transport read test)',
+          );
+          return;
+        }
+
+        logTestStart(testsLogger, 'Program - read transport request', {
+          name: 'read_transport',
+          params: { transport_request: transportRequest },
+        });
+
+        try {
+          const result = await client
+            .getRequest()
+            .read({ transportNumber: transportRequest });
+          expect(result).toBeDefined();
+          expect(
+            result?.transportNumber ||
+              result?.readResult?.data?.transport_request,
+          ).toBe(transportRequest);
+          const metadataState = await client
+            .getRequest()
+            .readMetadata({ transportNumber: transportRequest });
+          expect(metadataState).toBeDefined();
+          expect(
+            metadataState.transportNumber ||
+              metadataState.readResult?.data?.transport_request,
+          ).toBe(transportRequest);
+
+          logTestSuccess(testsLogger, 'Program - read transport request');
+        } catch (error) {
+          logTestError(testsLogger, 'Program - read transport request', error);
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, 'Program - read transport request');
         }
       },
       getTimeout('test'),
