@@ -31,9 +31,10 @@ import {
 
 const {
   resolvePackageName,
-  resolveTransportRequest,
   getEnvironmentConfig,
   getTimeout,
+  ensureSharedPackage,
+  ensureSharedDependency,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -67,6 +68,8 @@ describe('BehaviorDefinition (using AdtClient)', () => {
       systemContext = await resolveSystemContext(connection, isCloudSystem);
       client = new AdtClient(connection, libraryLogger, systemContext);
       hasConfig = true;
+
+      await ensureSharedPackage(client, testsLogger);
 
       tester = new BaseTester(
         client.getBehaviorDefinition(),
@@ -128,11 +131,6 @@ describe('BehaviorDefinition (using AdtClient)', () => {
   afterAll(() => tester?.afterAll()());
 
   describe('Full workflow test', () => {
-    let tableCreated = false;
-    let viewCreated = false;
-    let depTableName: string | null = null;
-    let depViewName: string | null = null;
-
     beforeEach(async () => {
       if (!hasConfig || !tester) return;
 
@@ -141,126 +139,29 @@ describe('BehaviorDefinition (using AdtClient)', () => {
 
       if (!testCase?.params) return;
       const params = testCase.params;
-      const packageName = resolvePackageName(params.package_name);
-      const transportRequest = resolveTransportRequest(
-        params.transport_request,
-      );
 
-      // Create dependency table (skip if already exists)
-      if (params.dep_table_name && params.dep_table_source && packageName) {
-        depTableName = params.dep_table_name;
-        try {
-          const depClient = new AdtClient(
-            connection,
-            libraryLogger,
-            systemContext,
-          );
-          await depClient.getTable().create({
-            tableName: depTableName!,
-            packageName,
-            description: `Dependency table for ${params.bdef_name}`,
-            ddlCode: params.dep_table_source,
-            transportRequest,
-          });
-          tableCreated = true;
-          testsLogger.info?.(`Created dependency table ${depTableName}`);
-        } catch (error: any) {
-          if (
-            error.message?.includes('409') ||
-            error.message?.includes('already exist')
-          ) {
-            testsLogger.info?.(
-              `Dependency table ${depTableName} already exists, reusing`,
-            );
-          } else {
-            testsLogger.warn?.(
-              `Failed to create dependency table ${depTableName}: ${error.message}`,
-            );
-          }
-        }
+      // Ensure shared dependencies exist (created once, never deleted)
+      if (params.dep_table_name) {
+        await ensureSharedDependency(
+          client,
+          'tables',
+          params.dep_table_name,
+          testsLogger,
+        );
       }
-
-      // Create dependency CDS view (skip if already exists)
-      if (params.dep_view_name && params.dep_view_ddl_source && packageName) {
-        depViewName = params.dep_view_name;
-        try {
-          const depClient = new AdtClient(
-            connection,
-            libraryLogger,
-            systemContext,
-          );
-          await depClient.getView().create({
-            viewName: depViewName!,
-            packageName,
-            description:
-              params.dep_view_description ||
-              `Dependency view for ${params.bdef_name}`,
-            ddlSource: params.dep_view_ddl_source,
-            transportRequest,
-          });
-          viewCreated = true;
-          testsLogger.info?.(`Created dependency CDS view ${depViewName}`);
-        } catch (error: any) {
-          if (
-            error.message?.includes('409') ||
-            error.message?.includes('already exist')
-          ) {
-            testsLogger.info?.(
-              `Dependency CDS view ${depViewName} already exists, reusing`,
-            );
-          } else {
-            testsLogger.warn?.(
-              `Failed to create dependency CDS view ${depViewName}: ${error.message}`,
-            );
-          }
-        }
+      if (params.dep_view_name) {
+        await ensureSharedDependency(
+          client,
+          'views',
+          params.dep_view_name,
+          testsLogger,
+        );
       }
     });
 
     afterEach(async () => {
       if (!hasConfig || !tester) return;
       await tester.afterEach()();
-
-      const envConfig = getEnvironmentConfig();
-      const skipCleanup = envConfig.skip_cleanup === true;
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
-
-      if (!shouldCleanup) return;
-
-      const transportRequest = resolveTransportRequest(
-        tester.getTestCaseDefinition()?.params?.transport_request,
-      );
-
-      // Cleanup dependency CDS view
-      if (viewCreated && depViewName) {
-        try {
-          await client.getView().delete({
-            viewName: depViewName,
-            transportRequest,
-          });
-          testsLogger.info?.(`Cleaned up dependency CDS view ${depViewName}`);
-        } catch (error: any) {
-          testsLogger.warn?.(
-            `Failed to cleanup CDS view ${depViewName}: ${error.message}`,
-          );
-        }
-      }
-
-      // Cleanup dependency table
-      if (tableCreated && depTableName) {
-        try {
-          await client.getTable().delete({
-            tableName: depTableName,
-            transportRequest,
-          });
-          testsLogger.info?.(`Cleaned up dependency table ${depTableName}`);
-        } catch (error: any) {
-          testsLogger.warn?.(
-            `Failed to cleanup table ${depTableName}: ${error.message}`,
-          );
-        }
-      }
     });
 
     it(

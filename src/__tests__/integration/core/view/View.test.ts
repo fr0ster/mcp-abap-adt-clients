@@ -34,9 +34,9 @@ const {
   resolveTransportRequest,
   checkDefaultTestEnvironment,
   logDefaultTestEnvironment,
-  createDependencyTable,
   getTimeout,
-  getEnvironmentConfig,
+  ensureSharedPackage,
+  ensureSharedDependency,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -86,6 +86,8 @@ describe('View (using AdtClient)', () => {
       defaultPackage = envCheck.defaultPackage || '';
       defaultTransport = envCheck.defaultTransport || '';
       logDefaultTestEnvironment(testsLogger, defaultPackage, defaultTransport);
+
+      await ensureSharedPackage(client, testsLogger);
 
       tester = new BaseTester(
         client.getView(),
@@ -164,9 +166,6 @@ describe('View (using AdtClient)', () => {
   afterAll(() => tester?.afterAll()());
 
   describe('Full workflow', () => {
-    let tableCreated = false;
-    let tableName: string | null = null;
-
     beforeEach(async () => {
       if (!hasConfig || !tester) {
         if (!hasConfig) {
@@ -181,37 +180,17 @@ describe('View (using AdtClient)', () => {
         }
         return;
       }
-      // Create table before test if needed (after tester.beforeEach() has loaded testCase)
       const testCase = tester.getTestCaseDefinition();
-      // Call tester.beforeEach() first to load test case and config
       await tester.beforeEach()();
-      if (testCase?.params?.table_name && testCase?.params?.table_source) {
-        const packageName = resolvePackageName(testCase.params.package_name);
-        if (packageName) {
-          tableName = testCase.params.table_name;
-          const tableConfig = {
-            tableName: tableName,
-            packageName: packageName,
-            description: `Test table for ${testCase.params.view_name}`,
-            ddlCode: testCase.params.table_source,
-            transportRequest: resolveTransportRequest(
-              testCase.params.transport_request,
-            ),
-          };
 
-          // Use AdtClient for dependency table creation
-          const tempAdtClient = new AdtClient(
-            connection,
-            libraryLogger,
-            systemContext,
-          );
-          const tableResult = await createDependencyTable(
-            tempAdtClient,
-            tableConfig,
-            testCase,
-          );
-          tableCreated = tableResult.created || false;
-        }
+      // Ensure shared dependency table exists (created once, never deleted)
+      if (testCase?.params?.table_name) {
+        await ensureSharedDependency(
+          client,
+          'tables',
+          testCase.params.table_name,
+          testsLogger,
+        );
       }
     });
 
@@ -220,28 +199,6 @@ describe('View (using AdtClient)', () => {
         return;
       }
       await tester.afterEach()();
-      // Cleanup table if it was created in beforeEach
-      const envConfig = getEnvironmentConfig();
-      const cleanupAfterTest = envConfig.cleanup_after_test !== false;
-      const globalSkipCleanup = envConfig.skip_cleanup === true;
-      const skipCleanup =
-        tester.getTestCaseDefinition()?.params?.skip_cleanup !== undefined
-          ? tester.getTestCaseDefinition()?.params?.skip_cleanup === true
-          : globalSkipCleanup;
-      const shouldCleanup = cleanupAfterTest && !skipCleanup;
-
-      if (shouldCleanup && tableCreated && tableName && connection) {
-        try {
-          await client.getTable().delete({
-            tableName: tableName,
-            transportRequest: resolveTransportRequest(
-              tester.getTestCaseDefinition()?.params?.transport_request,
-            ),
-          });
-        } catch (error) {
-          testsLogger.warn?.(`Failed to cleanup table ${tableName}:`, error);
-        }
-      }
     });
 
     it(

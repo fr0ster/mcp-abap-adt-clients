@@ -74,6 +74,122 @@ environment:
   default_master_system: "<YOUR_SYSTEM_ID>"  # SAP system ID for masterSystem attribute (on-prem only, cloud gets it from systeminformation endpoint)
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
 
+# Shared dependencies — persistent objects in a dedicated sub-package
+# These are created once and reused across all test suites (never deleted)
+shared_dependencies:
+  package: "<YOUR_SHARED_PACKAGE>"           # e.g., ZOK_TEST_0003_SHARED
+  super_package: "<YOUR_DEFAULT_PACKAGE>"    # Parent package
+  software_component: "<YOUR_SOFTWARE_COMPONENT>"  # e.g., HOME
+  transport_layer: "<YOUR_TRANSPORT_LAYER>"  # e.g., ZE19
+  # transport_request: ""  # Uses environment.default_transport if omitted
+
+  tables:
+    - name: "<YOUR_VIEW_TABLE_NAME>"         # e.g., ZADT_VIEW_TBL01
+      description: "Shared test table (view/CDS unit test)"
+      source: |
+        @EndUserText.label: 'Adt view test table'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table <your_view_table> {
+          key client : abap.clnt not null;
+          key id     : abap.char(10) not null;
+          name       : abap.char(50);
+          value      : abap.dec(10,2);
+          created_at : abap.dats;
+        }
+
+    - name: "<YOUR_BDEF_TABLE_NAME>"         # e.g., ZADT_BDEF_TBL01
+      description: "Shared test table (behavior definition)"
+      source: |
+        @EndUserText.label: 'Bdef test table'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table <your_bdef_table> {
+          key client : abap.clnt not null;
+          key id     : abap.char(10) not null;
+          name       : abap.char(50);
+          value      : abap.dec(10,2);
+          created_at : abap.dats;
+        }
+
+    - name: "<YOUR_BIMP_TABLE_NAME>"         # e.g., ZADT_BIMP_TBL01
+      description: "Shared test table (behavior implementation)"
+      source: |
+        @EndUserText.label: 'Bimp test table'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        @AbapCatalog.tableCategory : #TRANSPARENT
+        @AbapCatalog.deliveryClass : #A
+        @AbapCatalog.dataMaintenance : #RESTRICTED
+        define table <your_bimp_table> {
+          key client : abap.clnt not null;
+          key id     : abap.char(10) not null;
+          name       : abap.char(50);
+        }
+
+  views:
+    - name: "<YOUR_VIEW_NAME>"               # e.g., ZADT_BLD_VIEW01
+      description: "Shared CDS view (view/CDS unit test/metadata extension)"
+      source: |
+        @EndUserText.label: 'Adt view on custom table'
+        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        define view entity <YOUR_VIEW_NAME>
+          as select from <your_view_table>
+        {
+          key id,
+          name,
+          value,
+          created_at
+        }
+
+    - name: "<YOUR_BDEF_VIEW_NAME>"          # e.g., ZADT_BLD_BDEF_V01
+      description: "Shared CDS view (behavior definition)"
+      source: |
+        @EndUserText.label: 'CDS view for BDEF test'
+        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        define root view entity <YOUR_BDEF_VIEW_NAME>
+          as select from <your_bdef_table>
+        {
+          key id,
+          name,
+          value,
+          created_at
+        }
+
+    - name: "<YOUR_BIMP_VIEW_NAME>"          # e.g., ZADT_BLD_BIMP_V01
+      description: "Shared CDS view (behavior implementation)"
+      source: |
+        @EndUserText.label: 'CDS view for BIMP test'
+        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        define root view entity <YOUR_BIMP_VIEW_NAME>
+          as select from <your_bimp_table>
+        {
+          key id,
+          name
+        }
+
+  behavior_definitions:
+    - name: "<YOUR_BIMP_BDEF_NAME>"          # e.g., ZADT_BLD_BIMP_V01
+      description: "Shared BDEF (behavior implementation)"
+      root_entity: "<YOUR_BIMP_VIEW_NAME>"
+      implementation_type: "Managed"
+      source: |
+        managed implementation in class <your_bimp_class> unique;
+        strict ( 2 );
+
+        define behavior for <YOUR_BIMP_VIEW_NAME>
+        persistent table <your_bimp_table>
+        lock master
+        authorization master ( instance, global )
+        {
+          create;
+          update;
+          delete;
+        }
+
 # Standard SAP objects registry for read-only tests
 standard_objects:
   classes:
@@ -731,24 +847,11 @@ create_view:
       description: "View reserved for AdtView tests"
       params:
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
-        table_name: "ZADT_VIEW_TBL01"
+        table_name: "ZADT_VIEW_TBL01"  # → resolved from shared_dependencies.tables
         view_name: "ZADT_BLD_VIEW01"
         description: "AdtView workflow view"
         # transport_request: ""  # Uses environment.default_transport if omitted
         # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
-        table_source: |
-          @EndUserText.label: 'Adt view test table'
-          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          @AbapCatalog.deliveryClass : #A
-          @AbapCatalog.dataMaintenance : #RESTRICTED
-          define table zadt_view_tbl01 {
-            key client : abap.clnt not null;
-            key id     : abap.char(10) not null;
-            name       : abap.char(50);
-            value      : abap.dec(10,2);
-            created_at : abap.dats;
-          }
         ddl_source: |
           @EndUserText.label: 'Adt view on custom table'
           @AccessControl.authorizationCheck: #NOT_REQUIRED
@@ -887,34 +990,9 @@ create_behavior_definition:
             update;
             delete;
           }
-        # Dependencies: table and CDS view are auto-created by the test
-        dep_table_name: "<YOUR_TABLE_NAME>"  # e.g., ZADT_BDEF_TBL01
-        dep_table_source: |
-          @EndUserText.label: 'Bdef test table'
-          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          @AbapCatalog.deliveryClass : #A
-          @AbapCatalog.dataMaintenance : #RESTRICTED
-          define table <your_table_name> {
-            key client : abap.clnt not null;
-            key id     : abap.char(10) not null;
-            name       : abap.char(50);
-            value      : abap.dec(10,2);
-            created_at : abap.dats;
-          }
-        dep_view_name: "<YOUR_CDS_VIEW_NAME>"
-        dep_view_description: "CDS view for BDEF test"
-        dep_view_ddl_source: |
-          @EndUserText.label: 'CDS view for BDEF test'
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define root view entity <YOUR_CDS_VIEW_NAME>
-            as select from <your_table_name>
-          {
-            key id,
-            name,
-            value,
-            created_at
-          }
+        # Dependencies: resolved from shared_dependencies (created once, never deleted)
+        dep_table_name: "<YOUR_TABLE_NAME>"      # → resolved from shared_dependencies.tables
+        dep_view_name: "<YOUR_CDS_VIEW_NAME>"   # → resolved from shared_dependencies.views
 
 # Create Metadata Extension
 create_metadata_extension:
@@ -971,47 +1049,10 @@ create_behavior_implementation:
             ENDMETHOD.
 
           ENDCLASS.
-        # Dependencies: table, CDS view (root), and BDEF are auto-created by the test
-        dep_table_name: "<YOUR_TABLE_NAME>"  # e.g., ZADT_BIMP_TBL01
-        dep_table_source: |
-          @EndUserText.label: 'Bimp test table'
-          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          @AbapCatalog.deliveryClass : #A
-          @AbapCatalog.dataMaintenance : #RESTRICTED
-          define table <your_table_name> {
-            key client : abap.clnt not null;
-            key id     : abap.char(10) not null;
-            name       : abap.char(50);
-          }
-        dep_view_name: "<YOUR_CDS_VIEW_NAME>"
-        dep_view_description: "CDS view for BIMP test"
-        dep_view_ddl_source: |
-          @EndUserText.label: 'CDS view for BIMP test'
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define root view entity <YOUR_CDS_VIEW_NAME>
-            as select from <your_table_name>
-          {
-            key id,
-            name
-          }
-        dep_bdef_name: "<YOUR_BEHAVIOR_DEFINITION_NAME>"
-        dep_bdef_description: "BDEF for BIMP test"
-        dep_bdef_root_entity: "<YOUR_CDS_VIEW_NAME>"
-        dep_bdef_implementation_type: "Managed"
-        dep_bdef_source_code: |
-          managed implementation in class <your_bimp_class_name> unique;
-          strict ( 2 );
-
-          define behavior for <YOUR_CDS_VIEW_NAME>
-          persistent table <your_table_name>
-          lock master
-          authorization master ( instance, global )
-          {
-            create;
-            update;
-            delete;
-          }
+        # Dependencies: resolved from shared_dependencies (created once, never deleted)
+        dep_table_name: "<YOUR_TABLE_NAME>"              # → resolved from shared_dependencies.tables
+        dep_view_name: "<YOUR_CDS_VIEW_NAME>"           # → resolved from shared_dependencies.views
+        dep_bdef_name: "<YOUR_BEHAVIOR_DEFINITION_NAME>" # → resolved from shared_dependencies.behavior_definitions
 
 # Run Unit Test
 run_unit_test:
@@ -1080,32 +1121,9 @@ create_cds_unit_test:
         view_name: "<YOUR_CDS_VIEW_NAME>"  # e.g., ZADT_BLD_VIEW01
         description: "AdtView CDS unit test view"
         # transport_request: ""  # Uses environment.default_transport if omitted
-        # Dependencies: table and CDS view are auto-created by the test
-        dep_table_name: "<YOUR_TABLE_NAME>"  # e.g., ZADT_VIEW_TBL01
-        dep_table_source: |
-          @EndUserText.label: 'Adt view test table'
-          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          @AbapCatalog.deliveryClass : #A
-          @AbapCatalog.dataMaintenance : #RESTRICTED
-          define table <your_table_name> {
-            key client : abap.clnt not null;
-            key id     : abap.char(10) not null;
-            name       : abap.char(50);
-            value      : abap.dec(10,2);
-            created_at : abap.dats;
-          }
-        dep_view_ddl_source: |
-          @EndUserText.label: 'Adt view on custom table'
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define view entity <YOUR_CDS_VIEW_NAME>
-            as select from <your_table_name>
-          {
-            key id,
-            name,
-            value,
-            created_at
-          }
+        # Dependencies: resolved from shared_dependencies (created once, never deleted)
+        dep_table_name: "<YOUR_TABLE_NAME>"      # → resolved from shared_dependencies.tables
+        # view_name above also serves as dep view → resolved from shared_dependencies.views
         # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         # Note: CDS view and table must be created manually before running this test
         unit_test_options:

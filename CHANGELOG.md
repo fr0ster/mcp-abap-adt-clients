@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-03-01
+
+### Changed
+- **Test infrastructure**: moved dependency objects (tables, CDS views, BDEFs) to a persistent shared sub-package (`ZOK_TEST_0003_SHARED`) with "ensure on first use" strategy — check if exists, create only if missing, never delete.
+- Added `shared_dependencies` section to `test-config.yaml.template` as single source of truth for all dependency DDL sources.
+- Added `test-helper.js` to git tracking (previously caught by `src/**/*.js` gitignore rule).
+
+### Added
+- `ensureSharedPackage()` — creates shared sub-package on first use (in-memory flag skips after first verification).
+- `ensureSharedDependency()` — centralized "ensure on first use" for tables, views, and behavior definitions with in-memory cache per `type:name`.
+- `resolveSharedDependency()`, `getSharedDependenciesConfig()`, `getSharedPackage()`, `resetSharedDependencyCache()` helpers in `test-helper.js`.
+
+### Removed
+- Inline dependency creation/deletion in `View.test.ts`, `BehaviorDefinition.test.ts`, `CdsUnitTest.test.ts`, `BehaviorImplementation.test.ts` — replaced with shared dependency helpers (~490 lines removed).
+- Module-level `ensureDependency` and `delay` helper functions from `CdsUnitTest.test.ts` and `BehaviorImplementation.test.ts`.
+- Inline `dep_*_source` / `dep_*_ddl_source` / `table_source` fields from test case definitions (now resolved from `shared_dependencies`).
+
 ## [2.1.0] - 2026-03-01
 
 ### Added

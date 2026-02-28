@@ -45,6 +45,8 @@ const {
   resolveTransportRequest,
   getEnvironmentConfig,
   getTimeout,
+  ensureSharedPackage,
+  ensureSharedDependency,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -62,57 +64,6 @@ const libraryLogger: ILogger = createLibraryLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Ensure a dependency object exists: create (if not exists) → update → activate → wait */
-const ensureDependency = async (
-  label: string,
-  createFn: () => Promise<any>,
-  updateFn: () => Promise<any>,
-  activateFn: () => Promise<any>,
-  waitForActiveFn: () => Promise<any>,
-): Promise<boolean> => {
-  try {
-    await createFn();
-    testsLogger.info?.(`Created ${label}`);
-    await delay(3000);
-  } catch (error: any) {
-    if (
-      error.message?.includes('409') ||
-      error.message?.includes('already exist')
-    ) {
-      testsLogger.info?.(`${label} already exists, reusing`);
-    } else {
-      testsLogger.warn?.(`Failed to create ${label}: ${error.message}`);
-    }
-  }
-  try {
-    await updateFn();
-    testsLogger.info?.(`Updated ${label}`);
-    await delay(3000);
-  } catch (error: any) {
-    testsLogger.warn?.(`Failed to update ${label}: ${error.message}`);
-  }
-  try {
-    await activateFn();
-    testsLogger.info?.(`Activation started for ${label}`);
-  } catch (error: any) {
-    testsLogger.warn?.(`Failed to activate ${label}: ${error.message}`);
-    return false;
-  }
-  try {
-    await waitForActiveFn();
-    testsLogger.info?.(`${label} is active and ready`);
-    return true;
-  } catch (error: any) {
-    testsLogger.warn?.(
-      `${label} may not be fully active yet: ${error.message}`,
-    );
-    await delay(5000);
-    return true;
-  }
-};
-
 describe('AdtCdsUnitTest (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
@@ -128,6 +79,8 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
       systemContext = await resolveSystemContext(connection, isCloudSystem);
       client = new AdtClient(connection, libraryLogger, systemContext);
       hasConfig = true;
+
+      await ensureSharedPackage(client, testsLogger);
     } catch (_error) {
       hasConfig = false;
     }
@@ -235,89 +188,34 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           return;
         }
 
-        let tableCreated = false;
-        let viewCreated = false;
         const depTableName = testCase.params.dep_table_name;
-        const depTableSource = testCase.params.dep_table_source;
-        const depViewDdlSource = testCase.params.dep_view_ddl_source;
 
         try {
-          // Dependency: Create table (if configured)
-          if (depTableName && depTableSource && packageName) {
-            const depClient = new AdtClient(
-              connection,
-              libraryLogger,
-              systemContext,
-            );
-            const tableHandler = depClient.getTable();
-            tableCreated = await ensureDependency(
-              `table ${depTableName}`,
-              () =>
-                tableHandler.create({
-                  tableName: depTableName,
-                  packageName,
-                  description: `Dependency table for CDS unit test`,
-                  ddlCode: depTableSource,
-                  transportRequest,
-                }),
-              () =>
-                tableHandler.update(
-                  {
-                    tableName: depTableName,
-                    ddlCode: depTableSource,
-                    transportRequest,
-                  },
-                  { sourceCode: depTableSource },
-                ),
-              () => tableHandler.activate({ tableName: depTableName }),
-              () =>
-                tableHandler.read({ tableName: depTableName }, 'active', {
-                  withLongPolling: true,
-                }),
+          // Ensure shared dependencies exist (created once, never deleted)
+          if (depTableName) {
+            await ensureSharedDependency(
+              client,
+              'tables',
+              depTableName,
+              testsLogger,
             );
           }
 
-          // Dependency: Create CDS view (if configured)
-          if (depViewDdlSource && packageName) {
-            const depClient = new AdtClient(
-              connection,
-              libraryLogger,
-              systemContext,
+          if (viewName) {
+            const viewResult = await ensureSharedDependency(
+              client,
+              'views',
+              viewName,
+              testsLogger,
             );
-            const viewHandler = depClient.getView();
-            viewCreated = await ensureDependency(
-              `CDS view ${viewName}`,
-              () =>
-                viewHandler.create({
-                  viewName,
-                  packageName,
-                  description: `CDS view for unit test`,
-                  ddlSource: depViewDdlSource,
-                  transportRequest,
-                }),
-              () =>
-                viewHandler.update(
-                  {
-                    viewName,
-                    ddlSource: depViewDdlSource,
-                    transportRequest,
-                  },
-                  { sourceCode: depViewDdlSource },
-                ),
-              () => viewHandler.activate({ viewName }),
-              () =>
-                viewHandler.read({ viewName }, 'active', {
-                  withLongPolling: true,
-                }),
-            );
-          }
 
-          // Wait for CDS metadata to propagate after view activation
-          if (viewCreated) {
-            testsLogger.info?.(
-              'Waiting for CDS metadata to propagate after view activation...',
-            );
-            await delay(10000);
+            // Wait for CDS metadata to propagate only when view was newly created
+            if (viewResult.created) {
+              testsLogger.info?.(
+                'Waiting for CDS metadata to propagate after view creation...',
+              );
+              await new Promise((resolve) => setTimeout(resolve, 10000));
+            }
           }
 
           // Delete existing test class if it exists (idempotent test)
@@ -450,7 +348,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             envConfig.skip_cleanup === true;
 
           if (!skipCleanup) {
-            // Cleanup test class
+            // Cleanup test class (shared dependencies are never deleted)
             if (className) {
               try {
                 logTestStep('delete (cleanup)', testsLogger);
@@ -466,40 +364,6 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
               } catch (cleanupError: any) {
                 testsLogger.warn?.(
                   `Failed to cleanup CDS unit test class: ${cleanupError.message}`,
-                );
-              }
-            }
-
-            // Cleanup CDS view dependency
-            if (viewCreated && viewName) {
-              try {
-                await client.getView().delete({
-                  viewName,
-                  transportRequest,
-                });
-                testsLogger.info?.(
-                  `Cleaned up dependency CDS view ${viewName}`,
-                );
-              } catch (error: any) {
-                testsLogger.warn?.(
-                  `Failed to cleanup CDS view ${viewName}: ${error.message}`,
-                );
-              }
-            }
-
-            // Cleanup table dependency
-            if (tableCreated && depTableName) {
-              try {
-                await client.getTable().delete({
-                  tableName: depTableName,
-                  transportRequest,
-                });
-                testsLogger.info?.(
-                  `Cleaned up dependency table ${depTableName}`,
-                );
-              } catch (error: any) {
-                testsLogger.warn?.(
-                  `Failed to cleanup table ${depTableName}: ${error.message}`,
                 );
               }
             }

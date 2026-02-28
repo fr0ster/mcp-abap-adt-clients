@@ -11,6 +11,8 @@ tests/test-config.yaml
 # Compiled JS files in src (should be in dist)
 src/**/*.js
 src/**/*.js.map
+# Exception: test-helper.js is an intentional JS file (not compiled from TS)
+!src/__tests__/helpers/test-helper.js
 
 coverage/**
 
