@@ -38,7 +38,8 @@ export async function getSqlQuery(
     data: params.sql_query,
     headers: {
       'Content-Type': 'text/plain; charset=utf-8',
-      Accept: 'application/xml',
+      Accept:
+        'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml',
     },
   });
 }
