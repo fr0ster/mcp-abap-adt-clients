@@ -821,21 +821,21 @@ create_view:
       description: "View reserved for AdtView tests"
       params:
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
-        table_name: "ZADT_VIEW_TBL01"  # → resolved from shared_dependencies.tables
-        view_name: "ZADT_BLD_VIEW01"
+        table_name: "<YOUR_VIEW_TABLE_NAME>"  # → resolved from shared_dependencies.tables
+        view_name: "<YOUR_VIEW_NAME>"  # View created by this test (not from shared_dependencies)
         description: "AdtView workflow view"
         # transport_request: ""  # Uses environment.default_transport if omitted
         # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
         ddl_source: |
-          @EndUserText.label: 'Adt view on custom table'
+          @EndUserText.label: 'Adt view on shared table'
           @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define view entity ZADT_BLD_VIEW01
-            as select from zadt_view_tbl01
+          define view entity <YOUR_VIEW_NAME>
+            as select from <your_view_table>
           {
-            key id,
-            name,
-            value,
-            created_at
+            key fld1,
+            fld2,
+            fld3,
+            fld4
           }
 
 # Create Service Definition
@@ -1092,7 +1092,7 @@ create_cds_unit_test:
       description: "CDS view with ABAP Unit verification (dependencies auto-created)"
       params:
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
-        view_name: "<YOUR_CDS_VIEW_NAME>"  # e.g., ZADT_BLD_VIEW01
+        view_name: "<YOUR_CDS_VIEW_NAME>"  # e.g., ZADT_BLD_CDSVW01 — resolved from shared_dependencies.views
         description: "AdtView CDS unit test view"
         # transport_request: ""  # Uses environment.default_transport if omitted
         # Dependencies: resolved from shared_dependencies (created once, never deleted)
