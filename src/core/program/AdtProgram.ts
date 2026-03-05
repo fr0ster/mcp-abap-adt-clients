@@ -284,6 +284,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.logger?.info?.('Step 1: Locking program');
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
+      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Program locked, handle:', lockHandle);
 
@@ -336,6 +337,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking program');
+        this.connection.setSessionType('stateful');
         const unlockResponse = await unlockProgram(
           this.connection,
           config.programName,
@@ -397,7 +399,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking program during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockProgram(this.connection, config.programName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -595,7 +597,9 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     }
 
     this.connection.setSessionType('stateful');
-    return await lockProgram(this.connection, config.programName);
+    const lockHandle = await lockProgram(this.connection, config.programName);
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -609,6 +613,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       throw new Error('Program name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockProgram(
       this.connection,
       config.programName,

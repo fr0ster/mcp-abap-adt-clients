@@ -302,6 +302,7 @@ export class AdtStructure
       this.logger?.info?.('Step 1: Locking structure');
       this.connection.setSessionType('stateful');
       lockHandle = await lockStructure(this.connection, config.structureName);
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Structure locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -353,6 +354,7 @@ export class AdtStructure
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking structure');
+        this.connection.setSessionType('stateful');
         await unlockStructure(
           this.connection,
           config.structureName,
@@ -430,7 +432,7 @@ export class AdtStructure
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking structure during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockStructure(
             this.connection,
             config.structureName,
@@ -560,7 +562,12 @@ export class AdtStructure
     }
 
     this.connection.setSessionType('stateful');
-    return await lockStructure(this.connection, config.structureName);
+    const lockHandle = await lockStructure(
+      this.connection,
+      config.structureName,
+    );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -574,6 +581,7 @@ export class AdtStructure
       throw new Error('Structure name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockStructure(
       this.connection,
       config.structureName,

@@ -323,6 +323,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.info?.('Step 1: Locking class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
+      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Class locked, handle:', lockHandle);
 
@@ -372,6 +373,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking class');
+        this.connection.setSessionType('stateful');
         state.unlockResult = await unlockClass(
           this.connection,
           config.className,
@@ -428,7 +430,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking class during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -664,7 +666,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     }
 
     this.connection.setSessionType('stateful');
-    return await lockClass(this.connection, config.className);
+    const lockHandle = await lockClass(this.connection, config.className);
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -677,6 +681,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
+    this.connection.setSessionType('stateful');
     const result = await unlockClass(
       this.connection,
       config.className,
@@ -698,7 +703,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       throw new Error('Class name is required');
     }
     this.connection.setSessionType('stateful');
-    return await lockClass(this.connection, config.className);
+    const lockHandle = await lockClass(this.connection, config.className);
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -712,6 +719,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
+    this.connection.setSessionType('stateful');
     const result = await unlockClass(
       this.connection,
       config.className,
@@ -764,6 +772,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.info?.('Step 1: Locking parent class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Update test classes (uses parent class lock handle)
@@ -778,6 +787,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
 
       // 3. Unlock parent class (switch to stateless after unlock)
       this.logger?.info?.('Step 3: Unlocking parent class');
+      this.connection.setSessionType('stateful');
       await unlockClass(this.connection, config.className, lockHandle);
       this.connection.setSessionType('stateless');
       lockHandle = undefined;
@@ -788,6 +798,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking parent class after error');
+          this.connection.setSessionType('stateful');
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {

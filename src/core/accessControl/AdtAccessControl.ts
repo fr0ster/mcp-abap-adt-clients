@@ -300,6 +300,7 @@ export class AdtAccessControl
         this.connection,
         config.accessControlName,
       );
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Access control locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -352,6 +353,7 @@ export class AdtAccessControl
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking access control');
+        this.connection.setSessionType('stateful');
         await unlockAccessControl(
           this.connection,
           config.accessControlName,
@@ -421,7 +423,7 @@ export class AdtAccessControl
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking access control during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockAccessControl(
             this.connection,
             config.accessControlName,
@@ -557,7 +559,12 @@ export class AdtAccessControl
     }
 
     this.connection.setSessionType('stateful');
-    return await lockAccessControl(this.connection, config.accessControlName);
+    const lockHandle = await lockAccessControl(
+      this.connection,
+      config.accessControlName,
+    );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -571,6 +578,7 @@ export class AdtAccessControl
       throw new Error('Access control name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockAccessControl(
       this.connection,
       config.accessControlName,

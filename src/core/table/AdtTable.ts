@@ -283,6 +283,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.connection,
         config.tableName,
       );
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Table locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -334,6 +335,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking table');
+        this.connection.setSessionType('stateful');
         await unlockTable(this.connection, config.tableName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
@@ -406,7 +408,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking table during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockTable(this.connection, config.tableName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -522,7 +524,12 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     }
 
     this.connection.setSessionType('stateful');
-    return await acquireTableLockHandle(this.connection, config.tableName);
+    const lockHandle = await acquireTableLockHandle(
+      this.connection,
+      config.tableName,
+    );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -536,6 +543,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       throw new Error('Table name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockTable(
       this.connection,
       config.tableName,

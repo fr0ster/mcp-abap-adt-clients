@@ -285,6 +285,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.logger?.info?.('lock');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
+      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('locked');
 
@@ -348,6 +349,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('unlock');
+        this.connection.setSessionType('stateful');
         const unlockResponse = await unlockDomain(
           this.connection,
           config.domainName,
@@ -415,7 +417,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking domain during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockDomain(this.connection, config.domainName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -591,7 +593,9 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     }
 
     this.connection.setSessionType('stateful');
-    return await lockDomain(this.connection, config.domainName);
+    const lockHandle = await lockDomain(this.connection, config.domainName);
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -605,6 +609,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       throw new Error('Domain name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockDomain(
       this.connection,
       config.domainName,

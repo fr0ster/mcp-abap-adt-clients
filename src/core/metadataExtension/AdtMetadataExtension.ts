@@ -308,6 +308,7 @@ export class AdtMetadataExtension
       this.logger?.info?.('Step 1: Locking metadata extension');
       this.connection.setSessionType('stateful');
       lockHandle = await lockMetadataExtension(this.connection, config.name);
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -356,6 +357,7 @@ export class AdtMetadataExtension
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking metadata extension');
+        this.connection.setSessionType('stateful');
         await unlockMetadataExtension(this.connection, config.name, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
@@ -421,7 +423,7 @@ export class AdtMetadataExtension
           this.logger?.warn?.(
             'Unlocking metadata extension during error cleanup',
           );
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockMetadataExtension(
             this.connection,
             config.name,
@@ -567,7 +569,12 @@ export class AdtMetadataExtension
     }
 
     this.connection.setSessionType('stateful');
-    return await lockMetadataExtension(this.connection, config.name);
+    const lockHandle = await lockMetadataExtension(
+      this.connection,
+      config.name,
+    );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -581,6 +588,7 @@ export class AdtMetadataExtension
       throw new Error('Metadata extension name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockMetadataExtension(
       this.connection,
       config.name,

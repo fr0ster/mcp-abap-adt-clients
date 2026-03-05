@@ -267,6 +267,7 @@ export class AdtInterface
         this.connection,
         config.interfaceName,
       );
+      this.connection.setSessionType('stateless');
       lockHandle = lockResult.lockHandle;
       state.lockHandle = lockHandle;
       this.logger?.info?.('Interface locked, handle:', lockHandle);
@@ -319,6 +320,7 @@ export class AdtInterface
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking interface');
+        this.connection.setSessionType('stateful');
         const unlockResponse = await unlockInterface(
           this.connection,
           config.interfaceName,
@@ -388,7 +390,7 @@ export class AdtInterface
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking interface during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockInterface(
             this.connection,
             config.interfaceName,
@@ -574,6 +576,7 @@ export class AdtInterface
 
     this.connection.setSessionType('stateful');
     const result = await lockInterface(this.connection, config.interfaceName);
+    this.connection.setSessionType('stateless');
     return result.lockHandle;
   }
 
@@ -588,6 +591,7 @@ export class AdtInterface
       throw new Error('Interface name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockInterface(
       this.connection,
       config.interfaceName,

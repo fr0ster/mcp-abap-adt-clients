@@ -315,6 +315,7 @@ export class AdtDataElement
         this.connection,
         config.dataElementName,
       );
+      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Data element locked, handle:', lockHandle);
 
@@ -384,6 +385,7 @@ export class AdtDataElement
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking data element');
+        this.connection.setSessionType('stateful');
         const unlockResponse = await unlockDataElement(
           this.connection,
           config.dataElementName,
@@ -453,7 +455,7 @@ export class AdtDataElement
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking data element during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockDataElement(
             this.connection,
             config.dataElementName,
@@ -637,7 +639,12 @@ export class AdtDataElement
     }
 
     this.connection.setSessionType('stateful');
-    return await lockDataElement(this.connection, config.dataElementName);
+    const lockHandle = await lockDataElement(
+      this.connection,
+      config.dataElementName,
+    );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -651,6 +658,7 @@ export class AdtDataElement
       throw new Error('Data element name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockDataElement(
       this.connection,
       config.dataElementName,

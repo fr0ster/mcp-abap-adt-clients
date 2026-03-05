@@ -356,6 +356,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       this.logger?.info?.('Step 1: Locking package');
       this.connection.setSessionType('stateful');
       lockHandle = await lockPackage(this.connection, config.packageName);
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Package locked, handle:', lockHandle);
 
       // 2. Check inactive with XML for update (if provided)
@@ -416,6 +417,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking package');
+        this.connection.setSessionType('stateful');
         await unlockPackage(this.connection, config.packageName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
@@ -443,7 +445,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking package during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockPackage(this.connection, config.packageName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -550,7 +552,9 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     }
 
     this.connection.setSessionType('stateful');
-    return await lockPackage(this.connection, config.packageName);
+    const lockHandle = await lockPackage(this.connection, config.packageName);
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -564,6 +568,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       throw new Error('Package name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockPackage(
       this.connection,
       config.packageName,

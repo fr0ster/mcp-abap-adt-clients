@@ -333,6 +333,7 @@ export class AdtFunctionModule
         config.functionGroupName,
         config.functionModuleName,
       );
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Function module locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -387,6 +388,7 @@ export class AdtFunctionModule
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking function module');
+        this.connection.setSessionType('stateful');
         await unlockFunctionModule(
           this.connection,
           config.functionGroupName,
@@ -467,7 +469,7 @@ export class AdtFunctionModule
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking function module during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockFunctionModule(
             this.connection,
             config.functionGroupName,
@@ -610,11 +612,13 @@ export class AdtFunctionModule
     }
 
     this.connection.setSessionType('stateful');
-    return await lockFunctionModule(
+    const lockHandle = await lockFunctionModule(
       this.connection,
       config.functionGroupName,
       config.functionModuleName,
     );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -630,6 +634,7 @@ export class AdtFunctionModule
       );
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockFunctionModule(
       this.connection,
       config.functionGroupName,

@@ -300,6 +300,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       this.logger?.info?.('Step 1: Locking view');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDDLS(this.connection, config.viewName);
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('View locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -349,6 +350,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking view');
+        this.connection.setSessionType('stateful');
         await unlockDDLS(this.connection, config.viewName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
@@ -423,7 +425,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking view during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockDDLS(this.connection, config.viewName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -548,7 +550,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
     }
 
     this.connection.setSessionType('stateful');
-    return await lockDDLS(this.connection, config.viewName);
+    const lockHandle = await lockDDLS(this.connection, config.viewName);
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -562,6 +566,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       throw new Error('View name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockDDLS(
       this.connection,
       config.viewName,

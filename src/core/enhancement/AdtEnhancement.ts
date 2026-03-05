@@ -431,6 +431,7 @@ export class AdtEnhancement
         config.enhancementType,
         config.enhancementName,
       );
+      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Enhancement locked, handle:', lockHandle);
 
@@ -491,6 +492,7 @@ export class AdtEnhancement
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking enhancement');
+        this.connection.setSessionType('stateful');
         const unlockResponse = await unlockEnhancement(
           this.connection,
           config.enhancementType,
@@ -564,6 +566,7 @@ export class AdtEnhancement
       if (lockHandle && config.enhancementType && config.enhancementName) {
         try {
           this.logger?.warn?.('Unlocking enhancement during error cleanup');
+          this.connection.setSessionType('stateful');
           await unlockEnhancement(
             this.connection,
             config.enhancementType,
@@ -751,11 +754,13 @@ export class AdtEnhancement
     }
 
     this.connection.setSessionType('stateful');
-    return await lockEnhancement(
+    const lockHandle = await lockEnhancement(
       this.connection,
       config.enhancementType,
       config.enhancementName,
     );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -769,6 +774,7 @@ export class AdtEnhancement
       throw new Error('Enhancement name and type are required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockEnhancement(
       this.connection,
       config.enhancementType,

@@ -306,6 +306,7 @@ export class AdtServiceDefinition
         this.connection,
         config.serviceDefinitionName,
       );
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Service definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -358,6 +359,7 @@ export class AdtServiceDefinition
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking service definition');
+        this.connection.setSessionType('stateful');
         await unlockServiceDefinition(
           this.connection,
           config.serviceDefinitionName,
@@ -433,7 +435,7 @@ export class AdtServiceDefinition
           this.logger?.warn?.(
             'Unlocking service definition during error cleanup',
           );
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockServiceDefinition(
             this.connection,
             config.serviceDefinitionName,
@@ -569,10 +571,12 @@ export class AdtServiceDefinition
     }
 
     this.connection.setSessionType('stateful');
-    return await lockServiceDefinition(
+    const lockHandle = await lockServiceDefinition(
       this.connection,
       config.serviceDefinitionName,
     );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -586,6 +590,7 @@ export class AdtServiceDefinition
       throw new Error('Service definition name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockServiceDefinition(
       this.connection,
       config.serviceDefinitionName,

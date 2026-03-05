@@ -296,6 +296,7 @@ export class AdtDdicTableType
         this.connection,
         config.tableTypeName,
       );
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Table type locked, handle:', lockHandle);
 
       // 2. Check inactive (TableType is XML-based, no source code check needed)
@@ -353,6 +354,7 @@ export class AdtDdicTableType
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking table type');
+        this.connection.setSessionType('stateful');
         await unlockTableType(
           this.connection,
           config.tableTypeName,
@@ -441,7 +443,7 @@ export class AdtDdicTableType
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking table type during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockTableType(
             this.connection,
             config.tableTypeName,
@@ -564,10 +566,12 @@ export class AdtDdicTableType
     }
 
     this.connection.setSessionType('stateful');
-    return await acquireTableTypeLockHandle(
+    const lockHandle = await acquireTableTypeLockHandle(
       this.connection,
       config.tableTypeName,
     );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -581,6 +585,7 @@ export class AdtDdicTableType
       throw new Error('Table type name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockTableType(
       this.connection,
       config.tableTypeName,

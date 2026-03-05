@@ -435,6 +435,7 @@ export class AdtFunctionGroup
         config.functionGroupName,
         sessionId,
       );
+      this.connection.setSessionType('stateless');
       this.logger?.info?.('Function group locked, handle:', lockHandle);
 
       // 2. Update metadata (description)
@@ -467,6 +468,7 @@ export class AdtFunctionGroup
       // 3. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 3: Unlocking function group');
+        this.connection.setSessionType('stateful');
         await unlockFunctionGroup(
           this.connection,
           config.functionGroupName,
@@ -542,7 +544,7 @@ export class AdtFunctionGroup
       if (lockHandle) {
         try {
           this.logger?.warn?.('Unlocking function group during error cleanup');
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlockFunctionGroup(
             this.connection,
             config.functionGroupName,
@@ -669,7 +671,12 @@ export class AdtFunctionGroup
     }
 
     this.connection.setSessionType('stateful');
-    return await lockFunctionGroup(this.connection, config.functionGroupName);
+    const lockHandle = await lockFunctionGroup(
+      this.connection,
+      config.functionGroupName,
+    );
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -683,6 +690,7 @@ export class AdtFunctionGroup
       throw new Error('Function group name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlockFunctionGroup(
       this.connection,
       config.functionGroupName,

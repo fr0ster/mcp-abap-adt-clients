@@ -356,6 +356,7 @@ export class AdtBehaviorDefinition
       this.logger?.info?.('Step 1: Locking behavior definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
+      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
@@ -408,6 +409,7 @@ export class AdtBehaviorDefinition
       // 4. Unlock (obligatory stateless after unlock)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking behavior definition');
+        this.connection.setSessionType('stateful');
         const unlockResponse = await unlock(
           this.connection,
           config.name,
@@ -477,7 +479,7 @@ export class AdtBehaviorDefinition
           this.logger?.warn?.(
             'Unlocking behavior definition during error cleanup',
           );
-          // We're already in stateful after lock, just unlock and set stateless
+          this.connection.setSessionType('stateful');
           await unlock(this.connection, config.name, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
@@ -625,7 +627,9 @@ export class AdtBehaviorDefinition
     }
 
     this.connection.setSessionType('stateful');
-    return await lock(this.connection, config.name);
+    const lockHandle = await lock(this.connection, config.name);
+    this.connection.setSessionType('stateless');
+    return lockHandle;
   }
 
   /**
@@ -639,6 +643,7 @@ export class AdtBehaviorDefinition
       throw new Error('Behavior definition name is required');
     }
 
+    this.connection.setSessionType('stateful');
     const result = await unlock(this.connection, config.name, lockHandle);
     this.connection.setSessionType('stateless');
     return {
