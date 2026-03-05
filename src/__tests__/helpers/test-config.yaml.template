@@ -77,103 +77,77 @@ environment:
 # Shared dependencies — persistent objects in a dedicated sub-package
 # These are created once and reused across all test suites (never deleted)
 shared_dependencies:
-  package: "<YOUR_SHARED_PACKAGE>"           # e.g., ZOK_TEST_0003_SHARED
-  super_package: "<YOUR_DEFAULT_PACKAGE>"    # Parent package
-  software_component: "<YOUR_SOFTWARE_COMPONENT>"  # e.g., HOME
-  transport_layer: "<YOUR_TRANSPORT_LAYER>"  # e.g., ZE19
+  package: "<YOUR_SHARED_PACKAGE>"           # e.g., ZADT_BLD_SHARED
+  super_package: "<YOUR_DEFAULT_PACKAGE>"    # Parent package (e.g., ZADT_BLD_PKG03)
+  software_component: ""                     # e.g., HOME (leave empty for cloud)
+  transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
   # transport_request: ""  # Uses environment.default_transport if omitted
 
+  # Table for CDS view (used by create_view, create_cds_unit_test)
+  # Table for BIMP root view (used by create_behavior_implementation)
   tables:
-    - name: "<YOUR_VIEW_TABLE_NAME>"         # e.g., ZADT_VIEW_TBL01
-      description: "Shared test table (view/CDS unit test)"
+    - name: "<YOUR_VIEW_TABLE_NAME>"         # e.g., ZADT_BLD_VTBL01
+      description: "Shared test table for CDS view"
       source: |
-        @EndUserText.label: 'Adt view test table'
+        @EndUserText.label : 'Shared view test table'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
         @AbapCatalog.tableCategory : #TRANSPARENT
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
         define table <your_view_table> {
           key client : abap.clnt not null;
-          key id     : abap.char(10) not null;
-          name       : abap.char(50);
-          value      : abap.dec(10,2);
-          created_at : abap.dats;
+          key fld1   : abap.char(10) not null;
+          fld2       : abap.char(50);
+          fld3       : abap.dec(10,2);
+          fld4       : abap.dats;
         }
 
-    - name: "<YOUR_BDEF_TABLE_NAME>"         # e.g., ZADT_BDEF_TBL01
-      description: "Shared test table (behavior definition)"
+    - name: "<YOUR_BIMP_TABLE_NAME>"         # e.g., ZADT_BLD_BTBL01
+      description: "Shared test table for BIMP root view"
       source: |
-        @EndUserText.label: 'Bdef test table'
-        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-        @AbapCatalog.tableCategory : #TRANSPARENT
-        @AbapCatalog.deliveryClass : #A
-        @AbapCatalog.dataMaintenance : #RESTRICTED
-        define table <your_bdef_table> {
-          key client : abap.clnt not null;
-          key id     : abap.char(10) not null;
-          name       : abap.char(50);
-          value      : abap.dec(10,2);
-          created_at : abap.dats;
-        }
-
-    - name: "<YOUR_BIMP_TABLE_NAME>"         # e.g., ZADT_BIMP_TBL01
-      description: "Shared test table (behavior implementation)"
-      source: |
-        @EndUserText.label: 'Bimp test table'
+        @EndUserText.label : 'Shared BIMP test table'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
         @AbapCatalog.tableCategory : #TRANSPARENT
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
         define table <your_bimp_table> {
           key client : abap.clnt not null;
-          key id     : abap.char(10) not null;
-          name       : abap.char(50);
+          key fld1   : abap.char(10) not null;
+          fld2       : abap.char(50);
         }
 
+  # CDS view for view/CDS unit test (selects from view table above)
+  # CDS root view for BIMP BDEF (selects from BIMP table above)
   views:
     - name: "<YOUR_VIEW_NAME>"               # e.g., ZADT_BLD_VIEW01
-      description: "Shared CDS view (view/CDS unit test/metadata extension)"
+      description: "Shared CDS view for view/CDS unit test"
       source: |
-        @EndUserText.label: 'Adt view on custom table'
-        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        @EndUserText.label : 'Shared test CDS view'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
         define view entity <YOUR_VIEW_NAME>
           as select from <your_view_table>
         {
-          key id,
-          name,
-          value,
-          created_at
+          key fld1,
+          fld2,
+          fld3,
+          fld4
         }
 
-    - name: "<YOUR_BDEF_VIEW_NAME>"          # e.g., ZADT_BLD_BDEF_V01
-      description: "Shared CDS view (behavior definition)"
+    - name: "<YOUR_BIMP_VIEW_NAME>"          # e.g., ZADT_BLD_BVIEW01
+      description: "Shared CDS root view for BIMP BDEF"
       source: |
-        @EndUserText.label: 'CDS view for BDEF test'
-        @AccessControl.authorizationCheck: #NOT_REQUIRED
-        define root view entity <YOUR_BDEF_VIEW_NAME>
-          as select from <your_bdef_table>
-        {
-          key id,
-          name,
-          value,
-          created_at
-        }
-
-    - name: "<YOUR_BIMP_VIEW_NAME>"          # e.g., ZADT_BLD_BIMP_V01
-      description: "Shared CDS view (behavior implementation)"
-      source: |
-        @EndUserText.label: 'CDS view for BIMP test'
-        @AccessControl.authorizationCheck: #NOT_REQUIRED
+        @EndUserText.label : 'Shared BIMP root view'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
         define root view entity <YOUR_BIMP_VIEW_NAME>
           as select from <your_bimp_table>
         {
-          key id,
-          name
+          key fld1,
+          fld2
         }
 
   behavior_definitions:
-    - name: "<YOUR_BIMP_BDEF_NAME>"          # e.g., ZADT_BLD_BIMP_V01
-      description: "Shared BDEF (behavior implementation)"
+    - name: "<YOUR_BIMP_BDEF_NAME>"          # e.g., ZADT_BLD_BVIEW01 (same as root view)
+      description: "Shared BDEF for BIMP test"
       root_entity: "<YOUR_BIMP_VIEW_NAME>"
       implementation_type: "Managed"
       source: |
