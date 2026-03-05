@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_TABLE_TYPE } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTableTypeParams } from './types';
@@ -51,8 +52,8 @@ export async function createTableType(
 </ttyp:tableType>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.tabletype.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml',
+    Accept: CT_TABLE_TYPE,
+    'Content-Type': CT_TABLE_TYPE,
   };
 
   try {

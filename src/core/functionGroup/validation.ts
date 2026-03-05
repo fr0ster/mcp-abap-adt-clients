@@ -8,6 +8,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -56,7 +57,7 @@ export async function validateFunctionGroupName(
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.as+xml',
+      Accept: ACCEPT_VALIDATION,
     },
   });
 }

@@ -64,12 +64,27 @@ import {
   getWhereUsedScope,
   modifyWhereUsedScope,
 } from './whereUsed';
+
 // Note: Application Logs and ATC Logs are in runtime/, not core
 // They are accessed via AdtRuntime, not AdtUtils
 
 // Note: DDIC Activation Graph is in runtime/logs/ddic.ts
 // It is accessed via AdtRuntime.getDdicActivationGraph(), not AdtUtils
 
+import {
+  ACCEPT_CLASS,
+  ACCEPT_DATA_ELEMENT,
+  ACCEPT_DOMAIN,
+  ACCEPT_FUNCTION_GROUP,
+  ACCEPT_FUNCTION_MODULE,
+  ACCEPT_INTERFACE,
+  ACCEPT_PACKAGE,
+  ACCEPT_PROGRAM,
+  ACCEPT_STRUCTURE,
+  ACCEPT_TABLE,
+  ACCEPT_TABLE_TYPE,
+  CT_VIEW,
+} from '../../constants/contentTypes';
 // Import types
 import type {
   AdtObjectType,
@@ -893,40 +908,40 @@ function getMetadataAcceptHeader(objectType: AdtObjectType): string {
   switch (type) {
     case 'class':
     case 'clas/oc':
-      return 'application/vnd.sap.adt.oo.classes.v4+xml, application/vnd.sap.adt.oo.classes.v3+xml, application/vnd.sap.adt.oo.classes.v2+xml, application/vnd.sap.adt.oo.classes.v1+xml';
+      return ACCEPT_CLASS;
     case 'interface':
     case 'intf/if':
-      return 'application/vnd.sap.adt.oo.interfaces.v5+xml, application/vnd.sap.adt.oo.interfaces.v4+xml, application/vnd.sap.adt.oo.interfaces.v3+xml, application/vnd.sap.adt.oo.interfaces.v2+xml, application/vnd.sap.adt.oo.interfaces+xml';
+      return ACCEPT_INTERFACE;
     case 'table':
     case 'tabl/dt':
-      return 'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml';
+      return ACCEPT_TABLE;
     case 'tabletype':
     case 'ttyp/df':
-      return 'application/vnd.sap.adt.tabletypes.v2+xml, application/vnd.sap.adt.tabletypes.v1+xml, application/vnd.sap.adt.blues.v1+xml';
+      return ACCEPT_TABLE_TYPE;
     case 'domain':
     case 'doma/dd':
-      return 'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml';
+      return ACCEPT_DOMAIN;
     case 'dataelement':
     case 'dtel':
-      return 'application/vnd.sap.adt.dataelements.v2+xml, application/vnd.sap.adt.dataelements.v1+xml';
+      return ACCEPT_DATA_ELEMENT;
     case 'structure':
     case 'stru/dt':
-      return 'application/vnd.sap.adt.structures.v2+xml, application/vnd.sap.adt.structures.v1+xml';
+      return ACCEPT_STRUCTURE;
     case 'view':
     case 'ddls/df':
-      return 'application/vnd.sap.adt.ddlSource+xml';
+      return CT_VIEW;
     case 'program':
     case 'prog/p':
-      return 'application/vnd.sap.adt.programs.programs.v2+xml, application/vnd.sap.adt.programs.programs.v1+xml';
+      return ACCEPT_PROGRAM;
     case 'functiongroup':
     case 'fugr':
-      return 'application/vnd.sap.adt.functions.groups.v2+xml, application/vnd.sap.adt.functions.groups.v1+xml';
+      return ACCEPT_FUNCTION_GROUP;
     case 'functionmodule':
     case 'fugr/ff':
-      return 'application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml';
+      return ACCEPT_FUNCTION_MODULE;
     case 'package':
     case 'devc/k':
-      return 'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml';
+      return ACCEPT_PACKAGE;
     default:
       return 'application/xml';
   }

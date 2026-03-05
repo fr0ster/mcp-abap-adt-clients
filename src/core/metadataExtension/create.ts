@@ -8,6 +8,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_METADATA_EXTENSION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IMetadataExtensionCreateParams } from './types';
@@ -68,8 +69,8 @@ export async function createMetadataExtension(
 </ddlxsources:ddlxSource>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.ddic.ddlx.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.ddic.ddlx.v1+xml',
+    Accept: CT_METADATA_EXTENSION,
+    'Content-Type': CT_METADATA_EXTENSION,
   };
 
   const queryParams = params.transportRequest

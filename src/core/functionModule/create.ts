@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_FUNCTION_MODULE } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -48,8 +49,8 @@ export async function create(
     timeout: getTimeout('default'),
     data: xmlPayload,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.functions.fmodules+xml',
-      Accept: 'application/vnd.sap.adt.functions.fmodules+xml',
+      'Content-Type': CT_FUNCTION_MODULE,
+      Accept: CT_FUNCTION_MODULE,
     },
   });
 }

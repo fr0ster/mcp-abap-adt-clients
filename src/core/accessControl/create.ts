@@ -2,6 +2,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_ACCESS_CONTROL } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateAccessControlParams } from './types';
@@ -34,8 +35,8 @@ export async function create(
 </dcl:dclSource>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.dclSource+xml',
-    'Content-Type': 'application/vnd.sap.adt.dclSource+xml',
+    Accept: CT_ACCESS_CONTROL,
+    'Content-Type': CT_ACCESS_CONTROL,
   };
 
   return connection.makeAdtRequest({

@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_DOMAIN, CT_DOMAIN } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDomainParams } from './types';
 
@@ -43,9 +44,8 @@ export async function create(
 </doma:domain>`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.domains.v2+xml',
+    Accept: ACCEPT_DOMAIN,
+    'Content-Type': CT_DOMAIN,
   };
 
   return await connection.makeAdtRequest({

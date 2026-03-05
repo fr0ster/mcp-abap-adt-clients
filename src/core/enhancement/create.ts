@@ -7,6 +7,10 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_ENHANCEMENT,
+  CT_ENHANCEMENT,
+} from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
@@ -92,8 +96,8 @@ export async function create(
   const metadataXml = buildCreateXml(args, args.masterSystem, args.responsible);
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.enhancements.v1+xml, application/xml',
-    'Content-Type': 'application/vnd.sap.adt.enhancements.v1+xml',
+    Accept: ACCEPT_ENHANCEMENT,
+    'Content-Type': CT_ENHANCEMENT,
   };
 
   if (debugEnabled) {

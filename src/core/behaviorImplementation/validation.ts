@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { AxiosError } from 'axios';
+import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -54,8 +55,7 @@ export async function validateBehaviorImplementationName(
 
   const url = `/sap/bc/adt/oo/validation/objectname?${params.toString()}`;
   const headers = {
-    Accept:
-      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check',
+    Accept: ACCEPT_VALIDATION_CLASS_NAME,
   };
 
   try {

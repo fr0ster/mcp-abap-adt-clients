@@ -11,6 +11,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { CT_TABLE_TYPE } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -174,8 +175,8 @@ export async function updateTableType(
 </ttyp:tableType>`;
 
     const headers = {
-      Accept: 'application/vnd.sap.adt.tabletype.v1+xml',
-      'Content-Type': 'application/vnd.sap.adt.tabletype.v1+xml',
+      Accept: CT_TABLE_TYPE,
+      'Content-Type': CT_TABLE_TYPE,
     };
 
     try {

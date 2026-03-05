@@ -7,6 +7,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_DATA_ELEMENT,
+  CT_DATA_ELEMENT,
+} from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDataElementParams } from './types';
@@ -154,9 +158,8 @@ export async function create(
 </blue:wbobj>`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.dataelements.v2+xml',
+    Accept: ACCEPT_DATA_ELEMENT,
+    'Content-Type': CT_DATA_ELEMENT,
   };
 
   return connection.makeAdtRequest({

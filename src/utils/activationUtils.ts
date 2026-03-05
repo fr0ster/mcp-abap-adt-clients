@@ -10,6 +10,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
 
@@ -152,7 +153,7 @@ export async function activateObjectInSession(
 </adtcore:objectReferences>`;
 
   const headers = {
-    'Content-Type': 'application/vnd.sap.adt.activation+xml',
+    'Content-Type': CT_ACTIVATION,
     Accept: 'application/xml',
   };
 

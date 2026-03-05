@@ -10,6 +10,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -61,7 +62,7 @@ async function updateFunctionGroupMetadata(
   const headers: Record<string, string> = {
     'Content-Type':
       'application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8',
-    Accept: 'application/vnd.sap.adt.functions.groups.v3+xml',
+    Accept: CT_FUNCTION_GROUP,
   };
 
   return connection.makeAdtRequest({

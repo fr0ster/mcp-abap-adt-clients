@@ -7,6 +7,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_STRUCTURE } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateStructureParams } from './types';
@@ -40,7 +41,7 @@ export async function create(
   const headers = {
     Accept:
       'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.structures.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.structures.v2+xml',
+    'Content-Type': CT_STRUCTURE,
   };
 
   return connection.makeAdtRequest({

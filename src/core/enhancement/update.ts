@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
@@ -65,7 +66,7 @@ export async function update(
   const url = `${baseUri}/source/main?${params.toString()}`;
 
   const headers = {
-    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Type': CT_SOURCE,
     Accept: 'text/plain',
   };
 

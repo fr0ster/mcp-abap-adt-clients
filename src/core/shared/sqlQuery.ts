@@ -10,6 +10,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_DATA_PREVIEW, CT_SOURCE } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetSqlQueryParams } from './types';
 
@@ -37,9 +38,8 @@ export async function getSqlQuery(
     timeout: getTimeout('long'),
     data: params.sql_query,
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      Accept:
-        'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml',
+      'Content-Type': CT_SOURCE,
+      Accept: ACCEPT_DATA_PREVIEW,
     },
   });
 }

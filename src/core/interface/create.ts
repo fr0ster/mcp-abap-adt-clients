@@ -9,6 +9,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { CT_INTERFACE } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateInterfaceParams } from './types';
@@ -65,8 +66,8 @@ export async function create(
   const url = `/sap/bc/adt/oo/interfaces${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
   const headers = {
-    'Content-Type': 'application/vnd.sap.adt.oo.interfaces.v5+xml',
-    Accept: 'application/vnd.sap.adt.oo.interfaces.v5+xml',
+    'Content-Type': CT_INTERFACE,
+    Accept: CT_INTERFACE,
   };
 
   try {

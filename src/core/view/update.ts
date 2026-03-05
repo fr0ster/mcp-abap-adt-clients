@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -25,7 +26,7 @@ export async function updateView(
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {
-    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Type': CT_SOURCE,
   };
 
   return connection.makeAdtRequest({

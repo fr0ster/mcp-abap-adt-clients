@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { ACCEPT_LOCK, CT_SOURCE } from '../../constants/contentTypes';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -22,8 +23,7 @@ export async function lockClassTestClasses(
   const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
+    Accept: ACCEPT_LOCK,
   };
 
   const response = await connection.makeAdtRequest({
@@ -71,7 +71,7 @@ export async function updateClassTestInclude(
   }
 
   const headers = {
-    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Type': CT_SOURCE,
     Accept: 'text/plain',
   };
 

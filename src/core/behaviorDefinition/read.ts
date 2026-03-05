@@ -7,6 +7,10 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_TRANSPORT,
+  CT_BEHAVIOR_DEFINITION,
+} from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
@@ -40,7 +44,7 @@ export async function read(
   const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?version=${version}${query}`;
 
   const headers = {
-    Accept: options?.accept ?? 'application/vnd.sap.adt.blues.v1+xml',
+    Accept: options?.accept ?? CT_BEHAVIOR_DEFINITION,
   };
 
   return makeAdtRequestWithAcceptNegotiation(
@@ -113,8 +117,7 @@ export async function getBehaviorDefinitionTransport(
   const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/transport${query}`;
 
   const headers = {
-    Accept:
-      options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    Accept: options?.accept ?? ACCEPT_TRANSPORT,
   };
 
   return connection.makeAdtRequest({

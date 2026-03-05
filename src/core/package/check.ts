@@ -6,6 +6,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_CHECK_MESSAGES,
+  CT_CHECK_OBJECTS,
+} from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -60,8 +64,8 @@ export async function checkPackage(
     timeout: getTimeout('default'),
     data: xmlBody,
     headers: {
-      Accept: 'application/vnd.sap.adt.checkmessages+xml',
-      'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+      Accept: ACCEPT_CHECK_MESSAGES,
+      'Content-Type': CT_CHECK_OBJECTS,
     },
   });
 }

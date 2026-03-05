@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateFunctionGroupParams } from './types';
@@ -63,8 +64,8 @@ export async function create(
 </group:abapFunctionGroup>`;
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/vnd.sap.adt.functions.groups.v3+xml', //,
-    // 'Accept': 'application/vnd.sap.adt.functions.groups.v3+xml'
+    'Content-Type': CT_FUNCTION_GROUP, //,
+    // 'Accept': CT_FUNCTION_GROUP
   };
 
   // Log request details for debugging authorization issues (same as class/create.ts)

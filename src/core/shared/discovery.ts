@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { randomUUID } from 'crypto';
+import { ACCEPT_DISCOVERY } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetDiscoveryParams } from './types';
 
@@ -29,7 +30,7 @@ export async function getDiscovery(
     method: 'GET',
     timeout,
     headers: {
-      Accept: 'application/atomsvc+xml',
+      Accept: ACCEPT_DISCOVERY,
       'sap-adt-request-id': requestId,
     },
   });

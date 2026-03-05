@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
@@ -92,9 +93,8 @@ export async function createPackage(
     data: xmlBody,
     params: queryParams,
     headers: {
-      Accept:
-        'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
-      'Content-Type': 'application/vnd.sap.adt.packages.v2+xml',
+      Accept: ACCEPT_PACKAGE,
+      'Content-Type': CT_PACKAGE,
     },
   });
 }

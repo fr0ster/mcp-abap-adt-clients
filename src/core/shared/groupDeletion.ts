@@ -6,6 +6,12 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_DELETION,
+  ACCEPT_DELETION_CHECK,
+  CT_DELETION,
+  CT_DELETION_CHECK,
+} from '../../constants/contentTypes';
 import { buildObjectUri } from '../../utils/activationUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IObjectReference } from './types';
@@ -58,8 +64,8 @@ ${objectElements}
 </del:checkRequest>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
+    Accept: ACCEPT_DELETION_CHECK,
+    'Content-Type': CT_DELETION_CHECK,
   };
 
   return connection.makeAdtRequest({
@@ -127,8 +133,8 @@ ${objectElements}
 </del:deletionRequest>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml',
+    Accept: ACCEPT_DELETION,
+    'Content-Type': CT_DELETION,
   };
 
   return connection.makeAdtRequest({

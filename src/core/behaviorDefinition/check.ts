@@ -6,6 +6,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_CHECK_MESSAGES,
+  CT_CHECK_OBJECTS,
+} from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { CheckReporter } from './types';
 
@@ -61,8 +65,8 @@ export async function check(
   }
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+    Accept: ACCEPT_CHECK_MESSAGES,
+    'Content-Type': CT_CHECK_OBJECTS,
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;

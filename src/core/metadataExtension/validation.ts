@@ -10,6 +10,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { AxiosError } from 'axios';
+import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IMetadataExtensionValidationParams } from './types';
 
@@ -45,7 +46,7 @@ export async function validateMetadataExtension(
       method: 'POST',
       timeout: getTimeout('default'),
       headers: {
-        Accept: 'application/vnd.sap.as+xml',
+        Accept: ACCEPT_VALIDATION,
       },
     });
   } catch (error: any) {
