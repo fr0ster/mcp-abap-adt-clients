@@ -55,7 +55,8 @@ export function getConfig(): SapConfig {
     }
     return {
       url,
-      authType: 'rfc',
+      authType: 'basic',
+      connectionType: 'rfc',
       client: client || undefined,
       username,
       password,
