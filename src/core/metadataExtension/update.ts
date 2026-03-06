@@ -8,7 +8,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { CT_SOURCE } from '../../constants/contentTypes';
+import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -46,7 +46,7 @@ export async function updateMetadataExtension(
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main?lockHandle=${lockHandle}${corrNrParam}`;
 
   const headers = {
-    Accept: 'text/plain',
+    Accept: ACCEPT_SOURCE,
     'Content-Type': CT_SOURCE,
   };
 

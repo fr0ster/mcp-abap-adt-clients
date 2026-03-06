@@ -12,6 +12,8 @@
 
 // Source code
 export const ACCEPT_SOURCE = 'text/plain';
+export const ACCEPT_SOURCE_UTF8 = 'text/plain; charset=utf-8';
+export const ACCEPT_SOURCE_XML_FALLBACK = 'text/plain, application/xml';
 export const CT_SOURCE = 'text/plain; charset=utf-8';
 
 // Lock

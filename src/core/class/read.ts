@@ -7,7 +7,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
+import { ACCEPT_SOURCE, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
@@ -124,7 +124,7 @@ export async function getClassDefinitionsInclude(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },
@@ -155,7 +155,7 @@ export async function getClassMacrosInclude(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },
@@ -186,7 +186,7 @@ export async function getClassTestClassesInclude(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },
@@ -217,7 +217,7 @@ export async function getClassImplementationsInclude(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },

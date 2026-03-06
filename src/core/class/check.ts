@@ -115,6 +115,7 @@ export async function checkClassLocalTestClass(
   const base64Source = Buffer.from(testClassSource, 'utf-8').toString('base64');
 
   // Build XML with testclasses artifact
+  // TODO: analyze whether chkrun:contentType can be extracted to a constant
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
     <chkrun:artifacts>
@@ -284,6 +285,7 @@ async function checkClassInclude(
   const base64Source = Buffer.from(includeSource, 'utf-8').toString('base64');
 
   // Build XML with include artifact
+  // TODO: analyze whether chkrun:contentType can be extracted to a constant
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
     <chkrun:artifacts>

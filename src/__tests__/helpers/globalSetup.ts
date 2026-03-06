@@ -7,6 +7,7 @@
  */
 
 const { loadTestEnv } = require('./test-helper');
+
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import { getConfig } from './sessionConfig';
 

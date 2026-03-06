@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { noopLogger } from '../../utils/noopLogger';
 import { AdtUtils } from '../shared/AdtUtils';
@@ -83,7 +84,7 @@ export async function getBehaviorImplementationImplementations(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },

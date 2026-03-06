@@ -47,6 +47,7 @@ export async function check(
 
   if (sourceCode) {
     // Check with source code content (for unsaved changes)
+    // TODO: analyze whether chkrun:contentType can be extracted to a constant
     const base64Content = Buffer.from(sourceCode, 'utf-8').toString('base64');
     xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
     <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}" chkrun:version="${version}">

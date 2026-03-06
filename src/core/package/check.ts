@@ -39,6 +39,7 @@ export async function checkPackage(
     // Check with XML content (for unsaved changes or new content validation)
     const base64Content = Buffer.from(xmlContent, 'utf-8').toString('base64');
 
+    // TODO: analyze whether chkrun:contentType can be extracted to a constant
     xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
 <chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">

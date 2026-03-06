@@ -8,6 +8,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
+  ACCEPT_SOURCE,
   ACCEPT_TRANSPORT,
   CT_BEHAVIOR_DEFINITION,
 } from '../../constants/contentTypes';
@@ -87,7 +88,7 @@ export async function readSource(
   const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main?version=${version}${query}`;
 
   const headers = {
-    Accept: options?.accept ?? 'text/plain',
+    Accept: options?.accept ?? ACCEPT_SOURCE,
   };
 
   return makeAdtRequestWithAcceptNegotiation(

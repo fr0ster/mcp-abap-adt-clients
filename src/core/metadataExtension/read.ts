@@ -11,6 +11,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
+  ACCEPT_SOURCE,
   ACCEPT_TRANSPORT,
   CT_METADATA_EXTENSION,
 } from '../../constants/contentTypes';
@@ -87,7 +88,7 @@ export async function readMetadataExtensionSource(
   const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}/source/main${versionQuery}${longPollingQuery}`;
 
   const headers = {
-    Accept: options?.accept ?? 'text/plain',
+    Accept: options?.accept ?? ACCEPT_SOURCE,
   };
 
   return makeAdtRequestWithAcceptNegotiation(

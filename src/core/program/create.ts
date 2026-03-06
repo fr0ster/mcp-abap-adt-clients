@@ -6,7 +6,11 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { CT_PROGRAM, CT_SOURCE } from '../../constants/contentTypes';
+import {
+  ACCEPT_SOURCE,
+  CT_PROGRAM,
+  CT_SOURCE,
+} from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -126,7 +130,7 @@ async function _uploadProgramSource(
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {
-    Accept: 'text/plain',
+    Accept: ACCEPT_SOURCE,
     'Content-Type': CT_SOURCE,
   };
 

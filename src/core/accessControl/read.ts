@@ -4,6 +4,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
+  ACCEPT_SOURCE,
   ACCEPT_TRANSPORT,
   CT_ACCESS_CONTROL,
 } from '../../constants/contentTypes';
@@ -75,7 +76,7 @@ export async function getAccessControlSource(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },

@@ -7,7 +7,11 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
-import { ACCEPT_LOCK, CT_SOURCE } from '../../constants/contentTypes';
+import {
+  ACCEPT_LOCK,
+  ACCEPT_SOURCE,
+  CT_SOURCE,
+} from '../../constants/contentTypes';
 import { activateObjectInSession } from '../../utils/activationUtils';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -39,7 +43,7 @@ export async function updateClassTestInclude(
 
   const headers = {
     'Content-Type': CT_SOURCE,
-    Accept: 'text/plain',
+    Accept: ACCEPT_SOURCE,
   };
 
   return await connection.makeAdtRequest({

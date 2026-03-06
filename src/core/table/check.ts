@@ -29,6 +29,7 @@ function buildCheckRunPayload(
 
   if (sourceCode) {
     // Check with source code content (for unsaved changes or new code validation)
+    // TODO: analyze whether chkrun:contentType can be extracted to a constant
     const base64Source = Buffer.from(sourceCode, 'utf-8').toString('base64');
     return `<?xml version="1.0" encoding="UTF-8"?>
 <chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">

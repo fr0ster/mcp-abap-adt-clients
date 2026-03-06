@@ -67,7 +67,7 @@ export async function runClass(
   const url = `/sap/bc/adt/oo/classrun/${className}`;
 
   const headers = {
-    Accept: 'text/plain',
+    Accept: ACCEPT_SOURCE,
   };
 
   return connection.makeAdtRequest({
@@ -94,6 +94,7 @@ function boolAttr(value: boolean | undefined, fallback: boolean) {
 
 import {
   ACCEPT_JUNIT_RESULT,
+  ACCEPT_SOURCE,
   ACCEPT_UNIT_TEST_RESULT,
   ACCEPT_UNIT_TEST_STATUS,
   CT_UNIT_TEST_RUN,

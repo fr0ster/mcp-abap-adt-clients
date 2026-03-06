@@ -7,7 +7,11 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { ACCEPT_TRANSPORT, CT_TABLE_TYPE } from '../../constants/contentTypes';
+import {
+  ACCEPT_SOURCE,
+  ACCEPT_TRANSPORT,
+  CT_TABLE_TYPE,
+} from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -98,7 +102,7 @@ export async function getTableTypeSource(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },

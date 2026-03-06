@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_ENHANCEMENT,
+  ACCEPT_SOURCE_UTF8,
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
@@ -98,7 +99,7 @@ export async function getEnhancementSource(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain; charset=utf-8',
+        Accept: options?.accept ?? ACCEPT_SOURCE_UTF8,
       },
     },
     { logger },

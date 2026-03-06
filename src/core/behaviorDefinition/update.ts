@@ -6,7 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { CT_SOURCE } from '../../constants/contentTypes';
+import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateBehaviorDefinitionParams } from './types';
 
@@ -65,7 +65,7 @@ export async function update(
 
   const headers = {
     'Content-Type': CT_SOURCE,
-    Accept: 'text/plain',
+    Accept: ACCEPT_SOURCE,
   };
 
   return await connection.makeAdtRequest({
