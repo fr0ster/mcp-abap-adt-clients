@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-03-06
+
+### Added
+- **Jest globalSetup**: SAP connection preflight check — validates connectivity once before any test file runs. If `SAP_URL` is configured but unreachable, the entire suite fails immediately with a clear error instead of letting 24+ test files silently skip.
+
+### Changed
+- **Content type constants**: Extracted all inline `Accept` / `Content-Type` header strings into `src/constants/contentTypes.ts`. Replaces ~370 scattered string literals across 130+ core module files with named constants (`ACCEPT_*` for Accept headers, `CT_*` for Content-Type headers).
+- **Test config template**: Simplified `shared_dependencies`, aligned `create_view` template, replaced placeholders with concrete `ZADT_SHR_*` names, added BDEF shared dependencies.
+
+### Fixed
+- Aligned `create_view` template field names with shared table definition.
+- Simplified `shared_dependencies` template to match actual usage (removed unused BDEF table/view entries).
+- Updated `@mcp-abap-adt/connection` to `^1.3.2`.
+- Stateful session only on lock/unlock requests.
+- Rewritten `getTableContents` to use DDIC Data Preview endpoint.
+- Corrected Accept header for freestyle SQL query endpoint.
+
 ## [2.2.0] - 2026-03-01
 
 ### Changed
