@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  globalSetup: '<rootDir>/src/__tests__/helpers/globalSetup.ts',
   testMatch: [
     '**/__tests__/**/*.test.[tj]s',
     '**/*.test.[tj]s',
