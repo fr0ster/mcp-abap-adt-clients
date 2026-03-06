@@ -1,7 +1,10 @@
 /**
  * AdtPackageLegacy - Package handler for legacy SAP systems (BASIS < 7.50)
  *
- * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
+ * - create() blocked: on legacy systems packages are created via SAP GUI only (SE80/SE21)
+ * - validate() blocked: /sap/bc/adt/packages/validation not in discovery
+ * - delete() uses direct DELETE instead of /sap/bc/adt/deletion/ API
+ * - read() works via /sap/bc/adt/packages (present in legacy discovery)
  */
 
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -12,6 +15,21 @@ import type { IPackageConfig, IPackageState } from './types';
 import { unlockPackage } from './unlock';
 
 export class AdtPackageLegacy extends AdtPackage {
+  override async create(): Promise<IPackageState> {
+    throw new Error(
+      'Package creation is not supported on legacy SAP systems via ADT. ' +
+        'Use SAP GUI (SE80 or SE21) to create packages.',
+    );
+  }
+
+  override async validate(): Promise<IPackageState> {
+    throw new Error(
+      'Package validation is not supported on legacy SAP systems. ' +
+        'The endpoint /sap/bc/adt/packages/validation was not found in the ' +
+        'system\'s ADT discovery catalog.',
+    );
+  }
+
   override async delete(
     config: Partial<IPackageConfig>,
   ): Promise<IPackageState> {

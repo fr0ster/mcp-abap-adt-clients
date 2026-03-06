@@ -6,6 +6,8 @@
 
 Primary public entry points:
 - `AdtClient` - high-level CRUD-style object operations.
+- `AdtClientLegacy` - extends `AdtClient` for legacy systems (BASIS < 7.50): blocks unsupported types, uses legacy deletion and versionless content types.
+- `createAdtClient()` - factory that auto-detects system version and returns `AdtClient` or `AdtClientLegacy`.
 - `AdtRuntimeClient` - stable runtime operations (debugger, traces, dumps, logs, feeds, DDIC runtime helpers).
 - `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 - `AdtClientsWS` - WebSocket request/event facade.
@@ -27,12 +29,22 @@ Consumer code
           -> SAP ADT endpoints
 ```
 
+## Legacy System Support
+
+Legacy SAP systems (BASIS < 7.50) are supported through `AdtClientLegacy` and per-object `*Legacy` handler classes. The factory `createAdtClient()` auto-detects the system version and returns the appropriate client.
+
+Key differences: versionless content types, direct DELETE (no `/deletion/` API), limited object type support (no DDIC dedicated endpoints).
+
+See [LEGACY.md](LEGACY.md) for the complete support matrix and RFC transport details.
+
 ## Source Layout
 
 ```text
 src/
   clients/
     AdtClient.ts
+    AdtClientLegacy.ts
+    createAdtClient.ts
     AdtRuntimeClient.ts
     AdtRuntimeClientExperimental.ts
     AdtClientsWS.ts
@@ -42,10 +54,13 @@ src/
   core/
     <object>/                 # class, program, package, table, ...
       Adt<Object>.ts          # IAdtObject implementation
+      Adt<Object>Legacy.ts    # Legacy override (optional, for supported types)
       create.ts/read.ts/...   # low-level endpoint helpers
       types.ts
     shared/
       AdtUtils.ts             # cross-cutting non-CRUD utilities
+      contentTypes.ts         # AdtContentTypesBase / AdtContentTypesModern
+      deleteLegacy.ts         # direct DELETE for legacy systems
       *.ts                    # discovery, search, where-used, etc.
 
   runtime/
