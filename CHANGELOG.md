@@ -5,6 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-03-06
+
+### Added
+- **RFC transport**: Support for legacy SAP systems (BASIS < 7.50) where HTTP stateful sessions are not available. Uses `SADT_REST_RFC_ENDPOINT` function module — the same mechanism Eclipse ADT uses via JCo.
+- **AdtClientLegacy**: Extended client for legacy systems with per-object handlers (direct DELETE, versionless content types). Unsupported object types throw clear errors referencing missing ADT discovery endpoints.
+- **`createAdtClient()` factory**: Auto-detects modern vs legacy systems via `/sap/bc/adt/core/discovery` endpoint.
+- **7 legacy handlers**: `AdtClassLegacy`, `AdtProgramLegacy`, `AdtInterfaceLegacy`, `AdtFunctionGroupLegacy`, `AdtFunctionModuleLegacy`, `AdtPackageLegacy`, `AdtViewLegacy`.
+- **Content type system**: `AdtContentTypesBase` / `AdtContentTypesModern` for version-aware Accept/Content-Type headers.
+- **Discovery utilities**: `fetchDiscoveryEndpoints()` and `isEndpointInDiscovery()` for endpoint availability checking.
+- **CSRF diagnostic test** for connection troubleshooting.
+- **Documentation**: `LEGACY.md` (support matrix), `RFC_CONNECTION.md` (consumer guide), `RFC_TESTING.md` (developer guide), discovery endpoint analysis across cloud/on-prem modern/on-prem legacy.
+
+### Fixed
+- Fix double URL-encoding in 16 validation files (`$TMP` was encoded as `%2524TMP` instead of `%24TMP`).
+- Fix missing `encodeURIComponent(lockHandle)` in 33 update/unlock files (base64 lock handles from RFC contain spaces/+/= that break URLs).
+- Fix missing Accept header in table, interface, and view update operations.
+- Fix FunctionGroup read via RFC (only `*/*` Accept works).
+- Fix BaseTester multi-word object name lookup (camelCase prefix).
+- Fix missing `adtView` property declaration in `AdtCdsUnitTest`.
+- Resolve Biome lint errors across the codebase.
+
 ## [2.3.0] - 2026-03-06
 
 ### Added
