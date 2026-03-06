@@ -1,6 +1,6 @@
 /**
  * Integration test for Program run operation
- * Tests runProgram function with self-contained setup/teardown
+ * Uses shared program (created if missing) — see shared_dependencies.programs in test-config.yaml
  *
  * Enable debug logs: DEBUG_ADT_TESTS=true npm test -- integration/core/program/run
  */
@@ -18,6 +18,7 @@ import {
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -27,8 +28,7 @@ import {
 const {
   getEnabledTestCase,
   getTimeout,
-  resolvePackageName,
-  resolveTransportRequest,
+  ensureSharedDependency,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -46,8 +46,7 @@ describe('Program - Run', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
-  let programNameForTest: string | null = null;
-  let transportRequestForCleanup = '';
+  let isLegacy = false;
 
   beforeEach(async () => {
     try {
@@ -59,15 +58,14 @@ describe('Program - Run', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient } = await createTestAdtClient(
+      const { client: resolvedClient, isLegacy: legacy } = await createTestAdtClient(
         connection,
         libraryLogger,
         systemContext,
       );
       client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
-      programNameForTest = null;
-      transportRequestForCleanup = '';
     } catch (_error) {
       testsLogger.warn(
         'Skipping tests: No .env file or SAP configuration found',
@@ -77,19 +75,6 @@ describe('Program - Run', () => {
   });
 
   afterEach(async () => {
-    if (connection && programNameForTest) {
-      try {
-        await client.getProgram().delete({
-          programName: programNameForTest,
-          transportRequest: transportRequestForCleanup,
-        });
-      } catch (cleanupError) {
-        testsLogger.warn?.(
-          `Cleanup failed for program ${programNameForTest}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-        );
-      }
-    }
-
     if (connection) {
       (connection as any).reset();
     }
@@ -105,53 +90,22 @@ describe('Program - Run', () => {
         return;
       }
 
-      if (isCloudSystem) {
-        testsLogger.warn(
-          'Skipping test: Programs are not supported in cloud systems',
-        );
-        return;
-      }
-
       const testCase = getEnabledTestCase('run_program');
       if (!testCase) {
         testsLogger.warn('Skipping test: Test case is disabled');
         return;
       }
 
-      const baseName = testCase.params.program_name || 'ZADT_BLD_PROG_RUN';
-      const suffix = Date.now().toString().slice(-4);
-      const maxBaseLen = 30 - suffix.length;
-      const programName = `${baseName.toUpperCase().slice(0, maxBaseLen)}${suffix}`;
-
-      const packageName = resolvePackageName(testCase.params?.package_name);
-      const transportRequest = resolveTransportRequest(
-        testCase.params?.transport_request,
-      );
-
-      if (!packageName) {
-        testsLogger.warn('Skipping test: package_name not configured');
+      if (!TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)) {
+        const envName = isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
+        testsLogger.warn(`Skipping test: Not available for ${envName} environment`);
         return;
       }
 
-      programNameForTest = programName;
-      transportRequestForCleanup = transportRequest || '';
+      const programName = testCase.params.program_name || 'ZADT_BLD_RUN01';
 
-      const sourceCode = `REPORT ${programName}.\nWRITE: / 'RUN_PROGRAM_TEST_PROBE = OK'.`;
-
-      // Create and activate program
-      await client.getProgram().create({
-        programName,
-        packageName,
-        transportRequest,
-        description: `Run test ${programName}`,
-      });
-
-      await client
-        .getProgram()
-        .update(
-          { programName, sourceCode, transportRequest },
-          { activateOnUpdate: true, sourceCode },
-        );
+      // Ensure shared program exists (create if missing)
+      await ensureSharedDependency(client, 'programs', programName, testsLogger);
 
       // Run
       const result = await runProgram(connection, programName);

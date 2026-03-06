@@ -28,6 +28,7 @@ export interface ITestConfigResolverOptions {
   handlerName?: string;
   testCaseName?: string;
   isCloud?: boolean;
+  isLegacy?: boolean;
   logger?: ILogger;
 }
 
@@ -35,6 +36,7 @@ export class TestConfigResolver {
   private testCase: any;
   private envConfig: any;
   private isCloud: boolean;
+  private isLegacy: boolean;
   private logger?: ILogger;
 
   constructor(options: ITestConfigResolverOptions = {}) {
@@ -54,6 +56,7 @@ export class TestConfigResolver {
 
     this.envConfig = getEnvironmentConfig();
     this.isCloud = options.isCloud ?? false;
+    this.isLegacy = options.isLegacy ?? false;
     this.logger = options.logger;
   }
 
@@ -191,9 +194,22 @@ export class TestConfigResolver {
       return true;
     }
 
-    // Check if current environment is in the list
-    const currentEnv = this.isCloud ? 'cloud' : 'onprem';
+    // Determine current environment: cloud, onprem (modern), or legacy (on-premise BASIS < 7.50)
+    const currentEnv = this.isCloud ? 'cloud' : this.isLegacy ? 'legacy' : 'onprem';
     return availableIn.includes(currentEnv);
+  }
+
+  /**
+   * Check if test case is available for given environment
+   * Convenience static method for tests that don't use BaseTester
+   */
+  static isTestAvailable(testCase: any, isCloud: boolean, isLegacy: boolean): boolean {
+    const availableIn = testCase?.available_in;
+    if (!availableIn || !Array.isArray(availableIn) || availableIn.length === 0) {
+      return true;
+    }
+    const env = isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
+    return availableIn.includes(env);
   }
 
   /**

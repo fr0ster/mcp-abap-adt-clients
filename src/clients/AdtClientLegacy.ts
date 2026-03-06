@@ -36,7 +36,9 @@ import type { IPackageConfig, IPackageState } from '../core/package';
 import { AdtPackageLegacy } from '../core/package/AdtPackageLegacy';
 import type { IProgramConfig, IProgramState } from '../core/program';
 import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
+import type { AdtUtils } from '../core/shared/AdtUtils';
 import { AdtContentTypesBase } from '../core/shared/contentTypes';
+import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import type { IViewConfig, IViewState } from '../core/view';
 import { AdtViewLegacy } from '../core/view/AdtViewLegacy';
 import { AdtClient, type IAdtClientOptions } from './AdtClient';
@@ -126,6 +128,12 @@ export class AdtClientLegacy extends AdtClient {
 
   override getView(): IAdtObject<IViewConfig, IViewState> {
     return new AdtViewLegacy(this.connection, this.logger, this.systemContext);
+  }
+
+  // --- Utilities with legacy restrictions ---
+
+  override getUtils(): AdtUtils {
+    return new AdtUtilsLegacy(this.connection, this.logger);
   }
 
   // --- Unsupported types: endpoints absent from legacy /sap/bc/adt/discovery ---

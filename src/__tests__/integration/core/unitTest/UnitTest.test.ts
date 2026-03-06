@@ -15,13 +15,15 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IUnitTestConfig } from '../../../../core/unitTest';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -63,18 +65,26 @@ describe('AdtUnitTest (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isCloudSystem = false;
+  let isLegacy = false;
 
   beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      const isCloudSystem = await isCloudEnvironment(connection);
+      isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
         isCloudSystem,
       );
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient, isLegacy: legacy } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
     } catch (_error) {
       hasConfig = false;
@@ -95,6 +105,21 @@ describe('AdtUnitTest (using AdtClient)', () => {
           'run_unit_test',
           'adt_unit_test',
         );
+
+        if (!TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)) {
+          logTestStart(testsLogger, 'UnitTest - run unit test', {
+            name: 'run_unit_test',
+            params: {},
+          });
+          const envName = isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
+          logTestSkip(
+            testsLogger,
+            'UnitTest - run unit test',
+            `Test not available for ${envName} environment`,
+          );
+          return;
+        }
+
         if (!testCase?.params?.test_class?.run_unit_test) {
           logTestStart(testsLogger, 'UnitTest - run unit test', {
             name: 'run_unit_test',

@@ -1989,6 +1989,9 @@ async function ensureSharedDependency(client, type, name, logger) {
     } else if (type === 'views') {
       await client.getView().read({ viewName: name });
       exists = true;
+    } else if (type === 'programs') {
+      await client.getProgram().read({ programName: name });
+      exists = true;
     } else if (type === 'behavior_definitions') {
       await client.getBehaviorDefinition().read({ name });
       exists = true;
@@ -2023,6 +2026,19 @@ async function ensureSharedDependency(client, type, name, logger) {
         ddlSource: depConfig.source,
         transportRequest,
       });
+    } else if (type === 'programs') {
+      await client.getProgram().create({
+        programName: name,
+        packageName,
+        description: depConfig.description || 'Shared test program',
+        transportRequest,
+      });
+      if (depConfig.source) {
+        await client.getProgram().update(
+          { programName: name, sourceCode: depConfig.source, transportRequest },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+      }
     } else if (type === 'behavior_definitions') {
       await client.getBehaviorDefinition().create({
         name,
