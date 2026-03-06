@@ -5,6 +5,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-03-07
+
+### Added
+- **Legacy environment type**: Three-tier environment classification (`cloud`, `onprem`, `legacy`) for test infrastructure. Tests can now specify `available_in: ["onprem", "legacy"]` to control which systems they run on.
+- **`AdtUtilsLegacy`**: Throws clear errors for operations not available on legacy systems (`getTableContents`, `getSqlQuery`, `getTransaction`) instead of returning cryptic HTTP 404.
+- **`AdtClientLegacy.getUtils()`**: Returns `AdtUtilsLegacy` with unsupported operation guards.
+- **Shared test programs**: `ensureSharedDependency` now supports `programs` type for auto-creating test programs.
+- **`TestConfigResolver.isTestAvailable()`**: Static convenience method for tests that don't use BaseTester.
+- **Auto-detect legacy in BaseTester**: Determines legacy status from `AdtClientLegacy` constructor name — no manual `isLegacySystem` flag needed.
+
+### Fixed
+- **UnitTest**: Use `createTestAdtClient()` instead of `new AdtClient()` to get correct content types on legacy systems.
+- **Program run test**: Use shared program with fixed name instead of creating temporary programs with dynamic suffix.
+
 ## [3.0.0] - 2026-03-06
 
 ### Added
