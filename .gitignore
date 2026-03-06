@@ -26,3 +26,13 @@ mcp-abap-adt-adt-clients-*.tgz
 sk.json
 src/__tests__/helpers/test-config.yaml
 *.env
+
+# Claude Code local settings
+.claude/
+
+# Temp/scratch files
+cookies.txt
+*.abap
+
+# Credential/config files (not for repo)
+mdd-*.json
