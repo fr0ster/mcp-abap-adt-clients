@@ -229,6 +229,10 @@ export type {
 export type { IAdtContentTypes, IAdtHeaders } from './core/shared/contentTypes';
 export { AdtContentTypesBase, AdtContentTypesModern } from './core/shared/contentTypes';
 export {
+  fetchDiscoveryEndpoints,
+  isEndpointInDiscovery,
+} from './utils/discoveryEndpoints';
+export {
   getSystemInformation,
   isModernAdtSystem,
   resolveContentTypes,
