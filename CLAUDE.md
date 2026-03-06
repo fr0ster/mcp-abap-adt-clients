@@ -104,6 +104,55 @@ Error handling in chains: automatic unlock + `setSessionType('stateless')` on an
 - E2E tests (`src/__tests__/e2e/`) focus on session/lock persistence and crash recovery; excluded from default test run
 - Test structure mirrors core: `src/__tests__/integration/core/{objectType}/`
 
+### Running Tests with RFC (Legacy Systems)
+
+RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP stateful sessions don't work. Example: E77 system.
+
+**Prerequisites:**
+1. SAP NW RFC SDK installed (download from SAP Support Portal, requires S-user)
+2. `node-rfc` package installed (`npm install node-rfc`) — loaded dynamically at runtime
+3. SAP user has `S_RFC` authorization for `SADT_REST_RFC_ENDPOINT` (SAP Note 3569684)
+
+**Ensure `test-config.yaml` has `connection_type: "rfc"`:**
+
+```yaml
+environment:
+  connection_type: "rfc"        # Use RFC transport instead of HTTP
+  default_master_system: "E77"  # Match target system
+```
+
+**Run tests — pass `SAPNWRFC_HOME` and `PATH`/`LD_LIBRARY_PATH` inline:**
+
+These vars CANNOT be in `.env` — `dotenv` doesn't expand `PATH`. Pass them at launch.
+
+```bash
+# Copy target system credentials first
+cp e77.env .env
+```
+
+Windows (Git Bash):
+```bash
+SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm test
+SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" npm test -- integration/core/class
+SAPNWRFC_HOME='C:\nwrfcsdk\nwrfcsdk' PATH='C:\nwrfcsdk\nwrfcsdk\lib;'"$PATH" DEBUG_ADT_TESTS=true npm test -- integration/core/class
+```
+
+macOS:
+```bash
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm test
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH npm test -- integration/core/class
+```
+
+Linux:
+```bash
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm test
+SAPNWRFC_HOME=~/nwrfcsdk PATH=$SAPNWRFC_HOME/lib:$PATH LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH npm test -- integration/core/class
+```
+
+**Available .env files:** `e77.env` (legacy), `e19.env`, `dev.env`, `trial.env`, `mdd-sk-dev.env`
+
+See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for full details.
+
 ## Key Dependencies
 
 - `@mcp-abap-adt/interfaces` — All interfaces (`IAbapConnection`, `IAdtObject`, `IAdtResponse`, `IWebSocketTransport`, etc.)
