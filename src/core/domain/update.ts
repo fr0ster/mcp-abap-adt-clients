@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_DOMAIN } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -85,8 +86,7 @@ ${fixValuesXml}
 </doma:domain>`;
 
   const headers: Record<string, string> = {
-    Accept:
-      'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
+    Accept: ACCEPT_DOMAIN,
     'Content-Type': 'application/vnd.sap.adt.domains.v2+xml; charset=utf-8',
   };
 

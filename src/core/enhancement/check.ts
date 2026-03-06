@@ -48,6 +48,7 @@ export async function checkEnhancement(
   const checkUrl = `/sap/bc/adt/checkruns`;
 
   // Build check run XML with or without source code artifacts
+  // TODO: analyze whether chkrun:contentType can be extracted to a constant
   let artifactsXml = '';
   if (source_code && supportsSourceCode(enhancement_type)) {
     // Include source code for live validation (base64 encoded)

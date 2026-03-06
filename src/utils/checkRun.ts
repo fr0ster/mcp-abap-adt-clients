@@ -7,6 +7,10 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import {
+  ACCEPT_CHECK_MESSAGES,
+  CT_CHECK_OBJECTS,
+} from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
 
@@ -275,8 +279,8 @@ export async function runCheckRun(
     : buildCheckRunXml(objectUri, version);
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+    Accept: ACCEPT_CHECK_MESSAGES,
+    'Content-Type': CT_CHECK_OBJECTS,
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;
@@ -317,7 +321,7 @@ export async function runCheckRunWithSource(
   const xmlBody = buildCheckRunXmlWithSource(objectUri, sourceCode, version);
 
   const headers = {
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+    'Content-Type': CT_CHECK_OBJECTS,
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;

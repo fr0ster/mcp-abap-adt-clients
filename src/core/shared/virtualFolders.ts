@@ -8,6 +8,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_VIRTUAL_FOLDERS,
+  CT_VIRTUAL_FOLDERS,
+} from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetVirtualFoldersContentsParams } from './types';
 
@@ -90,9 +94,8 @@ export async function getVirtualFoldersContents(
     params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
     data: xmlBody,
     headers: {
-      Accept: 'application/vnd.sap.adt.repository.virtualfolders.result.v1+xml',
-      'Content-Type':
-        'application/vnd.sap.adt.repository.virtualfolders.request.v1+xml',
+      Accept: ACCEPT_VIRTUAL_FOLDERS,
+      'Content-Type': CT_VIRTUAL_FOLDERS,
     },
   });
 }

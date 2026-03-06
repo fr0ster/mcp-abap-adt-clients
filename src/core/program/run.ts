@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -30,7 +31,7 @@ export async function runProgram(
     method: 'POST',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'text/plain',
+      Accept: ACCEPT_SOURCE,
       'X-sap-adt-profiling': 'server-time',
     },
   });

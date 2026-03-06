@@ -5,6 +5,15 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import {
+  ACCEPT_CHECK_MESSAGES,
+  ACCEPT_DELETION,
+  ACCEPT_TRANSPORT_CHECK,
+  ACCEPT_VALIDATION,
+  CT_CHECK_OBJECTS,
+  CT_DELETION,
+  CT_TRANSPORT_CHECK,
+} from '../../constants/contentTypes';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type {
@@ -202,7 +211,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       data: xml,
       params: { servicename, serviceversion },
       headers: {
-        Accept: 'application/vnd.sap.as+xml',
+        Accept: ACCEPT_VALIDATION,
         'Content-Type': 'application/xml',
       },
     });
@@ -224,7 +233,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       data: xml,
       params: { servicename, serviceversion },
       headers: {
-        Accept: 'application/vnd.sap.as+xml',
+        Accept: ACCEPT_VALIDATION,
         'Content-Type': 'application/xml',
       },
     });
@@ -642,10 +651,8 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       timeout: getTimeout('default'),
       data: this.buildTransportCheckXml(params),
       headers: {
-        Accept:
-          'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.transport.service.checkData',
-        'Content-Type':
-          'application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.transport.service.checkData',
+        Accept: ACCEPT_TRANSPORT_CHECK,
+        'Content-Type': CT_TRANSPORT_CHECK,
       },
     });
   }
@@ -804,8 +811,8 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       timeout: getTimeout('default'),
       data: this.buildDeletionXml(params),
       headers: {
-        Accept: 'application/vnd.sap.adt.deletion.response.v1+xml',
-        'Content-Type': 'application/vnd.sap.adt.deletion.request.v1+xml',
+        Accept: ACCEPT_DELETION,
+        'Content-Type': CT_DELETION,
       },
     });
   }
@@ -827,8 +834,8 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       timeout: getTimeout('default'),
       data: xml,
       headers: {
-        Accept: 'application/vnd.sap.adt.checkmessages+xml',
-        'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+        Accept: ACCEPT_CHECK_MESSAGES,
+        'Content-Type': CT_CHECK_OBJECTS,
       },
     });
   }

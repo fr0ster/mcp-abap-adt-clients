@@ -13,12 +13,12 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_DATA_PREVIEW } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetTableContentsParams } from './types';
 
-const ACCEPT_HEADER =
-  'application/xml, application/vnd.sap.adt.datapreview.table.v1+xml';
+const ACCEPT_HEADER = ACCEPT_DATA_PREVIEW;
 
 /**
  * Get column names for a DDIC entity via metadata endpoint

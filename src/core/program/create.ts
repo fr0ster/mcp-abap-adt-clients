@@ -7,6 +7,11 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import {
+  ACCEPT_SOURCE,
+  CT_PROGRAM,
+  CT_SOURCE,
+} from '../../constants/contentTypes';
+import {
   encodeSapObjectName,
   limitDescription,
 } from '../../utils/internalUtils';
@@ -97,8 +102,8 @@ export async function create(
 </program:abapProgram>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.programs.programs.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.programs.programs.v2+xml',
+    Accept: CT_PROGRAM,
+    'Content-Type': CT_PROGRAM,
   };
 
   return connection.makeAdtRequest({
@@ -125,8 +130,8 @@ async function _uploadProgramSource(
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {
-    Accept: 'text/plain',
-    'Content-Type': 'text/plain; charset=utf-8',
+    Accept: ACCEPT_SOURCE,
+    'Content-Type': CT_SOURCE,
   };
 
   return connection.makeAdtRequest({

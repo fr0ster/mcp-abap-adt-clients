@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateServiceDefinitionParams } from './types';
@@ -29,8 +30,8 @@ export async function updateServiceDefinition(
   const url = `/sap/bc/adt/ddic/srvd/sources/${serviceDefinitionNameEncoded}/source/main?lockHandle=${lockHandle}${corrNrParam}`;
 
   const headers: Record<string, string> = {
-    Accept: 'text/plain',
-    'Content-Type': 'text/plain; charset=utf-8',
+    Accept: ACCEPT_SOURCE,
+    'Content-Type': CT_SOURCE,
   };
 
   return connection.makeAdtRequest({

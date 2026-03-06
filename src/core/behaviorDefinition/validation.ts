@@ -2,6 +2,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IBehaviorDefinitionValidationParams } from './types';
 
@@ -51,7 +52,7 @@ export async function validate(
       method: 'POST',
       timeout: getTimeout('default'),
       headers: {
-        Accept: 'application/vnd.sap.as+xml',
+        Accept: ACCEPT_VALIDATION,
       },
     });
 

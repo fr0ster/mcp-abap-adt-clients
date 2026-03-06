@@ -6,6 +6,12 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_JUNIT_RESULT,
+  ACCEPT_UNIT_TEST_RESULT,
+  ACCEPT_UNIT_TEST_STATUS,
+  CT_UNIT_TEST_RUN,
+} from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type {
@@ -70,7 +76,7 @@ export async function startClassUnitTestRun(
     timeout: getTimeout('default'),
     data: xml,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.api.abapunit.run.v2+xml',
+      'Content-Type': CT_UNIT_TEST_RUN,
     },
   });
 }
@@ -121,7 +127,7 @@ export async function startClassUnitTestRunByObject(
     timeout: getTimeout('default'),
     data: xml,
     headers: {
-      'Content-Type': 'application/vnd.sap.adt.api.abapunit.run.v2+xml',
+      'Content-Type': CT_UNIT_TEST_RUN,
     },
   });
 }
@@ -140,7 +146,7 @@ export async function getClassUnitTestStatus(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/vnd.sap.adt.api.abapunit.run-status.v1+xml',
+      Accept: ACCEPT_UNIT_TEST_STATUS,
     },
   });
 }
@@ -160,9 +166,7 @@ export async function getClassUnitTestResult(
   const query = params.length ? `?${params.join('&')}` : '';
   const format = options?.format || 'abapunit';
   const accept =
-    format === 'junit'
-      ? 'application/vnd.sap.adt.api.junit.run-result.v1+xml'
-      : 'application/vnd.sap.adt.api.abapunit.run-result.v1+xml';
+    format === 'junit' ? ACCEPT_JUNIT_RESULT : ACCEPT_UNIT_TEST_RESULT;
 
   return connection.makeAdtRequest({
     url: `/sap/bc/adt/abapunit/results/${runId}${query}`,

@@ -7,6 +7,11 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_SOURCE,
+  ACCEPT_TRANSPORT,
+  CT_TABLE_TYPE,
+} from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -24,8 +29,7 @@ export async function getTableTypeMetadata(
   const encodedName = encodeSapObjectName(tableTypeName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/tabletypes/${encodedName}${query}`;
-  const acceptHeader =
-    options?.accept ?? 'application/vnd.sap.adt.tabletype.v1+xml';
+  const acceptHeader = options?.accept ?? CT_TABLE_TYPE;
 
   try {
     return await makeAdtRequestWithAcceptNegotiation(
@@ -98,7 +102,7 @@ export async function getTableTypeSource(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },
@@ -136,8 +140,7 @@ export async function getTableTypeTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },
   });
 }

@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_VIEW, CT_VIEW } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateViewParams } from './types';
@@ -40,9 +41,8 @@ async function createDDLSObject(
 </ddl:ddlSource>`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.adt.ddlSource.v2+xml, application/vnd.sap.adt.ddlSource+xml',
-    'Content-Type': 'application/vnd.sap.adt.ddlSource+xml',
+    Accept: ACCEPT_VIEW,
+    'Content-Type': CT_VIEW,
   };
 
   return connection.makeAdtRequest({

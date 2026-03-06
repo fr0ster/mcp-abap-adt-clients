@@ -7,6 +7,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_NODE_STRUCTURE } from '../constants/contentTypes';
 import { encodeSapObjectName } from '../utils/internalUtils';
 import { getTimeout } from './timeouts';
 
@@ -200,8 +201,7 @@ export async function fetchNodeStructure(
 </asx:abap>`;
 
   return makeAdtRequest(connection, url, 'POST', 'default', xmlBody, params, {
-    Accept:
-      'application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml',
+    Accept: ACCEPT_NODE_STRUCTURE,
   });
 }
 

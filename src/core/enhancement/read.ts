@@ -7,6 +7,11 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_ENHANCEMENT,
+  ACCEPT_SOURCE_UTF8,
+  ACCEPT_TRANSPORT,
+} from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -47,9 +52,7 @@ export async function getEnhancementMetadata(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept:
-          options?.accept ??
-          'application/vnd.sap.adt.enhancements.v1+xml, application/xml',
+        Accept: options?.accept ?? ACCEPT_ENHANCEMENT,
       },
     },
     { logger },
@@ -96,7 +99,7 @@ export async function getEnhancementSource(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain; charset=utf-8',
+        Accept: options?.accept ?? ACCEPT_SOURCE_UTF8,
       },
     },
     { logger },
@@ -130,8 +133,7 @@ export async function getEnhancementTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },
   });
 }

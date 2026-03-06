@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
@@ -102,9 +103,8 @@ export async function updatePackage(
   const xmlBody = await buildUpdatePackageXml(connection, params);
 
   const headers = {
-    'Content-Type': 'application/vnd.sap.adt.packages.v2+xml',
-    Accept:
-      'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
+    'Content-Type': CT_PACKAGE,
+    Accept: ACCEPT_PACKAGE,
   };
 
   return await connection.makeAdtRequest({

@@ -8,6 +8,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_SOURCE_XML_FALLBACK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -48,7 +49,7 @@ export async function getTypeInfo(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: 'text/plain, application/xml',
+        Accept: ACCEPT_SOURCE_XML_FALLBACK,
       },
     });
     if (domainResponse.status === 200) {

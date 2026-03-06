@@ -7,6 +7,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_SERVICE_DEFINITION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateServiceDefinitionParams } from './types';
@@ -39,8 +40,8 @@ export async function create(
 </srvd:srvdSource>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.ddic.srvd.v1+xml',
-    'Content-Type': 'application/vnd.sap.adt.ddic.srvd.v1+xml',
+    Accept: CT_SERVICE_DEFINITION,
+    'Content-Type': CT_SERVICE_DEFINITION,
   };
 
   return connection.makeAdtRequest({

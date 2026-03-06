@@ -2,6 +2,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateAccessControlParams } from './types';
@@ -25,8 +26,8 @@ export async function updateAccessControl(
   const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}/source/main?lockHandle=${lockHandle}${corrNrParam}`;
 
   const headers: Record<string, string> = {
-    Accept: 'text/plain',
-    'Content-Type': 'text/plain; charset=utf-8',
+    Accept: ACCEPT_SOURCE,
+    'Content-Type': CT_SOURCE,
   };
 
   return connection.makeAdtRequest({

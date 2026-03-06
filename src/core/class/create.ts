@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { CT_CLASS } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateClassParams } from './types';
@@ -74,8 +75,8 @@ export async function create(
 </class:abapClass>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.oo.classes.v4+xml',
-    'Content-Type': 'application/vnd.sap.adt.oo.classes.v4+xml',
+    Accept: CT_CLASS,
+    'Content-Type': CT_CLASS,
   };
 
   // Log request details for debugging authorization issues

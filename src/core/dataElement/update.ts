@@ -9,6 +9,10 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
+  ACCEPT_DATA_ELEMENT,
+  ACCEPT_DOMAIN,
+} from '../../constants/contentTypes';
+import {
   encodeSapObjectName,
   limitDescription,
 } from '../../utils/internalUtils';
@@ -29,8 +33,7 @@ export async function getDomainInfo(
   const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.adt.domains.v1+xml, application/vnd.sap.adt.domains.v2+xml',
+    Accept: ACCEPT_DOMAIN,
   };
 
   const response = await connection.makeAdtRequest({
@@ -74,8 +77,7 @@ async function _getDataElementForVerification(
   const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
+    Accept: ACCEPT_DATA_ELEMENT,
   };
 
   const response = await connection.makeAdtRequest({
@@ -259,8 +261,7 @@ export async function updateDataElementInternal(
 </blue:wbobj>`;
 
   const headers: Record<string, string> = {
-    Accept:
-      'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
+    Accept: ACCEPT_DATA_ELEMENT,
     'Content-Type':
       'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8',
   };

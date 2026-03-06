@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { noopLogger } from '../../utils/noopLogger';
 import { getTimeout } from '../../utils/timeouts';
@@ -81,8 +82,7 @@ export async function getTableTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },
   });
 }

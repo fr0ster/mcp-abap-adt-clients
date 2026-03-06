@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -49,8 +50,7 @@ export async function lock(
 </asx:abap>`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
+    Accept: ACCEPT_LOCK,
   };
 
   const response = await connection.makeAdtRequest({
@@ -116,8 +116,7 @@ export async function lockForUpdate(
 </asx:abap>`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
+    Accept: ACCEPT_LOCK,
   };
 
   const response = await connection.makeAdtRequest({

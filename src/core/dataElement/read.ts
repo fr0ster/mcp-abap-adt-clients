@@ -6,6 +6,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_DATA_ELEMENT,
+  ACCEPT_TRANSPORT,
+} from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
@@ -27,9 +31,7 @@ export async function getDataElement(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ??
-        'application/vnd.sap.adt.dataelements.v2+xml, application/vnd.sap.adt.dataelements.v1+xml',
+      Accept: options?.accept ?? ACCEPT_DATA_ELEMENT,
     },
   });
 }
@@ -54,8 +56,7 @@ export async function getDataElementTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },
   });
 }

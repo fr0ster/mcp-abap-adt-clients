@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateStructureParams } from './types';
@@ -25,7 +26,7 @@ export async function upload(
 
   const headers = {
     Accept: 'application/xml, application/json, text/plain, */*',
-    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Type': CT_SOURCE,
   };
 
   return connection.makeAdtRequest({

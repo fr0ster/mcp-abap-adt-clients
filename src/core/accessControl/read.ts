@@ -3,6 +3,11 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_SOURCE,
+  ACCEPT_TRANSPORT,
+  CT_ACCESS_CONTROL,
+} from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -36,7 +41,7 @@ export async function getAccessControl(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'application/vnd.sap.adt.dclSource+xml',
+        Accept: options?.accept ?? CT_ACCESS_CONTROL,
       },
     },
     { logger },
@@ -71,7 +76,7 @@ export async function getAccessControlSource(
       method: 'GET',
       timeout: getTimeout('default'),
       headers: {
-        Accept: options?.accept ?? 'text/plain',
+        Accept: options?.accept ?? ACCEPT_SOURCE,
       },
     },
     { logger },
@@ -95,8 +100,7 @@ export async function getAccessControlTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },
   });
 }

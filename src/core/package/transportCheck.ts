@@ -4,6 +4,10 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import {
+  ACCEPT_TRANSPORT_CHECK,
+  CT_TRANSPORT_CHECK,
+} from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
 
@@ -39,10 +43,8 @@ export async function checkTransportRequirements(
     data: xmlBody,
     params: { transportLayer },
     headers: {
-      Accept:
-        'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.transport.service.checkData',
-      'Content-Type':
-        'application/vnd.sap.as+xml; charset=UTF-8; dataname=com.sap.adt.transport.service.checkData',
+      Accept: ACCEPT_TRANSPORT_CHECK,
+      'Content-Type': CT_TRANSPORT_CHECK,
     },
   });
 

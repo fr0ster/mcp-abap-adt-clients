@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_TABLE, CT_TABLE } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTableParams } from './types';
@@ -48,9 +49,8 @@ export async function createTable(
 </blue:blueSource>`;
 
   const headers = {
-    Accept:
-      'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml',
-    'Content-Type': 'application/vnd.sap.adt.tables.v2+xml',
+    Accept: ACCEPT_TABLE,
+    'Content-Type': CT_TABLE,
   };
 
   try {

@@ -7,6 +7,12 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import {
+  ACCEPT_WHERE_USED_RESULT,
+  ACCEPT_WHERE_USED_SCOPE,
+  CT_WHERE_USED_REQUEST,
+  CT_WHERE_USED_SCOPE,
+} from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type {
@@ -205,10 +211,8 @@ export async function getWhereUsedScope(
     timeout: getTimeout('default'),
     data: scopeRequestBody,
     headers: {
-      'Content-Type':
-        'application/vnd.sap.adt.repository.usagereferences.scope.request.v1+xml',
-      Accept:
-        'application/vnd.sap.adt.repository.usagereferences.scope.response.v1+xml',
+      'Content-Type': CT_WHERE_USED_SCOPE,
+      Accept: ACCEPT_WHERE_USED_SCOPE,
     },
   });
 }
@@ -272,10 +276,8 @@ export async function getWhereUsed(
     timeout: getTimeout('default'),
     data: searchRequestBody,
     headers: {
-      'Content-Type':
-        'application/vnd.sap.adt.repository.usagereferences.request.v1+xml',
-      Accept:
-        'application/vnd.sap.adt.repository.usagereferences.result.v1+xml',
+      'Content-Type': CT_WHERE_USED_REQUEST,
+      Accept: ACCEPT_WHERE_USED_RESULT,
     },
   });
 }

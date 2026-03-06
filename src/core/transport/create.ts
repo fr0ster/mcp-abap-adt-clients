@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTransportParams } from './types';
 
@@ -91,7 +92,7 @@ export async function createTransport(
 
   const xmlBody = buildCreateTransportXml(params, username);
   const headers = {
-    Accept: 'application/vnd.sap.adt.transportorganizer.v1+xml',
+    Accept: ACCEPT_TRANSPORT,
     'Content-Type': 'text/plain',
   };
 

@@ -4,6 +4,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import { CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -28,6 +29,6 @@ export async function upload(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: sourceCode,
-    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    headers: { 'Content-Type': CT_SOURCE },
   });
 }

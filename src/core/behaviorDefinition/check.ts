@@ -6,6 +6,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_CHECK_MESSAGES,
+  CT_CHECK_OBJECTS,
+} from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { CheckReporter } from './types';
 
@@ -43,6 +47,7 @@ export async function check(
 
   if (sourceCode) {
     // Check with source code content (for unsaved changes)
+    // TODO: analyze whether chkrun:contentType can be extracted to a constant
     const base64Content = Buffer.from(sourceCode, 'utf-8').toString('base64');
     xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
     <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}" chkrun:version="${version}">
@@ -61,8 +66,8 @@ export async function check(
   }
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+    Accept: ACCEPT_CHECK_MESSAGES,
+    'Content-Type': CT_CHECK_OBJECTS,
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=${reporter}`;

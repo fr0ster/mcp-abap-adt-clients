@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { ACCEPT_DOMAIN, ACCEPT_TRANSPORT } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
@@ -32,9 +33,7 @@ export async function getDomain(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ??
-        'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml',
+      Accept: options?.accept ?? ACCEPT_DOMAIN,
     },
   });
 }
@@ -64,8 +63,7 @@ export async function getDomainTransport(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept:
-        options?.accept ?? 'application/vnd.sap.adt.transportorganizer.v1+xml',
+      Accept: options?.accept ?? ACCEPT_TRANSPORT,
     },
   });
 }

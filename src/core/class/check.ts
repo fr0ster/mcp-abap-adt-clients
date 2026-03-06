@@ -6,6 +6,10 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_CHECK_MESSAGES,
+  CT_CHECK_OBJECTS,
+} from '../../constants/contentTypes';
 
 /**
  * Check class code (syntax, compilation, rules)
@@ -111,6 +115,7 @@ export async function checkClassLocalTestClass(
   const base64Source = Buffer.from(testClassSource, 'utf-8').toString('base64');
 
   // Build XML with testclasses artifact
+  // TODO: analyze whether chkrun:contentType can be extracted to a constant
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
     <chkrun:artifacts>
@@ -122,8 +127,8 @@ export async function checkClassLocalTestClass(
 </chkrun:checkObjectList>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+    Accept: ACCEPT_CHECK_MESSAGES,
+    'Content-Type': CT_CHECK_OBJECTS,
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
@@ -280,6 +285,7 @@ async function checkClassInclude(
   const base64Source = Buffer.from(includeSource, 'utf-8').toString('base64');
 
   // Build XML with include artifact
+  // TODO: analyze whether chkrun:contentType can be extracted to a constant
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
     <chkrun:artifacts>
@@ -291,8 +297,8 @@ async function checkClassInclude(
 </chkrun:checkObjectList>`;
 
   const headers = {
-    Accept: 'application/vnd.sap.adt.checkmessages+xml',
-    'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+    Accept: ACCEPT_CHECK_MESSAGES,
+    'Content-Type': CT_CHECK_OBJECTS,
   };
 
   const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;

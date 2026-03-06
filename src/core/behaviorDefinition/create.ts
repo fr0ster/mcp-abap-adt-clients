@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { CT_BEHAVIOR_DEFINITION } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IBehaviorDefinitionCreateParams } from './types';
@@ -60,8 +61,8 @@ export async function create(
 </blue:blueSource>`;
 
     const headers = {
-      Accept: 'application/vnd.sap.adt.blues.v1+xml',
-      'Content-Type': 'application/vnd.sap.adt.blues.v1+xml',
+      Accept: CT_BEHAVIOR_DEFINITION,
+      'Content-Type': CT_BEHAVIOR_DEFINITION,
     };
 
     const url = `/sap/bc/adt/bo/behaviordefinitions${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
