@@ -183,7 +183,8 @@ export class AdtContentTypesBase implements IAdtContentTypes {
   functionGroupUpdate(): IAdtHeaders {
     return {
       accept: 'application/vnd.sap.adt.functions.groups+xml',
-      contentType: 'application/vnd.sap.adt.functions.groups+xml; charset=utf-8',
+      contentType:
+        'application/vnd.sap.adt.functions.groups+xml; charset=utf-8',
     };
   }
 
@@ -282,8 +283,7 @@ export class AdtContentTypesModern extends AdtContentTypesBase {
     return {
       accept:
         'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml',
-      contentType:
-        'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8',
+      contentType: 'application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8',
     };
   }
 

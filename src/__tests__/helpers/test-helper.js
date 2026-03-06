@@ -3,8 +3,8 @@
  * Loads test parameters from test-config.yaml
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const yaml = require('yaml');
 const dotenv = require('dotenv');
 const { XMLParser } = require('fast-xml-parser');
@@ -180,7 +180,7 @@ function getDefaultMasterSystem() {
  * @returns {string} resolved master system or empty string
  */
 function resolveMasterSystem(masterSystem) {
-  if (masterSystem && masterSystem.trim()) {
+  if (masterSystem?.trim()) {
     return masterSystem.trim();
   }
   return getDefaultMasterSystem();
@@ -192,7 +192,7 @@ function resolveMasterSystem(masterSystem) {
  * @returns {string} resolved package name or empty string
  */
 function resolvePackageName(packageName) {
-  if (packageName && packageName.trim()) {
+  if (packageName?.trim()) {
     return packageName.trim();
   }
   return getDefaultPackage();
@@ -426,8 +426,8 @@ function resolveStandardObject(objectType, isCloud, testCase = null) {
   // Priority 3: Global standard_objects registry filtered by environment
   const objectsList = standardObjects[typeInfo.yamlKey] || [];
   const envFilter = isCloud ? 'cloud' : 'onprem';
-  const availableObjects = objectsList.filter(
-    (obj) => obj.available_in && obj.available_in.includes(envFilter),
+  const availableObjects = objectsList.filter((obj) =>
+    obj.available_in?.includes(envFilter),
   );
 
   if (availableObjects.length > 0) {
@@ -540,7 +540,7 @@ function extractValidationErrorMessage(response) {
 
       // Check for asx:abap structure (parsed XML)
       if (obj['asx:abap'] || obj['asx:values'] || obj.DATA) {
-        const data = obj['asx:abap']?.['asx:values']?.['DATA'] || obj.DATA;
+        const data = obj['asx:abap']?.['asx:values']?.DATA || obj.DATA;
         if (data) {
           if (data.SHORT_TEXT || data.ShortText || data.shortText) {
             return String(data.SHORT_TEXT || data.ShortText || data.shortText);
@@ -592,30 +592,30 @@ function extractValidationErrorMessage(response) {
       const exception = result['exc:exception'];
       if (exception) {
         // Extract message - handle both string and object with #text
-        let localizedMessage = exception['localizedMessage'];
+        let localizedMessage = exception.localizedMessage;
         if (localizedMessage && typeof localizedMessage === 'object') {
           localizedMessage =
             localizedMessage['#text'] ||
-            localizedMessage['text'] ||
+            localizedMessage.text ||
             localizedMessage;
         }
         if (typeof localizedMessage === 'object') {
           localizedMessage = JSON.stringify(localizedMessage);
         }
 
-        let message = exception['message'];
+        let message = exception.message;
         if (message && typeof message === 'object') {
-          message = message['#text'] || message['text'] || message;
+          message = message['#text'] || message.text || message;
         }
         if (typeof message === 'object') {
           message = JSON.stringify(message);
         }
 
         // Extract exception type
-        let exceptionType = exception['type'];
+        let exceptionType = exception.type;
         if (exceptionType && typeof exceptionType === 'object') {
           exceptionType =
-            exceptionType['#text'] || exceptionType['text'] || exceptionType;
+            exceptionType['#text'] || exceptionType.text || exceptionType;
         }
         exceptionType = exceptionType || '';
 
@@ -635,23 +635,22 @@ function extractValidationErrorMessage(response) {
 
       // Check for other XML formats (e.g., <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT>)
       // Function group validation uses this format
-      if (result['asx:abap'] || result['asx:values'] || result['DATA']) {
-        const data =
-          result['asx:abap']?.['asx:values']?.['DATA'] || result['DATA'];
+      if (result['asx:abap'] || result['asx:values'] || result.DATA) {
+        const data = result['asx:abap']?.['asx:values']?.DATA || result.DATA;
         if (data) {
-          if (data['SHORT_TEXT']) {
-            return String(data['SHORT_TEXT']);
+          if (data.SHORT_TEXT) {
+            return String(data.SHORT_TEXT);
           }
-          if (data['SEVERITY'] && data['SEVERITY'] !== 'OK') {
-            return `Validation error: ${data['SHORT_TEXT'] || data['SEVERITY']}`;
+          if (data.SEVERITY && data.SEVERITY !== 'OK') {
+            return `Validation error: ${data.SHORT_TEXT || data.SEVERITY}`;
           }
         }
       }
 
       // Check for direct SEVERITY/SHORT_TEXT format (function group validation)
-      if (result['SEVERITY']) {
-        const severity = result['SEVERITY'];
-        const shortText = result['SHORT_TEXT'] || result['shortText'] || '';
+      if (result.SEVERITY) {
+        const severity = result.SEVERITY;
+        const shortText = result.SHORT_TEXT || result.shortText || '';
         if (severity !== 'OK' && shortText) {
           return String(shortText);
         }
@@ -661,10 +660,10 @@ function extractValidationErrorMessage(response) {
       }
 
       // Check for exception with resource information (e.g., "Resource FUGR_MAINPROGRAM ...")
-      if (result['exception'] || result['exc:exception']) {
-        const exc = result['exception'] || result['exc:exception'];
-        if (exc['message']) {
-          const msg = String(exc['message']);
+      if (result.exception || result['exc:exception']) {
+        const exc = result.exception || result['exc:exception'];
+        if (exc.message) {
+          const msg = String(exc.message);
           // Extract resource name if present (e.g., "Resource FUGR_MAINPROGRAM ZADT_BLD_FGR01: wrong input data")
           if (msg.includes('Resource') && msg.includes(':')) {
             return msg;
@@ -712,7 +711,7 @@ function extractValidationErrorMessage(response) {
 
     // Fallback: return first 500 chars of raw data
     return errorText.length > 500
-      ? errorText.substring(0, 500) + '...'
+      ? `${errorText.substring(0, 500)}...`
       : errorText;
   } catch (parseError) {
     // If parsing fails, return raw data (limited)
@@ -722,7 +721,7 @@ function extractValidationErrorMessage(response) {
         ? errorData
         : JSON.stringify(errorData || {});
     return errorText.length > 500
-      ? errorText.substring(0, 500) + '...'
+      ? `${errorText.substring(0, 500)}...`
       : errorText;
   }
 }
@@ -744,13 +743,13 @@ function parseValidationResponse(response) {
     // Check for exception format (<exc:exception>)
     const exception = result['exc:exception'];
     if (exception) {
-      const message = exception['message'] || '';
-      const localizedMessage = exception['localizedMessage'] || message;
+      const message = exception.message || '';
+      const localizedMessage = exception.localizedMessage || message;
       const msgText = localizedMessage || message;
       const msgLower = msgText.toLowerCase();
 
       // Check exception type - ExceptionResourceAlreadyExists means object exists
-      const exceptionType = exception['type'] || '';
+      const exceptionType = exception.type || '';
       const isResourceAlreadyExists =
         exceptionType === 'ExceptionResourceAlreadyExists' ||
         exceptionType.includes('ResourceAlreadyExists') ||
@@ -782,21 +781,21 @@ function parseValidationResponse(response) {
     }
 
     // Check for standard format (<asx:abap><asx:values><DATA>)
-    const data = result['asx:abap']?.['asx:values']?.['DATA'];
+    const data = result['asx:abap']?.['asx:values']?.DATA;
     if (!data) {
       // No data means validation passed
       return { valid: true };
     }
 
     // Check for CHECK_RESULT=X (success)
-    if (data['CHECK_RESULT'] === 'X') {
+    if (data.CHECK_RESULT === 'X') {
       return { valid: true };
     }
 
     // Check for SEVERITY (error/warning)
-    const severity = data['SEVERITY'];
-    const shortText = data['SHORT_TEXT'] || '';
-    const longText = data['LONG_TEXT'] || '';
+    const severity = data.SEVERITY;
+    const shortText = data.SHORT_TEXT || '';
+    const longText = data.LONG_TEXT || '';
 
     // Check if message indicates object already exists
     const msgLower = shortText.toLowerCase();
@@ -829,7 +828,7 @@ function parseValidationResponse(response) {
  * @param {string} objectType - Type of object (e.g., 'Interface', 'Class', 'Table')
  * @throws {Error} If validation failed (status !== 200)
  */
-function checkValidationResult(validationResponse, objectName, objectType) {
+function checkValidationResult(validationResponse, _objectName, objectType) {
   if (!validationResponse) {
     return; // No validation response, assume OK
   }
@@ -898,7 +897,7 @@ async function retryCheckAfterActivate(checkFunction, options = {}) {
 
       if (isActivationInProgress) {
         // Activation still in progress - retry
-        if (logger && logger.debug) {
+        if (logger?.debug) {
           logger.debug(
             `Check attempt ${checkAttempts} failed for ${objectName} (activation in progress), retrying in ${delay}ms...`,
           );

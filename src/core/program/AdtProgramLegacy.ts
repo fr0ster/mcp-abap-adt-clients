@@ -44,7 +44,10 @@ export class AdtProgramLegacy extends AdtProgram {
         try {
           await unlockProgram(this.connection, config.programName, lockHandle);
         } catch (unlockError: any) {
-          this.logger?.error?.('Unlock after delete failure also failed:', unlockError);
+          this.logger?.error?.(
+            'Unlock after delete failure also failed:',
+            unlockError,
+          );
         }
       }
       throw error;

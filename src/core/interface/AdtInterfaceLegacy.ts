@@ -25,7 +25,10 @@ export class AdtInterfaceLegacy extends AdtInterface {
     try {
       this.logger?.info?.('Locking interface for deletion');
       this.connection.setSessionType('stateful');
-      const lockResult = await lockInterface(this.connection, config.interfaceName);
+      const lockResult = await lockInterface(
+        this.connection,
+        config.interfaceName,
+      );
       lockHandle = lockResult.lockHandle;
 
       this.logger?.info?.('Deleting interface (direct DELETE)');
@@ -43,9 +46,16 @@ export class AdtInterfaceLegacy extends AdtInterface {
       this.logger?.error?.('Delete failed:', error);
       if (lockHandle) {
         try {
-          await unlockInterface(this.connection, config.interfaceName, lockHandle);
+          await unlockInterface(
+            this.connection,
+            config.interfaceName,
+            lockHandle,
+          );
         } catch (unlockError: any) {
-          this.logger?.error?.('Unlock after delete failure also failed:', unlockError);
+          this.logger?.error?.(
+            'Unlock after delete failure also failed:',
+            unlockError,
+          );
         }
       }
       throw error;

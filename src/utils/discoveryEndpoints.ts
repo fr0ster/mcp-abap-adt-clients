@@ -36,13 +36,14 @@ export async function fetchDiscoveryEndpoints(
     const xml = typeof response.data === 'string' ? response.data : '';
     // Extract all href values from app:collection elements
     const hrefRegex = /href="([^"]+)"/g;
-    let match: RegExpExecArray | null;
-    while ((match = hrefRegex.exec(xml)) !== null) {
+    let match: RegExpExecArray | null = hrefRegex.exec(xml);
+    while (match !== null) {
       const href = match[1];
       // Only include relative paths (skip absolute URLs like http://...)
       if (href.startsWith('/')) {
         endpoints.add(href);
       }
+      match = hrefRegex.exec(xml);
     }
   } catch {
     // If discovery fails, return empty set — caller decides what to do

@@ -159,7 +159,7 @@ describe('Shared - getPackageHierarchy', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any, resolver?: TestConfigResolver) => {
+        buildConfig: (_testCase: any, resolver?: TestConfigResolver) => {
           const packageName = resolver?.getPackageName();
           if (!packageName) {
             throw new Error('package_name not configured');

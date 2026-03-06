@@ -35,8 +35,12 @@ export class AdtFunctionModuleLegacy extends AdtFunctionModule {
       );
 
       this.logger?.info?.('Deleting function module (direct DELETE)');
-      const encodedGroup = encodeSapObjectName(config.functionGroupName).toLowerCase();
-      const encodedModule = encodeSapObjectName(config.functionModuleName).toLowerCase();
+      const encodedGroup = encodeSapObjectName(
+        config.functionGroupName,
+      ).toLowerCase();
+      const encodedModule = encodeSapObjectName(
+        config.functionModuleName,
+      ).toLowerCase();
       const objectUrl = `/sap/bc/adt/functions/groups/${encodedGroup}/fmodules/${encodedModule}`;
       state.deleteResult = await deleteObjectDirect(
         this.connection,
@@ -58,7 +62,10 @@ export class AdtFunctionModuleLegacy extends AdtFunctionModule {
             lockHandle,
           );
         } catch (unlockError: any) {
-          this.logger?.error?.('Unlock after delete failure also failed:', unlockError);
+          this.logger?.error?.(
+            'Unlock after delete failure also failed:',
+            unlockError,
+          );
         }
       }
       throw error;

@@ -94,7 +94,10 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getFunctionGroup(): IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
+  override getFunctionGroup(): IAdtObject<
+    IFunctionGroupConfig,
+    IFunctionGroupState
+  > {
     return new AdtFunctionGroupLegacy(
       this.connection,
       this.logger,
@@ -102,7 +105,10 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getFunctionModule(): IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
+  override getFunctionModule(): IAdtObject<
+    IFunctionModuleConfig,
+    IFunctionModuleState
+  > {
     return new AdtFunctionModuleLegacy(
       this.connection,
       this.logger,
@@ -119,11 +125,7 @@ export class AdtClientLegacy extends AdtClient {
   }
 
   override getView(): IAdtObject<IViewConfig, IViewState> {
-    return new AdtViewLegacy(
-      this.connection,
-      this.logger,
-      this.systemContext,
-    );
+    return new AdtViewLegacy(this.connection, this.logger, this.systemContext);
   }
 
   // --- Unsupported types: endpoints absent from legacy /sap/bc/adt/discovery ---

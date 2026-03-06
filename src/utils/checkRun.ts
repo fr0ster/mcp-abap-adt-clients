@@ -277,7 +277,12 @@ export async function runCheckRun(
 ): Promise<AxiosResponse> {
   const objectUri = getObjectUri(objectType, objectName);
   const xmlBody = sourceCode
-    ? buildCheckRunXmlWithSource(objectUri, sourceCode, version, artifactContentType)
+    ? buildCheckRunXmlWithSource(
+        objectUri,
+        sourceCode,
+        version,
+        artifactContentType,
+      )
     : buildCheckRunXml(objectUri, version);
 
   const headers = {
@@ -321,7 +326,12 @@ export async function runCheckRunWithSource(
   artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
   const objectUri = await getObjectUri(objectType, objectName);
-  const xmlBody = buildCheckRunXmlWithSource(objectUri, sourceCode, version, artifactContentType);
+  const xmlBody = buildCheckRunXmlWithSource(
+    objectUri,
+    sourceCode,
+    version,
+    artifactContentType,
+  );
 
   const headers = {
     Accept: ACCEPT_CHECK_MESSAGES,

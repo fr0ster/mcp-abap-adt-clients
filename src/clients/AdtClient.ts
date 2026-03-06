@@ -187,7 +187,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Class operations
    */
   getClass(): IAdtObject<IClassConfig, IClassState> {
-    return new AdtClass(this.connection, this.logger, this.systemContext, this.contentTypes);
+    return new AdtClass(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 
   /**
@@ -195,7 +200,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Program operations
    */
   getProgram(): IAdtObject<IProgramConfig, IProgramState> {
-    return new AdtProgram(this.connection, this.logger, this.systemContext, this.contentTypes);
+    return new AdtProgram(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 
   /**

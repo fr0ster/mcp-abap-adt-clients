@@ -50,7 +50,10 @@ export class AdtFunctionGroupLegacy extends AdtFunctionGroup {
             lockHandle,
           );
         } catch (unlockError: any) {
-          this.logger?.error?.('Unlock after delete failure also failed:', unlockError);
+          this.logger?.error?.(
+            'Unlock after delete failure also failed:',
+            unlockError,
+          );
         }
       }
       throw error;

@@ -12,9 +12,7 @@ import type { IViewConfig, IViewState } from './types';
 import { unlockDDLS } from './unlock';
 
 export class AdtViewLegacy extends AdtView {
-  override async delete(
-    config: Partial<IViewConfig>,
-  ): Promise<IViewState> {
+  override async delete(config: Partial<IViewConfig>): Promise<IViewState> {
     if (!config.viewName) {
       throw new Error('View name is required');
     }
@@ -44,7 +42,10 @@ export class AdtViewLegacy extends AdtView {
         try {
           await unlockDDLS(this.connection, config.viewName, lockHandle);
         } catch (unlockError: any) {
-          this.logger?.error?.('Unlock after delete failure also failed:', unlockError);
+          this.logger?.error?.(
+            'Unlock after delete failure also failed:',
+            unlockError,
+          );
         }
       }
       throw error;

@@ -26,7 +26,7 @@ export class AdtPackageLegacy extends AdtPackage {
     throw new Error(
       'Package validation is not supported on legacy SAP systems. ' +
         'The endpoint /sap/bc/adt/packages/validation was not found in the ' +
-        'system\'s ADT discovery catalog.',
+        "system's ADT discovery catalog.",
     );
   }
 
@@ -62,7 +62,10 @@ export class AdtPackageLegacy extends AdtPackage {
         try {
           await unlockPackage(this.connection, config.packageName, lockHandle);
         } catch (unlockError: any) {
-          this.logger?.error?.('Unlock after delete failure also failed:', unlockError);
+          this.logger?.error?.(
+            'Unlock after delete failure also failed:',
+            unlockError,
+          );
         }
       }
       throw error;

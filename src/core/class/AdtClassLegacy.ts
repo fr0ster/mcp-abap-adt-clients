@@ -12,9 +12,7 @@ import type { IClassConfig, IClassState } from './types';
 import { unlockClass } from './unlock';
 
 export class AdtClassLegacy extends AdtClass {
-  override async delete(
-    config: Partial<IClassConfig>,
-  ): Promise<IClassState> {
+  override async delete(config: Partial<IClassConfig>): Promise<IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
@@ -49,7 +47,10 @@ export class AdtClassLegacy extends AdtClass {
         try {
           await unlockClass(this.connection, config.className, lockHandle);
         } catch (unlockError: any) {
-          this.logger?.error?.('Unlock after delete failure also failed:', unlockError);
+          this.logger?.error?.(
+            'Unlock after delete failure also failed:',
+            unlockError,
+          );
         }
       }
       throw error;

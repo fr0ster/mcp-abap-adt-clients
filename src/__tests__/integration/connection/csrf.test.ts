@@ -159,7 +159,9 @@ describe('CSRF Token diagnostics', () => {
     console.log('\n=== Summary ===');
     for (const [endpoint, token] of Object.entries(results)) {
       const path = endpoint.replace(baseUrl, '');
-      console.log(`  ${path}: ${token ? `OK (${token.substring(0, 20)}...)` : 'FAILED'}`);
+      console.log(
+        `  ${path}: ${token ? `OK (${token.substring(0, 20)}...)` : 'FAILED'}`,
+      );
     }
 
     // At least one endpoint should return CSRF

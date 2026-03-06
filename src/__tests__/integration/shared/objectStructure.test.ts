@@ -162,7 +162,7 @@ describe('Shared - getObjectStructure', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any, resolver?: TestConfigResolver) => {
+        buildConfig: (_testCase: any, resolver?: TestConfigResolver) => {
           const objectType = resolver?.getParam('object_type', 'CLAS/OC');
           const objectName =
             resolver?.getParam('object_name') ||
