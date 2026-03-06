@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,15 +27,13 @@ export async function validateDataElementName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/dataelements/validation`;
-  const encodedName = encodeSapObjectName(dataElementName);
-
   const queryParams = new URLSearchParams({
     objtype: 'dtel',
-    objname: encodedName,
+    objname: dataElementName,
   });
 
   if (packageName) {
-    queryParams.append('packagename', encodeSapObjectName(packageName));
+    queryParams.append('packagename', packageName);
   }
 
   // Description is required for data element validation

@@ -69,7 +69,7 @@ export async function updateClassTestInclude(
   }
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?lockHandle=${lockHandle}`;
+  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (transportRequest) {
     url += `&corrNr=${transportRequest}`;
   }
@@ -101,7 +101,7 @@ export async function unlockClassTestClasses(
   }
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/oo/classes/${encodedName}/includes/testclasses?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   const headers = {
     'Content-Type': 'application/x-www-form-urlencoded',

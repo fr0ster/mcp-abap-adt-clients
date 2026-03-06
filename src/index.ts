@@ -43,6 +43,8 @@ export type {
 } from './batch/types';
 export type { IAdtClientOptions, IAdtSystemContext } from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
+export { AdtClientLegacy } from './clients/AdtClientLegacy';
+export { createAdtClient } from './clients/createAdtClient';
 export { AdtClientsWS } from './clients/AdtClientsWS';
 export { AdtExecutor } from './clients/AdtExecutor';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
@@ -224,4 +226,10 @@ export type {
   IProgramExecutionTarget,
   IProgramExecutor,
 } from './executors';
-export { getSystemInformation } from './utils/systemInfo';
+export type { IAdtContentTypes, IAdtHeaders } from './core/shared/contentTypes';
+export { AdtContentTypesBase, AdtContentTypesModern } from './core/shared/contentTypes';
+export {
+  getSystemInformation,
+  isModernAdtSystem,
+  resolveContentTypes,
+} from './utils/systemInfo';

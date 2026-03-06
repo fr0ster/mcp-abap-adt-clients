@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -27,11 +26,9 @@ export async function validateStructureName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/structures/validation`;
-  const encodedName = encodeSapObjectName(structureName);
-
   const queryParams = new URLSearchParams({
     objtype: 'stru',
-    objname: encodedName,
+    objname: structureName,
   });
 
   if (description) {

@@ -10,6 +10,7 @@ import type {
 import { CT_CLASS } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { ICreateClassParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -24,6 +25,7 @@ export async function create(
   connection: IAbapConnection,
   args: ICreateClassParams,
   logger?: ILogger,
+  contentTypes?: IAdtContentTypes,
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(
@@ -74,9 +76,10 @@ export async function create(
 
 </class:abapClass>`;
 
+  const ct = contentTypes?.classCreate();
   const headers = {
-    Accept: CT_CLASS,
-    'Content-Type': CT_CLASS,
+    Accept: ct?.accept || CT_CLASS,
+    'Content-Type': ct?.contentType || CT_CLASS,
   };
 
   // Log request details for debugging authorization issues

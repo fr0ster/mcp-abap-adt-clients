@@ -15,12 +15,13 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IProgramConfig, IProgramState } from '../../../../core/program';
 import { getProgramSource } from '../../../../core/program/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -74,7 +75,12 @@ describe('Program (using AdtClient)', () => {
       await (connection as any).connect();
       isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
       hasConfig = true;
 
       tester = new BaseTester(
@@ -116,7 +122,7 @@ describe('Program (using AdtClient)', () => {
             // Program exists — delete it before test
             try {
               const transportRequest = tester.getTransportRequest();
-              const cleanupClient = new AdtClient(
+              const { client: cleanupClient } = await createTestAdtClient(
                 connection,
                 libraryLogger,
                 systemContext,

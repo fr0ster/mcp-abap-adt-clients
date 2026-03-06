@@ -6,7 +6,6 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
   ENHANCEMENT_TYPE_CODES,
@@ -39,12 +38,11 @@ export async function validateEnhancementName(
     throw new Error('enhancement_type is required');
   }
 
-  const encodedName = encodeSapObjectName(enhancement_name);
   const typeCode = ENHANCEMENT_TYPE_CODES[enhancement_type];
 
   // Build query parameters for validation
   const queryParams = new URLSearchParams({
-    objname: encodedName,
+    objname: enhancement_name,
     objtype: typeCode,
   });
 

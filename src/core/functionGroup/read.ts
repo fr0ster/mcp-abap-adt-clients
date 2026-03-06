@@ -27,7 +27,7 @@ export async function getFunctionGroup(
     url,
     method: 'GET',
     timeout: getTimeout('default'),
-    headers: options?.accept ? { Accept: options.accept } : {},
+    headers: { Accept: options?.accept ?? '*/*' },
   });
 }
 

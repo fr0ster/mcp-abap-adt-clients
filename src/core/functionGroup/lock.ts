@@ -73,7 +73,7 @@ export async function unlockFunctionGroup(
   lockHandle: string,
   _sessionId: string = '',
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/functions/groups/${functionGroupName.toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

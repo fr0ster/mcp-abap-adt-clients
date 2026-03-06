@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -27,11 +26,9 @@ export async function validateServiceDefinitionName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/srvd/sources/validation`;
-  const encodedName = encodeSapObjectName(serviceDefinitionName);
-
   const queryParams = new URLSearchParams({
     objtype: 'srvdsrv',
-    objname: encodedName,
+    objname: serviceDefinitionName,
   });
 
   if (description) {

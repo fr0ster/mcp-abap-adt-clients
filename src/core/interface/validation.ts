@@ -9,7 +9,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,11 +27,9 @@ export async function validateInterfaceName(
   packageName?: string,
   description?: string,
 ): Promise<AxiosResponse> {
-  const encodedName = encodeSapObjectName(interfaceName);
-
   // Build query parameters for interface validation (same format as class validation)
   const params = new URLSearchParams({
-    objname: encodedName,
+    objname: interfaceName,
     objtype: 'INTF/OI',
   });
 

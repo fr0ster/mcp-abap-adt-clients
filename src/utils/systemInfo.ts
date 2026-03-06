@@ -3,6 +3,11 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import {
+  AdtContentTypesBase,
+  AdtContentTypesModern,
+  type IAdtContentTypes,
+} from '../core/shared/contentTypes';
 import { getTimeout } from './timeouts';
 
 /**
@@ -102,4 +107,44 @@ export async function isCloudEnvironment(
   // Fallback: check if systeminformation endpoint is available
   const systemInfo = await getSystemInformation(connection);
   return systemInfo !== null;
+}
+
+/**
+ * Check if the system supports modern ADT endpoints (core/discovery).
+ *
+ * Modern systems (S/4 HANA, BTP) expose /sap/bc/adt/core/discovery.
+ * Older systems (BASIS 7.40 and below) only have /sap/bc/adt/discovery.
+ */
+export async function isModernAdtSystem(
+  connection: IAbapConnection,
+): Promise<boolean> {
+  try {
+    const response = await connection.makeAdtRequest({
+      url: '/sap/bc/adt/core/discovery',
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: {
+        Accept: 'application/atomsvc+xml',
+      },
+    });
+    // Modern systems return XML with content-length > 0
+    const contentType = String(response.headers?.['content-type'] || '');
+    return contentType.includes('xml');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve the appropriate content types for the connected SAP system.
+ *
+ * Uses /sap/bc/adt/core/discovery to detect modern systems:
+ * - Available → AdtContentTypesModern (v2+ headers)
+ * - Not available → AdtContentTypesBase (v1 headers, universal)
+ */
+export async function resolveContentTypes(
+  connection: IAbapConnection,
+): Promise<IAdtContentTypes> {
+  const isModern = await isModernAdtSystem(connection);
+  return isModern ? new AdtContentTypesModern() : new AdtContentTypesBase();
 }

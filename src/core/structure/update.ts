@@ -22,7 +22,7 @@ export async function upload(
   lockHandle: string,
 ): Promise<AxiosResponse> {
   const structureNameEncoded = encodeSapObjectName(params.structureName);
-  const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${lockHandle}${params.transportRequest ? `&corrNr=${params.transportRequest}` : ''}`;
+  const url = `/sap/bc/adt/ddic/structures/${structureNameEncoded}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${params.transportRequest ? `&corrNr=${params.transportRequest}` : ''}`;
 
   const headers = {
     Accept: 'application/xml, application/json, text/plain, */*',

@@ -17,7 +17,7 @@ export async function unlockAccessControl(
   const accessControlNameEncoded = encodeSapObjectName(
     accessControlName.toLowerCase(),
   );
-  const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

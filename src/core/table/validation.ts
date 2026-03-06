@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -27,11 +26,9 @@ export async function validateTableName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/tables/validation`;
-  const encodedName = encodeSapObjectName(tableName);
-
   const queryParams = new URLSearchParams({
     objtype: 'tabldt',
-    objname: encodedName,
+    objname: tableName,
   });
 
   // Description is required for table validation

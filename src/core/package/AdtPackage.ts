@@ -40,9 +40,9 @@ import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
 
 export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'Package';
 
   constructor(

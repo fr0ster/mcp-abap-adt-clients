@@ -32,7 +32,7 @@ export async function unlockMetadataExtension(
   lockHandle: string,
 ): Promise<AxiosResponse> {
   const lowerName = name.toLowerCase();
-  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/ddic/ddlx/sources/${lowerName}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,
