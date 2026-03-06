@@ -89,6 +89,7 @@ Error handling in chains: automatic unlock + `setSessionType('stateless')` on an
 - Comments explain "why" not "what"
 - Never change `package.json` version without explicit user request
 - When updating CHANGELOG, ask user which version to use
+- After changing the version in `package.json`, always run `npm install --package-lock-only` to update `package-lock.json` and include it in the same commit
 - Biome config: single quotes, semicolons always, indent 2 spaces
 - `noExplicitAny: warn` in production code, relaxed in tests
 
