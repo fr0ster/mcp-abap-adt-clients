@@ -133,12 +133,14 @@ export interface IAdtClientOptions {
   enableAcceptCorrection?: boolean;
   masterSystem?: string;
   responsible?: string;
+  contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
 }
 
 export class AdtClient {
-  private connection: IAbapConnection;
-  private logger: ILogger;
-  private systemContext: IAdtSystemContext;
+  protected connection: IAbapConnection;
+  protected logger: ILogger;
+  protected systemContext: IAdtSystemContext;
+  protected contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
 
   constructor(
     connection: IAbapConnection,
@@ -156,6 +158,7 @@ export class AdtClient {
       masterSystem: options?.masterSystem,
       responsible: options?.responsible,
     };
+    this.contentTypes = options?.contentTypes;
     if (options?.enableAcceptCorrection !== undefined) {
       const {
         setAcceptCorrectionEnabled,
@@ -184,7 +187,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Class operations
    */
   getClass(): IAdtObject<IClassConfig, IClassState> {
-    return new AdtClass(this.connection, this.logger, this.systemContext);
+    return new AdtClass(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 
   /**
@@ -192,7 +200,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Program operations
    */
   getProgram(): IAdtObject<IProgramConfig, IProgramState> {
-    return new AdtProgram(this.connection, this.logger, this.systemContext);
+    return new AdtProgram(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 
   /**

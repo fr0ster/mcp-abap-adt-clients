@@ -44,9 +44,9 @@ import { validateFunctionModuleName } from './validation';
 export class AdtFunctionModule
   implements IAdtObject<IFunctionModuleConfig, IFunctionModuleState>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'FunctionModule';
 
   constructor(

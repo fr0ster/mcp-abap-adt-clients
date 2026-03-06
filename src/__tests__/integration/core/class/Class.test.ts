@@ -15,11 +15,12 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IClassConfig, IClassState } from '../../../../core/class';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -73,7 +74,12 @@ describe('Class (using AdtClient)', () => {
       await (connection as any).connect();
       isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
       hasConfig = true;
 
       tester = new BaseTester(
@@ -111,7 +117,7 @@ describe('Class (using AdtClient)', () => {
         ensureObjectReady: async (className: string) => {
           if (!connection) return { success: true };
           try {
-            const cleanupClient = new AdtClient(
+            const { client: cleanupClient } = await createTestAdtClient(
               connection,
               libraryLogger,
               systemContext,
@@ -130,10 +136,10 @@ describe('Class (using AdtClient)', () => {
                 });
                 await new Promise((resolve) => setTimeout(resolve, 3000));
               } catch (cleanupError: any) {
-                return {
-                  success: false,
-                  reason: `Failed to delete existing class ${className}: ${cleanupError.message}`,
-                };
+                testsLogger.warn(
+                  `Could not delete existing class ${className}: ${cleanupError.message}. Will attempt update instead of create.`,
+                );
+                return { success: true, objectExists: true };
               }
             }
           } catch (error: any) {

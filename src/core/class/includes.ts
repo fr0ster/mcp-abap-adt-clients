@@ -129,7 +129,7 @@ async function updateClassInclude(
   }
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/${includeType}?lockHandle=${lockHandle}`;
+  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/${includeType}?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (transportRequest) {
     url += `&corrNr=${transportRequest}`;
   }

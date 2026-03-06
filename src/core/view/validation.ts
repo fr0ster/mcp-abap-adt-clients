@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,15 +27,13 @@ export async function validateViewName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/ddl/validation`;
-  const encodedName = encodeSapObjectName(viewName);
-
   const queryParams = new URLSearchParams({
     objtype: 'ddls',
-    objname: encodedName,
+    objname: viewName,
   });
 
   if (packageName) {
-    queryParams.append('packagename', encodeSapObjectName(packageName));
+    queryParams.append('packagename', packageName);
   }
 
   // Description is required for view validation

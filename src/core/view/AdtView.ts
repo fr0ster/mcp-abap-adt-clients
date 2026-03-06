@@ -38,9 +38,9 @@ import { updateView } from './update';
 import { validateViewName } from './validation';
 
 export class AdtView implements IAdtObject<IViewConfig, IViewState> {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'View';
 
   constructor(

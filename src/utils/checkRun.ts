@@ -110,6 +110,7 @@ export function buildCheckRunXmlWithSource(
   objectUri: string,
   sourceCode: string,
   version: string = 'active',
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): string {
   // Encode source code to base64
   const base64Source = Buffer.from(sourceCode, 'utf-8').toString('base64');
@@ -118,7 +119,7 @@ export function buildCheckRunXmlWithSource(
 <chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
     <chkrun:artifacts>
-      <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="${objectUri}/source/main">
+      <chkrun:artifact chkrun:contentType="${artifactContentType}" chkrun:uri="${objectUri}/source/main">
         <chkrun:content>${base64Source}</chkrun:content>
       </chkrun:artifact>
     </chkrun:artifacts>
@@ -272,10 +273,16 @@ export async function runCheckRun(
   version: string = 'active',
   reporter: string = 'abapCheckRun',
   sourceCode?: string,
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
   const objectUri = getObjectUri(objectType, objectName);
   const xmlBody = sourceCode
-    ? buildCheckRunXmlWithSource(objectUri, sourceCode, version)
+    ? buildCheckRunXmlWithSource(
+        objectUri,
+        sourceCode,
+        version,
+        artifactContentType,
+      )
     : buildCheckRunXml(objectUri, version);
 
   const headers = {
@@ -316,11 +323,18 @@ export async function runCheckRunWithSource(
   sourceCode: string,
   version: string = 'active',
   reporter: string = 'abapCheckRun',
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
   const objectUri = await getObjectUri(objectType, objectName);
-  const xmlBody = buildCheckRunXmlWithSource(objectUri, sourceCode, version);
+  const xmlBody = buildCheckRunXmlWithSource(
+    objectUri,
+    sourceCode,
+    version,
+    artifactContentType,
+  );
 
   const headers = {
+    Accept: ACCEPT_CHECK_MESSAGES,
     'Content-Type': CT_CHECK_OBJECTS,
   };
 

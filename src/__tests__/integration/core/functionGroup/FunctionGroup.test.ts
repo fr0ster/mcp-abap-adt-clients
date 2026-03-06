@@ -23,6 +23,7 @@ import type {
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -114,7 +115,42 @@ describe('FunctionGroup (using AdtClient)', () => {
             responsible: process.env.SAP_USERNAME || process.env.SAP_USER,
           };
         },
-        ensureObjectReady: async () => ({ success: true }),
+        ensureObjectReady: async (functionGroupName: string) => {
+          if (!connection) return { success: true };
+          try {
+            const { client: cleanupClient } = await createTestAdtClient(
+              connection,
+              libraryLogger,
+              systemContext,
+            );
+            const existing = await cleanupClient
+              .getFunctionGroup()
+              .read({ functionGroupName });
+            if (existing) {
+              try {
+                const transportRequest = tester.getTransportRequest();
+                await cleanupClient.getFunctionGroup().delete({
+                  functionGroupName,
+                  transportRequest,
+                });
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+              } catch (cleanupError: any) {
+                testsLogger.warn(
+                  `Could not delete existing function group ${functionGroupName}: ${cleanupError.message}. Will attempt update instead of create.`,
+                );
+                return { success: true, objectExists: true };
+              }
+            }
+          } catch (error: any) {
+            if (error.response?.status !== 404) {
+              return {
+                success: false,
+                reason: `Cannot verify function group existence: ${error.message}`,
+              };
+            }
+          }
+          return { success: true };
+        },
       });
     } catch (_error) {
       hasConfig = false;

@@ -42,9 +42,9 @@ import { validateFunctionGroupName } from './validation';
 export class AdtFunctionGroup
   implements IAdtObject<IFunctionGroupConfig, IFunctionGroupState>
 {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'FunctionGroup';
 
   constructor(

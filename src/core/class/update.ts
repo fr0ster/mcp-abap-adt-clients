@@ -98,7 +98,7 @@ export async function updateClass(
   }
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/source/main?lockHandle=${lockHandle}`;
+  let url = `/sap/bc/adt/oo/classes/${encodedName}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (transportRequest) {
     url += `&corrNr=${transportRequest}`;
   }
@@ -139,7 +139,7 @@ export async function updateClassImplementations(
   }
 
   const encodedName = encodeSapObjectName(className).toLowerCase();
-  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?lockHandle=${lockHandle}`;
+  let url = `/sap/bc/adt/oo/classes/${encodedName}/includes/implementations?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (transportRequest) {
     url += `&corrNr=${transportRequest}`;
   }

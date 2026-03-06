@@ -29,7 +29,7 @@ export async function updateDomain(
   const corrNrParam = args.transport_request
     ? `&corrNr=${args.transport_request}`
     : '';
-  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?lockHandle=${lockHandle}${corrNrParam}`;
+  const url = `/sap/bc/adt/ddic/domains/${domainNameEncoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
 
   const datatype = args.datatype || 'CHAR';
   const length = args.length || 100;

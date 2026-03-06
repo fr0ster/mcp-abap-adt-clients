@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,10 +27,8 @@ export async function validateProgramName(
   packageName?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/programs/validation`;
-  const encodedName = encodeSapObjectName(programName);
-
   const queryParams = new URLSearchParams({
-    objname: encodedName,
+    objname: programName,
     objtype: 'PROG/P',
   });
 

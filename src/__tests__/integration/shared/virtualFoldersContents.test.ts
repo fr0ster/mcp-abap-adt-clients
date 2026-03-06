@@ -169,7 +169,7 @@ describe('Shared - getVirtualFoldersContents', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any, resolver?: TestConfigResolver) => {
+        buildConfig: (_testCase: any, resolver?: TestConfigResolver) => {
           const objectSearchPattern = resolver?.getParam(
             'object_search_pattern',
             '*',

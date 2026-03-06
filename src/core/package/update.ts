@@ -98,7 +98,7 @@ export async function updatePackage(
   const corrNrParam = params.transport_request
     ? `&corrNr=${params.transport_request}`
     : '';
-  const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${lockHandle}${corrNrParam}`;
+  const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
 
   const xmlBody = await buildUpdatePackageXml(connection, params);
 

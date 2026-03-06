@@ -22,7 +22,7 @@ export async function unlockDataElement(
   const dataElementNameEncoded = encodeSapObjectName(
     dataElementName.toLowerCase(),
   );
-  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

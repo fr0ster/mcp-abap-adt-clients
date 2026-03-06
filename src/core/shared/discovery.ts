@@ -2,11 +2,11 @@
  * ADT discovery endpoint access
  */
 
+import { randomUUID } from 'node:crypto';
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { randomUUID } from 'crypto';
 import { ACCEPT_DISCOVERY } from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type { IGetDiscoveryParams } from './types';

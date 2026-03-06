@@ -23,7 +23,7 @@ export async function updateAccessControl(
   const corrNrParam = args.transport_request
     ? `&corrNr=${args.transport_request}`
     : '';
-  const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}/source/main?lockHandle=${lockHandle}${corrNrParam}`;
+  const url = `/sap/bc/adt/acm/dcl/sources/${accessControlNameEncoded}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
 
   const headers: Record<string, string> = {
     Accept: ACCEPT_SOURCE,

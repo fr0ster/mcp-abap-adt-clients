@@ -4,7 +4,7 @@
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { CT_SOURCE } from '../../constants/contentTypes';
+import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -19,7 +19,7 @@ export async function upload(
   lockHandle: string,
   corrNr: string | undefined,
 ): Promise<void> {
-  let url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}/source/main?lockHandle=${lockHandle}`;
+  let url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (corrNr) {
     url += `&corrNr=${corrNr}`;
   }
@@ -29,6 +29,6 @@ export async function upload(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: sourceCode,
-    headers: { 'Content-Type': CT_SOURCE },
+    headers: { 'Content-Type': CT_SOURCE, Accept: ACCEPT_SOURCE },
   });
 }

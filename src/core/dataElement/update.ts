@@ -115,7 +115,7 @@ export async function updateDataElementInternal(
   const corrNrParam = args.transport_request
     ? `&corrNr=${args.transport_request}`
     : '';
-  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?lockHandle=${lockHandle}${corrNrParam}`;
+  const url = `/sap/bc/adt/ddic/dataelements/${dataElementNameEncoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
 
   if (!args.type_kind) {
     throw new Error(

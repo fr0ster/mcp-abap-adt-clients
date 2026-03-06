@@ -7,7 +7,6 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -33,13 +32,10 @@ export async function validateFunctionModuleName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/validation`;
-  const encodedFugr = encodeSapObjectName(functionGroupName);
-  const encodedFm = encodeSapObjectName(functionModuleName);
-
   const queryParams = new URLSearchParams({
     objtype: 'FUGR/FF',
-    objname: encodedFm,
-    fugrname: encodedFugr,
+    objname: functionModuleName,
+    fugrname: functionGroupName,
   });
 
   if (description) {

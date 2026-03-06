@@ -10,10 +10,12 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 ## Architecture
 
 - [**ARCHITECTURE.md**](architecture/ARCHITECTURE.md) - System architecture, design patterns, and type system organization
+- [**LEGACY.md**](architecture/LEGACY.md) - Legacy system support (BASIS < 7.50): supported types, RFC transport, endpoint availability
 
 ## Usage Guides
 
 - [**CLIENT_API_REFERENCE.md**](usage/CLIENT_API_REFERENCE.md) - Complete API reference for `AdtClient`
+- [**RFC_CONNECTION.md**](usage/RFC_CONNECTION.md) - RFC connection guide for legacy systems
 - [**STATEFUL_SESSION_GUIDE.md**](usage/STATEFUL_SESSION_GUIDE.md) - Guide for stateful session management
 - [**CHECK_LOCAL_TEST_CLASS.md**](usage/CHECK_LOCAL_TEST_CLASS.md) - Guide for validating ABAP Unit test classes
 - [**DEBUG.md**](usage/DEBUG.md) - Debugging and troubleshooting guide
@@ -23,6 +25,7 @@ Complete documentation for the `@mcp-abap-adt/adt-clients` package.
 ## Development
 - [**TEST_CONFIG_SCHEMA.md**](development/TEST_CONFIG_SCHEMA.md) - Test configuration schema and guidelines
 - [**UPDATE_CONTENT_TYPES.md**](development/UPDATE_CONTENT_TYPES.md) - Content types for update operations (text/plain vs XML)
+- [**RFC_TESTING.md**](development/RFC_TESTING.md) - RFC testing setup and environment variables
 
 ### Roadmaps
 - [**BATCH_REQUEST_SUPPORT.md**](development/roadmaps/BATCH_REQUEST_SUPPORT.md) - ADT batch request support (multipart/mixed)
@@ -34,6 +37,7 @@ docs/
 ├── README.md                          # This file - documentation index
 ├── architecture/
 │   ├── ARCHITECTURE.md               # System architecture and design
+│   ├── LEGACY.md                     # Legacy system support (BASIS < 7.50)
 │   ├── discovery.md                  # ADT Discovery documentation
 │   └── discovery.xml                 # Pretty-printed ADT discovery XML
 ├── usage/

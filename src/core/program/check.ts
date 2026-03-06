@@ -16,6 +16,7 @@ export async function checkProgram(
   programName: string,
   version: string = 'active',
   sourceCode?: string,
+  artifactContentType?: string,
 ): Promise<AxiosResponse> {
   const response = await runCheckRun(
     connection,
@@ -24,6 +25,7 @@ export async function checkProgram(
     version,
     'abapCheckRun',
     sourceCode,
+    artifactContentType,
   );
   const checkResult = parseCheckRunResponse(response);
 

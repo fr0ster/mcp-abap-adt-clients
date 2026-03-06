@@ -387,7 +387,7 @@ export async function getWhereUsedList(
         responsible: adtObject['@_adtcore:responsible'],
         isResult: refObj['@_isResult'] === 'true',
         usageInformation: refObj['@_usageInformation'],
-        objectIdentifier: refObj['objectIdentifier'],
+        objectIdentifier: refObj.objectIdentifier,
       });
     }
   }

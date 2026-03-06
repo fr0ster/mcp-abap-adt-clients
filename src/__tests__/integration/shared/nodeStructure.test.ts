@@ -169,7 +169,7 @@ describe('Shared - fetchNodeStructure', () => {
         client,
         hasConfig,
         isCloudSystem,
-        buildConfig: (testCase: any, resolver?: TestConfigResolver) => {
+        buildConfig: (_testCase: any, resolver?: TestConfigResolver) => {
           const parentType = resolver?.getParam('parent_type', 'CLAS/OC');
           const parentName =
             resolver?.getParam('parent_name') ||

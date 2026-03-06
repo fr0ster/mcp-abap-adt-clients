@@ -8,7 +8,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -28,15 +27,13 @@ export async function validateDomainName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/domains/validation`;
-  const encodedName = encodeSapObjectName(domainName);
-
   const queryParams = new URLSearchParams({
     objtype: 'doma',
-    objname: encodedName,
+    objname: domainName,
   });
 
   if (packageName) {
-    queryParams.append('packagename', encodeSapObjectName(packageName));
+    queryParams.append('packagename', packageName);
   }
 
   // Description is required for domain validation

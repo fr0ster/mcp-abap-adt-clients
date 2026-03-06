@@ -16,6 +16,7 @@ import {
   limitDescription,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { ICreateProgramParams } from './types';
 
 /**
@@ -82,6 +83,7 @@ START-OF-SELECTION.
 export async function create(
   connection: IAbapConnection,
   args: ICreateProgramParams,
+  contentTypes?: IAdtContentTypes,
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
   const description = limitDescription(args.description || args.programName);
@@ -101,9 +103,10 @@ export async function create(
   <adtcore:packageRef adtcore:name="${args.packageName}"/>
 </program:abapProgram>`;
 
+  const ct = contentTypes?.programCreate();
   const headers = {
-    Accept: CT_PROGRAM,
-    'Content-Type': CT_PROGRAM,
+    Accept: ct?.accept || CT_PROGRAM,
+    'Content-Type': ct?.contentType || CT_PROGRAM,
   };
 
   return connection.makeAdtRequest({
@@ -126,7 +129,7 @@ async function _uploadProgramSource(
   _sessionId: string,
   transportRequest?: string,
 ): Promise<AxiosResponse> {
-  const queryParams = `lockHandle=${lockHandle}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
+  const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
   const url = `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {

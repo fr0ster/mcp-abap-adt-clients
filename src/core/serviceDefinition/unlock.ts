@@ -22,7 +22,7 @@ export async function unlockServiceDefinition(
   const serviceDefinitionNameEncoded = encodeSapObjectName(
     serviceDefinitionName.toLowerCase(),
   );
-  const url = `/sap/bc/adt/ddic/srvd/sources/${serviceDefinitionNameEncoded}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/ddic/srvd/sources/${serviceDefinitionNameEncoded}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

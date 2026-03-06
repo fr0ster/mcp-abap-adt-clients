@@ -18,7 +18,7 @@ export async function unlockInterface(
   interfaceName: string,
   lockHandle: string,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   try {
     const response = await connection.makeAdtRequest({

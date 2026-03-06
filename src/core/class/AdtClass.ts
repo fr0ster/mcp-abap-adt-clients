@@ -26,6 +26,7 @@ import {
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
@@ -46,16 +47,19 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
+  protected readonly contentTypes?: IAdtContentTypes;
   public readonly objectType: string = 'Class';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.contentTypes = contentTypes;
   }
 
   /**
@@ -147,6 +151,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           template_xml: config.classTemplate,
         },
         this.logger,
+        this.contentTypes,
       );
       objectCreated = true;
       this.connection.setSessionType('stateless');
@@ -256,10 +261,13 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       throw error;
     }
     try {
+      const readOptions = this.contentTypes
+        ? { ...options, accept: this.contentTypes.classRead().accept }
+        : options;
       const response = await getClassMetadata(
         this.connection,
         config.className,
-        options,
+        readOptions,
       );
       state.metadataResult = response;
       this.logger?.info?.('Class metadata read successfully');
@@ -338,6 +346,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           config.className,
           'inactive',
           codeToCheck,
+          this.contentTypes?.sourceArtifactContentType(),
         );
         this.logger?.info?.('Check inactive with update content passed');
       }
@@ -596,6 +605,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         config.className,
         version,
         config.sourceCode,
+        this.contentTypes?.sourceArtifactContentType(),
       );
 
       // Parse response to check for type E errors

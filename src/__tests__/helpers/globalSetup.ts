@@ -25,9 +25,11 @@ export default async function globalSetup() {
 
   try {
     const connection = createAbapConnection(config);
+    await (connection as any).connect();
     await connection.makeAdtRequest({
       url: '/sap/bc/adt/discovery',
       method: 'GET',
+      headers: { Accept: 'application/atomsvc+xml' },
       timeout: 15000,
     });
     console.log('[globalSetup] SAP connection OK');

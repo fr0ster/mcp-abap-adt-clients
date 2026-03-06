@@ -10,10 +10,11 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import { runProgram } from '../../../../core/program/run';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -58,7 +59,12 @@ describe('Program - Run', () => {
         connection,
         isCloudSystem,
       );
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient } = await createTestAdtClient(
+        connection,
+        libraryLogger,
+        systemContext,
+      );
+      client = resolvedClient;
       hasConfig = true;
       programNameForTest = null;
       transportRequestForCleanup = '';

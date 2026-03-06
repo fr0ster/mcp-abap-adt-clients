@@ -27,7 +27,7 @@ export async function updateServiceDefinition(
   const corrNrParam = args.transport_request
     ? `&corrNr=${args.transport_request}`
     : '';
-  const url = `/sap/bc/adt/ddic/srvd/sources/${serviceDefinitionNameEncoded}/source/main?lockHandle=${lockHandle}${corrNrParam}`;
+  const url = `/sap/bc/adt/ddic/srvd/sources/${serviceDefinitionNameEncoded}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
 
   const headers: Record<string, string> = {
     Accept: ACCEPT_SOURCE,

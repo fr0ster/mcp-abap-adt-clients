@@ -21,7 +21,6 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
 
 /**
@@ -44,11 +43,9 @@ export async function validateObjectName(
   objectName: string,
   additionalParams?: Record<string, string>,
 ): Promise<AxiosResponse> {
-  const encodedName = encodeSapObjectName(objectName);
-
   const params = new URLSearchParams({
     objtype: objectType,
-    objname: encodedName,
+    objname: objectName,
     ...additionalParams,
   });
 

@@ -50,9 +50,9 @@ export interface ICdsUnitTestState extends IUnitTestState {
  * Combines AdtClass for test class lifecycle and AdtUnitTest for test execution
  */
 export class AdtCdsUnitTest extends AdtUnitTest {
+  private adtView: AdtView;
   private cdsViewName?: string;
   private className?: string;
-  private adtView: AdtView;
 
   constructor(connection: IAbapConnection, logger?: ILogger) {
     super(connection, logger);

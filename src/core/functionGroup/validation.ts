@@ -9,10 +9,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -33,21 +30,19 @@ export async function validateFunctionGroupName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/validation`;
-  const encodedName = encodeSapObjectName(functionGroupName);
-
   const queryParams = new URLSearchParams({
     objtype: 'FUGR/F',
-    objname: encodedName,
+    objname: functionGroupName,
   });
 
   if (packageName) {
-    queryParams.append('packagename', encodeSapObjectName(packageName));
+    queryParams.append('packagename', packageName);
   }
 
   // Description is limited to 60 characters in SAP ADT
   const limitedDescription = description
     ? limitDescription(description)
-    : encodedName;
+    : functionGroupName;
   if (description) {
     queryParams.append('description', limitedDescription);
   }

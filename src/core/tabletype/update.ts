@@ -38,7 +38,7 @@ export async function updateTableType(
   }
 
   const tableTypeName = params.tabletype_name.toUpperCase();
-  const queryParams = `lockHandle=${lockHandle}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
+  const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${params.transport_request ? `&corrNr=${params.transport_request}` : ''}`;
 
   // TableType is XML-based entity (like Domain/DataElement), no DDL format
   if (!params.row_type_name) {

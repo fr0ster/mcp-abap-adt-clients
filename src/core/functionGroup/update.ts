@@ -34,7 +34,7 @@ async function updateFunctionGroupMetadata(
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
 
-  const url = `/sap/bc/adt/functions/groups/${encodedName}${lockHandle ? `?lockHandle=${lockHandle}` : ''}${transportRequest ? `${lockHandle ? '&' : '?'}corrNr=${transportRequest}` : ''}`;
+  const url = `/sap/bc/adt/functions/groups/${encodedName}${lockHandle ? `?lockHandle=${encodeURIComponent(lockHandle)}` : ''}${transportRequest ? `${lockHandle ? '&' : '?'}corrNr=${transportRequest}` : ''}`;
 
   // Parse current XML to update description
   const parser = new XMLParser({

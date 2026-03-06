@@ -21,7 +21,7 @@ export async function unlockFunctionModule(
   const encodedGroupName = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModuleName =
     encodeSapObjectName(functionModuleName).toLowerCase();
-  const url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}?_action=UNLOCK&lockHandle=${lockHandle}`;
+  const url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   const headers = {
     Accept: 'application/xml',

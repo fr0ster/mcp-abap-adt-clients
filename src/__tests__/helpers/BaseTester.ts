@@ -1270,7 +1270,11 @@ export class BaseTester<TConfig, TState> {
 
       // Ensure object ready (if function provided)
       if (this.ensureObjectReadyFn && this.config) {
+        const camelPrefix =
+          this.loggerPrefix.charAt(0).toLowerCase() +
+          this.loggerPrefix.slice(1);
         const objectName =
+          (this.config as any)[`${camelPrefix}Name`] ||
           (this.config as any)[`${this.loggerPrefix.toLowerCase()}Name`] ||
           (this.config as any).name ||
           (this.config as any).objectName;
@@ -1298,8 +1302,13 @@ export class BaseTester<TConfig, TState> {
   afterAll(): () => Promise<void> {
     return async () => {
       if (this.connection) {
-        this.log(LogLevel.INFO, 'afterAll: Resetting connection');
-        (this.connection as any).reset();
+        this.log(LogLevel.INFO, 'afterAll: Closing connection');
+        const conn = this.connection as any;
+        if (typeof conn.close === 'function') {
+          await conn.close();
+        } else if (typeof conn.reset === 'function') {
+          conn.reset();
+        }
       }
     };
   }

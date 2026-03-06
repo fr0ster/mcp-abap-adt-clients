@@ -25,6 +25,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
 import { checkProgram } from './check';
@@ -42,19 +43,22 @@ import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 
 export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
-  private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
-  private readonly systemContext: IAdtSystemContext;
+  protected readonly connection: IAbapConnection;
+  protected readonly logger?: ILogger;
+  protected readonly systemContext: IAdtSystemContext;
+  protected readonly contentTypes?: IAdtContentTypes;
   public readonly objectType: string = 'Program';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.contentTypes = contentTypes;
   }
 
   /**
@@ -122,17 +126,21 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       // Create program (requires stateful)
       this.logger?.info?.('Creating program');
       this.connection.setSessionType('stateful');
-      const createResponse = await createProgram(this.connection, {
-        programName: config.programName,
-        packageName: config.packageName,
-        transportRequest: config.transportRequest,
-        description: config.description,
-        programType: config.programType,
-        application: config.application,
-        sourceCode: options?.sourceCode || config.sourceCode,
-        masterSystem: this.systemContext.masterSystem,
-        responsible: this.systemContext.responsible,
-      });
+      const createResponse = await createProgram(
+        this.connection,
+        {
+          programName: config.programName,
+          packageName: config.packageName,
+          transportRequest: config.transportRequest,
+          description: config.description,
+          programType: config.programType,
+          application: config.application,
+          sourceCode: options?.sourceCode || config.sourceCode,
+          masterSystem: this.systemContext.masterSystem,
+          responsible: this.systemContext.responsible,
+        },
+        this.contentTypes,
+      );
       state.createResult = createResponse;
       objectCreated = true;
       this.connection.setSessionType('stateless');
@@ -299,6 +307,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           config.programName,
           'inactive',
           codeToCheck,
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Check inactive with update content passed');
@@ -535,6 +544,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         config.programName,
         version,
         config.sourceCode,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.checkResult = checkResponse;
       return state;

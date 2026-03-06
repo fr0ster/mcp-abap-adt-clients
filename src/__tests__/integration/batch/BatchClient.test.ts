@@ -146,12 +146,12 @@ describe('AdtClientBatch read operations', () => {
           let programPromise: Promise<any> | undefined;
           if (hasProgramObject) {
             logTestStep(
-              `recording readMetadata for program ${standardProgram!.name}`,
+              `recording readMetadata for program ${standardProgram?.name}`,
               testsLogger,
             );
             programPromise = batch
               .getProgram()
-              .readMetadata({ programName: standardProgram!.name });
+              .readMetadata({ programName: standardProgram?.name });
           }
 
           logTestStep(

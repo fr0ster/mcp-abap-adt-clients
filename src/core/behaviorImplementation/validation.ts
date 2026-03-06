@@ -8,10 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { AxiosError } from 'axios';
 import { ACCEPT_VALIDATION_CLASS_NAME } from '../../constants/contentTypes';
-import {
-  encodeSapObjectName,
-  limitDescription,
-} from '../../utils/internalUtils';
+import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -32,11 +29,9 @@ export async function validateBehaviorImplementationName(
   description?: string,
   behaviorDefinition?: string,
 ): Promise<AxiosResponse> {
-  const encodedName = encodeSapObjectName(className);
-
   // Build query parameters for behavior implementation validation
   const params = new URLSearchParams({
-    objname: encodedName,
+    objname: className,
     objtype: 'CLAS/OC',
   });
 

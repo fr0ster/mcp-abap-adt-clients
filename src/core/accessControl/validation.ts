@@ -3,7 +3,6 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -17,10 +16,8 @@ export async function validateAccessControlName(
   description?: string,
 ): Promise<AxiosResponse> {
   const url = '/sap/bc/adt/acm/dcl/validation';
-  const encodedName = encodeSapObjectName(accessControlName);
-
   const queryParams = new URLSearchParams({
-    objname: encodedName,
+    objname: accessControlName,
   });
 
   if (packageName) {

@@ -4,9 +4,25 @@
  */
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import type { IAdtClientOptions } from '../../clients/AdtClient';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { AdtClient, IAdtClientOptions } from '../../clients/AdtClient';
+import { AdtClientLegacy } from '../../clients/AdtClientLegacy';
+import { createAdtClient } from '../../clients/createAdtClient';
 import { getSystemInformation } from '../../utils/systemInfo';
+
+/**
+ * Get connection_type from test-config.yaml environment section.
+ * Returns 'http' (default) or 'rfc'.
+ */
+function getConnectionType(): 'http' | 'rfc' {
+  const { getEnvironmentConfig } = require('./test-helper');
+  try {
+    const envConfig = getEnvironmentConfig();
+    return envConfig.connection_type === 'rfc' ? 'rfc' : 'http';
+  } catch {
+    return 'http';
+  }
+}
 
 /**
  * Get SAP configuration from environment variables
@@ -24,6 +40,26 @@ export function getConfig(): SapConfig {
 
   if (!url || !/^https?:\/\//.test(url)) {
     throw new Error(`Missing or invalid SAP_URL: ${url}`);
+  }
+
+  // RFC transport overrides auth type — RFC connections use username/password
+  // but route through SADT_REST_RFC_ENDPOINT instead of HTTP
+  const connectionType = getConnectionType();
+  if (connectionType === 'rfc') {
+    const username = process.env.SAP_USERNAME;
+    const password = process.env.SAP_PASSWORD;
+    if (!username || !password) {
+      throw new Error(
+        'Missing SAP_USERNAME or SAP_PASSWORD for RFC connection',
+      );
+    }
+    return {
+      url,
+      authType: 'rfc',
+      client: client || undefined,
+      username,
+      password,
+    };
   }
 
   // Keep tests compatible with both modes:
@@ -106,4 +142,19 @@ export async function resolveSystemContext(
     masterSystem: envConfig.default_master_system,
     responsible: process.env.SAP_USERNAME,
   };
+}
+
+/**
+ * Create the appropriate AdtClient based on system capabilities.
+ * Modern systems (S/4 HANA, BTP) get AdtClient.
+ * Legacy systems (BASIS < 7.50) get AdtClientLegacy.
+ */
+export async function createTestAdtClient(
+  connection: IAbapConnection,
+  logger: ILogger,
+  options?: IAdtClientOptions,
+): Promise<{ client: AdtClient; isLegacy: boolean }> {
+  const client = await createAdtClient(connection, logger, options);
+  const isLegacy = client instanceof AdtClientLegacy;
+  return { client, isLegacy };
 }

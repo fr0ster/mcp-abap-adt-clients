@@ -32,6 +32,7 @@ export async function checkClass(
   className: string,
   version: 'active' | 'inactive',
   sourceCode?: string,
+  artifactContentType?: string,
 ): Promise<AxiosResponse> {
   const { runCheckRun, runCheckRunWithSource, parseCheckRunResponse } =
     await import('../../utils/checkRun');
@@ -47,6 +48,7 @@ export async function checkClass(
       sourceCode,
       version,
       'abapCheckRun',
+      artifactContentType,
     );
   } else {
     // Validate existing object in SAP (reads from system)
