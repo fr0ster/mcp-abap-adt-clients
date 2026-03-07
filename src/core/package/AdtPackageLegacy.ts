@@ -56,12 +56,12 @@ export class AdtPackageLegacy extends AdtPackage {
       this.logger?.info?.('Package deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error?.('Delete failed:', error);
       if (lockHandle) {
         try {
           await unlockPackage(this.connection, config.packageName, lockHandle);
-        } catch (unlockError: any) {
+        } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
             unlockError,

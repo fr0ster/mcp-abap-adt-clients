@@ -4,7 +4,11 @@
  * Provides a flat list view of package contents using node structure traversal.
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  ILogger,
+  XmlNode,
+} from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { fetchNodeStructure } from './nodeStructure';
 import type {
@@ -20,7 +24,7 @@ const xmlParser = new XMLParser({
   trimValues: true,
 });
 
-type NodeValue = Record<string, unknown> | unknown[] | string | number | null;
+type NodeValue = XmlNode[string];
 
 const readNodeValue = (value: NodeValue): string | undefined => {
   if (value === undefined || value === null) {
@@ -107,7 +111,7 @@ interface IObjectTypeInfo {
 }
 
 interface IParsedNodeStructure {
-  nodes: any[];
+  nodes: XmlNode[];
   objectTypes: IObjectTypeInfo[];
 }
 
@@ -117,25 +121,28 @@ const parseNodeStructure = (xmlData: string): IParsedNodeStructure => {
     if (!xmlData) {
       return emptyResult;
     }
-    const result = xmlParser.parse(xmlData) as Record<string, unknown>;
-    const data = (result as any)?.['asx:abap']?.['asx:values']?.DATA;
+    const result = xmlParser.parse(xmlData) as XmlNode;
+    const abap = result?.['asx:abap'] as XmlNode | undefined;
+    const data = (abap?.['asx:values'] as XmlNode | undefined)?.DATA as
+      | XmlNode
+      | undefined;
 
     // Parse TREE_CONTENT nodes
-    const treeContent = data?.TREE_CONTENT;
+    const treeContent = data?.TREE_CONTENT as XmlNode | undefined;
     const rawNodes = treeContent?.SEU_ADT_REPOSITORY_OBJ_NODE;
-    const nodes = rawNodes
+    const nodes: XmlNode[] = rawNodes
       ? Array.isArray(rawNodes)
-        ? rawNodes
-        : [rawNodes]
+        ? (rawNodes as XmlNode[])
+        : [rawNodes as XmlNode]
       : [];
 
     // Parse OBJECT_TYPES to get NODE_ID for each object type
-    const objectTypesData = data?.OBJECT_TYPES;
+    const objectTypesData = data?.OBJECT_TYPES as XmlNode | undefined;
     const rawTypes = objectTypesData?.SEU_ADT_OBJECT_TYPE_INFO;
-    const typeInfos = rawTypes
+    const typeInfos: XmlNode[] = rawTypes
       ? Array.isArray(rawTypes)
-        ? rawTypes
-        : [rawTypes]
+        ? (rawTypes as XmlNode[])
+        : [rawTypes as XmlNode]
       : [];
 
     const objectTypes: IObjectTypeInfo[] = [];
@@ -154,7 +161,7 @@ const parseNodeStructure = (xmlData: string): IParsedNodeStructure => {
 };
 
 const parseNodesToItems = (
-  nodes: any[],
+  nodes: XmlNode[],
   packageName: string,
   includeDescriptions: boolean,
 ): IPackageContentItem[] => {

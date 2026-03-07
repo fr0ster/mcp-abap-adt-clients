@@ -38,7 +38,7 @@ export async function getApplicationLogObject(
   options?: IGetApplicationLogObjectOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/${objectName}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.corrNr) params.corrNr = options.corrNr;
   if (options?.lockHandle) params.lockHandle = options.lockHandle;
@@ -82,7 +82,7 @@ export async function getApplicationLogSource(
   options?: IGetApplicationLogSourceOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/${objectName}/source/main`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.corrNr) params.corrNr = options.corrNr;
   if (options?.lockHandle) params.lockHandle = options.lockHandle;
@@ -113,7 +113,7 @@ export async function validateApplicationLogName(
   objectName: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/applicationlog/objects/validation`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   // Note: According to the template, validation might need objectName as a parameter
   // Adjust based on actual ADT endpoint behavior

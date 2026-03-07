@@ -1,4 +1,5 @@
 import type {
+  HttpError,
   IAbapConnection,
   IAbapRequestOptions,
   IAdtResponse,
@@ -32,9 +33,10 @@ export function getAcceptCorrectionEnabled(): boolean {
   return process.env.ADT_ACCEPT_CORRECTION === 'true';
 }
 
-export function extractSupportedAccept(error: any): string[] {
+export function extractSupportedAccept(error: unknown): string[] {
   const types = new Set<string>();
-  const headers = error?.response?.headers || {};
+  const e = error as HttpError;
+  const headers = (e?.response?.headers || {}) as Record<string, unknown>;
   const headerCandidates = [
     headers.accept,
     headers['x-sap-adt-supported-accept'],
@@ -55,7 +57,7 @@ export function extractSupportedAccept(error: any): string[] {
     }
   }
 
-  const data = error?.response?.data;
+  const data = e?.response?.data;
   const text =
     typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
   if (text) {
@@ -93,8 +95,8 @@ export function wrapConnectionAcceptNegotiation(
   baseRequestMap.set(connection, baseRequest);
 
   connection.makeAdtRequest = async function makeAdtRequestWithNegotiation<
-    T = any,
-    D = any,
+    T = unknown,
+    D = unknown,
   >(request: IAbapRequestOptions): Promise<IAdtResponse<T, D>> {
     return makeAdtRequestWithAcceptNegotiation(
       connection,
@@ -104,7 +106,10 @@ export function wrapConnectionAcceptNegotiation(
   };
 }
 
-export async function makeAdtRequestWithAcceptNegotiation<T = any, D = any>(
+export async function makeAdtRequestWithAcceptNegotiation<
+  T = unknown,
+  D = unknown,
+>(
   connection: IAbapConnection,
   request: IAbapRequestOptions,
   options?: IAcceptNegotiationOptions,
@@ -126,8 +131,9 @@ export async function makeAdtRequestWithAcceptNegotiation<T = any, D = any>(
       ...request,
       headers,
     });
-  } catch (error: any) {
-    if (error?.response?.status === 406) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
+    if (e.response?.status === 406) {
       const supported = extractSupportedAccept(error);
       if (supported.length > 0) {
         logger?.warn?.(

@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -76,7 +77,7 @@ export class AdtStructure
       );
       state.validationResponse = response;
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       state.errors.push({
         method: 'validate',
         error: error instanceof Error ? error : new Error(String(error)),
@@ -126,7 +127,7 @@ export class AdtStructure
       this.logger?.info?.('Structure created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (objectCreated && options?.deleteOnFailure) {
         try {
           this.logger?.warn?.('Deleting structure after failure');
@@ -170,8 +171,9 @@ export class AdtStructure
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       throw error;
@@ -427,7 +429,7 @@ export class AdtStructure
         readResult: readResponse,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -497,7 +499,7 @@ export class AdtStructure
         deleteResult: result,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     }
@@ -521,7 +523,7 @@ export class AdtStructure
         activateResult: result,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Activate failed:', error);
       throw error;
     }

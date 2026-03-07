@@ -31,7 +31,7 @@ export class BatchRecordingConnection implements IAbapConnection {
     // no-op — session management is handled by the outer batch request
   }
 
-  makeAdtRequest<T = any, D = any>(
+  makeAdtRequest<T = unknown, D = unknown>(
     options: IAbapRequestOptions,
   ): Promise<IAdtResponse<T, D>> {
     const part: IBatchRequestPart = {

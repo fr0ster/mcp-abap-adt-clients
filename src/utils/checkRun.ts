@@ -14,6 +14,13 @@ import {
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
 
+interface CheckMessage {
+  type: string;
+  text: string;
+  line: string;
+  href: string;
+}
+
 /**
  * Get ADT URI for object type
  */
@@ -134,9 +141,9 @@ export function parseCheckRunResponse(response: AxiosResponse): {
   success: boolean;
   status: string;
   message: string;
-  errors: any[];
-  warnings: any[];
-  info: any[];
+  errors: CheckMessage[];
+  warnings: CheckMessage[];
+  info: CheckMessage[];
   total_messages: number;
   has_errors: boolean;
   has_warnings: boolean;
@@ -200,28 +207,32 @@ export function parseCheckRunResponse(response: AxiosResponse): {
         ? [messages]
         : [];
 
-    const errors: any[] = [];
-    const warnings: any[] = [];
-    const info: any[] = [];
+    const errors: CheckMessage[] = [];
+    const warnings: CheckMessage[] = [];
+    const info: CheckMessage[] = [];
 
-    messageArray.forEach((msg: any) => {
+    messageArray.forEach((msg: Record<string, unknown>) => {
       if (!msg || typeof msg !== 'object') return;
 
-      const msgType = msg['@_chkrun:type'] || msg['@_type'] || msg.type;
-      const shortText =
+      const msgType = String(
+        msg['@_chkrun:type'] || msg['@_type'] || msg.type || '',
+      );
+      const st = msg.shortText as Record<string, unknown> | string | undefined;
+      const shortText = String(
         msg['@_chkrun:shortText'] ||
-        msg.shortText?.['#text'] ||
-        msg.shortText ||
-        msg.shortText?.txt ||
-        '';
-      const line = msg['@_line'] || msg.line;
-      const href = msg['@_chkrun:uri'] || msg['@_href'] || msg.href;
+          (typeof st === 'object' && st ? st['#text'] || st.txt || '' : st) ||
+          '',
+      );
+      const line = String(msg['@_line'] || msg.line || '');
+      const href = String(
+        msg['@_chkrun:uri'] || msg['@_href'] || msg.href || '',
+      );
 
-      const msgObj = {
+      const msgObj: CheckMessage = {
         type: msgType,
         text: shortText,
-        line: line || '',
-        href: href || '',
+        line,
+        href,
       };
 
       if (msgType === 'E') {

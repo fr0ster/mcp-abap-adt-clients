@@ -6,6 +6,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
@@ -95,18 +96,19 @@ export async function create(
     }
 
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     // Log error details for debugging (similar to class create)
-    if (error.response) {
+    if (e.response) {
       const errorData =
-        typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 1000)
-          : JSON.stringify(error.response.data).substring(0, 1000);
+        typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 1000)
+          : JSON.stringify(e.response.data).substring(0, 1000);
       logger?.error?.(
-        `[ERROR] Create interface failed - Status: ${error.response.status}`,
+        `[ERROR] Create interface failed - Status: ${e.response.status}`,
       );
       logger?.error?.(
-        `[ERROR] Create interface failed - StatusText: ${error.response.statusText}`,
+        `[ERROR] Create interface failed - StatusText: ${e.response.statusText}`,
       );
       logger?.error?.(
         `[ERROR] Create interface failed - Response data:`,

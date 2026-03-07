@@ -4,6 +4,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -29,10 +30,11 @@ export async function unlockInterface(
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     // If response is not returned (e.g., object locked by another user, network error),
     // provide more context in the error message
-    if (!error.response) {
+    if (!e.response) {
       throw new Error(
         `Failed to unlock interface ${interfaceName}: No response from server. ` +
           `Lock handle: ${lockHandle} ` +
@@ -40,13 +42,13 @@ export async function unlockInterface(
       );
     }
     // If we have a response, include its status and data in the error
-    const status = error.response?.status;
+    const status = e.response?.status;
     const statusText = status ? `HTTP ${status}` : 'HTTP ?';
-    const errorData = error.response?.data
-      ? typeof error.response.data === 'string'
-        ? error.response.data
-        : JSON.stringify(error.response.data)
-      : error.message;
+    const errorData = e.response?.data
+      ? typeof e.response.data === 'string'
+        ? e.response.data
+        : JSON.stringify(e.response.data)
+      : e.message;
 
     throw new Error(
       `Failed to unlock interface ${interfaceName} (${statusText}): ${errorData}`,

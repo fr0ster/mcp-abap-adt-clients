@@ -38,7 +38,7 @@ export async function checkStructure(
     // Check both message and errors array for "has been checked" message
     const hasCheckedMessage =
       errorMessage.toLowerCase().includes('has been checked') ||
-      checkResult.errors.some((err: any) =>
+      checkResult.errors.some((err: { text?: string }) =>
         (err.text || '').toLowerCase().includes('has been checked'),
       );
 

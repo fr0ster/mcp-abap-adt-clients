@@ -36,7 +36,7 @@ export async function listCrossTraces(
   options?: IListCrossTracesOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/crosstrace/traces`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.traceUser) params.traceUser = options.traceUser;
   if (options?.actCreateUser) params.actCreateUser = options.actCreateUser;
@@ -67,7 +67,7 @@ export async function getCrossTrace(
   includeSensitiveData?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/crosstrace/traces/${traceId}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (includeSensitiveData !== undefined)
     params.includeSensitiveData = includeSensitiveData;

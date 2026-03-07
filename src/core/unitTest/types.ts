@@ -60,13 +60,13 @@ export interface IUnitTestConfig {
     };
   };
   runId?: string; // Set after create, used for read operations
-  status?: any; // Set after read (status)
-  result?: any; // Set after read (result)
+  status?: unknown;
+  result?: unknown;
 }
 
 // Unit test state
 export interface IUnitTestState extends IAdtObjectState {
   runId?: string;
-  runStatus?: any;
-  runResult?: any;
+  runStatus?: unknown;
+  runResult?: unknown;
 }

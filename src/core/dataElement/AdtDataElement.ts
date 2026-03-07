@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -131,7 +132,7 @@ export class AdtDataElement
       this.logger?.info?.('Data element created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - ensure stateless
       this.connection.setSessionType('stateless');
 
@@ -180,8 +181,9 @@ export class AdtDataElement
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       this.logger?.error('Read failed:', error);
@@ -450,7 +452,7 @@ export class AdtDataElement
       }
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -525,7 +527,7 @@ export class AdtDataElement
       this.logger?.info?.('Data element deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     }
@@ -553,7 +555,7 @@ export class AdtDataElement
       );
       state.activateResult = activateResponse;
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Activate failed:', error);
       throw error;
     }

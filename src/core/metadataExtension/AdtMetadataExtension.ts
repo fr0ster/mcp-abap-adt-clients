@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -131,7 +132,7 @@ export class AdtMetadataExtension
       this.logger?.info?.('Metadata extension created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Create failed:', error);
       throw error;
     }
@@ -169,8 +170,9 @@ export class AdtMetadataExtension
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return state;
       }
       const err = error instanceof Error ? error : new Error(String(error));
@@ -416,7 +418,7 @@ export class AdtMetadataExtension
         readResult: readResponse,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -487,7 +489,7 @@ export class AdtMetadataExtension
         deleteResult: result,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'delete',
@@ -522,7 +524,7 @@ export class AdtMetadataExtension
         activateResult: result,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'activate',

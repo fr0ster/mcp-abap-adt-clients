@@ -2035,7 +2035,11 @@ async function ensureSharedDependency(client, type, name, logger) {
       });
       if (depConfig.source) {
         await client.getProgram().update(
-          { programName: name, sourceCode: depConfig.source, transportRequest },
+          {
+            programName: name,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
           { activateOnUpdate: true, sourceCode: depConfig.source },
         );
       }

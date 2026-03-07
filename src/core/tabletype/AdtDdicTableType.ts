@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -107,7 +108,7 @@ export class AdtDdicTableType
       this.logger?.info?.('Table type created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - ensure stateless
       this.connection.setSessionType('stateless');
 
@@ -152,9 +153,10 @@ export class AdtDdicTableType
         this.logger,
       );
       return { readResult, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
       // If metadata read fails with 404, return empty result
-      if (error.response?.status === 404) {
+      if (e.response?.status === 404) {
         return { readResult: undefined, errors: [] };
       }
       throw error;
@@ -326,11 +328,12 @@ export class AdtDdicTableType
             this.logger,
           );
           this.logger?.info?.('Table type updated');
-        } catch (updateError: any) {
+        } catch (updateError: unknown) {
+          const updateErr = updateError as HttpError;
           // Log update error details before rethrowing
           this.logger?.error?.('Update failed with error:', updateError);
-          if (updateError.message) {
-            this.logger?.error?.('Error message:', updateError.message);
+          if (updateErr.message) {
+            this.logger?.error?.('Error message:', updateErr.message);
           }
           throw updateError;
         }
@@ -428,9 +431,10 @@ export class AdtDdicTableType
           readResult: readResponse,
           errors: [],
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const e = error as HttpError;
         // If metadata read fails with 404, return empty result
-        if (error.response?.status === 404) {
+        if (e.response?.status === 404) {
           return {
             readResult: undefined,
             errors: [],
@@ -438,7 +442,7 @@ export class AdtDdicTableType
         }
         throw error;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -505,7 +509,7 @@ export class AdtDdicTableType
       this.logger?.info?.('Table type deleted');
 
       return { deleteResult: result, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     }
@@ -526,7 +530,7 @@ export class AdtDdicTableType
         config.tableTypeName,
       );
       return { activateResult: result, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Activate failed:', error);
       throw error;
     }

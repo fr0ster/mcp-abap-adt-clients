@@ -4,6 +4,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
@@ -168,9 +169,10 @@ export async function deletePackage(
         'Deletion failed';
       throw new Error(`Package deletion failed: ${message}`);
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     // If parsing fails or isDeleted is false, throw error
-    if (error.message?.includes('Package deletion failed')) {
+    if (e.message?.includes('Package deletion failed')) {
       throw error;
     }
     // If it's a parse error, check HTTP status

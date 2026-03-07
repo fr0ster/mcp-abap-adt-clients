@@ -20,6 +20,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -102,7 +103,7 @@ export class AdtRequest
         transportNumber,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Create failed:', error);
       throw error;
     }
@@ -134,8 +135,9 @@ export class AdtRequest
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       throw error;

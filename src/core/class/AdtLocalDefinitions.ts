@@ -5,7 +5,7 @@
  * All operations require the parent class to be locked.
  */
 
-import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
 import { checkClassDefinitions } from './check';
@@ -93,7 +93,7 @@ export class AdtLocalDefinitions extends AdtClass {
       const updateResponse = await updateClassDefinitions(
         this.connection,
         config.className,
-        codeToCheck!,
+        codeToCheck as string,
         lockHandle,
         config.transportRequest,
       );
@@ -110,7 +110,7 @@ export class AdtLocalDefinitions extends AdtClass {
       lockHandle = undefined;
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error
       if (lockHandle) {
         try {
@@ -154,8 +154,9 @@ export class AdtLocalDefinitions extends AdtClass {
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       this.logger?.error('Read LocalDefinitions failed:', error);
@@ -234,7 +235,7 @@ export class AdtLocalDefinitions extends AdtClass {
       const updateResponse = await updateClassDefinitions(
         this.connection,
         config.className,
-        codeToCheck!,
+        codeToCheck as string,
         lockHandle,
         config.transportRequest,
       );
@@ -251,7 +252,7 @@ export class AdtLocalDefinitions extends AdtClass {
       lockHandle = undefined;
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error
       if (lockHandle) {
         try {

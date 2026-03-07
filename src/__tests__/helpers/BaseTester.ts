@@ -1172,7 +1172,9 @@ export class BaseTester<TConfig, TState> {
     this.hasConfig = options.hasConfig;
     this.isCloudSystem = options.isCloudSystem;
     // Auto-detect legacy from client class name if not explicitly provided
-    this.isLegacySystem = options.isLegacySystem ?? options.client?.constructor?.name === 'AdtClientLegacy';
+    this.isLegacySystem =
+      options.isLegacySystem ??
+      options.client?.constructor?.name === 'AdtClientLegacy';
     this.buildConfigFn = options.buildConfig;
     this.ensureObjectReadyFn = options.ensureObjectReady;
     if (options.testDescription) {
@@ -1252,7 +1254,11 @@ export class BaseTester<TConfig, TState> {
 
       // Check if test is available for current environment
       if (!this.configResolver.isAvailableForEnvironment()) {
-        const envName = this.isCloudSystem ? 'cloud' : this.isLegacySystem ? 'legacy' : 'on-premise';
+        const envName = this.isCloudSystem
+          ? 'cloud'
+          : this.isLegacySystem
+            ? 'legacy'
+            : 'on-premise';
         this.skipReason = `Test not available for ${envName} environment (check available_in in test-config.yaml)`;
         this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
         this.testCase = null;

@@ -135,15 +135,15 @@ export interface IBehaviorDefinitionState extends IAdtObjectState {
   /** Name of the behavior definition */
   name?: string;
   /** Lock result */
-  lockResult?: AxiosResponse<any>;
+  lockResult?: AxiosResponse<unknown>;
   /** Update source result (separate from updateResult) */
-  updateSourceResult?: AxiosResponse<any>;
+  updateSourceResult?: AxiosResponse<unknown>;
   /** Check results (array for multiple checks) */
-  checkResults?: AxiosResponse<any>[];
+  checkResults?: AxiosResponse<unknown>[];
   /** Delete check result */
-  deleteCheckResult?: AxiosResponse<any>;
+  deleteCheckResult?: AxiosResponse<unknown>;
   /** Validation result */
-  validationResult?: AxiosResponse<any>;
+  validationResult?: AxiosResponse<unknown>;
   // All operation results are in IAdtObjectState:
   // validationResponse, createResult, lockHandle, updateResult, checkResult,
   // unlockResult, activateResult, deleteResult, readResult, transportResult, errors

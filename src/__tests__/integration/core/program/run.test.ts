@@ -58,11 +58,8 @@ describe('Program - Run', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } = await createTestAdtClient(
-        connection,
-        libraryLogger,
-        systemContext,
-      );
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
       hasConfig = true;
@@ -96,16 +93,29 @@ describe('Program - Run', () => {
         return;
       }
 
-      if (!TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)) {
-        const envName = isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
-        testsLogger.warn(`Skipping test: Not available for ${envName} environment`);
+      if (
+        !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
+      ) {
+        const envName = isCloudSystem
+          ? 'cloud'
+          : isLegacy
+            ? 'legacy'
+            : 'onprem';
+        testsLogger.warn(
+          `Skipping test: Not available for ${envName} environment`,
+        );
         return;
       }
 
       const programName = testCase.params.program_name || 'ZADT_BLD_RUN01';
 
       // Ensure shared program exists (create if missing)
-      await ensureSharedDependency(client, 'programs', programName, testsLogger);
+      await ensureSharedDependency(
+        client,
+        'programs',
+        programName,
+        testsLogger,
+      );
 
       // Run
       const result = await runProgram(connection, programName);

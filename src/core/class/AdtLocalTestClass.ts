@@ -5,7 +5,7 @@
  * All operations require the parent class to be locked.
  */
 
-import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
 import { checkClassLocalTestClass } from './check';
@@ -92,7 +92,7 @@ export class AdtLocalTestClass extends AdtClass {
       const updateResponse = await updateClassTestInclude(
         this.connection,
         config.className,
-        config.testClassCode!,
+        config.testClassCode as string,
         parentLockHandle,
         config.transportRequest,
       );
@@ -121,7 +121,7 @@ export class AdtLocalTestClass extends AdtClass {
       }
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error
       if (parentLockHandle) {
         try {
@@ -165,8 +165,9 @@ export class AdtLocalTestClass extends AdtClass {
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       this.logger?.error('Read LocalTestClass failed:', error);
@@ -246,7 +247,7 @@ export class AdtLocalTestClass extends AdtClass {
       const updateResponse = await updateClassTestInclude(
         this.connection,
         config.className,
-        codeToCheck!,
+        codeToCheck as string,
         parentLockHandle,
         config.transportRequest,
       );
@@ -275,7 +276,7 @@ export class AdtLocalTestClass extends AdtClass {
       }
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error
       if (parentLockHandle) {
         try {

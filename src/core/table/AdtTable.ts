@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -104,7 +105,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       this.logger?.info?.('Table created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - ensure stateless
       this.connection.setSessionType('stateless');
 
@@ -148,8 +149,9 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         options,
       );
       return { readResult, errors: [] };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return { readResult: undefined, errors: [] };
       }
       throw error;
@@ -403,7 +405,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         readResult: readResponse,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -466,7 +468,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       this.logger?.info?.('Table deleted');
 
       return { deleteResult: result, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     }
@@ -484,7 +486,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     try {
       const result = await activateTable(this.connection, config.tableName);
       return { activateResult: result, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Activate failed:', error);
       throw error;
     }

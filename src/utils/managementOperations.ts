@@ -17,8 +17,8 @@ async function makeAdtRequest(
   url: string,
   method: string = 'GET',
   timeout: 'default' | 'csrf' | 'long' | number = 'default',
-  data?: any,
-  params?: any,
+  data?: unknown,
+  params?: unknown,
   headers?: Record<string, string>,
 ): Promise<AxiosResponse> {
   const timeoutValue = getTimeout(timeout);
@@ -77,7 +77,7 @@ ${objectReferences}
 /**
  * Parse activation response to extract status and messages
  */
-export function parseActivationResponse(responseData: string | any): {
+export function parseActivationResponse(responseData: unknown): {
   activated: boolean;
   checked: boolean;
   generated: boolean;
@@ -99,7 +99,8 @@ export function parseActivationResponse(responseData: string | any): {
     const data =
       typeof responseData === 'string'
         ? responseData
-        : responseData.data || JSON.stringify(responseData);
+        : (responseData as Record<string, unknown>).data ||
+          JSON.stringify(responseData);
     const result = parser.parse(data);
 
     // Check for properties element
@@ -126,12 +127,18 @@ export function parseActivationResponse(responseData: string | any): {
 
     if (msgData) {
       const msgArray = Array.isArray(msgData) ? msgData : [msgData];
-      msgArray.forEach((msg: any) => {
+      msgArray.forEach((msg: Record<string, unknown>) => {
+        const st = msg.shortText as
+          | Record<string, unknown>
+          | string
+          | undefined;
         messages.push({
-          type: msg['@_type'] || 'info',
-          text: msg.shortText?.txt || msg.shortText || 'Unknown message',
-          line: msg['@_line'],
-          column: msg['@_column'],
+          type: String(msg['@_type'] || 'info'),
+          text: String(
+            (typeof st === 'object' && st ? st.txt : st) || 'Unknown message',
+          ),
+          line: msg['@_line'] as number | undefined,
+          column: msg['@_column'] as number | undefined,
         });
       });
     }

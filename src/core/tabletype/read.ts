@@ -4,6 +4,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
@@ -44,20 +45,17 @@ export async function getTableTypeMetadata(
       },
       { logger },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     // Output full error response as-is for debugging
-    const status = error.response?.status || 'unknown';
-    const statusText = error.response?.statusText || '';
-    const responseHeaders = JSON.stringify(
-      error.response?.headers || {},
-      null,
-      2,
-    );
-    const responseData = error.response?.data
-      ? typeof error.response.data === 'string'
-        ? error.response.data
-        : JSON.stringify(error.response.data, null, 2)
-      : error.message || 'No response data';
+    const status = e.response?.status || 'unknown';
+    const statusText = e.response?.statusText || '';
+    const responseHeaders = JSON.stringify(e.response?.headers || {}, null, 2);
+    const responseData = e.response?.data
+      ? typeof e.response.data === 'string'
+        ? e.response.data
+        : JSON.stringify(e.response.data, null, 2)
+      : e.message || 'No response data';
 
     const fullError = `getTableTypeMetadata failed for ${tableTypeName}
 HTTP Status: ${status} ${statusText}

@@ -22,6 +22,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -126,10 +127,10 @@ export class AdtFunctionGroup
           );
         }
         this.logger?.info?.('Validation passed');
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const e = error as HttpError;
         // Ignore "Kerberos library not loaded" error for FunctionGroup (test cloud issue)
-        const errorMessage =
-          error?.response?.data || error?.message || String(error);
+        const errorMessage = e.response?.data || e.message || String(error);
         const errorText =
           typeof errorMessage === 'string'
             ? errorMessage
@@ -240,7 +241,7 @@ export class AdtFunctionGroup
         createResult: readResponse,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Ensure stateless if needed
       this.connection.setSessionType('stateless');
 
@@ -287,8 +288,9 @@ export class AdtFunctionGroup
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       throw error;
@@ -539,7 +541,7 @@ export class AdtFunctionGroup
         updateResult: readResponse,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -609,7 +611,7 @@ export class AdtFunctionGroup
       this.logger?.info?.('Function group deleted');
 
       return { deleteResult: result, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     }
@@ -632,7 +634,7 @@ export class AdtFunctionGroup
         config.functionGroupName,
       );
       return { activateResult: result, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Activate failed:', error);
       throw error;
     }

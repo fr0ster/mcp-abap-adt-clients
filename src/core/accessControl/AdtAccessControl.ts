@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -129,7 +130,7 @@ export class AdtAccessControl
       this.logger?.info?.('Access control created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Create failed:', error);
       throw error;
     }
@@ -160,8 +161,9 @@ export class AdtAccessControl
       );
       state.readResult = response;
       return state;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       throw error;
@@ -418,7 +420,7 @@ export class AdtAccessControl
         readResult: readResponse,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -493,7 +495,7 @@ export class AdtAccessControl
         deleteResult: result,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     }
@@ -520,7 +522,7 @@ export class AdtAccessControl
       );
       state.activateResult = result;
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Activate failed:', error);
       throw error;
     }

@@ -17,9 +17,11 @@
  * - Delete: check(deletion) → delete
  */
 
-import type { IAdtResponse as AxiosResponse } from '@mcp-abap-adt/interfaces';
 import {
   AdtObjectErrorCodes,
+  AdtOperationError,
+  type IAdtResponse as AxiosResponse,
+  type HttpError,
   type IAbapConnection,
   type IAdtObject,
   type IAdtOperationOptions,
@@ -83,14 +85,15 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         validationResponse: validationResponse,
         errors: [],
       };
-    } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : JSON.stringify(error.response.data).substring(0, 500)
-        : error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : JSON.stringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
 
       this.logger?.error?.(
         `Validate failed: HTTP ${status || '?'} ${statusText || ''}`,
@@ -98,9 +101,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       );
 
       if (status && status >= 400 && status < 500) {
-        const customError = new Error(
+        const customError = new AdtOperationError(
           `Validation failed for object '${config.className}': ${errorMessage}`,
-        ) as any;
+        );
         customError.code = AdtObjectErrorCodes.VALIDATION_FAILED;
         customError.status = status;
         customError.statusText = statusText;
@@ -158,7 +161,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.info?.('Class created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - ensure stateless
       this.connection.setSessionType('stateless');
 
@@ -207,14 +210,15 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : JSON.stringify(error.response.data).substring(0, 500)
-        : error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : JSON.stringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
 
       // Log error details
       this.logger?.error?.(
@@ -229,9 +233,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
 
       // 4** errors - throw with error code
       if (status && status >= 400 && status < 500) {
-        const customError = new Error(
+        const customError = new AdtOperationError(
           `Failed to read object '${config.className}': ${errorMessage}`,
-        ) as any;
+        );
         customError.code = AdtObjectErrorCodes.OBJECT_NOT_FOUND;
         customError.status = status;
         customError.statusText = statusText;
@@ -434,7 +438,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       }
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -505,14 +509,15 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.info?.('Class deleted');
 
       return state;
-    } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : JSON.stringify(error.response.data).substring(0, 500)
-        : error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : JSON.stringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
 
       this.logger?.error?.(
         `Delete failed: HTTP ${status || '?'} ${statusText || ''}`,
@@ -520,9 +525,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       );
 
       if (status && status >= 400 && status < 500) {
-        const customError = new Error(
+        const customError = new AdtOperationError(
           `Deletion failed for object '${config.className}': ${errorMessage}`,
-        ) as any;
+        );
         customError.code = AdtObjectErrorCodes.DELETE_FAILED;
         customError.status = status;
         customError.statusText = statusText;
@@ -556,14 +561,15 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       );
       state.activateResult = activateResult;
       return state;
-    } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : JSON.stringify(error.response.data).substring(0, 500)
-        : error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : JSON.stringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
 
       this.logger?.error?.(
         `Activate failed: HTTP ${status || '?'} ${statusText || ''}`,
@@ -571,9 +577,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       );
 
       if (status && status >= 400 && status < 500) {
-        const customError = new Error(
+        const customError = new AdtOperationError(
           `Activation failed for object '${config.className}': ${errorMessage}`,
-        ) as any;
+        );
         customError.code = AdtObjectErrorCodes.ACTIVATE_FAILED;
         customError.status = status;
         customError.statusText = statusText;
@@ -615,11 +621,11 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       // If there are errors (type E), throw error
       if (checkResult.has_errors) {
         const errorMessages = checkResult.errors
-          .map((e: any) => e.text || '')
+          .map((e: { text?: string }) => e.text || '')
           .join('; ');
-        const customError = new Error(
+        const customError = new AdtOperationError(
           `Check failed for object '${config.className}': ${errorMessages || checkResult.message}`,
-        ) as any;
+        );
         customError.code = AdtObjectErrorCodes.CHECK_FAILED;
         customError.status = response.status;
         customError.statusText = response.statusText;
@@ -632,14 +638,15 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         errors: [],
       };
       return state;
-    } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : JSON.stringify(error.response.data).substring(0, 500)
-        : error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : JSON.stringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
 
       this.logger?.error?.(
         `Check failed: HTTP ${status || '?'} ${statusText || ''}`,
@@ -647,15 +654,15 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       );
 
       // If error already has code (from checkResult parsing), rethrow
-      if (error.code) {
+      if ((error as { code?: string }).code) {
         throw error;
       }
 
       // 4** errors - throw with error code
       if (status && status >= 400 && status < 500) {
-        const customError = new Error(
+        const customError = new AdtOperationError(
           `Check failed for object '${config.className}': ${errorMessage}`,
-        ) as any;
+        );
         customError.code = AdtObjectErrorCodes.CHECK_FAILED;
         customError.status = status;
         customError.statusText = statusText;

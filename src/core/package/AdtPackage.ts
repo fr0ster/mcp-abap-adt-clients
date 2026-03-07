@@ -22,6 +22,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -163,7 +164,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
 
       // Packages are containers — no source code, no activation, no need to read back
       return { errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Ensure stateless if needed
       this.connection.setSessionType('stateless');
 
@@ -212,8 +213,9 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       throw error;
@@ -440,7 +442,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         updateResult: readResponse,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -503,7 +505,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       this.logger?.info?.('Package deleted');
 
       return { deleteResult: result, errors: [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     }

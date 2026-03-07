@@ -32,7 +32,7 @@ export async function getActivationGraph(
   options?: IGetActivationGraphOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/logs/activationgraph`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.objectName) params.objectName = options.objectName;
   if (options?.objectType) params.objectType = options.objectType;

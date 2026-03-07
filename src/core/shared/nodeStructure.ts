@@ -38,7 +38,7 @@ export async function fetchNodeStructure(
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/repository/nodestructure`;
 
-  const params: Record<string, any> = {
+  const params: Record<string, string | number | boolean> = {
     parent_type: parentType,
     parent_name: parentName,
     parent_tech_name: parentName,

@@ -2,7 +2,7 @@
  * Domain lock operations
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { HttpError, IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
@@ -47,15 +47,19 @@ export async function acquireLockHandle(
     }
 
     return lockHandle;
-  } catch (error: any) {
-    if (error.response?.data?.includes('ExceptionResourceAlreadyExists')) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
+    if (
+      typeof e.response?.data === 'string' &&
+      e.response.data.includes('ExceptionResourceAlreadyExists')
+    ) {
       throw new Error(
         `Domain ${args.domain_name} already exists. Please delete it first or use a different name.`,
       );
     }
 
     throw new Error(
-      `Failed to create empty domain ${args.domain_name}: ${error.message || error}`,
+      `Failed to create empty domain ${args.domain_name}: ${e.message || error}`,
     );
   }
 }

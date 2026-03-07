@@ -60,7 +60,7 @@ export async function validateBehaviorImplementationName(
       timeout: getTimeout('default'),
       headers,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If validation returns 400 and object already exists, return error response instead of throwing
     if (error instanceof AxiosError && error.response?.status === 400) {
       return error.response;

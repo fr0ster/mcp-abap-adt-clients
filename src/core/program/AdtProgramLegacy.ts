@@ -38,12 +38,12 @@ export class AdtProgramLegacy extends AdtProgram {
       this.logger?.info?.('Program deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error?.('Delete failed:', error);
       if (lockHandle) {
         try {
           await unlockProgram(this.connection, config.programName, lockHandle);
-        } catch (unlockError: any) {
+        } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
             unlockError,

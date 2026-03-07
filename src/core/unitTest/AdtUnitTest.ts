@@ -21,6 +21,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -137,7 +138,7 @@ export class AdtUnitTest
         runId,
         errors: [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Create failed:', error);
       throw error;
     }
@@ -186,8 +187,9 @@ export class AdtUnitTest
         runResult: resultResponse?.data,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       throw error;
@@ -267,7 +269,7 @@ export class AdtUnitTest
       options,
     });
     this.lastRunId = result.runId;
-    return result.runId!;
+    return result.runId as string;
   }
 
   /**

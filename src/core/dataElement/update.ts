@@ -70,7 +70,7 @@ export async function getDomainInfo(
 async function _getDataElementForVerification(
   connection: IAbapConnection,
   dataElementName: string,
-): Promise<any> {
+): Promise<unknown> {
   const dataElementNameEncoded = encodeSapObjectName(
     dataElementName.toLowerCase(),
   );

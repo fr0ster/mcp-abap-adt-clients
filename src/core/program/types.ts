@@ -45,7 +45,7 @@ export interface IProgramConfig {
 }
 
 export interface IProgramState extends IAdtObjectState {
-  runResult?: any; // Program-specific: result of program execution
+  runResult?: unknown;
   // All operation results are in IAdtObjectState:
   // validationResponse, createResult, lockHandle, updateResult, checkResult,
   // unlockResult, activateResult, deleteResult, readResult, transportResult, errors

@@ -27,7 +27,7 @@ export async function checkAccessControl(
   const hasCheckedMessage =
     checkResult.message?.toLowerCase().includes('has been checked') ||
     checkResult.message?.toLowerCase().includes('was checked') ||
-    checkResult.errors.some((err: any) =>
+    checkResult.errors.some((err: { text?: string }) =>
       (err.text || '').toLowerCase().includes('has been checked'),
     );
 

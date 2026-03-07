@@ -4,6 +4,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_TABLE, CT_TABLE } from '../../constants/contentTypes';
@@ -63,12 +64,13 @@ export async function createTable(
     });
 
     return createResponse;
-  } catch (error: any) {
-    const errorMessage = error.response?.data
-      ? typeof error.response.data === 'string'
-        ? error.response.data
-        : JSON.stringify(error.response.data)
-      : error.message;
+  } catch (error: unknown) {
+    const e = error as HttpError;
+    const errorMessage = e.response?.data
+      ? typeof e.response.data === 'string'
+        ? e.response.data
+        : JSON.stringify(e.response.data)
+      : e.message;
 
     throw new Error(
       `Failed to create table ${params.table_name}: ${errorMessage}`,

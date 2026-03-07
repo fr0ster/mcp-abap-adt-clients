@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -81,20 +82,21 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         validationResponse: validationResponse,
         errors: [],
       };
-    } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : JSON.stringify(error.response.data).substring(0, 500)
-        : error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : JSON.stringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
 
       this.logger?.error?.(
         `Validation failed: HTTP ${status} ${statusText} - ${errorMessage}`,
       );
 
-      if (status === 400 || (status >= 400 && status < 500)) {
+      if (status && (status === 400 || (status >= 400 && status < 500))) {
         throw new Error(`Validation failed: ${errorMessage}`);
       }
 
@@ -147,7 +149,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.logger?.info?.('Program created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - ensure stateless
       this.connection.setSessionType('stateless');
 
@@ -196,8 +198,9 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       throw error;
@@ -403,7 +406,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       }
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -474,7 +477,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.logger?.info?.('Program deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Delete failed:', error);
       throw error;
     } finally {
@@ -502,14 +505,15 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       );
       state.activateResult = activateResponse;
       return state;
-    } catch (error: any) {
-      const status = error.response?.status;
-      const statusText = error.response?.statusText;
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 500)
-          : JSON.stringify(error.response.data).substring(0, 500)
-        : error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const status = e.response?.status;
+      const statusText = e.response?.statusText;
+      const errorMessage = e.response?.data
+        ? typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 500)
+          : JSON.stringify(e.response.data).substring(0, 500)
+        : e.message || 'Unknown error';
 
       this.logger?.error?.(
         `Activate failed: HTTP ${status} ${statusText} - ${errorMessage}`,
@@ -548,7 +552,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       );
       state.checkResult = checkResponse;
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Check failed:', error);
       throw error;
     }

@@ -149,7 +149,7 @@ export async function checkClassLocalTestClass(
   const hasCheckedMessage =
     checkResult.message?.toLowerCase().includes('has been checked') ||
     checkResult.message?.toLowerCase().includes('was checked') ||
-    checkResult.errors.some((err: any) =>
+    checkResult.errors.some((err: { text?: string }) =>
       (err.text || '').toLowerCase().includes('has been checked'),
     );
 
@@ -160,7 +160,7 @@ export async function checkClassLocalTestClass(
   // Throw error if there are actual problems (ERROR type)
   if (checkResult.has_errors) {
     const errorMessages = checkResult.errors
-      .map((err: any) => err.text)
+      .map((err: { text?: string }) => err.text)
       .join('; ');
     throw new Error(`Test class check failed: ${errorMessages}`);
   }
@@ -319,7 +319,7 @@ async function checkClassInclude(
   const hasCheckedMessage =
     checkResult.message?.toLowerCase().includes('has been checked') ||
     checkResult.message?.toLowerCase().includes('was checked') ||
-    checkResult.errors.some((err: any) =>
+    checkResult.errors.some((err: { text?: string }) =>
       (err.text || '').toLowerCase().includes('has been checked'),
     );
 
@@ -330,7 +330,7 @@ async function checkClassInclude(
   // Throw error if there are actual problems (ERROR type)
   if (checkResult.has_errors) {
     const errorMessages = checkResult.errors
-      .map((err: any) => err.text)
+      .map((err: { text?: string }) => err.text)
       .join('; ');
     throw new Error(`${includeName} check failed: ${errorMessages}`);
   }

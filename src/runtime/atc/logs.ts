@@ -35,7 +35,7 @@ export async function getCheckFailureLogs(
   options?: IGetCheckFailureLogsOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/atc/checkfailures/logs`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.displayId) params.displayId = options.displayId;
   if (options?.objName) params.objName = options.objName;

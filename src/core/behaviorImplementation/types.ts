@@ -35,7 +35,6 @@ export interface IBehaviorImplementationConfig {
 }
 
 export interface IBehaviorImplementationState extends IAdtObjectState {
-  metadataResult?: any; // Class-specific: metadata read result
   // All operation results are in IAdtObjectState:
   // validationResponse, createResult, lockHandle, updateResult, checkResult,
   // unlockResult, activateResult, deleteResult, readResult, transportResult, errors

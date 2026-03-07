@@ -19,8 +19,8 @@ async function makeAdtRequest(
   url: string,
   method: string = 'GET',
   timeout: 'default' | 'csrf' | 'long' | number = 'default',
-  data?: any,
-  params?: any,
+  data?: unknown,
+  params?: unknown,
   headers?: Record<string, string>,
 ): Promise<AxiosResponse> {
   const timeoutValue = getTimeout(timeout);

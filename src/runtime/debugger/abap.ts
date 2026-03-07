@@ -45,7 +45,7 @@ export async function launchDebugger(
   options?: ILaunchDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.debuggingMode) params.debuggingMode = options.debuggingMode;
   if (options?.requestUser) params.requestUser = options.requestUser;
@@ -90,7 +90,7 @@ export async function stopDebugger(
   options?: IStopDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.debuggingMode) params.debuggingMode = options.debuggingMode;
   if (options?.requestUser) params.requestUser = options.requestUser;
@@ -133,7 +133,7 @@ export async function getDebugger(
   options?: IGetDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/listeners`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.debuggingMode) params.debuggingMode = options.debuggingMode;
   if (options?.requestUser) params.requestUser = options.requestUser;
@@ -166,7 +166,7 @@ export async function getMemorySizes(
   includeAbap?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/memorysizes`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (includeAbap !== undefined) params.includeAbap = includeAbap;
 
@@ -210,7 +210,7 @@ export async function getSystemArea(
   }
 
   const url = `/sap/bc/adt/debugger/systemareas/${encodeURIComponent(systemarea)}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.offset !== undefined) params.offset = options.offset;
   if (options?.length !== undefined) params.length = options.length;
@@ -247,7 +247,7 @@ export async function synchronizeBreakpoints(
   checkConflict?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/debugger/breakpoints`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (checkConflict !== undefined) params.checkConflict = checkConflict;
 
@@ -389,7 +389,7 @@ export async function getVariableMaxLength(
   }
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (maxLength !== undefined) params.maxLength = maxLength;
 
@@ -428,7 +428,7 @@ export async function getVariableSubcomponents(
   }
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (component) params.component = component;
   if (line !== undefined) params.line = line;
@@ -476,7 +476,7 @@ export async function getVariableAsCsv(
   }
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.offset !== undefined) params.offset = options.offset;
   if (options?.length !== undefined) params.length = options.length;
@@ -528,7 +528,7 @@ export async function getVariableAsJson(
   }
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.offset !== undefined) params.offset = options.offset;
   if (options?.length !== undefined) params.length = options.length;
@@ -580,7 +580,7 @@ export async function getVariableValueStatement(
   }
 
   const url = `/sap/bc/adt/debugger/variables/${encodeURIComponent(variableName)}/${encodeURIComponent(part)}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.rows !== undefined) params.rows = options.rows;
   if (options?.maxStringLength !== undefined)
@@ -635,7 +635,7 @@ export async function executeDebuggerAction(
   }
 
   const url = `/sap/bc/adt/debugger/actions`;
-  const params: Record<string, any> = { action };
+  const params: Record<string, string | number | boolean> = { action };
 
   if (value) params.value = value;
 
@@ -690,7 +690,7 @@ export async function insertWatchpoint(
   }
 
   const url = `/sap/bc/adt/debugger/watchpoints`;
-  const params: Record<string, any> = { variableName };
+  const params: Record<string, string | number | boolean> = { variableName };
 
   if (condition) params.condition = condition;
 

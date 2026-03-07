@@ -34,7 +34,7 @@ export async function startAmdpDebugger(
   options?: IStartAmdpDebuggerOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.stopExisting !== undefined)
     params.stopExisting = options.stopExisting;
@@ -93,7 +93,7 @@ export async function terminateAmdpDebugger(
   hardStop?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (hardStop !== undefined) params.hardStop = hardStop;
 
@@ -157,7 +157,7 @@ export async function getAmdpVariable(
   length?: number,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (offset !== undefined) params.offset = offset;
   if (length !== undefined) params.length = length;
@@ -193,7 +193,7 @@ export async function setAmdpVariable(
   setNull?: boolean,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/variables/${varname}`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (setNull !== undefined) params.setNull = setNull;
 
@@ -226,7 +226,7 @@ export async function lookupAmdp(
   name?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/amdp/debugger/main/${mainId}/debuggees/${debuggeeId}/lookup`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (name) params.name = name;
 

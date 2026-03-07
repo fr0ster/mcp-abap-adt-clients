@@ -4,6 +4,7 @@
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
 
+import type { HttpError } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtClass } from './AdtClass';
@@ -37,16 +38,17 @@ export class AdtClassLegacy extends AdtClass {
       this.logger?.info?.('Class deleted');
 
       return state;
-    } catch (error: any) {
-      const responseData = error.response?.data;
-      const responseStatus = error.response?.status;
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      const responseData = e.response?.data;
+      const responseStatus = e.response?.status;
       this.logger?.error?.(
         `Delete failed: status=${responseStatus}, body=${typeof responseData === 'string' ? responseData.substring(0, 500) : JSON.stringify(responseData)?.substring(0, 500)}`,
       );
       if (lockHandle) {
         try {
           await unlockClass(this.connection, config.className, lockHandle);
-        } catch (unlockError: any) {
+        } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
             unlockError,

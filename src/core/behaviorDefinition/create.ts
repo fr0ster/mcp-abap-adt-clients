@@ -4,6 +4,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { CT_BEHAVIOR_DEFINITION } from '../../constants/contentTypes';
@@ -76,9 +77,10 @@ export async function create(
     });
 
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     throw new Error(
-      `Failed to create behavior definition ${params.name}: ${error.message}`,
+      `Failed to create behavior definition ${params.name}: ${e.message}`,
     );
   }
 }

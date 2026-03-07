@@ -24,6 +24,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -144,7 +145,7 @@ export class AdtBehaviorImplementation
       _objectCreated = true;
       this.logger?.info?.('Behavior implementation class created');
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error('Create failed:', error);
       throw error;
     }
@@ -175,8 +176,9 @@ export class AdtBehaviorImplementation
       );
       state.readResult = response;
       return state;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       const err = error instanceof Error ? error : new Error(String(error));
@@ -474,7 +476,7 @@ ENDCLASS.`;
       state.readResult = readResponse;
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -537,7 +539,7 @@ ENDCLASS.`;
       this.logger?.info?.('Behavior implementation class deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'delete',
@@ -569,7 +571,7 @@ ENDCLASS.`;
       });
       state.activateResult = activateState.activateResult;
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'activate',

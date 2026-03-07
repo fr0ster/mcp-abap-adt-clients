@@ -36,13 +36,13 @@ export class AdtInterfaceLegacy extends AdtInterface {
       state.deleteResult = await deleteObjectDirect(
         this.connection,
         objectUrl,
-        lockHandle!,
+        lockHandle as string,
         config.transportRequest,
       );
       this.logger?.info?.('Interface deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error?.('Delete failed:', error);
       if (lockHandle) {
         try {
@@ -51,7 +51,7 @@ export class AdtInterfaceLegacy extends AdtInterface {
             config.interfaceName,
             lockHandle,
           );
-        } catch (unlockError: any) {
+        } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
             unlockError,

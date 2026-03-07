@@ -36,12 +36,12 @@ export class AdtViewLegacy extends AdtView {
       this.logger?.info?.('View deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error?.('Delete failed:', error);
       if (lockHandle) {
         try {
           await unlockDDLS(this.connection, config.viewName, lockHandle);
-        } catch (unlockError: any) {
+        } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
             unlockError,

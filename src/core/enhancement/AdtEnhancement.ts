@@ -26,6 +26,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -159,7 +160,7 @@ export class AdtEnhancement
       this.logger?.info?.('Enhancement created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'create',
@@ -239,8 +240,9 @@ export class AdtEnhancement
         state.readResult = response;
       }
       return state;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       const err = error instanceof Error ? error : new Error(String(error));
@@ -561,7 +563,7 @@ export class AdtEnhancement
       state.readResult = readResponse;
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked
       if (lockHandle && config.enhancementType && config.enhancementName) {
         try {
@@ -648,7 +650,7 @@ export class AdtEnhancement
       this.logger?.info?.('Enhancement deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'delete',
@@ -691,7 +693,7 @@ export class AdtEnhancement
       );
       state.activateResult = result;
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'activate',

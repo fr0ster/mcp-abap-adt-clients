@@ -59,8 +59,11 @@ export async function checkTransportRequirements(
   const requests = data?.REQUESTS?.CTS_REQUEST || [];
   const transportList = Array.isArray(requests) ? requests : [requests];
   const transportNumbers = transportList
-    .map((req: any) => req.REQ_HEADER?.TRKORR)
-    .filter((trkorr: any) => trkorr);
+    .map(
+      (req: Record<string, unknown>) =>
+        (req.REQ_HEADER as Record<string, unknown>)?.TRKORR as string,
+    )
+    .filter((trkorr: string) => trkorr);
 
   return transportNumbers;
 }

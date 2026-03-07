@@ -19,6 +19,7 @@
  */
 
 import type {
+  HttpError,
   IAbapConnection,
   IAdtObject,
   IAdtOperationOptions,
@@ -157,7 +158,7 @@ export class AdtBehaviorDefinition
       this.logger?.info?.('Behavior definition created');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'create',
@@ -215,8 +216,9 @@ export class AdtBehaviorDefinition
       );
       state.readResult = response;
       return state;
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       const err = error instanceof Error ? error : new Error(String(error));
@@ -472,7 +474,7 @@ export class AdtBehaviorDefinition
       state.readResult = readResponse;
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error - unlock if locked (lockHandle saved for force unlock)
       if (lockHandle) {
         try {
@@ -542,7 +544,7 @@ export class AdtBehaviorDefinition
       this.logger?.info?.('Behavior definition deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'delete',
@@ -572,7 +574,7 @@ export class AdtBehaviorDefinition
       const result = await activate(this.connection, config.name);
       state.activateResult = result;
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'activate',

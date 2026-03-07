@@ -6,7 +6,7 @@
  * All operations require the parent class to be locked.
  */
 
-import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
 import { checkClassMacros } from './check';
@@ -92,7 +92,7 @@ export class AdtLocalMacros extends AdtClass {
       const updateResponse = await updateClassMacros(
         this.connection,
         config.className,
-        codeToCheck!,
+        codeToCheck as string,
         lockHandle,
         config.transportRequest,
       );
@@ -109,7 +109,7 @@ export class AdtLocalMacros extends AdtClass {
       lockHandle = undefined;
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error
       if (lockHandle) {
         try {
@@ -153,8 +153,9 @@ export class AdtLocalMacros extends AdtClass {
         readResult: response,
         errors: [],
       };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+    } catch (error: unknown) {
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
         return undefined;
       }
       this.logger?.error('Read LocalMacros failed:', error);
@@ -232,7 +233,7 @@ export class AdtLocalMacros extends AdtClass {
       const updateResponse = await updateClassMacros(
         this.connection,
         config.className,
-        codeToCheck!,
+        codeToCheck as string,
         lockHandle,
         config.transportRequest,
       );
@@ -249,7 +250,7 @@ export class AdtLocalMacros extends AdtClass {
       lockHandle = undefined;
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Cleanup on error
       if (lockHandle) {
         try {

@@ -7,6 +7,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
@@ -138,7 +139,8 @@ export async function updateFunctionGroup(
     }
 
     return updateResponse;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     // Unlock on error if we locked it
     if (shouldUnlock && lockHandle) {
       try {
@@ -153,20 +155,17 @@ export async function updateFunctionGroup(
     }
 
     let errorMessage = `Failed to update function group: ${error}`;
-    if (error.response?.status === 400) {
+    if (e.response?.status === 400) {
       errorMessage = `Bad request. Check parameters.`;
-    } else if (error.response?.status === 404) {
+    } else if (e.response?.status === 404) {
       errorMessage = `Function group ${params.function_group_name} not found.`;
-    } else if (
-      error.response?.data &&
-      typeof error.response.data === 'string'
-    ) {
+    } else if (e.response?.data && typeof e.response.data === 'string') {
       try {
         const parser = new XMLParser({
           ignoreAttributes: false,
           attributeNamePrefix: '@_',
         });
-        const errorData = parser.parse(error.response.data);
+        const errorData = parser.parse(e.response.data);
         const errorMsg =
           errorData['exc:exception']?.message?.['#text'] ||
           errorData['exc:exception']?.message;

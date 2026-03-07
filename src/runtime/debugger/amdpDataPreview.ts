@@ -39,7 +39,7 @@ export async function getAmdpDataPreview(
   options?: IGetAmdpDataPreviewOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/datapreview/amdpdebugger`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.rowNumber !== undefined) params.rowNumber = options.rowNumber;
   if (options?.colNumber !== undefined) params.colNumber = options.colNumber;
@@ -93,7 +93,7 @@ export async function getAmdpCellSubstring(
   options?: IGetAmdpCellSubstringOptions,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/datapreview/amdpdebugger/cellsubstring`;
-  const params: Record<string, any> = {};
+  const params: Record<string, string | number | boolean> = {};
 
   if (options?.rowNumber !== undefined) params.rowNumber = options.rowNumber;
   if (options?.columnName) params.columnName = options.columnName;

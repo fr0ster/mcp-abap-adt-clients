@@ -4,6 +4,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
@@ -89,15 +90,16 @@ export async function create(
       headers,
     });
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     // Special handling: Ignore Kerberos error for FunctionGroup
     // SAP sometimes returns HTTP 400 with "Kerberos library not loaded" but still creates the object
     // This is a known issue with FunctionGroup create - we ignore the error
-    if (error.response?.status === 400) {
+    if (e.response?.status === 400) {
       const errorData =
-        typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data);
+        typeof e.response.data === 'string'
+          ? e.response.data
+          : JSON.stringify(e.response.data);
 
       if (errorData.includes('Kerberos library not loaded')) {
         logger?.debug?.(
@@ -105,30 +107,30 @@ export async function create(
         );
         // Return a mock successful response (status 201)
         return {
-          ...error.response,
+          ...e.response,
           status: 201,
           statusText: 'Created',
-          data: error.response.data,
+          data: e.response.data,
         } as AxiosResponse;
       }
     }
 
     // Log error details for debugging (same as class/create.ts)
-    if (error.response && debugEnabled) {
+    if (e.response && debugEnabled) {
       logger?.error?.(
-        `[ERROR] Create FunctionGroup failed - Status: ${error.response.status}`,
+        `[ERROR] Create FunctionGroup failed - Status: ${e.response.status}`,
       );
       logger?.error?.(
-        `[ERROR] Create FunctionGroup failed - StatusText: ${error.response.statusText}`,
+        `[ERROR] Create FunctionGroup failed - StatusText: ${e.response.statusText}`,
       );
       logger?.error?.(
-        `[ERROR] Create FunctionGroup failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`,
+        `[ERROR] Create FunctionGroup failed - Response headers: ${JSON.stringify(e.response.headers, null, 2)}`,
       );
       logger?.error?.(
         `[ERROR] Create FunctionGroup failed - Response data (first 1000 chars):`,
-        typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 1000)
-          : JSON.stringify(error.response.data).substring(0, 1000),
+        typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 1000)
+          : JSON.stringify(e.response.data).substring(0, 1000),
       );
     }
     throw error;

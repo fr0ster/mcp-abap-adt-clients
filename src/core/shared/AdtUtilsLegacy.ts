@@ -7,7 +7,6 @@
  * - getTransaction → /sap/bc/adt/repository/informationsystem/objectproperties (not available)
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { AdtUtils } from './AdtUtils';
 
 function unsupportedError(operation: string, endpoint: string): string {
@@ -19,10 +18,6 @@ function unsupportedError(operation: string, endpoint: string): string {
 }
 
 export class AdtUtilsLegacy extends AdtUtils {
-  constructor(connection: IAbapConnection, logger: ILogger) {
-    super(connection, logger);
-  }
-
   override async getTableContents(): Promise<never> {
     throw new Error(
       unsupportedError('Table contents', '/sap/bc/adt/datapreview/ddic'),

@@ -40,7 +40,7 @@ export class AdtFunctionGroupLegacy extends AdtFunctionGroup {
       this.logger?.info?.('Function group deleted');
 
       return state;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger?.error?.('Delete failed:', error);
       if (lockHandle) {
         try {
@@ -49,7 +49,7 @@ export class AdtFunctionGroupLegacy extends AdtFunctionGroup {
             config.functionGroupName,
             lockHandle,
           );
-        } catch (unlockError: any) {
+        } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
             unlockError,

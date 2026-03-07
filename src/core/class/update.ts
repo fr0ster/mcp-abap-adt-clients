@@ -61,7 +61,7 @@ export async function updateClassWithCheck(
   // Block update if there are errors
   if (checkResult.has_errors) {
     const errorMessages = checkResult.errors
-      .map((err: any) => err.text)
+      .map((err: { text?: string }) => err.text)
       .join('; ');
     throw new Error(`Class check failed, update blocked: ${errorMessages}`);
   }

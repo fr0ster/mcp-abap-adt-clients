@@ -78,11 +78,8 @@ describe('AdtUnitTest (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient, isLegacy: legacy } = await createTestAdtClient(
-        connection,
-        libraryLogger,
-        systemContext,
-      );
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
       isLegacy = legacy;
       hasConfig = true;
@@ -106,12 +103,18 @@ describe('AdtUnitTest (using AdtClient)', () => {
           'adt_unit_test',
         );
 
-        if (!TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)) {
+        if (
+          !TestConfigResolver.isTestAvailable(testCase, isCloudSystem, isLegacy)
+        ) {
           logTestStart(testsLogger, 'UnitTest - run unit test', {
             name: 'run_unit_test',
             params: {},
           });
-          const envName = isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
+          const envName = isCloudSystem
+            ? 'cloud'
+            : isLegacy
+              ? 'legacy'
+              : 'onprem';
           logTestSkip(
             testsLogger,
             'UnitTest - run unit test',

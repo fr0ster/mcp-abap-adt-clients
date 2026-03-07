@@ -1,5 +1,6 @@
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
@@ -57,9 +58,10 @@ export async function validate(
     });
 
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
     throw new Error(
-      `Failed to validate behavior definition ${params.objname}: ${error.message}`,
+      `Failed to validate behavior definition ${params.objname}: ${e.message}`,
     );
   }
 }

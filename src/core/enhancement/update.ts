@@ -4,6 +4,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
+  HttpError,
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
@@ -90,22 +91,23 @@ export async function update(
       headers,
     });
     return response;
-  } catch (error: any) {
-    if (error.response && debugEnabled) {
+  } catch (error: unknown) {
+    const e = error as HttpError;
+    if (e.response && debugEnabled) {
       logger?.error?.(
-        `[ERROR] Update enhancement failed - Status: ${error.response.status}`,
+        `[ERROR] Update enhancement failed - Status: ${e.response.status}`,
       );
       logger?.error?.(
-        `[ERROR] Update enhancement failed - StatusText: ${error.response.statusText}`,
+        `[ERROR] Update enhancement failed - StatusText: ${e.response.statusText}`,
       );
       logger?.error?.(
-        `[ERROR] Update enhancement failed - Response headers: ${JSON.stringify(error.response.headers, null, 2)}`,
+        `[ERROR] Update enhancement failed - Response headers: ${JSON.stringify(e.response.headers, null, 2)}`,
       );
       logger?.error?.(
         `[ERROR] Update enhancement failed - Response data (first 1000 chars):`,
-        typeof error.response.data === 'string'
-          ? error.response.data.substring(0, 1000)
-          : JSON.stringify(error.response.data).substring(0, 1000),
+        typeof e.response.data === 'string'
+          ? e.response.data.substring(0, 1000)
+          : JSON.stringify(e.response.data).substring(0, 1000),
       );
     }
     throw error;

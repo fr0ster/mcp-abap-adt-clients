@@ -50,7 +50,7 @@ export interface ICdsUnitTestState extends IUnitTestState {
  * Combines AdtClass for test class lifecycle and AdtUnitTest for test execution
  */
 export class AdtCdsUnitTest extends AdtUnitTest {
-  private adtView: AdtView;
+  protected adtView: AdtView;
   private cdsViewName?: string;
   private className?: string;
 
@@ -116,7 +116,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
             `CDS view validation failed with HTTP ${response.status}`,
           );
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger?.error('validate failed:', error);
         throw error;
       }
@@ -146,7 +146,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
         this.logger?.info?.('Step 1: Creating global class with template');
         const createState = await this.adtClass.create({
           className: config.className,
-          packageName: config.packageName!,
+          packageName: config.packageName as string,
           description:
             config.description || `CDS unit test for ${config.className}`,
           classTemplate: config.classTemplate,
@@ -185,7 +185,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           },
           errors: [],
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger?.error('create failed:', error);
         throw error;
       }
@@ -238,7 +238,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           testClassState,
           errors: [],
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger?.error('update failed:', error);
         throw error;
       }
@@ -273,7 +273,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           testClassState: deleteState,
           errors: [],
         };
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger?.error('delete failed:', error);
         throw error;
       }
@@ -321,7 +321,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
         this.state.runId = runId;
         this.logger?.info?.('Unit test run started, runId:', runId);
         return runId;
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.logger?.error('run failed:', error);
         throw error;
       }
