@@ -5,6 +5,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.3.2] - 2026-03-07
+
+### Fixed
+- **Cloud compatibility**: Rewrite CSRF diagnostic test to use `connection.makeAdtRequest()` instead of raw axios (supports JWT auth on cloud).
+- **FunctionGroup**: Add retry with delay on post-create read 404 (cloud eventual consistency).
+- **FunctionModule**: Add function groups to shared dependencies for consistent test setup.
+- **ServiceBinding**: Increase default long timeout from 60s to 120s for publish/unpublish operations.
+- **Legacy support**: Auto-detect legacy content types for FunctionGroup/FunctionModule.
+
+### Changed
+- **Tests**: Add environment-based test filtering for legacy/cloud/onprem systems.
+
 ## [3.3.1] - 2026-03-07
 
 ### Fixed
