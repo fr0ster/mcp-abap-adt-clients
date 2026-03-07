@@ -10,10 +10,13 @@ import * as path from 'node:path';
 import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtObjectType } from '../../../core/shared/types';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { createTestAdtClient } from '../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestStep } from '../../helpers/testProgressLogger';
+import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -86,14 +89,20 @@ describe('Shared - readMetadata', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
+  let isCloudSystem = false;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, testsLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, testsLogger);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, testsLogger);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (_error) {
       testsLogger.warn?.(
         '⚠️ Skipping tests: No .env file or SAP configuration found',
@@ -112,6 +121,22 @@ describe('Shared - readMetadata', () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_metadata',
+      testCaseName: 'read_class_metadata',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readMetadata',
+        'Test not available for current environment',
       );
       return;
     }
@@ -173,6 +198,22 @@ describe('Shared - readMetadata', () => {
       return;
     }
 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_metadata',
+      testCaseName: 'read_domain_metadata',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readMetadata',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
     // Use a standard SAP domain that should exist
     const domainName = 'MANDT';
     try {
@@ -216,6 +257,22 @@ describe('Shared - readMetadata', () => {
       return;
     }
 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_metadata',
+      testCaseName: 'read_table_metadata',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readMetadata',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
     // Use a standard SAP table that should exist
     const tableName = 'T000';
     try {
@@ -245,6 +302,22 @@ describe('Shared - readMetadata', () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_metadata',
+      testCaseName: 'read_metadata_error_unsupported',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readMetadata',
+        'Test not available for current environment',
       );
       return;
     }

@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import {
   getTraceDbAccesses,
@@ -18,6 +18,7 @@ import {
 } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -138,6 +139,7 @@ describe('ProgramExecutor (integration)', () => {
   let executor: AdtExecutor;
   let hasConfig = false;
   let isCloudSystem = false;
+  let isLegacy = false;
   let programNameForTest: string | null = null;
   let transportRequestForCleanup = '';
 
@@ -155,7 +157,10 @@ describe('ProgramExecutor (integration)', () => {
         connection,
         isCloudSystem,
       );
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
+      client = resolvedClient;
+      isLegacy = legacy;
       executor = new AdtExecutor(connection, libraryLogger);
       hasConfig = true;
       programNameForTest = null;

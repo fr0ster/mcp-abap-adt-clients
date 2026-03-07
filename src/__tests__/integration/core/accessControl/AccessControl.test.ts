@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import type {
   IAccessControlConfig,
   IAccessControlState,
@@ -24,6 +24,7 @@ import { getAccessControl } from '../../../../core/accessControl/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -68,6 +69,7 @@ describe('AccessControl (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let isLegacy = false;
   let tester: BaseTester<IAccessControlConfig, IAccessControlState>;
 
   beforeAll(async () => {
@@ -80,7 +82,10 @@ describe('AccessControl (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester(

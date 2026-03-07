@@ -198,6 +198,14 @@ describe('DataElement (using AdtClient)', () => {
         return;
       }
 
+      // Check environment availability
+      if (
+        !TestConfigResolver.isTestAvailable(definition, isCloudSystem, isLegacy)
+      ) {
+        skipReason = `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem'} environment`;
+        return;
+      }
+
       const tc = getEnabledTestCase('create_data_element', 'adt_data_element');
       if (!tc) {
         skipReason = 'Test case disabled or not found';
@@ -404,8 +412,21 @@ describe('DataElement (using AdtClient)', () => {
         // Use TestConfigResolver for consistent parameter resolution
         const resolver = new TestConfigResolver({
           isCloud: isCloudSystem,
+          isLegacy,
           logger: testsLogger,
+          handlerName: 'create_data_element',
+          testCaseName: 'adt_data_element',
         });
+
+        if (!resolver.isAvailableForEnvironment()) {
+          logTestSkip(
+            testsLogger,
+            'DataElement - read standard object',
+            `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem'} environment`,
+          );
+          return;
+        }
+
         const standardObject = resolver.getStandardObject('dataElement');
 
         if (!standardObject) {

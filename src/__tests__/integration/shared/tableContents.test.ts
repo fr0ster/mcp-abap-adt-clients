@@ -12,8 +12,9 @@ import * as path from 'node:path';
 import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { createTestAdtClient } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 import {
@@ -94,6 +95,7 @@ describe('Shared - getTableContents', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
   let isCloudSystem = false;
 
   beforeEach(async () => {
@@ -101,7 +103,10 @@ describe('Shared - getTableContents', () => {
       const config = getConfig();
       connection = createAbapConnection(config, testsLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, testsLogger);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, testsLogger);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
       // Check if this is a cloud system using system information endpoint
       isCloudSystem = await isCloudEnvironment(connection);
@@ -132,6 +137,7 @@ describe('Shared - getTableContents', () => {
     // Get test case from YAML configuration
     const resolver = new TestConfigResolver({
       isCloud: isCloudSystem,
+      isLegacy,
       logger: testsLogger,
       handlerName: 'table_contents',
       testCaseName: 'get_table_contents',
@@ -189,6 +195,7 @@ describe('Shared - getTableContents', () => {
     // Get test case from YAML configuration
     const resolver = new TestConfigResolver({
       isCloud: isCloudSystem,
+      isLegacy,
       logger: testsLogger,
       handlerName: 'table_contents',
       testCaseName: 'get_table_contents_default_max_rows',
@@ -240,6 +247,7 @@ describe('Shared - getTableContents', () => {
     // Get test case from YAML configuration (use first available)
     const resolver = new TestConfigResolver({
       isCloud: isCloudSystem,
+      isLegacy,
       logger: testsLogger,
       handlerName: 'table_contents',
     });

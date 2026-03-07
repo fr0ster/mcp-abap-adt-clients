@@ -10,9 +10,12 @@ import * as path from 'node:path';
 import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
+import { createTestAdtClient } from '../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
-import { logTestStep } from '../../helpers/testProgressLogger';
+import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
@@ -86,14 +89,20 @@ describe('Shared - getWhereUsed', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
+  let isCloudSystem = false;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, testsLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, testsLogger);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, testsLogger);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (_error) {
       testsLogger.warn?.(
         '⚠️ Skipping tests: No .env file or SAP configuration found',
@@ -115,6 +124,23 @@ describe('Shared - getWhereUsed', () => {
       );
       return;
     }
+
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_default_scope',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
     logTestStep('where-used with default scope', testsLogger);
     testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
@@ -162,6 +188,23 @@ describe('Shared - getWhereUsed', () => {
       );
       return;
     }
+
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_all_types',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
     logTestStep('where-used with ALL types enabled', testsLogger);
     testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
@@ -234,6 +277,22 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_table',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
     try {
       logTestStep('get where-used for table', testsLogger);
       testsLogger.info?.('📋 Object: T000 (table)');
@@ -300,6 +359,22 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_error_no_name',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
     logTestStep('validate error if object name is missing', testsLogger);
     await expect(
       client.getUtils().getWhereUsed({
@@ -317,6 +392,22 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_error_no_type',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
     logTestStep('validate error if object type is missing', testsLogger);
     await expect(
       client.getUtils().getWhereUsed({
@@ -330,6 +421,22 @@ describe('Shared - getWhereUsed', () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_list_parsed',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
       );
       return;
     }
@@ -380,6 +487,22 @@ describe('Shared - getWhereUsed', () => {
     if (!hasConfig) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_list_raw_xml',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
       );
       return;
     }

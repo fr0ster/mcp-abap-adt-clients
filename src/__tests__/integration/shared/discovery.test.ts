@@ -10,7 +10,8 @@ import * as path from 'node:path';
 import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
+import { createTestAdtClient } from '../../helpers/sessionConfig';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestStep } from '../../helpers/testProgressLogger';
 
@@ -85,12 +86,16 @@ describe('Shared - discovery', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
 
   beforeEach(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, testsLogger);
-      client = new AdtClient(connection, testsLogger);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, testsLogger);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
     } catch (_error) {
       testsLogger.warn?.(

@@ -19,7 +19,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtClientBatch } from '../../../batch/AdtClientBatch';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { getConfig } from '../../helpers/sessionConfig';
+import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -49,6 +49,7 @@ describe('AdtClientBatch read operations', () => {
   let connection: IAbapConnection | null = null;
   let hasConfig = false;
   let isCloud = false;
+  let isLegacy = false;
 
   beforeAll(async () => {
     try {
@@ -64,15 +65,26 @@ describe('AdtClientBatch read operations', () => {
       await (connection as any).connect();
       hasConfig = true;
       isCloud = await isCloudEnvironment(connection);
+      const { isLegacy: legacy } = await createTestAdtClient(
+        connection,
+        connectionLogger,
+      );
+      isLegacy = legacy;
 
       testsLogger.info?.(
-        `AdtClientBatch test environment setup complete (${isCloud ? 'cloud' : 'onprem'})`,
+        `AdtClientBatch test environment setup complete (${isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem'})`,
       );
     } catch (error: any) {
       testsLogger.error?.('Failed to setup test environment:', error);
       throw error;
     }
   });
+
+  function checkBatchAvailable(): boolean {
+    const { getTestCaseDefinition } = require('../../helpers/test-helper');
+    const testCase = getTestCaseDefinition('batch_client', 'batch_read');
+    return TestConfigResolver.isTestAvailable(testCase, isCloud, isLegacy);
+  }
 
   afterAll(async () => {
     if (connection) {
@@ -104,8 +116,18 @@ describe('AdtClientBatch read operations', () => {
           return;
         }
 
+        if (!checkBatchAvailable()) {
+          logTestSkip(
+            testsLogger,
+            testName,
+            'Batch endpoint not available for current environment',
+          );
+          return;
+        }
+
         const resolver = new TestConfigResolver({
           isCloud,
+          isLegacy,
           logger: testsLogger,
         });
 
@@ -210,8 +232,18 @@ describe('AdtClientBatch read operations', () => {
           return;
         }
 
+        if (!checkBatchAvailable()) {
+          logTestSkip(
+            testsLogger,
+            testName,
+            'Batch endpoint not available for current environment',
+          );
+          return;
+        }
+
         const resolver = new TestConfigResolver({
           isCloud,
+          isLegacy,
           logger: testsLogger,
         });
 
@@ -306,8 +338,18 @@ describe('AdtClientBatch read operations', () => {
           return;
         }
 
+        if (!checkBatchAvailable()) {
+          logTestSkip(
+            testsLogger,
+            testName,
+            'Batch endpoint not available for current environment',
+          );
+          return;
+        }
+
         const resolver = new TestConfigResolver({
           isCloud,
+          isLegacy,
           logger: testsLogger,
         });
 
@@ -419,8 +461,18 @@ describe('AdtClientBatch read operations', () => {
           return;
         }
 
+        if (!checkBatchAvailable()) {
+          logTestSkip(
+            testsLogger,
+            testName,
+            'Batch endpoint not available for current environment',
+          );
+          return;
+        }
+
         const resolver = new TestConfigResolver({
           isCloud,
+          isLegacy,
           logger: testsLogger,
         });
 
@@ -480,8 +532,18 @@ describe('AdtClientBatch read operations', () => {
           return;
         }
 
+        if (!checkBatchAvailable()) {
+          logTestSkip(
+            testsLogger,
+            testName,
+            'Batch endpoint not available for current environment',
+          );
+          return;
+        }
+
         const resolver = new TestConfigResolver({
           isCloud,
+          isLegacy,
           logger: testsLogger,
         });
 

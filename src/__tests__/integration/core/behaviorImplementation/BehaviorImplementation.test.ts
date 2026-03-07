@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import type {
   IBehaviorImplementationConfig,
   IBehaviorImplementationState,
@@ -19,6 +19,7 @@ import type {
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -55,6 +56,7 @@ describe('BehaviorImplementation (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
   let tester: BaseTester<
     IBehaviorImplementationConfig,
@@ -68,7 +70,10 @@ describe('BehaviorImplementation (using AdtClient)', () => {
       await (connection as any).connect();
       const isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
 
       await ensureSharedPackage(client, testsLogger);

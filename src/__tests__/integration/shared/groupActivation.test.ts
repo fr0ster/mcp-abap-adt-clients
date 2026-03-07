@@ -15,9 +15,14 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { getConfig, resolveSystemContext } from '../../helpers/sessionConfig';
+import {
+  createTestAdtClient,
+  getConfig,
+  resolveSystemContext,
+} from '../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -62,18 +67,23 @@ describe('Group Activation (Shared)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      const isCloudSystem = await isCloudEnvironment(connection);
+      isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
         isCloudSystem,
       );
-      client = new AdtClient(connection, testsLogger, systemContext);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, testsLogger, systemContext);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
     } catch (_error) {
       testsLogger.warn?.(
@@ -121,6 +131,14 @@ describe('Group Activation (Shared)', () => {
       const definition = getTestDefinition();
       if (!definition) {
         skipReason = 'Test case not defined in test-config.yaml';
+        return;
+      }
+
+      // Check environment availability
+      if (
+        !TestConfigResolver.isTestAvailable(definition, isCloudSystem, isLegacy)
+      ) {
+        skipReason = `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'onprem'} environment`;
         return;
       }
 

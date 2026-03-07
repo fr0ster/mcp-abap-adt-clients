@@ -10,10 +10,14 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
 import { clearAcceptCache } from '../../../utils/acceptNegotiation';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { getConfig, resolveSystemContext } from '../../helpers/sessionConfig';
+import {
+  createTestAdtClient,
+  getConfig,
+  resolveSystemContext,
+} from '../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -100,6 +104,7 @@ describe('Shared - read Accept headers (corrected)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
   let isCloudSystem = false;
   let standardClassName: string | null = null;
   let standardInterfaceName: string | null = null;
@@ -117,10 +122,13 @@ describe('Shared - read Accept headers (corrected)', () => {
         connection,
         isCloudSystem,
       );
-      client = new AdtClient(connection, libraryLogger, {
-        ...systemContext,
-        enableAcceptCorrection: true,
-      });
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, {
+          ...systemContext,
+          enableAcceptCorrection: true,
+        });
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
 
       testCase = getEnabledTestCase('read_accept', 'read_accept');

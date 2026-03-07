@@ -15,9 +15,9 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { getConfig } from '../../helpers/sessionConfig';
+import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -50,6 +50,7 @@ describe('AdtClient read operations', () => {
   let connection: IAbapConnection | null = null;
   let client: AdtClient | null = null;
   let hasConfig = false;
+  let isLegacy = false;
   let isCloud = false;
 
   beforeAll(async () => {
@@ -64,7 +65,10 @@ describe('AdtClient read operations', () => {
 
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, connectionLogger);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, connectionLogger);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
       isCloud = await isCloudEnvironment(connection);
 
@@ -120,6 +124,7 @@ describe('AdtClient read operations', () => {
       // Use TestConfigResolver for consistent parameter resolution
       const resolver = new TestConfigResolver({
         isCloud,
+        isLegacy,
         logger: testsLogger,
         handlerName: handlerName || `read_${objectType}`,
         testCaseName: testCaseName || `readonly_read_${objectType}`,
@@ -334,10 +339,20 @@ describe('AdtClient read operations', () => {
         // Use TestConfigResolver to check if test is available for current environment
         const resolver = new TestConfigResolver({
           isCloud,
+          isLegacy,
           logger: testsLogger,
           handlerName: 'read_table',
           testCaseName: 'readonly_read_table',
         });
+
+        if (!resolver.isAvailableForEnvironment()) {
+          logTestSkip(
+            testsLogger,
+            'AdtClient - readTable',
+            `Test not available for ${isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem'} environment`,
+          );
+          return;
+        }
 
         // Cloud systems: 99% of tables are not readable via ADT, endpoint cannot read tables
         // On-premise: most tables are readable via ADT
@@ -648,6 +663,7 @@ describe('AdtClient read operations', () => {
         // Use TestConfigResolver for consistent parameter resolution
         const resolver = new TestConfigResolver({
           isCloud,
+          isLegacy,
           logger: testsLogger,
         });
         // Try to get transport request from test case or global defaults

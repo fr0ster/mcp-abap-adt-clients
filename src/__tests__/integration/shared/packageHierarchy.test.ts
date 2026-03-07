@@ -12,11 +12,11 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { AdtClient } from '../../../clients/AdtClient';
+import type { AdtClient } from '../../../clients/AdtClient';
 import type { PackageHierarchyNode } from '../../../index';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { BaseTester } from '../../helpers/BaseTester';
-import { getConfig } from '../../helpers/sessionConfig';
+import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
 import type { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
@@ -133,6 +133,7 @@ describe('Shared - getPackageHierarchy', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
   let isCloudSystem = false;
   let tester: BaseTester<IPackageHierarchyParams, PackageHierarchyNode>;
 
@@ -141,7 +142,10 @@ describe('Shared - getPackageHierarchy', () => {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      client = new AdtClient(connection, libraryLogger);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
       isCloudSystem = await isCloudEnvironment(connection);
 
