@@ -128,6 +128,7 @@ describe('Domain (using AdtClient)', () => {
             await getDomain(connection, domainName);
             return {
               success: false,
+              objectExists: true,
               reason: `⚠️ SAFETY: Domain ${domainName} already exists!`,
             };
           } catch (error: any) {

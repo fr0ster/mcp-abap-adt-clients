@@ -125,6 +125,7 @@ describe('AccessControl (using AdtClient)', () => {
             await getAccessControl(connection, accessControlName);
             return {
               success: false,
+              objectExists: true,
               reason: `SAFETY: Access Control ${accessControlName} already exists!`,
             };
           } catch (error: any) {

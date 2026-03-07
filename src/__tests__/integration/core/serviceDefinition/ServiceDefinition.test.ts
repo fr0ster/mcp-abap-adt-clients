@@ -129,6 +129,7 @@ describe('ServiceDefinition (using AdtClient)', () => {
             await getServiceDefinition(connection, serviceDefinitionName);
             return {
               success: false,
+              objectExists: true,
               reason: `⚠️ SAFETY: Service Definition ${serviceDefinitionName} already exists!`,
             };
           } catch (error: any) {

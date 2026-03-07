@@ -359,7 +359,12 @@ function getTestCaseDefinition(handlerName, testCaseName) {
  * @param {object} [testCase] - Optional test case with params (e.g., { params: { standard_class_name_onprem: '...' } })
  * @returns {{name: string, group?: string} | null} - Object name and optional group (for function modules), or null if not found
  */
-function resolveStandardObject(objectType, isCloud, testCase = null) {
+function resolveStandardObject(
+  objectType,
+  isCloud,
+  testCase = null,
+  isLegacy = false,
+) {
   const config = loadTestConfig();
   const standardObjects = config.standard_objects || {};
 
@@ -425,7 +430,7 @@ function resolveStandardObject(objectType, isCloud, testCase = null) {
 
   // Priority 3: Global standard_objects registry filtered by environment
   const objectsList = standardObjects[typeInfo.yamlKey] || [];
-  const envFilter = isCloud ? 'cloud' : 'onprem';
+  const envFilter = isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
   const availableObjects = objectsList.filter((obj) =>
     obj.available_in?.includes(envFilter),
   );

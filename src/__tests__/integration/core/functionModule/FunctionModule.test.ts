@@ -20,7 +20,6 @@ import type {
   IFunctionModuleConfig,
   IFunctionModuleState,
 } from '../../../../core/functionModule';
-import { getFunction } from '../../../../core/functionModule/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -123,32 +122,35 @@ describe('FunctionModule (using AdtClient)', () => {
           };
         },
         ensureObjectReady: async (functionModuleName: string) => {
-          if (!connection) return { success: true };
+          if (!connection || !client) return { success: true };
           const testCase = tester.getTestCaseDefinition();
           const functionGroupName = testCase?.params?.function_group_name;
           if (!functionGroupName) return { success: true };
 
-          // Check if function module exists
+          // Check if function module already exists via metadata
           try {
-            await getFunction(
-              connection,
+            await client.getFunctionModule().readMetadata({
               functionGroupName,
               functionModuleName,
-            );
+            });
+            // FM exists — skip test, post-test cleanup will handle deletion
             return {
               success: false,
-              reason: `⚠️ SAFETY: Function Module ${functionGroupName}/${functionModuleName} already exists!`,
+              objectExists: true,
+              reason: `⚠️ Function Module ${functionGroupName}/${functionModuleName} already exists. Post-test cleanup will delete it.`,
             };
-          } catch (error: any) {
-            const status = error.response?.status;
-            if (status !== 404 && status !== 500) {
-              return {
-                success: false,
-                reason: `Cannot verify function module existence: ${error.message}`,
-              };
+          } catch (readErr: any) {
+            const status = readErr?.response?.status ?? readErr?.status;
+            if (status === 404) {
+              // FM doesn't exist — safe to proceed
+              return { success: true };
             }
+            // Other error (406, 500, etc.) — cannot determine existence, skip for safety
+            return {
+              success: false,
+              reason: `⚠️ Cannot verify FM ${functionGroupName}/${functionModuleName} (HTTP ${status}): ${readErr.message}`,
+            };
           }
-          return { success: true };
         },
       });
     } catch (_error) {
@@ -213,7 +215,7 @@ describe('FunctionModule (using AdtClient)', () => {
           }
         }
       }
-      tester?.beforeEach()();
+      await tester?.beforeEach()();
     });
 
     afterEach(() => {

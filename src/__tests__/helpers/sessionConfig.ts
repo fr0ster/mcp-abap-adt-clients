@@ -129,19 +129,27 @@ export function getConfig(): SapConfig {
 export async function resolveSystemContext(
   connection: IAbapConnection,
   isCloud: boolean,
-): Promise<Pick<IAdtClientOptions, 'masterSystem' | 'responsible'>> {
+): Promise<
+  Pick<IAdtClientOptions, 'masterSystem' | 'responsible' | 'unicode'>
+> {
   if (isCloud) {
     const systemInfo = await getSystemInformation(connection);
     return {
       masterSystem: systemInfo?.systemID,
       responsible: systemInfo?.userName,
+      unicode: true,
     };
   }
   const { getEnvironmentConfig } = require('./test-helper');
   const envConfig = getEnvironmentConfig();
+  const rawUnicode = process.env.SAP_UNICODE;
+  const unicode = rawUnicode
+    ? rawUnicode.trim().toLowerCase() !== 'false'
+    : undefined;
   return {
     masterSystem: envConfig.default_master_system,
     responsible: process.env.SAP_USERNAME,
+    unicode,
   };
 }
 

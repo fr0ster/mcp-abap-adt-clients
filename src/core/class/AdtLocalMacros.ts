@@ -95,6 +95,7 @@ export class AdtLocalMacros extends AdtClass {
         codeToCheck as string,
         lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local macros created');
@@ -194,6 +195,7 @@ export class AdtLocalMacros extends AdtClass {
         codeToUpdate,
         options.lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       this.logger?.info?.('Local macros updated (low-level)');
       return {
@@ -236,6 +238,7 @@ export class AdtLocalMacros extends AdtClass {
         codeToCheck as string,
         lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local macros updated');

@@ -317,6 +317,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         codeToUpdate,
         options.lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       this.logger?.info?.('Class updated (low-level)');
       return {
@@ -364,6 +365,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           codeToCheck,
           lockHandle,
           config.transportRequest,
+          this.contentTypes?.sourceArtifactContentType(),
         );
         this.logger?.info?.('Class updated');
 
@@ -800,6 +802,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         config.testClassCode,
         lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
 
       // 3. Unlock parent class (switch to stateless after unlock)

@@ -18,17 +18,19 @@ export async function upload(
   sourceCode: string,
   lockHandle: string,
   corrNr: string | undefined,
+  sourceContentType?: string,
 ): Promise<void> {
   let url = `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName)}/source/main?lockHandle=${encodeURIComponent(lockHandle)}`;
   if (corrNr) {
     url += `&corrNr=${corrNr}`;
   }
 
+  const contentType = sourceContentType || CT_SOURCE;
   await connection.makeAdtRequest({
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
     data: sourceCode,
-    headers: { 'Content-Type': CT_SOURCE, Accept: ACCEPT_SOURCE },
+    headers: { 'Content-Type': contentType, Accept: ACCEPT_SOURCE },
   });
 }

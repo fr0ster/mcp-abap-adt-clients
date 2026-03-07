@@ -124,6 +124,7 @@ describe('Structure (using AdtClient)', () => {
             await getStructure(connection, structureName);
             return {
               success: false,
+              objectExists: true,
               reason: `⚠️ SAFETY: Structure ${structureName} already exists!`,
             };
           } catch (error: any) {

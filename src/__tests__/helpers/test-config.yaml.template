@@ -200,15 +200,15 @@ standard_objects:
   classes:
     - name: "CL_ABAP_CHAR_UTILITIES"
       description: "Character utilities helper (available everywhere)"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "legacy", "cloud"]
     - name: "CL_ABAP_CORRESPONDING"
       description: "Corresponding-move helper for ABAP"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "legacy", "cloud"]
 
   interfaces:
     - name: "IF_BUPA_API_MODIFY"
       description: "Interface zum BAdI: BUPA_API_MODIFY"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "legacy", "cloud"]
 
   domains:
     - name: "MANDT"
@@ -229,7 +229,7 @@ standard_objects:
   tables:
     - name: "T000"
       description: "Client table (on-premise SAP systems)"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
     - name: "T000"
       description: "Clients"
       available_in: ["cloud"]
@@ -255,12 +255,12 @@ standard_objects:
   programs:
     - name: "RSHOWTIM"
       description: "Standard SAP show time program"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
 
   views:
     - name: "H_T000"
       description: "Client table help view"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
     - name: "I_SapPackage"
       description: "ABAP Cloud: replace with CDS view name existing in tenant"
       available_in: ["cloud"]
@@ -268,13 +268,13 @@ standard_objects:
   function_groups:
     - name: "EDIN"
       description: "System function group"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "legacy", "cloud"]
 
   function_modules:
     - name: "IDOC_INBOUND_XML_SOAP_HTTP"
       group: "EDIN"
       description: "Returns system metadata"
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem", "legacy", "cloud"]
 
   service_definitions:
     - name: "I_SapPackage"
@@ -304,8 +304,10 @@ standard_objects:
 # Each test case can specify `available_in` parameter to conditionally enable/disable
 # tests for specific environments:
 #   - available_in: ["cloud"] - only run on cloud systems
-#   - available_in: ["onprem"] - only run on on-premise systems  
-#   - available_in: ["cloud", "onprem"] or omit - run on both environments
+#   - available_in: ["onprem"] - only run on modern on-premise systems (BASIS >= 7.50)
+#   - available_in: ["legacy"] - only run on legacy on-premise systems (BASIS < 7.50)
+#   - available_in: ["onprem", "legacy"] - run on all on-premise systems
+#   - available_in: ["cloud", "onprem"] or omit - run on cloud and modern on-premise
 #
 # Example:
 #   - name: "my_test"
@@ -473,8 +475,10 @@ read_transport:
 # Flow tests support available_in parameter to conditionally enable/disable tests
 # based on environment (cloud/on-premise):
 #   - available_in: ["cloud"] - only run on cloud systems
-#   - available_in: ["onprem"] - only run on on-premise systems  
-#   - available_in: ["cloud", "onprem"] or omit - run on both environments
+#   - available_in: ["onprem"] - only run on modern on-premise systems (BASIS >= 7.50)
+#   - available_in: ["legacy"] - only run on legacy on-premise systems (BASIS < 7.50)
+#   - available_in: ["onprem", "legacy"] - run on all on-premise systems
+#   - available_in: ["cloud", "onprem"] or omit - run on cloud and modern on-premise
 #
 # Example:
 #   - name: "my_test"
@@ -488,6 +492,7 @@ create_class:
   test_cases:
     - name: "adt_class"
       enabled: true
+      available_in: ["onprem", "legacy"]
       description: "Create test class for AdtClass tests"
       params:
         class_name: "ZADT_BLD_CLS01"
@@ -681,6 +686,7 @@ create_package:
   test_cases:
     - name: "adt_package"
       enabled: true
+      available_in: ["onprem"]
       description: "Package reserved for AdtPackage tests"
       params:
         package_name: "<YOUR_PARENT_PACKAGE>"    # Parent package (existing, must be structure/main type)
@@ -697,6 +703,7 @@ create_domain:
   test_cases:
     - name: "adt_domain"
       enabled: true
+      available_in: ["onprem"]
       description: "Domain used by AdtDomain workflow tests"
       params:
         domain_name: "ZADT_BLD_DOM01"
@@ -714,6 +721,7 @@ create_data_element:
   test_cases:
     - name: "adt_data_element"
       enabled: true
+      available_in: ["onprem"]
       description: "Data element reserved for AdtDataElement tests"
       params:
         data_element_name: "ZADT_BLD_DTEL01"
@@ -740,6 +748,7 @@ create_interface:
   test_cases:
     - name: "adt_interface"
       enabled: true
+      available_in: ["onprem", "legacy"]
       description: "Interface reserved for AdtInterface tests"
       params:
         interface_name: "ZADT_BLD_IF01"
@@ -783,6 +792,7 @@ create_table:
   test_cases:
     - name: "adt_table"
       enabled: true
+      available_in: ["onprem"]
       description: "Table reserved for AdtTable tests"
       params:
         table_name: "ZADT_BLD_TAB01"
@@ -812,6 +822,7 @@ create_tabletype:
   test_cases:
     - name: "adt_tabletype"
       enabled: true
+      available_in: ["onprem"]
       description: "TableType reserved for TableType tests"
       params:
         tabletype_name: "ZADT_BLD_TTYP01"
@@ -830,6 +841,7 @@ create_structure:
   test_cases:
     - name: "adt_structure"
       enabled: true
+      available_in: ["onprem"]
       description: "Structure reserved for AdtStructure tests"
       params:
         structure_name: "ZADT_BLD_STRU01"
@@ -849,6 +861,7 @@ create_view:
   test_cases:
     - name: "adt_view"
       enabled: true
+      available_in: ["onprem", "legacy"]
       description: "View reserved for AdtView tests"
       params:
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
@@ -931,6 +944,7 @@ create_function_group:
   test_cases:
     - name: "adt_function_group"
       enabled: true
+      available_in: ["onprem", "legacy"]
       description: "Function group reserved for AdtFunctionGroup tests"
       params:
         function_group_name: "ZADT_BLD_FGR_EMPTY"
@@ -943,6 +957,7 @@ create_function_module:
   test_cases:
     - name: "adt_function_module"
       enabled: true
+      available_in: ["onprem", "legacy"]
       description: "Function module reserved for AdtFunctionModule tests"
       params:
         function_module_name: "Z_ADT_BLD_FM03"  # Must start with Z_ or Y_ (with underscore)
@@ -974,6 +989,7 @@ create_behavior_definition:
   test_cases:
     - name: "adt_behavior_definition"
       enabled: true
+      available_in: ["onprem"]
       description: "Create test behavior definition for AdtBehaviorDefinition tests"
       params:
         bdef_name: "ZADT_SHR_BDEF_DDLS"
@@ -1004,6 +1020,7 @@ create_metadata_extension:
   test_cases:
     - name: "adt_metadata_extension"
       enabled: true
+      available_in: ["onprem"]
       description: "Create test metadata extension for AdtMetadataExtension tests"
       params:
         ext_name: "ZADT_BLD_MEXT_DDLX"
@@ -1026,6 +1043,7 @@ create_behavior_implementation:
   test_cases:
     - name: "adt_behavior_implementation"
       enabled: true
+      available_in: ["onprem"]
       description: "Create test behavior implementation class for AdtBehaviorImplementation tests"
       params:
         class_name: "ZBP_ADT_SHR_BIMP_DDLS"
@@ -1064,6 +1082,7 @@ run_unit_test:
   test_cases:
     - name: "adt_unit_test"
       enabled: true
+      available_in: ["onprem", "legacy"]
       description: "Run unit test for class test class"
       params:
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
@@ -1221,6 +1240,7 @@ group_activation:
   test_cases:
     - name: "adt_group_activation"
       enabled: true
+      available_in: ["onprem"]
       description: "Group activation test - domain, data element, structure"
       params:
         domain_name: "ZADT_BLD_DOM_GRP"

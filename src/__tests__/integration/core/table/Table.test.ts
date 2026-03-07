@@ -121,6 +121,7 @@ describe('Table (using AdtClient)', () => {
             await getTable(connection, tableName);
             return {
               success: false,
+              objectExists: true,
               reason: `⚠️ SAFETY: Table ${tableName} already exists!`,
             };
           } catch (error: any) {

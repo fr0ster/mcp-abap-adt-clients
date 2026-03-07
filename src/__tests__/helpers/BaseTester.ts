@@ -79,7 +79,7 @@ export interface IBaseTesterSetupOptions {
   buildConfig: (testCase: any, resolver?: TestConfigResolver) => any;
   ensureObjectReady?: (
     objectName: string,
-  ) => Promise<{ success: boolean; reason?: string }>;
+  ) => Promise<{ success: boolean; reason?: string; objectExists?: boolean }>;
   testDescription?: string;
 }
 
@@ -105,7 +105,7 @@ export class BaseTester<TConfig, TState> {
   ) => TConfig;
   private ensureObjectReadyFn?: (
     objectName: string,
-  ) => Promise<{ success: boolean; reason?: string }>;
+  ) => Promise<{ success: boolean; reason?: string; objectExists?: boolean }>;
   private testDescription: string = 'Full workflow';
 
   // Test state
@@ -192,6 +192,35 @@ export class BaseTester<TConfig, TState> {
       case LogLevel.ERROR:
         this.logger.error?.(prefixedMessage, ...args);
         break;
+    }
+  }
+
+  /**
+   * Cleanup a pre-existing object that was detected by ensureObjectReady.
+   * Respects cleanup settings from test-config.yaml.
+   */
+  private async cleanupExistingObject(config: TConfig): Promise<void> {
+    const cleanupSettings = this.getCleanupSettings(
+      this.testCase?.params as ITestCaseParams,
+    );
+    if (!cleanupSettings.shouldCleanup) {
+      this.log(
+        LogLevel.INFO,
+        '⚠️ Pre-existing object cleanup skipped (cleanup disabled in config)',
+      );
+      return;
+    }
+    try {
+      logTestStep('delete (pre-existing object cleanup)', this.logger);
+      await this.adtObject.delete(config as Partial<TConfig>);
+      this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
+      this.objectCreated = false;
+    } catch (cleanupError) {
+      this.log(
+        LogLevel.WARN,
+        'Pre-existing object cleanup failed:',
+        cleanupError,
+      );
     }
   }
 
@@ -1295,8 +1324,13 @@ export class BaseTester<TConfig, TState> {
             this.skipReason =
               cleanup.reason || 'Failed to cleanup object before test';
             this.log(LogLevel.WARN, `beforeEach: ${this.skipReason}`);
-            this.testCase = null;
-            this.config = null;
+            // If object exists, mark it for post-test cleanup (config stays for delete)
+            if (cleanup.objectExists) {
+              this.objectCreated = true;
+            } else {
+              this.testCase = null;
+              this.config = null;
+            }
             return;
           }
         }
@@ -1382,6 +1416,10 @@ export class BaseTester<TConfig, TState> {
         testName,
         this.skipReason || 'Test case not available',
       );
+      // Cleanup pre-existing object if ensureObjectReady flagged it
+      if (this.objectCreated && this.config) {
+        await this.cleanupExistingObject(this.config);
+      }
       logTestEnd(this.logger, testName);
       return undefined;
     }

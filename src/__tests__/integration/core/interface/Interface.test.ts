@@ -124,6 +124,7 @@ describe('Interface (using AdtClient)', () => {
             await getInterface(connection, interfaceName);
             return {
               success: false,
+              objectExists: true,
               reason: `⚠️ SAFETY: Interface ${interfaceName} already exists!`,
             };
           } catch (error: any) {

@@ -60,6 +60,12 @@ export interface IAdtContentTypes {
  * Base content types — v1 headers, works on all SAP systems including older BASIS
  */
 export class AdtContentTypesBase implements IAdtContentTypes {
+  protected readonly unicode: boolean;
+
+  constructor(unicode = false) {
+    this.unicode = unicode;
+  }
+
   programCreate(): IAdtHeaders {
     return {
       accept: 'application/vnd.sap.adt.programs.programs+xml',
@@ -189,7 +195,7 @@ export class AdtContentTypesBase implements IAdtContentTypes {
   }
 
   sourceArtifactContentType(): string {
-    return 'text/plain';
+    return this.unicode ? 'text/plain; charset=utf-8' : 'text/plain';
   }
 }
 
@@ -199,6 +205,10 @@ export class AdtContentTypesBase implements IAdtContentTypes {
  * Content-Type uses the newest version.
  */
 export class AdtContentTypesModern extends AdtContentTypesBase {
+  constructor() {
+    super(true);
+  }
+
   override classCreate(): IAdtHeaders {
     return {
       accept:
@@ -340,9 +350,5 @@ export class AdtContentTypesModern extends AdtContentTypesBase {
       contentType:
         'application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8',
     };
-  }
-
-  override sourceArtifactContentType(): string {
-    return 'text/plain; charset=utf-8';
   }
 }

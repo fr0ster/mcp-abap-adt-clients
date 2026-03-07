@@ -115,6 +115,7 @@ describe('BehaviorDefinition (using AdtClient)', () => {
             await readBdef(connection, bdefName, '', 'active');
             return {
               success: false,
+              objectExists: true,
               reason: `SAFETY: BehaviorDefinition ${bdefName} already exists!`,
             };
           } catch (error: any) {

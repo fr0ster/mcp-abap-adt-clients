@@ -16,6 +16,7 @@ export async function checkInterface(
   interfaceName: string,
   version: string = 'active',
   sourceCode?: string,
+  artifactContentType?: string,
 ): Promise<AxiosResponse> {
   const response = await runCheckRun(
     connection,
@@ -24,6 +25,7 @@ export async function checkInterface(
     version,
     'abapCheckRun',
     sourceCode,
+    artifactContentType,
   );
   const checkResult = parseCheckRunResponse(response);
 

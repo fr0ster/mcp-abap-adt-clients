@@ -29,6 +29,7 @@ export async function updateClassLocalTypes(
   localTypesSource: string,
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   return updateClassInclude(
     connection,
@@ -37,6 +38,7 @@ export async function updateClassLocalTypes(
     'implementations',
     lockHandle,
     transportRequest,
+    sourceContentType,
   );
 }
 
@@ -59,6 +61,7 @@ export async function updateClassDefinitions(
   definitionsSource: string,
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   return updateClassInclude(
     connection,
@@ -67,6 +70,7 @@ export async function updateClassDefinitions(
     'definitions',
     lockHandle,
     transportRequest,
+    sourceContentType,
   );
 }
 
@@ -90,6 +94,7 @@ export async function updateClassMacros(
   macrosSource: string,
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   return updateClassInclude(
     connection,
@@ -98,6 +103,7 @@ export async function updateClassMacros(
     'macros',
     lockHandle,
     transportRequest,
+    sourceContentType,
   );
 }
 
@@ -119,6 +125,7 @@ async function updateClassInclude(
   includeType: 'implementations' | 'definitions' | 'macros',
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   if (!includeSource) {
     throw new Error(`${includeType} source code is required`);
@@ -134,8 +141,9 @@ async function updateClassInclude(
     url += `&corrNr=${transportRequest}`;
   }
 
+  const contentType = sourceContentType || CT_SOURCE;
   const headers = {
-    'Content-Type': CT_SOURCE,
+    'Content-Type': contentType,
     Accept: ACCEPT_SOURCE,
   };
 

@@ -64,7 +64,8 @@ export class AdtClientLegacy extends AdtClient {
   ) {
     super(connection, logger, {
       ...options,
-      contentTypes: options?.contentTypes ?? new AdtContentTypesBase(),
+      contentTypes:
+        options?.contentTypes ?? new AdtContentTypesBase(options?.unicode),
     });
   }
 
@@ -93,6 +94,7 @@ export class AdtClientLegacy extends AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.contentTypes,
     );
   }
 

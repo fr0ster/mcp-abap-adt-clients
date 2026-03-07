@@ -140,7 +140,12 @@ export class TestConfigResolver {
   getStandardObject(
     objectType: string,
   ): { name: string; group?: string } | null {
-    return resolveStandardObject(objectType, this.isCloud, this.testCase);
+    return resolveStandardObject(
+      objectType,
+      this.isCloud,
+      this.testCase,
+      this.isLegacy,
+    );
   }
 
   /**

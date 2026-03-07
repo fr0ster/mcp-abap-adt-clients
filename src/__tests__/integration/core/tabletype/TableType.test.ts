@@ -129,6 +129,7 @@ describe('TableType (using AdtClient)', () => {
             await getTableType(connection, tableTypeName);
             return {
               success: false,
+              objectExists: true,
               reason: `SAFETY: TableType ${tableTypeName} already exists!`,
             };
           } catch (error: any) {

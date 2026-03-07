@@ -134,6 +134,8 @@ export interface IAdtClientOptions {
   masterSystem?: string;
   responsible?: string;
   contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
+  /** Whether the SAP system uses Unicode encoding. Affects Content-Type headers for source code operations. */
+  unicode?: boolean;
 }
 
 export class AdtClient {
@@ -444,7 +446,12 @@ export class AdtClient {
    * @returns IAdtObject instance for LocalTestClass operations
    */
   getLocalTestClass(): IAdtObject<ILocalTestClassConfig, IClassState> {
-    return new AdtLocalTestClass(this.connection, this.logger);
+    return new AdtLocalTestClass(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 
   /**
@@ -452,7 +459,12 @@ export class AdtClient {
    * @returns IAdtObject instance for LocalTypes operations
    */
   getLocalTypes(): IAdtObject<ILocalTypesConfig, IClassState> {
-    return new AdtLocalTypes(this.connection, this.logger);
+    return new AdtLocalTypes(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 
   /**
@@ -460,7 +472,12 @@ export class AdtClient {
    * @returns IAdtObject instance for LocalDefinitions operations
    */
   getLocalDefinitions(): IAdtObject<ILocalDefinitionsConfig, IClassState> {
-    return new AdtLocalDefinitions(this.connection, this.logger);
+    return new AdtLocalDefinitions(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 
   /**
@@ -468,6 +485,11 @@ export class AdtClient {
    * @returns IAdtObject instance for LocalMacros operations
    */
   getLocalMacros(): IAdtObject<ILocalMacrosConfig, IClassState> {
-    return new AdtLocalMacros(this.connection, this.logger);
+    return new AdtLocalMacros(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
   }
 }

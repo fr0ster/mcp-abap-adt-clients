@@ -96,6 +96,7 @@ export class AdtLocalDefinitions extends AdtClass {
         codeToCheck as string,
         lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local definitions created');
@@ -196,6 +197,7 @@ export class AdtLocalDefinitions extends AdtClass {
         codeToUpdate,
         options.lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       this.logger?.info?.('Local definitions updated (low-level)');
       return {
@@ -238,6 +240,7 @@ export class AdtLocalDefinitions extends AdtClass {
         codeToCheck as string,
         lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local definitions updated');

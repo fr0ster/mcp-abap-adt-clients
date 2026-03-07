@@ -36,6 +36,7 @@ export async function updateClassWithCheck(
   sourceCode: string,
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   if (!sourceCode) {
     throw new Error('source_code is required');
@@ -73,6 +74,7 @@ export async function updateClassWithCheck(
     sourceCode,
     lockHandle,
     transportRequest,
+    sourceContentType,
   );
 }
 
@@ -88,6 +90,7 @@ export async function updateClass(
   sourceCode: string,
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   if (!sourceCode) {
     throw new Error('source_code is required');
@@ -103,8 +106,9 @@ export async function updateClass(
     url += `&corrNr=${transportRequest}`;
   }
 
+  const contentType = sourceContentType || CT_SOURCE;
   const headers = {
-    'Content-Type': CT_SOURCE,
+    'Content-Type': contentType,
     Accept: ACCEPT_SOURCE,
   };
 
@@ -129,6 +133,7 @@ export async function updateClassImplementations(
   implementationCode: string,
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   if (!implementationCode) {
     throw new Error('implementationCode is required');
@@ -144,8 +149,9 @@ export async function updateClassImplementations(
     url += `&corrNr=${transportRequest}`;
   }
 
+  const contentType = sourceContentType || CT_SOURCE;
   const headers = {
-    'Content-Type': CT_SOURCE,
+    'Content-Type': contentType,
     Accept: ACCEPT_SOURCE,
   };
 

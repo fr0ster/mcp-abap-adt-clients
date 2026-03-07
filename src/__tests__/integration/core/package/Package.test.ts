@@ -135,6 +135,7 @@ describe('Package (using AdtClient)', () => {
             await getPackage(connection, packageName);
             return {
               success: false,
+              objectExists: true,
               reason: `⚠️ SAFETY: Package ${packageName} already exists!`,
             };
           } catch (error: any) {
@@ -248,6 +249,7 @@ describe('Package (using AdtClient)', () => {
           'package',
           isCloudSystem,
           null,
+          isLegacy,
         );
 
         if (!standardObject) {

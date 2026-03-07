@@ -135,6 +135,7 @@ describe('Program (using AdtClient)', () => {
             } catch (cleanupError: any) {
               return {
                 success: false,
+                objectExists: true,
                 reason: `Failed to delete existing program ${programName}: ${cleanupError.message}`,
               };
             }

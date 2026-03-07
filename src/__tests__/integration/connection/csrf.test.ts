@@ -58,6 +58,13 @@ describe('CSRF Token diagnostics', () => {
   it('should fetch CSRF token from available endpoints', async () => {
     if (!hasConfig) return;
 
+    // CSRF tokens are an HTTP concept — not applicable over RFC transport
+    const config = getConfig();
+    if ((config as any).connectionType === 'rfc') {
+      console.log('Skipping CSRF test: RFC connections do not use CSRF tokens');
+      return;
+    }
+
     const baseUrl = process.env.SAP_URL!;
     console.log('\n=== CSRF Token Diagnostic ===');
     console.log(`System: ${baseUrl}`);

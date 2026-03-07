@@ -26,6 +26,7 @@ export async function updateClassTestInclude(
   testClassSource: string,
   lockHandle: string,
   transportRequest?: string,
+  sourceContentType?: string,
 ): Promise<AxiosResponse> {
   if (!testClassSource) {
     throw new Error('Test class source code is required');
@@ -41,8 +42,9 @@ export async function updateClassTestInclude(
     url += `&corrNr=${transportRequest}`;
   }
 
+  const contentType = sourceContentType || CT_SOURCE;
   const headers = {
-    'Content-Type': CT_SOURCE,
+    'Content-Type': contentType,
     Accept: ACCEPT_SOURCE,
   };
 

@@ -26,6 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateInterface } from './activation';
 import { checkInterface } from './check';
@@ -48,16 +49,19 @@ export class AdtInterface
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
+  protected readonly contentTypes?: IAdtContentTypes;
   public readonly objectType: string = 'Interface';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.contentTypes = contentTypes;
   }
 
   /**
@@ -249,6 +253,7 @@ export class AdtInterface
         codeToUpdate,
         options.lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       this.logger?.info?.('Interface updated (low-level)');
       return {
@@ -285,6 +290,7 @@ export class AdtInterface
           config.interfaceName,
           'inactive',
           codeToCheck,
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Check inactive with update content passed');
@@ -299,6 +305,7 @@ export class AdtInterface
           codeToCheck,
           lockHandle,
           config.transportRequest,
+          this.contentTypes?.sourceArtifactContentType(),
         );
         // upload() returns void, so we don't store it in state
         this.logger?.info?.('Interface updated');
@@ -340,6 +347,8 @@ export class AdtInterface
         this.connection,
         config.interfaceName,
         'inactive',
+        undefined,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.checkResult = checkResponse2;
       this.logger?.info?.('Final check passed');
@@ -519,6 +528,7 @@ export class AdtInterface
       config.interfaceName,
       version,
       config.sourceCode,
+      this.contentTypes?.sourceArtifactContentType(),
     );
     state.checkResult = checkResponse;
     return state;

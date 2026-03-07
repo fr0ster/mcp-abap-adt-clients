@@ -95,6 +95,7 @@ export class AdtLocalTestClass extends AdtClass {
         config.testClassCode as string,
         parentLockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Test class created');
@@ -207,6 +208,7 @@ export class AdtLocalTestClass extends AdtClass {
         codeToUpdate,
         options.lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       this.logger?.info?.('Test class updated (low-level)');
       return {
@@ -250,6 +252,7 @@ export class AdtLocalTestClass extends AdtClass {
         codeToCheck as string,
         parentLockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Test class updated');

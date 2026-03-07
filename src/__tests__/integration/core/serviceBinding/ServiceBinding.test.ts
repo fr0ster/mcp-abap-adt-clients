@@ -191,6 +191,7 @@ describe('ServiceBinding (using AdtClient)', () => {
             }
             return {
               success: false,
+              objectExists: true,
               reason: `Cannot ensure clean service binding state for ${bindingName}: ${error?.message || String(error)}`,
             };
           }

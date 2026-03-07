@@ -94,6 +94,7 @@ export class AdtLocalTypes extends AdtClass {
         codeToCheck as string,
         lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local types created');
@@ -194,6 +195,7 @@ export class AdtLocalTypes extends AdtClass {
         codeToUpdate,
         options.lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       this.logger?.info?.('Local types updated (low-level)');
       return {
@@ -236,6 +238,7 @@ export class AdtLocalTypes extends AdtClass {
         codeToCheck as string,
         lockHandle,
         config.transportRequest,
+        this.contentTypes?.sourceArtifactContentType(),
       );
       state.updateResult = updateResponse;
       this.logger?.info?.('Local types updated');
