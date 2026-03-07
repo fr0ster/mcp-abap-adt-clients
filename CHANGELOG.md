@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-03-07
+
+### Changed
+- **Legacy unit test synchronous results**: Legacy systems (BASIS < 7.50) return test results synchronously from POST `/testruns` (`aunit:runResult`) — no run ID, no async polling. `AdtUnitTestLegacy` now handles this correctly with synthetic `legacy-sync` run ID and cached results.
+- **Removed unused legacy endpoints**: `getClassUnitTestStatusLegacy` and `getClassUnitTestResultLegacy` removed — legacy systems don't support separate status/result polling.
+- **Legacy XML format**: `runLegacy.ts` uses correct `aunit:runConfiguration` with `adtcore:objectReferences` format (matching Eclipse ADT behavior).
+
+### Fixed
+- **Unit test integration test**: Use single `unitTest` instance for read/readMetadata to preserve cached state across operations.
+- **Test config**: `run_unit_test` now available for `legacy` environment.
+
 ## [3.6.0] - 2026-03-07
 
 ### Added

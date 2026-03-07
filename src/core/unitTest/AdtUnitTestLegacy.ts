@@ -4,6 +4,9 @@
  * Extends AdtUnitTest and overrides run/status/result to use legacy endpoints:
  * - /sap/bc/adt/abapunit/testruns instead of /sap/bc/adt/abapunit/runs
  * - application/xml content types instead of versioned vnd.sap.adt.api.abapunit.* types
+ *
+ * Key difference: Legacy systems return results synchronously (aunit:runResult)
+ * from the POST to /testruns — no run ID, no async polling needed.
  */
 
 import type {
@@ -12,14 +15,17 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { headerValueToString } from '../../utils/internalUtils';
 import { AdtUnitTest } from './AdtUnitTest';
-import {
-  getClassUnitTestResultLegacy,
-  getClassUnitTestStatusLegacy,
-  startClassUnitTestRunLegacy,
-} from './runLegacy';
-import type { IUnitTestConfig, IUnitTestState } from './types';
+import { startClassUnitTestRunLegacy } from './runLegacy';
+import type {
+  IClassUnitTestDefinition,
+  IClassUnitTestRunOptions,
+  IUnitTestConfig,
+  IUnitTestState,
+} from './types';
+
+/** Synthetic run ID for legacy synchronous results */
+const LEGACY_SYNC_RUN_ID = 'legacy-sync';
 
 export class AdtUnitTestLegacy extends AdtUnitTest {
   constructor(connection: IAbapConnection, logger?: ILogger) {
@@ -27,7 +33,8 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
   }
 
   /**
-   * Create unit test run using legacy endpoint
+   * Create unit test run using legacy endpoint.
+   * Legacy returns results synchronously — no run ID or polling needed.
    */
   override async create(
     config: IUnitTestConfig,
@@ -47,22 +54,17 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
 
       this.logger?.debug?.('Unit test run response status:', response.status);
 
-      const runId = this.extractRunId(response);
+      // Legacy returns results synchronously — store as both status and result
+      this.lastStatusResponse = response;
+      this.lastResultResponse = response;
 
-      if (!runId) {
-        this.logger?.error?.(
-          'Failed to extract run ID from response. Response data:',
-          response.data,
-        );
-        throw new Error('Failed to start unit test run: run ID not returned');
-      }
-
-      this.logger?.info?.('Unit test run started (legacy), run ID:', runId);
-      this.lastRunId = runId;
+      this.lastRunId = LEGACY_SYNC_RUN_ID;
+      this.logger?.info?.('Unit test run completed (legacy, synchronous)');
 
       return {
         createResult: response,
-        runId,
+        runId: LEGACY_SYNC_RUN_ID,
+        runResult: response.data,
         errors: [],
       };
     } catch (error: unknown) {
@@ -72,76 +74,64 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
   }
 
   /**
-   * Get unit test status using legacy endpoint
+   * Run unit tests — legacy returns results synchronously.
+   */
+  override async run(
+    tests: IClassUnitTestDefinition[],
+    options?: IClassUnitTestRunOptions,
+  ): Promise<string> {
+    await this.create({ tests, options });
+    return LEGACY_SYNC_RUN_ID;
+  }
+
+  /**
+   * Get unit test status — legacy returns results synchronously,
+   * so this returns the cached response from create().
    */
   override async getStatus(
-    runId: string,
-    withLongPolling: boolean = true,
+    _runId: string,
+    _withLongPolling: boolean = true,
   ): Promise<AxiosResponse> {
-    const response = await getClassUnitTestStatusLegacy(
-      this.connection,
-      runId,
-      withLongPolling,
+    if (this.lastStatusResponse) {
+      return this.lastStatusResponse;
+    }
+    throw new Error(
+      'No status available. Legacy systems return results synchronously via create().',
     );
-    this.lastStatusResponse = response;
-    return response;
   }
 
   /**
-   * Get unit test result using legacy endpoint
+   * Get unit test result — legacy returns results synchronously,
+   * so this returns the cached response from create().
    */
   override async getResult(
-    runId: string,
-    options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
+    _runId: string,
+    _options?: { withNavigationUris?: boolean; format?: 'abapunit' | 'junit' },
   ): Promise<AxiosResponse> {
-    const response = await getClassUnitTestResultLegacy(
-      this.connection,
-      runId,
-      options,
+    if (this.lastResultResponse) {
+      return this.lastResultResponse;
+    }
+    throw new Error(
+      'No result available. Legacy systems return results synchronously via create().',
     );
-    this.lastResultResponse = response;
-    return response;
   }
 
   /**
-   * Extract run ID from legacy response
-   * Legacy uses /testruns/ in URIs instead of /runs/
+   * Read unit test — legacy returns results synchronously,
+   * so this returns the cached result from create().
    */
-  protected override extractRunId(response: AxiosResponse): string | undefined {
-    // Try headers first
-    const locationHeader =
-      headerValueToString(response.headers?.location) ||
-      headerValueToString(response.headers?.['content-location']) ||
-      headerValueToString(response.headers?.['sap-adt-location']);
-    if (locationHeader) {
-      const match =
-        locationHeader.match(/\/testruns\/([^/]+)/) ||
-        locationHeader.match(/\/runs\/([^/]+)/);
-      if (match) {
-        return match[1];
-      }
+  override async read(
+    _config: Partial<IUnitTestConfig>,
+    _version: 'active' | 'inactive' = 'active',
+  ): Promise<IUnitTestState | undefined> {
+    if (!this.lastResultResponse) {
+      return undefined;
     }
-
-    // Fallback: parse from response body (XML)
-    const data = response.data;
-    if (typeof data === 'string') {
-      const uriMatch = data.match(/uri="([^"]+)"/);
-      if (uriMatch) {
-        const uri = uriMatch[1];
-        const match =
-          uri.match(/\/testruns\/([^/]+)/) || uri.match(/\/runs\/([^/]+)/);
-        if (match) {
-          return match[1];
-        }
-      }
-    } else if (data?.uri) {
-      const match =
-        data.uri.match(/\/testruns\/([^/]+)/) ||
-        data.uri.match(/\/runs\/([^/]+)/);
-      if (match) {
-        return match[1];
-      }
-    }
-    return undefined;
+    return {
+      runId: LEGACY_SYNC_RUN_ID,
+      runStatus: this.lastStatusResponse?.data,
+      runResult: this.lastResultResponse.data,
+      errors: [],
+    };
   }
 }

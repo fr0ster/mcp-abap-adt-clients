@@ -288,16 +288,12 @@ describe('AdtUnitTest (using AdtClient)', () => {
             status: unitTestStatus,
           };
 
-          const readState = await client
-            .getUnitTest()
-            .read(readConfig, 'active');
+          const readState = await unitTest.read(readConfig, 'active');
           expect(readState).toBeDefined();
           expect(readState?.runId).toBe(runId);
           expect(readState?.runStatus).toBeDefined();
 
-          const metadataState = await client
-            .getUnitTest()
-            .readMetadata(readConfig);
+          const metadataState = await unitTest.readMetadata(readConfig);
           expect(metadataState).toBeDefined();
           expect(metadataState.runId).toBe(runId);
           expect(metadataState.runStatus).toBeDefined();

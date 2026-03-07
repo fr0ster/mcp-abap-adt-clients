@@ -20,56 +20,44 @@ import type {
 const CT_XML = 'application/xml';
 const ACCEPT_XML = 'application/xml';
 
-function boolAttr(value: boolean | undefined, fallback: boolean) {
-  return (value ?? fallback) ? 'true' : 'false';
-}
-
 /**
  * Start ABAP Unit test run on legacy systems
- * Uses /sap/bc/adt/abapunit/testruns endpoint with application/xml content type
+ * Uses /sap/bc/adt/abapunit/testruns endpoint with aunit:runConfiguration format
+ *
+ * Legacy format differs from modern:
+ * - Root element: aunit:runConfiguration (not aunit:run)
+ * - Namespace: http://www.sap.com/adt/aunit (not http://www.sap.com/adt/api/aunit)
+ * - Objects via adtcore:objectReferences with URI (not aunit:tests with containerClass/class)
+ * - Content-Type/Accept: application/xml (not versioned vnd.sap.adt.api.abapunit.*)
  */
 export async function startClassUnitTestRunLegacy(
   connection: IAbapConnection,
   tests: IClassUnitTestDefinition[],
-  options?: IClassUnitTestRunOptions,
+  _options?: IClassUnitTestRunOptions,
 ): Promise<AxiosResponse> {
   if (!tests.length) {
     throw new Error('At least one test definition is required');
   }
 
-  const scope = options?.scope ?? {
-    ownTests: true,
-    foreignTests: false,
-    addForeignTestsAsPreview: true,
-  };
-  const risk = options?.riskLevel ?? {
-    harmless: true,
-    dangerous: true,
-    critical: true,
-  };
-  const duration = options?.duration ?? {
-    short: true,
-    medium: true,
-    long: true,
-  };
+  const objectRefs = tests
+    .map((test) => {
+      const className = encodeSapObjectName(test.containerClass).toLowerCase();
+      return `        <adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/${className}"/>`;
+    })
+    .join('\n');
 
-  const testsXml = tests
-    .map(
-      (test) =>
-        `<aunit:test containerClass="${encodeSapObjectName(test.containerClass).toUpperCase()}" class="${test.testClass}"/>`,
-    )
-    .join('');
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit" title="${options?.title || tests[0].testClass}" context="${options?.context || 'MCP ABAP ADT Client'}">
-  <aunit:options>
-    <aunit:scope ownTests="${boolAttr(scope.ownTests, true)}" foreignTests="${boolAttr(scope.foreignTests, false)}" addForeignTestsAsPreview="${boolAttr(scope.addForeignTestsAsPreview, true)}"/>
-    <aunit:riskLevel harmless="${boolAttr(risk.harmless, true)}" dangerous="${boolAttr(risk.dangerous, true)}" critical="${boolAttr(risk.critical, true)}"/>
-    <aunit:duration short="${boolAttr(duration.short, true)}" medium="${boolAttr(duration.medium, true)}" long="${boolAttr(duration.long, true)}"/>
-  </aunit:options>
-  <aunit:tests>
-    ${testsXml}
-  </aunit:tests>
-</aunit:run>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><aunit:runConfiguration xmlns:aunit="http://www.sap.com/adt/aunit">
+  <external>
+    <coverage active="false"/>
+  </external>
+  <adtcore:objectSets xmlns:adtcore="http://www.sap.com/adt/core">
+    <objectSet kind="inclusive">
+      <adtcore:objectReferences>
+${objectRefs}
+      </adtcore:objectReferences>
+    </objectSet>
+  </adtcore:objectSets>
+</aunit:runConfiguration>`;
 
   return connection.makeAdtRequest({
     url: '/sap/bc/adt/abapunit/testruns',
