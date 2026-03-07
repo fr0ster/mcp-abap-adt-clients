@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-03-07
+
+### Added
+- **Unicode support**: `unicode` parameter in `AdtContentTypesBase` and `IAdtClientOptions` for correct `Content-Type` headers on legacy non-unicode systems (`text/plain` vs `text/plain; charset=utf-8`).
+- **Interface contentTypes**: Pass `contentTypes` through to `AdtInterface` for check and update operations on legacy systems.
+- **Class local includes contentTypes**: Pass `sourceArtifactContentType` to `AdtLocalTestClass`, `AdtLocalTypes`, `AdtLocalDefinitions`, `AdtLocalMacros` update operations.
+- **Pre-existing object cleanup**: `objectExists` flag in `ensureObjectReady` return type enables BaseTester to delete pre-existing objects when test is skipped.
+
+### Fixed
+- **FunctionModule test**: Fix missing `await` on `tester.beforeEach()()` causing `ensureObjectReady` to run without waiting.
+- **FunctionModule existence check**: Use `readMetadata()` instead of `read()` (source) for reliable FM existence detection on legacy.
+- **Interface check on legacy**: Pass `artifactContentType` to `checkInterface` to avoid "Wrong content type" errors on non-unicode systems.
+- **CSRF test**: Skip on RFC connections (CSRF tokens are HTTP-only).
+- **Test template**: Add default `available_in` markers for all flow test cases.
+
 ## [3.3.2] - 2026-03-07
 
 ### Fixed
