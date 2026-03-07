@@ -15,7 +15,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import type {
   IFunctionModuleConfig,
   IFunctionModuleState,
@@ -24,6 +24,7 @@ import { getFunction } from '../../../../core/functionModule/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -68,6 +69,7 @@ describe('FunctionModule (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
   let tester: BaseTester<IFunctionModuleConfig, IFunctionModuleState>;
 
@@ -78,7 +80,10 @@ describe('FunctionModule (using AdtClient)', () => {
       await (connection as any).connect();
       isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester(
@@ -206,7 +211,7 @@ describe('FunctionModule (using AdtClient)', () => {
 
     // Try to create (ignore "already exists" errors)
     try {
-      const tempClient = new AdtClient(
+      const { client: tempClient } = await createTestAdtClient(
         connection,
         libraryLogger,
         systemContext,
@@ -259,7 +264,7 @@ describe('FunctionModule (using AdtClient)', () => {
     // Delete Function Group (which automatically deletes all Function Modules inside)
     // Note: FM is already deleted in test chain if test succeeded
     try {
-      const tempClient = new AdtClient(
+      const { client: tempClient } = await createTestAdtClient(
         connection,
         libraryLogger,
         systemContext,

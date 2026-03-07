@@ -277,6 +277,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.contentTypes,
     );
   }
 
@@ -289,6 +290,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.contentTypes,
     );
   }
 

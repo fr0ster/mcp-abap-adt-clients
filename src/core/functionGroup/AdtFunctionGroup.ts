@@ -29,6 +29,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
@@ -46,16 +47,19 @@ export class AdtFunctionGroup
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
+  protected readonly contentTypes?: IAdtContentTypes;
   public readonly objectType: string = 'FunctionGroup';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.contentTypes = contentTypes;
   }
 
   /**
@@ -158,6 +162,7 @@ export class AdtFunctionGroup
           responsible: config.responsible ?? this.systemContext.responsible,
         },
         this.logger,
+        this.contentTypes,
       );
       this.logger?.info?.('Function group created');
 
@@ -412,12 +417,16 @@ export class AdtFunctionGroup
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateFunctionGroup(this.connection, {
-        function_group_name: config.functionGroupName,
-        description: config.description,
-        lock_handle: options.lockHandle,
-        transport_request: config.transportRequest,
-      });
+      const updateResponse = await updateFunctionGroup(
+        this.connection,
+        {
+          function_group_name: config.functionGroupName,
+          description: config.description,
+          lock_handle: options.lockHandle,
+          transport_request: config.transportRequest,
+        },
+        this.contentTypes,
+      );
       this.logger?.info?.('Function group updated (low-level)');
       return {
         updateResult: updateResponse,
@@ -442,12 +451,16 @@ export class AdtFunctionGroup
 
       // 2. Update metadata (description)
       this.logger?.info?.('Step 2: Updating function group metadata');
-      await updateFunctionGroup(this.connection, {
-        function_group_name: config.functionGroupName,
-        description: config.description,
-        transport_request: config.transportRequest,
-        lock_handle: lockHandle,
-      });
+      await updateFunctionGroup(
+        this.connection,
+        {
+          function_group_name: config.functionGroupName,
+          description: config.description,
+          transport_request: config.transportRequest,
+          lock_handle: lockHandle,
+        },
+        this.contentTypes,
+      );
       this.logger?.info?.('Function group updated');
 
       // 2.5. Read with long polling to ensure object is ready after update

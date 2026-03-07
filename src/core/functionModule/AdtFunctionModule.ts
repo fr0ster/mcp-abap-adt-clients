@@ -26,6 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateFunctionModule } from './activation';
 import { checkFunctionModule } from './check';
@@ -48,16 +49,19 @@ export class AdtFunctionModule
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
+  protected readonly contentTypes?: IAdtContentTypes;
   public readonly objectType: string = 'FunctionModule';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    contentTypes?: IAdtContentTypes,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.contentTypes = contentTypes;
   }
 
   /**
@@ -310,13 +314,17 @@ export class AdtFunctionModule
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await update(this.connection, {
-        functionModuleName: config.functionModuleName,
-        functionGroupName: config.functionGroupName,
-        sourceCode: codeToUpdate,
-        lockHandle: options.lockHandle,
-        transportRequest: config.transportRequest,
-      });
+      const updateResponse = await update(
+        this.connection,
+        {
+          functionModuleName: config.functionModuleName,
+          functionGroupName: config.functionGroupName,
+          sourceCode: codeToUpdate,
+          lockHandle: options.lockHandle,
+          transportRequest: config.transportRequest,
+        },
+        this.contentTypes,
+      );
       this.logger?.info?.('Function module updated (low-level)');
       return {
         updateResult: updateResponse,
@@ -350,6 +358,7 @@ export class AdtFunctionModule
           config.functionModuleName,
           'inactive',
           codeToCheck,
+          this.contentTypes,
         );
         this.logger?.info?.('Check inactive with update content passed');
       }
@@ -357,13 +366,17 @@ export class AdtFunctionModule
       // 3. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 3: Updating function module');
-        await update(this.connection, {
-          functionGroupName: config.functionGroupName,
-          functionModuleName: config.functionModuleName,
-          sourceCode: codeToCheck,
-          lockHandle,
-          transportRequest: config.transportRequest,
-        });
+        await update(
+          this.connection,
+          {
+            functionGroupName: config.functionGroupName,
+            functionModuleName: config.functionModuleName,
+            sourceCode: codeToCheck,
+            lockHandle,
+            transportRequest: config.transportRequest,
+          },
+          this.contentTypes,
+        );
         this.logger?.info?.('Function module updated');
 
         // 3.5. Read with long polling (wait for object to be ready after update)
@@ -409,6 +422,8 @@ export class AdtFunctionModule
         config.functionGroupName,
         config.functionModuleName,
         'inactive',
+        undefined,
+        this.contentTypes,
       );
       this.logger?.info?.('Final check passed');
 
@@ -598,6 +613,8 @@ export class AdtFunctionModule
         config.functionGroupName,
         config.functionModuleName,
         version,
+        undefined,
+        this.contentTypes,
       ),
       errors: [],
     };

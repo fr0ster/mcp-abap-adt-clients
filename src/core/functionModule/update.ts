@@ -9,6 +9,7 @@ import type {
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IUpdateFunctionModuleParams } from './types';
 
 /**
@@ -19,6 +20,7 @@ import type { IUpdateFunctionModuleParams } from './types';
 export async function update(
   connection: IAbapConnection,
   params: IUpdateFunctionModuleParams,
+  contentTypes?: IAdtContentTypes,
 ): Promise<AxiosResponse> {
   const encodedGroupName = encodeSapObjectName(
     params.functionGroupName,
@@ -27,13 +29,14 @@ export async function update(
     params.functionModuleName,
   ).toLowerCase();
 
-  let url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}/source/main?lockHandle=${params.lockHandle}`;
+  let url = `/sap/bc/adt/functions/groups/${encodedGroupName}/fmodules/${encodedModuleName}/source/main?lockHandle=${encodeURIComponent(params.lockHandle)}`;
   if (params.transportRequest) {
     url += `&corrNr=${params.transportRequest}`;
   }
 
+  const sourceContentType = contentTypes?.sourceArtifactContentType();
   const headers = {
-    'Content-Type': CT_SOURCE,
+    'Content-Type': sourceContentType || CT_SOURCE,
     Accept: ACCEPT_SOURCE,
   };
 

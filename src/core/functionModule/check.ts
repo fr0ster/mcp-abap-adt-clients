@@ -13,6 +13,7 @@ import {
 import { parseCheckRunResponse } from '../../utils/checkRun';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 
 /**
  * Build check run XML payload for function module
@@ -22,6 +23,7 @@ function buildCheckRunXml(
   functionModuleName: string,
   version: string,
   sourceCode?: string,
+  sourceContentType?: string,
 ): string {
   const encodedGroup = encodeSapObjectName(functionGroupName).toLowerCase();
   const encodedModule = encodeSapObjectName(functionModuleName).toLowerCase();
@@ -34,7 +36,7 @@ function buildCheckRunXml(
 <chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
     <chkrun:artifacts>
-      <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="${objectUri}/source/main">
+      <chkrun:artifact chkrun:contentType="${sourceContentType || 'text/plain; charset=utf-8'}" chkrun:uri="${objectUri}/source/main">
         <chkrun:content>${base64Source}</chkrun:content>
       </chkrun:artifact>
     </chkrun:artifacts>
@@ -70,12 +72,14 @@ export async function checkFunctionModule(
   functionModuleName: string,
   version: 'active' | 'inactive',
   sourceCode?: string,
+  contentTypes?: IAdtContentTypes,
 ): Promise<AxiosResponse> {
   const xmlBody = buildCheckRunXml(
     functionGroupName,
     functionModuleName,
     version,
     sourceCode,
+    contentTypes?.sourceArtifactContentType(),
   );
   const headers = {
     Accept: ACCEPT_CHECK_MESSAGES,

@@ -58,7 +58,7 @@ export async function update(
     throw new Error('lockHandle is required');
   }
 
-  let url = `/sap/bc/adt/bo/behaviordefinitions/${params.name.toLowerCase()}/source/main?lockHandle=${params.lockHandle}`;
+  let url = `/sap/bc/adt/bo/behaviordefinitions/${params.name.toLowerCase()}/source/main?lockHandle=${encodeURIComponent(params.lockHandle)}`;
   if (params.transportRequest) {
     url += `&corrNr=${params.transportRequest}`;
   }

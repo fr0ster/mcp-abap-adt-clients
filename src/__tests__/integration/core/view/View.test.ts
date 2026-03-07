@@ -15,11 +15,12 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import { AdtClient } from '../../../../clients/AdtClient';
+import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IViewConfig, IViewState } from '../../../../core/view';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
+  createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
@@ -58,6 +59,7 @@ describe('View (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
   let defaultPackage: string = '';
   let defaultTransport: string = '';
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
@@ -70,7 +72,10 @@ describe('View (using AdtClient)', () => {
       await (connection as any).connect();
       const isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      client = new AdtClient(connection, libraryLogger, systemContext);
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
+      client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
 
       const envCheck = await checkDefaultTestEnvironment(connection);

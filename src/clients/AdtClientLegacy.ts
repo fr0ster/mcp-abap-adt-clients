@@ -104,6 +104,7 @@ export class AdtClientLegacy extends AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.contentTypes,
     );
   }
 
@@ -115,6 +116,7 @@ export class AdtClientLegacy extends AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.contentTypes,
     );
   }
 

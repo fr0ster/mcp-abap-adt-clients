@@ -17,6 +17,7 @@ import {
   limitDescription,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import { lockFunctionGroup } from './lock';
 import { getFunctionGroup } from './read';
 import type { IUpdateFunctionGroupParams } from './types';
@@ -32,6 +33,7 @@ async function updateFunctionGroupMetadata(
   newDescription: string,
   lockHandle: string,
   transportRequest?: string,
+  contentTypes?: IAdtContentTypes,
 ): Promise<AxiosResponse> {
   const encodedName = encodeSapObjectName(functionGroupName);
 
@@ -60,10 +62,12 @@ async function updateFunctionGroupMetadata(
     `adtcore:description="${limitedDescription}"`,
   );
 
+  const ct = contentTypes?.functionGroupUpdate();
   const headers: Record<string, string> = {
     'Content-Type':
+      ct?.contentType ||
       'application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8',
-    Accept: CT_FUNCTION_GROUP,
+    Accept: ct?.accept || CT_FUNCTION_GROUP,
   };
 
   return connection.makeAdtRequest({
@@ -82,6 +86,7 @@ async function updateFunctionGroupMetadata(
 export async function updateFunctionGroup(
   connection: IAbapConnection,
   params: IUpdateFunctionGroupParams,
+  contentTypes?: IAdtContentTypes,
 ): Promise<AxiosResponse> {
   if (!params.function_group_name) {
     throw new Error('function_group_name is required');
@@ -127,6 +132,7 @@ export async function updateFunctionGroup(
       params.description,
       lockHandle,
       params.transport_request,
+      contentTypes,
     );
 
     // Unlock if we locked it

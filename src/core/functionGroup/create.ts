@@ -11,6 +11,7 @@ import type {
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { ICreateFunctionGroupParams } from './types';
 
 const debugEnabled = process.env.DEBUG_ADT_LIBS === 'true';
@@ -23,6 +24,7 @@ export async function create(
   connection: IAbapConnection,
   params: ICreateFunctionGroupParams,
   logger?: ILogger,
+  contentTypes?: IAdtContentTypes,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/functions/groups${params.transportRequest ? `?corrNr=${params.transportRequest}` : ''}`;
 
@@ -64,9 +66,9 @@ export async function create(
   <adtcore:packageRef adtcore:name="${params.packageName}"/>
 </group:abapFunctionGroup>`;
 
+  const ct = contentTypes?.functionGroupCreate();
   const headers: Record<string, string> = {
-    'Content-Type': CT_FUNCTION_GROUP, //,
-    // 'Accept': CT_FUNCTION_GROUP
+    'Content-Type': ct?.contentType || CT_FUNCTION_GROUP,
   };
 
   // Log request details for debugging authorization issues (same as class/create.ts)
