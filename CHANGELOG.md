@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-03-07
+
+### Added
+- **Legacy unit test support**: `AdtUnitTestLegacy` class for systems with BASIS < 7.50 that use `/sap/bc/adt/abapunit/testruns` endpoint instead of `/sap/bc/adt/abapunit/runs`.
+- **Legacy unit test run functions**: `runLegacy.ts` with `startClassUnitTestRunLegacy`, `getClassUnitTestStatusLegacy`, `getClassUnitTestResultLegacy` using `application/xml` content types.
+- **AdtClientLegacy.getUnitTest()**: Override returns `AdtUnitTestLegacy` for legacy systems.
+
 ## [3.5.0] - 2026-03-07
 
 ### Fixed

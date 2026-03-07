@@ -39,6 +39,8 @@ import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
 import type { AdtUtils } from '../core/shared/AdtUtils';
 import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import { AdtContentTypesBase } from '../core/shared/contentTypes';
+import type { IUnitTestConfig, IUnitTestState } from '../core/unitTest';
+import { AdtUnitTestLegacy } from '../core/unitTest/AdtUnitTestLegacy';
 import type { IViewConfig, IViewState } from '../core/view';
 import { AdtViewLegacy } from '../core/view/AdtViewLegacy';
 import { AdtClient, type IAdtClientOptions } from './AdtClient';
@@ -134,6 +136,12 @@ export class AdtClientLegacy extends AdtClient {
     return new AdtViewLegacy(this.connection, this.logger, this.systemContext);
   }
 
+  // --- Unit tests with legacy endpoints ---
+
+  override getUnitTest(): IAdtObject<IUnitTestConfig, IUnitTestState> {
+    return new AdtUnitTestLegacy(this.connection, this.logger);
+  }
+
   // --- Utilities with legacy restrictions ---
 
   override getUtils(): AdtUtils {
@@ -227,7 +235,4 @@ export class AdtClientLegacy extends AdtClient {
       unsupportedError('Enhancement', '/sap/bc/adt/enhancements'),
     );
   }
-
-  // Note: CdsUnitTest (/sap/bc/adt/abapunit/testruns) IS available on legacy
-  // systems, so no override needed — parent AdtClient handles it.
 }
