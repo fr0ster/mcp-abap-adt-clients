@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-03-07
+
+### Fixed
+- **CI/Release**: Resolve `@mcp-abap-adt/interfaces` from npm registry instead of local symlink in `package-lock.json`.
+
+## [3.3.0] - 2026-03-07
+
+### Fixed
+- **Biome linter**: Replace all `any` types with strict alternatives to satisfy `noExplicitAny` rule.
+
 ## [3.2.0] - 2026-03-07
 
 ### Added
