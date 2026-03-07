@@ -38,6 +38,7 @@ export class AdtLocalMacros extends AdtClass {
       config.className,
       config.macrosCode,
       'inactive',
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {
@@ -82,6 +83,7 @@ export class AdtLocalMacros extends AdtClass {
           config.className,
           codeToCheck,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local macros check passed');
@@ -225,6 +227,7 @@ export class AdtLocalMacros extends AdtClass {
           config.className,
           codeToCheck,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local macros check passed');
@@ -318,6 +321,7 @@ export class AdtLocalMacros extends AdtClass {
       config.className,
       config.macrosCode,
       version,
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {

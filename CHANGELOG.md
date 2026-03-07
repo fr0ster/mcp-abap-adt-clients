@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-03-07
+
+### Fixed
+- **Class includes check on legacy**: Pass `artifactContentType` through to `checkClassDefinitions`, `checkClassLocalTypes`, `checkClassLocalTestClass`, `checkClassMacros` — fixes "Dirty Source: Wrong content type" errors on non-unicode legacy systems (e.g., E77).
+- **checkClassLocalTestClass refactored**: Deduplicated into shared `checkClassInclude` function (was a standalone copy-paste).
+- **Macros test config**: Remove stray `CLASS ZADT_BLD_CLS01 IMPLEMENTATION` from `macrosCode_update` (copy-paste error).
+
+### Added
+- **SAP_UNICODE documentation**: Document `SAP_UNICODE=false` env var in CLAUDE.md, RFC_TESTING.md, RFC_CONNECTION.md, LEGACY.md, and test-config.yaml template.
+
 ## [3.4.0] - 2026-03-07
 
 ### Added

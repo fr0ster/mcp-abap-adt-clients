@@ -766,6 +766,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       config.className,
       config.testClassCode,
       version,
+      this.contentTypes?.sourceArtifactContentType(),
     );
   }
 

@@ -104,68 +104,17 @@ export async function checkClassLocalTestClass(
   className: string,
   testClassSource: string,
   version: 'active' | 'inactive' = 'inactive',
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
-  const { getTimeout } = await import('../../utils/timeouts');
-  const { encodeSapObjectName } = await import('../../utils/internalUtils');
-  const { parseCheckRunResponse } = await import('../../utils/checkRun');
-
-  const encodedName = encodeSapObjectName(className.toLowerCase());
-  const objectUri = `/sap/bc/adt/oo/classes/${encodedName}`;
-  const testClassUri = `${objectUri}/includes/testclasses`;
-
-  // Encode test class source to base64
-  const base64Source = Buffer.from(testClassSource, 'utf-8').toString('base64');
-
-  // Build XML with testclasses artifact
-  // TODO: analyze whether chkrun:contentType can be extracted to a constant
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
-  <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
-    <chkrun:artifacts>
-      <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="${testClassUri}">
-        <chkrun:content>${base64Source}</chkrun:content>
-      </chkrun:artifact>
-    </chkrun:artifacts>
-  </chkrun:checkObject>
-</chkrun:checkObjectList>`;
-
-  const headers = {
-    Accept: ACCEPT_CHECK_MESSAGES,
-    'Content-Type': CT_CHECK_OBJECTS,
-  };
-
-  const url = `/sap/bc/adt/checkruns?reporters=abapCheckRun`;
-
-  const response = await connection.makeAdtRequest({
-    url,
-    method: 'POST',
-    timeout: getTimeout('default'),
-    data: xmlBody,
-    headers,
-  });
-
-  const checkResult = parseCheckRunResponse(response);
-
-  // "has been checked" or "was checked" messages are normal responses, not errors
-  const hasCheckedMessage =
-    checkResult.message?.toLowerCase().includes('has been checked') ||
-    checkResult.message?.toLowerCase().includes('was checked') ||
-    checkResult.errors.some((err: { text?: string }) =>
-      (err.text || '').toLowerCase().includes('has been checked'),
-    );
-
-  if (hasCheckedMessage && !checkResult.has_errors) {
-    return response; // "has been checked" with no errors is a normal response
-  }
-
-  // Throw error if there are actual problems (ERROR type)
-  if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors
-      .map((err: { text?: string }) => err.text)
-      .join('; ');
-    throw new Error(`Test class check failed: ${errorMessages}`);
-  }
-
-  return response;
+  return checkClassInclude(
+    connection,
+    className,
+    testClassSource,
+    'testclasses',
+    version,
+    'Test class',
+    artifactContentType,
+  );
 }
 
 /**
@@ -186,6 +135,7 @@ export async function checkClassLocalTypes(
   className: string,
   localTypesSource: string,
   version: 'active' | 'inactive' = 'inactive',
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
   return checkClassInclude(
     connection,
@@ -194,6 +144,7 @@ export async function checkClassLocalTypes(
     'implementations',
     version,
     'Local types',
+    artifactContentType,
   );
 }
 
@@ -215,6 +166,7 @@ export async function checkClassDefinitions(
   className: string,
   definitionsSource: string,
   version: 'active' | 'inactive' = 'inactive',
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
   return checkClassInclude(
     connection,
@@ -223,6 +175,7 @@ export async function checkClassDefinitions(
     'definitions',
     version,
     'Definitions',
+    artifactContentType,
   );
 }
 
@@ -244,6 +197,7 @@ export async function checkClassMacros(
   className: string,
   macrosSource: string,
   version: 'active' | 'inactive' = 'inactive',
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
   return checkClassInclude(
     connection,
@@ -252,6 +206,7 @@ export async function checkClassMacros(
     'macros',
     version,
     'Macros',
+    artifactContentType,
   );
 }
 
@@ -274,6 +229,7 @@ async function checkClassInclude(
   includeType: 'implementations' | 'definitions' | 'macros' | 'testclasses',
   version: 'active' | 'inactive' = 'inactive',
   includeName: string,
+  artifactContentType: string = 'text/plain; charset=utf-8',
 ): Promise<AxiosResponse> {
   const { getTimeout } = await import('../../utils/timeouts');
   const { encodeSapObjectName } = await import('../../utils/internalUtils');
@@ -287,11 +243,10 @@ async function checkClassInclude(
   const base64Source = Buffer.from(includeSource, 'utf-8').toString('base64');
 
   // Build XML with include artifact
-  // TODO: analyze whether chkrun:contentType can be extracted to a constant
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
   <chkrun:checkObject adtcore:uri="${objectUri}" chkrun:version="${version}">
     <chkrun:artifacts>
-      <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="${includeUri}">
+      <chkrun:artifact chkrun:contentType="${artifactContentType}" chkrun:uri="${includeUri}">
         <chkrun:content>${base64Source}</chkrun:content>
       </chkrun:artifact>
     </chkrun:artifacts>
@@ -329,9 +284,12 @@ async function checkClassInclude(
 
   // Throw error if there are actual problems (ERROR type)
   if (checkResult.has_errors) {
-    const errorMessages = checkResult.errors
-      .map((err: { text?: string }) => err.text)
-      .join('; ');
+    const errorMessages =
+      checkResult.errors.length > 0
+        ? checkResult.errors
+            .map((err: { text?: string }) => err.text)
+            .join('; ')
+        : `status=${checkResult.status}, message=${checkResult.message || 'none'}`;
     throw new Error(`${includeName} check failed: ${errorMessages}`);
   }
 

@@ -38,6 +38,7 @@ export class AdtLocalTestClass extends AdtClass {
       config.className,
       config.testClassCode,
       'inactive',
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {
@@ -82,6 +83,7 @@ export class AdtLocalTestClass extends AdtClass {
           config.className,
           config.testClassCode,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Test class check passed');
@@ -239,6 +241,7 @@ export class AdtLocalTestClass extends AdtClass {
           config.className,
           codeToCheck,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Test class check passed');
@@ -334,6 +337,7 @@ export class AdtLocalTestClass extends AdtClass {
       config.className,
       config.testClassCode,
       status as 'active' | 'inactive',
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {

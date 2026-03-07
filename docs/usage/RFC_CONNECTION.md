@@ -98,6 +98,16 @@ On legacy systems, some ADT endpoints don't support versioned content types (v2+
 
 This is handled automatically by `createAdtClient()` which returns either `AdtClient` or `AdtClientLegacy` based on system capabilities.
 
+### Unicode / Non-Unicode Systems
+
+Non-unicode legacy systems require `text/plain` (without `charset=utf-8`) as the source artifact content type in checkRun XML payloads. Set `SAP_UNICODE=false` in `.env` to configure this:
+
+```env
+SAP_UNICODE=false   # Non-unicode legacy system (e.g., E77)
+```
+
+If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setting this incorrectly causes checkRun to return `notProcessed` with `"Dirty Source: Wrong content type"`.
+
 ## How It Works
 
 1. `RfcAbapConnection.connect()` opens an RFC connection via `node-rfc`

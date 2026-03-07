@@ -37,6 +37,7 @@ export class AdtLocalTypes extends AdtClass {
       config.className,
       config.localTypesCode,
       'inactive',
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {
@@ -81,6 +82,7 @@ export class AdtLocalTypes extends AdtClass {
           config.className,
           codeToCheck,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local types check passed');
@@ -225,6 +227,7 @@ export class AdtLocalTypes extends AdtClass {
           config.className,
           codeToCheck,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local types check passed');
@@ -318,6 +321,7 @@ export class AdtLocalTypes extends AdtClass {
       config.className,
       config.localTypesCode,
       version,
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {

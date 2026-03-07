@@ -73,6 +73,7 @@ environment:
   default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Default transport request (used if not specified in test case)
   default_master_system: "<YOUR_SYSTEM_ID>"  # SAP system ID for masterSystem attribute (on-prem only, cloud gets it from systeminformation endpoint)
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
+  # connection_type: "rfc"  # Uncomment for legacy systems (BASIS < 7.50). Also set SAP_UNICODE=false in .env for non-unicode systems
 
 # Shared dependencies — persistent Lego library for integration tests
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.

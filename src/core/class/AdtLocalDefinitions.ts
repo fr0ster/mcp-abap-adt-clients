@@ -39,6 +39,7 @@ export class AdtLocalDefinitions extends AdtClass {
       config.className,
       config.definitionsCode,
       'inactive',
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {
@@ -83,6 +84,7 @@ export class AdtLocalDefinitions extends AdtClass {
           config.className,
           codeToCheck,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local definitions check passed');
@@ -227,6 +229,7 @@ export class AdtLocalDefinitions extends AdtClass {
           config.className,
           codeToCheck,
           'inactive',
+          this.contentTypes?.sourceArtifactContentType(),
         );
         state.checkResult = checkResponse;
         this.logger?.info?.('Local definitions check passed');
@@ -322,6 +325,7 @@ export class AdtLocalDefinitions extends AdtClass {
       config.className,
       config.definitionsCode,
       version,
+      this.contentTypes?.sourceArtifactContentType(),
     );
 
     return {

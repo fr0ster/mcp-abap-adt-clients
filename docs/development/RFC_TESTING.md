@@ -47,7 +47,18 @@ SAP_USERNAME=DEVELOPER
 SAP_PASSWORD=secret
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
+SAP_UNICODE=false          # Set to false for non-unicode legacy systems
 ```
+
+#### SAP_UNICODE
+
+Controls the `chkrun:contentType` attribute in checkRun XML payloads for class includes and source artifacts:
+
+- `SAP_UNICODE=false` — uses `text/plain` (required for non-unicode legacy systems like E77)
+- `SAP_UNICODE=true` or omitted — uses `text/plain; charset=utf-8` (default for modern/unicode systems)
+
+If this is set incorrectly, checkRun returns `notProcessed` with `"Dirty Source: Wrong content type"`.
+The value is read in `resolveSystemContext()` and passed to `AdtContentTypesBase(unicode)` which provides `sourceArtifactContentType()`.
 
 Copy the appropriate file to `.env` before running tests:
 ```bash
