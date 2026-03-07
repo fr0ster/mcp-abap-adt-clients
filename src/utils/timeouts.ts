@@ -16,7 +16,7 @@ export function getTimeoutConfig(): ITimeoutConfig {
     10,
   );
   const csrfTimeout = parseInt(process.env.SAP_TIMEOUT_CSRF || '15000', 10);
-  const longTimeout = parseInt(process.env.SAP_TIMEOUT_LONG || '60000', 10);
+  const longTimeout = parseInt(process.env.SAP_TIMEOUT_LONG || '120000', 10);
 
   return {
     default: defaultTimeout,

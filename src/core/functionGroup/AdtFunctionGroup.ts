@@ -238,14 +238,43 @@ export class AdtFunctionGroup
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getFunctionGroup(
-        this.connection,
-        config.functionGroupName,
-      );
-      return {
-        createResult: readResponse,
-        errors: [],
-      };
+      // Wrap in try-catch: on cloud systems the object may not be immediately
+      // readable after creation due to eventual consistency (HTTP 404).
+      try {
+        const readResponse = await getFunctionGroup(
+          this.connection,
+          config.functionGroupName,
+        );
+        return {
+          createResult: readResponse,
+          errors: [],
+        };
+      } catch (readError) {
+        const status = (readError as HttpError)?.response?.status;
+        if (status === 404) {
+          this.logger?.warn?.(
+            'Post-create read returned 404 (cloud eventual consistency), retrying after delay',
+          );
+          await new Promise((r) => setTimeout(r, 5000));
+          try {
+            const retryResponse = await getFunctionGroup(
+              this.connection,
+              config.functionGroupName,
+            );
+            return {
+              createResult: retryResponse,
+              errors: [],
+            };
+          } catch (retryError) {
+            this.logger?.warn?.(
+              'Post-create read retry also failed, returning without read result',
+              retryError,
+            );
+            return { errors: [] };
+          }
+        }
+        throw readError;
+      }
     } catch (error: unknown) {
       // Ensure stateless if needed
       this.connection.setSessionType('stateless');

@@ -191,6 +191,10 @@ shared_dependencies:
           delete;
         }
 
+  function_groups:
+    - name: "ZADT_SHR_FUGR"
+      description: "Shared FUGR for FM tests"
+
 # Standard SAP objects registry for read-only tests
 standard_objects:
   classes:
@@ -942,7 +946,7 @@ create_function_module:
       description: "Function module reserved for AdtFunctionModule tests"
       params:
         function_module_name: "Z_ADT_BLD_FM03"  # Must start with Z_ or Y_ (with underscore)
-        function_group_name: "ZADT_BLD_FGR03"  # Different from AdtFunctionGroup test (ZADT_BLD_FGR_EMPTY)
+        function_group_name: "ZADT_SHR_FUGR"  # → shared_dependencies.function_groups
         description: "AdtFunctionModule workflow FM"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""

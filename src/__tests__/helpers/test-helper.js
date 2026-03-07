@@ -1876,7 +1876,7 @@ function getSharedPackage() {
 
 /**
  * Look up a shared dependency by type and name
- * @param {'tables'|'views'|'behavior_definitions'} type - Dependency collection type
+ * @param {'tables'|'views'|'behavior_definitions'|'function_groups'} type - Dependency collection type
  * @param {string} name - Object name (e.g., "ZADT_VIEW_TBL01")
  * @returns {Object|null} The dependency config (name, description, source, etc.)
  */
@@ -1939,10 +1939,31 @@ async function ensureSharedPackage(client, logger) {
     ) {
       logger?.info?.(`Shared package ${packageName} already exists`);
     } else {
-      logger?.warn?.(
-        `Failed to create shared package ${packageName}: ${error.message}`,
-      );
-      throw error;
+      // Create failed (e.g. missing softwareComponent on cloud) —
+      // verify the package exists via search before giving up
+      let exists = false;
+      try {
+        const searchResult = await client
+          .getUtils()
+          .searchObjects({ query: packageName, objectType: 'DEVC' });
+        const data =
+          typeof searchResult.data === 'string' ? searchResult.data : '';
+        exists =
+          searchResult.status === 200 &&
+          data.toUpperCase().includes(packageName.toUpperCase());
+      } catch (_searchError) {
+        exists = false;
+      }
+      if (exists) {
+        logger?.info?.(
+          `Shared package ${packageName} already exists (verified via search)`,
+        );
+      } else {
+        logger?.warn?.(
+          `Failed to create shared package ${packageName}: ${error.message}`,
+        );
+        throw error;
+      }
     }
   }
 
@@ -1954,7 +1975,7 @@ async function ensureSharedPackage(client, logger) {
  * Uses in-memory cache to skip verification after first check.
  *
  * @param {Object} client - AdtClient instance
- * @param {'tables'|'views'|'behavior_definitions'} type - Dependency type
+ * @param {'tables'|'views'|'behavior_definitions'|'function_groups'} type - Dependency type
  * @param {string} name - Object name
  * @param {Object} logger - Logger instance
  * @returns {Promise<{existed: boolean, created: boolean}>}
@@ -1995,6 +2016,11 @@ async function ensureSharedDependency(client, type, name, logger) {
     } else if (type === 'behavior_definitions') {
       await client.getBehaviorDefinition().read({ name });
       exists = true;
+    } else if (type === 'function_groups') {
+      const result = await client
+        .getFunctionGroup()
+        .read({ functionGroupName: name });
+      exists = result !== undefined;
     }
   } catch (error) {
     // 404 or similar — object doesn't exist
@@ -2053,6 +2079,23 @@ async function ensureSharedDependency(client, type, name, logger) {
         sourceCode: depConfig.source,
         transportRequest,
       });
+    } else if (type === 'function_groups') {
+      try {
+        await client.getFunctionGroup().create({
+          functionGroupName: name,
+          packageName,
+          description: depConfig.description || 'Shared test FUGR',
+          transportRequest,
+        });
+      } catch (createErr) {
+        // On cloud, HTTP create may succeed but post-create read fails (404).
+        // Wait and verify the object actually exists before re-throwing.
+        await new Promise((r) => setTimeout(r, 5000));
+        const verify = await client
+          .getFunctionGroup()
+          .read({ functionGroupName: name });
+        if (!verify) throw createErr;
+      }
     }
     logger?.info?.(`Created shared ${type} ${name}`);
     _verifiedDependencies[cacheKey] = true;

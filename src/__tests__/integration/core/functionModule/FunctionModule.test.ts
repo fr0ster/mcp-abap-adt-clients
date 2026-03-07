@@ -47,6 +47,8 @@ const {
   resolveTransportRequest,
   resolveMasterSystem,
   getTimeout,
+  ensureSharedPackage,
+  ensureSharedDependency,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -156,181 +158,66 @@ describe('FunctionModule (using AdtClient)', () => {
 
   afterAll(() => tester?.afterAll()());
 
-  /**
-   * Ensure Function Module is deleted (cleanup before test)
-   */
-  /**
-   * Pre-check: Verify test function module doesn't exist
-   * Safety: Skip test if object exists to avoid accidental deletion
-   * Note: Can only check FM if FUGR exists. If FUGR doesn't exist, FM can't exist either.
-   */
-  async function _ensureFunctionModuleReady(
-    functionGroupName: string,
-    functionModuleName: string,
-  ): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true };
-    }
-
-    // Check if function module exists
-    // Note: If FUGR doesn't exist, this will return 500 - that's OK, FM can't exist without FUGR
-    try {
-      await getFunction(connection, functionGroupName, functionModuleName);
-      return {
-        success: false,
-        reason:
-          `⚠️ SAFETY: Function Module ${functionGroupName}/${functionModuleName} already exists! ` +
-          `Delete manually or use different test name to avoid accidental deletion.`,
-      };
-    } catch (error: any) {
-      // 404 or 500 are expected - object doesn't exist (or parent doesn't exist), we can proceed
-      const status = error.response?.status;
-      if (status !== 404 && status !== 500) {
-        return {
-          success: false,
-          reason: `Cannot verify function module existence: ${error.message}`,
-        };
-      }
-    }
-
-    return { success: true };
-  }
-
-  /**
-   * Ensure Function Group exists, create if it doesn't
-   * Ignores only "already exists" errors (409)
-   */
-  async function ensureFunctionGroupExists(
-    functionGroupName: string,
-    packageName: string,
-    transportRequest?: string,
-  ): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: false, reason: 'No connection' };
-    }
-
-    // Try to create (ignore "already exists" errors)
-    try {
-      const { client: tempClient } = await createTestAdtClient(
-        connection,
-        libraryLogger,
-        systemContext,
-      );
-      await tempClient.getFunctionGroup().create(
-        {
-          functionGroupName: functionGroupName,
-          packageName: packageName,
-          transportRequest: transportRequest,
-          description: `Test function group for ${functionGroupName}`,
-          masterSystem: resolveMasterSystem(undefined),
-          responsible: process.env.SAP_USERNAME || process.env.SAP_USER,
-        },
-        { activateOnCreate: false },
-      );
-      return { success: true };
-    } catch (error: any) {
-      // 409 = already exists, that's fine
-      if (error.response?.status === 409) {
-        return { success: true };
-      }
-      // Also handle validation "already exists" error (from SEVERITY check)
-      if (error.message?.includes('already exists')) {
-        return { success: true };
-      }
-      // Other errors - log and return failure
-      testsLogger.warn?.(
-        `ensureFunctionGroupExists failed for ${functionGroupName}:`,
-        error.message || error,
-      );
-      return {
-        success: false,
-        reason: error.message || 'Failed to create function group',
-      };
-    }
-  }
-
-  /**
-   * Cleanup: delete Function Module and Function Group
-   * Ignores all errors - just tries to delete
-   */
-  async function _cleanupFunctionModuleAndGroup(
-    functionGroupName: string,
-    _functionModuleName: string,
-  ): Promise<{ success: boolean; reason?: string }> {
-    if (!connection) {
-      return { success: true }; // No connection = nothing to clean
-    }
-
-    // Delete Function Group (which automatically deletes all Function Modules inside)
-    // Note: FM is already deleted in test chain if test succeeded
-    try {
-      const { client: tempClient } = await createTestAdtClient(
-        connection,
-        libraryLogger,
-        systemContext,
-      );
-      // Use BaseTester's config resolver for consistent parameter resolution
-      const transportRequest = tester.getTransportRequest() || undefined;
-      await tempClient.getFunctionGroup().delete({
-        functionGroupName: functionGroupName,
-        transportRequest,
-      });
-    } catch (_error) {
-      // Ignore all errors (404, locked, etc.)
-    }
-
-    return { success: true };
-  }
-
-  function _getTestDefinition() {
-    const { getTestCaseDefinition } = require('../../../helpers/test-helper');
-    return getTestCaseDefinition(
-      'create_function_module',
-      'adt_function_module',
-    );
-  }
-
   describe('Full workflow', () => {
-    let functionGroupCreated: boolean = false;
-    let functionGroupName: string | null = null;
-
     beforeEach(async () => {
-      // Ensure FunctionGroup exists before test
-      const testCase = tester.getTestCaseDefinition();
-      if (testCase?.params?.function_group_name) {
-        functionGroupName = testCase.params.function_group_name;
-        const packageName = resolvePackageName(testCase.params.package_name);
-        if (packageName && functionGroupName) {
-          const result = await ensureFunctionGroupExists(
-            functionGroupName,
-            packageName,
-            resolveTransportRequest(testCase.params.transport_request),
-          );
-          functionGroupCreated = result.success;
+      // Ensure the shared function group exists (created once, never deleted)
+      if (hasConfig && client) {
+        const testCase = tester.getTestCaseDefinition();
+        const functionGroupName = testCase?.params?.function_group_name;
+        if (functionGroupName) {
+          try {
+            await ensureSharedPackage(client, testsLogger);
+            await ensureSharedDependency(
+              client,
+              'function_groups',
+              functionGroupName,
+              testsLogger,
+            );
+          } catch (_sharedError) {
+            // Shared package unavailable (e.g. BTP trial without transport layer) —
+            // fall back to creating the function group in the default package
+            const packageName = resolvePackageName(
+              testCase?.params?.package_name,
+            );
+            const transportRequest = resolveTransportRequest(
+              testCase?.params?.transport_request,
+            );
+            const readResult = await client
+              .getFunctionGroup()
+              .read({ functionGroupName });
+            if (readResult) {
+              testsLogger.info?.(
+                `Function group ${functionGroupName} already exists`,
+              );
+            } else {
+              try {
+                await client.getFunctionGroup().create({
+                  functionGroupName,
+                  packageName,
+                  description: 'Shared FUGR for FM tests',
+                  transportRequest,
+                });
+              } catch (_createErr) {
+                // On cloud, the HTTP create may succeed but the post-create read
+                // fails (404) due to eventual consistency. Wait and verify.
+                await new Promise((r) => setTimeout(r, 5000));
+                const verify = await client
+                  .getFunctionGroup()
+                  .read({ functionGroupName });
+                if (!verify) throw _createErr;
+              }
+              testsLogger.info?.(
+                `Created function group ${functionGroupName} in ${packageName}`,
+              );
+            }
+          }
         }
       }
       tester?.beforeEach()();
     });
 
-    afterEach(async () => {
+    afterEach(() => {
       tester?.afterEach()();
-      // Cleanup function group if it was created in beforeEach
-      if (functionGroupCreated && functionGroupName) {
-        try {
-          await client.getFunctionGroup().delete({
-            functionGroupName: functionGroupName,
-            transportRequest:
-              resolveTransportRequest(
-                tester.getTestCaseDefinition()?.params?.transport_request,
-              ) || '',
-          });
-        } catch (cleanupError) {
-          testsLogger.warn?.(
-            `Cleanup failed for function group ${functionGroupName}:`,
-            cleanupError,
-          );
-        }
-      }
     });
 
     it(
