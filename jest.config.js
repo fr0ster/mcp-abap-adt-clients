@@ -27,6 +27,7 @@ module.exports = {
     '/node_modules/',
     '/dist/',
     '/e2e/', // E2E tests should be run separately
+    '/admin/', // Admin scripts (setup/teardown shared deps) — run via npm run shared:*
   ],
   // Force sequential execution for all tests (single worker, no parallelism)
   // Integration tests MUST run sequentially to avoid conflicts with shared SAP objects

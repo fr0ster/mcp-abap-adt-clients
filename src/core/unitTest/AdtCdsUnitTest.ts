@@ -2,7 +2,7 @@
  * AdtCdsUnitTest - High-level CRUD operations for CDS Unit Test objects
  *
  * Extends AdtUnitTest with CDS-specific functionality:
- * - Validates CDS views for unit test doubles
+ * - Checks CDS view availability for unit test doubles
  * - Creates test classes with CDS templates
  * - Manages test class lifecycle (create, update, delete)
  * - Runs unit tests for CDS views
@@ -20,13 +20,13 @@ import { startClassUnitTestRunByObject } from '../class/run';
 import type { IClassState } from '../class/types';
 import { AdtView } from '../view/AdtView';
 import { AdtUnitTest } from './AdtUnitTest';
+import { checkCdsTestDoublesAvailability } from './checkCdsTestDoublesAvailability';
 import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IUnitTestConfig,
   IUnitTestState,
 } from './types';
-import { validateCdsForUnitTest } from './validateCdsForUnitTest';
 
 export interface ICdsUnitTestConfig extends IUnitTestConfig {
   // CDS-specific fields
@@ -41,7 +41,7 @@ export interface ICdsUnitTestConfig extends IUnitTestConfig {
 
 export interface ICdsUnitTestState extends IUnitTestState {
   testClassState?: IClassState;
-  cdsValidationResponse?: AxiosResponse;
+  cdsCheckResponse?: AxiosResponse;
 }
 
 /**
@@ -62,68 +62,60 @@ export class AdtCdsUnitTest extends AdtUnitTest {
   }
 
   /**
-   * Override: Validate CDS view for unit test doubles
-   * This validation is required before creating a CDS unit test class
-   * Uses validateCdsForUnitTest if cdsViewName is provided in config
+   * Check CDS view availability for unit test doubles
+   * This check is required before creating a CDS unit test class.
+   *
+   * Unlike validate() (which checks name/params before create), this checks whether
+   * a CDS view can be used with the test doubles framework (cl_cds_test_environment).
    */
-  async validate(
-    config: Partial<ICdsUnitTestConfig>,
-  ): Promise<ICdsUnitTestState> {
-    // If cdsViewName is provided, validate CDS view for unit test doubles
-    if (config.cdsViewName) {
-      try {
-        this.logger?.info?.(
-          'Validating CDS view for unit test doubles:',
-          config.cdsViewName,
-        );
-        const response = await validateCdsForUnitTest(
-          this.connection,
-          config.cdsViewName,
-        );
+  async checkCdsTestDoubles(cdsViewName: string): Promise<ICdsUnitTestState> {
+    try {
+      this.logger?.info?.(
+        'Checking CDS view for unit test doubles:',
+        cdsViewName,
+      );
+      const response = await checkCdsTestDoublesAvailability(
+        this.connection,
+        cdsViewName,
+      );
 
-        // Check if validation succeeded (SEVERITY=OK)
-        if (response?.status === 200) {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({ ignoreAttributes: false });
-          const parsed = parser.parse(response.data);
-          const severity = parsed?.['asx:abap']?.['asx:values']?.DATA?.SEVERITY;
+      // Check if the check succeeded (SEVERITY=OK)
+      if (response?.status === 200) {
+        const { XMLParser } = require('fast-xml-parser');
+        const parser = new XMLParser({ ignoreAttributes: false });
+        const parsed = parser.parse(response.data);
+        const severity = parsed?.['asx:abap']?.['asx:values']?.DATA?.SEVERITY;
 
-          if (severity !== 'OK') {
-            const shortText =
-              parsed?.['asx:abap']?.['asx:values']?.DATA?.SHORT_TEXT || '';
-            const longText =
-              parsed?.['asx:abap']?.['asx:values']?.DATA?.LONG_TEXT || '';
-            const errorMessage =
-              shortText ||
-              longText ||
-              `Validation failed with severity: ${severity}`;
-            throw new Error(
-              `CDS view ${config.cdsViewName} validation for unit test doubles failed: ${errorMessage}`,
-            );
-          }
-
-          this.logger?.info?.(
-            'CDS view validated successfully for unit test doubles',
-          );
-          this.cdsViewName = config.cdsViewName;
-          const state: ICdsUnitTestState = {
-            cdsValidationResponse: response,
-            errors: [],
-          };
-          return state;
-        } else {
+        if (severity !== 'OK') {
+          const shortText =
+            parsed?.['asx:abap']?.['asx:values']?.DATA?.SHORT_TEXT || '';
+          const longText =
+            parsed?.['asx:abap']?.['asx:values']?.DATA?.LONG_TEXT || '';
+          const errorMessage =
+            shortText ||
+            longText ||
+            `CDS test doubles check failed with severity: ${severity}`;
           throw new Error(
-            `CDS view validation failed with HTTP ${response.status}`,
+            `CDS view ${cdsViewName} is not available for unit test doubles: ${errorMessage}`,
           );
         }
-      } catch (error: unknown) {
-        this.logger?.error('validate failed:', error);
-        throw error;
-      }
-    }
 
-    // Otherwise, use parent's validate method
-    return await super.validate(config);
+        this.logger?.info?.('CDS view available for unit test doubles');
+        this.cdsViewName = cdsViewName;
+        const state: ICdsUnitTestState = {
+          cdsCheckResponse: response,
+          errors: [],
+        };
+        return state;
+      } else {
+        throw new Error(
+          `CDS test doubles check failed with HTTP ${response.status}`,
+        );
+      }
+    } catch (error: unknown) {
+      this.logger?.error('checkCdsTestDoubles failed:', error);
+      throw error;
+    }
   }
 
   /**

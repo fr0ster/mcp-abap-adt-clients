@@ -78,15 +78,15 @@ environment:
 # Shared dependencies — persistent Lego library for integration tests
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.
 # Names are fixed across all systems — no placeholders needed.
-# Naming convention: ZADT_SHR_{COMPONENT}_{OBJTYPE}
+# Naming convention: ZAC_SHR_{COMPONENT}_{OBJTYPE}
 shared_dependencies:
-  package: "ZADT_SHR_PKG"
+  package: "ZAC_SHR_PKG"
   super_package: "<YOUR_DEFAULT_PACKAGE>"    # Parent package (same as environment.default_package)
   software_component: ""                     # e.g., HOME (leave empty for cloud)
   transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
 
   tables:
-    - name: "ZADT_SHR_VIEW_TABL"
+    - name: "ZAC_SHR_VTABL"
       description: "Shared table for View and CDS Unit Test"
       source: |
         @EndUserText.label : 'Shared table for View and CDS Unit Test'
@@ -94,7 +94,7 @@ shared_dependencies:
         @AbapCatalog.tableCategory : #TRANSPARENT
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
-        define table zadt_shr_view_tabl {
+        define table zac_shr_vtabl {
           key client : abap.clnt not null;
           key fld1   : abap.char(10) not null;
           fld2       : abap.char(50);
@@ -102,7 +102,7 @@ shared_dependencies:
           fld4       : abap.dats;
         }
 
-    - name: "ZADT_SHR_BDEF_TABL"
+    - name: "ZAC_SHR_BTABL"
       description: "Shared table for BehaviorDefinition root view"
       source: |
         @EndUserText.label : 'Shared table for BehaviorDefinition'
@@ -110,7 +110,7 @@ shared_dependencies:
         @AbapCatalog.tableCategory : #TRANSPARENT
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
-        define table zadt_shr_bdef_tabl {
+        define table zac_shr_btabl {
           key client : abap.clnt not null;
           key fld1   : abap.char(10) not null;
           fld2       : abap.char(50);
@@ -118,7 +118,7 @@ shared_dependencies:
           fld4       : abap.dats;
         }
 
-    - name: "ZADT_SHR_BIMP_TABL"
+    - name: "ZAC_SHR_ITABL"
       description: "Shared table for BehaviorImplementation root view"
       source: |
         @EndUserText.label : 'Shared table for BehaviorImplementation'
@@ -126,20 +126,20 @@ shared_dependencies:
         @AbapCatalog.tableCategory : #TRANSPARENT
         @AbapCatalog.deliveryClass : #A
         @AbapCatalog.dataMaintenance : #RESTRICTED
-        define table zadt_shr_bimp_tabl {
+        define table zac_shr_itabl {
           key client : abap.clnt not null;
           key fld1   : abap.char(10) not null;
           fld2       : abap.char(50);
         }
 
   views:
-    - name: "ZADT_SHR_CDSUT_DDLS"
+    - name: "ZAC_SHR_CDSUT_DDLS"
       description: "Shared CDS view for CDS Unit Test"
       source: |
         @EndUserText.label : 'Shared CDS view for CDS Unit Test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define view entity ZADT_SHR_CDSUT_DDLS
-          as select from zadt_shr_view_tabl
+        define view entity ZAC_SHR_CDSUT_DDLS
+          as select from zac_shr_vtabl
         {
           key fld1,
           fld2,
@@ -147,13 +147,13 @@ shared_dependencies:
           fld4
         }
 
-    - name: "ZADT_SHR_BDEF_DDLS"
+    - name: "ZAC_SHR_BDEF_DDLS"
       description: "Shared CDS root view for BehaviorDefinition"
       source: |
         @EndUserText.label : 'Shared root view for BehaviorDefinition'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define root view entity ZADT_SHR_BDEF_DDLS
-          as select from zadt_shr_bdef_tabl
+        define root view entity ZAC_SHR_BDEF_DDLS
+          as select from zac_shr_btabl
         {
           key fld1,
           fld2,
@@ -161,29 +161,29 @@ shared_dependencies:
           fld4
         }
 
-    - name: "ZADT_SHR_BIMP_DDLS"
+    - name: "ZAC_SHR_BIMP_DDLS"
       description: "Shared CDS root view for BehaviorImplementation"
       source: |
         @EndUserText.label : 'Shared root view for BehaviorImplementation'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define root view entity ZADT_SHR_BIMP_DDLS
-          as select from zadt_shr_bimp_tabl
+        define root view entity ZAC_SHR_BIMP_DDLS
+          as select from zac_shr_itabl
         {
           key fld1,
           fld2
         }
 
   behavior_definitions:
-    - name: "ZADT_SHR_BIMP_DDLS"
+    - name: "ZAC_SHR_BIMP_DDLS"
       description: "Shared BDEF for BehaviorImplementation"
-      root_entity: "ZADT_SHR_BIMP_DDLS"
+      root_entity: "ZAC_SHR_BIMP_DDLS"
       implementation_type: "Managed"
       source: |
         managed implementation in class zbp_adt_shr_bimp_ddls unique;
         strict ( 2 );
 
-        define behavior for ZADT_SHR_BIMP_DDLS
-        persistent table zadt_shr_bimp_tabl
+        define behavior for ZAC_SHR_BIMP_DDLS
+        persistent table zac_shr_itabl
         lock master
         authorization master ( instance, global )
         {
@@ -193,8 +193,15 @@ shared_dependencies:
         }
 
   function_groups:
-    - name: "ZADT_SHR_FUGR"
+    - name: "ZAC_SHR_FUGR"
       description: "Shared FUGR for FM tests"
+
+  programs:
+    - name: "ZAC_SHR_PROG"
+      description: "Shared program for run tests"
+      source: |
+        REPORT ZAC_SHR_PROG.
+        WRITE: / 'Shared test program'.
 
 # Standard SAP objects registry for read-only tests
 standard_objects:
@@ -866,7 +873,7 @@ create_view:
       description: "View reserved for AdtView tests"
       params:
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
-        table_name: "ZADT_SHR_VIEW_TABL"    # → shared_dependencies.tables
+        table_name: "ZAC_SHR_VTABL"    # → shared_dependencies.tables
         view_name: "ZADT_BLD_VIEW_DDLS"     # View created/deleted by this test
         description: "AdtView workflow view"
         # transport_request: ""  # Uses environment.default_transport if omitted
@@ -875,7 +882,7 @@ create_view:
           @EndUserText.label: 'AdtView workflow view'
           @AccessControl.authorizationCheck: #NOT_REQUIRED
           define view entity ZADT_BLD_VIEW_DDLS
-            as select from zadt_shr_view_tabl
+            as select from zac_shr_vtabl
           {
             key fld1,
             fld2,
@@ -962,7 +969,7 @@ create_function_module:
       description: "Function module reserved for AdtFunctionModule tests"
       params:
         function_module_name: "Z_ADT_BLD_FM03"  # Must start with Z_ or Y_ (with underscore)
-        function_group_name: "ZADT_SHR_FUGR"  # → shared_dependencies.function_groups
+        function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
         description: "AdtFunctionModule workflow FM"
         # package_name: "ZADT_BLD_PKG01"
         # transport_request: ""
@@ -993,18 +1000,18 @@ create_behavior_definition:
       available_in: ["onprem"]
       description: "Create test behavior definition for AdtBehaviorDefinition tests"
       params:
-        bdef_name: "ZADT_SHR_BDEF_DDLS"
-        description: "BehaviorDefinition for ZADT_SHR_BDEF_DDLS"
+        bdef_name: "ZAC_SHR_BDEF_DDLS"
+        description: "BehaviorDefinition for ZAC_SHR_BDEF_DDLS"
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
-        root_entity: "ZADT_SHR_BDEF_DDLS"    # Root entity = shared CDS view
+        root_entity: "ZAC_SHR_BDEF_DDLS"    # Root entity = shared CDS view
         implementation_type: "Managed"
         source_code: |
           managed implementation in class zbp_adt_shr_bdef_ddls unique;
           strict ( 2 );
 
-          define behavior for ZADT_SHR_BDEF_DDLS
-          persistent table zadt_shr_bdef_tabl
+          define behavior for ZAC_SHR_BDEF_DDLS
+          persistent table zac_shr_btabl
           lock master
           authorization master ( instance )
           {
@@ -1013,8 +1020,8 @@ create_behavior_definition:
             delete;
           }
         # Dependencies: resolved from shared_dependencies (created once, never deleted)
-        dep_table_name: "ZADT_SHR_BDEF_TABL"   # → shared_dependencies.tables
-        dep_view_name: "ZADT_SHR_BDEF_DDLS"    # → shared_dependencies.views
+        dep_table_name: "ZAC_SHR_BTABL"   # → shared_dependencies.tables
+        dep_view_name: "ZAC_SHR_BDEF_DDLS"    # → shared_dependencies.views
 
 # Create Metadata Extension
 create_metadata_extension:
@@ -1025,13 +1032,13 @@ create_metadata_extension:
       description: "Create test metadata extension for AdtMetadataExtension tests"
       params:
         ext_name: "ZADT_BLD_MEXT_DDLX"
-        description: "MetadataExtension for ZADT_SHR_BDEF_DDLS"
+        description: "MetadataExtension for ZAC_SHR_BDEF_DDLS"
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
-        target_entity: "ZADT_SHR_BDEF_DDLS"  # Shared CDS view (must exist before running)
+        target_entity: "ZAC_SHR_BDEF_DDLS"  # Shared CDS view (must exist before running)
         source_code: |
           @Metadata.layer: #CORE
-          annotate entity ZADT_SHR_BDEF_DDLS with
+          annotate entity ZAC_SHR_BDEF_DDLS with
           {
             @EndUserText.label: 'Field 1'
             fld1;
@@ -1048,23 +1055,23 @@ create_behavior_implementation:
       description: "Create test behavior implementation class for AdtBehaviorImplementation tests"
       params:
         class_name: "ZBP_ADT_SHR_BIMP_DDLS"
-        description: "BehaviorImplementation for ZADT_SHR_BIMP_DDLS"
+        description: "BehaviorImplementation for ZAC_SHR_BIMP_DDLS"
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
-        behavior_definition: "ZADT_SHR_BIMP_DDLS"  # BDEF name = root entity CDS view name
+        behavior_definition: "ZAC_SHR_BIMP_DDLS"  # BDEF name = root entity CDS view name
         source_code: |
-          CLASS lhc_zadt_shr_bimp_ddls DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_zac_shr_bimp_ddls DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zadt_shr_bimp_ddls RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zac_shr_bimp_ddls RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zadt_shr_bimp_ddls RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zac_shr_bimp_ddls RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_zadt_shr_bimp_ddls IMPLEMENTATION.
+          CLASS lhc_zac_shr_bimp_ddls IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -1074,9 +1081,9 @@ create_behavior_implementation:
 
           ENDCLASS.
         # Dependencies: resolved from shared_dependencies (created once, never deleted)
-        dep_table_name: "ZADT_SHR_BIMP_TABL"    # → shared_dependencies.tables
-        dep_view_name: "ZADT_SHR_BIMP_DDLS"     # → shared_dependencies.views
-        dep_bdef_name: "ZADT_SHR_BIMP_DDLS"     # → shared_dependencies.behavior_definitions
+        dep_table_name: "ZAC_SHR_ITABL"    # → shared_dependencies.tables
+        dep_view_name: "ZAC_SHR_BIMP_DDLS"     # → shared_dependencies.views
+        dep_bdef_name: "ZAC_SHR_BIMP_DDLS"     # → shared_dependencies.behavior_definitions
 
 # Run Unit Test
 run_unit_test:
@@ -1143,10 +1150,10 @@ create_cds_unit_test:
       description: "CDS view with ABAP Unit verification (dependencies auto-created)"
       params:
         # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
-        view_name: "ZADT_SHR_CDSUT_DDLS"     # → shared_dependencies.views
-        description: "CDS Unit Test for ZADT_SHR_CDSUT_DDLS"
+        view_name: "ZAC_SHR_CDSUT_DDLS"     # → shared_dependencies.views
+        description: "CDS Unit Test for ZAC_SHR_CDSUT_DDLS"
         # transport_request: ""  # Uses environment.default_transport if omitted
-        dep_table_name: "ZADT_SHR_VIEW_TABL"  # → shared_dependencies.tables
+        dep_table_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
         # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         # Note: CDS view and table must be created manually before running this test
         unit_test_options:
@@ -1168,14 +1175,14 @@ create_cds_unit_test:
           format: "abapunit"
         cds_unit_test:
           class_name: "ZADT_BLD_CDSUT_CLS"
-          test_class_name: "LTC_ZADT_SHR_CDSUT_DDLS"
+          test_class_name: "LTC_ZAC_SHR_CDSUT_DDLS"
           description: "CDS unit test class"
           # transport_request: ""  # Uses environment.default_transport if omitted
           template_xml: |
             <abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
               <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
             &lt;cds:cdstobetested xmlns:cds="http://www.sap.com/adt/cdsfrwk/cds"&gt;
-              &lt;cds:cdsundertest api_doc="true" cds_name="ZADT_SHR_CDSUT_DDLS" cds_test_type="UNIT_TEST"&gt;
+              &lt;cds:cdsundertest api_doc="true" cds_name="ZAC_SHR_CDSUT_DDLS" cds_test_type="UNIT_TEST"&gt;
                 &lt;cds:testmethods&gt;
                   &lt;cds:testmethod test_method_name="AUNIT_FOR_CDS_METHOD"/&gt;
                 &lt;/cds:testmethods&gt;
@@ -1186,14 +1193,14 @@ create_cds_unit_test:
             </abapsource:template>
           test_class_source: |
             "!@testing ZADT_BLD_CDSUT_CLS
-            CLASS LTC_ZADT_SHR_CDSUT_DDLS DEFINITION FINAL
+            CLASS LTC_ZAC_SHR_CDSUT_DDLS DEFINITION FINAL
               FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
 
               PRIVATE SECTION.
                 CLASS-DATA environment TYPE REF TO if_cds_test_environment.
 
-                DATA td_zadt_shr_view_tabl TYPE STANDARD TABLE OF zadt_shr_view_tabl WITH EMPTY KEY.
-                DATA act_results TYPE STANDARD TABLE OF zadt_shr_cdsut_ddls WITH EMPTY KEY.
+                DATA td_zac_shr_vtabl TYPE STANDARD TABLE OF zac_shr_vtabl WITH EMPTY KEY.
+                DATA act_results TYPE STANDARD TABLE OF zac_shr_cdsut_ddls WITH EMPTY KEY.
 
                 CLASS-METHODS class_setup RAISING cx_static_check.
                 CLASS-METHODS class_teardown.
@@ -1203,10 +1210,10 @@ create_cds_unit_test:
                 METHODS aunit_for_cds_method FOR TESTING RAISING cx_static_check.
             ENDCLASS.
 
-            CLASS LTC_ZADT_SHR_CDSUT_DDLS IMPLEMENTATION.
+            CLASS LTC_ZAC_SHR_CDSUT_DDLS IMPLEMENTATION.
 
               METHOD class_setup.
-                environment = cl_cds_test_environment=>create( i_for_entity = 'ZADT_SHR_CDSUT_DDLS' ).
+                environment = cl_cds_test_environment=>create( i_for_entity = 'ZAC_SHR_CDSUT_DDLS' ).
               ENDMETHOD.
 
               METHOD setup.
@@ -1219,19 +1226,19 @@ create_cds_unit_test:
 
               METHOD aunit_for_cds_method.
                 prepare_testdata( ).
-                SELECT * FROM zadt_shr_cdsut_ddls INTO TABLE @act_results.
+                SELECT * FROM zac_shr_cdsut_ddls INTO TABLE @act_results.
                 cl_abap_unit_assert=>fail( msg = 'Place your assertions here' ).
               ENDMETHOD.
 
               METHOD prepare_testdata.
-                td_zadt_shr_view_tabl = VALUE #(
+                td_zac_shr_vtabl = VALUE #(
                   (
                     client = '100'
                     fld1 = 'TEST01'
                     fld2 = 'Test data'
                   )
                 ).
-                environment->insert_test_data( i_data = td_zadt_shr_view_tabl ).
+                environment->insert_test_data( i_data = td_zac_shr_vtabl ).
               ENDMETHOD.
 
             ENDCLASS.
@@ -1439,6 +1446,7 @@ execute_class:
 
 # Run Program (direct runProgram call)
 # Requires: program must already exist and be activated
+# Uses shared_dependencies.programs (ZAC_SHR_PROG)
 run_program:
   test_cases:
     - name: "run_program"
@@ -1446,7 +1454,7 @@ run_program:
       available_in: ["onprem"]
       description: "Run existing program using runProgram() directly"
       params:
-        program_name: "ZADT_BLD_PROG01"
+        program_name: "ZAC_SHR_PROG"
 
 # Execute Program (Executor API)
 execute_program:

@@ -2013,14 +2013,14 @@ async function ensureSharedDependency(client, type, name, logger) {
       // Table read returns { readResult: undefined } on 404 (quirk)
       exists = result?.readResult !== undefined;
     } else if (type === 'views') {
-      await client.getView().read({ viewName: name });
-      exists = true;
+      const result = await client.getView().read({ viewName: name });
+      exists = result !== undefined;
     } else if (type === 'programs') {
-      await client.getProgram().read({ programName: name });
-      exists = true;
+      const result = await client.getProgram().read({ programName: name });
+      exists = result !== undefined;
     } else if (type === 'behavior_definitions') {
-      await client.getBehaviorDefinition().read({ name });
-      exists = true;
+      const result = await client.getBehaviorDefinition().read({ name });
+      exists = result !== undefined;
     } else if (type === 'function_groups') {
       const result = await client
         .getFunctionGroup()
@@ -2049,6 +2049,18 @@ async function ensureSharedDependency(client, type, name, logger) {
         ddlCode: depConfig.source,
         transportRequest,
       });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared table ${name}...`);
+        await client.getTable().update(
+          {
+            tableName: name,
+            ddlCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared table ${name} activated`);
+      }
     } else if (type === 'views') {
       await client.getView().create({
         viewName: name,
@@ -2057,6 +2069,18 @@ async function ensureSharedDependency(client, type, name, logger) {
         ddlSource: depConfig.source,
         transportRequest,
       });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared view ${name}...`);
+        await client.getView().update(
+          {
+            viewName: name,
+            ddlSource: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared view ${name} activated`);
+      }
     } else if (type === 'programs') {
       await client.getProgram().create({
         programName: name,
@@ -2084,6 +2108,18 @@ async function ensureSharedDependency(client, type, name, logger) {
         sourceCode: depConfig.source,
         transportRequest,
       });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared behavior definition ${name}...`);
+        await client.getBehaviorDefinition().update(
+          {
+            name,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared behavior definition ${name} activated`);
+      }
     } else if (type === 'function_groups') {
       try {
         await client.getFunctionGroup().create({

@@ -107,7 +107,7 @@ describe('Program - Run', () => {
         return;
       }
 
-      const programName = testCase.params.program_name || 'ZADT_BLD_RUN01';
+      const programName = testCase.params.program_name;
 
       // Ensure shared program exists (create if missing)
       await ensureSharedDependency(

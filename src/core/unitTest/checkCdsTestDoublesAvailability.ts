@@ -1,6 +1,10 @@
 /**
- * Validate CDS view for unit test doubles
- * Uses ADT validation endpoint: /sap/bc/adt/aunit/dbtestdoubles/cds/validation
+ * Check CDS view availability for unit test doubles
+ * Uses ADT endpoint: /sap/bc/adt/aunit/dbtestdoubles/cds/validation
+ *
+ * This is NOT a standard ADT validation (which checks name/params before create).
+ * It checks whether a CDS view can be used with the test doubles framework
+ * (cl_cds_test_environment).
  */
 
 import type {
@@ -11,13 +15,12 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
- * Validate CDS view for unit test doubles
- * This validation is required before creating a CDS unit test class
+ * Check CDS view availability for unit test doubles
  *
  * Endpoint: POST /sap/bc/adt/aunit/dbtestdoubles/cds/validation?ddlName={viewName}
  *
- * What this validation checks:
- * - Whether the CDS view is active (must be activated before validation)
+ * What this checks:
+ * - Whether the CDS view is active (must be activated before check)
  * - Whether the view structure allows creation of test doubles (temporary updatable copies)
  * - Whether dependent components (tables, views) can be replaced with test doubles
  * - Whether there are any restrictions preventing use of the view in test doubles framework
@@ -30,7 +33,7 @@ import { getTimeout } from '../../utils/timeouts';
  * - Success: <SEVERITY>OK</SEVERITY>
  * - Error: <SEVERITY>ERROR</SEVERITY> with <SHORT_TEXT> and <LONG_TEXT>
  */
-export async function validateCdsForUnitTest(
+export async function checkCdsTestDoublesAvailability(
   connection: IAbapConnection,
   viewName: string,
 ): Promise<AxiosResponse> {

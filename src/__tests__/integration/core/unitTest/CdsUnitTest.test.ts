@@ -20,6 +20,7 @@ import type {
   ICdsUnitTestConfig,
   IUnitTestConfig,
 } from '../../../../core/unitTest';
+import { checkCdsTestDoublesAvailability } from '../../../../core/unitTest/checkCdsTestDoublesAvailability';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
   createTestAdtClient,
@@ -237,19 +238,20 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             // Class doesn't exist — continue
           }
 
-          // Step 1: Validate CDS view for unit test doubles
+          // Step 1: Check CDS view availability for unit test doubles
           if (viewName) {
-            logTestStep('validate', testsLogger);
+            logTestStep('checkCdsTestDoubles', testsLogger);
             testsLogger.info?.(
-              'Validating CDS view for unit test doubles:',
+              'Checking CDS view for unit test doubles:',
               viewName,
             );
-            const validateState = await client.getCdsUnitTest().validate({
-              cdsViewName: viewName,
-            });
-            expect(validateState).toBeDefined();
-            expect(validateState.cdsValidationResponse).toBeDefined();
-            testsLogger.info?.('CDS view validated successfully');
+            const checkResponse = await checkCdsTestDoublesAvailability(
+              connection,
+              viewName,
+            );
+            expect(checkResponse).toBeDefined();
+            expect(checkResponse.status).toBe(200);
+            testsLogger.info?.('CDS view check passed');
           }
 
           // Step 2: Create CDS unit test class
