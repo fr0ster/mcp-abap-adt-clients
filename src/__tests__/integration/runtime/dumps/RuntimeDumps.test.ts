@@ -153,7 +153,8 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             : undefined;
         const inlinecount =
           params.inlinecount === 'allpages' ? 'allpages' : undefined;
-        const generateArtificialDump = params.generate_artificial_dump !== false;
+        const generateArtificialDump =
+          params.generate_artificial_dump !== false;
         const maxAttempts = toPositiveInt(params.retries, 8);
         const retryDelayMs = toPositiveInt(params.retry_delay_ms, 1500);
 
@@ -219,10 +220,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
               testsLogger,
             );
           } else {
-            logTestStep(
-              'generated dump not found after retries',
-              testsLogger,
-            );
+            logTestStep('generated dump not found after retries', testsLogger);
           }
         }
 

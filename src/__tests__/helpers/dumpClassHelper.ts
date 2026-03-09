@@ -12,9 +12,7 @@ const DEFAULT_CLASS_NAME = 'ZAC_SHR_DMP01';
  * Resolve the dump class name from test config params.
  * Returns the uppercase class name — does NOT create or modify anything.
  */
-export function resolveDumpClassName(
-  params: Record<string, unknown>,
-): string {
+export function resolveDumpClassName(params: Record<string, unknown>): string {
   return (
     typeof params.dump_class_name === 'string' && params.dump_class_name.trim()
       ? params.dump_class_name.trim()

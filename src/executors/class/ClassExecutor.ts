@@ -169,7 +169,8 @@ export class ClassExecutor implements IClassExecutor {
       response,
       profilerId,
       traceId: fallbackTraceId,
-      traceRequestsResponse: traceRequestsResponse ?? fallbackResponse!,
+      traceRequestsResponse:
+        traceRequestsResponse ?? (fallbackResponse as AxiosResponse),
     };
   }
 

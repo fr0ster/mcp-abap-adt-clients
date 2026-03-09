@@ -134,8 +134,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
         expect(traceFilesResponse.data).toBeDefined();
 
         logTestStep('list profiler trace requests', testsLogger);
-        const traceRequestsResponse =
-          await runtime.listProfilerTraceRequests();
+        const traceRequestsResponse = await runtime.listProfilerTraceRequests();
         expect(traceRequestsResponse.status).toBeGreaterThanOrEqual(200);
         expect(traceRequestsResponse.status).toBeLessThan(300);
         expect(traceRequestsResponse.data).toBeDefined();
@@ -403,10 +402,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
             );
             resolvedTraceId = discoveredId;
           } else {
-            logTestStep(
-              'no trace id configured or discovered',
-              testsLogger,
-            );
+            logTestStep('no trace id configured or discovered', testsLogger);
           }
         } else {
           logTestStep(
@@ -477,10 +473,9 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
       try {
         const traceId = resolvedTraceId;
         logTestStep(`read trace hitlist for ${traceId}`, testsLogger);
-        const hitlistResponse = await runtime.getProfilerTraceHitList(
-          traceId,
-          { withSystemEvents: false },
-        );
+        const hitlistResponse = await runtime.getProfilerTraceHitList(traceId, {
+          withSystemEvents: false,
+        });
         expect(hitlistResponse.status).toBeGreaterThanOrEqual(200);
         expect(hitlistResponse.status).toBeLessThan(300);
         expect(hitlistResponse.data).toBeDefined();
@@ -489,10 +484,12 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
           `read trace hitlist with system events for ${traceId}`,
           testsLogger,
         );
-        const hitlistWithEventsResponse =
-          await runtime.getProfilerTraceHitList(traceId, {
+        const hitlistWithEventsResponse = await runtime.getProfilerTraceHitList(
+          traceId,
+          {
             withSystemEvents: true,
-          });
+          },
+        );
         expect(hitlistWithEventsResponse.status).toBeGreaterThanOrEqual(200);
         expect(hitlistWithEventsResponse.status).toBeLessThan(300);
 
@@ -585,8 +582,7 @@ describe('Profiler Traces (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep(`get trace requests by URI: ${objectUri}`, testsLogger);
-        const response =
-          await runtime.getProfilerTraceRequestsByUri(objectUri);
+        const response = await runtime.getProfilerTraceRequestsByUri(objectUri);
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);
         expect(response.data).toBeDefined();
