@@ -177,5 +177,12 @@ export const CT_ENHANCEMENT = 'application/vnd.sap.adt.enhancements.v1+xml';
 export const ACCEPT_VALIDATION_CLASS_NAME =
   'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check';
 
+// Profiler Traces
+export const ACCEPT_TRACE_XML = 'application/xml';
+export const ACCEPT_TRACE_FEED = 'application/atom+xml;type=feed';
+export const ACCEPT_TRACE_CALLTREE =
+  'application/vnd.sap.adt.runtime.traces.abaptraces.aggcalltree+xml, application/xml';
+export const CT_TRACE_PARAMETERS = 'application/xml';
+
 // System Information
 export const ACCEPT_SYSTEM_INFO = 'application/json';

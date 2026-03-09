@@ -2,6 +2,9 @@
  * Integration test for Runtime Dumps
  * Tests runtime dump read APIs using AdtRuntimeClient.
  *
+ * The dump class (e.g. ZADT_BLD_DMP01) must already exist on the SAP system.
+ * The test does NOT create or modify the class — it only runs it to produce a dump.
+ *
  * Enable debug logs:
  *  DEBUG_ADT_TESTS=true   - Integration test execution logs
  *  DEBUG_ADT_LIBS=true    - Runtime client library logs
@@ -15,10 +18,10 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
-import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
-import { createTestAdtClient, getConfig } from '../../../helpers/sessionConfig';
+import { resolveDumpClassName } from '../../../helpers/dumpClassHelper';
+import { getConfig } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
   createLibraryLogger,
@@ -37,8 +40,6 @@ const {
   getEnabledTestCase,
   getTimeout,
   isHttpStatusAllowed,
-  resolvePackageName,
-  resolveTransportRequest,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -93,47 +94,17 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function createName(prefix: string): string {
-  const stamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `${prefix}${stamp}${random}`.slice(0, 30);
-}
-
-function buildDumpClassSource(className: string): string {
-  return `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-ENDCLASS.
-
-CLASS ${className} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    DATA lv_num TYPE i VALUE 1.
-    DATA lv_den TYPE i VALUE 0.
-    DATA lv_res TYPE i.
-    lv_res = lv_num / lv_den.
-    out->write( |${className} result: ${'${'} lv_res }| ).
-  ENDMETHOD.
-ENDCLASS.
-`;
-}
-
 describe('Runtime Dumps (using AdtRuntimeClient)', () => {
   let connection: IAbapConnection;
-  let client: AdtClient;
   let executor: AdtExecutor;
   let runtime: AdtRuntimeClient;
   let hasConfig = false;
-  let isLegacy = false;
 
   beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      const { client: resolvedClient, isLegacy: legacy } =
-        await createTestAdtClient(connection, libraryLogger);
-      client = resolvedClient;
-      isLegacy = legacy;
       executor = new AdtExecutor(connection, libraryLogger);
       runtime = new AdtRuntimeClient(connection, libraryLogger);
       hasConfig = true;
@@ -182,7 +153,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             : undefined;
         const inlinecount =
           params.inlinecount === 'allpages' ? 'allpages' : undefined;
-        const createArtificialDump = params.generate_artificial_dump !== false;
+        const generateArtificialDump = params.generate_artificial_dump !== false;
         const maxAttempts = toPositiveInt(params.retries, 8);
         const retryDelayMs = toPositiveInt(params.retry_delay_ms, 1500);
 
@@ -212,105 +183,46 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
         }
 
         let generatedDumpId: string | undefined;
-        let attemptedArtificialDump = false;
-        let dumpClassName: string | undefined;
-        if (createArtificialDump) {
-          const packageName = resolvePackageName(params.package_name);
-          const transportRequest = resolveTransportRequest(
-            params.transport_request,
+        if (generateArtificialDump) {
+          const className = resolveDumpClassName(params);
+          logTestStep(
+            `run shared dump class ${className} (division by zero)`,
+            testsLogger,
           );
-          if (!packageName) {
+          try {
+            await executor.getClassExecutor().run({ className });
+          } catch (_runError) {
+            // Expected: run should fail and produce dump
+          }
+
+          for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             logTestStep(
-              'artificial dump generation skipped (package_name/default_package not configured)',
+              `discover generated dump attempt ${attempt}/${maxAttempts}`,
+              testsLogger,
+            );
+            const current = await runtime.listRuntimeDumpsByUser(user, {
+              top: Math.max(top, 50),
+              inlinecount,
+            });
+            const ids = extractDumpIds(current.data);
+            generatedDumpId = ids.find((id) => !beforeDumpIds.has(id));
+            if (generatedDumpId) {
+              break;
+            }
+            if (attempt < maxAttempts) {
+              await delay(retryDelayMs);
+            }
+          }
+          if (generatedDumpId) {
+            logTestStep(
+              `generated dump found: ${generatedDumpId}`,
               testsLogger,
             );
           } else {
-            attemptedArtificialDump = true;
-            dumpClassName = createName(
-              (typeof params.dump_class_prefix === 'string' &&
-              params.dump_class_prefix.trim()
-                ? params.dump_class_prefix
-                : 'ZADT_BLD_DMP'
-              )
-                .toUpperCase()
-                .replace(/[^A-Z0-9_]/g, ''),
+            logTestStep(
+              'generated dump not found after retries',
+              testsLogger,
             );
-
-            try {
-              logTestStep(
-                `create dump class ${dumpClassName} (division by zero)`,
-                testsLogger,
-              );
-              await client.getClass().create({
-                className: dumpClassName,
-                packageName,
-                transportRequest,
-                description: `Runtime dump probe ${dumpClassName}`,
-              });
-              await client.getClass().update(
-                {
-                  className: dumpClassName,
-                  sourceCode: buildDumpClassSource(dumpClassName),
-                  transportRequest,
-                },
-                {
-                  sourceCode: buildDumpClassSource(dumpClassName),
-                  activateOnUpdate: true,
-                },
-              );
-
-              logTestStep(`run dump class ${dumpClassName}`, testsLogger);
-              try {
-                await executor.getClassExecutor().run({
-                  className: dumpClassName,
-                });
-              } catch (_runError) {
-                // Expected: run should fail and produce dump
-              }
-
-              for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-                logTestStep(
-                  `discover generated dump attempt ${attempt}/${maxAttempts}`,
-                  testsLogger,
-                );
-                const current = await runtime.listRuntimeDumpsByUser(user, {
-                  top: Math.max(top, 50),
-                  inlinecount,
-                });
-                const ids = extractDumpIds(current.data);
-                generatedDumpId = ids.find((id) => !beforeDumpIds.has(id));
-                if (generatedDumpId) {
-                  break;
-                }
-                if (attempt < maxAttempts) {
-                  await delay(retryDelayMs);
-                }
-              }
-              if (generatedDumpId) {
-                logTestStep(
-                  `generated dump found: ${generatedDumpId} (source=forced_class_failure)`,
-                  testsLogger,
-                );
-              } else {
-                logTestStep(
-                  'generated dump not found after retries (source=forced_class_failure)',
-                  testsLogger,
-                );
-              }
-            } finally {
-              if (dumpClassName) {
-                try {
-                  await client.getClass().delete({
-                    className: dumpClassName,
-                    transportRequest,
-                  });
-                } catch (cleanupError) {
-                  testsLogger.warn?.(
-                    `cleanup failed for ${dumpClassName}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-                  );
-                }
-              }
-            }
           }
         }
 
@@ -374,10 +286,9 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           expect(formattedResponse.status).toBeLessThan(300);
           expect(formattedResponse.data).toBeDefined();
         } else {
-          const reason =
-            attemptedArtificialDump && createArtificialDump
-              ? 'forced dump was not discovered and no fallback dump_id/feed id'
-              : 'no dump id configured/discovered';
+          const reason = generateArtificialDump
+            ? 'forced dump was not discovered and no fallback dump_id/feed id'
+            : 'no dump id configured/discovered';
           logTestStep(
             `read runtime dump by id: skipped (${reason})`,
             testsLogger,

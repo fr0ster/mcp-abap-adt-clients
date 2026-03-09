@@ -192,6 +192,41 @@ shared_dependencies:
           delete;
         }
 
+  classes:
+    - name: "ZAC_SHR_RUN01"
+      description: "Shared runnable class (if_oo_adt_classrun) for profiler/executor tests"
+      source: |
+        CLASS zac_shr_run01 DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zac_shr_run01 IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DO 5 TIMES.
+              out->write( |Hello World { sy-index }| ).
+            ENDDO.
+          ENDMETHOD.
+        ENDCLASS.
+
+    - name: "ZAC_SHR_DMP01"
+      description: "Shared dump class (division by zero) for runtime dumps tests"
+      source: |
+        CLASS zac_shr_dmp01 DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zac_shr_dmp01 IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_num TYPE i VALUE 1.
+            DATA lv_den TYPE i VALUE 0.
+            DATA lv_res TYPE i.
+            lv_res = lv_num / lv_den.
+            out->write( |ZAC_SHR_DMP01 result: { lv_res }| ).
+          ENDMETHOD.
+        ENDCLASS.
+
   function_groups:
     - name: "ZAC_SHR_FUGR"
       description: "Shared FUGR for FM tests"
@@ -1390,6 +1425,23 @@ runtime_dumps:
         inlinecount: "allpages"
         user: ""      # Optional: ADT user for user-filtered dump feed
         dump_id: ""   # Optional: when empty, test tries to discover ID from feed
+        dump_class_name: "ZAC_SHR_DMP01"  # Pre-existing shared class that produces a dump (division by zero)
+        generate_artificial_dump: true     # Run shared dump class to generate a fresh dump
+        retries: 8                         # Number of retry attempts to discover generated dump
+        retry_delay_ms: 1500               # Delay between retries in ms
+
+# Profiler traces operations (AdtRuntimeClient)
+profiler_traces:
+  test_cases:
+    - name: "adt_profiler_traces"
+      enabled: false  # Set to true to enable test
+      description: "Profiler trace list/read/create and run-with-profiling flow"
+      params:
+        trace_id: ""              # Optional: existing trace ID to read; when empty, discovered from feed
+        object_uri: ""            # Optional: ADT object URI for trace-requests-by-URI test
+        class_name: "ZAC_SHR_RUN01"  # Pre-existing shared runnable class (if_oo_adt_classrun)
+        skip_create: false        # Skip create-trace-parameters test
+        skip_run_with_profiling: false  # Skip run-with-profiling test
 
 # Runtime memory snapshots read operations (AdtRuntimeClient)
 runtime_memory_snapshots:

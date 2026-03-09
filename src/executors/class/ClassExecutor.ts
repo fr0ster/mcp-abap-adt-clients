@@ -129,7 +129,7 @@ export class ClassExecutor implements IClassExecutor {
       }
     }
 
-    let fallbackResponse: AxiosResponse;
+    let fallbackResponse: AxiosResponse | undefined;
     let fallbackTraceId: string | undefined;
     try {
       fallbackResponse = await listTraceRequests(this.connection);
@@ -140,9 +140,21 @@ export class ClassExecutor implements IClassExecutor {
         className: target.className,
         error: error instanceof Error ? error.message : String(error),
       });
-      fallbackResponse = await listTraceFiles(this.connection);
-      fallbackTraceId =
-        extractTraceIdFromTraceRequestsResponse(fallbackResponse);
+    }
+    if (!fallbackTraceId) {
+      try {
+        const filesResponse = await listTraceFiles(this.connection);
+        fallbackTraceId =
+          extractTraceIdFromTraceRequestsResponse(filesResponse);
+        if (fallbackTraceId) {
+          fallbackResponse = filesResponse;
+        }
+      } catch (error) {
+        this.logger?.debug?.('Trace files list also failed', {
+          className: target.className,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
     if (!fallbackTraceId) {
       this.logger?.warn?.('Fallback trace response did not contain trace id', {
@@ -157,7 +169,7 @@ export class ClassExecutor implements IClassExecutor {
       response,
       profilerId,
       traceId: fallbackTraceId,
-      traceRequestsResponse: traceRequestsResponse ?? fallbackResponse,
+      traceRequestsResponse: traceRequestsResponse ?? fallbackResponse!,
     };
   }
 

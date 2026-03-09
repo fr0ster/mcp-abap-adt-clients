@@ -12,6 +12,12 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import {
+  ACCEPT_TRACE_CALLTREE,
+  ACCEPT_TRACE_FEED,
+  ACCEPT_TRACE_XML,
+  CT_TRACE_PARAMETERS,
+} from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 
 export interface IProfilerTraceParameters {
@@ -177,8 +183,8 @@ export async function createTraceParameters(
     data,
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
-      'Content-Type': 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
+      'Content-Type': CT_TRACE_PARAMETERS,
     },
   });
 }
@@ -270,7 +276,7 @@ export async function getTraceHitList(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }
@@ -313,7 +319,7 @@ export async function getTraceStatements(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_CALLTREE,
     },
   });
 }
@@ -343,7 +349,7 @@ export async function getTraceDbAccesses(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }
@@ -364,7 +370,7 @@ export async function listTraceFiles(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }
@@ -385,7 +391,7 @@ export async function getTraceParameters(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }
@@ -399,7 +405,6 @@ export async function getTraceParameters(
 export async function getTraceParametersForCallstack(
   connection: IAbapConnection,
 ): Promise<AxiosResponse> {
-  // Note: Same endpoint as getTraceParameters, but used for callstack aggregation
   const url = `/sap/bc/adt/runtime/traces/abaptraces/parameters`;
 
   return connection.makeAdtRequest({
@@ -407,7 +412,7 @@ export async function getTraceParametersForCallstack(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }
@@ -421,7 +426,6 @@ export async function getTraceParametersForCallstack(
 export async function getTraceParametersForAmdp(
   connection: IAbapConnection,
 ): Promise<AxiosResponse> {
-  // Note: Same endpoint as getTraceParameters, but used for AMDP trace
   const url = `/sap/bc/adt/runtime/traces/abaptraces/parameters`;
 
   return connection.makeAdtRequest({
@@ -429,7 +433,7 @@ export async function getTraceParametersForAmdp(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }
@@ -450,7 +454,7 @@ export async function listTraceRequests(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_FEED,
     },
   });
 }
@@ -477,7 +481,7 @@ export async function getTraceRequestsByUri(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_FEED,
     },
   });
 }
@@ -498,7 +502,7 @@ export async function listObjectTypes(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }
@@ -519,7 +523,7 @@ export async function listProcessTypes(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: ACCEPT_TRACE_XML,
     },
   });
 }

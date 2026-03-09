@@ -2021,6 +2021,9 @@ async function ensureSharedDependency(client, type, name, logger) {
     } else if (type === 'behavior_definitions') {
       const result = await client.getBehaviorDefinition().read({ name });
       exists = result !== undefined;
+    } else if (type === 'classes') {
+      const result = await client.getClass().read({ className: name });
+      exists = result !== undefined;
     } else if (type === 'function_groups') {
       const result = await client
         .getFunctionGroup()
@@ -2119,6 +2122,25 @@ async function ensureSharedDependency(client, type, name, logger) {
           { activateOnUpdate: true, sourceCode: depConfig.source },
         );
         logger?.info?.(`Shared behavior definition ${name} activated`);
+      }
+    } else if (type === 'classes') {
+      await client.getClass().create({
+        className: name,
+        packageName,
+        description: depConfig.description || 'Shared test class',
+        transportRequest,
+      });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared class ${name}...`);
+        await client.getClass().update(
+          {
+            className: name,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared class ${name} activated`);
       }
     } else if (type === 'function_groups') {
       try {

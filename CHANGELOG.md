@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.8.1] - 2026-03-09
+
+### Fixed
+- **Profiler trace ID resolution**: `ClassExecutor.runWithProfiling` now falls back to `listTraceFiles` when `listTraceRequests` returns a feed without trace file IDs (previously only fell back on exception).
+- **Profiler statements Accept header**: Use `application/vnd.sap.adt.runtime.traces.abaptraces.aggcalltree+xml, application/xml` for `/statements` endpoint (matching Eclipse ADT behavior).
+
+### Added
+- **Shared runnable classes**: `ZAC_SHR_RUN01` (if_oo_adt_classrun with Hello World loop) and `ZAC_SHR_DMP01` (division by zero for dumps) as shared dependencies — created once, never modified by tests.
+- **Profiler traces integration test**: 6 test cases — list endpoints, create parameters, run with profiling, discover traces, read trace details (hitlist/statements/dbAccesses), requests by URI.
+- **Runtime dumps integration test**: Read dumps feed, generate artificial dump via shared class, read dump by ID with views (default/summary/formatted).
+- **Shared dependency support for classes**: `ensureSharedDependency` and setup script now handle `classes` type.
+- **`ACCEPT_TRACE_CALLTREE`** content type constant for profiler trace statements.
+
 ## [3.7.0] - 2026-03-07
 
 ### Changed
