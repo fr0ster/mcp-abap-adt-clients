@@ -142,8 +142,13 @@ describe('Shared - getWhereUsed', () => {
     }
 
     const params = resolver.getParams();
-    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
-    const objectType = params.object_type || 'class';
+    const objectName =
+      params.object_name || resolver.getObjectName('object_name', 'table');
+    const objectType = params.object_type || 'table';
+    if (!objectName) {
+      logTestSkip(testsLogger, 'Shared - getWhereUsed', 'No object configured');
+      return;
+    }
 
     logTestStep('where-used with default scope', testsLogger);
     testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
@@ -210,8 +215,13 @@ describe('Shared - getWhereUsed', () => {
     }
 
     const params = resolver.getParams();
-    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
-    const objectType = params.object_type || 'class';
+    const objectName =
+      params.object_name || resolver.getObjectName('object_name', 'table');
+    const objectType = params.object_type || 'table';
+    if (!objectName) {
+      logTestSkip(testsLogger, 'Shared - getWhereUsed', 'No object configured');
+      return;
+    }
 
     logTestStep('where-used with ALL types enabled', testsLogger);
     testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
@@ -302,8 +312,13 @@ describe('Shared - getWhereUsed', () => {
     }
 
     const params = resolver.getParams();
-    const objectName = params.object_name || 'T000';
+    const objectName =
+      params.object_name || resolver.getObjectName('object_name', 'table');
     const objectType = params.object_type || 'table';
+    if (!objectName) {
+      logTestSkip(testsLogger, 'Shared - getWhereUsed', 'No object configured');
+      return;
+    }
 
     try {
       logTestStep('get where-used for table', testsLogger);
@@ -454,9 +469,14 @@ describe('Shared - getWhereUsed', () => {
     }
 
     const params = resolver.getParams();
-    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
-    const objectType = params.object_type || 'class';
+    const objectName =
+      params.object_name || resolver.getObjectName('object_name', 'table');
+    const objectType = params.object_type || 'table';
     const enableAllTypes = params.enable_all_types !== false;
+    if (!objectName) {
+      logTestSkip(testsLogger, 'Shared - getWhereUsed', 'No object configured');
+      return;
+    }
 
     logTestStep('get where-used list with parsed results', testsLogger);
     testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
@@ -525,8 +545,13 @@ describe('Shared - getWhereUsed', () => {
     }
 
     const params = resolver.getParams();
-    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
-    const objectType = params.object_type || 'class';
+    const objectName =
+      params.object_name || resolver.getObjectName('object_name', 'table');
+    const objectType = params.object_type || 'table';
+    if (!objectName) {
+      logTestSkip(testsLogger, 'Shared - getWhereUsed', 'No object configured');
+      return;
+    }
 
     logTestStep('get where-used list with raw XML', testsLogger);
 

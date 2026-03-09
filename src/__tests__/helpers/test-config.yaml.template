@@ -1352,6 +1352,35 @@ package_hierarchy:
       # package_name: "<YOUR_PACKAGE_NAME>"  # Uses environment.default_package if omitted
       params: {}
 
+# Read Source (readObjectSource)
+# Reads source code for ABAP objects (class, program, interface, etc.)
+# Uses standard_objects for test object names
+read_source:
+  test_cases:
+    - name: "read_class_source"
+      enabled: false  # Set to true to enable test
+      description: "Read class source code. Uses standard_objects.classes."
+      params:
+        # class_name: Uses standard_objects.classes if not specified
+
+    - name: "read_class_source_inactive"
+      enabled: false  # Set to true to enable test
+      description: "Read class source code (inactive version). Uses standard_objects.classes."
+      params:
+        # class_name: Uses standard_objects.classes if not specified
+
+    - name: "read_class_source_versions"
+      enabled: false  # Set to true to enable test
+      description: "Read class source code (active and inactive versions). Uses standard_objects.classes."
+      params:
+        # class_name: Uses standard_objects.classes if not specified
+
+    - name: "read_source_error_unsupported"
+      enabled: false  # Set to true to enable test
+      description: "Validate error for object type without source code. Uses standard_objects.domains."
+      params:
+        # domain_name: Uses standard_objects.domains if not specified
+
 # Read Metadata (readObjectMetadata)
 # Reads metadata for ABAP objects (class, domain, table, etc.)
 # Uses standard_objects for test object names

@@ -12,12 +12,14 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import type { AdtSourceObjectType } from '../../../core/shared/types';
+import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { createTestAdtClient } from '../../helpers/sessionConfig';
+import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createTestsLogger,
 } from '../../helpers/testLogger';
-import { logTestStep } from '../../helpers/testProgressLogger';
+import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
 
 const { withAcceptHandling } = require('../../helpers/test-helper');
 
@@ -95,6 +97,7 @@ describe('Shared - readSource', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isLegacy = false;
+  let isCloudSystem = false;
 
   beforeEach(async () => {
     try {
@@ -106,6 +109,7 @@ describe('Shared - readSource', () => {
       client = resolvedClient;
       isLegacy = legacy;
       hasConfig = true;
+      isCloudSystem = await isCloudEnvironment(connection);
     } catch (_error) {
       testsLogger.warn?.(
         '⚠️ Skipping tests: No .env file or SAP configuration found',
@@ -147,8 +151,22 @@ describe('Shared - readSource', () => {
       return;
     }
 
-    // Use a standard SAP class that should exist
-    const className = 'CL_ABAP_CHAR_UTILITIES';
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_source',
+      testCaseName: 'read_class_source',
+    });
+    const className = resolver.getObjectName('class_name', 'class');
+    if (!className) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readSource',
+        'No class configured in standard_objects',
+      );
+      return;
+    }
     logTestStep('read class source code', testsLogger);
     testsLogger.info?.(`📋 Object: ${className} (class)`);
     testsLogger.info?.('📖 Reading source code...');
@@ -175,7 +193,22 @@ describe('Shared - readSource', () => {
       return;
     }
 
-    const className = 'CL_ABAP_CHAR_UTILITIES';
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_source',
+      testCaseName: 'read_class_source_inactive',
+    });
+    const className = resolver.getObjectName('class_name', 'class');
+    if (!className) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readSource',
+        'No class configured in standard_objects',
+      );
+      return;
+    }
     logTestStep('read class source code (inactive version)', testsLogger);
     const result = await withAcceptHandling(
       client
@@ -194,7 +227,22 @@ describe('Shared - readSource', () => {
       return;
     }
 
-    const className = 'CL_ABAP_CHAR_UTILITIES';
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_source',
+      testCaseName: 'read_class_source_versions',
+    });
+    const className = resolver.getObjectName('class_name', 'class');
+    if (!className) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readSource',
+        'No class configured in standard_objects',
+      );
+      return;
+    }
     logTestStep(
       'read class source code (active and inactive versions)',
       testsLogger,
@@ -235,6 +283,16 @@ describe('Shared - readSource', () => {
       return;
     }
 
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'read_source',
+      testCaseName: 'read_source_error_unsupported',
+    });
+    const domainName =
+      resolver.getObjectName('domain_name', 'domain') || 'MANDT';
+
     logTestStep(
       'validate error for object type without source code',
       testsLogger,
@@ -243,7 +301,10 @@ describe('Shared - readSource', () => {
       client
         .getUtils()
         // Force runtime validation for invalid inputs.
-        .readObjectSource('domain' as unknown as AdtSourceObjectType, 'MANDT'),
+        .readObjectSource(
+          'domain' as unknown as AdtSourceObjectType,
+          domainName,
+        ),
     ).rejects.toThrow('does not support source code reading');
   });
 });

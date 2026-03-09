@@ -166,7 +166,7 @@ describe('Shared - getSqlQuery', () => {
     // Get SQL query from params or build from standard_objects.tables
     let sqlQuery = resolver.getParam('sql_query');
     if (!sqlQuery) {
-      const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
+      const tableName = resolver.getObjectName('table_name', 'table');
       sqlQuery = `SELECT * FROM ${tableName}`;
     }
     const rowNumber = resolver.getParam('row_number', 10);
@@ -220,7 +220,7 @@ describe('Shared - getSqlQuery', () => {
     // Get SQL query from params or build from standard_objects.tables
     let sqlQuery = resolver.getParam('sql_query');
     if (!sqlQuery) {
-      const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
+      const tableName = resolver.getObjectName('table_name', 'table');
       sqlQuery = `SELECT * FROM ${tableName}`;
     }
 

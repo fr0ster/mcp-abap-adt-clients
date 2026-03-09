@@ -168,7 +168,7 @@ describe('Shared - getTableContents', () => {
     }
 
     // Get table name from params or standard_objects.tables
-    const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
+    const tableName = resolver.getObjectName('table_name', 'table')!;
     const maxRows = resolver.getParam('max_rows', 10);
 
     logTestStep('get table contents', testsLogger);
@@ -222,7 +222,7 @@ describe('Shared - getTableContents', () => {
     }
 
     // Get table name from params or standard_objects.tables
-    const tableName = resolver.getObjectName('table_name', 'table') || 'T000';
+    const tableName = resolver.getObjectName('table_name', 'table')!;
 
     logTestStep('get table contents with default max_rows', testsLogger);
     const result = await withAcceptHandling(

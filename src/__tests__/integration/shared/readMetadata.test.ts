@@ -141,8 +141,15 @@ describe('Shared - readMetadata', () => {
       return;
     }
 
-    // Use a standard SAP class that should exist
-    const className = 'CL_ABAP_CHAR_UTILITIES';
+    const className = resolver.getObjectName('class_name', 'class');
+    if (!className) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readMetadata',
+        'No class configured in standard_objects',
+      );
+      return;
+    }
     try {
       logTestStep('read class metadata', testsLogger);
       testsLogger.info?.(`📋 Object: ${className} (class)`);
@@ -214,8 +221,15 @@ describe('Shared - readMetadata', () => {
       return;
     }
 
-    // Use a standard SAP domain that should exist
-    const domainName = 'MANDT';
+    const domainName = resolver.getObjectName('domain_name', 'domain');
+    if (!domainName) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readMetadata',
+        'No domain configured in standard_objects',
+      );
+      return;
+    }
     try {
       logTestStep('read domain metadata', testsLogger);
       testsLogger.info?.(`📋 Object: ${domainName} (domain)`);
@@ -273,8 +287,15 @@ describe('Shared - readMetadata', () => {
       return;
     }
 
-    // Use a standard SAP table that should exist
-    const tableName = 'T000';
+    const tableName = resolver.getObjectName('table_name', 'table');
+    if (!tableName) {
+      logTestSkip(
+        testsLogger,
+        'Shared - readMetadata',
+        'No table configured in standard_objects',
+      );
+      return;
+    }
     try {
       logTestStep('read table metadata', testsLogger);
       const result = await client
