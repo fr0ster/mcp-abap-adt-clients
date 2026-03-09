@@ -1352,6 +1352,88 @@ package_hierarchy:
       # package_name: "<YOUR_PACKAGE_NAME>"  # Uses environment.default_package if omitted
       params: {}
 
+# Read Metadata (readObjectMetadata)
+# Reads metadata for ABAP objects (class, domain, table, etc.)
+# Uses standard_objects for test object names
+read_metadata:
+  test_cases:
+    - name: "read_class_metadata"
+      enabled: false  # Set to true to enable test
+      description: "Read metadata for a standard class (active and inactive versions). Uses standard_objects.classes."
+      params:
+        # class_name: Uses standard_objects.classes if not specified
+
+    - name: "read_domain_metadata"
+      enabled: false  # Set to true to enable test
+      description: "Read metadata for a standard domain. Uses standard_objects.domains."
+      params:
+        # domain_name: Uses standard_objects.domains if not specified
+
+    - name: "read_table_metadata"
+      enabled: false  # Set to true to enable test
+      description: "Read metadata for a standard table. Uses standard_objects.tables."
+      params:
+        # table_name: Uses standard_objects.tables if not specified
+
+    - name: "read_metadata_error_unsupported"
+      enabled: false  # Set to true to enable test
+      description: "Validate error for unsupported object type"
+      params: {}
+
+# Where-Used (getWhereUsed, getWhereUsedList, getWhereUsedScope)
+# Searches for references to an ABAP object across the system.
+# Two-step flow: 1) GET scope (available object types), 2) POST search with scope.
+# Supported object types: class, program, include, functionGroup, functionModule,
+#   interface, package, table, structure, domain, dataElement, view (CDS)
+where_used:
+  test_cases:
+    - name: "where_used_default_scope"
+      enabled: false  # Set to true to enable test
+      description: "Test getWhereUsed with default scope (Eclipse default behavior). Uses shared_dependencies.tables."
+      params:
+        object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables (referenced by ZAC_SHR_CDSUT_DDLS)
+        object_type: "table"  # class | program | include | functionGroup | functionModule | interface | package | table | structure | domain | dataElement | view
+
+    - name: "where_used_all_types"
+      enabled: false  # Set to true to enable test
+      description: "Test getWhereUsed with all types enabled (Eclipse 'select all' behavior). Uses shared_dependencies.tables."
+      params:
+        object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
+        object_type: "table"
+
+    - name: "where_used_table"
+      enabled: false  # Set to true to enable test
+      description: "Test getWhereUsed for table object type. Uses shared_dependencies.tables."
+      params:
+        object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
+        object_type: "table"
+
+    - name: "where_used_error_no_name"
+      enabled: false  # Set to true to enable test
+      description: "Validate error when object name is missing"
+      params: {}
+
+    - name: "where_used_error_no_type"
+      enabled: false  # Set to true to enable test
+      description: "Validate error when object type is missing"
+      params: {}
+
+    - name: "where_used_list_parsed"
+      enabled: false  # Set to true to enable test
+      description: "Test getWhereUsedList with parsed results. Uses shared_dependencies.tables."
+      params:
+        object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
+        object_type: "table"
+        enable_all_types: true
+
+    - name: "where_used_list_raw_xml"
+      enabled: false  # Set to true to enable test
+      description: "Test getWhereUsedList with raw XML included. Uses shared_dependencies.tables."
+      params:
+        object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
+        object_type: "table"
+        include_raw_xml: true
+
 # Read Accept (read methods should return 2xx; 406 is error)
 read_accept:
   test_cases:

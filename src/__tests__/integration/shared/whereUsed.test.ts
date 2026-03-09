@@ -141,15 +141,19 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const params = resolver.getParams();
+    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
+    const objectType = params.object_type || 'class';
+
     logTestStep('where-used with default scope', testsLogger);
-    testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+    testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
     const utils = client.getUtils();
     const scopeResponse = await withAcceptHandling(
       utils.getWhereUsedScope({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class',
+        object_name: objectName,
+        object_type: objectType,
       }),
     );
 
@@ -162,8 +166,8 @@ describe('Shared - getWhereUsed', () => {
     );
     const result = await withAcceptHandling(
       utils.getWhereUsed({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class',
+        object_name: objectName,
+        object_type: objectType,
         scopeXml: scopeResponse.data, // Pass scope as-is, no modifications
       }),
     );
@@ -205,15 +209,19 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const params = resolver.getParams();
+    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
+    const objectType = params.object_type || 'class';
+
     logTestStep('where-used with ALL types enabled', testsLogger);
-    testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+    testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
     testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
     const utils = client.getUtils();
     const scopeResponse = await withAcceptHandling(
       utils.getWhereUsedScope({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class',
+        object_name: objectName,
+        object_type: objectType,
       }),
     );
 
@@ -250,8 +258,8 @@ describe('Shared - getWhereUsed', () => {
     );
     const result = await withAcceptHandling(
       utils.getWhereUsed({
-        object_name: 'CL_ABAP_CHAR_UTILITIES',
-        object_type: 'class',
+        object_name: objectName,
+        object_type: objectType,
         scopeXml: modifiedScope,
       }),
     );
@@ -293,15 +301,19 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const params = resolver.getParams();
+    const objectName = params.object_name || 'T000';
+    const objectType = params.object_type || 'table';
+
     try {
       logTestStep('get where-used for table', testsLogger);
-      testsLogger.info?.('📋 Object: T000 (table)');
+      testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
       testsLogger.info?.('🔍 Step 1: Fetching scope configuration...');
 
       const result = await withAcceptHandling(
         client.getUtils().getWhereUsed({
-          object_name: 'T000',
-          object_type: 'table',
+          object_name: objectName,
+          object_type: objectType,
         }),
       );
 
@@ -344,7 +356,7 @@ describe('Shared - getWhereUsed', () => {
       }
       if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         throw new Error(
-          `Request timeout: Where-used query for table "T000" exceeded timeout. This may indicate that the query is too complex or the system is slow. Consider increasing the timeout or using a simpler test object. Error: ${error.message}`,
+          `Request timeout: Where-used query for table "${objectName}" exceeded timeout. This may indicate that the query is too complex or the system is slow. Consider increasing the timeout or using a simpler test object. Error: ${error.message}`,
         );
       }
       throw error;
@@ -441,20 +453,25 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const params = resolver.getParams();
+    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
+    const objectType = params.object_type || 'class';
+    const enableAllTypes = params.enable_all_types !== false;
+
     logTestStep('get where-used list with parsed results', testsLogger);
-    testsLogger.info?.('📋 Object: CL_ABAP_CHAR_UTILITIES (class)');
+    testsLogger.info?.(`📋 Object: ${objectName} (${objectType})`);
     testsLogger.info?.('🔍 Fetching parsed where-used list...');
 
     const utils = client.getUtils();
     const result = await utils.getWhereUsedList({
-      object_name: 'CL_ABAP_CHAR_UTILITIES',
-      object_type: 'class',
-      enableAllTypes: true,
+      object_name: objectName,
+      object_type: objectType,
+      enableAllTypes: enableAllTypes,
     });
 
     expect(result).toBeDefined();
-    expect(result.objectName).toBe('CL_ABAP_CHAR_UTILITIES');
-    expect(result.objectType).toBe('class');
+    expect(result.objectName).toBe(objectName);
+    expect(result.objectType).toBe(objectType);
     expect(typeof result.totalReferences).toBe('number');
     expect(Array.isArray(result.references)).toBe(true);
 
@@ -507,12 +524,16 @@ describe('Shared - getWhereUsed', () => {
       return;
     }
 
+    const params = resolver.getParams();
+    const objectName = params.object_name || 'CL_ABAP_CHAR_UTILITIES';
+    const objectType = params.object_type || 'class';
+
     logTestStep('get where-used list with raw XML', testsLogger);
 
     const utils = client.getUtils();
     const result = await utils.getWhereUsedList({
-      object_name: 'CL_ABAP_CHAR_UTILITIES',
-      object_type: 'class',
+      object_name: objectName,
+      object_type: objectType,
       includeRawXml: true,
     });
 

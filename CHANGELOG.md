@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.8.2] - 2026-03-09
+
+### Added
+- **Where-used test config**: Added `where_used` section (7 test cases) to YAML template and config using `ZAC_SHR_VTABL` from shared dependencies for consistent results across environments.
+- **Read metadata test config**: Added `read_metadata` section (4 test cases) to YAML template and config.
+
+### Changed
+- **Where-used tests**: Replaced hardcoded object names (`CL_ABAP_CHAR_UTILITIES`, `T000`) with YAML config-driven params via `TestConfigResolver`.
+
 ## [3.8.1] - 2026-03-09
 
 ### Fixed
