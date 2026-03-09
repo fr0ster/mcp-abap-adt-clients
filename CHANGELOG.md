@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.8.3] - 2026-03-09
+
+### Changed
+- **Test config**: Replace hardcoded object names with YAML config in shared tests (readMetadata, readSource, whereUsed, sqlQuery, tableContents). All tests now use `standard_objects` / `shared_dependencies` via `TestConfigResolver`.
+- **Test config**: Add missing YAML sections — `read_source`, `read_metadata`, `where_used`, `read_transport`, `run_program`, and 11 readonly read sections.
+
+### Dependencies
+- **@mcp-abap-adt/connection**: `^1.5.0` → `^1.5.1` — fixes RFC query params encoding.
+
 ## [3.8.2] - 2026-03-09
 
 ### Added
