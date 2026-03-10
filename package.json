@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "3.8.7",
+  "version": "3.8.8",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -44,6 +44,7 @@
     "format": "npx biome format --write src",
     "build": "npm run --silent clean && npx biome check src --diagnostic-level=error && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
+    "test:init": "cp -n src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml && echo 'Created test-config.yaml — edit lines marked ← CHANGE'",
     "test": "npx jest --runInBand",
     "test:check": "npx tsc --noEmit --project tsconfig.test.json",
     "test:type-check": "npm run test:check",

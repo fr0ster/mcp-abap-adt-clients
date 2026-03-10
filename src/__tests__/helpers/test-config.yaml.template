@@ -1,10 +1,20 @@
-# Test Configuration Template for @mcp-abap-adt/adt-clients
-# Copy this file to test-config.yaml and configure for your environment
-# AdtClient Tests Configuration
+# Test Configuration for @mcp-abap-adt/adt-clients
 #
 # Usage:
 #   cp src/__tests__/helpers/test-config.yaml.template src/__tests__/helpers/test-config.yaml
-#   # Edit test-config.yaml with your specific values
+#   # Edit ONLY the lines marked with "# ← CHANGE" below
+#
+# ┌──────────────────────────────────────────────────────────────────┐
+# │  REQUIRED CHANGES (edit these after copying):                    │
+# │                                                                  │
+# │  1. environment.default_package       — your dev package (Z*/Y*) │
+# │  2. environment.default_transport     — transport request or ""  │
+# │  3. environment.default_master_system — SAP system ID            │
+# │  4. shared_dependencies.super_package — parent package           │
+# │                                                                  │
+# │  ON-PREM ONLY (if creating packages):                            │
+# │  5. create_package.transport_layer    — e.g. "ZE19"             │
+# └──────────────────────────────────────────────────────────────────┘
 #
 # IMPORTANT: Object Naming Convention
 # ===================================
@@ -69,9 +79,9 @@ lock_config:
 
 # Environment configuration
 environment:
-  default_package: "<YOUR_DEFAULT_PACKAGE>"  # Default package for creating objects (used if not specified in test case)
-  default_transport: "<YOUR_TRANSPORT_REQUEST>"  # Default transport request (used if not specified in test case)
-  default_master_system: "<YOUR_SYSTEM_ID>"  # SAP system ID for masterSystem attribute (on-prem only, cloud gets it from systeminformation endpoint)
+  default_package: "ZADT_TEST"               # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
+  default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
+  default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
   # connection_type: "rfc"  # Uncomment for legacy systems (BASIS < 7.50). Also set SAP_UNICODE=false in .env for non-unicode systems
 
@@ -81,7 +91,7 @@ environment:
 # Naming convention: ZAC_SHR_{COMPONENT}_{OBJTYPE}
 shared_dependencies:
   package: "ZAC_SHR_PKG"
-  super_package: "<YOUR_DEFAULT_PACKAGE>"    # Parent package (same as environment.default_package)
+  super_package: "ZADT_TEST"                 # ← CHANGE: parent package (same as environment.default_package)
   software_component: ""                     # e.g., HOME (leave empty for cloud)
   transport_layer: ""                        # e.g., ZE19 (leave empty for cloud)
 
@@ -743,13 +753,13 @@ create_package:
       available_in: ["onprem"]
       description: "Package reserved for AdtPackage tests"
       params:
-        package_name: "<YOUR_PARENT_PACKAGE>"    # Parent package (existing, must be structure/main type)
+        package_name: "ZADT_TEST"                 # Parent package (existing, must be structure/main type)
         test_package: "ZADT_BLD_INNER_PKG01"    # Package created by the test
         description: "AdtPackage workflow package"
         updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
         software_component: "HOME"              # Software component name (required for package creation)
-        transport_layer: "<YOUR_TRANSPORT_LAYER>"  # Transport layer (required, e.g., "ZE19")
+        transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "ZE19"
         # transport_request: ""                 # Uses environment.default_transport if omitted
 
 # Create Domain
