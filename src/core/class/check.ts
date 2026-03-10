@@ -258,7 +258,9 @@ async function checkClassInclude(
   if (checkResult.has_errors) {
     const errorMessages =
       checkResult.errors.length > 0
-        ? checkResult.errors.map((err: { text?: string }) => err.text).join('; ')
+        ? checkResult.errors
+            .map((err: { text?: string }) => err.text)
+            .join('; ')
         : `status=${checkResult.status}, message=${checkResult.message || 'none'}`;
     throw new Error(`${includeName} check failed: ${errorMessages}`);
   }

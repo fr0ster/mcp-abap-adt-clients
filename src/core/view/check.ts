@@ -72,7 +72,9 @@ export async function checkView(
         return response;
       }
 
-      const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
+      const errorMessages = checkResult.errors
+        .map((err) => err.text)
+        .join('; ');
       throw new Error(`View check failed: ${errorMessages}`);
     }
 
