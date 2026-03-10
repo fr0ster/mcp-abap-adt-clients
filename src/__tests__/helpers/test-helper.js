@@ -2135,9 +2135,7 @@ async function ensureSharedDependency(client, type, name, logger) {
         .read({ accessControlName: name });
       exists = result !== undefined;
     } else if (type === 'interfaces') {
-      const result = await client
-        .getInterface()
-        .read({ interfaceName: name });
+      const result = await client.getInterface().read({ interfaceName: name });
       exists = result !== undefined;
     } else if (type === 'function_groups') {
       const result = await client
@@ -2145,9 +2143,10 @@ async function ensureSharedDependency(client, type, name, logger) {
         .read({ functionGroupName: name });
       exists = result !== undefined;
     } else if (type === 'function_modules') {
-      const result = await client
-        .getFunctionModule()
-        .read({ functionModuleName: name, functionGroupName: depConfig.function_group });
+      const result = await client.getFunctionModule().read({
+        functionModuleName: name,
+        functionGroupName: depConfig.function_group,
+      });
       exists = result !== undefined;
     }
   } catch (error) {

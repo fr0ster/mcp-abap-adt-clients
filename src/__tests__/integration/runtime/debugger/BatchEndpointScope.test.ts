@@ -296,7 +296,9 @@ describe('Debugger Batch Endpoint Scope', () => {
             if (process.env.DEBUG_ADT_TESTS === 'true') {
               for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
-                const statusMatch = part.match(/HTTP\/1\.1\s+(\d+)\s+([^\r\n]*)/);
+                const statusMatch = part.match(
+                  /HTTP\/1\.1\s+(\d+)\s+([^\r\n]*)/,
+                );
                 const status = statusMatch
                   ? `${statusMatch[1]} ${statusMatch[2]}`
                   : 'unknown';

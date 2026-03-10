@@ -5,6 +5,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.8.9] - 2026-03-11
+
+### Changed
+- **Test config**: Migrate `standard_objects` from system-dependent SAP objects to own shared dependencies (`ZAC_SHR_*`) to avoid ABAP version/system differences across test environments.
+  - classes: `CL_ABAP_CHAR_UTILITIES` → `ZAC_SHR_RUN01`
+  - interfaces: `IF_BUPA_API_MODIFY` → `ZAC_SHR_IF01`
+  - views: `H_T000` → `ZAC_SHR_CDSUT_DDLS`
+  - programs: `RSHOWTIM` → `ZAC_SHR_PROG`
+  - function_groups: `EDIN` → `ZAC_SHR_FUGR`
+  - function_modules: `IDOC_INBOUND_XML_SOAP_HTTP` → `Z_AC_SHR_FM01`
+  - Basic DDIC objects (MANDT, SYST, T000, STRING_TABLE, ABAP_BOOL) kept as-is.
+- **Test config**: Rename all test object names from `ZADT_BLD_*` prefix to `ZAC_*` (shorter, avoids collision with `mcp-abap-adt` project).
+- **Test config**: Enable all tests by default in template (`enabled: true`); use `available_in` for environment-specific restrictions instead of `enabled: false`.
+
+### Added
+- **Shared dependencies**: Add `ZAC_SHR_IF01` (interface) and `Z_AC_SHR_FM01` (function module in `ZAC_SHR_FUGR`) to shared dependencies.
+- **Admin scripts**: Add `interfaces` and `function_modules` support to setup and teardown scripts.
+
+### Fixed
+- **ServiceDefinition**: Fix leaked YAML comment (`#`) in `source_code` block causing CDS syntax error on update.
+- **BatchEndpointScope**: Wrap verbose payload/response logging behind `DEBUG_ADT_TESTS` env var.
+- **readAccept/readAcceptCorrected**: Skip local test classes read on cloud (standard classes have no test includes).
+
+## [3.8.8] - 2026-03-11
+
+### Fixed
+- **Biome formatting**: Fix formatting in `check.ts` for class and view modules after i18n refactoring.
+
+## [3.8.7] - 2026-03-11
+
+### Fixed
+- **Check results (i18n)**: Replace English text matching (`"has been checked"` / `"was checked"`) in `parseCheckRunResponse` with language-independent approach — filter E-type echo messages by `statusText` comparison, extract structured `code`/`msgId`/`msgNo` from check messages. Removes hardcoded English strings from all 12 `check.ts` files. Fixes [fr0ster/mcp-abap-adt#13](https://github.com/fr0ster/mcp-abap-adt/issues/13).
+
+## [3.8.6] - 2026-03-11
+
+### Fixed
+- **Error response logging**: Replace `JSON.stringify(e.response.data)` with `safeStringify()` in create/update/unlock error handlers across class, enhancement, interface, program, table, tabletype, transport, function group modules — `JSON.stringify` on Axios error responses throws `TypeError` due to circular references, masking the original SAP error message.
+
+### Added
+- **`safeStringify` utility** (`src/utils/internalUtils.ts`): Serializes objects with circular reference protection via replacer function.
+
+## [3.8.5] - 2026-03-11
+
+### Fixed
+- **Logger error calls**: Replace raw `AxiosError` objects passed to `logger.error()`/`logger.warn()` with `safeErrorMessage()` utility across all 34 ADT object modules — `AxiosError` objects contain circular references that crash `JSON.stringify` inside logger implementations. `safeErrorMessage()` safely extracts HTTP status, response data snippet, and error message.
+
+### Added
+- **`safeErrorMessage` utility** (`src/utils/internalUtils.ts`): Extract safe, loggable string from error objects (HTTP status + response data + message) without circular reference risks.
+- **Test scripts**: `test:reinit` — cross-platform (Windows compatible) script to recreate `test-config.yaml` from template (replaces `cp -n` which doesn't work on Windows).
+
 ## [3.8.4] - 2026-03-10
 
 ### Fixed

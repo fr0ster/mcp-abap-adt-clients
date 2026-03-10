@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "3.8.8",
+  "version": "3.8.9",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -44,7 +44,8 @@
     "format": "npx biome format --write src",
     "build": "npm run --silent clean && npx biome check src --diagnostic-level=error && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
-    "test:init": "node -e \"const fs=require('fs'),s='src/__tests__/helpers/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
+    "test:init": "node -e \"const fs=require('fs'),s='src/__tests__/helpers/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
+    "test:reinit": "node -e \"const fs=require('fs'),s='src/__tests__/helpers/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "npx jest --runInBand",
     "test:check": "npx tsc --noEmit --project tsconfig.test.json",
     "test:type-check": "npm run test:check",
