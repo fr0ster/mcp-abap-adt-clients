@@ -92,10 +92,11 @@ describe('Admin: Setup shared dependencies', () => {
       testsLogger.info('Setting up shared package...');
       await ensureSharedPackage(client, testsLogger);
 
-      // Dependency order: tables → views → behavior_definitions → classes → function_groups → programs
+      // Dependency order: tables → views → access_controls → behavior_definitions → classes → function_groups → programs
       const typeOrder: Array<{ type: string; label: string }> = [
         { type: 'tables', label: 'Tables' },
         { type: 'views', label: 'Views' },
+        { type: 'access_controls', label: 'Access controls' },
         { type: 'behavior_definitions', label: 'Behavior definitions' },
         { type: 'classes', label: 'Classes' },
         { type: 'function_groups', label: 'Function groups' },

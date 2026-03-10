@@ -173,6 +173,17 @@ shared_dependencies:
           fld2
         }
 
+  access_controls:
+    - name: "ZAC_SHR_AC01"
+      description: "Shared access control for CDS view ZAC_SHR_CDSUT_DDLS"
+      source: |
+        @EndUserText.label : 'Shared access control for ZAC_SHR_CDSUT_DDLS'
+        @MappingRole : true
+        define role ZAC_SHR_AC01 {
+          grant select on ZAC_SHR_CDSUT_DDLS
+          where ( ) = aspect pfcg_auth ( 'S_TABU_NAM', ACTVT = '03', TABLE = 'ZAC_SHR_CDSUT_DDLS' );
+        }
+
   behavior_definitions:
     - name: "ZAC_SHR_BIMP_DDLS"
       description: "Shared BDEF for BehaviorImplementation"
@@ -328,8 +339,8 @@ standard_objects:
       available_in: ["onprem"]
 
   access_controls:
-    - name: "ZPLACEHOLDER_DCLS"
-      description: "Placeholder for access control – replace with existing access control"
+    - name: "ZAC_SHR_AC01"
+      description: "Shared access control for CDS view ZAC_SHR_CDSUT_DDLS"
       available_in: ["onprem", "cloud"]
 
   service_bindings:
@@ -957,8 +968,8 @@ create_access_control:
           @EndUserText.label: 'AdtAccessControl workflow access control'
           @MappingRole: true
           define role ZADT_BLD_AC01 {
-            grant select on ZADT_BLD_AC01
-            where ( ) = aspect pfcg_auth( , , );
+            grant select on ZAC_SHR_CDSUT_DDLS
+            where ( ) = aspect pfcg_auth ( 'S_TABU_NAM', ACTVT = '03', TABLE = 'ZAC_SHR_CDSUT_DDLS' );
           }
 
 # Create Service Binding

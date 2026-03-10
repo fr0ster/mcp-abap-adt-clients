@@ -29,6 +29,7 @@ const DEP_PARAM_MAP: Record<string, string> = {
 const PARAM_TO_TYPE: Record<string, string> = {
   table_name: 'tables',
   view_name: 'views',
+  access_control_name: 'access_controls',
   function_group_name: 'function_groups',
   program_name: 'programs',
 };
@@ -51,6 +52,7 @@ function buildAllSharedNamesSet(
   const sections = [
     'tables',
     'views',
+    'access_controls',
     'behavior_definitions',
     'function_groups',
     'programs',
@@ -172,10 +174,11 @@ describe('Config: shared_dependencies consistency', () => {
     }
   });
 
-  it('shared view/bdef DDL should only reference tables defined in shared_dependencies', () => {
+  it('shared view/bdef/access_control DDL should only reference objects defined in shared_dependencies', () => {
     if (!sharedConfig) return;
 
     const sharedTableNames = getSharedNames(sharedConfig, 'tables');
+    const sharedViewNames = getSharedNames(sharedConfig, 'views');
     const allSharedNames = buildAllSharedNamesSet(sharedConfig);
     const errors: string[] = [];
 
@@ -217,8 +220,27 @@ describe('Config: shared_dependencies consistency', () => {
       }
     }
 
+    // Check access control DDL: "grant select on <view>"
+    const accessControls = sharedConfig.access_controls || [];
+    for (const ac of accessControls) {
+      if (typeof ac.source !== 'string') continue;
+      const matches = ac.source.match(/grant\s+select\s+on\s+(\w+)/gi) || [];
+      for (const match of matches) {
+        const viewName = match
+          .replace(/grant\s+select\s+on\s+/i, '')
+          .trim()
+          .toUpperCase();
+        if (!allSharedNames.has(viewName)) continue;
+        if (!sharedViewNames.includes(viewName)) {
+          errors.push(
+            `shared_dependencies.access_controls.${ac.name}: DDL references "${viewName}" not in shared_dependencies.views`,
+          );
+        }
+      }
+    }
+
     if (errors.length > 0) {
-      fail(`Unresolved DDL table references:\n  ${errors.join('\n  ')}`);
+      fail(`Unresolved DDL references:\n  ${errors.join('\n  ')}`);
     }
   });
 
@@ -263,6 +285,18 @@ describe('Config: shared_dependencies consistency', () => {
       }
       if (typeof bdef.root_entity === 'string') {
         const name = bdef.root_entity.toUpperCase();
+        if (allSharedNames.has(name)) referencedNames.add(name);
+      }
+    }
+
+    // Also collect names referenced via access control DDL (grant select on <view>)
+    for (const ac of sharedConfig.access_controls || []) {
+      if (typeof ac.source !== 'string') continue;
+      for (const m of ac.source.match(/grant\s+select\s+on\s+(\w+)/gi) || []) {
+        const name = m
+          .replace(/grant\s+select\s+on\s+/i, '')
+          .trim()
+          .toUpperCase();
         if (allSharedNames.has(name)) referencedNames.add(name);
       }
     }
