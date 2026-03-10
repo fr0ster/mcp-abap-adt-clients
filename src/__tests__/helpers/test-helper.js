@@ -2064,6 +2064,25 @@ async function updateAndActivateShared(
       },
       { activateOnUpdate: true, sourceCode: depConfig.source },
     );
+  } else if (type === 'interfaces') {
+    await client.getInterface().update(
+      {
+        interfaceName: name,
+        sourceCode: depConfig.source,
+        transportRequest,
+      },
+      { activateOnUpdate: true, sourceCode: depConfig.source },
+    );
+  } else if (type === 'function_modules') {
+    await client.getFunctionModule().update(
+      {
+        functionModuleName: name,
+        functionGroupName: depConfig.function_group,
+        sourceCode: depConfig.source,
+        transportRequest,
+      },
+      { activateOnUpdate: true, sourceCode: depConfig.source },
+    );
   } else {
     logger?.info?.(`Shared ${type} ${name} — no update logic, skipping`);
     return;
@@ -2115,10 +2134,20 @@ async function ensureSharedDependency(client, type, name, logger) {
         .getAccessControl()
         .read({ accessControlName: name });
       exists = result !== undefined;
+    } else if (type === 'interfaces') {
+      const result = await client
+        .getInterface()
+        .read({ interfaceName: name });
+      exists = result !== undefined;
     } else if (type === 'function_groups') {
       const result = await client
         .getFunctionGroup()
         .read({ functionGroupName: name });
+      exists = result !== undefined;
+    } else if (type === 'function_modules') {
+      const result = await client
+        .getFunctionModule()
+        .read({ functionModuleName: name, functionGroupName: depConfig.function_group });
       exists = result !== undefined;
     }
   } catch (error) {
@@ -2271,6 +2300,25 @@ async function ensureSharedDependency(client, type, name, logger) {
         );
         logger?.info?.(`Shared access control ${name} activated`);
       }
+    } else if (type === 'interfaces') {
+      await client.getInterface().create({
+        interfaceName: name,
+        packageName,
+        description: depConfig.description || 'Shared test interface',
+        transportRequest,
+      });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared interface ${name}...`);
+        await client.getInterface().update(
+          {
+            interfaceName: name,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared interface ${name} activated`);
+      }
     } else if (type === 'function_groups') {
       try {
         await client.getFunctionGroup().create({
@@ -2287,6 +2335,27 @@ async function ensureSharedDependency(client, type, name, logger) {
           .getFunctionGroup()
           .read({ functionGroupName: name });
         if (!verify) throw createErr;
+      }
+    } else if (type === 'function_modules') {
+      await client.getFunctionModule().create({
+        functionModuleName: name,
+        functionGroupName: depConfig.function_group,
+        packageName,
+        description: depConfig.description || 'Shared test FM',
+        transportRequest,
+      });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared function module ${name}...`);
+        await client.getFunctionModule().update(
+          {
+            functionModuleName: name,
+            functionGroupName: depConfig.function_group,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared function module ${name} activated`);
       }
     }
     logger?.info?.(`Created shared ${type} ${name}`);

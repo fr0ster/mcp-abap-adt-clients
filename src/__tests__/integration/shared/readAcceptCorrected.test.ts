@@ -235,6 +235,12 @@ describe('Shared - read Accept headers (corrected)', () => {
       );
       return;
     }
+    if (isCloudSystem) {
+      testsLogger.warn?.(
+        '⚠️ Skipping test: Standard classes on cloud trial have no local test classes',
+      );
+      return;
+    }
 
     logTestStep('read local test classes', testsLogger);
     const state = await runReadWithAcceptLogging(

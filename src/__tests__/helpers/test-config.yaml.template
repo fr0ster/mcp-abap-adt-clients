@@ -18,21 +18,21 @@
 #
 # IMPORTANT: Object Naming Convention
 # ===================================
-# All test objects must use the ZADT_BLD_* naming convention:
-# - Classes: ZADT_BLD_CLS01, ZADT_BLD_CLS02, etc.
-# - Domains: ZADT_BLD_DOM01, ZADT_BLD_DOM02, etc.
-# - Data Elements: ZADT_BLD_DTEL01, ZADT_BLD_DTEL02, etc.
-# - Function Modules: Z_ADT_BLD_FM01, Z_ADT_BLD_FM02, etc. (must start with Z_ or Y_)
-# - Function Groups: ZADT_BLD_FGR01, ZADT_BLD_FGR02, etc.
-# - Interfaces: ZADT_BLD_IF01, ZADT_BLD_IF02, etc.
-# - Programs: ZADT_BLD_PROG01, ZADT_BLD_PROG02, etc.
-# - Tables: ZADT_BLD_TAB01, ZADT_BLD_TAB02, etc.
-# - TableTypes: ZADT_BLD_TTYP01, ZADT_BLD_TTYP02, etc.
-# - Structures: ZADT_BLD_STRU01, ZADT_BLD_STRU02, etc.
-# - Views: ZADT_BLD_VIEW01, ZADT_BLD_VIEW02, etc.
-# - Service Definitions: ZADT_BLD_SRVD01, ZADT_BLD_SRVD02, etc.
-# - Service Bindings: ZADT_BLD_SRVB01, ZADT_BLD_SRVB02, etc.
-# - Packages: ZADT_BLD_PKG01, ZADT_BLD_PKG02, etc.
+# All test objects must use the ZAC_* naming convention:
+# - Classes: ZAC_CLS01, ZAC_CLS02, etc.
+# - Domains: ZAC_DOM01, ZAC_DOM02, etc.
+# - Data Elements: ZAC_DTEL01, ZAC_DTEL02, etc.
+# - Function Modules: Z_AC_FM01, Z_AC_FM02, etc. (must start with Z_ or Y_)
+# - Function Groups: ZAC_FGR01, ZAC_FGR02, etc.
+# - Interfaces: ZAC_IF01, ZAC_IF02, etc.
+# - Programs: ZAC_PROG01, ZAC_PROG02, etc.
+# - Tables: ZAC_TAB01, ZAC_TAB02, etc.
+# - TableTypes: ZAC_TTYP01, ZAC_TTYP02, etc.
+# - Structures: ZAC_STRU01, ZAC_STRU02, etc.
+# - Views: ZAC_VIEW01, ZAC_VIEW02, etc.
+# - Service Definitions: ZAC_SRVD01, ZAC_SRVD02, etc.
+# - Service Bindings: ZAC_SRVB01, ZAC_SRVB02, etc.
+# - Packages: ZAC_PKG01, ZAC_PKG02, etc.
 #
 # Test settings
 test_settings:
@@ -200,7 +200,7 @@ shared_dependencies:
       root_entity: "ZAC_SHR_BIMP_DDLS"
       implementation_type: "Managed"
       source: |
-        managed implementation in class zbp_adt_shr_bimp_ddls unique;
+        managed implementation in class zbp_ac_shr_bimp_ddls unique;
         strict ( 2 );
 
         define behavior for ZAC_SHR_BIMP_DDLS
@@ -248,9 +248,33 @@ shared_dependencies:
           ENDMETHOD.
         ENDCLASS.
 
+  interfaces:
+    - name: "ZAC_SHR_IF01"
+      description: "Shared interface for read-only tests"
+      source: |
+        INTERFACE zac_shr_if01 PUBLIC.
+          METHODS get_value RETURNING VALUE(rv_value) TYPE string.
+        ENDINTERFACE.
+
   function_groups:
     - name: "ZAC_SHR_FUGR"
       description: "Shared FUGR for FM tests"
+
+  function_modules:
+    - name: "Z_AC_SHR_FM01"
+      function_group: "ZAC_SHR_FUGR"
+      description: "Shared FM for read-only tests"
+      source: |
+        FUNCTION z_ac_shr_fm01.
+        *"----------------------------------------------------------------------
+        *"*"Local Interface:
+        *"  IMPORTING
+        *"     VALUE(IV_INPUT) TYPE  STRING
+        *"  EXPORTING
+        *"     VALUE(EV_OUTPUT) TYPE  STRING
+        *"----------------------------------------------------------------------
+          ev_output = |Result: { iv_input }|.
+        ENDFUNCTION.
 
   programs:
     - name: "ZAC_SHR_PROG"
@@ -259,21 +283,21 @@ shared_dependencies:
         REPORT ZAC_SHR_PROG.
         WRITE: / 'Shared test program'.
 
-# Standard SAP objects registry for read-only tests
+# Standard objects registry for read-only tests
+# Uses shared dependencies (ZAC_SHR_*) where possible to avoid ABAP version dependencies.
+# Only basic DDIC objects (MANDT, SYST, T000, etc.) use SAP standard names.
 standard_objects:
   classes:
-    - name: "CL_ABAP_CHAR_UTILITIES"
-      description: "Character utilities helper (available everywhere)"
-      available_in: ["onprem", "legacy", "cloud"]
-    - name: "CL_ABAP_CORRESPONDING"
-      description: "Corresponding-move helper for ABAP"
-      available_in: ["onprem", "legacy", "cloud"]
+    - name: "ZAC_SHR_RUN01"
+      description: "Shared runnable class (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
   interfaces:
-    - name: "IF_BUPA_API_MODIFY"
-      description: "Interface zum BAdI: BUPA_API_MODIFY"
-      available_in: ["onprem", "legacy", "cloud"]
+    - name: "ZAC_SHR_IF01"
+      description: "Shared interface (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
+  # Basic DDIC objects — guaranteed to exist on all ABAP systems
   domains:
     - name: "MANDT"
       description: "Client domain"
@@ -292,11 +316,8 @@ standard_objects:
 
   tables:
     - name: "T000"
-      description: "Client table (on-premise SAP systems)"
-      available_in: ["onprem", "legacy"]
-    - name: "T000"
-      description: "Clients"
-      available_in: ["cloud"]
+      description: "Client table"
+      available_in: ["onprem", "legacy", "cloud"]
 
   tabletypes:
     - name: "STRING_TABLE"
@@ -317,49 +338,43 @@ standard_objects:
       available_in: ["cloud"]
 
   programs:
-    - name: "RSHOWTIM"
-      description: "Standard SAP show time program"
-      available_in: ["onprem", "legacy"]
+    - name: "ZAC_SHR_PROG"
+      description: "Shared program (from shared_dependencies)"
+      available_in: ["onprem"]
 
   views:
-    - name: "H_T000"
-      description: "Client table help view"
-      available_in: ["onprem", "legacy"]
-    - name: "I_SapPackage"
-      description: "ABAP Cloud: replace with CDS view name existing in tenant"
-      available_in: ["cloud"]
+    - name: "ZAC_SHR_CDSUT_DDLS"
+      description: "Shared CDS view (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
   function_groups:
-    - name: "EDIN"
-      description: "System function group"
-      available_in: ["onprem", "legacy", "cloud"]
+    - name: "ZAC_SHR_FUGR"
+      description: "Shared function group (from shared_dependencies)"
+      available_in: ["onprem"]
 
   function_modules:
-    - name: "IDOC_INBOUND_XML_SOAP_HTTP"
-      group: "EDIN"
-      description: "Returns system metadata"
-      available_in: ["onprem", "legacy", "cloud"]
+    - name: "Z_AC_SHR_FM01"
+      group: "ZAC_SHR_FUGR"
+      description: "Shared function module (from shared_dependencies)"
+      available_in: ["onprem"]
 
   service_definitions:
-    - name: "I_SapPackage"
-      description: "ABAP Cloud: replace with service definition name existing in tenant"
-      available_in: ["cloud"]
-    - name: "ZPLACEHOLDER_SRVD"
-      description: "Placeholder for on-premise service definition – replace with existing service definition"
+    - name: "ZAC_SRVD01"
+      description: "Placeholder for service definition – replace with existing service definition"
       available_in: ["onprem"]
 
   access_controls:
     - name: "ZAC_SHR_AC01"
-      description: "Shared access control for CDS view ZAC_SHR_CDSUT_DDLS"
+      description: "Shared access control (from shared_dependencies)"
       available_in: ["onprem", "cloud"]
 
   service_bindings:
-    - name: "ZPLACEHOLDER_SRVB"
+    - name: "ZAC_SRVB01"
       description: "Placeholder for service binding – replace with existing service binding"
       available_in: ["onprem", "cloud"]
 
   standard_criteria:
-    note: "Update the entries above with objects that exist in your SAP system before running read tests."
+    note: "Most entries use shared dependencies (ZAC_SHR_*). Only basic DDIC uses SAP standard names."
 
 # ============================================================================
 # READ TESTS (Read-only operations on existing objects)
@@ -395,7 +410,7 @@ read_program:
 read_class:
   test_cases:
     - name: "readonly_read_class"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing class using AdtClient (uses standard_objects.classes)"
       params: {}  # No params needed - automatically uses standard_objects.classes filtered by available_in
 
@@ -404,7 +419,7 @@ read_class:
 read_interface:
   test_cases:
     - name: "readonly_read_interface"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing interface using AdtClient (uses standard_objects.interfaces)"
       params: {}  # No params needed - automatically uses standard_objects.interfaces filtered by available_in
 
@@ -413,7 +428,7 @@ read_interface:
 read_domain:
   test_cases:
     - name: "readonly_read_domain"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing domain using AdtClient (uses standard_objects.domains)"
       params: {}  # No params needed - automatically uses standard_objects.domains filtered by available_in
 
@@ -422,7 +437,7 @@ read_domain:
 read_data_element:
   test_cases:
     - name: "readonly_read_data_element"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing data element using AdtClient (uses standard_objects.data_elements)"
       params: {}  # No params needed - automatically uses standard_objects.data_elements filtered by available_in
 
@@ -431,7 +446,7 @@ read_data_element:
 read_structure:
   test_cases:
     - name: "readonly_read_structure"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing structure using AdtClient (uses standard_objects.structures)"
       params: {}  # No params needed - automatically uses standard_objects.structures filtered by available_in
 
@@ -441,7 +456,7 @@ read_structure:
 read_table:
   test_cases:
     - name: "readonly_read_table"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       available_in: ["onprem"]  # Only available on on-premise (tables endpoint cannot read tables on cloud)
       description: "Read existing table using AdtClient (uses standard_objects.tables). On cloud, 99% of tables are not readable via ADT."
       params: {}  # No params needed - automatically uses standard_objects.tables filtered by available_in
@@ -451,7 +466,7 @@ read_table:
 read_view:
   test_cases:
     - name: "readonly_read_view"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing view using AdtClient (uses standard_objects.views)"
       params: {}  # No params needed - automatically uses standard_objects.views filtered by available_in
 
@@ -460,7 +475,7 @@ read_view:
 read_function_group:
   test_cases:
     - name: "readonly_read_function_group"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing function group using AdtClient (uses standard_objects.function_groups)"
       params: {}  # No params needed - automatically uses standard_objects.function_groups filtered by available_in
 
@@ -469,7 +484,7 @@ read_function_group:
 read_function_module:
   test_cases:
     - name: "readonly_read_function_module"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing function module using AdtClient (uses standard_objects.function_modules)"
       params: {}  # No params needed - automatically uses standard_objects.function_modules filtered by available_in
 
@@ -478,7 +493,7 @@ read_function_module:
 read_package:
   test_cases:
     - name: "readonly_read_package"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing package using AdtClient (uses standard_objects.packages)"
       params: {}  # No params needed - automatically uses standard_objects.packages filtered by available_in
 
@@ -487,39 +502,36 @@ read_package:
 read_service_definition:
   test_cases:
     - name: "readonly_read_service_definition"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing service definition using AdtClient (uses standard_objects.service_definitions)"
       params: {}  # No params needed - automatically uses standard_objects.service_definitions filtered by available_in
     - name: "read_standard_service_definition"
-      enabled: false  # Set to true and configure params below to enable read test
+      enabled: true
       description: "Read standard SAP service definition"
       params:
         # Specify standard object name directly (overrides standard_objects registry)
-        service_definition_name: "I_SapPackage"  # Replace with existing service definition in your system
-        # Or use environment-specific parameters:
-        # service_definition_name_cloud: "I_SapPackage"  # For cloud systems only
-        # service_definition_name_onprem: "ZPLACEHOLDER_SRVD"  # For on-premise systems only
+        service_definition_name: "ZAC_SRVD01"  # Replace with existing service definition in your system
 
 # Read Access Control (AdtClient)
 # Uses standard_objects.access_controls with available_in filter
 read_access_control:
   test_cases:
     - name: "read_standard_access_control"
-      enabled: false  # Set to true and configure params below to enable read test
+      enabled: true
       description: "Read standard SAP access control"
       params:
         # Specify standard object name directly (overrides standard_objects registry)
-        # access_control_name: "ZPLACEHOLDER_DCLS"  # Replace with existing access control in your system
+        # access_control_name: "ZAC_SHR_AC01"  # Replace with existing access control in your system
         # Or use environment-specific parameters:
-        # access_control_name_cloud: "ZPLACEHOLDER_DCLS"  # For cloud systems only
-        # access_control_name_onprem: "ZPLACEHOLDER_DCLS"  # For on-premise systems only
+        # access_control_name_cloud: "ZAC_SHR_AC01"  # For cloud systems only
+        # access_control_name_onprem: "ZAC_SHR_AC01"  # For on-premise systems only
 
 # Read Service Binding (AdtClient)
 # Uses standard_objects.service_bindings with available_in filter
 read_service_binding:
   test_cases:
     - name: "readonly_read_service_binding"
-      enabled: false  # Set to true to enable read test
+      enabled: true
       description: "Read existing service binding using AdtClient (uses standard_objects.service_bindings)"
       params: {}  # No params needed - automatically uses standard_objects.service_bindings filtered by available_in
 
@@ -527,7 +539,7 @@ read_service_binding:
 read_transport:
   test_cases:
     - name: "readonly_read_transport"
-      enabled: false  # Set to true and configure params below to enable read test
+      enabled: true
       description: "Read existing transport request using AdtClient"
       params:
         transport_request: ""  # Replace with existing transport request in your system
@@ -559,9 +571,9 @@ create_class:
       available_in: ["onprem", "legacy"]
       description: "Create test class for AdtClass tests"
       params:
-        class_name: "ZADT_BLD_CLS01"
+        class_name: "ZAC_CLS01"
         description: "AdtClass workflow class"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         superclass: ""
         final: true
@@ -572,7 +584,7 @@ create_class:
         #   update: 5000    # Custom delay after update
         #   create: 4000    # Custom delay after create
         source_code: |
-          CLASS ZADT_BLD_CLS01 DEFINITION
+          CLASS ZAC_CLS01 DEFINITION
             PUBLIC
             FINAL
             CREATE PUBLIC .
@@ -600,9 +612,9 @@ create_class:
             PRIVATE SECTION.
           ENDCLASS.
 
-          CLASS ZADT_BLD_CLS01 IMPLEMENTATION.
+          CLASS ZAC_CLS01 IMPLEMENTATION.
             METHOD get_text.
-              rv_text = 'Hello from ZADT_BLD_CLS01'.
+              rv_text = 'Hello from ZAC_CLS01'.
             ENDMETHOD.
 
             METHOD build_parent_data.
@@ -622,11 +634,11 @@ create_class:
 update_class_local_definitions:
   test_cases:
     - name: "local_definitions"
-      enabled: false
+      enabled: true
       description: "Update class definitions include (local types/data in class private section)"
       params:
-        class_name: "ZADT_BLD_CLS10"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        class_name: "ZAC_CLS10"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         definitionsCode_create: |
           TYPES: BEGIN OF ty_local_dummy,
@@ -643,11 +655,11 @@ update_class_local_definitions:
 update_class_local_types:
   test_cases:
     - name: "local_types"
-      enabled: false
+      enabled: true
       description: "Update class implementations include (local helper class/types)"
       params:
-        class_name: "ZADT_BLD_CLS11"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        class_name: "ZAC_CLS11"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         localTypesCode_create: |
           CLASS lcl_helper DEFINITION FINAL.
@@ -676,11 +688,11 @@ update_class_local_types:
 update_class_local_testclass:
   test_cases:
     - name: "local_testclass"
-      enabled: false
+      enabled: true
       description: "Update class testclasses include (local ABAP Unit test class)"
       params:
-        class_name: "ZADT_BLD_CLS12"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        class_name: "ZAC_CLS12"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         testClassCode_create: |
           CLASS ltcl_local_test DEFINITION FINAL FOR TESTING DURATION SHORT RISK LEVEL HARMLESS.
@@ -709,11 +721,12 @@ update_class_local_testclass:
 update_class_local_macros:
   test_cases:
     - name: "local_macros"
-      enabled: false
+      enabled: true
+      available_in: ["onprem", "legacy"]
       description: "Update class macros include (on-premise only; not available in ABAP Cloud)"
       params:
-        class_name: "ZADT_BLD_CLS13"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        class_name: "ZAC_CLS13"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         macrosCode_create: |
           DEFINE _local_noop.
@@ -724,7 +737,7 @@ update_class_local_macros:
             ASSERT 2 = 2.
           END-OF-DEFINITION.
 
-          CLASS ZADT_BLD_CLS01 IMPLEMENTATION.
+          CLASS ZAC_CLS01 IMPLEMENTATION.
             METHOD get_text.
               rv_text = |Parents: { lines( build_parent_data( ) ) }|.
             ENDMETHOD.
@@ -754,7 +767,7 @@ create_package:
       description: "Package reserved for AdtPackage tests"
       params:
         package_name: "ZADT_TEST"                 # Parent package (existing, must be structure/main type)
-        test_package: "ZADT_BLD_INNER_PKG01"    # Package created by the test
+        test_package: "ZAC_INNER_PKG01"    # Package created by the test
         description: "AdtPackage workflow package"
         updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
@@ -770,9 +783,9 @@ create_domain:
       available_in: ["onprem"]
       description: "Domain used by AdtDomain workflow tests"
       params:
-        domain_name: "ZADT_BLD_DOM01"
+        domain_name: "ZAC_DOM01"
         description: "AdtDomain workflow domain"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         datatype: "CHAR"
         length: 5
@@ -788,9 +801,9 @@ create_data_element:
       available_in: ["onprem"]
       description: "Data element reserved for AdtDataElement tests"
       params:
-        data_element_name: "ZADT_BLD_DTEL01"
+        data_element_name: "ZAC_DTEL01"
         description: "AdtDataElement workflow data element"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         # Allowed type_kind values:
         #   - domain
@@ -815,12 +828,12 @@ create_interface:
       available_in: ["onprem", "legacy"]
       description: "Interface reserved for AdtInterface tests"
       params:
-        interface_name: "ZADT_BLD_IF01"
+        interface_name: "ZAC_IF01"
         description: "AdtInterface workflow interface"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         source_code: |
-          INTERFACE ZADT_BLD_IF01
+          INTERFACE ZAC_IF01
             PUBLIC .
             METHODS: test_method.
           ENDINTERFACE.
@@ -839,16 +852,16 @@ create_program:
       available_in: ["onprem"]  # Programs are not supported in cloud systems
       description: "Program reserved for AdtProgram tests. Only available on on-premise systems."
       params:
-        program_name: "ZADT_BLD_PROG01"
+        program_name: "ZAC_PROG01"
         description: "AdtProgram workflow report"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         program_type: "executable"
         source_code: |
-          REPORT ZADT_BLD_PROG01.
+          REPORT ZAC_PROG01.
           WRITE: / 'Adt test program'.
         update_source_code: |
-          REPORT ZADT_BLD_PROG01.
+          REPORT ZAC_PROG01.
           WRITE: / 'Adt test program - updated'.
 
 # Create Table
@@ -859,9 +872,9 @@ create_table:
       available_in: ["onprem"]
       description: "Table reserved for AdtTable tests"
       params:
-        table_name: "ZADT_BLD_TAB01"
+        table_name: "ZAC_TAB01"
         description: "AdtTable workflow table"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         delivery_class: "A"
         data_class: "APPL0"
@@ -871,7 +884,7 @@ create_table:
           @AbapCatalog.tableCategory: #TRANSPARENT
           @AbapCatalog.deliveryClass: #A
           @AbapCatalog.dataMaintenance: #RESTRICTED
-          define table ZADT_BLD_TAB01 {
+          define table ZAC_TAB01 {
             key mandt          : abap.clnt not null;
             key builder_id     : abap.char(10) not null;
             description        : abap.char(40);
@@ -889,12 +902,12 @@ create_tabletype:
       available_in: ["onprem"]
       description: "TableType reserved for TableType tests"
       params:
-        tabletype_name: "ZADT_BLD_TTYP01"
+        tabletype_name: "ZAC_TTYP01"
         description: "TableType workflow table type"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         # XML format parameters (for update - rowType added after create)
-        row_type_name: "ZADT_BLD_STRU01"  # Structure name (must exist)
+        row_type_name: "ZAC_STRU01"  # Structure name (must exist)
         row_type_kind: "dictionaryType"   # Type kind: dictionaryType, predefinedAbapType, etc.
         access_type: "standard"           # standard, sorted, hashed, index
         primary_key_definition: "standard"  # standard, rowType, keyComponents, empty
@@ -908,14 +921,14 @@ create_structure:
       available_in: ["onprem"]
       description: "Structure reserved for AdtStructure tests"
       params:
-        structure_name: "ZADT_BLD_STRU01"
+        structure_name: "ZAC_STRU01"
         description: "AdtStructure workflow structure"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         ddl_code: |
           @EndUserText.label: 'AdtStructure workflow structure'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure ZADT_BLD_STRU01 {
+          define structure ZAC_STRU01 {
             mandt : abap.clnt;
             field1 : abap.int1;
           }
@@ -928,16 +941,16 @@ create_view:
       available_in: ["onprem", "legacy"]
       description: "View reserved for AdtView tests"
       params:
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         table_name: "ZAC_SHR_VTABL"    # → shared_dependencies.tables
-        view_name: "ZADT_BLD_VIEW_DDLS"     # View created/deleted by this test
+        view_name: "ZAC_VIEW_DDLS"     # View created/deleted by this test
         description: "AdtView workflow view"
         # transport_request: ""  # Uses environment.default_transport if omitted
         # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
         ddl_source: |
           @EndUserText.label: 'AdtView workflow view'
           @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define view entity ZADT_BLD_VIEW_DDLS
+          define view entity ZAC_VIEW_DDLS
             as select from zac_shr_vtabl
           {
             key fld1,
@@ -950,34 +963,34 @@ create_view:
 create_service_definition:
   test_cases:
     - name: "adt_service_definition"
-      enabled: false  # Set to true and configure params below to enable tests
+      enabled: true
       description: "Service definition reserved for AdtServiceDefinition tests"
       params:
-        service_definition_name: "ZADT_BLD_SRVD01"  # Replace with your service definition name
+        service_definition_name: "ZAC_SRVD01"  # Replace with your service definition name
         description: "AdtServiceDefinition workflow service definition"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
           @EndUserText.label: 'AdtServiceDefinition workflow service definition'
-          define service ZADT_BLD_SRVD01 {
-            expose ZOK_C_CDS_TEST;  # Replace with your CDS view name
+          define service ZAC_SRVD01 {
+            expose ZAC_SHR_CDSUT_DDLS;
           }
 
 # Create Access Control
 create_access_control:
   test_cases:
     - name: "adt_access_control"
-      enabled: false  # Set to true and configure params below to enable tests
+      enabled: true
       description: "Access control reserved for AdtAccessControl tests"
       params:
-        access_control_name: "ZADT_BLD_AC01"  # Replace with your access control name
+        access_control_name: "ZAC_AC01"  # Replace with your access control name
         description: "AdtAccessControl workflow access control"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
           @EndUserText.label: 'AdtAccessControl workflow access control'
           @MappingRole: true
-          define role ZADT_BLD_AC01 {
+          define role ZAC_AC01 {
             grant select on ZAC_SHR_CDSUT_DDLS
             where ( ) = aspect pfcg_auth ( 'S_TABU_NAM', ACTVT = '03', TABLE = 'ZAC_SHR_CDSUT_DDLS' );
           }
@@ -986,12 +999,12 @@ create_access_control:
 create_service_binding:
   test_cases:
     - name: "adt_service_binding"
-      enabled: false  # Set to true and configure params below to enable tests
+      enabled: true
       description: "Service binding reserved for AdtServiceBinding tests"
       params:
-        binding_name: "ZADT_BLD_SRVB01"  # Replace with your service binding name
-        service_definition_name: "ZOK_CDS_TEST_SRV"  # Existing SRVD name used by ServiceBinding integration test
-        service_name: "ZOK_CDS_TEST_SRV"  # Usually same as service_definition_name
+        binding_name: "ZAC_SRVB01"  # Replace with your service binding name
+        service_definition_name: "ZAC_SRVD01"  # Existing SRVD name used by ServiceBinding integration test
+        service_name: "ZAC_SRVD01"  # Usually same as service_definition_name
         service_version: "0001"
         binding_type: "ODATA"
         binding_version: "V4"  # V2 or V4
@@ -1000,8 +1013,8 @@ create_service_binding:
         description: "AdtServiceBinding workflow service binding"
         # software_component: "HOME"  # Optional; if omitted, inherited from parent package metadata
         package_type: "development"
-        # parent_package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
-        # test_subpackage_name: "ZADT_BLD_PKG01_SRVB"  # Created automatically if missing
+        # parent_package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # test_subpackage_name: "ZAC_PKG01_SRVB"  # Created automatically if missing
         # transport_request: ""  # Uses environment.default_transport if omitted
 # Create Function Group
 create_function_group:
@@ -1011,9 +1024,9 @@ create_function_group:
       available_in: ["onprem", "legacy"]
       description: "Function group reserved for AdtFunctionGroup tests"
       params:
-        function_group_name: "ZADT_BLD_FGR_EMPTY"
+        function_group_name: "ZAC_FGR_EMPTY"
         description: "AdtFunctionGroup workflow FUGR"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
 
 # Create Function Module
@@ -1024,13 +1037,13 @@ create_function_module:
       available_in: ["onprem", "legacy"]
       description: "Function module reserved for AdtFunctionModule tests"
       params:
-        function_module_name: "Z_ADT_BLD_FM03"  # Must start with Z_ or Y_ (with underscore)
+        function_module_name: "Z_AC_FM03"  # Must start with Z_ or Y_ (with underscore)
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
         description: "AdtFunctionModule workflow FM"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
         # transport_request: ""
         source_code: |
-          FUNCTION Z_ADT_BLD_FM03
+          FUNCTION Z_AC_FM03
             IMPORTING
               VALUE(IV_PARAM) TYPE STRING
             EXPORTING
@@ -1042,11 +1055,12 @@ create_function_module:
 create_transport:
   test_cases:
     - name: "builder_transport"
-      enabled: false  # Set to true to enable transport tests (requires system with transport layer)
+      enabled: true
+      available_in: ["onprem"]
       description: "Transport reserved for AdtRequest tests"
       params:
         description: "AdtRequest workflow transport"
-        # package_name: "ZADT_BLD_PKG01"
+        # package_name: "ZAC_PKG01"
 
 # Create Behavior Definition
 create_behavior_definition:
@@ -1058,12 +1072,12 @@ create_behavior_definition:
       params:
         bdef_name: "ZAC_SHR_BDEF_DDLS"
         description: "BehaviorDefinition for ZAC_SHR_BDEF_DDLS"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         root_entity: "ZAC_SHR_BDEF_DDLS"    # Root entity = shared CDS view
         implementation_type: "Managed"
         source_code: |
-          managed implementation in class zbp_adt_shr_bdef_ddls unique;
+          managed implementation in class zbp_ac_shr_bdef_ddls unique;
           strict ( 2 );
 
           define behavior for ZAC_SHR_BDEF_DDLS
@@ -1087,9 +1101,9 @@ create_metadata_extension:
       available_in: ["onprem"]
       description: "Create test metadata extension for AdtMetadataExtension tests"
       params:
-        ext_name: "ZADT_BLD_MEXT_DDLX"
+        ext_name: "ZAC_MEXT_DDLX"
         description: "MetadataExtension for ZAC_SHR_BDEF_DDLS"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         target_entity: "ZAC_SHR_BDEF_DDLS"  # Shared CDS view (must exist before running)
         source_code: |
@@ -1110,9 +1124,9 @@ create_behavior_implementation:
       available_in: ["onprem"]
       description: "Create test behavior implementation class for AdtBehaviorImplementation tests"
       params:
-        class_name: "ZBP_ADT_SHR_BIMP_DDLS"
+        class_name: "ZBP_AC_SHR_BIMP_DDLS"
         description: "BehaviorImplementation for ZAC_SHR_BIMP_DDLS"
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         behavior_definition: "ZAC_SHR_BIMP_DDLS"  # BDEF name = root entity CDS view name
         source_code: |
@@ -1149,24 +1163,24 @@ run_unit_test:
       available_in: ["onprem", "legacy"]
       description: "Run unit test for class test class"
       params:
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         source_code: |
-          CLASS ZADT_BLD_UTST_CLS DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          CLASS ZAC_UTST_CLS DEFINITION PUBLIC FINAL CREATE PUBLIC.
             PUBLIC SECTION.
               METHODS test_method.
           ENDCLASS.
-          CLASS ZADT_BLD_UTST_CLS IMPLEMENTATION.
+          CLASS ZAC_UTST_CLS IMPLEMENTATION.
             METHOD test_method.
               " Test method implementation
             ENDMETHOD.
           ENDCLASS.
         test_class_source: |
-          CLASS LTCL_ZADT_BLD_UTST_CLS DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+          CLASS LTCL_ZAC_UTST_CLS DEFINITION FINAL FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
             PRIVATE SECTION.
               METHODS test_method FOR TESTING.
           ENDCLASS.
-          CLASS LTCL_ZADT_BLD_UTST_CLS IMPLEMENTATION.
+          CLASS LTCL_ZAC_UTST_CLS IMPLEMENTATION.
             METHOD test_method.
               cl_abap_unit_assert=>assert_true( abap_true ).
             ENDMETHOD.
@@ -1174,11 +1188,11 @@ run_unit_test:
         test_class:
           enabled: true
           run_unit_test: true
-          container_class: "ZADT_BLD_UTST_CLS"
-          name: "LTCL_ZADT_BLD_UTST_CLS"
+          container_class: "ZAC_UTST_CLS"
+          name: "LTCL_ZAC_UTST_CLS"
         # skip_cleanup: false  # Set to true to skip cleanup after test (test class left for analysis)
         unit_test_options:
-          title: "LTCL_ZADT_BLD_UTST_CLS"
+          title: "LTCL_ZAC_UTST_CLS"
           context: "Adt Class ABAP Unit"
           scope:
             own_tests: true
@@ -1205,7 +1219,7 @@ create_cds_unit_test:
       enabled: true
       description: "CDS view with ABAP Unit verification (dependencies auto-created)"
       params:
-        # package_name: "ZADT_BLD_PKG01"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         view_name: "ZAC_SHR_CDSUT_DDLS"     # → shared_dependencies.views
         description: "CDS Unit Test for ZAC_SHR_CDSUT_DDLS"
         # transport_request: ""  # Uses environment.default_transport if omitted
@@ -1230,7 +1244,7 @@ create_cds_unit_test:
           with_navigation_uris: false
           format: "abapunit"
         cds_unit_test:
-          class_name: "ZADT_BLD_CDSUT_CLS"
+          class_name: "ZAC_CDSUT_CLS"
           test_class_name: "LTC_ZAC_SHR_CDSUT_DDLS"
           description: "CDS unit test class"
           # transport_request: ""  # Uses environment.default_transport if omitted
@@ -1248,7 +1262,7 @@ create_cds_unit_test:
               <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
             </abapsource:template>
           test_class_source: |
-            "!@testing ZADT_BLD_CDSUT_CLS
+            "!@testing ZAC_CDSUT_CLS
             CLASS LTC_ZAC_SHR_CDSUT_DDLS DEFINITION FINAL
               FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
 
@@ -1307,11 +1321,11 @@ group_activation:
       available_in: ["onprem"]
       description: "Group activation test - domain, data element, structure"
       params:
-        domain_name: "ZADT_BLD_DOM_GRP"
-        data_element_name: "ZADT_BLD_DTEL_GRP"
-        structure_name: "ZADT_BLD_STRU_GRP"
+        domain_name: "ZAC_DOM_GRP"
+        data_element_name: "ZAC_DTEL_GRP"
+        structure_name: "ZAC_STRU_GRP"
         description: "Group activation test objects"
-        # package_name: "ZADT_BLD_PKG03"  # Uses environment.default_package if omitted
+        # package_name: "ZAC_PKG03"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
         domain_datatype: "CHAR"
         domain_length: 10
@@ -1320,9 +1334,9 @@ group_activation:
         structure_ddl_code: |
           @EndUserText.label: 'Group activation test structure'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure ZADT_BLD_STRU_GRP {
+          define structure ZAC_STRU_GRP {
             mandt : abap.clnt;
-            test_field : ZADT_BLD_DTEL_GRP;
+            test_field : ZAC_DTEL_GRP;
           }
 
 # ============================================================================
@@ -1333,7 +1347,7 @@ group_activation:
 virtual_folders_contents:
   test_cases:
     - name: "fetch_virtual_folders_contents"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getVirtualFoldersContents for package browsing"
       params:
         # package_names: ["ZPKG1", "ZPKG2"]  # Optional: overrides package_name/default_package
@@ -1345,7 +1359,7 @@ virtual_folders_contents:
 object_structure:
   test_cases:
     - name: "get_object_structure"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getObjectStructure for a standard class"
       params:
         object_type: "CLAS/OC"
@@ -1356,7 +1370,7 @@ object_structure:
 node_structure:
   test_cases:
     - name: "fetch_node_structure"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test fetchNodeStructure for a standard class"
       params:
         parent_type: "CLAS/OC"
@@ -1368,7 +1382,7 @@ node_structure:
 package_hierarchy:
   test_cases:
     - name: "get_package_hierarchy"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getPackageHierarchy for a package"
       # package_name: "<YOUR_PACKAGE_NAME>"  # Uses environment.default_package if omitted
       params: {}
@@ -1379,25 +1393,25 @@ package_hierarchy:
 read_source:
   test_cases:
     - name: "read_class_source"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read class source code. Uses standard_objects.classes."
       params:
         # class_name: Uses standard_objects.classes if not specified
 
     - name: "read_class_source_inactive"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read class source code (inactive version). Uses standard_objects.classes."
       params:
         # class_name: Uses standard_objects.classes if not specified
 
     - name: "read_class_source_versions"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read class source code (active and inactive versions). Uses standard_objects.classes."
       params:
         # class_name: Uses standard_objects.classes if not specified
 
     - name: "read_source_error_unsupported"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Validate error for object type without source code. Uses standard_objects.domains."
       params:
         # domain_name: Uses standard_objects.domains if not specified
@@ -1408,25 +1422,25 @@ read_source:
 read_metadata:
   test_cases:
     - name: "read_class_metadata"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read metadata for a standard class (active and inactive versions). Uses standard_objects.classes."
       params:
         # class_name: Uses standard_objects.classes if not specified
 
     - name: "read_domain_metadata"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read metadata for a standard domain. Uses standard_objects.domains."
       params:
         # domain_name: Uses standard_objects.domains if not specified
 
     - name: "read_table_metadata"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read metadata for a standard table. Uses standard_objects.tables."
       params:
         # table_name: Uses standard_objects.tables if not specified
 
     - name: "read_metadata_error_unsupported"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Validate error for unsupported object type"
       params: {}
 
@@ -1438,38 +1452,38 @@ read_metadata:
 where_used:
   test_cases:
     - name: "where_used_default_scope"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getWhereUsed with default scope (Eclipse default behavior). Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables (referenced by ZAC_SHR_CDSUT_DDLS)
         object_type: "table"  # class | program | include | functionGroup | functionModule | interface | package | table | structure | domain | dataElement | view
 
     - name: "where_used_all_types"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getWhereUsed with all types enabled (Eclipse 'select all' behavior). Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
         object_type: "table"
 
     - name: "where_used_table"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getWhereUsed for table object type. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
         object_type: "table"
 
     - name: "where_used_error_no_name"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Validate error when object name is missing"
       params: {}
 
     - name: "where_used_error_no_type"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Validate error when object type is missing"
       params: {}
 
     - name: "where_used_list_parsed"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getWhereUsedList with parsed results. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1477,7 +1491,7 @@ where_used:
         enable_all_types: true
 
     - name: "where_used_list_raw_xml"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Test getWhereUsedList with raw XML included. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1488,7 +1502,7 @@ where_used:
 read_accept:
   test_cases:
     - name: "read_accept"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read Accept headers for all read methods (expects 2xx)"
       params: {}
         # Optional overrides (if standard_objects registry doesn't cover these)
@@ -1511,7 +1525,7 @@ read_accept:
 table_contents:
   test_cases:
     - name: "get_table_contents"
-      enabled: false  # Set to true to enable test
+      enabled: true
       available_in: ["onprem"]  # Only available on on-premise systems
       description: "Test getTableContents function - reads table data via Data Preview API. Uses standard_objects.tables filtered by available_in."
       params:
@@ -1519,7 +1533,7 @@ table_contents:
         max_rows: 10  # Maximum number of rows to retrieve
 
     - name: "get_table_contents_default_max_rows"
-      enabled: false  # Set to true to enable test
+      enabled: true
       available_in: ["onprem"]  # Only available on on-premise systems
       description: "Test getTableContents with default max_rows parameter. Uses standard_objects.tables filtered by available_in."
       params:
@@ -1532,7 +1546,7 @@ table_contents:
 sql_query:
   test_cases:
     - name: "execute_sql_query"
-      enabled: false  # Set to true to enable test
+      enabled: true
       available_in: ["onprem"]  # Only available on on-premise systems
       description: "Test getSqlQuery function - executes SQL query via Data Preview API. Uses standard_objects.tables filtered by available_in."
       params:
@@ -1540,7 +1554,7 @@ sql_query:
         row_number: 10  # Maximum number of rows to retrieve
 
     - name: "execute_sql_query_default_row_number"
-      enabled: false  # Set to true to enable test
+      enabled: true
       available_in: ["onprem"]  # Only available on on-premise systems
       description: "Test getSqlQuery with default row_number parameter. Uses standard_objects.tables filtered by available_in."
       params:
@@ -1550,7 +1564,7 @@ sql_query:
 runtime_dumps:
   test_cases:
     - name: "adt_runtime_dumps"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Read runtime dumps feed and optionally read dump payload by ID"
       params:
         top: 20
@@ -1566,7 +1580,7 @@ runtime_dumps:
 profiler_traces:
   test_cases:
     - name: "adt_profiler_traces"
-      enabled: false  # Set to true to enable test
+      enabled: true
       description: "Profiler trace list/read/create and run-with-profiling flow"
       params:
         trace_id: ""              # Optional: existing trace ID to read; when empty, discovered from feed
@@ -1579,7 +1593,7 @@ profiler_traces:
 runtime_memory_snapshots:
   test_cases:
     - name: "adt_runtime_memory_snapshots"
-      enabled: false  # Set to true to enable test
+      enabled: false  # TODO: investigate endpoint/content-type support before enabling
       description: "TODO: investigate endpoint/content-type support for runtime memory snapshots before enabling"
       params:
         user: ""          # Optional
@@ -1590,10 +1604,10 @@ runtime_memory_snapshots:
 execute_class:
   test_cases:
     - name: "adt_class_executor"
-      enabled: false
+      enabled: true
       description: "Run class via AdtExecutor (with and without profiling)"
       params:
-        class_name: "ZADT_BLD_CLS023"
+        class_name: "ZAC_CLS023"
         source_code: |
           CLASS {{CLASS_NAME}} DEFINITION PUBLIC FINAL CREATE PUBLIC.
             PUBLIC SECTION.
@@ -1617,7 +1631,7 @@ execute_class:
             all_procedural_units: true
             all_internal_table_events: false
             all_dynpro_events: false
-            description: "ZADT_BLD_CLS023"
+            description: "ZAC_CLS023"
             aggregate: false
             explicit_on_off: false
             with_rfc_tracing: true
@@ -1644,11 +1658,11 @@ run_program:
 execute_program:
   test_cases:
     - name: "adt_program_executor"
-      enabled: false
+      enabled: true
       available_in: ["onprem"]
       description: "Run program via AdtExecutor (with and without profiling)"
       params:
-        program_name: "ZADT_BLD_PROG023"
+        program_name: "ZAC_PROG023"
         source_code: |
           REPORT {{PROGRAM_NAME}}.
 
@@ -1660,7 +1674,7 @@ execute_program:
             all_procedural_units: true
             all_internal_table_events: false
             all_dynpro_events: false
-            description: "ZADT_BLD_PROG023"
+            description: "ZAC_PROG023"
             aggregate: false
             explicit_on_off: false
             with_rfc_tracing: true

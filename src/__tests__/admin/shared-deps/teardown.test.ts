@@ -123,8 +123,25 @@ describe('Admin: Teardown shared dependencies', () => {
         status: string;
       }> = [];
 
-      // Reverse dependency order: bdefs → access_controls → views → tables → function_groups → programs → package
+      // Reverse dependency order: function_modules → bdefs → access_controls → interfaces → views → tables → function_groups → programs → package
       // (dependents deleted before their dependencies)
+
+      // 0. Function modules (before function groups)
+      const functionModules = sharedConfig.function_modules || [];
+      for (const item of functionModules) {
+        const status = await safeDelete(
+          `function_module ${item.name}`,
+          async () => {
+            await client.getFunctionModule().delete({
+              functionModuleName: item.name,
+              functionGroupName: item.function_group,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'function_modules', name: item.name, status });
+      }
 
       // 1. Behavior definitions
       const bdefs = sharedConfig.behavior_definitions || [];
@@ -156,6 +173,22 @@ describe('Admin: Teardown shared dependencies', () => {
           testsLogger,
         );
         results.push({ type: 'access_controls', name: item.name, status });
+      }
+
+      // 1c. Interfaces
+      const interfaces = sharedConfig.interfaces || [];
+      for (const item of interfaces) {
+        const status = await safeDelete(
+          `interface ${item.name}`,
+          async () => {
+            await client.getInterface().delete({
+              interfaceName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'interfaces', name: item.name, status });
       }
 
       // 2. Views

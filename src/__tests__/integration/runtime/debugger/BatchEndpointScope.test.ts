@@ -122,10 +122,12 @@ describe('Debugger Batch Endpoint Scope', () => {
 
         const payload = buildBatchPayloadWithEmptyLine([discoveryRequest]);
 
-        logTestStep(
-          `raw payload:\n${JSON.stringify(payload.body)}`,
-          testsLogger,
-        );
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          logTestStep(
+            `raw payload:\n${JSON.stringify(payload.body)}`,
+            testsLogger,
+          );
+        }
         logTestStep(
           'sending non-debugger request (GET /sap/bc/adt/discovery) via /sap/bc/adt/debugger/batch',
           testsLogger,
@@ -143,19 +145,22 @@ describe('Debugger Batch Endpoint Scope', () => {
         });
 
         logTestStep(`response status: ${response.status}`, testsLogger);
-        logTestStep(
-          `response content-type: ${response.headers?.['content-type'] ?? 'N/A'}`,
-          testsLogger,
-        );
 
-        const dataPreview =
-          typeof response.data === 'string'
-            ? response.data.substring(0, 2000)
-            : JSON.stringify(response.data).substring(0, 2000);
-        logTestStep(
-          `response body (first 2000 chars):\n${dataPreview}`,
-          testsLogger,
-        );
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          logTestStep(
+            `response content-type: ${response.headers?.['content-type'] ?? 'N/A'}`,
+            testsLogger,
+          );
+
+          const dataPreview =
+            typeof response.data === 'string'
+              ? response.data.substring(0, 2000)
+              : JSON.stringify(response.data).substring(0, 2000);
+          logTestStep(
+            `response body (first 2000 chars):\n${dataPreview}`,
+            testsLogger,
+          );
+        }
 
         // Check if the response contains discovery XML or an error
         const hasDiscoveryContent =
@@ -178,7 +183,7 @@ describe('Debugger Batch Endpoint Scope', () => {
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
         logTestStep(`request failed with: ${error.message}`, testsLogger);
-        if (error.response) {
+        if (process.env.DEBUG_ADT_TESTS === 'true' && error.response) {
           logTestStep(`error status: ${error.response.status}`, testsLogger);
           const errorData =
             typeof error.response.data === 'string'
@@ -232,10 +237,12 @@ describe('Debugger Batch Endpoint Scope', () => {
           programReadRequest,
         ]);
 
-        logTestStep(
-          `raw payload:\n${JSON.stringify(payload.body)}`,
-          testsLogger,
-        );
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          logTestStep(
+            `raw payload:\n${JSON.stringify(payload.body)}`,
+            testsLogger,
+          );
+        }
         logTestStep(
           'sending 2 non-debugger requests (class + program read) via /sap/bc/adt/debugger/batch',
           testsLogger,
@@ -253,19 +260,22 @@ describe('Debugger Batch Endpoint Scope', () => {
         });
 
         logTestStep(`response status: ${response.status}`, testsLogger);
-        logTestStep(
-          `response content-type: ${response.headers?.['content-type'] ?? 'N/A'}`,
-          testsLogger,
-        );
 
-        const dataPreview =
-          typeof response.data === 'string'
-            ? response.data.substring(0, 3000)
-            : JSON.stringify(response.data).substring(0, 3000);
-        logTestStep(
-          `response body (first 3000 chars):\n${dataPreview}`,
-          testsLogger,
-        );
+        if (process.env.DEBUG_ADT_TESTS === 'true') {
+          logTestStep(
+            `response content-type: ${response.headers?.['content-type'] ?? 'N/A'}`,
+            testsLogger,
+          );
+
+          const dataPreview =
+            typeof response.data === 'string'
+              ? response.data.substring(0, 3000)
+              : JSON.stringify(response.data).substring(0, 3000);
+          logTestStep(
+            `response body (first 3000 chars):\n${dataPreview}`,
+            testsLogger,
+          );
+        }
 
         // Parse multipart response by boundary
         if (typeof response.data === 'string') {
@@ -273,7 +283,9 @@ describe('Debugger Batch Endpoint Scope', () => {
           const boundaryMatch = contentType.match(/boundary=([^;]+)/);
           const respBoundary = boundaryMatch?.[1]?.trim();
 
-          console.log(`[BATCH-SCOPE] response boundary: ${respBoundary}`);
+          if (process.env.DEBUG_ADT_TESTS === 'true') {
+            console.log(`[BATCH-SCOPE] response boundary: ${respBoundary}`);
+          }
 
           if (respBoundary) {
             const parts = response.data
@@ -281,19 +293,21 @@ describe('Debugger Batch Endpoint Scope', () => {
               .filter((p: string) => p.trim() && !p.trim().startsWith('--'));
             logTestStep(`multipart parts count: ${parts.length}`, testsLogger);
 
-            for (let i = 0; i < parts.length; i++) {
-              const part = parts[i];
-              const statusMatch = part.match(/HTTP\/1\.1\s+(\d+)\s+([^\r\n]*)/);
-              const status = statusMatch
-                ? `${statusMatch[1]} ${statusMatch[2]}`
-                : 'unknown';
-              console.log(`[BATCH-SCOPE] part ${i + 1} status: ${status}`);
-              console.log(
-                `[BATCH-SCOPE] part ${i + 1} preview (500 chars): ${part.substring(0, 500)}`,
-              );
-            }
+            if (process.env.DEBUG_ADT_TESTS === 'true') {
+              for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                const statusMatch = part.match(/HTTP\/1\.1\s+(\d+)\s+([^\r\n]*)/);
+                const status = statusMatch
+                  ? `${statusMatch[1]} ${statusMatch[2]}`
+                  : 'unknown';
+                console.log(`[BATCH-SCOPE] part ${i + 1} status: ${status}`);
+                console.log(
+                  `[BATCH-SCOPE] part ${i + 1} preview (500 chars): ${part.substring(0, 500)}`,
+                );
+              }
 
-            console.log(`[BATCH-SCOPE] total parts: ${parts.length}`);
+              console.log(`[BATCH-SCOPE] total parts: ${parts.length}`);
+            }
             expect(parts.length).toBe(2);
           }
 
@@ -303,15 +317,17 @@ describe('Debugger Batch Endpoint Scope', () => {
           const hasProgramContent =
             response.data.includes('sapmhttp') ||
             response.data.includes('SAPMHTTP');
-          console.log(
-            `[BATCH-SCOPE] class content found: ${hasClassContent}, program content found: ${hasProgramContent}`,
-          );
+          if (process.env.DEBUG_ADT_TESTS === 'true') {
+            console.log(
+              `[BATCH-SCOPE] class content found: ${hasClassContent}, program content found: ${hasProgramContent}`,
+            );
+          }
         }
 
         logTestSuccess(testsLogger, testName);
       } catch (error: any) {
         logTestStep(`request failed with: ${error.message}`, testsLogger);
-        if (error.response) {
+        if (process.env.DEBUG_ADT_TESTS === 'true' && error.response) {
           logTestStep(`error status: ${error.response.status}`, testsLogger);
           const errorData =
             typeof error.response.data === 'string'
