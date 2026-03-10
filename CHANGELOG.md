@@ -5,6 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.8.4] - 2026-03-10
+
+### Fixed
+- **Test config**: Add missing `typeMap` entries for `serviceBinding`, `tabletype`, `accessControl` in `resolveStandardObject()` — root cause of these read tests being skipped.
+- **Test config**: Fix transport test case name mismatch (`adt_transport` → `builder_transport`).
+- **Package test**: Skip activation step (packages don't require activation in ADT), add `record_changes: false` for local packages without transport.
+- **Access control DCL**: Fix invalid `pfcg_auth` syntax in shared and build access controls.
+
+### Added
+- **Shared dependencies**: Add `ZAC_SHR_AC01` access control (for CDS view `ZAC_SHR_CDSUT_DDLS`) to `shared_dependencies` and `standard_objects`.
+- **Shared setup**: `ensureSharedDependency` now re-activates existing objects when source differs from config (previously skipped objects that already existed).
+- **Admin scripts**: Add `access_controls` support to setup, teardown, and check scripts.
+
 ## [3.8.3] - 2026-03-09
 
 ### Changed
