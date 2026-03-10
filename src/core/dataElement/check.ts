@@ -82,7 +82,7 @@ export async function checkDataElement(
   const checkResult = parseCheckRunResponse(response);
 
   // Check only for type E messages - HTTP 200 is normal, errors are in XML response
-  if (checkResult.errors.length > 0) {
+  if (checkResult.has_errors) {
     const errorTexts = checkResult.errors
       .map((err) => err.text || '')
       .join(' ')
@@ -90,8 +90,6 @@ export async function checkDataElement(
 
     // Ignore messages that should not cause failure
     const shouldIgnore =
-      errorTexts.includes('has been checked') ||
-      errorTexts.includes('was checked') ||
       (errorTexts.includes('importing') && errorTexts.includes('database')) ||
       // For newly created empty data elements, these errors are expected until object is fully initialized
       (errorTexts.includes('no domain') &&
@@ -99,7 +97,6 @@ export async function checkDataElement(
       errorTexts.includes('datatype is expected');
 
     if (!shouldIgnore) {
-      // Has type E errors that should not be ignored - throw error
       const errorMessages = checkResult.errors
         .map((err) => err.text)
         .join('; ');

@@ -97,25 +97,9 @@ export async function checkFunctionModule(
 
   const checkResult = parseCheckRunResponse(response);
 
-  // Check result is OK if:
-  // 1. Message says "has been checked" or "was checked" - object was already checked, this is OK
-  // Problems are: ERROR and WARNING
-  // Only throw error if there are actual ERROR or WARNING messages
-
-  // If message indicates object was already checked, it's OK (even if has errors/warnings)
-  const isAlreadyChecked =
-    checkResult.message?.toLowerCase().includes('has been checked') ||
-    checkResult.message?.toLowerCase().includes('was checked');
-
-  if (isAlreadyChecked) {
-    return response; // Object was already checked - this is OK
-  }
-
-  // Problems: ERROR (errors) and WARNING (warnings)
-  if (checkResult.errors.length > 0) {
-    throw new Error(
-      `Function module check failed: ${checkResult.message || 'Unknown error'}`,
-    );
+  if (checkResult.has_errors) {
+    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
+    throw new Error(`Function module check failed: ${errorMessages}`);
   }
 
   if (checkResult.warnings.length > 0) {

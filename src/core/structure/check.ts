@@ -32,25 +32,9 @@ export async function checkStructure(
   const checkResult = parseCheckRunResponse(response);
 
   if (!checkResult.success && checkResult.has_errors) {
-    // For DDIC objects, "inactive version does not exist", "importing from database", or "has been checked" errors
+    // For DDIC objects, "inactive version does not exist" or "importing from database" errors
     // are often non-critical and can be safely ignored, especially for inactive versions
     const errorMessage = checkResult.message || '';
-    // Check both message and errors array for "has been checked" message
-    const hasCheckedMessage =
-      errorMessage.toLowerCase().includes('has been checked') ||
-      checkResult.errors.some((err: { text?: string }) =>
-        (err.text || '').toLowerCase().includes('has been checked'),
-      );
-
-    if (hasCheckedMessage) {
-      // This is expected behavior - structure was already checked, return response anyway
-      if (process.env.DEBUG_ADT_LIBS === 'true') {
-        logger?.warn?.(
-          `Check warning for structure ${structureName}: ${errorMessage} (structure was already checked)`,
-        );
-      }
-      return response; // Return response anyway
-    }
 
     if (
       (errorMessage.toLowerCase().includes('inactive version') &&
@@ -67,7 +51,9 @@ export async function checkStructure(
       }
       return response; // Return response anyway
     }
-    throw new Error(`Structure check failed: ${checkResult.message}`);
+
+    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
+    throw new Error(`Structure check failed: ${errorMessages}`);
   }
 
   return response;

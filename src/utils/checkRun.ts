@@ -19,6 +19,9 @@ interface CheckMessage {
   text: string;
   line: string;
   href: string;
+  code?: string;
+  msgId?: string;
+  msgNo?: string;
 }
 
 /**
@@ -227,12 +230,29 @@ export function parseCheckRunResponse(response: AxiosResponse): {
       const href = String(
         msg['@_chkrun:uri'] || msg['@_href'] || msg.href || '',
       );
+      const code = String(
+        msg['@_chkrun:code'] || msg['@_code'] || msg.code || '',
+      );
+
+      // Extract T100 message key (language-independent error identifier)
+      const t100Key = msg['chkrun:t100Key'] as
+        | Record<string, unknown>
+        | undefined;
+      const msgId = t100Key
+        ? String(t100Key['@_chkrun:msgid'] || t100Key['@_msgid'] || '')
+        : '';
+      const msgNo = t100Key
+        ? String(t100Key['@_chkrun:msgno'] || t100Key['@_msgno'] || '')
+        : '';
 
       const msgObj: CheckMessage = {
         type: msgType,
         text: shortText,
         line,
         href,
+        ...(code && { code }),
+        ...(msgId && { msgId }),
+        ...(msgNo && { msgNo }),
       };
 
       if (msgType === 'E') {
@@ -244,15 +264,27 @@ export function parseCheckRunResponse(response: AxiosResponse): {
       }
     });
 
+    // When status='processed', SAP sometimes echoes the statusText as a type="E" message.
+    // This is not a real error — it's just the check completion notification (e.g.,
+    // "Objekt Z_TEST wurde geprüft" / "Object Z_TEST has been checked").
+    // Filter these out by comparing E-type message text with statusText (language-independent).
+    let realErrors = errors;
+    if (status === 'processed' && statusText && errors.length > 0) {
+      const statusLower = statusText.toLowerCase().trim();
+      realErrors = errors.filter(
+        (err) => err.text.toLowerCase().trim() !== statusLower,
+      );
+    }
+
     // If status is 'notProcessed', it's an error (object doesn't exist or can't be validated)
-    const hasErrors = errors.length > 0 || status === 'notProcessed';
-    const isSuccess = status === 'processed' && errors.length === 0;
+    const hasErrors = realErrors.length > 0 || status === 'notProcessed';
+    const isSuccess = status === 'processed' && realErrors.length === 0;
 
     return {
       success: isSuccess,
       status: status || 'no_report',
       message: statusText,
-      errors,
+      errors: realErrors,
       warnings,
       info,
       total_messages: messageArray.length,

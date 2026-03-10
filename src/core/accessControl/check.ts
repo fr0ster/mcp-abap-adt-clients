@@ -23,21 +23,9 @@ export async function checkAccessControl(
   );
   const checkResult = parseCheckRunResponse(response);
 
-  // "has been checked" or "was checked" messages are normal responses, not errors
-  const hasCheckedMessage =
-    checkResult.message?.toLowerCase().includes('has been checked') ||
-    checkResult.message?.toLowerCase().includes('was checked') ||
-    checkResult.errors.some((err: { text?: string }) =>
-      (err.text || '').toLowerCase().includes('has been checked'),
-    );
-
-  if (hasCheckedMessage) {
-    return response;
-  }
-
-  // Only throw error if there are actual problems (ERROR or WARNING)
-  if (!checkResult.success && checkResult.has_errors) {
-    throw new Error(`Access control check failed: ${checkResult.message}`);
+  if (checkResult.has_errors) {
+    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
+    throw new Error(`Access control check failed: ${errorMessages}`);
   }
 
   return response;

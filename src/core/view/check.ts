@@ -51,20 +51,6 @@ export async function checkView(
 
     if (!checkResult.success && checkResult.has_errors) {
       const errorMessage = checkResult.message || '';
-      const hasCheckedMessage =
-        errorMessage.toLowerCase().includes('has been checked') ||
-        checkResult.errors.some((err: { text?: string }) =>
-          (err.text || '').toLowerCase().includes('has been checked'),
-        );
-
-      if (hasCheckedMessage) {
-        if (process.env.DEBUG_ADT_LIBS === 'true') {
-          logger?.warn?.(
-            `Check warning for view ${viewName}: ${errorMessage} (view was already checked)`,
-          );
-        }
-        return response;
-      }
 
       if (attempt === 0 && shouldRetryMissingVersion(checkResult)) {
         if (process.env.DEBUG_ADT_LIBS === 'true') {
@@ -86,7 +72,8 @@ export async function checkView(
         return response;
       }
 
-      throw new Error(`View check failed: ${checkResult.message}`);
+      const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
+      throw new Error(`View check failed: ${errorMessages}`);
     }
 
     return response;

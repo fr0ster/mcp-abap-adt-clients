@@ -81,26 +81,9 @@ export async function checkDomainSyntax(
 
   const checkResult = parseCheckRunResponse(response);
 
-  if (!checkResult.success && checkResult.has_errors) {
-    // "has been checked" is a non-critical warning - domain was already checked
-    const errorMessage = checkResult.message || '';
-    // Check both message and errors array for "has been checked" message
-    const hasCheckedMessage =
-      errorMessage.toLowerCase().includes('has been checked') ||
-      checkResult.errors.some((err: { text?: string }) =>
-        (err.text || '').toLowerCase().includes('has been checked'),
-      );
-
-    if (hasCheckedMessage) {
-      // This is expected behavior - domain was already checked, return response anyway
-      if (process.env.DEBUG_ADT_LIBS === 'true') {
-        logger?.warn?.(
-          `Check warning for domain ${domainName}: ${errorMessage} (domain was already checked)`,
-        );
-      }
-      return response; // Return response anyway
-    }
-    throw new Error(`Domain check failed: ${checkResult.message}`);
+  if (checkResult.has_errors) {
+    const errorMessages = checkResult.errors.map((err) => err.text).join('; ');
+    throw new Error(`Domain check failed: ${errorMessages}`);
   }
 
   return response;
