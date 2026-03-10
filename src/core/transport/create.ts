@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_TRANSPORT } from '../../constants/contentTypes';
+import { safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTransportParams } from './types';
 
@@ -132,7 +133,7 @@ export async function createTransport(
     const errorMessage = e.response?.data
       ? typeof e.response.data === 'string'
         ? e.response.data
-        : JSON.stringify(e.response.data)
+        : safeStringify(e.response.data)
       : e.message;
 
     throw new Error(`Failed to create transport request: ${errorMessage}`);

@@ -9,7 +9,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_CLASS } from '../../constants/contentTypes';
-import { limitDescription } from '../../utils/internalUtils';
+import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { ICreateClassParams } from './types';
@@ -121,7 +121,7 @@ export async function create(
         `[ERROR] Create class failed - Response data (first 1000 chars):`,
         typeof e.response.data === 'string'
           ? e.response.data.substring(0, 1000)
-          : JSON.stringify(e.response.data).substring(0, 1000),
+          : safeStringify(e.response.data).substring(0, 1000),
       );
     }
     throw error;

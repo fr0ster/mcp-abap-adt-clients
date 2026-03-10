@@ -28,7 +28,7 @@ import {
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
@@ -93,7 +93,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       const errorMessage = e.response?.data
         ? typeof e.response.data === 'string'
           ? e.response.data.substring(0, 500)
-          : JSON.stringify(e.response.data).substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
         : e.message || 'Unknown error';
 
       this.logger?.error?.(
@@ -218,7 +218,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       const errorMessage = e.response?.data
         ? typeof e.response.data === 'string'
           ? e.response.data.substring(0, 500)
-          : JSON.stringify(e.response.data).substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
         : e.message || 'Unknown error';
 
       // Log error details
@@ -522,7 +522,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       const errorMessage = e.response?.data
         ? typeof e.response.data === 'string'
           ? e.response.data.substring(0, 500)
-          : JSON.stringify(e.response.data).substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
         : e.message || 'Unknown error';
 
       this.logger?.error?.(
@@ -574,7 +574,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       const errorMessage = e.response?.data
         ? typeof e.response.data === 'string'
           ? e.response.data.substring(0, 500)
-          : JSON.stringify(e.response.data).substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
         : e.message || 'Unknown error';
 
       this.logger?.error?.(
@@ -651,7 +651,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       const errorMessage = e.response?.data
         ? typeof e.response.data === 'string'
           ? e.response.data.substring(0, 500)
-          : JSON.stringify(e.response.data).substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
         : e.message || 'Unknown error';
 
       this.logger?.error?.(

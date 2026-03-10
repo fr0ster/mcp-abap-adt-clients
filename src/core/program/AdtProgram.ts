@@ -26,7 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
@@ -90,7 +90,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       const errorMessage = e.response?.data
         ? typeof e.response.data === 'string'
           ? e.response.data.substring(0, 500)
-          : JSON.stringify(e.response.data).substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
         : e.message || 'Unknown error';
 
       this.logger?.error?.(
@@ -516,7 +516,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       const errorMessage = e.response?.data
         ? typeof e.response.data === 'string'
           ? e.response.data.substring(0, 500)
-          : JSON.stringify(e.response.data).substring(0, 500)
+          : safeStringify(e.response.data).substring(0, 500)
         : e.message || 'Unknown error';
 
       this.logger?.error?.(

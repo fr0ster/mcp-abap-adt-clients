@@ -11,7 +11,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_INTERFACE } from '../../constants/contentTypes';
-import { limitDescription } from '../../utils/internalUtils';
+import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateInterfaceParams } from './types';
 
@@ -103,7 +103,7 @@ export async function create(
       const errorData =
         typeof e.response.data === 'string'
           ? e.response.data.substring(0, 1000)
-          : JSON.stringify(e.response.data).substring(0, 1000);
+          : safeStringify(e.response.data).substring(0, 1000);
       logger?.error?.(
         `[ERROR] Create interface failed - Status: ${e.response.status}`,
       );

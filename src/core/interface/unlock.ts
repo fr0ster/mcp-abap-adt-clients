@@ -7,7 +7,7 @@ import type {
   HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -47,7 +47,7 @@ export async function unlockInterface(
     const errorData = e.response?.data
       ? typeof e.response.data === 'string'
         ? e.response.data
-        : JSON.stringify(e.response.data)
+        : safeStringify(e.response.data)
       : e.message;
 
     throw new Error(

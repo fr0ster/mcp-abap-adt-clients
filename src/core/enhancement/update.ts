@@ -9,7 +9,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import { encodeSapObjectName, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
   type EnhancementType,
@@ -107,7 +107,7 @@ export async function update(
         `[ERROR] Update enhancement failed - Response data (first 1000 chars):`,
         typeof e.response.data === 'string'
           ? e.response.data.substring(0, 1000)
-          : JSON.stringify(e.response.data).substring(0, 1000),
+          : safeStringify(e.response.data).substring(0, 1000),
       );
     }
     throw error;

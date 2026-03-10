@@ -12,7 +12,7 @@ import {
   ACCEPT_ENHANCEMENT,
   CT_ENHANCEMENT,
 } from '../../constants/contentTypes';
-import { limitDescription } from '../../utils/internalUtils';
+import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import {
   ENHANCEMENT_TYPE_CODES,
@@ -137,7 +137,7 @@ export async function create(
         `[ERROR] Create enhancement failed - Response data (first 1000 chars):`,
         typeof e.response.data === 'string'
           ? e.response.data.substring(0, 1000)
-          : JSON.stringify(e.response.data).substring(0, 1000),
+          : safeStringify(e.response.data).substring(0, 1000),
       );
     }
     throw error;

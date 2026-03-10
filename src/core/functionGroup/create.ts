@@ -9,7 +9,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
-import { limitDescription } from '../../utils/internalUtils';
+import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { ICreateFunctionGroupParams } from './types';
@@ -101,7 +101,7 @@ export async function create(
       const errorData =
         typeof e.response.data === 'string'
           ? e.response.data
-          : JSON.stringify(e.response.data);
+          : safeStringify(e.response.data);
 
       if (errorData.includes('Kerberos library not loaded')) {
         logger?.debug?.(
@@ -132,7 +132,7 @@ export async function create(
         `[ERROR] Create FunctionGroup failed - Response data (first 1000 chars):`,
         typeof e.response.data === 'string'
           ? e.response.data.substring(0, 1000)
-          : JSON.stringify(e.response.data).substring(0, 1000),
+          : safeStringify(e.response.data).substring(0, 1000),
       );
     }
     throw error;

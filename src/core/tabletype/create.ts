@@ -8,7 +8,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { CT_TABLE_TYPE } from '../../constants/contentTypes';
-import { limitDescription } from '../../utils/internalUtils';
+import { limitDescription, safeStringify } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateTableTypeParams } from './types';
 
@@ -72,7 +72,7 @@ export async function createTableType(
     const errorMessage = e.response?.data
       ? typeof e.response.data === 'string'
         ? e.response.data
-        : JSON.stringify(e.response.data)
+        : safeStringify(e.response.data)
       : e.message;
 
     throw new Error(

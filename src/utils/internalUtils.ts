@@ -81,3 +81,29 @@ export function safeErrorMessage(error: unknown): string {
 
   return String(error);
 }
+
+/**
+ * Safely stringify any value, handling circular references.
+ * Use instead of JSON.stringify() on values that may contain circular references
+ * (e.g., Axios response data, HTTP error objects).
+ * @param value - Any value to stringify
+ * @param maxLength - Maximum length of the result (default 500)
+ * @returns JSON string or fallback string representation
+ */
+export function safeStringify(value: unknown, maxLength = 500): string {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value.substring(0, maxLength);
+
+  try {
+    const seen = new WeakSet();
+    return JSON.stringify(value, (_key, val) => {
+      if (typeof val === 'object' && val !== null) {
+        if (seen.has(val)) return '[Circular]';
+        seen.add(val);
+      }
+      return val;
+    }).substring(0, maxLength);
+  } catch {
+    return String(value).substring(0, maxLength);
+  }
+}
