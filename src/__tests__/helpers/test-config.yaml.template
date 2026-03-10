@@ -1020,8 +1020,8 @@ create_function_module:
 # Create Transport
 create_transport:
   test_cases:
-    - name: "adt_transport"
-      enabled: true
+    - name: "builder_transport"
+      enabled: false  # Set to true to enable transport tests (requires system with transport layer)
       description: "Transport reserved for AdtRequest tests"
       params:
         description: "AdtRequest workflow transport"

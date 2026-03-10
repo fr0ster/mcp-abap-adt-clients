@@ -407,6 +407,25 @@ function resolveStandardObject(
       yamlKey: 'service_definitions',
       paramSuffix: 'service_definition_name',
     },
+    serviceBinding: {
+      yamlKey: 'service_bindings',
+      paramSuffix: 'service_binding_name',
+    },
+    service_binding: {
+      yamlKey: 'service_bindings',
+      paramSuffix: 'service_binding_name',
+    },
+    tabletype: { yamlKey: 'tabletypes', paramSuffix: 'tabletype_name' },
+    tableType: { yamlKey: 'tabletypes', paramSuffix: 'tabletype_name' },
+    table_type: { yamlKey: 'tabletypes', paramSuffix: 'tabletype_name' },
+    accessControl: {
+      yamlKey: 'access_controls',
+      paramSuffix: 'access_control_name',
+    },
+    access_control: {
+      yamlKey: 'access_controls',
+      paramSuffix: 'access_control_name',
+    },
   };
 
   const typeInfo = typeMap[objectType];
