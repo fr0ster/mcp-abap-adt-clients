@@ -4,6 +4,7 @@
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
 
+import { safeErrorMessage } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtFunctionGroup } from './AdtFunctionGroup';
 import { lockFunctionGroup } from './lock';
@@ -41,7 +42,7 @@ export class AdtFunctionGroupLegacy extends AdtFunctionGroup {
 
       return state;
     } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', error);
+      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
       if (lockHandle) {
         try {
           await unlockFunctionGroup(
@@ -52,7 +53,7 @@ export class AdtFunctionGroupLegacy extends AdtFunctionGroup {
         } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }

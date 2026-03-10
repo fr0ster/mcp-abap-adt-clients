@@ -7,6 +7,7 @@
  */
 
 import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
 import { checkClassMacros } from './check';
@@ -121,12 +122,12 @@ export class AdtLocalMacros extends AdtClass {
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }
 
-      this.logger?.error('Create LocalMacros failed:', error);
+      this.logger?.error('Create LocalMacros failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -161,7 +162,7 @@ export class AdtLocalMacros extends AdtClass {
       if (e.response?.status === 404) {
         return undefined;
       }
-      this.logger?.error('Read LocalMacros failed:', error);
+      this.logger?.error('Read LocalMacros failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -265,12 +266,12 @@ export class AdtLocalMacros extends AdtClass {
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }
 
-      this.logger?.error('Update LocalMacros failed:', error);
+      this.logger?.error('Update LocalMacros failed:', safeErrorMessage(error));
       throw error;
     }
   }

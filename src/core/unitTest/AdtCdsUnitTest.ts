@@ -15,7 +15,10 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { headerValueToString } from '../../utils/internalUtils';
+import {
+  headerValueToString,
+  safeErrorMessage,
+} from '../../utils/internalUtils';
 import { startClassUnitTestRunByObject } from '../class/run';
 import type { IClassState } from '../class/types';
 import { AdtView } from '../view/AdtView';
@@ -113,7 +116,10 @@ export class AdtCdsUnitTest extends AdtUnitTest {
         );
       }
     } catch (error: unknown) {
-      this.logger?.error('checkCdsTestDoubles failed:', error);
+      this.logger?.error(
+        'checkCdsTestDoubles failed:',
+        safeErrorMessage(error),
+      );
       throw error;
     }
   }
@@ -178,7 +184,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           errors: [],
         };
       } catch (error: unknown) {
-        this.logger?.error('create failed:', error);
+        this.logger?.error('create failed:', safeErrorMessage(error));
         throw error;
       }
     }
@@ -231,7 +237,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           errors: [],
         };
       } catch (error: unknown) {
-        this.logger?.error('update failed:', error);
+        this.logger?.error('update failed:', safeErrorMessage(error));
         throw error;
       }
     }
@@ -266,7 +272,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
           errors: [],
         };
       } catch (error: unknown) {
-        this.logger?.error('delete failed:', error);
+        this.logger?.error('delete failed:', safeErrorMessage(error));
         throw error;
       }
     }
@@ -314,7 +320,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
         this.logger?.info?.('Unit test run started, runId:', runId);
         return runId;
       } catch (error: unknown) {
-        this.logger?.error('run failed:', error);
+        this.logger?.error('run failed:', safeErrorMessage(error));
         throw error;
       }
     }

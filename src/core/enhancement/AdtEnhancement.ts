@@ -33,6 +33,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { activateEnhancement } from './activation';
 import { check as checkEnhancement } from './check';
@@ -108,7 +109,7 @@ export class AdtEnhancement
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Validate failed:', err);
+      this.logger?.error('Validate failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -182,12 +183,12 @@ export class AdtEnhancement
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete enhancement after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Create failed:', err);
+      this.logger?.error('Create failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -247,7 +248,7 @@ export class AdtEnhancement
       }
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'read', error: err, timestamp: new Date() });
-      this.logger?.error('Read failed:', err);
+      this.logger?.error('Read failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -301,7 +302,7 @@ export class AdtEnhancement
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Read metadata failed:', err);
+      this.logger?.error('Read metadata failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -354,7 +355,7 @@ export class AdtEnhancement
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Read transport failed:', err);
+      this.logger?.error('Read transport failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -486,7 +487,7 @@ export class AdtEnhancement
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed (object may not be ready yet):',
-            readError,
+            safeErrorMessage(readError),
           );
         }
       }
@@ -547,7 +548,7 @@ export class AdtEnhancement
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed (object may not be ready yet):',
-            readError,
+            safeErrorMessage(readError),
           );
         }
 
@@ -577,7 +578,10 @@ export class AdtEnhancement
           );
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         this.connection.setSessionType('stateless');
@@ -598,12 +602,12 @@ export class AdtEnhancement
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete enhancement after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -657,7 +661,7 @@ export class AdtEnhancement
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Delete failed:', err);
+      this.logger?.error('Delete failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -700,7 +704,7 @@ export class AdtEnhancement
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Activate failed:', err);
+      this.logger?.error('Activate failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -742,7 +746,7 @@ export class AdtEnhancement
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'check', error: err, timestamp: new Date() });
-      this.logger?.error('Check failed:', err);
+      this.logger?.error('Check failed:', safeErrorMessage(err));
       throw err;
     }
   }

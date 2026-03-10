@@ -7,7 +7,10 @@
  * - read() works via /sap/bc/adt/packages (present in legacy discovery)
  */
 
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import {
+  encodeSapObjectName,
+  safeErrorMessage,
+} from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtPackage } from './AdtPackage';
 import { lockPackage } from './lock';
@@ -57,14 +60,14 @@ export class AdtPackageLegacy extends AdtPackage {
 
       return state;
     } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', error);
+      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
       if (lockHandle) {
         try {
           await unlockPackage(this.connection, config.packageName, lockHandle);
         } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }

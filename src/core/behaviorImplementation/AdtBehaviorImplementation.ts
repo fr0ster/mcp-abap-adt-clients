@@ -30,6 +30,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class';
 import { updateClass } from '../class/update';
@@ -96,7 +97,7 @@ export class AdtBehaviorImplementation
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('validate', err);
+      this.logger?.error('validate', safeErrorMessage(err));
       throw err;
     }
   }
@@ -146,7 +147,7 @@ export class AdtBehaviorImplementation
       this.logger?.info?.('Behavior implementation class created');
       return state;
     } catch (error: unknown) {
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -183,7 +184,7 @@ export class AdtBehaviorImplementation
       }
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'read', error: err, timestamp: new Date() });
-      this.logger?.error('read', err);
+      this.logger?.error('read', safeErrorMessage(err));
       throw err;
     }
   }
@@ -222,7 +223,7 @@ export class AdtBehaviorImplementation
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readMetadata', err);
+      this.logger?.error('readMetadata', safeErrorMessage(err));
       throw err;
     }
   }
@@ -264,7 +265,7 @@ export class AdtBehaviorImplementation
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readTransport', err);
+      this.logger?.error('readTransport', safeErrorMessage(err));
       throw err;
     }
   }
@@ -410,7 +411,7 @@ ENDCLASS.`;
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed (object may not be ready yet):',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - unlock might still work
         }
@@ -460,7 +461,7 @@ ENDCLASS.`;
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed (object may not be ready yet):',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - return state with activation result
         }
@@ -486,7 +487,10 @@ ENDCLASS.`;
           await this.class.unlock({ className: config.className }, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         // Ensure stateless if lock failed
@@ -505,12 +509,12 @@ ENDCLASS.`;
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete behavior implementation class after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -546,7 +550,7 @@ ENDCLASS.`;
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Delete', err);
+      this.logger?.error('Delete', safeErrorMessage(err));
       throw err;
     }
   }
@@ -578,7 +582,7 @@ ENDCLASS.`;
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Activate', err);
+      this.logger?.error('Activate', safeErrorMessage(err));
       throw err;
     }
   }
@@ -607,7 +611,7 @@ ENDCLASS.`;
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'check', error: err, timestamp: new Date() });
-      this.logger?.error('check', err);
+      this.logger?.error('check', safeErrorMessage(err));
       throw err;
     }
   }

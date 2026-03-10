@@ -6,6 +6,7 @@
  */
 
 import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
 import { checkClassLocalTypes } from './check';
@@ -120,12 +121,12 @@ export class AdtLocalTypes extends AdtClass {
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }
 
-      this.logger?.error('Create LocalTypes failed:', error);
+      this.logger?.error('Create LocalTypes failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -160,7 +161,7 @@ export class AdtLocalTypes extends AdtClass {
       if (e.response?.status === 404) {
         return undefined;
       }
-      this.logger?.error('Read LocalTypes failed:', error);
+      this.logger?.error('Read LocalTypes failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -265,12 +266,12 @@ export class AdtLocalTypes extends AdtClass {
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }
 
-      this.logger?.error('Update LocalTypes failed:', error);
+      this.logger?.error('Update LocalTypes failed:', safeErrorMessage(error));
       throw error;
     }
   }

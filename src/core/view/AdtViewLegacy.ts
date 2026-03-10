@@ -4,7 +4,10 @@
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
 
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import {
+  encodeSapObjectName,
+  safeErrorMessage,
+} from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtView } from './AdtView';
 import { lockDDLS } from './lock';
@@ -37,14 +40,14 @@ export class AdtViewLegacy extends AdtView {
 
       return state;
     } catch (error: unknown) {
-      this.logger?.error?.('Delete failed:', error);
+      this.logger?.error?.('Delete failed:', safeErrorMessage(error));
       if (lockHandle) {
         try {
           await unlockDDLS(this.connection, config.viewName, lockHandle);
         } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }

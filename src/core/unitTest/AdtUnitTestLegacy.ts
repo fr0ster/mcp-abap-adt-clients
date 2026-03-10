@@ -15,6 +15,7 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import { AdtUnitTest } from './AdtUnitTest';
 import { startClassUnitTestRunLegacy } from './runLegacy';
 import type {
@@ -68,7 +69,7 @@ export class AdtUnitTestLegacy extends AdtUnitTest {
         errors: [],
       };
     } catch (error: unknown) {
-      this.logger?.error('Create failed (legacy):', error);
+      this.logger?.error('Create failed (legacy):', safeErrorMessage(error));
       throw error;
     }
   }

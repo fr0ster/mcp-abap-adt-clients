@@ -26,6 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { activateDDLS } from './activation';
 import { checkView } from './check';
@@ -79,7 +80,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('validate', err);
+      this.logger?.error('validate', safeErrorMessage(err));
       throw err;
     }
   }
@@ -138,12 +139,12 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete view after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -213,7 +214,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readMetadata', err);
+      this.logger?.error('readMetadata', safeErrorMessage(err));
       throw err;
     }
   }
@@ -253,7 +254,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readTransport', err);
+      this.logger?.error('readTransport', safeErrorMessage(err));
       throw err;
     }
   }
@@ -343,7 +344,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - unlock might still work
         }
@@ -397,7 +398,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - activation was successful
         }
@@ -431,7 +432,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
           await unlockDDLS(this.connection, config.viewName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         // Ensure stateless if lock failed
@@ -449,12 +453,12 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete view after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -489,7 +493,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         errors: [],
       };
     } catch (error: unknown) {
-      this.logger?.error('Delete failed:', error);
+      this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -510,7 +514,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         errors: [],
       };
     } catch (error: unknown) {
-      this.logger?.error('Activate failed:', error);
+      this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
     }
   }

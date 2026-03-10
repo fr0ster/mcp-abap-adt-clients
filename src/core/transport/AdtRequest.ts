@@ -27,6 +27,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import { createTransport } from './create';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
@@ -104,7 +105,7 @@ export class AdtRequest
         errors: [],
       };
     } catch (error: unknown) {
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }

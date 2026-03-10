@@ -44,3 +44,40 @@ export function headerValueToString(
   }
   return String(value);
 }
+
+/**
+ * Safely extracts error message from any error object.
+ * Prevents circular reference issues when logging AxiosError or other HTTP errors.
+ * @param error - Any error object (AxiosError, Error, string, unknown)
+ * @returns Safe string representation of the error
+ */
+export function safeErrorMessage(error: unknown): string {
+  if (!error) return 'Unknown error';
+  if (typeof error === 'string') return error;
+
+  const e = error as Record<string, unknown>;
+
+  // Extract HTTP response details if available (AxiosError)
+  if (e.response && typeof e.response === 'object') {
+    const resp = e.response as Record<string, unknown>;
+    const status = resp.status;
+    const statusText = resp.statusText || '';
+    const data = resp.data;
+
+    if (typeof data === 'string' && data.length > 0) {
+      return `HTTP ${status} ${statusText}: ${data.substring(0, 500)}`;
+    }
+
+    if (status) {
+      const msg = typeof e.message === 'string' ? e.message : '';
+      return `HTTP ${status} ${statusText}${msg ? `: ${msg}` : ''}`;
+    }
+  }
+
+  // Standard Error object
+  if (typeof e.message === 'string' && e.message.length > 0) {
+    return e.message;
+  }
+
+  return String(error);
+}

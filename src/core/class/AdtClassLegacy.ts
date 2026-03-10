@@ -5,7 +5,10 @@
  */
 
 import type { HttpError } from '@mcp-abap-adt/interfaces';
-import { encodeSapObjectName } from '../../utils/internalUtils';
+import {
+  encodeSapObjectName,
+  safeErrorMessage,
+} from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
 import { AdtClass } from './AdtClass';
 import { lockClass } from './lock';
@@ -51,7 +54,7 @@ export class AdtClassLegacy extends AdtClass {
         } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }

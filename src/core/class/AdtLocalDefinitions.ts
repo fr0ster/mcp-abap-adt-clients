@@ -6,6 +6,7 @@
  */
 
 import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
 import { checkClassDefinitions } from './check';
@@ -122,12 +123,15 @@ export class AdtLocalDefinitions extends AdtClass {
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }
 
-      this.logger?.error('Create LocalDefinitions failed:', error);
+      this.logger?.error(
+        'Create LocalDefinitions failed:',
+        safeErrorMessage(error),
+      );
       throw error;
     }
   }
@@ -162,7 +166,10 @@ export class AdtLocalDefinitions extends AdtClass {
       if (e.response?.status === 404) {
         return undefined;
       }
-      this.logger?.error('Read LocalDefinitions failed:', error);
+      this.logger?.error(
+        'Read LocalDefinitions failed:',
+        safeErrorMessage(error),
+      );
       throw error;
     }
   }
@@ -267,12 +274,15 @@ export class AdtLocalDefinitions extends AdtClass {
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }
 
-      this.logger?.error('Update LocalDefinitions failed:', error);
+      this.logger?.error(
+        'Update LocalDefinitions failed:',
+        safeErrorMessage(error),
+      );
       throw error;
     }
   }

@@ -27,7 +27,10 @@ import type {
   IAdtOperationOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import { headerValueToString } from '../../utils/internalUtils';
+import {
+  headerValueToString,
+  safeErrorMessage,
+} from '../../utils/internalUtils';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
 import { startClassUnitTestRun } from './run';
@@ -139,7 +142,7 @@ export class AdtUnitTest
         errors: [],
       };
     } catch (error: unknown) {
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }

@@ -26,6 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { activateTable } from './activation';
 import { runTableCheckRun } from './check';
@@ -119,12 +120,12 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete table after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -191,7 +192,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readMetadata', err);
+      this.logger?.error('readMetadata', safeErrorMessage(err));
       throw err;
     }
   }
@@ -231,7 +232,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readTransport', err);
+      this.logger?.error('readTransport', safeErrorMessage(err));
       throw err;
     }
   }
@@ -328,7 +329,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - unlock might still work
         }
@@ -386,7 +387,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - activation was successful
         }
@@ -414,7 +415,10 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
           await unlockTable(this.connection, config.tableName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         // Ensure stateless if lock failed
@@ -432,12 +436,12 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete table after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -469,7 +473,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
 
       return { deleteResult: result, errors: [] };
     } catch (error: unknown) {
-      this.logger?.error('Delete failed:', error);
+      this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -487,7 +491,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       const result = await activateTable(this.connection, config.tableName);
       return { activateResult: result, errors: [] };
     } catch (error: unknown) {
-      this.logger?.error('Activate failed:', error);
+      this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
     }
   }

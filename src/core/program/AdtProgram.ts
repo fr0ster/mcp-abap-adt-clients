@@ -26,6 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
@@ -165,12 +166,12 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete program after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -240,7 +241,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readMetadata', err);
+      this.logger?.error('readMetadata', safeErrorMessage(err));
       throw err;
     }
   }
@@ -340,7 +341,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - unlock might still work
         }
@@ -399,7 +400,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - activation was successful
         }
@@ -415,7 +416,10 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           await unlockProgram(this.connection, config.programName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         // Ensure stateless if lock failed
@@ -434,12 +438,12 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete program after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -478,7 +482,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
 
       return state;
     } catch (error: unknown) {
-      this.logger?.error('Delete failed:', error);
+      this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
     } finally {
       this.connection.setSessionType('stateless');
@@ -519,7 +523,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         `Activate failed: HTTP ${status} ${statusText} - ${errorMessage}`,
       );
 
-      this.logger?.error('Activate failed:', error);
+      this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -553,7 +557,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       state.checkResult = checkResponse;
       return state;
     } catch (error: unknown) {
-      this.logger?.error('Check failed:', error);
+      this.logger?.error('Check failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -597,7 +601,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readTransport', err);
+      this.logger?.error('readTransport', safeErrorMessage(err));
       throw err;
     }
   }

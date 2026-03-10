@@ -26,6 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { activate } from './activation';
 import { check as checkBehaviorDefinition } from './check';
@@ -110,7 +111,7 @@ export class AdtBehaviorDefinition
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Validate failed:', err);
+      this.logger?.error('Validate failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -181,12 +182,12 @@ export class AdtBehaviorDefinition
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete behavior definition after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Create failed:', err);
+      this.logger?.error('Create failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -223,7 +224,7 @@ export class AdtBehaviorDefinition
       }
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'read', error: err, timestamp: new Date() });
-      this.logger?.error('Read failed:', err);
+      this.logger?.error('Read failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -265,7 +266,7 @@ export class AdtBehaviorDefinition
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Read metadata failed:', err);
+      this.logger?.error('Read metadata failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -307,7 +308,7 @@ export class AdtBehaviorDefinition
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Read transport failed:', err);
+      this.logger?.error('Read transport failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -402,7 +403,7 @@ export class AdtBehaviorDefinition
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed (object may not be ready yet):',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - unlock might still work
         }
@@ -455,7 +456,7 @@ export class AdtBehaviorDefinition
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed (object may not be ready yet):',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - return state with activation result
         }
@@ -485,7 +486,10 @@ export class AdtBehaviorDefinition
           await unlock(this.connection, config.name, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         // Ensure stateless if lock failed
@@ -504,12 +508,12 @@ export class AdtBehaviorDefinition
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete behavior definition after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -551,7 +555,7 @@ export class AdtBehaviorDefinition
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Delete failed:', err);
+      this.logger?.error('Delete failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -581,7 +585,7 @@ export class AdtBehaviorDefinition
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Activate failed:', err);
+      this.logger?.error('Activate failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -615,7 +619,7 @@ export class AdtBehaviorDefinition
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({ method: 'check', error: err, timestamp: new Date() });
-      this.logger?.error('Check failed:', err);
+      this.logger?.error('Check failed:', safeErrorMessage(err));
       throw err;
     }
   }

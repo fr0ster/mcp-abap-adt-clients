@@ -28,6 +28,7 @@ import {
   type ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
@@ -177,12 +178,12 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete class after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -283,7 +284,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Read metadata failed:', err);
+      this.logger?.error('Read metadata failed:', safeErrorMessage(err));
       throw err;
     }
   }
@@ -379,7 +380,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - unlock might still work
         }
@@ -433,7 +434,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - activation was successful
         }
@@ -449,7 +450,10 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         // Ensure stateless if lock failed
@@ -468,12 +472,12 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete class after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -825,7 +829,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
-            unlockError,
+            safeErrorMessage(unlockError),
           );
         }
       }
@@ -889,7 +893,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('Read transport failed:', err);
+      this.logger?.error('Read transport failed:', safeErrorMessage(err));
       throw err;
     }
   }

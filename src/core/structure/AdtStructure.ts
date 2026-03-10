@@ -26,6 +26,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
+import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { activateStructure } from './activation';
 import { checkStructure } from './check';
@@ -83,7 +84,7 @@ export class AdtStructure
         error: error instanceof Error ? error : new Error(String(error)),
         timestamp: new Date(),
       });
-      this.logger?.error('validate failed:', error);
+      this.logger?.error('validate failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -138,12 +139,12 @@ export class AdtStructure
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete structure after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Create failed:', error);
+      this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -213,7 +214,7 @@ export class AdtStructure
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readMetadata', err);
+      this.logger?.error('readMetadata', safeErrorMessage(err));
       throw err;
     }
   }
@@ -253,7 +254,7 @@ export class AdtStructure
         error: err,
         timestamp: new Date(),
       });
-      this.logger?.error('readTransport', err);
+      this.logger?.error('readTransport', safeErrorMessage(err));
       throw err;
     }
   }
@@ -347,7 +348,7 @@ export class AdtStructure
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after update:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - unlock might still work
         }
@@ -409,7 +410,7 @@ export class AdtStructure
         } catch (readError) {
           this.logger?.warn?.(
             'read with long polling failed after activation:',
-            readError,
+            safeErrorMessage(readError),
           );
           // Continue anyway - activation was successful
         }
@@ -442,7 +443,10 @@ export class AdtStructure
           );
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
-          this.logger?.warn?.('Failed to unlock during cleanup:', unlockError);
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
         }
       } else {
         // Ensure stateless if lock failed
@@ -460,12 +464,12 @@ export class AdtStructure
         } catch (deleteError) {
           this.logger?.warn?.(
             'Failed to delete structure after failure:',
-            deleteError,
+            safeErrorMessage(deleteError),
           );
         }
       }
 
-      this.logger?.error('Update failed:', error);
+      this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -500,7 +504,7 @@ export class AdtStructure
         errors: [],
       };
     } catch (error: unknown) {
-      this.logger?.error('Delete failed:', error);
+      this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
     }
   }
@@ -524,7 +528,7 @@ export class AdtStructure
         errors: [],
       };
     } catch (error: unknown) {
-      this.logger?.error('Activate failed:', error);
+      this.logger?.error('Activate failed:', safeErrorMessage(error));
       throw error;
     }
   }
