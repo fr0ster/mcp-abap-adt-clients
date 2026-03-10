@@ -123,7 +123,7 @@ describe('Admin: Teardown shared dependencies', () => {
         status: string;
       }> = [];
 
-      // Reverse dependency order: bdefs → views → tables → function_groups → programs → package
+      // Reverse dependency order: bdefs → access_controls → views → tables → function_groups → programs → package
       // (dependents deleted before their dependencies)
 
       // 1. Behavior definitions
@@ -140,6 +140,22 @@ describe('Admin: Teardown shared dependencies', () => {
           testsLogger,
         );
         results.push({ type: 'behavior_definitions', name: item.name, status });
+      }
+
+      // 1b. Access controls (before views, since they depend on views)
+      const accessControls = sharedConfig.access_controls || [];
+      for (const item of accessControls) {
+        const status = await safeDelete(
+          `access_control ${item.name}`,
+          async () => {
+            await client.getAccessControl().delete({
+              accessControlName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'access_controls', name: item.name, status });
       }
 
       // 2. Views

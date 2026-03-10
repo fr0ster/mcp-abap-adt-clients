@@ -223,6 +223,9 @@ describe('Package (using AdtClient)', () => {
         }
 
         await tester.flowTestAuto({
+          // Packages do not require activation in ADT
+          activateOnCreate: true,
+          activateOnUpdate: true,
           updateConfig: {
             packageName: config.packageName,
             superPackage: config.superPackage,

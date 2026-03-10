@@ -407,6 +407,25 @@ function resolveStandardObject(
       yamlKey: 'service_definitions',
       paramSuffix: 'service_definition_name',
     },
+    serviceBinding: {
+      yamlKey: 'service_bindings',
+      paramSuffix: 'service_binding_name',
+    },
+    service_binding: {
+      yamlKey: 'service_bindings',
+      paramSuffix: 'service_binding_name',
+    },
+    tabletype: { yamlKey: 'tabletypes', paramSuffix: 'tabletype_name' },
+    tableType: { yamlKey: 'tabletypes', paramSuffix: 'tabletype_name' },
+    table_type: { yamlKey: 'tabletypes', paramSuffix: 'tabletype_name' },
+    accessControl: {
+      yamlKey: 'access_controls',
+      paramSuffix: 'access_control_name',
+    },
+    access_control: {
+      yamlKey: 'access_controls',
+      paramSuffix: 'access_control_name',
+    },
   };
 
   const typeInfo = typeMap[objectType];
@@ -1985,6 +2004,73 @@ async function ensureSharedPackage(client, logger) {
  * @param {Object} logger - Logger instance
  * @returns {Promise<{existed: boolean, created: boolean}>}
  */
+
+/**
+ * Update source and activate an existing shared dependency.
+ * Called when object exists but may have outdated or inactive source.
+ */
+async function updateAndActivateShared(
+  client,
+  type,
+  name,
+  depConfig,
+  transportRequest,
+  logger,
+) {
+  logger?.info?.(
+    `Shared ${type} ${name} exists — updating source and activating...`,
+  );
+  if (type === 'tables') {
+    await client
+      .getTable()
+      .update(
+        { tableName: name, ddlCode: depConfig.source, transportRequest },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      );
+  } else if (type === 'views') {
+    await client
+      .getView()
+      .update(
+        { viewName: name, ddlSource: depConfig.source, transportRequest },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      );
+  } else if (type === 'programs') {
+    await client
+      .getProgram()
+      .update(
+        { programName: name, sourceCode: depConfig.source, transportRequest },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      );
+  } else if (type === 'behavior_definitions') {
+    await client
+      .getBehaviorDefinition()
+      .update(
+        { name, sourceCode: depConfig.source, transportRequest },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      );
+  } else if (type === 'classes') {
+    await client
+      .getClass()
+      .update(
+        { className: name, sourceCode: depConfig.source, transportRequest },
+        { activateOnUpdate: true, sourceCode: depConfig.source },
+      );
+  } else if (type === 'access_controls') {
+    await client.getAccessControl().update(
+      {
+        accessControlName: name,
+        sourceCode: depConfig.source,
+        transportRequest,
+      },
+      { activateOnUpdate: true, sourceCode: depConfig.source },
+    );
+  } else {
+    logger?.info?.(`Shared ${type} ${name} — no update logic, skipping`);
+    return;
+  }
+  logger?.info?.(`Shared ${type} ${name} updated and activated`);
+}
+
 async function ensureSharedDependency(client, type, name, logger) {
   const cacheKey = `${type}:${name}`;
   if (_verifiedDependencies[cacheKey]) {
@@ -2024,6 +2110,11 @@ async function ensureSharedDependency(client, type, name, logger) {
     } else if (type === 'classes') {
       const result = await client.getClass().read({ className: name });
       exists = result !== undefined;
+    } else if (type === 'access_controls') {
+      const result = await client
+        .getAccessControl()
+        .read({ accessControlName: name });
+      exists = result !== undefined;
     } else if (type === 'function_groups') {
       const result = await client
         .getFunctionGroup()
@@ -2036,7 +2127,25 @@ async function ensureSharedDependency(client, type, name, logger) {
   }
 
   if (exists) {
-    logger?.info?.(`Shared ${type} ${name} already exists`);
+    // If config has source, update and activate to ensure it matches config
+    if (depConfig.source) {
+      try {
+        await updateAndActivateShared(
+          client,
+          type,
+          name,
+          depConfig,
+          transportRequest,
+          logger,
+        );
+      } catch (updateErr) {
+        logger?.warn?.(
+          `Shared ${type} ${name} exists but update/activate failed: ${updateErr.message}`,
+        );
+      }
+    } else {
+      logger?.info?.(`Shared ${type} ${name} already exists`);
+    }
     _verifiedDependencies[cacheKey] = true;
     return { existed: true, created: false };
   }
@@ -2141,6 +2250,26 @@ async function ensureSharedDependency(client, type, name, logger) {
           { activateOnUpdate: true, sourceCode: depConfig.source },
         );
         logger?.info?.(`Shared class ${name} activated`);
+      }
+    } else if (type === 'access_controls') {
+      await client.getAccessControl().create({
+        accessControlName: name,
+        packageName,
+        description: depConfig.description || 'Shared test access control',
+        sourceCode: depConfig.source,
+        transportRequest,
+      });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared access control ${name}...`);
+        await client.getAccessControl().update(
+          {
+            accessControlName: name,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared access control ${name} activated`);
       }
     } else if (type === 'function_groups') {
       try {
