@@ -37,14 +37,63 @@ environment:
   cleanup_after_test: true
 ```
 
+## shared_dependencies
+
+Persistent objects created via `npm run shared:setup`, deleted via `npm run shared:teardown`.
+Each item supports `available_in` to control which environments it is created/deleted on.
+
+```yaml
+shared_dependencies:
+  package: "ZAC_SHR_PKG"
+  transport_request: ""
+  tables:
+    - name: "ZAC_SHR_ITABL"
+      source: "..."
+  views:
+    - name: "ZAC_SHR_CDSUT_DDLS"
+      source: "..."
+  access_controls:
+    - name: "ZAC_SHR_AC01"
+      source: "..."
+  behavior_definitions:
+    - name: "ZAC_SHR_BIMP_DDLS"
+      source: "..."
+  service_definitions:
+    - name: "ZAC_SHR_SRVD01"
+      source: "..."
+  classes:
+    - name: "ZAC_SHR_RUN01"
+      source: "..."
+  interfaces:
+    - name: "ZAC_SHR_IF01"
+      source: "..."
+  function_groups:
+    - name: "ZAC_SHR_FUGR"
+  function_modules:
+    - name: "Z_AC_SHR_FM01"
+      function_group: "ZAC_SHR_FUGR"
+      source: "..."
+  programs:
+    - name: "ZAC_SHR_PROG"
+      available_in: ["onprem", "legacy"]
+```
+
+Supported object types: `tables`, `views`, `access_controls`, `behavior_definitions`, `service_definitions`, `classes`, `interfaces`, `function_groups`, `function_modules`, `programs`.
+
 ## standard_objects
 
-Used by read-only tests and shared utility tests.
+Used by read-only tests and shared utility tests. Each entry supports `available_in`.
 
 ```yaml
 standard_objects:
   classes:
-    - name: "CL_ABAP_CHAR_UTILITIES"
+    - name: "ZAC_SHR_RUN01"
+      available_in: ["onprem", "cloud"]
+  interfaces:
+    - name: "ZAC_SHR_IF01"
+      available_in: ["onprem", "cloud"]
+  service_definitions:
+    - name: "ZAC_SHR_SRVD01"
       available_in: ["onprem", "cloud"]
   tables:
     - name: "T000"
@@ -62,10 +111,10 @@ create_class:
       enabled: true
       description: "Create test class"
       params:
-        class_name: "ZADT_CLS01"
+        class_name: "ZAC_CLS01"
         description: "Test"
         source_code: |
-          CLASS ZADT_CLS01 DEFINITION.
+          CLASS ZAC_CLS01 DEFINITION.
 ```
 
 Runtime examples:
@@ -105,7 +154,31 @@ Use `available_in` to scope tests:
 available_in: ["onprem"]
 ```
 
+## Group Activation
+
+Tests multi-object activation (domain + data element + structure):
+
+```yaml
+group_activation:
+  test_cases:
+    - name: "adt_group_activation"
+      enabled: true
+      params:
+        domain_name: "ZAC_DOM_GA01"
+        data_element_name: "ZAC_DTEL_GA01"
+        structure_name: "ZAC_STRU_GA01"
+        structure_ddl_code: |
+          define structure zac_stru_ga01 {
+            mandt   : abap.clnt;
+            ga_field : zac_dtel_ga01;
+          }
+```
+
+The test includes pre-cleanup (delete leftovers from failed previous runs) and guaranteed unlock via try/finally.
+
 ## Notes
 
 - `BaseTester` resolves params via `TestConfigResolver`.
 - Read-only tests pull names from `standard_objects` if not provided in params.
+- Shared dependencies use `available_in` to skip objects not available in certain environments (e.g. programs are not available on cloud).
+- Setup/teardown scripts respect `available_in` — items are skipped if the current environment doesn't match.

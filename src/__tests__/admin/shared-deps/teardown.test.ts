@@ -72,6 +72,7 @@ describe('Admin: Teardown shared dependencies', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let envType = 'onprem';
 
   beforeAll(async () => {
     try {
@@ -79,6 +80,7 @@ describe('Admin: Teardown shared dependencies', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       const isCloud = await isCloudEnvironment(connection);
+      envType = isCloud ? 'cloud' : 'onprem';
       const systemContext = await resolveSystemContext(connection, isCloud);
       const { client: resolvedClient } = await createTestAdtClient(
         connection,
@@ -123,12 +125,30 @@ describe('Admin: Teardown shared dependencies', () => {
         status: string;
       }> = [];
 
-      // Reverse dependency order: function_modules → bdefs → access_controls → interfaces → views → tables → function_groups → programs → package
+      // Reverse dependency order: programs → function_modules → bdefs → access_controls → interfaces → views → tables → function_groups → package
       // (dependents deleted before their dependencies)
+
+      const shouldSkip = (item: any, type: string) => {
+        if (item.available_in && !item.available_in.includes(envType)) {
+          testsLogger.info(
+            `Skipping ${type} ${item.name} — not available in ${envType}`,
+          );
+          return true;
+        }
+        return false;
+      };
 
       // 0. Function modules (before function groups)
       const functionModules = sharedConfig.function_modules || [];
       for (const item of functionModules) {
+        if (shouldSkip(item, 'function_module')) {
+          results.push({
+            type: 'function_modules',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
         const status = await safeDelete(
           `function_module ${item.name}`,
           async () => {
@@ -146,6 +166,14 @@ describe('Admin: Teardown shared dependencies', () => {
       // 1. Behavior definitions
       const bdefs = sharedConfig.behavior_definitions || [];
       for (const item of bdefs) {
+        if (shouldSkip(item, 'behavior_definition')) {
+          results.push({
+            type: 'behavior_definitions',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
         const status = await safeDelete(
           `behavior_definition ${item.name}`,
           async () => {
@@ -159,9 +187,41 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'behavior_definitions', name: item.name, status });
       }
 
+      // 1a. Service definitions (before views, since they depend on views)
+      const serviceDefinitions = sharedConfig.service_definitions || [];
+      for (const item of serviceDefinitions) {
+        if (shouldSkip(item, 'service_definition')) {
+          results.push({
+            type: 'service_definitions',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
+        const status = await safeDelete(
+          `service_definition ${item.name}`,
+          async () => {
+            await client.getServiceDefinition().delete({
+              serviceDefinitionName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'service_definitions', name: item.name, status });
+      }
+
       // 1b. Access controls (before views, since they depend on views)
       const accessControls = sharedConfig.access_controls || [];
       for (const item of accessControls) {
+        if (shouldSkip(item, 'access_control')) {
+          results.push({
+            type: 'access_controls',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
         const status = await safeDelete(
           `access_control ${item.name}`,
           async () => {
@@ -178,6 +238,14 @@ describe('Admin: Teardown shared dependencies', () => {
       // 1c. Interfaces
       const interfaces = sharedConfig.interfaces || [];
       for (const item of interfaces) {
+        if (shouldSkip(item, 'interface')) {
+          results.push({
+            type: 'interfaces',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
         const status = await safeDelete(
           `interface ${item.name}`,
           async () => {
@@ -194,6 +262,10 @@ describe('Admin: Teardown shared dependencies', () => {
       // 2. Views
       const views = sharedConfig.views || [];
       for (const item of views) {
+        if (shouldSkip(item, 'view')) {
+          results.push({ type: 'views', name: item.name, status: 'skipped' });
+          continue;
+        }
         const status = await safeDelete(
           `view ${item.name}`,
           async () => {
@@ -210,6 +282,10 @@ describe('Admin: Teardown shared dependencies', () => {
       // 3. Tables
       const tables = sharedConfig.tables || [];
       for (const item of tables) {
+        if (shouldSkip(item, 'table')) {
+          results.push({ type: 'tables', name: item.name, status: 'skipped' });
+          continue;
+        }
         const status = await safeDelete(
           `table ${item.name}`,
           async () => {
@@ -226,6 +302,14 @@ describe('Admin: Teardown shared dependencies', () => {
       // 4. Function groups
       const functionGroups = sharedConfig.function_groups || [];
       for (const item of functionGroups) {
+        if (shouldSkip(item, 'function_group')) {
+          results.push({
+            type: 'function_groups',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
         const status = await safeDelete(
           `function_group ${item.name}`,
           async () => {
@@ -242,6 +326,14 @@ describe('Admin: Teardown shared dependencies', () => {
       // 5. Programs
       const programs = sharedConfig.programs || [];
       for (const item of programs) {
+        if (shouldSkip(item, 'program')) {
+          results.push({
+            type: 'programs',
+            name: item.name,
+            status: 'skipped',
+          });
+          continue;
+        }
         const status = await safeDelete(
           `program ${item.name}`,
           async () => {

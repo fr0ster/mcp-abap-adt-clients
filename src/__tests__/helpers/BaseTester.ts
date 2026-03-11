@@ -491,7 +491,7 @@ export class BaseTester<TConfig, TState> {
 
     const shouldSkipInitialSourceRead = (): boolean => {
       const configAny = config as any;
-      return Boolean(configAny?.className);
+      return Boolean(configAny?.className || configAny?.interfaceName);
     };
 
     let preUpdateActive: string | undefined;

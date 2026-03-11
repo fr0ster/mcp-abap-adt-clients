@@ -47,6 +47,7 @@ describe('Admin: Setup shared dependencies', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let envType = 'onprem';
 
   beforeAll(async () => {
     try {
@@ -54,6 +55,7 @@ describe('Admin: Setup shared dependencies', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       const isCloud = await isCloudEnvironment(connection);
+      envType = isCloud ? 'cloud' : 'onprem';
       const systemContext = await resolveSystemContext(connection, isCloud);
       const { client: resolvedClient } = await createTestAdtClient(
         connection,
@@ -92,12 +94,13 @@ describe('Admin: Setup shared dependencies', () => {
       testsLogger.info('Setting up shared package...');
       await ensureSharedPackage(client, testsLogger);
 
-      // Dependency order: tables → views → access_controls → behavior_definitions → classes → interfaces → function_groups → function_modules → programs
+      // Dependency order: tables → views → access_controls → behavior_definitions → service_definitions → classes → interfaces → function_groups → function_modules → programs
       const typeOrder: Array<{ type: string; label: string }> = [
         { type: 'tables', label: 'Tables' },
         { type: 'views', label: 'Views' },
         { type: 'access_controls', label: 'Access controls' },
         { type: 'behavior_definitions', label: 'Behavior definitions' },
+        { type: 'service_definitions', label: 'Service definitions' },
         { type: 'classes', label: 'Classes' },
         { type: 'interfaces', label: 'Interfaces' },
         { type: 'function_groups', label: 'Function groups' },
@@ -121,6 +124,13 @@ describe('Admin: Setup shared dependencies', () => {
         testsLogger.info(`Setting up ${label} (${items.length})...`);
 
         for (const item of items) {
+          if (item.available_in && !item.available_in.includes(envType)) {
+            testsLogger.info(
+              `Skipping ${type} ${item.name} — not available in ${envType}`,
+            );
+            results.push({ type, name: item.name, status: 'skipped' });
+            continue;
+          }
           try {
             const result = await ensureSharedDependency(
               client,

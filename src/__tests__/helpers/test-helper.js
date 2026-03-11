@@ -2083,6 +2083,15 @@ async function updateAndActivateShared(
       },
       { activateOnUpdate: true, sourceCode: depConfig.source },
     );
+  } else if (type === 'service_definitions') {
+    await client.getServiceDefinition().update(
+      {
+        serviceDefinitionName: name,
+        sourceCode: depConfig.source,
+        transportRequest,
+      },
+      { activateOnUpdate: true, sourceCode: depConfig.source },
+    );
   } else {
     logger?.info?.(`Shared ${type} ${name} — no update logic, skipping`);
     return;
@@ -2147,6 +2156,11 @@ async function ensureSharedDependency(client, type, name, logger) {
         functionModuleName: name,
         functionGroupName: depConfig.function_group,
       });
+      exists = result !== undefined;
+    } else if (type === 'service_definitions') {
+      const result = await client
+        .getServiceDefinition()
+        .read({ serviceDefinitionName: name });
       exists = result !== undefined;
     }
   } catch (error) {
@@ -2355,6 +2369,26 @@ async function ensureSharedDependency(client, type, name, logger) {
           { activateOnUpdate: true, sourceCode: depConfig.source },
         );
         logger?.info?.(`Shared function module ${name} activated`);
+      }
+    } else if (type === 'service_definitions') {
+      await client.getServiceDefinition().create({
+        serviceDefinitionName: name,
+        packageName,
+        description: depConfig.description || 'Shared test service definition',
+        transportRequest,
+        sourceCode: depConfig.source,
+      });
+      if (depConfig.source) {
+        logger?.info?.(`Activating shared service definition ${name}...`);
+        await client.getServiceDefinition().update(
+          {
+            serviceDefinitionName: name,
+            sourceCode: depConfig.source,
+            transportRequest,
+          },
+          { activateOnUpdate: true, sourceCode: depConfig.source },
+        );
+        logger?.info?.(`Shared service definition ${name} activated`);
       }
     }
     logger?.info?.(`Created shared ${type} ${name}`);

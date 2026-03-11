@@ -276,6 +276,38 @@ describe('Group Activation (Shared)', () => {
 
       let currentStep = '';
 
+      // Pre-cleanup: delete leftover objects from failed previous runs
+      for (const [label, deleteFn] of [
+        [
+          'structure',
+          () =>
+            client
+              .getStructure()
+              .delete({ structureName: structureName!, transportRequest }),
+        ],
+        [
+          'data element',
+          () =>
+            client
+              .getDataElement()
+              .delete({ dataElementName: dataElementName!, transportRequest }),
+        ],
+        [
+          'domain',
+          () =>
+            client
+              .getDomain()
+              .delete({ domainName: domainName!, transportRequest }),
+        ],
+      ] as const) {
+        try {
+          await deleteFn();
+          testsLogger.info?.(`Pre-cleanup: deleted leftover ${label}`);
+        } catch (_e) {
+          // Expected — object doesn't exist
+        }
+      }
+
       try {
         // Step 0: Validate domain
         currentStep = 'validate domain';
@@ -427,17 +459,25 @@ define structure ${structureName} {
           setTimeout(resolve, getOperationDelay('create', testCase)),
         );
 
-        // Step 3.5: Update structure with DDL code
+        // Step 3.5: Update structure with DDL code (low-level: skip check since deps not yet activated)
         currentStep = 'update structure';
         logTestStep(currentStep, testsLogger);
-        await client.getStructure().update(
-          {
-            structureName: structureName,
-            ddlCode: structureDdlCode,
-            transportRequest: transportRequest,
-          },
-          { activateOnUpdate: false },
-        );
+        const structureHandler = client.getStructure();
+        const structureLockHandle = await structureHandler.lock({
+          structureName,
+        });
+        try {
+          await structureHandler.update(
+            {
+              structureName: structureName,
+              ddlCode: structureDdlCode,
+              transportRequest: transportRequest,
+            },
+            { activateOnUpdate: false, lockHandle: structureLockHandle },
+          );
+        } finally {
+          await structureHandler.unlock({ structureName }, structureLockHandle);
+        }
         await new Promise((resolve) =>
           setTimeout(resolve, getOperationDelay('update', testCase)),
         );

@@ -200,7 +200,7 @@ shared_dependencies:
       root_entity: "ZAC_SHR_BIMP_DDLS"
       implementation_type: "Managed"
       source: |
-        managed implementation in class zbp_ac_shr_bimp_ddls unique;
+        managed implementation in class zac_bp_shr_bimp_ddls unique;
         strict ( 2 );
 
         define behavior for ZAC_SHR_BIMP_DDLS
@@ -276,9 +276,19 @@ shared_dependencies:
           ev_output = |Result: { iv_input }|.
         ENDFUNCTION.
 
+  service_definitions:
+    - name: "ZAC_SHR_SRVD01"
+      description: "Shared service definition for read-only tests"
+      source: |
+        @EndUserText.label: 'Shared service definition'
+        define service ZAC_SHR_SRVD01 {
+          expose ZAC_SHR_CDSUT_DDLS;
+        }
+
   programs:
     - name: "ZAC_SHR_PROG"
       description: "Shared program for run tests"
+      available_in: ["onprem", "legacy"]
       source: |
         REPORT ZAC_SHR_PROG.
         WRITE: / 'Shared test program'.
@@ -350,18 +360,18 @@ standard_objects:
   function_groups:
     - name: "ZAC_SHR_FUGR"
       description: "Shared function group (from shared_dependencies)"
-      available_in: ["onprem"]
+      available_in: ["onprem", "cloud"]
 
   function_modules:
     - name: "Z_AC_SHR_FM01"
       group: "ZAC_SHR_FUGR"
       description: "Shared function module (from shared_dependencies)"
-      available_in: ["onprem"]
+      available_in: ["onprem", "cloud"]
 
   service_definitions:
-    - name: "ZAC_SRVD01"
-      description: "Placeholder for service definition – replace with existing service definition"
-      available_in: ["onprem"]
+    - name: "ZAC_SHR_SRVD01"
+      description: "Shared service definition (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
   access_controls:
     - name: "ZAC_SHR_AC01"
@@ -510,7 +520,7 @@ read_service_definition:
       description: "Read standard SAP service definition"
       params:
         # Specify standard object name directly (overrides standard_objects registry)
-        service_definition_name: "ZAC_SRVD01"  # Replace with existing service definition in your system
+        service_definition_name: "ZAC_SHR_SRVD01"  # Shared service definition (from shared_dependencies)
 
 # Read Access Control (AdtClient)
 # Uses standard_objects.access_controls with available_in filter
@@ -568,7 +578,6 @@ create_class:
   test_cases:
     - name: "adt_class"
       enabled: true
-      available_in: ["onprem", "legacy"]
       description: "Create test class for AdtClass tests"
       params:
         class_name: "ZAC_CLS01"
@@ -763,15 +772,14 @@ create_package:
   test_cases:
     - name: "adt_package"
       enabled: true
-      available_in: ["onprem"]
       description: "Package reserved for AdtPackage tests"
       params:
-        package_name: "ZADT_TEST"                 # Parent package (existing, must be structure/main type)
-        test_package: "ZAC_INNER_PKG01"    # Package created by the test
+        package_name: "ZADT_TEST"                 # ← CHANGE: parent package (existing, must be structure/main type)
+        test_package: "ZAC_INNER_PKG02"    # Package created by the test
         description: "AdtPackage workflow package"
         updated_description: "AdtPackage workflow package - updated"  # Description for update operation
         package_type: "development"             # Optional: development, main, structure, etc.
-        software_component: "HOME"              # Software component name (required for package creation)
+        software_component: "HOME"              # ← CHANGE: on-prem "HOME", cloud "ZLOCAL"
         transport_layer: ""                        # ← CHANGE (on-prem only): transport layer, e.g. "ZE19"
         # transport_request: ""                 # Uses environment.default_transport if omitted
 
@@ -780,7 +788,6 @@ create_domain:
   test_cases:
     - name: "adt_domain"
       enabled: true
-      available_in: ["onprem"]
       description: "Domain used by AdtDomain workflow tests"
       params:
         domain_name: "ZAC_DOM01"
@@ -798,7 +805,6 @@ create_data_element:
   test_cases:
     - name: "adt_data_element"
       enabled: true
-      available_in: ["onprem"]
       description: "Data element reserved for AdtDataElement tests"
       params:
         data_element_name: "ZAC_DTEL01"
@@ -825,7 +831,6 @@ create_interface:
   test_cases:
     - name: "adt_interface"
       enabled: true
-      available_in: ["onprem", "legacy"]
       description: "Interface reserved for AdtInterface tests"
       params:
         interface_name: "ZAC_IF01"
@@ -844,13 +849,12 @@ create_interface:
         unlock: 3000
 
 # Create Program
-# ⚠️ ABAP Cloud Limitation: Programs are not supported in cloud systems (BTP ABAP Environment)
 create_program:
   test_cases:
     - name: "adt_program"
       enabled: true
-      available_in: ["onprem"]  # Programs are not supported in cloud systems
-      description: "Program reserved for AdtProgram tests. Only available on on-premise systems."
+      available_in: ["onprem"]
+      description: "Program reserved for AdtProgram tests"
       params:
         program_name: "ZAC_PROG01"
         description: "AdtProgram workflow report"
@@ -869,7 +873,6 @@ create_table:
   test_cases:
     - name: "adt_table"
       enabled: true
-      available_in: ["onprem"]
       description: "Table reserved for AdtTable tests"
       params:
         table_name: "ZAC_TAB01"
@@ -899,7 +902,6 @@ create_tabletype:
   test_cases:
     - name: "adt_tabletype"
       enabled: true
-      available_in: ["onprem"]
       description: "TableType reserved for TableType tests"
       params:
         tabletype_name: "ZAC_TTYP01"
@@ -918,7 +920,6 @@ create_structure:
   test_cases:
     - name: "adt_structure"
       enabled: true
-      available_in: ["onprem"]
       description: "Structure reserved for AdtStructure tests"
       params:
         structure_name: "ZAC_STRU01"
@@ -1021,7 +1022,6 @@ create_function_group:
   test_cases:
     - name: "adt_function_group"
       enabled: true
-      available_in: ["onprem", "legacy"]
       description: "Function group reserved for AdtFunctionGroup tests"
       params:
         function_group_name: "ZAC_FGR_EMPTY"
@@ -1034,7 +1034,6 @@ create_function_module:
   test_cases:
     - name: "adt_function_module"
       enabled: true
-      available_in: ["onprem", "legacy"]
       description: "Function module reserved for AdtFunctionModule tests"
       params:
         function_module_name: "Z_AC_FM03"  # Must start with Z_ or Y_ (with underscore)
@@ -1056,7 +1055,6 @@ create_transport:
   test_cases:
     - name: "builder_transport"
       enabled: true
-      available_in: ["onprem"]
       description: "Transport reserved for AdtRequest tests"
       params:
         description: "AdtRequest workflow transport"
@@ -1067,7 +1065,6 @@ create_behavior_definition:
   test_cases:
     - name: "adt_behavior_definition"
       enabled: true
-      available_in: ["onprem"]
       description: "Create test behavior definition for AdtBehaviorDefinition tests"
       params:
         bdef_name: "ZAC_SHR_BDEF_DDLS"
@@ -1098,7 +1095,6 @@ create_metadata_extension:
   test_cases:
     - name: "adt_metadata_extension"
       enabled: true
-      available_in: ["onprem"]
       description: "Create test metadata extension for AdtMetadataExtension tests"
       params:
         ext_name: "ZAC_MEXT_DDLX"
@@ -1121,10 +1117,9 @@ create_behavior_implementation:
   test_cases:
     - name: "adt_behavior_implementation"
       enabled: true
-      available_in: ["onprem"]
       description: "Create test behavior implementation class for AdtBehaviorImplementation tests"
       params:
-        class_name: "ZBP_AC_SHR_BIMP_DDLS"
+        class_name: "ZAC_BP_SHR_BIMP_DDLS"
         description: "BehaviorImplementation for ZAC_SHR_BIMP_DDLS"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
@@ -1160,7 +1155,6 @@ run_unit_test:
   test_cases:
     - name: "adt_unit_test"
       enabled: true
-      available_in: ["onprem", "legacy"]
       description: "Run unit test for class test class"
       params:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
@@ -1318,12 +1312,11 @@ group_activation:
   test_cases:
     - name: "adt_group_activation"
       enabled: true
-      available_in: ["onprem"]
       description: "Group activation test - domain, data element, structure"
       params:
-        domain_name: "ZAC_DOM_GRP"
-        data_element_name: "ZAC_DTEL_GRP"
-        structure_name: "ZAC_STRU_GRP"
+        domain_name: "ZAC_DOM_GA01"
+        data_element_name: "ZAC_DTEL_GA01"
+        structure_name: "ZAC_STRU_GA01"
         description: "Group activation test objects"
         # package_name: "ZAC_PKG03"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
@@ -1334,9 +1327,9 @@ group_activation:
         structure_ddl_code: |
           @EndUserText.label: 'Group activation test structure'
           @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure ZAC_STRU_GRP {
-            mandt : abap.clnt;
-            test_field : ZAC_DTEL_GRP;
+          define structure zac_stru_ga01 {
+            mandt   : abap.clnt;
+            ga_field : zac_dtel_ga01;
           }
 
 # ============================================================================

@@ -5,6 +5,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-03-11
+
+### Added
+- **Shared dependencies**: Add `ZAC_SHR_SRVD01` (service definition) exposing `ZAC_SHR_CDSUT_DDLS` to shared dependencies for read-only tests.
+- **Admin scripts**: Add `service_definitions` support to setup, teardown scripts and `test-helper.js`.
+- **Admin scripts**: Add `available_in` filtering to shared dependencies setup/teardown — items not available in the current environment (cloud/onprem) are skipped automatically.
+
+### Changed
+- **Cloud test coverage**: Enable all flow tests that can work on cloud by removing unnecessary `available_in: ["onprem"]` restrictions (domain, data element, table, tabletype, structure, class, interface, function group, function module, behavior definition, behavior implementation, metadata extension, transport, group activation, unit test).
+- **Group activation**: Rename test objects from `ZAC_*_GRP` to `ZAC_*_GA01` (domain, data element, structure) with corrected DDL code.
+- **Group activation**: Add pre-cleanup to delete leftover objects from failed previous runs, use low-level lock/update/unlock with try/finally for guaranteed unlock.
+- **Shared dependencies**: Mark programs as `available_in: ["onprem", "legacy"]` (programs don't exist on cloud).
+- **Shared dependencies**: Rename behavior provider class `ZBP_AC_SHR_BIMP_DDLS` → `ZAC_BP_SHR_BIMP_DDLS`.
+
+### Fixed
+- **Interface test**: Fix `Read undefined failed: no response` on cloud by skipping initial source read after create (same as class — source not yet available immediately after creation).
+- **Package test**: Add `software_component: "ZLOCAL"` and `record_changes: false` for cloud trial packages.
+
 ## [3.8.9] - 2026-03-11
 
 ### Changed
