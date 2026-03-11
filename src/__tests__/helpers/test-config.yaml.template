@@ -464,6 +464,7 @@ read_domain:
   test_cases:
     - name: "readonly_read_domain"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read existing domain using AdtClient (uses standard_objects.domains)"
       params: {}  # No params needed - automatically uses standard_objects.domains filtered by available_in
 
@@ -473,6 +474,7 @@ read_data_element:
   test_cases:
     - name: "readonly_read_data_element"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read existing data element using AdtClient (uses standard_objects.data_elements)"
       params: {}  # No params needed - automatically uses standard_objects.data_elements filtered by available_in
 
@@ -482,6 +484,7 @@ read_structure:
   test_cases:
     - name: "readonly_read_structure"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read existing structure using AdtClient (uses standard_objects.structures)"
       params: {}  # No params needed - automatically uses standard_objects.structures filtered by available_in
 
@@ -538,10 +541,12 @@ read_service_definition:
   test_cases:
     - name: "readonly_read_service_definition"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read existing service definition using AdtClient (uses standard_objects.service_definitions)"
       params: {}  # No params needed - automatically uses standard_objects.service_definitions filtered by available_in
     - name: "read_standard_service_definition"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read standard SAP service definition"
       params:
         # Specify standard object name directly (overrides standard_objects registry)
@@ -553,6 +558,7 @@ read_access_control:
   test_cases:
     - name: "read_standard_access_control"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read standard SAP access control"
       params:
         # Specify standard object name directly (overrides standard_objects registry)
@@ -567,6 +573,7 @@ read_service_binding:
   test_cases:
     - name: "readonly_read_service_binding"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read existing service binding using AdtClient (uses standard_objects.service_bindings)"
       params: {}  # No params needed - automatically uses standard_objects.service_bindings filtered by available_in
 
@@ -1225,6 +1232,7 @@ create_cds_unit_test:
   test_cases:
     - name: "cds_unit_test"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "CDS view with ABAP Unit verification (dependencies auto-created)"
       params:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
@@ -1326,6 +1334,7 @@ group_activation:
   test_cases:
     - name: "adt_group_activation"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Group activation test - domain, data element, structure"
       params:
         domain_name: "ZAC_DOM_GA01"
@@ -1436,12 +1445,14 @@ read_metadata:
 
     - name: "read_domain_metadata"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read metadata for a standard domain. Uses standard_objects.domains."
       params:
         # domain_name: Uses standard_objects.domains if not specified
 
     - name: "read_table_metadata"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read metadata for a standard table. Uses standard_objects.tables."
       params:
         # table_name: Uses standard_objects.tables if not specified
@@ -1572,6 +1583,7 @@ runtime_dumps:
   test_cases:
     - name: "adt_runtime_dumps"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read runtime dumps feed and optionally read dump payload by ID"
       params:
         top: 20
@@ -1588,6 +1600,7 @@ profiler_traces:
   test_cases:
     - name: "adt_profiler_traces"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Profiler trace list/read/create and run-with-profiling flow"
       params:
         trace_id: ""              # Optional: existing trace ID to read; when empty, discovered from feed
@@ -1612,6 +1625,7 @@ execute_class:
   test_cases:
     - name: "adt_class_executor"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Run class via AdtExecutor (with and without profiling)"
       params:
         class_name: "ZAC_CLS023"
