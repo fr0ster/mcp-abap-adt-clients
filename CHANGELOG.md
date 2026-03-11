@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.9.2] - 2026-03-11
+
+### Changed
+- **Shared dependencies**: Add `available_in` to access_controls, behavior_definitions, service_definitions (`["onprem", "cloud"]`) — not available on legacy systems (BASIS < 7.50). Tables, views, classes, interfaces, function groups, function modules remain available everywhere.
+
 ## [3.9.1] - 2026-03-11
 
 ### Fixed
