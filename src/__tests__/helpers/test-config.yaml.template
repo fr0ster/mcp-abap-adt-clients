@@ -942,7 +942,6 @@ create_view:
   test_cases:
     - name: "adt_view"
       enabled: true
-      available_in: ["onprem", "legacy"]
       description: "View reserved for AdtView tests"
       params:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
