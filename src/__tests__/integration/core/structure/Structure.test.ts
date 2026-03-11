@@ -202,7 +202,7 @@ describe('Structure (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'Structure - read standard object',
-            `Standard structure not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard structure not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

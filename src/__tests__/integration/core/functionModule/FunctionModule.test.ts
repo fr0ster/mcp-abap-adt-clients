@@ -276,7 +276,7 @@ describe('FunctionModule (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'FunctionModule - read standard object',
-            `Standard function module not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard function module not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

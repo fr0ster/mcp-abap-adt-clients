@@ -429,19 +429,21 @@ const fetchPackageTreeRecursive = async (
         ? maxDepth
         : currentDepth + 1;
 
-      const subpackageTrees = await Promise.all(
-        subpackages.map((subpackage) =>
-          fetchPackageTreeRecursive(
-            connection,
-            subpackage.name,
-            currentDepth + 1,
-            subpackageMaxDepth,
-            includeDescriptions,
-            includeSubpackages,
-            logger,
-          ),
-        ),
-      );
+      // Process subpackages sequentially — RFC connections support only
+      // one concurrent request per session, so Promise.all would deadlock.
+      const subpackageTrees: IPackageHierarchyNode[] = [];
+      for (const subpackage of subpackages) {
+        const tree = await fetchPackageTreeRecursive(
+          connection,
+          subpackage.name,
+          currentDepth + 1,
+          subpackageMaxDepth,
+          includeDescriptions,
+          includeSubpackages,
+          logger,
+        );
+        subpackageTrees.push(tree);
+      }
 
       packageNode.children = packageNode.children?.map((child) => {
         if (!child.is_package) {

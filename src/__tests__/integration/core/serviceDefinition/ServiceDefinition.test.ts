@@ -269,7 +269,7 @@ describe('ServiceDefinition (using AdtClient)', () => {
             logTestSkip(
               testsLogger,
               'ServiceDefinition - read standard object',
-              `Standard service definition not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+              `Standard service definition not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
             );
             return;
           }

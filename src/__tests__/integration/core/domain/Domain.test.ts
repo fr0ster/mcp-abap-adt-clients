@@ -203,7 +203,7 @@ describe('Domain (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'Domain - read standard object',
-            `Standard domain not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard domain not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

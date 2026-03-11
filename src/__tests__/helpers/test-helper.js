@@ -12,6 +12,7 @@ const { XMLParser } = require('fast-xml-parser');
 let cachedConfig = null;
 let configLoadedFrom = null;
 let displayedTemplateWarning = false;
+let cachedEnvType = null;
 
 /**
  * Load environment variables from .env file (quiet mode - no console output)
@@ -26,6 +27,40 @@ function loadTestEnv() {
     dotenv.config({ path: envPath });
     console.log = originalLog; // Restore console.log
   }
+}
+
+/**
+ * Determine current environment type from test config.
+ * Returns 'cloud', 'legacy', or 'onprem'.
+ */
+function getEnvironmentType() {
+  if (cachedEnvType) {
+    return cachedEnvType;
+  }
+  const config = loadTestConfig();
+  const connectionType = config?.environment?.connection_type;
+  if (connectionType === 'rfc') {
+    cachedEnvType = 'legacy';
+  } else {
+    // Will be refined later when isCloud is known; default to 'onprem'
+    cachedEnvType = 'onprem';
+  }
+  return cachedEnvType;
+}
+
+/**
+ * Check if a test case is available for the current environment based on available_in.
+ * If available_in is not specified, the test is available everywhere.
+ */
+function isTestAvailableForEnv(testCase) {
+  if (!testCase) {
+    return false;
+  }
+  const availableIn = testCase.available_in;
+  if (!availableIn || !Array.isArray(availableIn) || availableIn.length === 0) {
+    return true;
+  }
+  return availableIn.includes(getEnvironmentType());
 }
 
 /**
@@ -95,6 +130,11 @@ function getEnabledTestCase(handlerName, testCaseName) {
     return null;
   }
 
+  // Filter by available_in if specified
+  if (!isTestAvailableForEnv(enabledTest)) {
+    return null;
+  }
+
   return enabledTest;
 }
 
@@ -107,7 +147,9 @@ function getAllEnabledTestCases(handlerName) {
   const config = loadTestConfig();
   const handlerTests = config[handlerName]?.test_cases || [];
 
-  const enabledTests = handlerTests.filter((tc) => tc.enabled === true);
+  const enabledTests = handlerTests.filter(
+    (tc) => tc.enabled === true && isTestAvailableForEnv(tc),
+  );
   // Silent return - test will handle empty array gracefully
   return enabledTests;
 }
@@ -344,11 +386,19 @@ function getTestCaseDefinition(handlerName, testCaseName) {
   const config = loadTestConfig();
   const handlerTests = config[handlerName]?.test_cases || [];
 
+  let testCase;
   if (!testCaseName) {
-    return handlerTests[0] || null;
+    testCase = handlerTests[0] || null;
+  } else {
+    testCase = handlerTests.find((tc) => tc.name === testCaseName) || null;
   }
 
-  return handlerTests.find((tc) => tc.name === testCaseName) || null;
+  // Filter by available_in if specified
+  if (testCase && !isTestAvailableForEnv(testCase)) {
+    return null;
+  }
+
+  return testCase;
 }
 
 /**
@@ -2492,4 +2542,6 @@ module.exports = {
   ensureSharedPackage, // Create shared sub-package if it doesn't exist
   ensureSharedDependency, // Ensure shared dependency exists (create if missing, never delete)
   resetSharedDependencyCache, // Clear in-memory caches (for debugging)
+  getEnvironmentType, // Get current environment type: 'cloud', 'legacy', or 'onprem'
+  isTestAvailableForEnv, // Check if test case available_in includes current environment
 };

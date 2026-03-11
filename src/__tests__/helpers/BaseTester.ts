@@ -946,10 +946,14 @@ export class BaseTester<TConfig, TState> {
         currentStep = 'delete (cleanup)';
         logTestStep(currentStep, this.logger);
         try {
-          // Reset session before delete to release any lingering locks (e.g. packages)
+          // Close and reopen session to release any lingering locks.
+          // Use close() instead of reset() — reset() doesn't await close()
+          // on RFC connections, so enqueue locks may persist.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
             const conn = this.connection as any;
-            if (typeof conn.reset === 'function') {
+            if (typeof conn.close === 'function') {
+              await conn.close();
+            } else if (typeof conn.reset === 'function') {
               conn.reset();
             }
             if (typeof conn.connect === 'function') {
@@ -1004,10 +1008,14 @@ export class BaseTester<TConfig, TState> {
       // Cleanup on error if enabled
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         try {
-          // Reset session before delete to release any lingering locks
+          // Close and reopen session to release any lingering locks.
+          // Use close() instead of reset() — reset() doesn't await close()
+          // on RFC connections, so enqueue locks may persist.
           if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
             const conn = this.connection as any;
-            if (typeof conn.reset === 'function') {
+            if (typeof conn.close === 'function') {
+              await conn.close();
+            } else if (typeof conn.reset === 'function') {
               conn.reset();
             }
             if (typeof conn.connect === 'function') {
@@ -1053,12 +1061,33 @@ export class BaseTester<TConfig, TState> {
   }
 
   /**
+   * Ensure the connection is open, reconnecting if needed.
+   * RFC connections close on reset() — need to reopen before next test.
+   */
+  private async ensureConnection(): Promise<void> {
+    if (!this.connection) return;
+    const conn = this.connection as any;
+    // RFC connections: rfcClient is set to null after reset/close.
+    // Only reconnect if the connection is actually dead.
+    const isRfc = conn.rfcClient !== undefined || conn.rfcParams !== undefined;
+    if (isRfc) {
+      if (!conn.rfcClient?.alive) {
+        this.log(LogLevel.INFO, 'Reconnecting closed RFC connection');
+        await conn.connect();
+      }
+    }
+  }
+
+  /**
    * Read test: read-only operations
    */
   async readTest(
     config: Partial<TConfig>,
     options?: IReadTestOptions,
   ): Promise<TState | undefined> {
+    // Ensure connection is open (RFC connections may close after flowTest cleanup)
+    await this.ensureConnection();
+
     try {
       logTestStep('read', this.logger);
       const readState = await this.adtObject.read(
@@ -1190,11 +1219,17 @@ export class BaseTester<TConfig, TState> {
         objectType,
         this.isCloudSystem,
         this.testCase,
+        this.isLegacySystem,
       );
     }
     // Use null testCase to prioritize standard_objects registry
     const { resolveStandardObject } = require('./test-helper');
-    return resolveStandardObject(objectType, this.isCloudSystem, null);
+    return resolveStandardObject(
+      objectType,
+      this.isCloudSystem,
+      null,
+      this.isLegacySystem,
+    );
   }
 
   /**
@@ -1258,6 +1293,9 @@ export class BaseTester<TConfig, TState> {
         this.log(LogLevel.WARN, 'beforeEach: Skipping - No SAP configuration');
         return;
       }
+
+      // Ensure connection is open (RFC may have been closed by previous test cleanup)
+      await this.ensureConnection();
 
       const definition = this.getTestCaseDefinition();
       if (!definition) {

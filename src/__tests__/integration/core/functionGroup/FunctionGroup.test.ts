@@ -131,6 +131,38 @@ describe('FunctionGroup (using AdtClient)', () => {
               .getFunctionGroup()
               .read({ functionGroupName });
             if (existing) {
+              // Try to release any stale lock before deleting
+              try {
+                const lockHandle = await cleanupClient
+                  .getFunctionGroup()
+                  .lock({ functionGroupName });
+                if (lockHandle) {
+                  await cleanupClient
+                    .getFunctionGroup()
+                    .unlock({ functionGroupName }, lockHandle);
+                  testsLogger.info?.(
+                    `Released stale lock on ${functionGroupName}`,
+                  );
+                }
+              } catch (lockError: any) {
+                // Lock failed — object locked by another user/session
+                const msg = lockError.message || String(lockError);
+                if (
+                  lockError.response?.status === 403 ||
+                  msg.includes('currently editing')
+                ) {
+                  testsLogger.warn(
+                    `Cannot release lock on ${functionGroupName}: ${msg}. ` +
+                      `Clear the lock in SM12 or close SE80.`,
+                  );
+                  return {
+                    success: false,
+                    reason: `${functionGroupName} is locked: ${msg}. Clear lock in SM12.`,
+                  };
+                }
+                // Other lock errors (404 etc.) — ignore and try delete anyway
+              }
+
               try {
                 const transportRequest = tester.getTransportRequest();
                 await cleanupClient.getFunctionGroup().delete({
@@ -215,7 +247,7 @@ describe('FunctionGroup (using AdtClient)', () => {
           logTestSkip(
             libraryLogger,
             'FunctionGroup - read standard object',
-            `Standard function group not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard function group not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

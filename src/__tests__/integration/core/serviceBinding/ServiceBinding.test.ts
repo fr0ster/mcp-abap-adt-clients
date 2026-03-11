@@ -404,7 +404,7 @@ describe('ServiceBinding (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'ServiceBinding - read standard object',
-            `Standard service binding not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard service binding not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

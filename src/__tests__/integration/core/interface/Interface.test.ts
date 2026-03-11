@@ -198,7 +198,7 @@ describe('Interface (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'Interface - read standard object',
-            `Standard interface not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard interface not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

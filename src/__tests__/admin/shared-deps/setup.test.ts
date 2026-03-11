@@ -185,9 +185,7 @@ describe('Admin: Setup shared dependencies', () => {
           `Group activating ${groupActivationObjects.length} objects: ${groupActivationObjects.map((o) => `${o.type}:${o.name}`).join(', ')}`,
         );
         try {
-          await client
-            .getUtils()
-            .activateObjectsGroup(groupActivationObjects);
+          await client.getUtils().activateObjectsGroup(groupActivationObjects);
           testsLogger.info('Group activation completed successfully');
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);

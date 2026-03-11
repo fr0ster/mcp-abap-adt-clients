@@ -161,7 +161,7 @@ describe('Shared - getTableContents', () => {
       logTestSkip(
         testsLogger,
         'Shared - getTableContents',
-        `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
+        `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment. ` +
           `Table contents are only supported on on-premise systems.`,
       );
       return;
@@ -215,7 +215,7 @@ describe('Shared - getTableContents', () => {
       logTestSkip(
         testsLogger,
         'Shared - getTableContents',
-        `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
+        `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment. ` +
           `Table contents are only supported on on-premise systems.`,
       );
       return;
@@ -253,11 +253,11 @@ describe('Shared - getTableContents', () => {
     });
 
     const testCase = resolver.getTestCase();
-    if (testCase && !resolver.isAvailableForEnvironment()) {
+    if (!resolver.isAvailableForEnvironment()) {
       logTestSkip(
         testsLogger,
         'Shared - getTableContents',
-        `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
+        `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment. ` +
           `Table contents are only supported on on-premise systems.`,
       );
       return;

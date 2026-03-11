@@ -263,7 +263,7 @@ describe('Package (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'Package - read standard object',
-            `Standard package not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard package not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

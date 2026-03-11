@@ -64,6 +64,7 @@ describe('Class (using AdtClient)', () => {
   let client: AdtClient;
   let hasConfig = false;
   let isCloudSystem = false;
+  let isLegacy = false;
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
   let tester: BaseTester<IClassConfig, IClassState>;
 
@@ -74,12 +75,10 @@ describe('Class (using AdtClient)', () => {
       await (connection as any).connect();
       isCloudSystem = await isCloudEnvironment(connection);
       systemContext = await resolveSystemContext(connection, isCloudSystem);
-      const { client: resolvedClient } = await createTestAdtClient(
-        connection,
-        libraryLogger,
-        systemContext,
-      );
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
 
       tester = new BaseTester(
@@ -224,7 +223,7 @@ describe('Class (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'Class - read standard object',
-            `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard class not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }
@@ -287,7 +286,7 @@ describe('Class (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'Class - read transport request',
-            `Standard class not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard class not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

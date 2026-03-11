@@ -199,7 +199,7 @@ describe('Table (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'Table - read standard object',
-            `Standard table not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+            `Standard table not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
           );
           return;
         }

@@ -224,6 +224,7 @@ shared_dependencies:
   classes:
     - name: "ZAC_SHR_RUN01"
       description: "Shared runnable class (if_oo_adt_classrun) for profiler/executor tests"
+      available_in: ["onprem", "cloud"]
       source: |
         CLASS zac_shr_run01 DEFINITION PUBLIC FINAL CREATE PUBLIC.
           PUBLIC SECTION.
@@ -240,6 +241,7 @@ shared_dependencies:
 
     - name: "ZAC_SHR_DMP01"
       description: "Shared dump class (division by zero) for runtime dumps tests"
+      available_in: ["onprem", "cloud"]
       source: |
         CLASS zac_shr_dmp01 DEFINITION PUBLIC FINAL CREATE PUBLIC.
           PUBLIC SECTION.
@@ -331,6 +333,7 @@ standard_objects:
   classes:
     - name: "ZAC_SHR_RUN01"
       description: "Shared runnable class (from shared_dependencies)"
+      available_in: ["onprem", "cloud"]
 
   interfaces:
     - name: "ZAC_SHR_IF01"
@@ -370,7 +373,7 @@ standard_objects:
   packages:
     - name: "$TMP"
       description: "Local package"
-      available_in: ["onprem", "legacy"]
+      available_in: ["onprem"]
     - name: "ZLOCAL"
       description: "Placeholder for ABAP Cloud package – replace with existing package"
       available_in: ["cloud"]
@@ -532,6 +535,7 @@ read_package:
   test_cases:
     - name: "readonly_read_package"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read existing package using AdtClient (uses standard_objects.packages)"
       params: {}  # No params needed - automatically uses standard_objects.packages filtered by available_in
 
@@ -783,6 +787,7 @@ create_package:
   test_cases:
     - name: "adt_package"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Package reserved for AdtPackage tests"
       params:
         package_name: "ZADT_TEST"                 # ← CHANGE: parent package (existing, must be structure/main type)
@@ -1073,6 +1078,7 @@ create_transport:
   test_cases:
     - name: "builder_transport"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Transport reserved for AdtRequest tests"
       params:
         description: "AdtRequest workflow transport"
@@ -1364,6 +1370,7 @@ virtual_folders_contents:
   test_cases:
     - name: "fetch_virtual_folders_contents"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Test getVirtualFoldersContents for package browsing"
       params:
         # package_names: ["ZPKG1", "ZPKG2"]  # Optional: overrides package_name/default_package
@@ -1471,6 +1478,7 @@ where_used:
   test_cases:
     - name: "where_used_default_scope"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Test getWhereUsed with default scope (Eclipse default behavior). Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables (referenced by ZAC_SHR_CDSUT_DDLS)
@@ -1478,6 +1486,7 @@ where_used:
 
     - name: "where_used_all_types"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Test getWhereUsed with all types enabled (Eclipse 'select all' behavior). Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1485,6 +1494,7 @@ where_used:
 
     - name: "where_used_table"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Test getWhereUsed for table object type. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1492,16 +1502,19 @@ where_used:
 
     - name: "where_used_error_no_name"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Validate error when object name is missing"
       params: {}
 
     - name: "where_used_error_no_type"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Validate error when object type is missing"
       params: {}
 
     - name: "where_used_list_parsed"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Test getWhereUsedList with parsed results. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1510,6 +1523,7 @@ where_used:
 
     - name: "where_used_list_raw_xml"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Test getWhereUsedList with raw XML included. Uses shared_dependencies.tables."
       params:
         object_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1521,6 +1535,7 @@ read_accept:
   test_cases:
     - name: "read_accept"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Read Accept headers for all read methods (expects 2xx)"
       params: {}
         # Optional overrides (if standard_objects registry doesn't cover these)

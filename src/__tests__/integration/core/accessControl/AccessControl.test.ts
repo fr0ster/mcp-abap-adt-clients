@@ -252,7 +252,7 @@ describe('AccessControl (using AdtClient)', () => {
             logTestSkip(
               testsLogger,
               'AccessControl - read standard object',
-              `Standard access control not configured for ${isCloudSystem ? 'cloud' : 'on-premise'} environment`,
+              `Standard access control not configured for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment`,
             );
             return;
           }

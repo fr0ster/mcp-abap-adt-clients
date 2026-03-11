@@ -157,7 +157,7 @@ describe('Shared - getSqlQuery', () => {
       logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
-        `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
+        `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment. ` +
           `SQL queries are only supported on on-premise systems.`,
       );
       return;
@@ -211,7 +211,7 @@ describe('Shared - getSqlQuery', () => {
       logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
-        `Test not available for ${isCloudSystem ? 'cloud' : 'on-premise'} environment. ` +
+        `Test not available for ${isCloudSystem ? 'cloud' : isLegacy ? 'legacy' : 'on-premise'} environment. ` +
           `SQL queries are only supported on on-premise systems.`,
       );
       return;
@@ -250,7 +250,7 @@ describe('Shared - getSqlQuery', () => {
     });
 
     const testCase = resolver.getTestCase();
-    if (testCase && !resolver.isAvailableForEnvironment()) {
+    if (!resolver.isAvailableForEnvironment()) {
       logTestSkip(
         testsLogger,
         'Shared - getSqlQuery',
