@@ -5,10 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
-## [3.9.2] - 2026-03-11
+## [3.9.3] - 2026-03-11
+
+### Fixed
+- **Legacy read tests**: Enable read tests on legacy systems — remove unnecessary `available_in` restrictions from standard_objects for classes, interfaces, views, tables, function groups, function modules. These objects are available on all systems including legacy (BASIS < 7.50).
+- **View flow test**: Remove `available_in: ["onprem", "legacy"]` restriction — views work on cloud.
+- **Package $TMP**: Add `"legacy"` to `available_in` for standard $TMP package.
 
 ### Changed
-- **Shared dependencies**: Add `available_in` to access_controls, behavior_definitions, service_definitions (`["onprem", "cloud"]`) — not available on legacy systems (BASIS < 7.50). Tables, views, classes, interfaces, function groups, function modules remain available everywhere.
+- **Shared dependencies**: Add `available_in` to access_controls, behavior_definitions, service_definitions (`["onprem", "cloud"]`) — not available on legacy systems (BASIS < 7.50).
 
 ## [3.9.1] - 2026-03-11
 
