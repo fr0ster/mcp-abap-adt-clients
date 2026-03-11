@@ -300,15 +300,14 @@ shared_dependencies:
 # Uses shared dependencies (ZAC_SHR_*) where possible to avoid ABAP version dependencies.
 # Only basic DDIC objects (MANDT, SYST, T000, etc.) use SAP standard names.
 standard_objects:
+  # Objects from shared_dependencies — available on systems where shared:setup was run
   classes:
     - name: "ZAC_SHR_RUN01"
       description: "Shared runnable class (from shared_dependencies)"
-      available_in: ["onprem", "cloud"]
 
   interfaces:
     - name: "ZAC_SHR_IF01"
       description: "Shared interface (from shared_dependencies)"
-      available_in: ["onprem", "cloud"]
 
   # Basic DDIC objects — guaranteed to exist on all ABAP systems
   domains:
@@ -330,7 +329,6 @@ standard_objects:
   tables:
     - name: "T000"
       description: "Client table"
-      available_in: ["onprem", "legacy", "cloud"]
 
   tabletypes:
     - name: "STRING_TABLE"
@@ -345,7 +343,7 @@ standard_objects:
   packages:
     - name: "$TMP"
       description: "Local package"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
     - name: "ZLOCAL"
       description: "Placeholder for ABAP Cloud package – replace with existing package"
       available_in: ["cloud"]
@@ -353,23 +351,20 @@ standard_objects:
   programs:
     - name: "ZAC_SHR_PROG"
       description: "Shared program (from shared_dependencies)"
-      available_in: ["onprem"]
+      available_in: ["onprem", "legacy"]
 
   views:
     - name: "ZAC_SHR_CDSUT_DDLS"
       description: "Shared CDS view (from shared_dependencies)"
-      available_in: ["onprem", "cloud"]
 
   function_groups:
     - name: "ZAC_SHR_FUGR"
       description: "Shared function group (from shared_dependencies)"
-      available_in: ["onprem", "cloud"]
 
   function_modules:
     - name: "Z_AC_SHR_FM01"
       group: "ZAC_SHR_FUGR"
       description: "Shared function module (from shared_dependencies)"
-      available_in: ["onprem", "cloud"]
 
   service_definitions:
     - name: "ZAC_SHR_SRVD01"
