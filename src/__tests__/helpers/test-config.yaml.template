@@ -186,6 +186,7 @@ shared_dependencies:
   access_controls:
     - name: "ZAC_SHR_AC01"
       description: "Shared access control for CDS view ZAC_SHR_CDSUT_DDLS"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared access control for ZAC_SHR_CDSUT_DDLS'
         @MappingRole : true
@@ -197,6 +198,7 @@ shared_dependencies:
   behavior_definitions:
     - name: "ZAC_SHR_BIMP_DDLS"
       description: "Shared BDEF for BehaviorImplementation"
+      available_in: ["onprem", "cloud"]
       root_entity: "ZAC_SHR_BIMP_DDLS"
       implementation_type: "Managed"
       source: |
@@ -279,6 +281,7 @@ shared_dependencies:
   service_definitions:
     - name: "ZAC_SHR_SRVD01"
       description: "Shared service definition for read-only tests"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label: 'Shared service definition'
         define service ZAC_SHR_SRVD01 {
