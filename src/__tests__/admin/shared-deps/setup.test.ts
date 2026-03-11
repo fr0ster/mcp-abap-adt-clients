@@ -55,14 +55,14 @@ describe('Admin: Setup shared dependencies', () => {
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
       const isCloud = await isCloudEnvironment(connection);
-      envType = isCloud ? 'cloud' : 'onprem';
       const systemContext = await resolveSystemContext(connection, isCloud);
-      const { client: resolvedClient } = await createTestAdtClient(
+      const { client: resolvedClient, isLegacy } = await createTestAdtClient(
         connection,
         libraryLogger,
         systemContext,
       );
       client = resolvedClient;
+      envType = isCloud ? 'cloud' : isLegacy ? 'legacy' : 'onprem';
       hasConfig = true;
     } catch (_error) {
       testsLogger.warn('Skipping: No .env file or SAP configuration found');

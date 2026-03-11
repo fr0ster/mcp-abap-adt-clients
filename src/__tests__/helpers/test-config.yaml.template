@@ -98,6 +98,7 @@ shared_dependencies:
   tables:
     - name: "ZAC_SHR_VTABL"
       description: "Shared table for View and CDS Unit Test"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for View and CDS Unit Test'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -114,6 +115,7 @@ shared_dependencies:
 
     - name: "ZAC_SHR_BTABL"
       description: "Shared table for BehaviorDefinition root view"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for BehaviorDefinition'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -130,6 +132,7 @@ shared_dependencies:
 
     - name: "ZAC_SHR_ITABL"
       description: "Shared table for BehaviorImplementation root view"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared table for BehaviorImplementation'
         @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
@@ -145,6 +148,7 @@ shared_dependencies:
   views:
     - name: "ZAC_SHR_CDSUT_DDLS"
       description: "Shared CDS view for CDS Unit Test"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared CDS view for CDS Unit Test'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -159,6 +163,7 @@ shared_dependencies:
 
     - name: "ZAC_SHR_BDEF_DDLS"
       description: "Shared CDS root view for BehaviorDefinition"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared root view for BehaviorDefinition'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -173,6 +178,7 @@ shared_dependencies:
 
     - name: "ZAC_SHR_BIMP_DDLS"
       description: "Shared CDS root view for BehaviorImplementation"
+      available_in: ["onprem", "cloud"]
       source: |
         @EndUserText.label : 'Shared root view for BehaviorImplementation'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
@@ -786,6 +792,7 @@ create_domain:
   test_cases:
     - name: "adt_domain"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Domain used by AdtDomain workflow tests"
       params:
         domain_name: "ZAC_DOM01"
@@ -803,6 +810,7 @@ create_data_element:
   test_cases:
     - name: "adt_data_element"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Data element reserved for AdtDataElement tests"
       params:
         data_element_name: "ZAC_DTEL01"
@@ -871,6 +879,7 @@ create_table:
   test_cases:
     - name: "adt_table"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Table reserved for AdtTable tests"
       params:
         table_name: "ZAC_TAB01"
@@ -900,6 +909,7 @@ create_tabletype:
   test_cases:
     - name: "adt_tabletype"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "TableType reserved for TableType tests"
       params:
         tabletype_name: "ZAC_TTYP01"
@@ -918,6 +928,7 @@ create_structure:
   test_cases:
     - name: "adt_structure"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Structure reserved for AdtStructure tests"
       params:
         structure_name: "ZAC_STRU01"
@@ -962,6 +973,7 @@ create_service_definition:
   test_cases:
     - name: "adt_service_definition"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Service definition reserved for AdtServiceDefinition tests"
       params:
         service_definition_name: "ZAC_SRVD01"  # Replace with your service definition name
@@ -979,6 +991,7 @@ create_access_control:
   test_cases:
     - name: "adt_access_control"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Access control reserved for AdtAccessControl tests"
       params:
         access_control_name: "ZAC_AC01"  # Replace with your access control name
@@ -998,6 +1011,7 @@ create_service_binding:
   test_cases:
     - name: "adt_service_binding"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Service binding reserved for AdtServiceBinding tests"
       params:
         binding_name: "ZAC_SRVB01"  # Replace with your service binding name
@@ -1062,6 +1076,7 @@ create_behavior_definition:
   test_cases:
     - name: "adt_behavior_definition"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Create test behavior definition for AdtBehaviorDefinition tests"
       params:
         bdef_name: "ZAC_SHR_BDEF_DDLS"
@@ -1092,6 +1107,7 @@ create_metadata_extension:
   test_cases:
     - name: "adt_metadata_extension"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Create test metadata extension for AdtMetadataExtension tests"
       params:
         ext_name: "ZAC_MEXT_DDLX"
@@ -1114,6 +1130,7 @@ create_behavior_implementation:
   test_cases:
     - name: "adt_behavior_implementation"
       enabled: true
+      available_in: ["onprem", "cloud"]
       description: "Create test behavior implementation class for AdtBehaviorImplementation tests"
       params:
         class_name: "ZAC_BP_SHR_BIMP_DDLS"
