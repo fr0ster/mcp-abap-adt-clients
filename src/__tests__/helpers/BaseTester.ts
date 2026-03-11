@@ -946,6 +946,16 @@ export class BaseTester<TConfig, TState> {
         currentStep = 'delete (cleanup)';
         logTestStep(currentStep, this.logger);
         try {
+          // Reset session before delete to release any lingering locks (e.g. packages)
+          if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
+            const conn = this.connection as any;
+            if (typeof conn.reset === 'function') {
+              conn.reset();
+            }
+            if (typeof conn.connect === 'function') {
+              await conn.connect();
+            }
+          }
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete
           await this.waitDelay(
@@ -994,6 +1004,16 @@ export class BaseTester<TConfig, TState> {
       // Cleanup on error if enabled
       if (cleanupSettings.shouldCleanup && this.objectCreated) {
         try {
+          // Reset session before delete to release any lingering locks
+          if (cleanupSettings.cleanupSessionAfterTest && this.connection) {
+            const conn = this.connection as any;
+            if (typeof conn.reset === 'function') {
+              conn.reset();
+            }
+            if (typeof conn.connect === 'function') {
+              await conn.connect();
+            }
+          }
           logTestStep('delete (cleanup)', this.logger);
           await this.adtObject.delete(config as Partial<TConfig>);
           // Delay after delete (cleanup on error)

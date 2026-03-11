@@ -10,13 +10,13 @@ import type {
   HttpError,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
 import { CT_FUNCTION_GROUP } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   limitDescription,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import { patchXmlAttribute } from '../../utils/xmlPatch';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import { lockFunctionGroup } from './lock';
 import { getFunctionGroup } from './read';
@@ -24,7 +24,7 @@ import type { IUpdateFunctionGroupParams } from './types';
 import { unlockFunctionGroup } from './unlock';
 
 /**
- * Update function group metadata via PUT
+ * Update function group metadata via PUT (read-modify-write pattern)
  */
 async function updateFunctionGroupMetadata(
   connection: IAbapConnection,
@@ -39,27 +39,11 @@ async function updateFunctionGroupMetadata(
 
   const url = `/sap/bc/adt/functions/groups/${encodedName}${lockHandle ? `?lockHandle=${encodeURIComponent(lockHandle)}` : ''}${transportRequest ? `${lockHandle ? '&' : '?'}corrNr=${transportRequest}` : ''}`;
 
-  // Parse current XML to update description
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '@_',
-    parseAttributeValue: false,
-  });
-
-  const parsedXml = parser.parse(currentXml);
-  const functionGroup = parsedXml['group:abapFunctionGroup'];
-
-  // Description is limited to 60 characters in SAP ADT
   const limitedDescription = limitDescription(newDescription);
-  // Update description
-  if (functionGroup) {
-    functionGroup['@_adtcore:description'] = limitedDescription;
-  }
-
-  // Rebuild XML (simplified - use original XML with replaced description)
-  const updatedXml = currentXml.replace(
-    /adtcore:description="[^"]*"/,
-    `adtcore:description="${limitedDescription}"`,
+  const updatedXml = patchXmlAttribute(
+    currentXml,
+    'adtcore:description',
+    limitedDescription,
   );
 
   const ct = contentTypes?.functionGroupUpdate();
@@ -167,6 +151,7 @@ export async function updateFunctionGroup(
       errorMessage = `Function group ${params.function_group_name} not found.`;
     } else if (e.response?.data && typeof e.response.data === 'string') {
       try {
+        const { XMLParser } = require('fast-xml-parser');
         const parser = new XMLParser({
           ignoreAttributes: false,
           attributeNamePrefix: '@_',

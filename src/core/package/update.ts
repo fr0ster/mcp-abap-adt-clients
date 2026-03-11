@@ -1,5 +1,9 @@
 /**
  * Package update operations
+ *
+ * Uses read-modify-write pattern: GET current XML → patch fields → PUT.
+ * This preserves all SAP-managed fields (abapLanguageVersion, etc.)
+ * that would be lost if XML were built from scratch.
  */
 
 import type {
@@ -12,68 +16,66 @@ import {
   limitDescription,
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import {
+  extractXmlString,
+  patchIf,
+  patchXmlAttribute,
+  patchXmlElementAttribute,
+} from '../../utils/xmlPatch';
 import type { ICreatePackageParams } from './types';
 
 /**
- * Build XML for package update (similar to create)
- * Note: masterSystem and responsible should only be included for cloud systems
+ * Patch current package XML with updated values.
+ * Only modifies fields that are explicitly provided in args.
  */
-async function buildUpdatePackageXml(
-  connection: IAbapConnection,
+function patchPackageXml(
+  currentXml: string,
   args: ICreatePackageParams,
-): Promise<string> {
-  const { getSystemInformation } = await import('../../utils/systemInfo');
+): string {
+  let xml = currentXml;
 
-  // Get system information - only for cloud systems
-  const systemInfo = await getSystemInformation(connection);
-  const username = systemInfo?.userName || '';
-  const systemId = systemInfo?.systemID || '';
+  // Description (always provided for update)
+  if (args.description) {
+    const description = limitDescription(args.description);
+    xml = patchXmlAttribute(xml, 'adtcore:description', description);
+  }
 
-  // Only add masterSystem and responsible for cloud systems
-  const masterSystem = systemInfo ? systemId : '';
-  const responsible = systemInfo ? args.responsible || username : '';
+  // Responsible
+  xml = patchIf(xml, args.responsible, (x, val) =>
+    patchXmlAttribute(x, 'adtcore:responsible', val),
+  );
 
-  const masterSystemAttr = masterSystem
-    ? ` adtcore:masterSystem="${masterSystem}"`
-    : '';
-  const responsibleAttr = responsible
-    ? ` adtcore:responsible="${responsible}"`
-    : '';
+  // Package type (pak:packageType attribute on pak:attributes element)
+  xml = patchIf(xml, args.package_type, (x, val) =>
+    patchXmlElementAttribute(x, 'pak:attributes', 'pak:packageType', val),
+  );
 
-  const softwareComponentName = args.software_component || 'HOME';
-  const transportLayerXml = args.transport_layer
-    ? `<pak:transportLayer pak:name="${args.transport_layer}"/>`
-    : '<pak:transportLayer/>';
+  // Record changes
+  if (args.record_changes !== undefined) {
+    xml = patchXmlElementAttribute(
+      xml,
+      'pak:attributes',
+      'pak:recordChanges',
+      args.record_changes ? 'true' : 'false',
+    );
+  }
 
-  // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(args.description || args.package_name);
-  return `<?xml version="1.0" encoding="UTF-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  // Super package
+  xml = patchIf(xml, args.super_package, (x, val) =>
+    patchXmlElementAttribute(x, 'pak:superPackage', 'adtcore:name', val),
+  );
 
-  <adtcore:packageRef adtcore:name="${args.package_name}"/>
+  // Software component
+  xml = patchIf(xml, args.software_component, (x, val) =>
+    patchXmlElementAttribute(x, 'pak:softwareComponent', 'pak:name', val),
+  );
 
-  <pak:attributes pak:isEncapsulated="false" pak:packageType="${args.package_type || 'development'}" pak:recordChanges="${args.record_changes ? 'true' : 'false'}"/>
+  // Transport layer
+  xml = patchIf(xml, args.transport_layer, (x, val) =>
+    patchXmlElementAttribute(x, 'pak:transportLayer', 'pak:name', val),
+  );
 
-  <pak:superPackage adtcore:name="${args.super_package}"/>
-
-  <pak:applicationComponent/>
-
-  <pak:transport>
-
-    <pak:softwareComponent pak:name="${softwareComponentName}"/>
-
-    ${transportLayerXml}
-
-  </pak:transport>
-
-  <pak:translation/>
-
-  <pak:useAccesses/>
-
-  <pak:packageInterfaces/>
-
-  <pak:subPackages/>
-
-</pak:package>`;
+  return xml;
 }
 
 export interface UpdatePackageParams extends ICreatePackageParams {
@@ -81,7 +83,7 @@ export interface UpdatePackageParams extends ICreatePackageParams {
 }
 
 /**
- * Update package with new data
+ * Update package with new data (read-modify-write pattern)
  *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
@@ -95,12 +97,24 @@ export async function updatePackage(
   }
 
   const packageNameEncoded = encodeSapObjectName(params.package_name);
+
+  // 1. GET current XML
+  const currentResponse = await connection.makeAdtRequest({
+    url: `/sap/bc/adt/packages/${packageNameEncoded}`,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: ACCEPT_PACKAGE },
+  });
+  const currentXml = extractXmlString(currentResponse.data);
+
+  // 2. Patch only changed fields
+  const updatedXml = patchPackageXml(currentXml, params);
+
+  // 3. PUT
   const corrNrParam = params.transport_request
     ? `&corrNr=${params.transport_request}`
     : '';
   const url = `/sap/bc/adt/packages/${packageNameEncoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
-
-  const xmlBody = await buildUpdatePackageXml(connection, params);
 
   const headers = {
     'Content-Type': CT_PACKAGE,
@@ -111,14 +125,13 @@ export async function updatePackage(
     url,
     method: 'PUT',
     timeout: getTimeout('default'),
-    data: xmlBody,
+    data: updatedXml,
     headers,
   });
 }
 
 /**
  * Update only package description (safe update - only modifiable field)
- * Generates minimal XML with updated description without reading current package
  *
  * NOTE: Requires stateful session mode enabled via connection.setSessionType("stateful")
  */
@@ -136,18 +149,13 @@ export async function updatePackageDescription(
     throw new Error('description is required');
   }
 
-  // Description is limited to 60 characters in SAP ADT
-  const limitedDescription = limitDescription(description);
-
-  // Generate minimal package XML with just description update
-  // We don't need to GET the full package - SAP will merge this with existing data
-  const params: UpdatePackageParams = {
-    package_name: packageName,
-    super_package: superPackage || '',
-    description: limitedDescription,
-    package_type: 'development', // Default, SAP will use existing if not changing
-  };
-
-  // Use the full updatePackage which doesn't do GET
-  return updatePackage(connection, params, lockHandle);
+  return updatePackage(
+    connection,
+    {
+      package_name: packageName,
+      description: limitDescription(description),
+      super_package: superPackage || '',
+    },
+    lockHandle,
+  );
 }

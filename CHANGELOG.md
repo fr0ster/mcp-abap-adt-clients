@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.9.1] - 2026-03-11
+
+### Fixed
+- **Package/Domain/DataElement/TableType update**: Refactor XML update to read-modify-write pattern — GET current XML, patch only changed fields, PUT back. Previously XML was built from scratch, losing SAP-managed fields like `abapLanguageVersion`.
+- **FunctionGroup update**: Remove unused XML parsing; use shared `patchXmlAttribute` utility.
+- **Package delete after update**: Reset connection session before cleanup delete to release lingering locks from the update session.
+
+### Added
+- **`xmlPatch` utility** (`src/utils/xmlPatch.ts`): Shared helpers for safe XML patching — `patchXmlAttribute`, `patchXmlElement`, `patchXmlElementAttribute`, `patchXmlBlock`, `patchIf`, `extractXmlString`.
+
 ## [3.9.0] - 2026-03-11
 
 ### Added
