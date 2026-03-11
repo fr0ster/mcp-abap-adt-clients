@@ -94,13 +94,14 @@ describe('Admin: Setup shared dependencies', () => {
       testsLogger.info('Setting up shared package...');
       await ensureSharedPackage(client, testsLogger);
 
-      // Dependency order: tables → views → access_controls → behavior_definitions → service_definitions → classes → interfaces → function_groups → function_modules → programs
+      // Dependency order: tables → views → access_controls → behavior_definitions → service_definitions → service_bindings → classes → interfaces → function_groups → function_modules → programs
       const typeOrder: Array<{ type: string; label: string }> = [
         { type: 'tables', label: 'Tables' },
         { type: 'views', label: 'Views' },
         { type: 'access_controls', label: 'Access controls' },
         { type: 'behavior_definitions', label: 'Behavior definitions' },
         { type: 'service_definitions', label: 'Service definitions' },
+        { type: 'service_bindings', label: 'Service bindings' },
         { type: 'classes', label: 'Classes' },
         { type: 'interfaces', label: 'Interfaces' },
         { type: 'function_groups', label: 'Function groups' },
@@ -148,6 +149,54 @@ describe('Admin: Setup shared dependencies', () => {
             testsLogger.error(`Failed to ensure ${type} ${item.name}: ${msg}`);
             results.push({ type, name: item.name, status: `FAILED: ${msg}` });
           }
+        }
+      }
+
+      // Group activation for objects with skip_activation: true
+      const adtTypeMap: Record<string, string> = {
+        service_definitions: 'SRVD/SRV',
+        service_bindings: 'SRVB/SVB',
+      };
+
+      const groupActivationObjects: Array<{
+        type: string;
+        name: string;
+      }> = [];
+      for (const { type } of typeOrder) {
+        const items = sharedConfig[type];
+        if (!Array.isArray(items)) continue;
+        for (const item of items) {
+          if (!item.skip_activation) continue;
+          if (item.available_in && !item.available_in.includes(envType))
+            continue;
+          const adtType = adtTypeMap[type];
+          if (!adtType) continue;
+          // Only activate if not failed
+          const resultEntry = results.find(
+            (r) => r.type === type && r.name === item.name,
+          );
+          if (resultEntry?.status.startsWith('FAILED')) continue;
+          groupActivationObjects.push({ type: adtType, name: item.name });
+        }
+      }
+
+      if (groupActivationObjects.length > 0) {
+        testsLogger.info(
+          `Group activating ${groupActivationObjects.length} objects: ${groupActivationObjects.map((o) => `${o.type}:${o.name}`).join(', ')}`,
+        );
+        try {
+          await client
+            .getUtils()
+            .activateObjectsGroup(groupActivationObjects);
+          testsLogger.info('Group activation completed successfully');
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          testsLogger.error(`Group activation failed: ${msg}`);
+          results.push({
+            type: 'group_activation',
+            name: groupActivationObjects.map((o) => o.name).join('+'),
+            status: `FAILED: ${msg}`,
+          });
         }
       }
 

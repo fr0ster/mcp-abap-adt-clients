@@ -288,6 +288,27 @@ shared_dependencies:
           expose ZAC_SHR_CDSUT_DDLS;
         }
 
+    - name: "ZAC_SHR_SRVD02"
+      description: "Shared service definition for service binding tests"
+      available_in: ["onprem", "cloud"]
+      skip_activation: true
+      source: |
+        @EndUserText.label: 'Shared service definition for binding'
+        define service ZAC_SHR_SRVD02 {
+          expose ZAC_SHR_BIMP_DDLS;
+        }
+
+  service_bindings:
+    - name: "ZAC_SHR_SRVB01"
+      description: "Shared service binding for read-only tests"
+      available_in: ["onprem", "cloud"]
+      skip_activation: true
+      service_definition: "ZAC_SHR_SRVD02"
+      service_name: "ZAC_SHR_SRVD02"
+      service_version: "0001"
+      binding_type: "ODATA"
+      binding_version: "V4"
+
   programs:
     - name: "ZAC_SHR_PROG"
       description: "Shared program for run tests"
@@ -377,8 +398,8 @@ standard_objects:
       available_in: ["onprem", "cloud"]
 
   service_bindings:
-    - name: "ZAC_SRVB01"
-      description: "Placeholder for service binding – replace with existing service binding"
+    - name: "ZAC_SHR_SRVB01"
+      description: "Shared service binding (from shared_dependencies)"
       available_in: ["onprem", "cloud"]
 
   standard_criteria:
@@ -743,27 +764,6 @@ update_class_local_macros:
           DEFINE _local_noop.
             ASSERT 2 = 2.
           END-OF-DEFINITION.
-
-          CLASS ZAC_CLS01 IMPLEMENTATION.
-            METHOD get_text.
-              rv_text = |Parents: { lines( build_parent_data( ) ) }|.
-            ENDMETHOD.
-
-            METHOD build_parent_data.
-              rt_parent = VALUE #(
-                ( fld1 = '0000000001' fld2 = 'Parent 1' fld3 = '20250101' )
-                ( fld1 = '0000000002' fld2 = 'Parent 2' fld3 = '20250105' )
-              ).
-            ENDMETHOD.
-
-            METHOD build_child_data.
-              rt_child = VALUE #(
-                ( parent_id = '0000000001' chld_id = 'C01' )
-                ( parent_id = '0000000001' chld_id = 'C02' )
-                ( parent_id = '0000000002' chld_id = 'C03' )
-              ).
-            ENDMETHOD.
-            ENDCLASS.
 
 # Create Package
 create_package:

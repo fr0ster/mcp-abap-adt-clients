@@ -24,11 +24,13 @@ npm run lint:check      # Lint check only (no fixes)
 npm run format          # Format code with Biome
 
 # Test (requires .env with SAP credentials + src/__tests__/helpers/test-config.yaml)
-npm test                        # Run all tests sequentially (maxWorkers=1)
-npm test -- integration/class   # Run tests for specific object type
-npm test -- e2e                 # Run end-to-end tests (excluded from default run)
-DEBUG_TESTS=true npm test -- integration/class   # With connection debug logs
-DEBUG_ADT_TESTS=true npm test -- integration/view # With ADT operation logs
+# IMPORTANT: Always save full log first, then analyze. Never pipe through grep/tail/head.
+npm test 2>&1 | tee test-run.log                  # Run all tests, save log
+npm test -- integration/class 2>&1 | tee test-run.log   # Tests for specific object type
+npm test -- e2e 2>&1 | tee test-run.log            # End-to-end tests (excluded from default run)
+npm run shared:setup 2>&1 | tee shared-setup.log   # Create shared dependencies
+DEBUG_TESTS=true npm test -- integration/class 2>&1 | tee test-run.log   # With connection debug logs
+DEBUG_ADT_TESTS=true npm test -- integration/view 2>&1 | tee test-run.log # With ADT operation logs
 
 # Type-check tests without running
 npm run test:check              # All test tsconfigs

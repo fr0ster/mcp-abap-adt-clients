@@ -31,7 +31,11 @@ const PARAM_TO_TYPE: Record<string, string> = {
   view_name: 'views',
   access_control_name: 'access_controls',
   function_group_name: 'function_groups',
+  function_module_name: 'function_modules',
   program_name: 'programs',
+  class_name: 'classes',
+  interface_name: 'interfaces',
+  service_definition_name: 'service_definitions',
 };
 
 /** Get all names (upper-cased) from a shared_dependencies section */
@@ -44,20 +48,27 @@ function getSharedNames(
   return items.map((item: any) => String(item.name).toUpperCase());
 }
 
+/** All shared_dependencies sections */
+const ALL_SECTIONS = [
+  'tables',
+  'views',
+  'access_controls',
+  'behavior_definitions',
+  'service_definitions',
+  'service_bindings',
+  'classes',
+  'interfaces',
+  'function_groups',
+  'function_modules',
+  'programs',
+];
+
 /** Build a set of ALL shared dependency names across all sections */
 function buildAllSharedNamesSet(
   sharedConfig: Record<string, any>,
 ): Set<string> {
   const allNames = new Set<string>();
-  const sections = [
-    'tables',
-    'views',
-    'access_controls',
-    'behavior_definitions',
-    'function_groups',
-    'programs',
-  ];
-  for (const section of sections) {
+  for (const section of ALL_SECTIONS) {
     for (const name of getSharedNames(sharedConfig, section)) {
       allNames.add(name);
     }
@@ -302,14 +313,7 @@ describe('Config: shared_dependencies consistency', () => {
     }
 
     const orphans: string[] = [];
-    const sections = [
-      'tables',
-      'views',
-      'behavior_definitions',
-      'function_groups',
-      'programs',
-    ];
-    for (const type of sections) {
+    for (const type of ALL_SECTIONS) {
       for (const name of getSharedNames(sharedConfig, type)) {
         if (!referencedNames.has(name)) {
           orphans.push(`shared_dependencies.${type}: ${name}`);

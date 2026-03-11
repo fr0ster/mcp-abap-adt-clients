@@ -2162,6 +2162,11 @@ async function ensureSharedDependency(client, type, name, logger) {
         .getServiceDefinition()
         .read({ serviceDefinitionName: name });
       exists = result !== undefined;
+    } else if (type === 'service_bindings') {
+      const result = await client
+        .getServiceBinding()
+        .read({ bindingName: name });
+      exists = result !== undefined;
     }
   } catch (error) {
     // 404 or similar — object doesn't exist
@@ -2378,7 +2383,7 @@ async function ensureSharedDependency(client, type, name, logger) {
         transportRequest,
         sourceCode: depConfig.source,
       });
-      if (depConfig.source) {
+      if (depConfig.source && !depConfig.skip_activation) {
         logger?.info?.(`Activating shared service definition ${name}...`);
         await client.getServiceDefinition().update(
           {
@@ -2389,6 +2394,30 @@ async function ensureSharedDependency(client, type, name, logger) {
           { activateOnUpdate: true, sourceCode: depConfig.source },
         );
         logger?.info?.(`Shared service definition ${name} activated`);
+      } else if (depConfig.skip_activation) {
+        logger?.info?.(
+          `Shared service definition ${name} created (activation deferred for group activation)`,
+        );
+      }
+    } else if (type === 'service_bindings') {
+      await client.getServiceBinding().create(
+        {
+          bindingName: name,
+          packageName,
+          description: depConfig.description || 'Shared test service binding',
+          serviceDefinitionName: depConfig.service_definition,
+          serviceName: depConfig.service_name || name,
+          serviceVersion: depConfig.service_version || '0001',
+          bindingType: depConfig.binding_type || 'ODATA',
+          bindingVersion: depConfig.binding_version || 'V4',
+          transportRequest,
+        },
+        { activateOnCreate: !depConfig.skip_activation },
+      );
+      if (depConfig.skip_activation) {
+        logger?.info?.(
+          `Shared service binding ${name} created (activation deferred for group activation)`,
+        );
       }
     }
     logger?.info?.(`Created shared ${type} ${name}`);
