@@ -353,13 +353,12 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     let lockCorrNr: string | undefined;
 
     try {
-      // 1. Lock (update always starts with lock, stateful ONLY before lock)
+      // 1. Lock — stateful mode stays active until after unlock
       this.logger?.info?.('Step 1: Locking package');
       this.connection.setSessionType('stateful');
       const lockResult = await lockPackage(this.connection, config.packageName);
       lockHandle = lockResult.lockHandle;
       lockCorrNr = lockResult.corrNr;
-      this.connection.setSessionType('stateless');
       this.logger?.info?.(
         `Package locked, handle: ${lockHandle}, corrNr: ${lockCorrNr}`,
       );
@@ -421,22 +420,16 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         }
       }
 
-      // 4. Unlock (obligatory stateless after unlock)
+      // 4. Unlock — set stateless after unlock (standard pattern)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking package');
-        this.connection.setSessionType('stateful');
         await unlockPackage(this.connection, config.packageName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('Package unlocked');
       }
 
-      // 5. Final check (no stateful needed)
-      this.logger?.info?.('Step 5: Final check');
-      await checkPackage(this.connection, config.packageName, 'inactive');
-      this.logger?.info?.('Final check passed');
-
-      // Note: Packages don't have activate operation
+      // Note: Packages have no source code — no check or activate needed
 
       // Read and return result (no stateful needed)
       const readResponse = await getPackage(
