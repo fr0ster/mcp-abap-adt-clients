@@ -21,7 +21,7 @@ export async function unlockPackage(
   packageName: string,
   lockHandle: string,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName)}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName.toLowerCase())}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return await connection.makeAdtRequest({
     url,

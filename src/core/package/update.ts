@@ -97,7 +97,9 @@ export async function updatePackage(
     throw new Error('package_name is required');
   }
 
-  const packageNameEncoded = encodeSapObjectName(params.package_name);
+  const packageNameEncoded = encodeSapObjectName(
+    params.package_name.toLowerCase(),
+  );
 
   // 1. GET current XML
   const currentResponse = await connection.makeAdtRequest({
