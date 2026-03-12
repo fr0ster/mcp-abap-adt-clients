@@ -160,12 +160,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       }
       objectCreated = true;
 
-      // 3. Check after create (no stateful needed)
-      this.logger?.info?.('Step 3: Checking created package');
-      await checkPackage(this.connection, config.packageName, 'inactive');
-      this.logger?.info?.('Check after create passed');
-
-      // Packages are containers — no source code, no activation, no need to read back
+      // Packages are containers — no source code, no activation, no syntax check needed
       return { errors: [] };
     } catch (error: unknown) {
       // Ensure stateless if needed
