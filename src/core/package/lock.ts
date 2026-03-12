@@ -24,7 +24,7 @@ export async function lockPackage(
   connection: IAbapConnection,
   packageName: string,
 ): Promise<IPackageLockResult> {
-  const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName)}?_action=LOCK&accessMode=MODIFY`;
+  const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName.toLowerCase())}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
     Accept: ACCEPT_LOCK,

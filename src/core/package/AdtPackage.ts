@@ -349,6 +349,18 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       };
     }
 
+    // TODO: Package update via RFC (SADT_REST_RFC_ENDPOINT) fails with HTTP 400
+    // "Package is already locked" on PUT even though LOCK/UNLOCK succeed.
+    // Root cause: PAK framework locks are session-scoped. Each call to
+    // SADT_REST_RFC_ENDPOINT runs in a new internal ABAP context, so the
+    // PUT cannot access the PAK lock created by the LOCK call.
+    // DDIC objects are unaffected because their locks live in the DDIC buffer
+    // (accessible by lockHandle from any context).
+    // This is non-critical for release — HTTP is the primary transport for
+    // modern on-premise systems. RFC is used for legacy (BASIS < 7.50) where
+    // package CRUD is not supported anyway.
+    // Reference: docs/development/RFC_TESTING.md
+
     let lockHandle: string | undefined;
     let lockCorrNr: string | undefined;
 
@@ -359,6 +371,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       const lockResult = await lockPackage(this.connection, config.packageName);
       lockHandle = lockResult.lockHandle;
       lockCorrNr = lockResult.corrNr;
+      this.connection.setSessionType('stateless');
       this.logger?.info?.(
         `Package locked, handle: ${lockHandle}, corrNr: ${lockCorrNr}`,
       );
@@ -420,9 +433,10 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         }
       }
 
-      // 4. Unlock — set stateless after unlock (standard pattern)
+      // 4. Unlock — set stateful before unlock, stateless after (standard pattern)
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking package');
+        this.connection.setSessionType('stateful');
         await unlockPackage(this.connection, config.packageName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
