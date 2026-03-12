@@ -11,9 +11,11 @@ import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import { AdtExecutor } from '../../../../clients/AdtExecutor';
 import {
+  extractTraceIdFromTraceRequestsResponse,
   getTraceDbAccesses,
   getTraceHitList,
   getTraceStatements,
+  listTraceRequests,
   type IProfilerTraceParameters,
 } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
@@ -367,17 +369,24 @@ describe('ProgramExecutor (integration)', () => {
         expect(result.profilerId).toContain(
           '/sap/bc/adt/runtime/traces/abaptraces/parameters/',
         );
-        expect(typeof result.traceId).toBe('string');
-        expect(result.traceId.length).toBeGreaterThan(10);
-        expect(result.traceRequestsResponse.status).toBe(200);
 
         logTestStep(
-          `run output: ${toShortText(result.response.data)}; traceId=${result.traceId}`,
+          `run output: ${toShortText(result.response.data)}; profilerId=${result.profilerId}`,
           testsLogger,
         );
 
+        logTestStep('resolve traceId from trace requests list', testsLogger);
+        const traceRequestsResponse = await listTraceRequests(connection);
+        const traceId =
+          extractTraceIdFromTraceRequestsResponse(traceRequestsResponse);
+        expect(traceId).toBeDefined();
+        expect(typeof traceId).toBe('string');
+        expect((traceId as string).length).toBeGreaterThan(10);
+
+        logTestStep(`traceId=${traceId}`, testsLogger);
+
         logTestStep('read trace hitlist', testsLogger);
-        const hitlist = await getTraceHitList(connection, result.traceId, {
+        const hitlist = await getTraceHitList(connection, traceId as string, {
           withSystemEvents: false,
         });
         expect(hitlist.status).toBe(200);
@@ -385,7 +394,7 @@ describe('ProgramExecutor (integration)', () => {
         logTestStep('read trace statements', testsLogger);
         const statements = await getTraceStatements(
           connection,
-          result.traceId,
+          traceId as string,
           {
             withSystemEvents: false,
           },
@@ -395,7 +404,7 @@ describe('ProgramExecutor (integration)', () => {
         logTestStep('read trace db accesses', testsLogger);
         const dbAccesses = await getTraceDbAccesses(
           connection,
-          result.traceId,
+          traceId as string,
           {
             withSystemEvents: false,
           },
