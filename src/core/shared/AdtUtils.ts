@@ -108,7 +108,7 @@ import type {
 } from './types';
 
 export class AdtUtils {
-  private connection: IAbapConnection;
+  protected connection: IAbapConnection;
   private logger: ILogger;
 
   constructor(connection: IAbapConnection, logger: ILogger) {
