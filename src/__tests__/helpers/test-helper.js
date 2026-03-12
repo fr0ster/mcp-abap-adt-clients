@@ -38,8 +38,9 @@ function getEnvironmentType() {
     return cachedEnvType;
   }
   const config = loadTestConfig();
-  const connectionType = config?.environment?.connection_type;
-  if (connectionType === 'rfc') {
+  // connection_type (rfc/http) is a transport mechanism, not a system type.
+  // Use explicit is_legacy: true in environment config to mark BASIS < 7.50 systems.
+  if (config?.environment?.is_legacy === true) {
     cachedEnvType = 'legacy';
   } else {
     // Will be refined later when isCloud is known; default to 'onprem'

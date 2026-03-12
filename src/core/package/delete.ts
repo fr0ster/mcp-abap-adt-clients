@@ -6,6 +6,7 @@ import type {
   IAdtResponse as AxiosResponse,
   HttpError,
   IAbapConnection,
+  IDeletePackageParams,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import {
@@ -17,11 +18,6 @@ import {
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
-export interface DeletePackageParams {
-  package_name: string;
-  transport_request?: string;
-}
-
 /**
  * Check if package can be deleted (deletion check)
  * Returns response with isDeletable flag
@@ -30,7 +26,7 @@ export interface DeletePackageParams {
  */
 export async function checkPackageDeletion(
   connection: IAbapConnection,
-  params: DeletePackageParams,
+  params: IDeletePackageParams,
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('package_name is required');
@@ -106,7 +102,7 @@ export function parsePackageDeletionCheck(response: AxiosResponse): {
  */
 export async function deletePackage(
   connection: IAbapConnection,
-  params: DeletePackageParams,
+  params: IDeletePackageParams,
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
     throw new Error('package_name is required');

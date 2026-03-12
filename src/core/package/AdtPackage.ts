@@ -78,6 +78,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       transport_request: config.transportRequest,
       application_component: config.applicationComponent,
       responsible: config.responsible,
+      record_changes: config.recordChanges ?? false,
     });
 
     return {
@@ -122,6 +123,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         transport_request: config.transportRequest,
         application_component: config.applicationComponent,
         responsible: config.responsible,
+        record_changes: config.recordChanges ?? false,
       });
       this.logger?.info?.('Validation passed');
 
@@ -137,8 +139,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         transport_request: config.transportRequest,
         application_component: config.applicationComponent,
         responsible: config.responsible ?? this.systemContext.responsible,
-        masterSystem: this.systemContext.masterSystem,
-        record_changes: config.recordChanges,
+        master_system: this.systemContext.masterSystem,
+        record_changes: config.recordChanges ?? false,
       });
       this.logger?.info?.('Package created');
 
@@ -341,7 +343,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           description: config.description,
           package_type: config.packageType,
           responsible: config.responsible,
-          record_changes: config.recordChanges,
+          record_changes: config.recordChanges ?? false,
         },
         options.lockHandle,
       );
@@ -353,14 +355,19 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     }
 
     let lockHandle: string | undefined;
+    let lockCorrNr: string | undefined;
 
     try {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking package');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockPackage(this.connection, config.packageName);
+      const lockResult = await lockPackage(this.connection, config.packageName);
+      lockHandle = lockResult.lockHandle;
+      lockCorrNr = lockResult.corrNr;
       this.connection.setSessionType('stateless');
-      this.logger?.info?.('Package locked, handle:', lockHandle);
+      this.logger?.info?.(
+        `Package locked, handle: ${lockHandle}, corrNr: ${lockCorrNr}`,
+      );
 
       // 2. Check inactive with XML for update (if provided)
       const xmlToCheck = options?.xmlContent;
@@ -392,9 +399,11 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
             package_type: config.packageType,
             software_component: config.softwareComponent,
             transport_layer: config.transportLayer,
-            transport_request: config.transportRequest,
+            transport_request: config.transportRequest || lockCorrNr,
             application_component: config.applicationComponent,
             responsible: config.responsible ?? this.systemContext.responsible,
+            master_system:
+              config.masterSystem ?? this.systemContext.masterSystem,
             record_changes: config.recordChanges,
           },
           lockHandle,
@@ -558,9 +567,9 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     }
 
     this.connection.setSessionType('stateful');
-    const lockHandle = await lockPackage(this.connection, config.packageName);
+    const lockResult = await lockPackage(this.connection, config.packageName);
     this.connection.setSessionType('stateless');
-    return lockHandle;
+    return lockResult.lockHandle;
   }
 
   /**

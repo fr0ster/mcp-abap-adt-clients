@@ -15,10 +15,15 @@ import { getTimeout } from '../../utils/timeouts';
  * NOTE: Caller must enable stateful session mode via connection.setSessionType("stateful")
  * before calling this function
  */
+export interface IPackageLockResult {
+  lockHandle: string;
+  corrNr?: string;
+}
+
 export async function lockPackage(
   connection: IAbapConnection,
   packageName: string,
-): Promise<string> {
+): Promise<IPackageLockResult> {
   const url = `/sap/bc/adt/packages/${encodeSapObjectName(packageName)}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
@@ -39,7 +44,8 @@ export async function lockPackage(
     attributeNamePrefix: '',
   });
   const result = parser.parse(response.data);
-  const lockHandle = result?.['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
+  const data = result?.['asx:abap']?.['asx:values']?.DATA;
+  const lockHandle = data?.LOCK_HANDLE;
 
   if (!lockHandle) {
     throw new Error(
@@ -47,5 +53,6 @@ export async function lockPackage(
     );
   }
 
-  return lockHandle;
+  const corrNr = data?.CORR_NUMBER || undefined;
+  return { lockHandle, corrNr };
 }

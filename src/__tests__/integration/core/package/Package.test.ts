@@ -13,6 +13,7 @@ import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type { IPackageConfig, IPackageState } from '../../../../core/package';
+import { deletePackage } from '../../../../core/package/delete';
 import { getPackage } from '../../../../core/package/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -36,6 +37,7 @@ import {
 
 const {
   getTestCaseDefinition,
+  resolveMasterSystem,
   resolvePackageName,
   resolveTransportRequest,
   resolveStandardObject,
@@ -126,8 +128,26 @@ describe('Package (using AdtClient)', () => {
             transportRequest: resolveTransportRequest(params.transport_request),
             applicationComponent: params.application_component,
             responsible: params.responsible,
-            recordChanges: params.record_changes !== false,
+            masterSystem: resolveMasterSystem(params.master_system),
+            recordChanges: params.record_changes === true ? true : false,
           };
+        },
+        cleanupObject: async (cfg: IPackageConfig) => {
+          // Use a fresh connection so the delete runs in a different ABAP session.
+          // A package cannot be deleted from the same session it was created in.
+          const cleanupConn = createAbapConnection(
+            getConfig(),
+            connectionLogger,
+          );
+          await (cleanupConn as any).connect();
+          try {
+            await deletePackage(cleanupConn, {
+              package_name: cfg.packageName,
+              transport_request: cfg.transportRequest,
+            });
+          } finally {
+            await (cleanupConn as any).disconnect?.();
+          }
         },
         ensureObjectReady: async (packageName: string) => {
           if (!connection) return { success: true };

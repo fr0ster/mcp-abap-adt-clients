@@ -83,7 +83,8 @@ environment:
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
-  # connection_type: "rfc"  # Uncomment for legacy systems (BASIS < 7.50). Also set SAP_UNICODE=false in .env for non-unicode systems
+  # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type.
+  # is_legacy: true         # Uncomment for BASIS < 7.50 systems (e.g. E77). Also set SAP_UNICODE=false in .env for non-unicode systems.
 
 # Shared dependencies — persistent Lego library for integration tests
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.

@@ -4,20 +4,12 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreatePackageParams {
-  package_name: string;
-  description?: string;
-  super_package: string;
-  package_type?: string;
-  software_component?: string;
-  transport_layer?: string;
-  transport_request?: string;
-  application_component?: string;
-  responsible?: string;
-  masterSystem?: string;
-  record_changes?: boolean;
-}
+export type {
+  ICreatePackageParams,
+  IDeletePackageParams,
+  IReadPackageParams,
+  IUpdatePackageParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: superPackage is required for create operations (validated in builder methods)
@@ -33,6 +25,7 @@ export interface IPackageConfig {
   transportRequest?: string; // Only optional parameter
   applicationComponent?: string;
   responsible?: string;
+  masterSystem?: string;
   recordChanges?: boolean;
   onLock?: (lockHandle: string) => void;
 }
