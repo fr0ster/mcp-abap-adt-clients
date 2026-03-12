@@ -1,5 +1,7 @@
 # @mcp-abap-adt/adt-clients
 
+[![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
+
 TypeScript clients for SAP ABAP Development Tools (ADT).
 
 ## Features
