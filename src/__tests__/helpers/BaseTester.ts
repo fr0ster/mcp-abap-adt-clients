@@ -80,6 +80,7 @@ export interface IBaseTesterSetupOptions {
   ensureObjectReady?: (
     objectName: string,
   ) => Promise<{ success: boolean; reason?: string; objectExists?: boolean }>;
+  cleanupObject?: (config: any) => Promise<void>;
   testDescription?: string;
 }
 
@@ -106,6 +107,7 @@ export class BaseTester<TConfig, TState> {
   private ensureObjectReadyFn?: (
     objectName: string,
   ) => Promise<{ success: boolean; reason?: string; objectExists?: boolean }>;
+  private cleanupObjectFn?: (config: any) => Promise<void>;
   private testDescription: string = 'Full workflow';
 
   // Test state
@@ -212,7 +214,11 @@ export class BaseTester<TConfig, TState> {
     }
     try {
       logTestStep('delete (pre-existing object cleanup)', this.logger);
-      await this.adtObject.delete(config as Partial<TConfig>);
+      if (this.cleanupObjectFn) {
+        await this.cleanupObjectFn(config);
+      } else {
+        await this.adtObject.delete(config as Partial<TConfig>);
+      }
       this.log(LogLevel.INFO, 'Pre-existing object deleted successfully');
       this.objectCreated = false;
     } catch (cleanupError) {
@@ -1261,6 +1267,7 @@ export class BaseTester<TConfig, TState> {
       options.client?.constructor?.name === 'AdtClientLegacy';
     this.buildConfigFn = options.buildConfig;
     this.ensureObjectReadyFn = options.ensureObjectReady;
+    this.cleanupObjectFn = options.cleanupObject;
     if (options.testDescription) {
       this.testDescription = options.testDescription;
     }

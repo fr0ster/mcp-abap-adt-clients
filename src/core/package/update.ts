@@ -9,6 +9,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IUpdatePackageParams,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
 import {
@@ -22,7 +23,6 @@ import {
   patchXmlAttribute,
   patchXmlElementAttribute,
 } from '../../utils/xmlPatch';
-import type { ICreatePackageParams } from './types';
 
 /**
  * Patch current package XML with updated values.
@@ -30,7 +30,7 @@ import type { ICreatePackageParams } from './types';
  */
 function patchPackageXml(
   currentXml: string,
-  args: ICreatePackageParams,
+  args: IUpdatePackageParams,
 ): string {
   let xml = currentXml;
 
@@ -43,6 +43,11 @@ function patchPackageXml(
   // Responsible
   xml = patchIf(xml, args.responsible, (x, val) =>
     patchXmlAttribute(x, 'adtcore:responsible', val),
+  );
+
+  // Master system
+  xml = patchIf(xml, args.master_system, (x, val) =>
+    patchXmlAttribute(x, 'adtcore:masterSystem', val),
   );
 
   // Package type (pak:packageType attribute on pak:attributes element)
@@ -78,10 +83,6 @@ function patchPackageXml(
   return xml;
 }
 
-export interface UpdatePackageParams extends ICreatePackageParams {
-  package_name: string;
-}
-
 /**
  * Update package with new data (read-modify-write pattern)
  *
@@ -89,7 +90,7 @@ export interface UpdatePackageParams extends ICreatePackageParams {
  */
 export async function updatePackage(
   connection: IAbapConnection,
-  params: UpdatePackageParams,
+  params: IUpdatePackageParams,
   lockHandle: string,
 ): Promise<AxiosResponse> {
   if (!params.package_name) {
@@ -155,6 +156,7 @@ export async function updatePackageDescription(
       package_name: packageName,
       description: limitDescription(description),
       super_package: superPackage || '',
+      record_changes: false,
     },
     lockHandle,
   );

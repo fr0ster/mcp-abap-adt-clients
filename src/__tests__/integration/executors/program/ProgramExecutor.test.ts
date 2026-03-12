@@ -15,8 +15,8 @@ import {
   getTraceDbAccesses,
   getTraceHitList,
   getTraceStatements,
-  listTraceRequests,
   type IProfilerTraceParameters,
+  listTraceRequests,
 } from '../../../../runtime/traces';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import {
@@ -377,8 +377,9 @@ describe('ProgramExecutor (integration)', () => {
 
         logTestStep('resolve traceId from trace requests list', testsLogger);
         const traceRequestsResponse = await listTraceRequests(connection);
-        const traceId =
-          extractTraceIdFromTraceRequestsResponse(traceRequestsResponse);
+        const traceId = extractTraceIdFromTraceRequestsResponse(
+          traceRequestsResponse,
+        );
         expect(traceId).toBeDefined();
         expect(typeof traceId).toBe('string');
         expect((traceId as string).length).toBeGreaterThan(10);

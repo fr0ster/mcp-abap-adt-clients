@@ -38,7 +38,7 @@ export async function createPackage(
   );
   const packageType = params.package_type || 'development';
 
-  const masterSystem = params.masterSystem;
+  const masterSystem = params.master_system;
   const responsibleUser = params.responsible || '';
 
   // Software component is required for package creation
