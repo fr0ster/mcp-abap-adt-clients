@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.11.1] - 2026-03-13
+
+### Changed
+- **CI**: Upgrade Node.js from 18/20 to 24 in CI and Release workflows.
+
 ## [3.11.0] - 2026-03-13
 
 ### Added
