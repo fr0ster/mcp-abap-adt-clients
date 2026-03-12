@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.11.0] - 2026-03-13
+
+### Added
+- **interfaces v5**: Upgrade `@mcp-abap-adt/interfaces` to v5 — package CRUD interfaces (`ICreatePackageParams`, `IUpdatePackageParams`, `IDeletePackageParams`, `IReadPackageParams`) moved to interfaces package.
+- **Package lock**: `lockPackage` now returns `{ lockHandle, corrNr }` — `corrNr` is used as fallback transport request in update flow.
+- **Package update**: Patching `master_system` field is now supported in update XML.
+- **BaseTester**: Add `cleanupObject` hook for custom pre-test cleanup logic.
+- **README**: Add Stand With Ukraine badge.
+
+### Fixed
+- **Package create**: Remove redundant `checkPackage(inactive)` after create — packages are containers with no source code, no syntax check needed.
+- **Package update**: Remove redundant final `checkPackage(inactive)` after update.
+- **Package update**: Fix `setSessionType` placement — stateful mode is now held across the full lock→update→unlock sequence.
+- **Package URLs**: Normalize package name to lowercase in lock, unlock, and update URLs to avoid HTTP 404 on case-sensitive ADT endpoints.
+- **Package create**: Fix `masterSystem` → `master_system` field name in low-level params.
+- **Package update**: Pass `master_system` and `record_changes` consistently in all update calls.
+- **ProgramExecutor test**: Adapt to fire-and-forget profiling — `traceId` is now resolved via `listTraceRequests()` + `extractTraceIdFromTraceRequestsResponse()`.
+- **Test config**: Separate `connection_type` (transport mechanism) from `is_legacy` (system type) — legacy detection now uses explicit `is_legacy: true` flag instead of inferring from `connection_type: "rfc"`.
+
 ## [3.9.3] - 2026-03-11
 
 ### Fixed
