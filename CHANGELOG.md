@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.11.2] - 2026-03-13
+
+### Fixed
+- **Biome lint**: Fix `noUselessTernary` in `Package.test.ts` — simplify `=== true ? true : false` to `=== true`.
+- **Biome lint**: Fix `noUselessConstructor` in `AdtUnitTestLegacy` — remove redundant constructor.
+- **Biome lint**: Fix `noUnusedFunctionParameters` in `domain/check.ts` — prefix unused `logger` param with underscore.
+
 ## [3.11.1] - 2026-03-13
 
 ### Changed

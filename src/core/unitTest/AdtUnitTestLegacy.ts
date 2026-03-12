@@ -11,9 +11,7 @@
 
 import type {
   IAdtResponse as AxiosResponse,
-  IAbapConnection,
   IAdtOperationOptions,
-  ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { AdtUnitTest } from './AdtUnitTest';
@@ -29,10 +27,6 @@ import type {
 const LEGACY_SYNC_RUN_ID = 'legacy-sync';
 
 export class AdtUnitTestLegacy extends AdtUnitTest {
-  constructor(connection: IAbapConnection, logger?: ILogger) {
-    super(connection, logger);
-  }
-
   /**
    * Create unit test run using legacy endpoint.
    * Legacy returns results synchronously — no run ID or polling needed.

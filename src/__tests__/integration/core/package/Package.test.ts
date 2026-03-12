@@ -129,7 +129,7 @@ describe('Package (using AdtClient)', () => {
             applicationComponent: params.application_component,
             responsible: params.responsible,
             masterSystem: resolveMasterSystem(params.master_system),
-            recordChanges: params.record_changes === true ? true : false,
+            recordChanges: params.record_changes === true,
           };
         },
         cleanupObject: async (cfg: IPackageConfig) => {

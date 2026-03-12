@@ -31,7 +31,7 @@ export async function checkDomainSyntax(
   domainName: string,
   version: 'active' | 'inactive',
   xmlContent?: string,
-  logger?: ILogger,
+  _logger?: ILogger,
 ): Promise<AxiosResponse> {
   let response: AxiosResponse;
 
