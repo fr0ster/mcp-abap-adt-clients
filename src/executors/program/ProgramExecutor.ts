@@ -8,11 +8,7 @@ import { runProgram } from '../../core/program/run';
 import {
   createTraceParameters,
   extractProfilerIdFromResponse,
-  extractTraceIdFromTraceRequestsResponse,
-  getTraceRequestsByUri,
   type IProfilerTraceParameters,
-  listTraceFiles,
-  listTraceRequests,
 } from '../../runtime/traces/profiler';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
@@ -27,14 +23,14 @@ export interface IProgramExecuteWithProfilerOptions {
 
 export interface IProgramExecuteWithProfilingOptions {
   profilerParameters?: IProfilerTraceParameters;
-  traceLookupUris?: string[];
 }
 
 export interface IProgramExecuteWithProfilingResult {
   response: AxiosResponse;
   profilerId: string;
-  traceId: string;
-  traceRequestsResponse: AxiosResponse;
+  // traceId is NOT included — program execution is fire-and-forget.
+  // Traces are written asynchronously by SAP after the program completes.
+  // Use RuntimeListProfilerTraceFiles to poll for the trace after execution.
 }
 
 export interface IProgramExecutor
@@ -48,11 +44,9 @@ export interface IProgramExecutor
 
 export class ProgramExecutor implements IProgramExecutor {
   private readonly connection: IAbapConnection;
-  private readonly logger?: ILogger;
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(connection: IAbapConnection, _logger?: ILogger) {
     this.connection = connection;
-    this.logger = logger;
   }
 
   async run(target: IProgramExecutionTarget): Promise<AxiosResponse> {
@@ -103,69 +97,9 @@ export class ProgramExecutor implements IProgramExecutor {
       profilerId,
     );
 
-    const lookupUris = [
-      ...(options.traceLookupUris ?? []),
-      `/sap/bc/adt/programs/programrun/${normalizedProgramName}`,
-      `/sap/bc/adt/programs/programrun/${encodeURIComponent(normalizedProgramName)}`,
-    ];
-
-    let traceRequestsResponse: AxiosResponse | undefined;
-    for (const uri of lookupUris) {
-      if (!uri) {
-        continue;
-      }
-
-      try {
-        const current = await getTraceRequestsByUri(this.connection, uri);
-        const traceId = extractTraceIdFromTraceRequestsResponse(current);
-        if (traceId) {
-          return {
-            response,
-            profilerId,
-            traceId,
-            traceRequestsResponse: current,
-          };
-        }
-        traceRequestsResponse = current;
-      } catch (error) {
-        this.logger?.debug?.('Trace lookup by URI failed, trying next URI', {
-          programName: normalizedProgramName,
-          uri,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    let fallbackResponse: AxiosResponse;
-    let fallbackTraceId: string | undefined;
-    try {
-      fallbackResponse = await listTraceRequests(this.connection);
-      fallbackTraceId =
-        extractTraceIdFromTraceRequestsResponse(fallbackResponse);
-    } catch (error) {
-      this.logger?.debug?.('Trace requests list failed, trying trace files', {
-        programName: normalizedProgramName,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      fallbackResponse = await listTraceFiles(this.connection);
-      fallbackTraceId =
-        extractTraceIdFromTraceRequestsResponse(fallbackResponse);
-    }
-    if (!fallbackTraceId) {
-      this.logger?.warn?.('Fallback trace response did not contain trace id', {
-        programName: normalizedProgramName,
-      });
-      throw new Error(
-        `Failed to resolve traceId after profiled execution for program ${normalizedProgramName}`,
-      );
-    }
-
-    return {
-      response,
-      profilerId,
-      traceId: fallbackTraceId,
-      traceRequestsResponse: traceRequestsResponse ?? fallbackResponse,
-    };
+    // Fire-and-forget: SAP writes the trace asynchronously after program completes.
+    // The caller is responsible for polling RuntimeListProfilerTraceFiles to find the trace.
+    return { response, profilerId };
   }
 
   private async runWithProfilerId(
