@@ -21,6 +21,11 @@
  *   npx ts-node scripts/read-object.ts --type=metadataextension ZAC_SHR_MDE01
  *   npx ts-node scripts/read-object.ts --type=enhancement ZAC_SHR_ENH01 --enhancement-type=enhoxhb
  *
+ * Flags:
+ *   --read=source      Read source code only (default: both)
+ *   --read=metadata    Read metadata only
+ *   --read=both        Read both source code and metadata
+ *
  * Environment variables:
  *   MCP_ENV_PATH - Path to .env file (default: .env in project root)
  */
@@ -65,11 +70,14 @@ const OBJECT_TYPES = [
 
 type ObjectType = (typeof OBJECT_TYPES)[number];
 
+type ReadMode = 'source' | 'metadata' | 'both';
+
 interface Options {
   objectType: ObjectType;
   objectName: string;
   functionGroupName?: string;
   enhancementType?: string;
+  readMode: ReadMode;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -77,6 +85,7 @@ function parseArgs(argv: string[]): Options {
   let objectType: string | undefined;
   let functionGroupName: string | undefined;
   let enhancementType: string | undefined;
+  let readMode: ReadMode = 'both';
 
   for (const arg of argv) {
     if (arg.startsWith('--type=')) {
@@ -85,6 +94,13 @@ function parseArgs(argv: string[]): Options {
       functionGroupName = arg.slice('--group='.length).trim();
     } else if (arg.startsWith('--enhancement-type=')) {
       enhancementType = arg.slice('--enhancement-type='.length).trim();
+    } else if (arg.startsWith('--read=')) {
+      const value = arg.slice('--read='.length).trim().toLowerCase();
+      if (value === 'source' || value === 'metadata' || value === 'both') {
+        readMode = value;
+      } else {
+        throw new Error(`Invalid --read value: ${value}. Use: source, metadata, both`);
+      }
     } else if (!arg.startsWith('--') && !objectName) {
       objectName = arg.trim();
     }
@@ -115,6 +131,7 @@ function parseArgs(argv: string[]): Options {
     objectName,
     functionGroupName,
     enhancementType,
+    readMode,
   };
 }
 
@@ -266,34 +283,39 @@ async function run(): Promise<void> {
   const handler = getHandler(client, options);
   const readConfig = buildReadConfig(options);
 
-  // 1. Read (source code or full object for DDIC types)
-  console.log('--- READ ---');
-  try {
-    const state = await handler.read(readConfig);
-    if (state) {
-      printResult('Read result', state);
-    } else {
-      console.log('[Object not found]');
+  if (options.readMode === 'source' || options.readMode === 'both') {
+    console.log('--- SOURCE ---');
+    try {
+      const state = await handler.read(readConfig);
+      if (state) {
+        printResult('Source', state);
+      } else {
+        console.log('[Object not found]');
+      }
+    } catch (error: any) {
+      console.error(
+        `[Read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
+      );
     }
-  } catch (error: any) {
-    console.error(
-      `[Read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
-    );
   }
 
-  // 2. Read metadata
-  console.log('\n--- METADATA ---');
-  try {
-    const state = await handler.readMetadata(readConfig);
-    if (state) {
-      printResult('Metadata', state);
-    } else {
-      console.log('[No metadata returned]');
+  if (options.readMode === 'metadata' || options.readMode === 'both') {
+    if (options.readMode === 'both') {
+      console.log('');
     }
-  } catch (error: any) {
-    console.error(
-      `[Metadata read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
-    );
+    console.log('--- METADATA ---');
+    try {
+      const state = await handler.readMetadata(readConfig);
+      if (state) {
+        printResult('Metadata', state);
+      } else {
+        console.log('[No metadata returned]');
+      }
+    } catch (error: any) {
+      console.error(
+        `[Metadata read failed: HTTP ${error.response?.status || '?'} ${error.message}]`,
+      );
+    }
   }
 
   (connection as any).reset();
