@@ -169,7 +169,9 @@ export function isLegacyEnvironment(): boolean {
  * header is not sent — otherwise locks go to ABAP session memory instead
  * of the global enqueue server, causing HTTP 423 on subsequent requests.
  */
-export function getConnectionOptions(): { skipSessionType?: boolean } | undefined {
+export function getConnectionOptions():
+  | { skipSessionType?: boolean }
+  | undefined {
   return isLegacyEnvironment() ? { skipSessionType: true } : undefined;
 }
 

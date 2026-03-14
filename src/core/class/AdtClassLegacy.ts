@@ -12,10 +12,7 @@
  * - delete() — uses direct DELETE instead of /sap/bc/adt/deletion/ API
  */
 
-import type {
-  HttpError,
-  IAdtOperationOptions,
-} from '@mcp-abap-adt/interfaces';
+import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
 import {
   encodeSapObjectName,
   safeErrorMessage,
@@ -65,9 +62,7 @@ export class AdtClassLegacy extends AdtClass {
       // 2. Check inactive with source code
       const codeToUpdate = options?.sourceCode || config.sourceCode;
       if (codeToUpdate) {
-        this.logger?.info?.(
-          'Legacy update step 2: Checking inactive version',
-        );
+        this.logger?.info?.('Legacy update step 2: Checking inactive version');
         state.checkResult = await checkClass(
           this.connection,
           config.className,
