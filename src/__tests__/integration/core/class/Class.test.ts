@@ -22,6 +22,7 @@ import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
   getConfig,
+  getConnectionOptions,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../../helpers/TestConfigResolver';
