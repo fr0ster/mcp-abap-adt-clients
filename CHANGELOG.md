@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.11.3] - 2026-03-14
+
+### Fixed
+- **Legacy class update**: Keep lock→check→update→unlock in a single stateful session on legacy SAP systems (BASIS < 7.50). Fixes HTTP 423 errors caused by lock handle invalidation when switching to stateless between lock and update (GitHub #11).
+
+### Added
+- **read-object script**: Universal `scripts/read-object.ts` for reading any ADT object (source code and/or metadata) with `--type`, `--read=source|metadata|both` flags. Supports all 18 object types.
+
 ## [3.11.2] - 2026-03-13
 
 ### Fixed
