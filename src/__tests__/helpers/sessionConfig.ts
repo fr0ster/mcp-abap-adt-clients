@@ -154,15 +154,44 @@ export async function resolveSystemContext(
 }
 
 /**
+ * Check if test-config.yaml marks the system as legacy (BASIS < 7.50).
+ */
+export function isLegacyEnvironment(): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { loadTestConfig } = require('./test-helper');
+  const testConfig = loadTestConfig();
+  return testConfig?.environment?.is_legacy === true;
+}
+
+/**
+ * Get connection options for createAbapConnection.
+ * Legacy systems need skipSessionType: true so the x-sap-adt-sessiontype
+ * header is not sent — otherwise locks go to ABAP session memory instead
+ * of the global enqueue server, causing HTTP 423 on subsequent requests.
+ */
+export function getConnectionOptions(): { skipSessionType?: boolean } | undefined {
+  return isLegacyEnvironment() ? { skipSessionType: true } : undefined;
+}
+
+/**
  * Create the appropriate AdtClient based on system capabilities.
  * Modern systems (S/4 HANA, BTP) get AdtClient.
  * Legacy systems (BASIS < 7.50) get AdtClientLegacy.
+ *
+ * Respects is_legacy: true from test-config.yaml to force legacy client
+ * (auto-detection via /sap/bc/adt/core/discovery is unreliable for HTTP
+ * connections to legacy systems — discovery returns XML on any system).
  */
 export async function createTestAdtClient(
   connection: IAbapConnection,
   logger: ILogger,
   options?: IAdtClientOptions,
 ): Promise<{ client: AdtClient; isLegacy: boolean }> {
+  if (isLegacyEnvironment()) {
+    const client = new AdtClientLegacy(connection, logger, options);
+    return { client, isLegacy: true };
+  }
+
   const client = await createAdtClient(connection, logger, options);
   const isLegacy = client instanceof AdtClientLegacy;
   return { client, isLegacy };

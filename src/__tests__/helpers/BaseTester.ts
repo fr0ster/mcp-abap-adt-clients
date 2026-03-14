@@ -461,6 +461,10 @@ export class BaseTester<TConfig, TState> {
       if (!this.connection || !this.client) {
         return;
       }
+      // Skip on legacy — objectproperties endpoint does not exist on BASIS < 7.50
+      if (this.isLegacySystem) {
+        return;
+      }
       const sourceUrl = getSourceUrl(undefined);
       if (!sourceUrl) {
         return;
