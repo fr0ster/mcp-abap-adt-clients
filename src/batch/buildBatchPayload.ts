@@ -60,10 +60,10 @@ export function buildBatchPayload(
         innerRequest,
       ].join('\r\n');
     })
-    .join('');
+    .join('\r\n');
 
   return {
     boundary,
-    body: `${multipartParts}--${boundary}--\r\n`,
+    body: `${multipartParts}\r\n--${boundary}--\r\n`,
   };
 }

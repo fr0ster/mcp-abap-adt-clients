@@ -141,7 +141,71 @@ Only single-step operations are batch-compatible:
 - `check()`, `validate()`, `activate()` — single POST
 
 Multi-step chains (`create()`, `update()`, `delete()`) are **not** batch-safe because they
-perform multiple awaited requests internally.
+perform multiple awaited requests internally. However, their individual steps can be
+orchestrated across sequential batches — see [Multi-Batch Orchestration](#multi-batch-orchestration).
+
+> **Note:** The batch endpoint `/sap/bc/adt/debugger/batch` is an undocumented generic ADT
+> router. While it accepts any ADT request (GET, POST, PUT), its behavior may change in
+> future SAP releases. Integration tests cover batch operations to detect regressions early.
+
+### Multi-Batch Orchestration
+
+Instead of calling `create()` (which chains validate → create → lock → update → unlock → activate
+sequentially) for N objects, a consumer can split the chain into independent batches:
+
+```typescript
+const batch = new AdtClientBatch(connection, logger);
+
+// Batch 1: validate all names in parallel
+const validations = objects.map(obj =>
+  batch.getClass().validate({ className: obj.name, packageName: obj.pkg })
+);
+await batch.batchExecute();
+
+// Filter: collect valid names, report errors
+const valid = [];
+for (let i = 0; i < objects.length; i++) {
+  const state = await validations[i];
+  if (state.errors?.length) errors.push(objects[i]);
+  else valid.push(objects[i]);
+}
+
+// Batch 2: create all valid objects
+const creates = valid.map(obj =>
+  batch.getClass().create({ className: obj.name, ... })
+);
+await batch.batchExecute();
+
+// Batch 3: lock all
+const locks = valid.map(obj =>
+  batch.getClass().lock({ className: obj.name })
+);
+await batch.batchExecute();
+
+// Collect lock handles from results
+const handles = await Promise.all(locks);
+
+// Batch 4: update all (using lock handles from batch 3)
+const updates = valid.map((obj, i) =>
+  batch.getClass().update({ className: obj.name, source: obj.source, lockHandle: handles[i].lockHandle })
+);
+await batch.batchExecute();
+
+// Batch 5: unlock all
+const unlocks = valid.map((obj, i) =>
+  batch.getClass().unlock({ className: obj.name, lockHandle: handles[i].lockHandle })
+);
+await batch.batchExecute();
+
+// Batch 6: activate all
+const activations = valid.map(obj =>
+  batch.getClass().activate({ className: obj.name })
+);
+await batch.batchExecute();
+```
+
+This replaces N sequential create chains (each ~7 HTTP requests) with 6 batch requests total,
+regardless of how many objects are processed.
 
 ### Sequential Batches
 
