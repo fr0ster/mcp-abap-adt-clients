@@ -7,7 +7,7 @@
 
 SAP ADT supports multipart/mixed batch requests, allowing multiple independent HTTP operations to be sent in a single round-trip. This significantly reduces network latency when multiple operations need to execute within the same stateful session.
 
-**Current state:** Batch support exists only in the debugger module (`src/runtime/debugger/abap.ts`) as a hardcoded pattern (step + getStack). There is no reusable batch infrastructure across the library.
+**Current state:** Generic batch infrastructure is implemented (`src/batch/`). `AdtClientBatch` and `AdtRuntimeClientBatch` provide batch-capable wrappers for all ADT and runtime operations. The original debugger batch code in `src/runtime/debugger/abap.ts` remains as a specialized implementation.
 
 **Goal:** Provide a general-purpose batch execution layer that:
 1. Allows any ADT operation to be collected without immediate execution
@@ -321,61 +321,33 @@ const responses = await batch.batchExecute();
 
 ---
 
-## Implementation Plan
+## Implementation Status
 
-### Phase 1: Core Batch Infrastructure
-
-**Files to create:**
+### Phase 1: Core Batch Infrastructure — DONE
 
 | File | Purpose |
 |------|---------|
-| `src/batch/types.ts` | `IBatchRequestPart`, `IBatchPayload`, `IBatchResponse` |
+| `src/batch/types.ts` | `IBatchRequestPart`, `IBatchPayload`, `IBatchResponsePart` |
 | `src/batch/buildBatchPayload.ts` | Build `multipart/mixed` body from `IBatchRequestPart[]` |
-| `src/batch/parseMultipartResponse.ts` | Parse `multipart/mixed` response into individual `IAdtResponse` objects |
+| `src/batch/parseBatchResponse.ts` | Parse `multipart/mixed` response into individual responses |
 | `src/batch/BatchRecordingConnection.ts` | Recording `IAbapConnection` proxy |
 | `src/batch/index.ts` | Exports |
 
-**Refactoring:**
-
-- Extract `createBatchBoundary()` and `createRequestId()` from `src/runtime/debugger/abap.ts` into `src/batch/buildBatchPayload.ts`
-- Refactor existing `buildDebuggerBatchPayload()` to use the new generic `buildBatchPayload()`
-- **Fix the `.trim()` bug** that strips the required empty line after inner request headers
-
-### Phase 2: AdtClientBatch
-
-**Files to create:**
+### Phase 2: AdtClientBatch — DONE
 
 | File | Purpose |
 |------|---------|
-| `src/clients/AdtClientBatch.ts` | Batch-capable AdtClient with `batchExecute()` |
+| `src/batch/AdtClientBatch.ts` | Batch-capable AdtClient with `batchExecute()` |
 
-**Design decisions:**
-
-- `AdtClientBatch` wraps `AdtClient` with a `BatchRecordingConnection`
-- Same factory method signatures (`getClass()`, `getProgram()`, etc.)
-- Adds `batchExecute(): Promise<IAdtResponse[]>` to flush collected requests
-- Adds `reset(): void` to clear pending requests without executing
-
-### Phase 3: AdtRuntimeClientBatch (Optional)
-
-Extend batch support to `AdtRuntimeClient` operations (debugger, traces):
+### Phase 3: AdtRuntimeClientBatch — DONE
 
 | File | Purpose |
 |------|---------|
-| `src/clients/AdtRuntimeClientBatch.ts` | Batch-capable runtime client |
+| `src/batch/AdtRuntimeClientBatch.ts` | Batch-capable runtime client |
 
-This would replace the hardcoded `buildDebuggerStepWithStackBatchPayload()` with the generic batch pattern.
+### Phase 4: Response Type Safety — DONE
 
-### Phase 4: Response Type Safety (Optional)
-
-Add generic response mapping so each deferred promise resolves with the correct type:
-
-```typescript
-// Each call returns a typed promise
-const classResult: Promise<IClassState> = batch.getClass().read({ className: 'ZCL_TEST' });
-```
-
-This already works naturally because `BatchRecordingConnection.makeAdtRequest()` returns the same `Promise<IAdtResponse<T>>` type — the deferred promise just resolves later.
+Type safety works naturally — `BatchRecordingConnection.makeAdtRequest()` returns `Promise<IAdtResponse<T>>` and deferred promises preserve the type.
 
 ---
 

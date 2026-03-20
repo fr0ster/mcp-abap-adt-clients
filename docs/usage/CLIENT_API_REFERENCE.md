@@ -150,13 +150,13 @@ orchestrated across sequential batches — see [Multi-Batch Orchestration](#mult
 
 ### Multi-Batch Orchestration
 
-Instead of calling `create()` (which chains validate → create → lock → update → unlock → activate
-sequentially) for N objects, a consumer can split the chain into independent batches:
+Instead of processing N objects sequentially (each requiring multiple HTTP round-trips),
+a consumer can split the workflow into sequential batches of independent operations:
 
 ```typescript
 const batch = new AdtClientBatch(connection, logger);
 
-// Batch 1: validate all names in parallel
+// Batch 1: validate all names
 const validations = objects.map(obj =>
   batch.getClass().validate({ className: obj.name, packageName: obj.pkg })
 );
@@ -165,35 +165,41 @@ await batch.batchExecute();
 // Filter: collect valid names, report errors
 const valid = [];
 for (let i = 0; i < objects.length; i++) {
-  const state = await validations[i];
-  if (state.errors?.length) errors.push(objects[i]);
-  else valid.push(objects[i]);
+  try {
+    await validations[i];
+    valid.push(objects[i]);
+  } catch {
+    errors.push(objects[i]);
+  }
 }
 
-// Batch 2: create all valid objects
+// Batch 2: create all valid objects (single POST per object)
 const creates = valid.map(obj =>
-  batch.getClass().create({ className: obj.name, ... })
+  batch.getClass().create({ className: obj.name, packageName: obj.pkg, ... })
 );
 await batch.batchExecute();
 
-// Batch 3: lock all
+// Batch 3: lock all created objects
 const locks = valid.map(obj =>
   batch.getClass().lock({ className: obj.name })
 );
 await batch.batchExecute();
 
 // Collect lock handles from results
-const handles = await Promise.all(locks);
+const lockHandles = await Promise.all(locks);
 
-// Batch 4: update all (using lock handles from batch 3)
+// Batch 4: update all (low-level mode — single PUT per object)
 const updates = valid.map((obj, i) =>
-  batch.getClass().update({ className: obj.name, source: obj.source, lockHandle: handles[i].lockHandle })
+  batch.getClass().update(
+    { className: obj.name, sourceCode: obj.source },
+    { lockHandle: lockHandles[i] },
+  )
 );
 await batch.batchExecute();
 
 // Batch 5: unlock all
 const unlocks = valid.map((obj, i) =>
-  batch.getClass().unlock({ className: obj.name, lockHandle: handles[i].lockHandle })
+  batch.getClass().unlock({ className: obj.name }, lockHandles[i])
 );
 await batch.batchExecute();
 
@@ -204,8 +210,12 @@ const activations = valid.map(obj =>
 await batch.batchExecute();
 ```
 
-This replaces N sequential create chains (each ~7 HTTP requests) with 6 batch requests total,
+This replaces N sequential workflows with 6 batch requests total,
 regardless of how many objects are processed.
+
+**Key:** `update()` with `options.lockHandle` runs in low-level mode (single PUT request),
+making it batch-safe. Without `lockHandle`, `update()` runs the full chain
+(lock → check → update → unlock → activate) which is not batch-compatible.
 
 ### Sequential Batches
 

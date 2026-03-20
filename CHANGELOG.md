@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.11.4] - 2026-03-21
+
+### Fixed
+- **Batch payload**: Fix multipart boundary separation in `buildBatchPayload()` — request body content was merging with boundary markers when inner requests contained a body (POST/PUT with XML/text data). Added `\r\n` between parts and before closing boundary.
+
+### Added
+- **Batch POST tests**: Exploratory integration tests verifying POST operations (validate, check, mixed GET+POST) work through the batch endpoint.
+
 ## [3.11.3] - 2026-03-14
 
 ### Fixed

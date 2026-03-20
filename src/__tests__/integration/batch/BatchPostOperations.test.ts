@@ -19,8 +19,8 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { buildBatchPayload } from '../../../batch/buildBatchPayload';
-import type { IBatchRequestPart } from '../../../batch/types';
 import { parseBatchResponse } from '../../../batch/parseBatchResponse';
+import type { IBatchRequestPart } from '../../../batch/types';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
 import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
@@ -285,8 +285,7 @@ describe('Batch POST operations', () => {
               url: '/sap/bc/adt/checkruns',
               headers: {
                 Accept: 'application/vnd.sap.adt.oo.CheckMessages+xml',
-                'Content-Type':
-                  'application/vnd.sap.adt.oo.CheckObjects+xml',
+                'Content-Type': 'application/vnd.sap.adt.oo.CheckObjects+xml',
               },
               params: {
                 reporters: 'abapCheckRun',
@@ -361,8 +360,7 @@ describe('Batch POST operations', () => {
               url: '/sap/bc/adt/checkruns',
               headers: {
                 Accept: 'application/vnd.sap.adt.oo.CheckMessages+xml',
-                'Content-Type':
-                  'application/vnd.sap.adt.oo.CheckObjects+xml',
+                'Content-Type': 'application/vnd.sap.adt.oo.CheckObjects+xml',
               },
               params: {
                 reporters: 'abapCheckRun',
