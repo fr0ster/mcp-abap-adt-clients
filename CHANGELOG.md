@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.11.5] - 2026-03-21
+
+### Added
+- **Pre-commit hook**: Add husky with Biome auto-fix on staged files — prevents committing code with lint/format errors.
+
 ## [3.11.4] - 2026-03-21
 
 ### Fixed
