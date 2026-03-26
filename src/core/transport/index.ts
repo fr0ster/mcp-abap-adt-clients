@@ -7,7 +7,11 @@ import type { ITransportConfig, ITransportState } from './types';
 
 export { AdtRequest } from './AdtRequest';
 export { AdtRequestLegacy } from './AdtRequestLegacy';
-export type { ITransportConfig, ITransportState } from './types';
+export type {
+  IListTransportsParams,
+  ITransportConfig,
+  ITransportState,
+} from './types';
 
 // Type alias for AdtRequest
 export type AdtRequestType = IAdtObject<ITransportConfig, ITransportState>;

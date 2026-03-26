@@ -238,4 +238,45 @@ describe('AdtRequest', () => {
       getTimeout('test'),
     );
   });
+
+  describe('List transports', () => {
+    it(
+      'should list transport requests for current user',
+      async () => {
+        logTestStart(testsLogger, 'AdtRequest - list transports', {
+          name: 'list_transports',
+          params: {},
+        });
+
+        if (!hasConfig) {
+          logTestSkip(
+            testsLogger,
+            'AdtRequest - list transports',
+            'No SAP configuration',
+          );
+          return;
+        }
+
+        try {
+          logTestStep('list', testsLogger);
+          const listState = await client.getRequest().list({
+            user: process.env.SAP_USERNAME || '*',
+            status: 'D',
+          });
+
+          expect(listState).toBeDefined();
+          expect(listState.listResult).toBeDefined();
+          expect(listState.errors.length).toBe(0);
+
+          logTestSuccess(testsLogger, 'AdtRequest - list transports');
+        } catch (error: any) {
+          logTestError(testsLogger, 'AdtRequest - list transports', error);
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, 'AdtRequest - list transports');
+        }
+      },
+      getTimeout('test'),
+    );
+  });
 });

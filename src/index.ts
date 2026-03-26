@@ -207,6 +207,7 @@ export type {
 } from './core/tabletype';
 export type {
   AdtRequestType,
+  IListTransportsParams,
   ITransportConfig,
   ITransportState,
 } from './core/transport';
