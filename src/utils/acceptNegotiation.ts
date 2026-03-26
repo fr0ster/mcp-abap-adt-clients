@@ -7,6 +7,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 
 const acceptCache = new Map<string, string>();
+const contentTypeCache = new Map<string, string>();
 const baseRequestMap = new WeakMap<
   IAbapConnection,
   IAbapConnection['makeAdtRequest']
@@ -20,6 +21,7 @@ export interface IAcceptNegotiationOptions {
 
 export function clearAcceptCache(): void {
   acceptCache.clear();
+  contentTypeCache.clear();
 }
 
 export function setAcceptCorrectionEnabled(enabled?: boolean): void {
@@ -43,6 +45,46 @@ export function extractSupportedAccept(error: unknown): string[] {
     headers['x-sap-adt-accept'],
     headers['supported-accept'],
     headers['accept-supported'],
+  ];
+
+  for (const value of headerCandidates) {
+    if (typeof value === 'string') {
+      value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .forEach((entry) => {
+          types.add(entry);
+        });
+    }
+  }
+
+  const data = e?.response?.data;
+  const text =
+    typeof data === 'string' ? data : data ? JSON.stringify(data) : '';
+  if (text) {
+    const matches =
+      text.match(/[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+(?:;[^,\s]+)?/g) || [];
+    for (const match of matches) {
+      types.add(match);
+    }
+  }
+
+  return Array.from(types).filter(Boolean);
+}
+
+export function extractSupportedContentType(error: unknown): string[] {
+  const e = error as HttpError;
+  if (e?.response?.status !== 415) {
+    return [];
+  }
+
+  const types = new Set<string>();
+  const headers = (e?.response?.headers || {}) as Record<string, unknown>;
+  const headerCandidates = [
+    headers['content-type'],
+    headers['x-sap-adt-supported-content-type'],
+    headers['supported-content-type'],
   ];
 
   for (const value of headerCandidates) {
