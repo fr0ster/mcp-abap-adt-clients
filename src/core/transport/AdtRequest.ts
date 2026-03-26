@@ -29,6 +29,7 @@ import type {
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { createTransport } from './create';
+import { listTransports } from './list';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
 
@@ -143,6 +144,27 @@ export class AdtRequest
       }
       throw error;
     }
+  }
+
+  /**
+   * List transport requests
+   */
+  async list(params: {
+    user: string;
+    status?: string;
+    dateRange?: string;
+    targetSystem?: string;
+    requestType?: string;
+  }): Promise<ITransportState> {
+    this.logger?.info?.('Listing transport requests for user:', params.user);
+    const response = await listTransports(this.connection, {
+      user: params.user,
+      status: params.status,
+      date_range: params.dateRange,
+      target_system: params.targetSystem,
+      request_type: params.requestType,
+    });
+    return { listResult: response, errors: [] };
   }
 
   /**

@@ -110,10 +110,6 @@ import {
   type ITableTypeState,
 } from '../core/tabletype';
 import { AdtRequest } from '../core/transport';
-import type {
-  ITransportConfig,
-  ITransportState,
-} from '../core/transport/types';
 import {
   AdtCdsUnitTest,
   AdtUnitTest,
@@ -421,7 +417,7 @@ export class AdtClient {
    * Get high-level operations for Request (Transport Request) objects
    * @returns IAdtObject instance for Request operations
    */
-  getRequest(): IAdtObject<ITransportConfig, ITransportState> {
+  getRequest(): AdtRequest {
     return new AdtRequest(this.connection, this.logger, this.systemContext);
   }
 

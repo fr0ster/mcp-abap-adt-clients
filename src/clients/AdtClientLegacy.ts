@@ -39,7 +39,7 @@ import { AdtProgramLegacy } from '../core/program/AdtProgramLegacy';
 import type { AdtUtils } from '../core/shared/AdtUtils';
 import { AdtUtilsLegacy } from '../core/shared/AdtUtilsLegacy';
 import { AdtContentTypesBase } from '../core/shared/contentTypes';
-import type { ITransportConfig, ITransportState } from '../core/transport';
+import type { AdtRequest } from '../core/transport';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
 import type { IUnitTestConfig, IUnitTestState } from '../core/unitTest';
 import { AdtUnitTestLegacy } from '../core/unitTest/AdtUnitTestLegacy';
@@ -146,7 +146,7 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Transport with legacy URL prefix ---
 
-  override getRequest(): IAdtObject<ITransportConfig, ITransportState> {
+  override getRequest(): AdtRequest {
     return new AdtRequestLegacy(
       this.connection,
       this.logger,
