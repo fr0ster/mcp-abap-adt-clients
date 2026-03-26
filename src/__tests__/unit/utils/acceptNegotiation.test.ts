@@ -1,6 +1,8 @@
 import {
   extractSupportedAccept,
   extractSupportedContentType,
+  makeAdtRequestWithAcceptNegotiation,
+  clearAcceptCache,
 } from '../../../utils/acceptNegotiation';
 
 describe('acceptNegotiation', () => {
@@ -57,5 +59,136 @@ describe('acceptNegotiation', () => {
       const result = extractSupportedContentType(error);
       expect(result.length).toBeGreaterThanOrEqual(2);
     });
+  });
+});
+
+describe('makeAdtRequestWithAcceptNegotiation - 415 retry', () => {
+  beforeEach(() => {
+    clearAcceptCache();
+  });
+
+  it('should retry with corrected Content-Type on 415', async () => {
+    let callCount = 0;
+    const mockConnection = {
+      makeAdtRequest: async (request: any) => {
+        callCount++;
+        if (callCount === 1) {
+          const error: any = new Error('415');
+          error.response = {
+            status: 415,
+            headers: {},
+            data: 'Supported Media Types: application/vnd.sap.adt.checkobjects.v2+xml',
+          };
+          throw error;
+        }
+        expect(request.headers['Content-Type']).toBe(
+          'application/vnd.sap.adt.checkobjects.v2+xml',
+        );
+        return { data: 'ok', status: 200, headers: {} };
+      },
+    };
+
+    const result = await makeAdtRequestWithAcceptNegotiation(
+      mockConnection as any,
+      {
+        url: '/sap/bc/adt/checkruns',
+        method: 'POST',
+        timeout: 0,
+        headers: {
+          'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+        },
+      },
+      { enableAcceptCorrection: true },
+    );
+
+    expect(result.data).toBe('ok');
+    expect(callCount).toBe(2);
+  });
+
+  it('should use cached Content-Type on subsequent requests', async () => {
+    let callCount = 0;
+    const mockConnection = {
+      makeAdtRequest: async (request: any) => {
+        callCount++;
+        if (callCount === 1) {
+          const error: any = new Error('415');
+          error.response = {
+            status: 415,
+            headers: {},
+            data: 'Supported Media Types: application/vnd.sap.adt.checkobjects.v2+xml',
+          };
+          throw error;
+        }
+        return { data: 'ok', status: 200, headers: {} };
+      },
+    };
+
+    // First call: triggers 415 + retry
+    await makeAdtRequestWithAcceptNegotiation(
+      mockConnection as any,
+      {
+        url: '/sap/bc/adt/checkruns',
+        method: 'POST',
+        timeout: 0,
+        headers: {
+          'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+        },
+      },
+      { enableAcceptCorrection: true },
+    );
+
+    // Second call: should use cached Content-Type directly (no 415)
+    callCount = 0;
+    mockConnection.makeAdtRequest = async (request: any) => {
+      callCount++;
+      expect(request.headers['Content-Type']).toBe(
+        'application/vnd.sap.adt.checkobjects.v2+xml',
+      );
+      return { data: 'ok', status: 200, headers: {} };
+    };
+
+    await makeAdtRequestWithAcceptNegotiation(
+      mockConnection as any,
+      {
+        url: '/sap/bc/adt/checkruns',
+        method: 'POST',
+        timeout: 0,
+        headers: {
+          'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+        },
+      },
+      { enableAcceptCorrection: true },
+    );
+
+    expect(callCount).toBe(1);
+  });
+
+  it('should not retry 415 when enableAcceptCorrection is false', async () => {
+    const mockConnection = {
+      makeAdtRequest: async () => {
+        const error: any = new Error('415');
+        error.response = {
+          status: 415,
+          headers: {},
+          data: 'Supported Media Types: application/vnd.sap.adt.checkobjects.v2+xml',
+        };
+        throw error;
+      },
+    };
+
+    await expect(
+      makeAdtRequestWithAcceptNegotiation(
+        mockConnection as any,
+        {
+          url: '/sap/bc/adt/checkruns',
+          method: 'POST',
+          timeout: 0,
+          headers: {
+            'Content-Type': 'application/vnd.sap.adt.checkobjects+xml',
+          },
+        },
+        { enableAcceptCorrection: false },
+      ),
+    ).rejects.toThrow();
   });
 });

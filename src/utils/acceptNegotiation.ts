@@ -167,6 +167,13 @@ export async function makeAdtRequestWithAcceptNegotiation<
     headers.Accept = cachedAccept;
   }
 
+  const cachedContentType = enableCorrection
+    ? contentTypeCache.get(cacheKey)
+    : undefined;
+  if (cachedContentType) {
+    headers['Content-Type'] = cachedContentType;
+  }
+
   const baseRequest = getBaseRequest(connection);
   try {
     return await baseRequest({
@@ -199,6 +206,30 @@ export async function makeAdtRequestWithAcceptNegotiation<
         }
       }
     }
+
+    if (e.response?.status === 415) {
+      const supported = extractSupportedContentType(error);
+      if (supported.length > 0) {
+        logger?.warn?.(
+          `Content-Type not supported for ${request.url}. Supported Content-Type: ${supported.join(', ')}`,
+        );
+      }
+
+      if (enableCorrection && supported.length > 0) {
+        const nextContentType = supported[0];
+        if (headers['Content-Type'] !== nextContentType) {
+          contentTypeCache.set(cacheKey, nextContentType);
+          logger?.warn?.(
+            `Retrying ${request.url} with corrected Content-Type: ${nextContentType}`,
+          );
+          return await baseRequest({
+            ...request,
+            headers: { ...headers, 'Content-Type': nextContentType },
+          });
+        }
+      }
+    }
+
     throw error;
   }
 }
