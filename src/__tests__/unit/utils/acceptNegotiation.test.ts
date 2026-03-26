@@ -1,8 +1,8 @@
 import {
+  clearAcceptCache,
   extractSupportedAccept,
   extractSupportedContentType,
   makeAdtRequestWithAcceptNegotiation,
-  clearAcceptCache,
 } from '../../../utils/acceptNegotiation';
 
 describe('acceptNegotiation', () => {
@@ -108,7 +108,7 @@ describe('makeAdtRequestWithAcceptNegotiation - 415 retry', () => {
   it('should use cached Content-Type on subsequent requests', async () => {
     let callCount = 0;
     const mockConnection = {
-      makeAdtRequest: async (request: any) => {
+      makeAdtRequest: async (_request: any) => {
         callCount++;
         if (callCount === 1) {
           const error: any = new Error('415');

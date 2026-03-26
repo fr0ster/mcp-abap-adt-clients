@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.12.0] - 2026-03-26
+
+### Fixed
+- **Content-Type Negotiation**: Fixed 415 (Unsupported Media Type) errors on ECC on-premise systems by auto-detecting and caching correct Content-Type per endpoint. Mirrors the existing Accept (406) negotiation mechanism. Affects `checkruns`, `deletion/check`, and any other endpoint where Content-Type varies by SAP system version. (#6)
+
+### Changed
+- **Accept/Content-Type correction enabled by default**: `enableAcceptCorrection` is now `true` by default — both 406 (Accept) and 415 (Content-Type) auto-retry work out of the box without explicit opt-in. Disable with `enableAcceptCorrection: false` or `ADT_ACCEPT_CORRECTION=false`.
+
 ## [3.11.5] - 2026-03-21
 
 ### Added

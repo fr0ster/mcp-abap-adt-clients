@@ -32,7 +32,7 @@ export function getAcceptCorrectionEnabled(): boolean {
   if (acceptCorrectionOverride !== undefined) {
     return acceptCorrectionOverride;
   }
-  return process.env.ADT_ACCEPT_CORRECTION === 'true';
+  return process.env.ADT_ACCEPT_CORRECTION !== 'false';
 }
 
 export function extractSupportedAccept(error: unknown): string[] {

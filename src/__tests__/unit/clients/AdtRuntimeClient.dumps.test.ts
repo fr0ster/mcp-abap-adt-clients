@@ -14,7 +14,9 @@ describe('AdtRuntimeClient dumps API', () => {
       error: jest.fn(),
     };
 
-    const client = new AdtRuntimeClient(connection, logger);
+    const client = new AdtRuntimeClient(connection, logger, {
+      enableAcceptCorrection: false,
+    });
     return { client, connection };
   }
 
