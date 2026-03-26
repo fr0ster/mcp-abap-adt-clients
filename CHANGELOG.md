@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.13.0] - 2026-03-26
+
+### Added
+- **listTransports()**: New `AdtClient.getRequest().list()` method to query transport requests via `GET /sap/bc/adt/cts/transportrequests` with proper Accept header negotiation. Supports filtering by `user`, `status`, `dateRange`, `targetSystem`, `requestType`. (#7)
+
 ## [3.12.0] - 2026-03-26
 
 ### Fixed
