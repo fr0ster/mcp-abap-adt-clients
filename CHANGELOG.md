@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.14.1] - 2026-04-02
+
+### Fixed
+- **Exports**: Export `buildDumpIdPrefix`, `buildRuntimeDumpsUserQuery`, `IRuntimeDumpsListOptions`, `IRuntimeDumpReadOptions`, `IRuntimeDumpReadView` from package index for standalone usage.
+- **Integration tests**: Add test coverage for `from`/`to` datetime filtering in `listRuntimeDumps` and `listRuntimeDumpsByUser`.
+
 ## [3.14.0] - 2026-04-02
 
 ### Added
