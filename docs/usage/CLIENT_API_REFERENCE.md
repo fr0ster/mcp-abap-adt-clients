@@ -265,17 +265,39 @@ const feeds = await runtime.getFeeds();
 ### Runtime Dumps
 
 ```typescript
+// List dumps with optional time-range filter (YYYYMMDDHHMMSS)
 const allDumps = await runtime.listRuntimeDumps({ top: 50 });
+const recentDumps = await runtime.listRuntimeDumps({
+  from: '20260401000000',
+  to: '20260402235959',
+  top: 50,
+});
+
+// Filter by user (and optionally by time range)
 const userDumps = await runtime.listRuntimeDumpsByUser('CB9980000423', {
   inlinecount: 'allpages',
   top: 50,
+  from: '20260401000000',
+  to: '20260402235959',
 });
+
+// Read dump by ID
 const dumpPayload = await runtime.getRuntimeDumpById('ABCDEF1234567890');
+
+// Build dump ID prefix from known components (e.g. from CALM events)
+const prefix = runtime.buildDumpIdPrefix(
+  '20260331215347', // datetime (YYYYMMDDHHMMSS)
+  'epbyminsd0654',  // hostname
+  'E19',            // sysid
+  '00',             // instance
+);
+// => '20260331215347epbyminsd0654_E19_00'
 ```
 
 Contract notes:
-- `listRuntimeDumps(options?)` and `listRuntimeDumpsByUser(user?, options?)` are read-only feed operations.
+- `listRuntimeDumps(options?)` and `listRuntimeDumpsByUser(user?, options?)` are read-only feed operations. `from`/`to` params enable server-side time-range filtering.
 - `getRuntimeDumpById(dumpId)` requires plain dump ID (not full URI) and throws for empty/invalid IDs.
+- `buildDumpIdPrefix()` composes a dump ID prefix from datetime, hostname, sysid and instance. Combine with `from`/`to` filtering to locate a specific dump entry (the sequence number is only available from the feed).
 - Methods return raw ADT payload (`IAdtResponse`) so consumers can parse XML according to their needs.
 
 ### Runtime Memory Snapshots
