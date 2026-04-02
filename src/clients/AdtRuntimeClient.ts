@@ -94,6 +94,7 @@ import {
 } from '../runtime/debugger/abap';
 // Import runtime dumps functions
 import {
+  buildDumpIdPrefix as buildDumpIdPrefixUtil,
   buildRuntimeDumpsUserQuery as buildRuntimeDumpsUserQueryUtil,
   getRuntimeDumpById as getRuntimeDumpByIdUtil,
   type IRuntimeDumpReadOptions,
@@ -849,6 +850,20 @@ export class AdtRuntimeClient {
   // ============================================================================
   // Runtime Dumps (ABAP Short Dump Analysis)
   // ============================================================================
+
+  /**
+   * Build a runtime dump ID prefix from its known components.
+   *
+   * @see buildDumpIdPrefix in runtime/dumps/read.ts
+   */
+  buildDumpIdPrefix(
+    datetime: string,
+    hostname: string,
+    sysid: string,
+    instance: string,
+  ): string {
+    return buildDumpIdPrefixUtil(datetime, hostname, sysid, instance);
+  }
 
   /**
    * Build ADT runtime dumps query expression for user filtering.

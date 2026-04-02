@@ -19,6 +19,8 @@ export interface IRuntimeDumpsListOptions {
   top?: number;
   skip?: number;
   orderby?: string;
+  from?: string; // YYYYMMDDHHMMSS
+  to?: string; // YYYYMMDDHHMMSS
 }
 
 export type IRuntimeDumpReadView = 'default' | 'summary' | 'formatted';
@@ -50,6 +52,25 @@ function appendIfDefined(
 }
 
 /**
+ * Build a runtime dump ID prefix from its known components.
+ *
+ * The full dump ID is a compound key: `{datetime}{hostname}_{sysid}_{instance}{user}{client}{seq}`.
+ * All fields except `seq` are typically available from external sources (e.g. CALM events).
+ * Use this prefix with `from`/`to` time-range filtering to locate the exact dump entry.
+ *
+ * @example buildDumpIdPrefix('20260331215347', 'epbyminsd0654', 'E19', '00')
+ *          // => '20260331215347epbyminsd0654_E19_00'
+ */
+export function buildDumpIdPrefix(
+  datetime: string,
+  hostname: string,
+  sysid: string,
+  instance: string,
+): string {
+  return `${datetime}${hostname}_${sysid}_${instance}`;
+}
+
+/**
  * Build ADT runtime dumps query expression for user filtering.
  *
  * @example and( equals( user, CB9980000423 ) )
@@ -76,6 +97,8 @@ export async function listRuntimeDumps(
   appendIfDefined(params, '$top', options.top);
   appendIfDefined(params, '$skip', options.skip);
   appendIfDefined(params, '$orderby', options.orderby);
+  appendIfDefined(params, 'from', options.from);
+  appendIfDefined(params, 'to', options.to);
 
   const query = params.toString();
   const url = `/sap/bc/adt/runtime/dumps${query ? `?${query}` : ''}`;

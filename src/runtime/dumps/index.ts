@@ -3,6 +3,7 @@
  */
 
 export {
+  buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
   getRuntimeDumpById,
   type IRuntimeDumpReadOptions,

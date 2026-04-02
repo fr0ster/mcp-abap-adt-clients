@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import {
+  buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
   getRuntimeDumpById,
   listRuntimeDumps,
@@ -12,6 +13,12 @@ describe('runtime/dumps/read', () => {
       makeAdtRequest: jest.fn().mockResolvedValue({ status: 200, data: '' }),
     } as unknown as IAbapConnection;
   }
+
+  it('buildDumpIdPrefix composes prefix from components', () => {
+    expect(
+      buildDumpIdPrefix('20260331215347', 'epbyminsd0654', 'E19', '00'),
+    ).toBe('20260331215347epbyminsd0654_E19_00');
+  });
 
   it('buildRuntimeDumpsUserQuery returns undefined when user is not provided', () => {
     expect(buildRuntimeDumpsUserQuery(undefined)).toBeUndefined();
@@ -35,6 +42,37 @@ describe('runtime/dumps/read', () => {
         method: 'GET',
       }),
     );
+  });
+
+  it('listRuntimeDumps appends from and to params when provided', async () => {
+    const connection = createConnectionMock();
+
+    await listRuntimeDumps(connection, {
+      from: '20260401000000',
+      to: '20260402235959',
+      top: 10,
+    });
+
+    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining('from=20260401000000'),
+      }),
+    );
+    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: expect.stringContaining('to=20260402235959'),
+      }),
+    );
+  });
+
+  it('listRuntimeDumps omits from and to when not provided', async () => {
+    const connection = createConnectionMock();
+
+    await listRuntimeDumps(connection, { top: 5 });
+
+    const call = (connection.makeAdtRequest as jest.Mock).mock.calls[0][0];
+    expect(call.url).not.toContain('from=');
+    expect(call.url).not.toContain('to=');
   });
 
   it('listRuntimeDumpsByUser falls back to all dumps when user is missing', async () => {

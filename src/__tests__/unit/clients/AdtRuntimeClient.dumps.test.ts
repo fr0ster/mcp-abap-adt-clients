@@ -20,6 +20,13 @@ describe('AdtRuntimeClient dumps API', () => {
     return { client, connection };
   }
 
+  it('buildDumpIdPrefix composes prefix from components', () => {
+    const { client } = createRuntimeClient();
+    expect(
+      client.buildDumpIdPrefix('20260331215347', 'epbyminsd0654', 'E19', '00'),
+    ).toBe('20260331215347epbyminsd0654_E19_00');
+  });
+
   it('buildRuntimeDumpsUserQuery returns undefined for empty user', () => {
     const { client } = createRuntimeClient();
     expect(client.buildRuntimeDumpsUserQuery()).toBeUndefined();
