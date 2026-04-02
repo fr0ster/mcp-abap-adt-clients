@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.14.0] - 2026-04-02
+
+### Added
+- **from/to datetime filter**: `listRuntimeDumps()` and `listRuntimeDumpsByUser()` now support `from` and `to` query params (YYYYMMDDHHMMSS format) for server-side time-range filtering. (#9)
+- **buildDumpIdPrefix()**: New helper to compose a runtime dump ID prefix from datetime, hostname, sysid, and instance number — useful for locating dumps discovered via CALM events.
+
 ## [3.13.0] - 2026-03-26
 
 ### Added
