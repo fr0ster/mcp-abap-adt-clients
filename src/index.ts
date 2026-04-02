@@ -233,6 +233,13 @@ export type {
   IProgramExecutor,
 } from './executors';
 export {
+  buildDumpIdPrefix,
+  buildRuntimeDumpsUserQuery,
+  type IRuntimeDumpReadOptions,
+  type IRuntimeDumpReadView,
+  type IRuntimeDumpsListOptions,
+} from './runtime/dumps';
+export {
   fetchDiscoveryEndpoints,
   isEndpointInDiscovery,
 } from './utils/discoveryEndpoints';
