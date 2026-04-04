@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.14.4] - 2026-04-05
+
+### Fixed
+- **DataElement create**: Remove `<dtel:dataElement>` child elements from create XML payload — SAP rejects the request with "description is missing" when type details are included at creation time. Create now sends minimal XML (root element + packageRef only), matching Eclipse ADT behavior. Type details are set via update. (#11)
+- **DataElement Accept header**: Fix version negotiation order to `v1, v2` matching Eclipse ADT.
+
 ## [3.14.3] - 2026-04-04
 
 ### Fixed
