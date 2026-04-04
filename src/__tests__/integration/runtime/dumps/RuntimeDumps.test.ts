@@ -171,10 +171,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
 
         logTestStep('list runtime dumps with from/to filter', testsLogger);
         const now = new Date();
-        const toDate = now
-          .toISOString()
-          .replace(/[-:T]/g, '')
-          .slice(0, 14);
+        const toDate = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
         const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         const fromDate = oneDayAgo
           .toISOString()
@@ -202,13 +199,15 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           'list runtime dumps by user with from/to filter',
           testsLogger,
         );
-        const byUserFilteredResponse =
-          await runtime.listRuntimeDumpsByUser(user, {
+        const byUserFilteredResponse = await runtime.listRuntimeDumpsByUser(
+          user,
+          {
             top,
             inlinecount,
             from: fromDate,
             to: toDate,
-          });
+          },
+        );
         expect(byUserFilteredResponse.status).toBeGreaterThanOrEqual(200);
         expect(byUserFilteredResponse.status).toBeLessThan(300);
         for (const id of extractDumpIds(listResponse.data)) {

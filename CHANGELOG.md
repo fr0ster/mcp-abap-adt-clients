@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.14.2] - 2026-04-04
+
+### Fixed
+- **Biome lint**: Fix formatting in `RuntimeDumps.test.ts` that caused CI failure.
+- **Pre-commit hook**: Add full `src/` Biome check alongside staged-files auto-fix — prevents committing when any file in `src/` has lint errors, matching CI behavior.
+
 ## [3.14.1] - 2026-04-02
 
 ### Fixed

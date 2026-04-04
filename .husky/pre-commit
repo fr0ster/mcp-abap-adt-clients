@@ -1,1 +1,2 @@
 npx biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched --diagnostic-level=error
+npx biome check src --diagnostic-level=error
