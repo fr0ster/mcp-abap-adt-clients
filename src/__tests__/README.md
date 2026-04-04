@@ -158,6 +158,7 @@ DEBUG_TESTS=true DEBUG_ADT_TESTS=true npm test -- integration/view
 All tests require:
 - `.env` file with SAP credentials
 - `test-config.yaml` with test parameters
+- **Root package must exist** — the package specified in `environment.default_package` (e.g., `ZADT_BLD_PKG03`) must be created manually in the SAP system before running tests. Tests do NOT create this package automatically — they only create objects inside it. Create it via ADT or SE80.
 - FUGR tests: Package must exist (e.g., `ZOK_TEST_PKG_01`)
 - FM tests: FUGR must be created first (for integration workflow)
 

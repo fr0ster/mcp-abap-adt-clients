@@ -5,6 +5,12 @@
 #   # Edit ONLY the lines marked with "# ← CHANGE" below
 #
 # ┌──────────────────────────────────────────────────────────────────┐
+# │  PREREQUISITE (do this BEFORE running any tests):                │
+# │                                                                  │
+# │  Create the root package manually in your SAP system (ADT/SE80) │
+# │  e.g. ZADT_BLD_PKG03. Tests do NOT create this package —        │
+# │  they only create objects INSIDE it.                             │
+# │                                                                  │
 # │  REQUIRED CHANGES (edit these after copying):                    │
 # │                                                                  │
 # │  1. environment.default_package       — your dev package (Z*/Y*) │

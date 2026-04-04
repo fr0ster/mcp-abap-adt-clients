@@ -15,6 +15,7 @@ import {
   listTraceRequests,
 } from '../../runtime/traces/profiler';
 import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 
 export interface IClassExecutionTarget {
@@ -28,6 +29,10 @@ export interface IClassExecuteWithProfilerOptions {
 export interface IClassExecuteWithProfilingOptions {
   profilerParameters?: IProfilerTraceParameters;
   traceLookupUris?: string[];
+  /** Maximum number of polling attempts to find the trace (default: 5) */
+  maxTraceAttempts?: number;
+  /** Delay in ms between polling attempts (default: 2000) */
+  traceRetryDelayMs?: number;
 }
 
 export interface IClassExecuteWithProfilingResult {
@@ -45,6 +50,9 @@ export interface IClassExecutor
     IClassExecuteWithProfilingOptions,
     IClassExecuteWithProfilingResult
   > {}
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class ClassExecutor implements IClassExecutor {
   private readonly connection: IAbapConnection;
@@ -94,7 +102,19 @@ export class ClassExecutor implements IClassExecutor {
       );
     }
 
+    // Resolve current user for trace file lookup
+    let userName: string | undefined;
+    try {
+      const sysInfo = await getSystemInformation(this.connection);
+      userName = sysInfo?.userName;
+    } catch {
+      this.logger?.debug?.('Failed to resolve userName for trace lookup');
+    }
+
     const response = await this.runWithProfilerId(target.className, profilerId);
+
+    const maxAttempts = options.maxTraceAttempts ?? 5;
+    const retryDelayMs = options.traceRetryDelayMs ?? 2000;
 
     const lookupUris = [
       ...(options.traceLookupUris ?? []),
@@ -102,18 +122,82 @@ export class ClassExecutor implements IClassExecutor {
       `/sap/bc/adt/oo/classrun/${encodeSapObjectName(target.className).toUpperCase()}`,
     ];
 
+    // SAP writes traces asynchronously — poll until the trace file appears
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      this.logger?.debug?.(`Trace lookup attempt ${attempt}/${maxAttempts}`, {
+        className: target.className,
+        profilerId,
+      });
+
+      const result = await this.tryResolveTrace(
+        lookupUris,
+        profilerId,
+        response,
+        userName,
+      );
+      if (result) {
+        return result;
+      }
+
+      if (attempt < maxAttempts) {
+        await delay(retryDelayMs);
+      }
+    }
+
+    this.logger?.warn?.('Failed to resolve trace after all attempts', {
+      className: target.className,
+      profilerId,
+      maxAttempts,
+    });
+    throw new Error(
+      `Failed to resolve traceId after profiled execution for class ${target.className}`,
+    );
+  }
+
+  /**
+   * Single attempt to find trace via trace files (filtered by user),
+   * URI lookup, and trace requests fallback.
+   */
+  private async tryResolveTrace(
+    lookupUris: string[],
+    profilerId: string,
+    runResponse: AxiosResponse,
+    userName?: string,
+  ): Promise<IClassExecuteWithProfilingResult | undefined> {
     let traceRequestsResponse: AxiosResponse | undefined;
+
+    // 1. Primary: list trace files filtered by user
+    try {
+      const filesResponse = await listTraceFiles(
+        this.connection,
+        userName ? { user: userName } : undefined,
+      );
+      const traceId = extractTraceIdFromTraceRequestsResponse(filesResponse);
+      if (traceId) {
+        return {
+          response: runResponse,
+          profilerId,
+          traceId,
+          traceRequestsResponse: filesResponse,
+        };
+      }
+    } catch (error) {
+      this.logger?.debug?.('Trace files list failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // 2. Fallback: lookup by URI
     for (const uri of lookupUris) {
       if (!uri) {
         continue;
       }
-
       try {
         const current = await getTraceRequestsByUri(this.connection, uri);
         const traceId = extractTraceIdFromTraceRequestsResponse(current);
         if (traceId) {
           return {
-            response,
+            response: runResponse,
             profilerId,
             traceId,
             traceRequestsResponse: current,
@@ -122,56 +206,31 @@ export class ClassExecutor implements IClassExecutor {
         traceRequestsResponse = current;
       } catch (error) {
         this.logger?.debug?.('Trace lookup by URI failed, trying next URI', {
-          className: target.className,
           uri,
           error: error instanceof Error ? error.message : String(error),
         });
       }
     }
 
-    let fallbackResponse: AxiosResponse | undefined;
-    let fallbackTraceId: string | undefined;
+    // 3. Fallback: list all trace requests
     try {
-      fallbackResponse = await listTraceRequests(this.connection);
-      fallbackTraceId =
-        extractTraceIdFromTraceRequestsResponse(fallbackResponse);
+      const reqResponse = await listTraceRequests(this.connection);
+      const traceId = extractTraceIdFromTraceRequestsResponse(reqResponse);
+      if (traceId) {
+        return {
+          response: runResponse,
+          profilerId,
+          traceId,
+          traceRequestsResponse: traceRequestsResponse ?? reqResponse,
+        };
+      }
     } catch (error) {
-      this.logger?.debug?.('Trace requests list failed, trying trace files', {
-        className: target.className,
+      this.logger?.debug?.('Trace requests list failed', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-    if (!fallbackTraceId) {
-      try {
-        const filesResponse = await listTraceFiles(this.connection);
-        fallbackTraceId =
-          extractTraceIdFromTraceRequestsResponse(filesResponse);
-        if (fallbackTraceId) {
-          fallbackResponse = filesResponse;
-        }
-      } catch (error) {
-        this.logger?.debug?.('Trace files list also failed', {
-          className: target.className,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-    if (!fallbackTraceId) {
-      this.logger?.warn?.('Fallback trace response did not contain trace id', {
-        className: target.className,
-      });
-      throw new Error(
-        `Failed to resolve traceId after profiled execution for class ${target.className}`,
-      );
-    }
 
-    return {
-      response,
-      profilerId,
-      traceId: fallbackTraceId,
-      traceRequestsResponse:
-        traceRequestsResponse ?? (fallbackResponse as AxiosResponse),
-    };
+    return undefined;
   }
 
   private async runWithProfilerId(

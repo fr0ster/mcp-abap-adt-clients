@@ -358,12 +358,19 @@ export async function getTraceDbAccesses(
  * List trace files
  *
  * @param connection - ABAP connection
+ * @param options - Optional filters (user)
  * @returns Axios response with list of trace files
  */
 export async function listTraceFiles(
   connection: IAbapConnection,
+  options?: { user?: string },
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/runtime/traces/abaptraces`;
+  const params = new URLSearchParams();
+  if (options?.user) {
+    params.set('user', options.user);
+  }
+  const qs = params.toString();
+  const url = `/sap/bc/adt/runtime/traces/abaptraces${qs ? `?${qs}` : ''}`;
 
   return connection.makeAdtRequest({
     url,

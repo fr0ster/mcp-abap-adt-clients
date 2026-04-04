@@ -5,6 +5,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.14.3] - 2026-04-04
+
+### Fixed
+- **Package update**: Empty string params (`master_system`, `responsible`, `package_type`, etc.) no longer overwrite existing SAP-managed values in read-modify-write pattern. Fixes `Check of condition failed` error on BTP trial. (#10)
+- **Profiler traces**: `listTraceFiles()` now supports `?user=` filter parameter. `ClassExecutor.runWithProfiling()` resolves current user via `getSystemInformation()` and polls trace files filtered by user — fixes `Failed to resolve traceId` on BTP. (#10)
+
+### Added
+- **Docs**: Root package prerequisite documented in test-config template, tests README, and CLAUDE.md.
+
 ## [3.14.2] - 2026-04-04
 
 ### Fixed
