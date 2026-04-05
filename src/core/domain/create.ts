@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_DOMAIN, CT_DOMAIN } from '../../constants/contentTypes';
+import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreateDomainParams } from './types';
 
@@ -28,18 +29,15 @@ export async function create(
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';
 
+  const description = limitDescription(
+    args.description || args.domain_name,
+  );
+
   const masterSystemAttr = masterSystem
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<doma:domain xmlns:doma="http://www.sap.com/dictionary/domain"
-             xmlns:adtcore="http://www.sap.com/adt/core"
-             adtcore:description="${args.description || args.domain_name}"
-             adtcore:language="EN"
-             adtcore:name="${args.domain_name.toUpperCase()}"
-             adtcore:type="DOMA/DD"
-             adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.domain_name.toUpperCase()}" adtcore:type="DOMA/DD" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </doma:domain>`;
 
