@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [3.14.5] - 2026-04-05
+
+### Fixed
+- **Domain create**: Use single-line XML and `limitDescription()` in create payload — same fix as DataElement in 3.14.4. Pretty-printed XML with newlines between declaration and root element caused intermittent 400 "description is missing" on BTP trial. (#12)
+
 ## [3.14.4] - 2026-04-05
 
 ### Fixed
