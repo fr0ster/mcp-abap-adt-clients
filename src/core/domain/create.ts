@@ -29,9 +29,7 @@ export async function create(
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';
 
-  const description = limitDescription(
-    args.description || args.domain_name,
-  );
+  const description = limitDescription(args.description || args.domain_name);
 
   const masterSystemAttr = masterSystem
     ? ` adtcore:masterSystem="${masterSystem}"`

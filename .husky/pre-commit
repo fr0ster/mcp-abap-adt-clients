@@ -1,2 +1,3 @@
 npx biome check --write --staged --files-ignore-unknown=true --no-errors-on-unmatched --diagnostic-level=error
+git diff --name-only --cached | xargs -r git add
 npx biome check src --diagnostic-level=error
