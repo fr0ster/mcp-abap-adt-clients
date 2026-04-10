@@ -55,14 +55,20 @@ These are NOT `IAdtObject` (not CRUD). A dedicated interface hierarchy for runti
 
 ```typescript
 interface IRuntimeAnalysisObject {
-  // Marker interface — all runtime domain objects implement this
+  /** Discriminant for runtime type checking (e.g. 'profiler', 'dumps', 'feeds') */
+  readonly kind: string;
 }
 
-// Generic — each domain supplies its own options type
-interface IListableRuntimeObject<TOptions = void>
+// Generic — each domain supplies its own result and options types
+interface IListableRuntimeObject<TResult, TOptions = undefined>
   extends IRuntimeAnalysisObject {
-  list(options?: TOptions): Promise<IAdtResponse>;
+  list(options?: TOptions): Promise<TResult>;
 }
+```
+
+Every domain object class sets `readonly kind = '<name>' as const` (e.g. `kind = 'profiler'`). This enables runtime type discrimination when working with collections of runtime objects.
+
+```typescript
 
 interface IFeedRepository extends IRuntimeAnalysisObject {
   list(): Promise<IAdtResponse>;
