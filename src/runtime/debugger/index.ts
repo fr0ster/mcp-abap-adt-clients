@@ -3,6 +3,7 @@
  */
 
 export { AbapDebugger } from './AbapDebugger';
+export { AmdpDebugger } from './AmdpDebugger';
 export type { IAbapDebuggerStepMethod, IDebuggerBatchPayload } from './abap';
 export {
   buildDebuggerBatchPayload,
