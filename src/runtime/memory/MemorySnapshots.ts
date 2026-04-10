@@ -3,7 +3,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
+import type { IListableRuntimeObject } from '../types';
 import {
   getSnapshot,
   getSnapshotChildren,
@@ -20,7 +20,14 @@ import {
   listSnapshots,
 } from './snapshots';
 
-export class MemorySnapshots implements IRuntimeAnalysisObject {
+export interface IMemorySnapshotsListOptions {
+  user?: string;
+  originalUser?: string;
+}
+
+export class MemorySnapshots
+  implements IListableRuntimeObject<AxiosResponse, IMemorySnapshotsListOptions>
+{
   readonly kind = 'memorySnapshots' as const;
 
   constructor(
@@ -28,8 +35,8 @@ export class MemorySnapshots implements IRuntimeAnalysisObject {
     private readonly logger: ILogger,
   ) {}
 
-  async list(user?: string, originalUser?: string): Promise<AxiosResponse> {
-    return listSnapshots(this.connection, user, originalUser);
+  async list(options?: IMemorySnapshotsListOptions): Promise<AxiosResponse> {
+    return listSnapshots(this.connection, options?.user, options?.originalUser);
   }
 
   async getById(snapshotId: string): Promise<AxiosResponse> {

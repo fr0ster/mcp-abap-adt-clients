@@ -3,7 +3,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
+import type { IListableRuntimeObject } from '../types';
 import {
   buildTraceParametersXml,
   createTraceParameters,
@@ -26,7 +26,13 @@ import {
   listTraceRequests,
 } from './profiler';
 
-export class Profiler implements IRuntimeAnalysisObject {
+export interface IProfilerListOptions {
+  user?: string;
+}
+
+export class Profiler
+  implements IListableRuntimeObject<AxiosResponse, IProfilerListOptions>
+{
   readonly kind = 'profiler' as const;
 
   constructor(
@@ -34,8 +40,13 @@ export class Profiler implements IRuntimeAnalysisObject {
     private readonly logger: ILogger,
   ) {}
 
-  async listTraceFiles(options?: { user?: string }): Promise<AxiosResponse> {
+  async list(options?: IProfilerListOptions): Promise<AxiosResponse> {
     return listTraceFiles(this.connection, options);
+  }
+
+  /** @deprecated Use list() instead */
+  async listTraceFiles(options?: IProfilerListOptions): Promise<AxiosResponse> {
+    return this.list(options);
   }
 
   async getParameters(): Promise<AxiosResponse> {

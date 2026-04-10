@@ -17,7 +17,21 @@ describe('Profiler', () => {
     } as any;
   }
 
-  it('listTraceFiles() delegates to /sap/bc/adt/runtime/traces/abaptraces', async () => {
+  it('list() delegates to /sap/bc/adt/runtime/traces/abaptraces', async () => {
+    const connection = createConnectionMock();
+    const profiler = new Profiler(connection, createLogger());
+
+    await profiler.list();
+
+    expect(connection.makeAdtRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/sap/bc/adt/runtime/traces/abaptraces',
+        method: 'GET',
+      }),
+    );
+  });
+
+  it('listTraceFiles() is a deprecated alias for list()', async () => {
     const connection = createConnectionMock();
     const profiler = new Profiler(connection, createLogger());
 

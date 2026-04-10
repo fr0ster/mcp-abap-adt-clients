@@ -35,7 +35,7 @@ describe('MemorySnapshots', () => {
     const connection = createConnectionMock();
     const snapshots = new MemorySnapshots(connection, createLogger());
 
-    await snapshots.list('DEVELOPER', 'ORIG_USER');
+    await snapshots.list({ user: 'DEVELOPER', originalUser: 'ORIG_USER' });
 
     expect(connection.makeAdtRequest).toHaveBeenCalledWith(
       expect.objectContaining({
