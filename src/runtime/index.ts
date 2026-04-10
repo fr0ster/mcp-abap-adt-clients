@@ -8,7 +8,9 @@ export * from './ddic';
 export * from './debugger/abap';
 export * from './dumps';
 export * from './feeds';
+export * from './memory';
 // AdtRuntimeClient is now in clients/, not runtime/
 export * from './traces/crossTrace';
 export * from './traces/profiler';
 export * from './traces/st05';
+export * from './types';

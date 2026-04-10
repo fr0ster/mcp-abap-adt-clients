@@ -2,6 +2,7 @@
  * Runtime Debugger - Exports
  */
 
+export { AbapDebugger } from './AbapDebugger';
 export type { IAbapDebuggerStepMethod, IDebuggerBatchPayload } from './abap';
 export {
   buildDebuggerBatchPayload,

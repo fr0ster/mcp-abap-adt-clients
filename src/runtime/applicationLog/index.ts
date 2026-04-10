@@ -2,6 +2,7 @@
  * Application Log - Exports
  */
 
+export { ApplicationLog } from './ApplicationLog';
 export {
   getApplicationLogObject,
   getApplicationLogSource,
