@@ -11,9 +11,9 @@
  * - ddicActivation() — DDIC activation graph
  * - dumps() — Runtime dump analysis
  * - memorySnapshots() — Memory snapshot analysis
- *
- * Feed reader operations (getFeeds, getFeedVariants) remain as direct methods
- * because they don't belong to a specific domain object.
+ * - feeds() — Feed repository (list feeds, variants, parse Atom feeds)
+ * - systemMessages() — System messages (SM02)
+ * - gatewayErrorLog() — Gateway error log (/IWFND/ERROR_LOG)
  *
  * Usage:
  * ```typescript
@@ -35,21 +35,16 @@
  * ```
  */
 
-import type {
-  IAdtResponse as AxiosResponse,
-  IAbapConnection,
-  ILogger,
-} from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
 import { AtcLog } from '../runtime/atc/AtcLog';
 import { DdicActivation } from '../runtime/ddic/DdicActivation';
 import { AbapDebugger } from '../runtime/debugger/AbapDebugger';
 import { RuntimeDumps } from '../runtime/dumps/RuntimeDumps';
-import {
-  getFeeds as getFeedsUtil,
-  getFeedVariants as getFeedVariantsUtil,
-} from '../runtime/feeds';
+import { FeedRepository } from '../runtime/feeds/FeedRepository';
+import { GatewayErrorLog } from '../runtime/gatewayErrorLog/GatewayErrorLog';
 import { MemorySnapshots } from '../runtime/memory/MemorySnapshots';
+import { SystemMessages } from '../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../runtime/traces/CrossTraceDomain';
 import { Profiler } from '../runtime/traces/ProfilerDomain';
 import { St05Trace } from '../runtime/traces/St05Trace';
@@ -67,6 +62,9 @@ export class AdtRuntimeClient {
   private _ddicActivation?: DdicActivation;
   private _dumps?: RuntimeDumps;
   private _memorySnapshots?: MemorySnapshots;
+  private _feeds?: FeedRepository;
+  private _systemMessages?: SystemMessages;
+  private _gatewayErrorLog?: GatewayErrorLog;
 
   constructor(
     connection: IAbapConnection,
@@ -171,24 +169,27 @@ export class AdtRuntimeClient {
   }
 
   // ============================================================================
-  // Feed Reader (no dedicated domain object — thin pass-through)
+  // Feed, SystemMessages, GatewayErrorLog Factories
   // ============================================================================
 
-  /**
-   * Get feeds
-   *
-   * @returns Axios response with feeds
-   */
-  async getFeeds(): Promise<AxiosResponse> {
-    return getFeedsUtil(this.connection);
+  feeds(): FeedRepository {
+    if (!this._feeds) {
+      this._feeds = new FeedRepository(this.connection, this.logger);
+    }
+    return this._feeds;
   }
 
-  /**
-   * Get feed variants
-   *
-   * @returns Axios response with feed variants
-   */
-  async getFeedVariants(): Promise<AxiosResponse> {
-    return getFeedVariantsUtil(this.connection);
+  systemMessages(): SystemMessages {
+    if (!this._systemMessages) {
+      this._systemMessages = new SystemMessages(this.connection, this.logger);
+    }
+    return this._systemMessages;
+  }
+
+  gatewayErrorLog(): GatewayErrorLog {
+    if (!this._gatewayErrorLog) {
+      this._gatewayErrorLog = new GatewayErrorLog(this.connection, this.logger);
+    }
+    return this._gatewayErrorLog;
   }
 }

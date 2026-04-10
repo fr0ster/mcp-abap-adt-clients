@@ -5,7 +5,10 @@ import { AtcLog } from '../../../runtime/atc/AtcLog';
 import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
 import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
+import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
+import { GatewayErrorLog } from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
 import { MemorySnapshots } from '../../../runtime/memory/MemorySnapshots';
+import { SystemMessages } from '../../../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
 import { Profiler } from '../../../runtime/traces/ProfilerDomain';
 import { St05Trace } from '../../../runtime/traces/St05Trace';
@@ -74,6 +77,21 @@ describe('AdtRuntimeClient factory pattern', () => {
     expect(client.memorySnapshots()).toBeInstanceOf(MemorySnapshots);
   });
 
+  it('feeds() returns a FeedRepository instance', () => {
+    const { client } = createRuntimeClient();
+    expect(client.feeds()).toBeInstanceOf(FeedRepository);
+  });
+
+  it('systemMessages() returns a SystemMessages instance', () => {
+    const { client } = createRuntimeClient();
+    expect(client.systemMessages()).toBeInstanceOf(SystemMessages);
+  });
+
+  it('gatewayErrorLog() returns a GatewayErrorLog instance', () => {
+    const { client } = createRuntimeClient();
+    expect(client.gatewayErrorLog()).toBeInstanceOf(GatewayErrorLog);
+  });
+
   describe('caching', () => {
     it('profiler() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
@@ -118,6 +136,21 @@ describe('AdtRuntimeClient factory pattern', () => {
     it('memorySnapshots() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
       expect(client.memorySnapshots()).toBe(client.memorySnapshots());
+    });
+
+    it('feeds() returns the same instance on repeated calls', () => {
+      const { client } = createRuntimeClient();
+      expect(client.feeds()).toBe(client.feeds());
+    });
+
+    it('systemMessages() returns the same instance on repeated calls', () => {
+      const { client } = createRuntimeClient();
+      expect(client.systemMessages()).toBe(client.systemMessages());
+    });
+
+    it('gatewayErrorLog() returns the same instance on repeated calls', () => {
+      const { client } = createRuntimeClient();
+      expect(client.gatewayErrorLog()).toBe(client.gatewayErrorLog());
     });
   });
 
