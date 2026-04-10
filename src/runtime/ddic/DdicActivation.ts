@@ -10,6 +10,8 @@ import {
 } from './activationGraph';
 
 export class DdicActivation implements IRuntimeAnalysisObject {
+  readonly kind = 'ddicActivation' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

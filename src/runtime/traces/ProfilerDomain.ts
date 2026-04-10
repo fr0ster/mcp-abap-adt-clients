@@ -27,6 +27,8 @@ import {
 } from './profiler';
 
 export class Profiler implements IRuntimeAnalysisObject {
+  readonly kind = 'profiler' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

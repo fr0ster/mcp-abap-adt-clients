@@ -11,6 +11,8 @@ import {
 } from './logs';
 
 export class AtcLog implements IRuntimeAnalysisObject {
+  readonly kind = 'atcLog' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

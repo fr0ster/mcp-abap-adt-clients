@@ -3,7 +3,7 @@ import type {
   IAbapConnection,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IListableRuntimeObject } from '../types';
+import type { IListableRuntimeObject, IRuntimeAnalysisObject } from '../types';
 import {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
@@ -15,8 +15,11 @@ import {
 } from './read';
 
 export class RuntimeDumps
-  implements IListableRuntimeObject<IRuntimeDumpsListOptions>
+  implements
+    IListableRuntimeObject<AxiosResponse, IRuntimeDumpsListOptions>,
+    IRuntimeAnalysisObject
 {
+  readonly kind = 'runtimeDumps' as const;
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

@@ -21,6 +21,8 @@ import {
 } from './snapshots';
 
 export class MemorySnapshots implements IRuntimeAnalysisObject {
+  readonly kind = 'memorySnapshots' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

@@ -44,6 +44,8 @@ import {
 } from './abap';
 
 export class AbapDebugger implements IRuntimeAnalysisObject {
+  readonly kind = 'abapDebugger' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

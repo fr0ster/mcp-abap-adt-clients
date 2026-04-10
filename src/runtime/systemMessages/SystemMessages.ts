@@ -10,12 +10,15 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IFeedQueryOptions } from '../feeds/types';
-import type { IListableRuntimeObject } from '../types';
+import type { IListableRuntimeObject, IRuntimeAnalysisObject } from '../types';
 import { getSystemMessage, listSystemMessages } from './read';
 
 export class SystemMessages
-  implements IListableRuntimeObject<IFeedQueryOptions>
+  implements
+    IListableRuntimeObject<AxiosResponse, IFeedQueryOptions>,
+    IRuntimeAnalysisObject
 {
+  readonly kind = 'systemMessages' as const;
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

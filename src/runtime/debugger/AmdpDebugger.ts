@@ -31,6 +31,8 @@ import {
  * AMDP debugger domain object — wraps all AMDP debugger and data preview operations.
  */
 export class AmdpDebugger implements IRuntimeAnalysisObject {
+  readonly kind = 'amdpDebugger' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

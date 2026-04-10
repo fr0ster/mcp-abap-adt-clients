@@ -7,6 +7,8 @@ import type { IRuntimeAnalysisObject } from '../types';
 import { getSt05TraceDirectory, getSt05TraceState } from './st05';
 
 export class St05Trace implements IRuntimeAnalysisObject {
+  readonly kind = 'st05Trace' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,

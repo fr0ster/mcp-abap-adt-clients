@@ -13,6 +13,8 @@ import {
 } from './read';
 
 export class ApplicationLog implements IRuntimeAnalysisObject {
+  readonly kind = 'applicationLog' as const;
+
   constructor(
     private readonly connection: IAbapConnection,
     private readonly logger: ILogger,
