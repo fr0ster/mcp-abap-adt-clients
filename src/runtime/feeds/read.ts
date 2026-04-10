@@ -29,7 +29,7 @@ export async function getFeeds(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: 'application/atom+xml;type=feed',
     },
   });
 }
@@ -50,7 +50,7 @@ export async function getFeedVariants(
     method: 'GET',
     timeout: getTimeout('default'),
     headers: {
-      Accept: 'application/xml',
+      Accept: 'application/atom+xml;type=feed',
     },
   });
 }
