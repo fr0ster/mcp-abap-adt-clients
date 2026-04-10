@@ -6,8 +6,8 @@ import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
 import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
 import { MemorySnapshots } from '../../../runtime/memory/MemorySnapshots';
-import { CrossTrace } from '../../../runtime/traces/CrossTrace';
-import { Profiler } from '../../../runtime/traces/Profiler';
+import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
+import { Profiler } from '../../../runtime/traces/ProfilerDomain';
 import { St05Trace } from '../../../runtime/traces/St05Trace';
 
 describe('AdtRuntimeClient factory pattern', () => {

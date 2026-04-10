@@ -1,5 +1,5 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { CrossTrace } from '../../../runtime/traces/CrossTrace';
+import { CrossTrace } from '../../../runtime/traces/CrossTraceDomain';
 
 describe('CrossTrace', () => {
   function createConnectionMock() {

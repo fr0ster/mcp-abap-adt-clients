@@ -2,7 +2,7 @@
  * Runtime Traces - Exports
  */
 
-export { CrossTrace } from './CrossTrace';
+export { CrossTrace } from './CrossTraceDomain';
 export {
   getCrossTrace,
   getCrossTraceActivations,
@@ -11,7 +11,7 @@ export {
   type IListCrossTracesOptions,
   listCrossTraces,
 } from './crossTrace';
-export { Profiler } from './Profiler';
+export { Profiler } from './ProfilerDomain';
 export {
   buildTraceParametersXml,
   createTraceParameters,

@@ -50,8 +50,8 @@ import {
   getFeedVariants as getFeedVariantsUtil,
 } from '../runtime/feeds';
 import { MemorySnapshots } from '../runtime/memory/MemorySnapshots';
-import { CrossTrace } from '../runtime/traces/CrossTrace';
-import { Profiler } from '../runtime/traces/Profiler';
+import { CrossTrace } from '../runtime/traces/CrossTraceDomain';
+import { Profiler } from '../runtime/traces/ProfilerDomain';
 import { St05Trace } from '../runtime/traces/St05Trace';
 
 export class AdtRuntimeClient {

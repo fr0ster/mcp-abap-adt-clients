@@ -232,6 +232,12 @@ export type {
   IProgramExecutionTarget,
   IProgramExecutor,
 } from './executors';
+export { ApplicationLog } from './runtime/applicationLog/ApplicationLog';
+export { AtcLog } from './runtime/atc/AtcLog';
+export { DdicActivation } from './runtime/ddic/DdicActivation';
+export { AbapDebugger } from './runtime/debugger/AbapDebugger';
+export { AmdpDebugger } from './runtime/debugger/AmdpDebugger';
+// Keep low-level dump types/functions (may be used by consumers)
 export {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,
@@ -239,6 +245,16 @@ export {
   type IRuntimeDumpReadView,
   type IRuntimeDumpsListOptions,
 } from './runtime/dumps';
+export { RuntimeDumps } from './runtime/dumps/RuntimeDumps';
+export { MemorySnapshots } from './runtime/memory/MemorySnapshots';
+export { CrossTrace } from './runtime/traces/CrossTraceDomain';
+// Domain objects
+export { Profiler } from './runtime/traces/ProfilerDomain';
+export { St05Trace } from './runtime/traces/St05Trace';
+export type {
+  IListableRuntimeObject,
+  IRuntimeAnalysisObject,
+} from './runtime/types';
 export {
   fetchDiscoveryEndpoints,
   isEndpointInDiscovery,

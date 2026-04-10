@@ -1,5 +1,5 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { Profiler } from '../../../runtime/traces/Profiler';
+import { Profiler } from '../../../runtime/traces/ProfilerDomain';
 
 describe('Profiler', () => {
   function createConnectionMock() {
