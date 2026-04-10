@@ -53,3 +53,37 @@ export async function getFeedVariants(
     },
   });
 }
+
+/**
+ * Fetch a feed by URL with optional query parameters
+ *
+ * @param connection - ABAP connection
+ * @param feedUrl - Feed URL path
+ * @param options - Query options (user filter, pagination, date range)
+ * @returns Axios response with Atom XML feed
+ */
+export async function fetchFeed(
+  connection: IAbapConnection,
+  feedUrl: string,
+  options?: { user?: string; maxResults?: number; from?: string; to?: string },
+): Promise<AxiosResponse> {
+  const params = new URLSearchParams();
+  if (options?.user) {
+    params.set('$query', `and( equals( user, ${options.user.trim()} ) )`);
+  }
+  if (options?.maxResults) {
+    params.set('$top', String(options.maxResults));
+  }
+  if (options?.from) params.set('from', options.from);
+  if (options?.to) params.set('to', options.to);
+
+  const query = params.toString();
+  const url = `${feedUrl}${query ? `?${query}` : ''}`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'GET',
+    timeout: getTimeout('default'),
+    headers: { Accept: 'application/atom+xml;type=feed' },
+  });
+}
