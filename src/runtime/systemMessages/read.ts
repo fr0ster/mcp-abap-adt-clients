@@ -9,24 +9,10 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IFeedQueryOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
-import type { IFeedQueryOptions } from '../feeds/types';
-
-function buildQueryParams(options?: IFeedQueryOptions): string {
-  if (!options) return '';
-  const params = new URLSearchParams();
-  if (options.user) {
-    params.set('$query', `and( equals( user, ${options.user.trim()} ) )`);
-  }
-  if (options.maxResults) {
-    params.set('$top', String(options.maxResults));
-  }
-  if (options.from) params.set('from', options.from);
-  if (options.to) params.set('to', options.to);
-  const query = params.toString();
-  return query ? `?${query}` : '';
-}
+import { buildFeedQueryParams } from '../feeds/read';
 
 /**
  * List system messages
@@ -39,7 +25,7 @@ export async function listSystemMessages(
   connection: IAbapConnection,
   options?: IFeedQueryOptions,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/runtime/systemmessages${buildQueryParams(options)}`;
+  const url = `/sap/bc/adt/runtime/systemmessages${buildFeedQueryParams(options)}`;
 
   return connection.makeAdtRequest({
     url,

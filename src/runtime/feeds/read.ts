@@ -9,6 +9,7 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IFeedQueryOptions,
 } from '@mcp-abap-adt/interfaces';
 import { getTimeout } from '../../utils/timeouts';
 
@@ -55,6 +56,25 @@ export async function getFeedVariants(
 }
 
 /**
+ * Build query string from IFeedQueryOptions.
+ * Shared by all feed-backed runtime modules.
+ */
+export function buildFeedQueryParams(options?: IFeedQueryOptions): string {
+  if (!options) return '';
+  const params = new URLSearchParams();
+  if (options.user) {
+    params.set('$query', `and( equals( user, ${options.user.trim()} ) )`);
+  }
+  if (options.maxResults) {
+    params.set('$top', String(options.maxResults));
+  }
+  if (options.from) params.set('from', options.from);
+  if (options.to) params.set('to', options.to);
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
+/**
  * Fetch a feed by URL with optional query parameters
  *
  * @param connection - ABAP connection
@@ -65,20 +85,9 @@ export async function getFeedVariants(
 export async function fetchFeed(
   connection: IAbapConnection,
   feedUrl: string,
-  options?: { user?: string; maxResults?: number; from?: string; to?: string },
+  options?: IFeedQueryOptions,
 ): Promise<AxiosResponse> {
-  const params = new URLSearchParams();
-  if (options?.user) {
-    params.set('$query', `and( equals( user, ${options.user.trim()} ) )`);
-  }
-  if (options?.maxResults) {
-    params.set('$top', String(options.maxResults));
-  }
-  if (options?.from) params.set('from', options.from);
-  if (options?.to) params.set('to', options.to);
-
-  const query = params.toString();
-  const url = `${feedUrl}${query ? `?${query}` : ''}`;
+  const url = `${feedUrl}${buildFeedQueryParams(options)}`;
 
   return connection.makeAdtRequest({
     url,
