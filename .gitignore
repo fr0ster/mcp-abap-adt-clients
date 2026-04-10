@@ -30,6 +30,9 @@ src/__tests__/helpers/test-config.yaml
 # Claude Code local settings
 .claude/
 
+# Codex CLI
+.codex/
+
 # Temp/scratch files
 cookies.txt
 *.abap
