@@ -2,8 +2,12 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
   ILogger,
+  IMemorySnapshots,
+  IMemorySnapshotsListOptions,
+  ISnapshotChildrenOptions,
+  ISnapshotRankingListOptions,
+  ISnapshotReferencesOptions,
 } from '@mcp-abap-adt/interfaces';
-import type { IListableRuntimeObject } from '../types';
 import {
   getSnapshot,
   getSnapshotChildren,
@@ -14,20 +18,10 @@ import {
   getSnapshotOverview,
   getSnapshotRankingList,
   getSnapshotReferences,
-  type ISnapshotChildrenOptions,
-  type ISnapshotRankingListOptions,
-  type ISnapshotReferencesOptions,
   listSnapshots,
 } from './snapshots';
 
-export interface IMemorySnapshotsListOptions {
-  user?: string;
-  originalUser?: string;
-}
-
-export class MemorySnapshots
-  implements IListableRuntimeObject<AxiosResponse, IMemorySnapshotsListOptions>
-{
+export class MemorySnapshots implements IMemorySnapshots {
   readonly kind = 'memorySnapshots' as const;
 
   constructor(

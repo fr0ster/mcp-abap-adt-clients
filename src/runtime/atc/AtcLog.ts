@@ -1,16 +1,13 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAtcLog,
+  IGetCheckFailureLogsOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
-import {
-  getCheckFailureLogs,
-  getExecutionLog,
-  type IGetCheckFailureLogsOptions,
-} from './logs';
+import { getCheckFailureLogs, getExecutionLog } from './logs';
 
-export class AtcLog implements IRuntimeAnalysisObject {
+export class AtcLog implements IAtcLog {
   readonly kind = 'atcLog' as const;
 
   constructor(

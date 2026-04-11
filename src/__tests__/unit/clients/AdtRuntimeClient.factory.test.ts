@@ -4,6 +4,8 @@ import { ApplicationLog } from '../../../runtime/applicationLog/ApplicationLog';
 import { AtcLog } from '../../../runtime/atc/AtcLog';
 import { DdicActivation } from '../../../runtime/ddic/DdicActivation';
 import { AbapDebugger } from '../../../runtime/debugger/AbapDebugger';
+import { AmdpDebugger } from '../../../runtime/debugger/AmdpDebugger';
+import { Debugger } from '../../../runtime/debugger/Debugger';
 import { RuntimeDumps } from '../../../runtime/dumps/RuntimeDumps';
 import { FeedRepository } from '../../../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../../../runtime/gatewayErrorLog/GatewayErrorLog';
@@ -32,140 +34,180 @@ describe('AdtRuntimeClient factory pattern', () => {
     return { client, connection };
   }
 
-  it('profiler() returns a Profiler instance', () => {
+  it('getProfiler() returns a Profiler instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.profiler()).toBeInstanceOf(Profiler);
+    expect(client.getProfiler()).toBeInstanceOf(Profiler);
   });
 
-  it('crossTrace() returns a CrossTrace instance', () => {
+  it('getCrossTrace() returns a CrossTrace instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.crossTrace()).toBeInstanceOf(CrossTrace);
+    expect(client.getCrossTrace()).toBeInstanceOf(CrossTrace);
   });
 
-  it('st05Trace() returns an St05Trace instance', () => {
+  it('getSt05Trace() returns an St05Trace instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.st05Trace()).toBeInstanceOf(St05Trace);
+    expect(client.getSt05Trace()).toBeInstanceOf(St05Trace);
   });
 
-  it('debugger() returns an AbapDebugger instance', () => {
+  it('getDebugger() returns a Debugger instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.debugger()).toBeInstanceOf(AbapDebugger);
+    expect(client.getDebugger()).toBeInstanceOf(Debugger);
   });
 
-  it('applicationLog() returns an ApplicationLog instance', () => {
+  it('getApplicationLog() returns an ApplicationLog instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.applicationLog()).toBeInstanceOf(ApplicationLog);
+    expect(client.getApplicationLog()).toBeInstanceOf(ApplicationLog);
   });
 
-  it('atcLog() returns an AtcLog instance', () => {
+  it('getAtcLog() returns an AtcLog instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.atcLog()).toBeInstanceOf(AtcLog);
+    expect(client.getAtcLog()).toBeInstanceOf(AtcLog);
   });
 
-  it('ddicActivation() returns a DdicActivation instance', () => {
+  it('getDdicActivation() returns a DdicActivation instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.ddicActivation()).toBeInstanceOf(DdicActivation);
+    expect(client.getDdicActivation()).toBeInstanceOf(DdicActivation);
   });
 
-  it('dumps() returns a RuntimeDumps instance', () => {
+  it('getDumps() returns a RuntimeDumps instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.dumps()).toBeInstanceOf(RuntimeDumps);
+    expect(client.getDumps()).toBeInstanceOf(RuntimeDumps);
   });
 
-  it('memorySnapshots() returns a MemorySnapshots instance', () => {
+  it('getFeeds() returns a FeedRepository instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.memorySnapshots()).toBeInstanceOf(MemorySnapshots);
+    expect(client.getFeeds()).toBeInstanceOf(FeedRepository);
   });
 
-  it('feeds() returns a FeedRepository instance', () => {
+  it('getSystemMessages() returns a SystemMessages instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.feeds()).toBeInstanceOf(FeedRepository);
+    expect(client.getSystemMessages()).toBeInstanceOf(SystemMessages);
   });
 
-  it('systemMessages() returns a SystemMessages instance', () => {
+  it('getGatewayErrorLog() returns a GatewayErrorLog instance', () => {
     const { client } = createRuntimeClient();
-    expect(client.systemMessages()).toBeInstanceOf(SystemMessages);
-  });
-
-  it('gatewayErrorLog() returns a GatewayErrorLog instance', () => {
-    const { client } = createRuntimeClient();
-    expect(client.gatewayErrorLog()).toBeInstanceOf(GatewayErrorLog);
+    expect(client.getGatewayErrorLog()).toBeInstanceOf(GatewayErrorLog);
   });
 
   describe('caching', () => {
-    it('profiler() returns the same instance on repeated calls', () => {
+    it('getProfiler() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.profiler()).toBe(client.profiler());
+      expect(client.getProfiler()).toBe(client.getProfiler());
     });
 
-    it('crossTrace() returns the same instance on repeated calls', () => {
+    it('getCrossTrace() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.crossTrace()).toBe(client.crossTrace());
+      expect(client.getCrossTrace()).toBe(client.getCrossTrace());
     });
 
-    it('st05Trace() returns the same instance on repeated calls', () => {
+    it('getSt05Trace() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.st05Trace()).toBe(client.st05Trace());
+      expect(client.getSt05Trace()).toBe(client.getSt05Trace());
     });
 
-    it('debugger() returns the same instance on repeated calls', () => {
+    it('getDebugger() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.debugger()).toBe(client.debugger());
+      expect(client.getDebugger()).toBe(client.getDebugger());
     });
 
-    it('applicationLog() returns the same instance on repeated calls', () => {
+    it('getApplicationLog() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.applicationLog()).toBe(client.applicationLog());
+      expect(client.getApplicationLog()).toBe(client.getApplicationLog());
     });
 
-    it('atcLog() returns the same instance on repeated calls', () => {
+    it('getAtcLog() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.atcLog()).toBe(client.atcLog());
+      expect(client.getAtcLog()).toBe(client.getAtcLog());
     });
 
-    it('ddicActivation() returns the same instance on repeated calls', () => {
+    it('getDdicActivation() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.ddicActivation()).toBe(client.ddicActivation());
+      expect(client.getDdicActivation()).toBe(client.getDdicActivation());
     });
 
-    it('dumps() returns the same instance on repeated calls', () => {
+    it('getDumps() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.dumps()).toBe(client.dumps());
+      expect(client.getDumps()).toBe(client.getDumps());
     });
 
-    it('memorySnapshots() returns the same instance on repeated calls', () => {
+    it('getFeeds() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.memorySnapshots()).toBe(client.memorySnapshots());
+      expect(client.getFeeds()).toBe(client.getFeeds());
     });
 
-    it('feeds() returns the same instance on repeated calls', () => {
+    it('getSystemMessages() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.feeds()).toBe(client.feeds());
+      expect(client.getSystemMessages()).toBe(client.getSystemMessages());
     });
 
-    it('systemMessages() returns the same instance on repeated calls', () => {
+    it('getGatewayErrorLog() returns the same instance on repeated calls', () => {
       const { client } = createRuntimeClient();
-      expect(client.systemMessages()).toBe(client.systemMessages());
+      expect(client.getGatewayErrorLog()).toBe(client.getGatewayErrorLog());
+    });
+  });
+
+  describe('composite debugger', () => {
+    it('getDebugger().getAbap() returns an AbapDebugger instance', () => {
+      const { client } = createRuntimeClient();
+      const dbg = client.getDebugger();
+      expect(dbg.getAbap()).toBeInstanceOf(AbapDebugger);
     });
 
-    it('gatewayErrorLog() returns the same instance on repeated calls', () => {
+    it('getDebugger().getAmdp() returns an AmdpDebugger instance', () => {
       const { client } = createRuntimeClient();
-      expect(client.gatewayErrorLog()).toBe(client.gatewayErrorLog());
+      const dbg = client.getDebugger();
+      expect(dbg.getAmdp()).toBeInstanceOf(AmdpDebugger);
+    });
+
+    it('getDebugger().getMemorySnapshots() returns a MemorySnapshots instance', () => {
+      const { client } = createRuntimeClient();
+      const dbg = client.getDebugger();
+      expect(dbg.getMemorySnapshots()).toBeInstanceOf(MemorySnapshots);
+    });
+
+    it('getDebugger() sub-factories cache their instances', () => {
+      const { client } = createRuntimeClient();
+      const dbg = client.getDebugger();
+      expect(dbg.getAbap()).toBe(dbg.getAbap());
+      expect(dbg.getAmdp()).toBe(dbg.getAmdp());
+      expect(dbg.getMemorySnapshots()).toBe(dbg.getMemorySnapshots());
+    });
+
+    it('getDebugger() has kind "debugger"', () => {
+      const { client } = createRuntimeClient();
+      expect(client.getDebugger().kind).toBe('debugger');
+    });
+
+    it('getDebugger().getAbap() has kind "abapDebugger"', () => {
+      const { client } = createRuntimeClient();
+      expect(client.getDebugger().getAbap().kind).toBe('abapDebugger');
+    });
+
+    it('getDebugger().getAmdp() has kind "amdpDebugger"', () => {
+      const { client } = createRuntimeClient();
+      expect(client.getDebugger().getAmdp().kind).toBe('amdpDebugger');
+    });
+
+    it('getDebugger().getMemorySnapshots() has kind "memorySnapshots"', () => {
+      const { client } = createRuntimeClient();
+      expect(client.getDebugger().getMemorySnapshots().kind).toBe(
+        'memorySnapshots',
+      );
     });
   });
 
   describe('domain object methods', () => {
     it('profiler has expected methods', () => {
       const { client } = createRuntimeClient();
-      const p = client.profiler();
-      expect(typeof p.listTraceFiles).toBe('function');
+      const p = client.getProfiler();
+      expect(typeof p.list).toBe('function');
       expect(typeof p.getParameters).toBe('function');
       expect(typeof p.getHitList).toBe('function');
     });
 
-    it('debugger has expected methods', () => {
+    it('abap debugger has expected methods', () => {
       const { client } = createRuntimeClient();
-      const d = client.debugger();
+      const d = client.getDebugger().getAbap();
       expect(typeof d.launch).toBe('function');
       expect(typeof d.stop).toBe('function');
       expect(typeof d.getCallStack).toBe('function');
@@ -173,10 +215,9 @@ describe('AdtRuntimeClient factory pattern', () => {
 
     it('dumps has expected methods', () => {
       const { client } = createRuntimeClient();
-      const d = client.dumps();
+      const d = client.getDumps();
       expect(typeof d.list).toBe('function');
       expect(typeof d.getById).toBe('function');
-      expect(typeof d.buildIdPrefix).toBe('function');
     });
   });
 });

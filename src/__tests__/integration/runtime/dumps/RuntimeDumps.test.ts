@@ -161,7 +161,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
         const beforeDumpIds = new Set<string>();
 
         logTestStep('list runtime dumps', testsLogger);
-        const listResponse = await runtime.dumps().list({
+        const listResponse = await runtime.getDumps().list({
           top,
           inlinecount,
         });
@@ -177,7 +177,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           .toISOString()
           .replace(/[-:T]/g, '')
           .slice(0, 14);
-        const filteredResponse = await runtime.dumps().list({
+        const filteredResponse = await runtime.getDumps().list({
           from: fromDate,
           to: toDate,
           top,
@@ -188,7 +188,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
         expect(filteredResponse.data).toBeDefined();
 
         logTestStep('list runtime dumps by user', testsLogger);
-        const byUserResponse = await runtime.dumps().listByUser(user, {
+        const byUserResponse = await runtime.getDumps().listByUser(user, {
           top,
           inlinecount,
         });
@@ -199,12 +199,14 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
           'list runtime dumps by user with from/to filter',
           testsLogger,
         );
-        const byUserFilteredResponse = await runtime.dumps().listByUser(user, {
-          top,
-          inlinecount,
-          from: fromDate,
-          to: toDate,
-        });
+        const byUserFilteredResponse = await runtime
+          .getDumps()
+          .listByUser(user, {
+            top,
+            inlinecount,
+            from: fromDate,
+            to: toDate,
+          });
         expect(byUserFilteredResponse.status).toBeGreaterThanOrEqual(200);
         expect(byUserFilteredResponse.status).toBeLessThan(300);
         for (const id of extractDumpIds(listResponse.data)) {
@@ -232,7 +234,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
               `discover generated dump attempt ${attempt}/${maxAttempts}`,
               testsLogger,
             );
-            const current = await runtime.dumps().listByUser(user, {
+            const current = await runtime.getDumps().listByUser(user, {
               top: Math.max(top, 50),
               inlinecount,
             });
@@ -280,7 +282,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             testsLogger,
           );
           logTestStep(`read runtime dump by id: ${dumpId}`, testsLogger);
-          const dumpResponse = await runtime.dumps().getById(dumpId);
+          const dumpResponse = await runtime.getDumps().getById(dumpId);
           expect(dumpResponse.status).toBeGreaterThanOrEqual(200);
           expect(dumpResponse.status).toBeLessThan(300);
           expect(dumpResponse.data).toBeDefined();
@@ -293,7 +295,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `read runtime dump summary by id: ${dumpId}`,
             testsLogger,
           );
-          const summaryResponse = await runtime.dumps().getById(dumpId, {
+          const summaryResponse = await runtime.getDumps().getById(dumpId, {
             view: 'summary',
           });
           expect(summaryResponse.status).toBeGreaterThanOrEqual(200);
@@ -308,7 +310,7 @@ describe('Runtime Dumps (using AdtRuntimeClient)', () => {
             `read runtime dump formatted by id: ${dumpId}`,
             testsLogger,
           );
-          const formattedResponse = await runtime.dumps().getById(dumpId, {
+          const formattedResponse = await runtime.getDumps().getById(dumpId, {
             view: 'formatted',
           });
           expect(formattedResponse.status).toBeGreaterThanOrEqual(200);

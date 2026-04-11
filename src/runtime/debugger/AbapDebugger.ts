@@ -1,9 +1,17 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAbapDebugger,
+  IAbapDebuggerStepMethod,
+  IGetDebuggerOptions,
+  IGetSystemAreaOptions,
+  IGetVariableAsCsvOptions,
+  IGetVariableAsJsonOptions,
+  IGetVariableValueStatementOptions,
+  ILaunchDebuggerOptions,
   ILogger,
+  IStopDebuggerOptions,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
 import {
   buildDebuggerBatchPayload,
   buildDebuggerStepWithStackBatchPayload,
@@ -24,15 +32,7 @@ import {
   getVariableValueStatement,
   getVitBreakpoints,
   getWatchpoints,
-  type IAbapDebuggerStepMethod,
   type IDebuggerBatchPayload,
-  type IGetDebuggerOptions,
-  type IGetSystemAreaOptions,
-  type IGetVariableAsCsvOptions,
-  type IGetVariableAsJsonOptions,
-  type IGetVariableValueStatementOptions,
-  type ILaunchDebuggerOptions,
-  type IStopDebuggerOptions,
   insertWatchpoint,
   launchDebugger,
   stepContinueDebuggerBatch,
@@ -43,7 +43,7 @@ import {
   validateBreakpoints,
 } from './abap';
 
-export class AbapDebugger implements IRuntimeAnalysisObject {
+export class AbapDebugger implements IAbapDebugger {
   readonly kind = 'abapDebugger' as const;
 
   constructor(

@@ -1,16 +1,18 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IAmdpDebugger,
+  IGetAmdpCellSubstringOptions,
+  IGetAmdpDataPreviewOptions,
   ILogger,
+  IStartAmdpDebuggerOptions,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
 import {
   getAmdpBreakpoints,
   getAmdpBreakpointsLlang,
   getAmdpBreakpointsTableFunctions,
   getAmdpDebuggee,
   getAmdpVariable,
-  type IStartAmdpDebuggerOptions,
   lookupAmdp,
   resumeAmdpDebugger,
   setAmdpVariable,
@@ -19,18 +21,13 @@ import {
   stepOverAmdp,
   terminateAmdpDebugger,
 } from './amdp';
-import {
-  getAmdpCellSubstring,
-  getAmdpDataPreview,
-  type IGetAmdpCellSubstringOptions,
-  type IGetAmdpDataPreviewOptions,
-} from './amdpDataPreview';
+import { getAmdpCellSubstring, getAmdpDataPreview } from './amdpDataPreview';
 
 /**
  * @experimental
  * AMDP debugger domain object — wraps all AMDP debugger and data preview operations.
  */
-export class AmdpDebugger implements IRuntimeAnalysisObject {
+export class AmdpDebugger implements IAmdpDebugger {
   readonly kind = 'amdpDebugger' as const;
 
   constructor(

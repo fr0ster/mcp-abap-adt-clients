@@ -7,17 +7,13 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IFeedQueryOptions,
   ILogger,
+  ISystemMessages,
 } from '@mcp-abap-adt/interfaces';
-import type { IFeedQueryOptions } from '../feeds/types';
-import type { IListableRuntimeObject, IRuntimeAnalysisObject } from '../types';
 import { getSystemMessage, listSystemMessages } from './read';
 
-export class SystemMessages
-  implements
-    IListableRuntimeObject<AxiosResponse, IFeedQueryOptions>,
-    IRuntimeAnalysisObject
-{
+export class SystemMessages implements ISystemMessages {
   readonly kind = 'systemMessages' as const;
   constructor(
     private readonly connection: IAbapConnection,

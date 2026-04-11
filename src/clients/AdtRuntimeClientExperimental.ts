@@ -2,30 +2,13 @@
  * AdtRuntimeClientExperimental
  *
  * Experimental runtime APIs that are still in progress and may change.
- * Current scope:
- * - AMDP debugger APIs (via amdpDebugger() factory)
+ * AMDP debugger is now accessible via getDebugger().getAmdp() on the base client.
  */
 
-export type { IStartAmdpDebuggerOptions } from '../runtime/debugger/amdp';
-export type {
-  IGetAmdpCellSubstringOptions,
-  IGetAmdpDataPreviewOptions,
-} from '../runtime/debugger/amdpDataPreview';
-
-import { AmdpDebugger } from '../runtime/debugger/AmdpDebugger';
 import { AdtRuntimeClient } from './AdtRuntimeClient';
 
 /**
  * @experimental
- * AMDP runtime APIs are in progress and not finalized yet.
+ * Placeholder for future experimental runtime APIs.
  */
-export class AdtRuntimeClientExperimental extends AdtRuntimeClient {
-  private _amdpDebugger?: AmdpDebugger;
-
-  amdpDebugger(): AmdpDebugger {
-    if (!this._amdpDebugger) {
-      this._amdpDebugger = new AmdpDebugger(this.connection, this.logger);
-    }
-    return this._amdpDebugger;
-  }
-}
+export class AdtRuntimeClientExperimental extends AdtRuntimeClient {}

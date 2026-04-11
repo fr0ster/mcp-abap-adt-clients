@@ -1,23 +1,19 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ICrossTrace,
+  IListCrossTracesOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IListableRuntimeObject, IRuntimeAnalysisObject } from '../types';
 import {
   getCrossTrace,
   getCrossTraceActivations,
   getCrossTraceRecordContent,
   getCrossTraceRecords,
-  type IListCrossTracesOptions,
   listCrossTraces,
 } from './crossTrace';
 
-export class CrossTrace
-  implements
-    IListableRuntimeObject<AxiosResponse, IListCrossTracesOptions>,
-    IRuntimeAnalysisObject
-{
+export class CrossTrace implements ICrossTrace {
   readonly kind = 'crossTrace' as const;
   constructor(
     private readonly connection: IAbapConnection,

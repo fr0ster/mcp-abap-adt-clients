@@ -2,11 +2,11 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
   ILogger,
+  ISt05Trace,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
 import { getSt05TraceDirectory, getSt05TraceState } from './st05';
 
-export class St05Trace implements IRuntimeAnalysisObject {
+export class St05Trace implements ISt05Trace {
   readonly kind = 'st05Trace' as const;
 
   constructor(

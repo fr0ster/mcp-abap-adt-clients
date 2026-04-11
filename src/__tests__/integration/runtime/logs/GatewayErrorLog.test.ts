@@ -100,7 +100,7 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list gateway error log entries', testsLogger);
-        const response = await runtime.gatewayErrorLog().list();
+        const response = await runtime.getGatewayErrorLog().list();
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);
         expect(response.data).toBeDefined();
@@ -160,7 +160,7 @@ describe('GatewayErrorLog (using AdtRuntimeClient)', () => {
           testsLogger,
         );
         const response = await runtime
-          .gatewayErrorLog()
+          .getGatewayErrorLog()
           .list({ maxResults: 10 });
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);

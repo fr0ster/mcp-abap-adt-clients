@@ -1,18 +1,18 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IApplicationLog,
+  IGetApplicationLogObjectOptions,
+  IGetApplicationLogSourceOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
 import {
   getApplicationLogObject,
   getApplicationLogSource,
-  type IGetApplicationLogObjectOptions,
-  type IGetApplicationLogSourceOptions,
   validateApplicationLogName,
 } from './read';
 
-export class ApplicationLog implements IRuntimeAnalysisObject {
+export class ApplicationLog implements IApplicationLog {
   readonly kind = 'applicationLog' as const;
 
   constructor(

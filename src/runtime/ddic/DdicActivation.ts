@@ -1,15 +1,13 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IDdicActivation,
+  IGetActivationGraphOptions,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IRuntimeAnalysisObject } from '../types';
-import {
-  getActivationGraph,
-  type IGetActivationGraphOptions,
-} from './activationGraph';
+import { getActivationGraph } from './activationGraph';
 
-export class DdicActivation implements IRuntimeAnalysisObject {
+export class DdicActivation implements IDdicActivation {
   readonly kind = 'ddicActivation' as const;
 
   constructor(

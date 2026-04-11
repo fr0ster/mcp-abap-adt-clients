@@ -2,8 +2,13 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
   ILogger,
+  IProfiler,
+  IProfilerListOptions,
+  IProfilerTraceDbAccessesOptions,
+  IProfilerTraceHitListOptions,
+  IProfilerTraceParameters,
+  IProfilerTraceStatementsOptions,
 } from '@mcp-abap-adt/interfaces';
-import type { IListableRuntimeObject } from '../types';
 import {
   buildTraceParametersXml,
   createTraceParameters,
@@ -16,23 +21,13 @@ import {
   getTraceParametersForCallstack,
   getTraceRequestsByUri,
   getTraceStatements,
-  type IProfilerTraceDbAccessesOptions,
-  type IProfilerTraceHitListOptions,
-  type IProfilerTraceParameters,
-  type IProfilerTraceStatementsOptions,
   listObjectTypes,
   listProcessTypes,
   listTraceFiles,
   listTraceRequests,
 } from './profiler';
 
-export interface IProfilerListOptions {
-  user?: string;
-}
-
-export class Profiler
-  implements IListableRuntimeObject<AxiosResponse, IProfilerListOptions>
-{
+export class Profiler implements IProfiler {
   readonly kind = 'profiler' as const;
 
   constructor(

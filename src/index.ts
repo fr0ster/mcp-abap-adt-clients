@@ -237,6 +237,7 @@ export { AtcLog } from './runtime/atc/AtcLog';
 export { DdicActivation } from './runtime/ddic/DdicActivation';
 export { AbapDebugger } from './runtime/debugger/AbapDebugger';
 export { AmdpDebugger } from './runtime/debugger/AmdpDebugger';
+export { Debugger } from './runtime/debugger/Debugger';
 // Keep low-level dump types/functions (may be used by consumers)
 export {
   buildDumpIdPrefix,
@@ -260,6 +261,8 @@ export type {
   IGatewayException,
   ISourceCodeLine,
 } from './runtime/gatewayErrorLog/types';
+// MemorySnapshots is now accessed via getDebugger().getMemorySnapshots()
+// The class is still exported for backward compatibility
 export { MemorySnapshots } from './runtime/memory/MemorySnapshots';
 export { SystemMessages } from './runtime/systemMessages/SystemMessages';
 export type { ISystemMessageEntry } from './runtime/systemMessages/types';

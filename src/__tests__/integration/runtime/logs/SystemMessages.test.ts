@@ -100,7 +100,7 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list system messages', testsLogger);
-        const response = await runtime.systemMessages().list();
+        const response = await runtime.getSystemMessages().list();
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);
         expect(response.data).toBeDefined();
@@ -156,7 +156,9 @@ describe('SystemMessages (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list system messages with maxResults: 5', testsLogger);
-        const response = await runtime.systemMessages().list({ maxResults: 5 });
+        const response = await runtime
+          .getSystemMessages()
+          .list({ maxResults: 5 });
         expect(response.status).toBeGreaterThanOrEqual(200);
         expect(response.status).toBeLessThan(300);
         expect(response.data).toBeDefined();

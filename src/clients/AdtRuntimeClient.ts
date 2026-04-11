@@ -2,18 +2,17 @@
  * AdtRuntimeClient - Runtime Operations Client
  *
  * Provides access to runtime-related ADT operations through domain object factories:
- * - profiler() — Profiler traces
- * - crossTrace() — Cross trace analysis
- * - st05Trace() — ST05 performance traces
- * - debugger() — ABAP debugger operations
- * - applicationLog() — Application log analysis
- * - atcLog() — ATC check failure and execution logs
- * - ddicActivation() — DDIC activation graph
- * - dumps() — Runtime dump analysis
- * - memorySnapshots() — Memory snapshot analysis
- * - feeds() — Feed repository (list feeds, variants, parse Atom feeds)
- * - systemMessages() — System messages (SM02)
- * - gatewayErrorLog() — Gateway error log (/IWFND/ERROR_LOG)
+ * - getProfiler() — Profiler traces
+ * - getCrossTrace() — Cross trace analysis
+ * - getSt05Trace() — ST05 performance traces
+ * - getDebugger() — Composite debugger (ABAP, AMDP, memory snapshots)
+ * - getApplicationLog() — Application log analysis
+ * - getAtcLog() — ATC check failure and execution logs
+ * - getDdicActivation() — DDIC activation graph
+ * - getDumps() — Runtime dump analysis
+ * - getFeeds() — Feed repository (list feeds, variants, parse Atom feeds)
+ * - getSystemMessages() — System messages (SM02)
+ * - getGatewayErrorLog() — Gateway error log (/IWFND/ERROR_LOG)
  *
  * Usage:
  * ```typescript
@@ -22,28 +21,41 @@
  * const client = new AdtRuntimeClient(connection, logger);
  *
  * // Profiler traces
- * const traceFiles = await client.profiler().listTraceFiles();
- * const traceParams = await client.profiler().getParameters();
+ * const traceFiles = await client.getProfiler().list();
+ * const traceParams = await client.getProfiler().getParameters();
  *
  * // Debugging
- * await client.debugger().launch({ debuggingMode: 'external' });
- * const callStack = await client.debugger().getCallStack();
+ * await client.getDebugger().getAbap().launch({ debuggingMode: 'external' });
+ * const callStack = await client.getDebugger().getAbap().getCallStack();
  *
  * // Logs
- * const appLog = await client.applicationLog().getObject('Z_MY_LOG');
- * const atcLogs = await client.atcLog().getCheckFailureLogs();
+ * const appLog = await client.getApplicationLog().getObject('Z_MY_LOG');
+ * const atcLogs = await client.getAtcLog().getCheckFailureLogs();
  * ```
  */
 
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IApplicationLog,
+  IAtcLog,
+  ICrossTrace,
+  IDdicActivation,
+  IDebugger,
+  IFeedRepository,
+  IGatewayErrorLog,
+  ILogger,
+  IProfiler,
+  IRuntimeDumps,
+  ISt05Trace,
+  ISystemMessages,
+} from '@mcp-abap-adt/interfaces';
 import { ApplicationLog } from '../runtime/applicationLog/ApplicationLog';
 import { AtcLog } from '../runtime/atc/AtcLog';
 import { DdicActivation } from '../runtime/ddic/DdicActivation';
-import { AbapDebugger } from '../runtime/debugger/AbapDebugger';
+import { Debugger } from '../runtime/debugger/Debugger';
 import { RuntimeDumps } from '../runtime/dumps/RuntimeDumps';
 import { FeedRepository } from '../runtime/feeds/FeedRepository';
 import { GatewayErrorLog } from '../runtime/gatewayErrorLog/GatewayErrorLog';
-import { MemorySnapshots } from '../runtime/memory/MemorySnapshots';
 import { SystemMessages } from '../runtime/systemMessages/SystemMessages';
 import { CrossTrace } from '../runtime/traces/CrossTraceDomain';
 import { Profiler } from '../runtime/traces/ProfilerDomain';
@@ -56,12 +68,11 @@ export class AdtRuntimeClient {
   private _profiler?: Profiler;
   private _crossTrace?: CrossTrace;
   private _st05Trace?: St05Trace;
-  private _debugger?: AbapDebugger;
+  private _debugger?: Debugger;
   private _applicationLog?: ApplicationLog;
   private _atcLog?: AtcLog;
   private _ddicActivation?: DdicActivation;
   private _dumps?: RuntimeDumps;
-  private _memorySnapshots?: MemorySnapshots;
   private _feeds?: FeedRepository;
   private _systemMessages?: SystemMessages;
   private _gatewayErrorLog?: GatewayErrorLog;
@@ -105,88 +116,81 @@ export class AdtRuntimeClient {
   // Domain Object Factories
   // ============================================================================
 
-  profiler(): Profiler {
+  getProfiler(): IProfiler {
     if (!this._profiler) {
       this._profiler = new Profiler(this.connection, this.logger);
     }
     return this._profiler;
   }
 
-  crossTrace(): CrossTrace {
+  getCrossTrace(): ICrossTrace {
     if (!this._crossTrace) {
       this._crossTrace = new CrossTrace(this.connection, this.logger);
     }
     return this._crossTrace;
   }
 
-  st05Trace(): St05Trace {
+  getSt05Trace(): ISt05Trace {
     if (!this._st05Trace) {
       this._st05Trace = new St05Trace(this.connection, this.logger);
     }
     return this._st05Trace;
   }
 
-  debugger(): AbapDebugger {
+  getDebugger(): IDebugger {
     if (!this._debugger) {
-      this._debugger = new AbapDebugger(this.connection, this.logger);
+      this._debugger = new Debugger(this.connection, this.logger);
     }
     return this._debugger;
   }
 
-  applicationLog(): ApplicationLog {
+  getApplicationLog(): IApplicationLog {
     if (!this._applicationLog) {
       this._applicationLog = new ApplicationLog(this.connection, this.logger);
     }
     return this._applicationLog;
   }
 
-  atcLog(): AtcLog {
+  getAtcLog(): IAtcLog {
     if (!this._atcLog) {
       this._atcLog = new AtcLog(this.connection, this.logger);
     }
     return this._atcLog;
   }
 
-  ddicActivation(): DdicActivation {
+  getDdicActivation(): IDdicActivation {
     if (!this._ddicActivation) {
       this._ddicActivation = new DdicActivation(this.connection, this.logger);
     }
     return this._ddicActivation;
   }
 
-  dumps(): RuntimeDumps {
+  getDumps(): IRuntimeDumps {
     if (!this._dumps) {
       this._dumps = new RuntimeDumps(this.connection, this.logger);
     }
     return this._dumps;
   }
 
-  memorySnapshots(): MemorySnapshots {
-    if (!this._memorySnapshots) {
-      this._memorySnapshots = new MemorySnapshots(this.connection, this.logger);
-    }
-    return this._memorySnapshots;
-  }
-
   // ============================================================================
   // Feed, SystemMessages, GatewayErrorLog Factories
   // ============================================================================
 
-  feeds(): FeedRepository {
+  getFeeds(): IFeedRepository {
     if (!this._feeds) {
       this._feeds = new FeedRepository(this.connection, this.logger);
     }
     return this._feeds;
   }
 
-  systemMessages(): SystemMessages {
+  getSystemMessages(): ISystemMessages {
     if (!this._systemMessages) {
       this._systemMessages = new SystemMessages(this.connection, this.logger);
     }
     return this._systemMessages;
   }
 
-  gatewayErrorLog(): GatewayErrorLog {
+  getGatewayErrorLog(): IGatewayErrorLog {
     if (!this._gatewayErrorLog) {
       this._gatewayErrorLog = new GatewayErrorLog(this.connection, this.logger);
     }

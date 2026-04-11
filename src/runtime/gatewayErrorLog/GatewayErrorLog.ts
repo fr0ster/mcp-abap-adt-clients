@@ -7,17 +7,13 @@
 import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
+  IFeedQueryOptions,
+  IGatewayErrorLog,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
-import type { IFeedQueryOptions } from '../feeds/types';
-import type { IListableRuntimeObject, IRuntimeAnalysisObject } from '../types';
 import { getGatewayError, listGatewayErrors } from './read';
 
-export class GatewayErrorLog
-  implements
-    IListableRuntimeObject<AxiosResponse, IFeedQueryOptions>,
-    IRuntimeAnalysisObject
-{
+export class GatewayErrorLog implements IGatewayErrorLog {
   readonly kind = 'gatewayErrorLog' as const;
   constructor(
     private readonly connection: IAbapConnection,

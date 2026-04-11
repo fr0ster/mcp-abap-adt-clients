@@ -16,6 +16,7 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import { AdtRuntimeClient } from '../../../../clients/AdtRuntimeClient';
+import type { FeedRepository } from '../../../../runtime/feeds/FeedRepository';
 import { getConfig } from '../../../helpers/sessionConfig';
 import {
   createConnectionLogger,
@@ -97,7 +98,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list feed catalog', testsLogger);
-        const feeds = await runtime.feeds().list();
+        const feeds = await runtime.getFeeds().list();
         expect(feeds).toBeDefined();
         expect(Array.isArray(feeds)).toBe(true);
 
@@ -149,7 +150,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('list feed variants', testsLogger);
-        const variants = await runtime.feeds().variants();
+        const variants = await runtime.getFeeds().variants();
         expect(variants).toBeDefined();
         expect(Array.isArray(variants)).toBe(true);
 
@@ -201,7 +202,7 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('get dumps via feed', testsLogger);
-        const entries = await runtime.feeds().dumps();
+        const entries = await runtime.getFeeds().dumps();
         expect(entries).toBeDefined();
         expect(Array.isArray(entries)).toBe(true);
 
@@ -253,9 +254,9 @@ describe('FeedRepository (using AdtRuntimeClient)', () => {
 
       try {
         logTestStep('fetch feed by URL /sap/bc/adt/runtime/dumps', testsLogger);
-        const entries = await runtime
-          .feeds()
-          .byUrl('/sap/bc/adt/runtime/dumps');
+        const entries = await (runtime.getFeeds() as FeedRepository).byUrl(
+          '/sap/bc/adt/runtime/dumps',
+        );
         expect(entries).toBeDefined();
         expect(Array.isArray(entries)).toBe(true);
 
