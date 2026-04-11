@@ -6,7 +6,6 @@
  *   npx ts-node scripts/read-feeds.ts dumps              # dumps feed
  *   npx ts-node scripts/read-feeds.ts systemMessages     # system messages feed
  *   npx ts-node scripts/read-feeds.ts gatewayErrors      # gateway error log feed
- *   npx ts-node scripts/read-feeds.ts <url>              # arbitrary feed URL
  *
  * Options (env vars):
  *   FEED_USER=CB9980000974     — filter by user
@@ -32,13 +31,6 @@ const sessionConfigPath = path.resolve(
 );
 const { getConfig } = require(sessionConfigPath);
 
-const TOPICS = ['dumps', 'systemMessages', 'gatewayErrors'] as const;
-type Topic = (typeof TOPICS)[number];
-
-function isTopic(value: string): value is Topic {
-  return TOPICS.includes(value as Topic);
-}
-
 async function main() {
   const config = getConfig();
   const topic = process.argv[2];
@@ -60,23 +52,22 @@ async function main() {
   const feeds = runtime.getFeeds();
 
   if (!topic) {
-    // Feed catalog
     console.log('\n=== Feed Catalog ===\n');
     const catalog = await feeds.list();
     for (const entry of catalog) {
       console.log(`  ${entry.title}`);
-      console.log(`    href: ${entry.href}`);
-      console.log(`    category: ${entry.category}`);
+      console.log(`    url: ${entry.url}`);
+      if (entry.category) console.log(`    category: ${entry.category}`);
       console.log();
     }
     return;
   }
 
-  if (isTopic(topic)) {
+  if (topic === 'dumps') {
     console.log(
-      `\n=== ${topic} (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+      `\n=== Dumps Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
     );
-    const entries = await feeds[topic](options);
+    const entries = await feeds.dumps(options);
     console.log(`Found ${entries.length} entries:\n`);
     for (const entry of entries) {
       console.log(`  [${entry.updated}] ${entry.title}`);
@@ -93,17 +84,43 @@ async function main() {
     return;
   }
 
-  // Arbitrary URL
-  console.log(
-    `\n=== Feed: ${topic} (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
-  );
-  const entries = await feeds.byUrl(topic, options);
-  console.log(`Found ${entries.length} entries:\n`);
-  for (const entry of entries) {
-    console.log(`  [${entry.updated}] ${entry.title}`);
-    if (entry.link) console.log(`    link: ${entry.link}`);
-    console.log();
+  if (topic === 'systemMessages') {
+    console.log(
+      `\n=== System Messages Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+    );
+    const entries = await feeds.systemMessages(options);
+    console.log(`Found ${entries.length} entries:\n`);
+    for (const entry of entries) {
+      console.log(`  [${entry.id}] ${entry.title}`);
+      console.log(`    severity: ${entry.severity}`);
+      console.log(`    text: ${entry.text}`);
+      console.log(`    created by: ${entry.createdBy}`);
+      console.log(`    valid: ${entry.validFrom} — ${entry.validTo}`);
+      console.log();
+    }
+    return;
   }
+
+  if (topic === 'gatewayErrors') {
+    console.log(
+      `\n=== Gateway Errors Feed (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+    );
+    const entries = await feeds.gatewayErrors(options);
+    console.log(`Found ${entries.length} entries:\n`);
+    for (const entry of entries) {
+      console.log(`  [${entry.type}] ${entry.shortText}`);
+      console.log(`    dateTime: ${entry.dateTime}`);
+      console.log(`    username: ${entry.username}`);
+      console.log(`    requestKind: ${entry.requestKind}`);
+      console.log(`    transactionId: ${entry.transactionId}`);
+      console.log();
+    }
+    return;
+  }
+
+  console.error(`Unknown topic: ${topic}`);
+  console.error('Available: dumps, systemMessages, gatewayErrors');
+  process.exit(1);
 }
 
 main().catch((err) => {
