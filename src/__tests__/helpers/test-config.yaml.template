@@ -1617,6 +1617,33 @@ runtime_dumps:
         retries: 8                         # Number of retry attempts to discover generated dump
         retry_delay_ms: 1500               # Delay between retries in ms
 
+# Feed repository operations (AdtRuntimeClient)
+runtime_feeds:
+  test_cases:
+    - name: "adt_feeds"
+      enabled: true
+      description: "Read feed catalog, variants, and topic-specific feeds (dumps, system messages, gateway errors)"
+      params:
+        max_results: 20
+
+# System messages - SM02 (AdtRuntimeClient)
+runtime_system_messages:
+  test_cases:
+    - name: "adt_system_messages"
+      enabled: true
+      description: "Read system messages feed"
+      params:
+        max_results: 10
+
+# Gateway error log - /IWFND/ERROR_LOG (AdtRuntimeClient)
+runtime_gateway_errors:
+  test_cases:
+    - name: "adt_gateway_errors"
+      enabled: true
+      description: "Read gateway error log feed"
+      params:
+        max_results: 10
+
 # Profiler traces operations (AdtRuntimeClient)
 profiler_traces:
   test_cases:

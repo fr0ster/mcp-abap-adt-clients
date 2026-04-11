@@ -255,26 +255,136 @@ await runtimeBatch.batchExecute();
 
 ## AdtRuntimeClient
 
+`AdtRuntimeClient` exposes all runtime operations through domain object factories. Each factory returns a stateless domain object that wraps a set of related ADT endpoints.
+
 ```typescript
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 
-const runtime = new AdtRuntimeClient(connection);
-const feeds = await runtime.getFeeds();
+const runtime = new AdtRuntimeClient(connection, logger);
+```
+
+### Profiler Traces
+
+```typescript
+const profiler = runtime.getProfiler();
+
+// List / configure
+const files = await profiler.list();
+const params = await profiler.getParameters();
+const created = await profiler.createParameters({
+  description: 'CI trace run',
+  sqlTrace: true,
+  maxTimeForTracing: 1800,
+});
+const traceId = profiler.extractIdFromResponse(created);
+
+// Catalog
+const requests = await profiler.listRequests();
+const byUri = await profiler.getRequestsByUri('/sap/bc/adt/oo/classes/zcl_test');
+const objectTypes = await profiler.listObjectTypes();
+const processTypes = await profiler.listProcessTypes();
+
+// Analysis
+const hitList = await profiler.getHitList(traceId, { withSystemEvents: false });
+const statements = await profiler.getStatements(traceId);
+const dbAccesses = await profiler.getDbAccesses(traceId);
+```
+
+Contract notes:
+- `extractIdFromResponse()` parses the ADT response to extract the trace ID.
+- Trace-aware methods accept a plain trace ID or a full ADT trace URI.
+
+### Cross-Trace Analysis
+
+```typescript
+const crossTrace = runtime.getCrossTrace();
+
+const list = await crossTrace.list();
+const trace = await crossTrace.getById(traceId);
+const records = await crossTrace.getRecords(traceId);
+const content = await crossTrace.getRecordContent(traceId, recordNumber);
+const activations = await crossTrace.getActivations();
+```
+
+### ST05 Performance Traces
+
+```typescript
+const st05 = runtime.getSt05Trace();
+
+const state = await st05.getState();
+const directory = await st05.getDirectory();
+```
+
+### Debugger (Composite)
+
+`getDebugger()` returns a composite object exposing three sub-domains: ABAP debugger, AMDP debugger, and memory snapshots.
+
+```typescript
+const debugger = runtime.getDebugger();
+
+// ABAP debugger
+const abap = debugger.getAbap();
+await abap.launch({ debuggingMode: 'external' });
+await abap.stop();
+const state = await abap.get();
+const callStack = await abap.getCallStack();
+await abap.executeAction('stepOver');
+
+// Step operations (batch endpoint — stepInto + getStack in one request)
+const stepIntoResult = await abap.stepIntoBatch();
+const stepOutResult = await abap.stepOutBatch();
+const continueResult = await abap.stepContinueBatch();
+
+// AMDP debugger
+await debugger.getAmdp().start();
+
+// Memory snapshots
+const snapshots = await debugger.getMemorySnapshots().list();
+```
+
+Contract notes:
+- Step batch operations use `POST /sap/bc/adt/debugger/batch` with `multipart/mixed` payload.
+- `executeAction()` must be used for non-step actions; step actions are reserved for batch-only execution.
+
+### Application Log
+
+```typescript
+const appLog = runtime.getApplicationLog();
+
+const logObject = await appLog.getObject('Z_MY_LOG');
+const logSource = await appLog.getSource('Z_MY_LOG');
+```
+
+### ATC Log
+
+```typescript
+const atcLog = runtime.getAtcLog();
+
+const checkFailures = await atcLog.getCheckFailureLogs();
+const execLog = await atcLog.getExecutionLog(id);
+```
+
+### DDIC Activation Graph
+
+```typescript
+const graph = await runtime.getDdicActivation().getGraph();
 ```
 
 ### Runtime Dumps
 
 ```typescript
-// List dumps with optional time-range filter (YYYYMMDDHHMMSS)
-const allDumps = await runtime.listRuntimeDumps({ top: 50 });
-const recentDumps = await runtime.listRuntimeDumps({
+const dumps = runtime.getDumps();
+
+// List with optional time-range filter (YYYYMMDDHHMMSS)
+const allDumps = await dumps.list({ top: 50 });
+const recentDumps = await dumps.list({
   from: '20260401000000',
   to: '20260402235959',
   top: 50,
 });
 
-// Filter by user (and optionally by time range)
-const userDumps = await runtime.listRuntimeDumpsByUser('CB9980000423', {
+// Filter by user
+const userDumps = await dumps.listByUser('CB9980000423', {
   inlinecount: 'allpages',
   top: 50,
   from: '20260401000000',
@@ -282,76 +392,46 @@ const userDumps = await runtime.listRuntimeDumpsByUser('CB9980000423', {
 });
 
 // Read dump by ID
-const dumpPayload = await runtime.getRuntimeDumpById('ABCDEF1234567890');
-
-// Build dump ID prefix from known components (e.g. from CALM events)
-const prefix = runtime.buildDumpIdPrefix(
-  '20260331215347', // datetime (YYYYMMDDHHMMSS)
-  'epbyminsd0654',  // hostname
-  'E19',            // sysid
-  '00',             // instance
-);
-// => '20260331215347epbyminsd0654_E19_00'
+const dumpPayload = await dumps.getById('ABCDEF1234567890');
 ```
 
 Contract notes:
-- `listRuntimeDumps(options?)` and `listRuntimeDumpsByUser(user?, options?)` are read-only feed operations. `from`/`to` params enable server-side time-range filtering.
-- `getRuntimeDumpById(dumpId)` requires plain dump ID (not full URI) and throws for empty/invalid IDs.
-- `buildDumpIdPrefix()` composes a dump ID prefix from datetime, hostname, sysid and instance. Combine with `from`/`to` filtering to locate a specific dump entry (the sequence number is only available from the feed).
+- `getById()` requires a plain dump ID (not full URI) and throws for empty/invalid IDs.
 - Methods return raw ADT payload (`IAdtResponse`) so consumers can parse XML according to their needs.
 
 ### Runtime Memory Snapshots
 
-Memory snapshots are currently not exposed via the public `AdtRuntimeClient` API.
-They remain internal until endpoint/content-type behavior is validated across target systems.
+Memory snapshots are accessed via the composite debugger: `runtime.getDebugger().getMemorySnapshots().list()`.
 
-### Runtime Profiling (ABAP Traces)
-
-```typescript
-const params = await runtime.getProfilerTraceParameters();
-const created = await runtime.createProfilerTraceParameters({
-  description: 'CI trace run',
-  sqlTrace: true,
-  maxTimeForTracing: 1800,
-});
-const profilerId = runtime.extractProfilerIdFromResponse(created);
-
-const hitlist = await runtime.getProfilerTraceHitList(
-  '/sap/bc/adt/runtime/traces/abaptraces/ABCDEF1234567890',
-  { withSystemEvents: false },
-);
-```
-
-Contract notes:
-- Profiling API is split into:
-  - trace configuration (`get/createProfilerTraceParameters`)
-  - catalog/list endpoints (`listProfilerTraceFiles`, `listProfilerTraceRequests`, `listProfilerObjectTypes`, `listProfilerProcessTypes`)
-  - trace analysis endpoints (`getProfilerTraceHitList`, `getProfilerTraceStatements`, `getProfilerTraceDbAccesses`)
-- Trace-aware methods accept trace ID or full ADT trace URI.
-- `extractProfilerIdFromResponse()` and `extractTraceIdFromTraceRequestsResponse()` are helper parsers for ADT header/body responses.
-
-### ABAP Debugger Step Operations (Batch Only)
-
-Step operations are executed through debugger batch endpoint:
-- Endpoint: `POST /sap/bc/adt/debugger/batch`
-- Request content type: `multipart/mixed; boundary=...`
-- Response accept: `multipart/mixed`
-- Default batch pattern: `step*` + `getStack` in one request
+### Feed Repository
 
 ```typescript
-const stepIntoResult = await runtime.stepIntoDebuggerBatch();
-const stepOutResult = await runtime.stepOutDebuggerBatch();
-const continueResult = await runtime.stepContinueDebuggerBatch();
+const feeds = runtime.getFeeds();
+
+const catalog = await feeds.list();         // feed catalog
+const variants = await feeds.variants();    // feed variants
+const dumps = await feeds.dumps();          // dumps via Atom feed
+const sysMessages = await feeds.systemMessages(); // system messages via feed
+const gwErrors = await feeds.gatewayErrors();     // gateway errors via feed
 ```
 
-You can also build payloads manually:
+### System Messages
 
 ```typescript
-const payload = runtime.buildDebuggerStepWithStackBatchPayload('stepInto');
-const batchResult = await runtime.executeDebuggerStepBatch('stepInto');
+const sysMsgs = runtime.getSystemMessages();
+
+const list = await sysMsgs.list();
+const msg = await sysMsgs.getById(id);
 ```
 
-`executeDebuggerAction(action)` must be used for non-step actions only.
+### Gateway Error Log
+
+```typescript
+const gwLog = runtime.getGatewayErrorLog();
+
+const list = await gwLog.list();
+const entry = await gwLog.getById(type, id);
+```
 
 ## AdtRuntimeClientExperimental
 
@@ -359,7 +439,7 @@ const batchResult = await runtime.executeDebuggerStepBatch('stepInto');
 import { AdtRuntimeClientExperimental } from '@mcp-abap-adt/adt-clients';
 
 const runtimeExperimental = new AdtRuntimeClientExperimental(connection);
-const session = await runtimeExperimental.startAmdpDebugger();
+await runtimeExperimental.startAmdpDataPreview();
 ```
 
-`AdtRuntimeClientExperimental` contains APIs marked in progress and may change between releases.
+`AdtRuntimeClientExperimental` contains APIs marked in progress and may change between releases. AMDP debugger functionality has been promoted to `AdtRuntimeClient.getDebugger().getAmdp()`.

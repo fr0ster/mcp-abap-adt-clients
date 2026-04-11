@@ -2,6 +2,7 @@
  * Runtime Dumps - Exports
  */
 
+export { RuntimeDumps } from './RuntimeDumps';
 export {
   buildDumpIdPrefix,
   buildRuntimeDumpsUserQuery,

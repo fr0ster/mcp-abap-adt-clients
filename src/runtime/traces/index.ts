@@ -2,6 +2,7 @@
  * Runtime Traces - Exports
  */
 
+export { CrossTrace } from './CrossTraceDomain';
 export {
   getCrossTrace,
   getCrossTraceActivations,
@@ -10,6 +11,7 @@ export {
   type IListCrossTracesOptions,
   listCrossTraces,
 } from './crossTrace';
+export { Profiler } from './ProfilerDomain';
 export {
   buildTraceParametersXml,
   createTraceParameters,
@@ -33,7 +35,7 @@ export {
   listTraceRequests,
   normalizeProfilerTraceId,
 } from './profiler';
-
+export { St05Trace } from './St05Trace';
 export {
   getSt05TraceDirectory,
   getSt05TraceState,

@@ -94,8 +94,9 @@ npm install @mcp-abap-adt/adt-clients
    - Example: `await client.getClass().create({...}, { activateOnCreate: true })`
 
 2. **AdtRuntimeClient**
-   - Stable runtime operations for ABAP debugging, traces, dumps, and logs
-   - Example: `await runtimeClient.getDebugger(...)`
+   - Stable runtime operations for ABAP debugging, traces, dumps, logs, feeds, and more
+   - Factory accessors: `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()`, `getApplicationLog()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()`, `getSystemMessages()`, `getGatewayErrorLog()`
+   - Example: `await runtimeClient.getDebugger().getAbap().launch()`
 
 3. **AdtExecutor**
    - Typed execution API based on `IExecutor`
@@ -106,8 +107,8 @@ npm install @mcp-abap-adt/adt-clients
 
 4. **AdtRuntimeClientExperimental**
    - Runtime APIs in progress that may change without backward-compatibility guarantees
-   - Current scope: AMDP debugger + AMDP data preview
-   - Example: `await experimentalRuntime.startAmdpDebugger(...)`
+   - Current scope: AMDP data preview (AMDP debugger is now part of `AdtRuntimeClient.getDebugger().getAmdp()`)
+   - Example: `await experimentalRuntime.startAmdpDataPreview(...)`
 
 5. **AdtClientsWS**
    - Realtime request/event facade over `IWebSocketTransport`
@@ -239,16 +240,17 @@ const deState = await dePromise;
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 
 const runtime = new AdtRuntimeClient(connection);
+const abapDebugger = runtime.getDebugger().getAbap();
 
 // Executes stepInto + getStack in one batch request
-const batchResponse = await runtime.stepIntoDebuggerBatch();
+const batchResponse = await abapDebugger.stepIntoBatch();
 
 // Also available:
-await runtime.stepOutDebuggerBatch();
-await runtime.stepContinueDebuggerBatch();
+await abapDebugger.stepOutBatch();
+await abapDebugger.stepContinueBatch();
 ```
 
-For non-step actions keep using `executeDebuggerAction(action, value?)`.  
+For non-step actions use `executeAction(action, value?)`.
 Step actions (`stepInto`, `stepOut`, `stepContinue`) are reserved for batch-only execution.
 
 ### Using AdtExecutor (Execution API)

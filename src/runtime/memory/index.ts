@@ -2,6 +2,7 @@
  * Runtime Memory Analysis - Exports
  */
 
+export { MemorySnapshots } from './MemorySnapshots';
 export type {
   ISnapshotChildrenOptions,
   ISnapshotRankingListOptions,

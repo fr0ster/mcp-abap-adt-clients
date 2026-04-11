@@ -42,7 +42,7 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
 ### Client Classes (`src/clients/`)
 
 - **AdtClient** (`AdtClient.ts`): High-level CRUD operations via factory methods (`getClass()`, `getProgram()`, `getPackage()`, `getView()`, `getTable()`, etc.). Each method returns an `IAdtObject<Config, State>` handler. Also: `getUtils()` for shared operations, `getLocalTestClass()`/`getLocalTypes()`/`getLocalDefinitions()`/`getLocalMacros()` for class includes.
-- **AdtRuntimeClient** (`AdtRuntimeClient.ts`): Runtime operations — profiler traces, cross-traces, debugger, application logs, ATC logs, runtime dumps, feeds, DDIC activation graph.
+- **AdtRuntimeClient** (`AdtRuntimeClient.ts`): Runtime operations exposed via factory accessors — `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()` (composite: `getAbap()`, `getAmdp()`, `getMemorySnapshots()`), `getApplicationLog()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()` (FeedRepository), `getSystemMessages()`, `getGatewayErrorLog()`.
 - **AdtExecutor** (`AdtExecutor.ts`): Program/class execution with optional profiling — `getClassExecutor()`, `getProgramExecutor()`.
 - **AdtClientsWS** (`AdtClientsWS.ts`): WebSocket facade (request/response + event model) wrapping `IWebSocketTransport`.
 - **Batch clients** (`AdtClientBatch`, `AdtRuntimeClientBatch`): Mirror main clients but collect requests into `multipart/mixed` batch via `BatchRecordingConnection`.
