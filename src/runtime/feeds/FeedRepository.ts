@@ -309,6 +309,7 @@ export class FeedRepository implements IFeedRepository, IRuntimeAnalysisObject {
       this.connection,
       FEED_URLS.gatewayErrors,
       options,
+      'username',
     );
     return parseGatewayErrors(response.data);
   }

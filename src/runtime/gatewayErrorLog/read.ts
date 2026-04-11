@@ -25,7 +25,7 @@ export async function listGatewayErrors(
   connection: IAbapConnection,
   options?: IFeedQueryOptions,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/gw/errorlog${buildFeedQueryParams(options)}`;
+  const url = `/sap/bc/adt/gw/errorlog${buildFeedQueryParams(options, 'username')}`;
 
   return connection.makeAdtRequest({
     url,

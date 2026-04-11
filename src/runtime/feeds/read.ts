@@ -58,12 +58,21 @@ export async function getFeedVariants(
 /**
  * Build query string from IFeedQueryOptions.
  * Shared by all feed-backed runtime modules.
+ *
+ * @param options - Query options
+ * @param userAttribute - Feed-specific user attribute name ('user' for dumps, 'username' for gateway)
  */
-export function buildFeedQueryParams(options?: IFeedQueryOptions): string {
+export function buildFeedQueryParams(
+  options?: IFeedQueryOptions,
+  userAttribute = 'user',
+): string {
   if (!options) return '';
   const params = new URLSearchParams();
   if (options.user) {
-    params.set('$query', `and( equals( user, ${options.user.trim()} ) )`);
+    params.set(
+      '$query',
+      `and ( equals ( ${userAttribute} , ${options.user.trim()} ) )`,
+    );
   }
   if (options.maxResults) {
     params.set('$top', String(options.maxResults));
@@ -86,8 +95,9 @@ export async function fetchFeed(
   connection: IAbapConnection,
   feedUrl: string,
   options?: IFeedQueryOptions,
+  userAttribute?: string,
 ): Promise<AxiosResponse> {
-  const url = `${feedUrl}${buildFeedQueryParams(options)}`;
+  const url = `${feedUrl}${buildFeedQueryParams(options, userAttribute)}`;
 
   return connection.makeAdtRequest({
     url,
