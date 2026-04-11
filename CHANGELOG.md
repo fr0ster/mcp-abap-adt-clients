@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [4.0.2] - 2026-04-11
+
+### Changed
+- **CI**: Upgrade GitHub Actions to Node.js 24 versions — `actions/checkout` v4→v6, `actions/setup-node` v4→v6, `softprops/action-gh-release` v1→v2.
+
 ## [4.0.1] - 2026-04-11
 
 ### Fixed
