@@ -311,10 +311,8 @@ const ifaceState = await ifacePromise;
 const batch = new AdtClientBatch(connection, logger);
 const runtime = new AdtRuntimeClientBatch(batch.getRecorder());
 
-runtime.stepIntoDebugger();
-runtime.getCallStack();
-runtime.getVariableAsJson('LV_RESULT', 'LOCAL');
-runtime.getVariableAsJson('LT_DATA', 'LOCAL');
+runtime.getDebugger().getAbap().stepIntoBatch();
+runtime.getDebugger().getAbap().getCallStack();
 
 const responses = await batch.batchExecute();
 ```
