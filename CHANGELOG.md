@@ -5,6 +5,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-04-11
+
+### Fixed
+- **FeedRepository**: Disable XML entity processing (`processEntities: false`) to prevent `Entity expansion limit exceeded` error when parsing large Atom feeds from SAP ADT (e.g. dumps with >1000 entries). Also mitigates potential XXE vectors. (#13)
+
+## [4.0.0] - 2026-04-11
+
+### Breaking Changes
+- **AdtRuntimeClient**: Refactored from ~80 flat methods to `getX()` factory methods returning interfaces from `@mcp-abap-adt/interfaces@6.0.0`. All domain objects implement `IRuntimeAnalysisObject`; listable ones also implement `IListableRuntimeObject`.
+- **Debugger**: Composite object — `getDebugger()` returns `getAbap()`, `getAmdp()`, `getMemorySnapshots()`.
+
+### Added
+- **FeedRepository**: New domain object with Atom XML parsing — `dumps()`, `systemMessages()`, `gatewayErrors()`, `gatewayErrorDetail()`, `list()`, `variants()`, `byUrl()`.
+- **SystemMessages**: SM02 system messages feed reader.
+- **GatewayErrorLog**: `/IWFND/ERROR_LOG` gateway error feed reader with detail view.
+- **AmdpDebugger**: AMDP debugging domain object.
+- **Domain objects**: `AbapDebugger`, `MemorySnapshots`, `ApplicationLog`, `CrossTrace`, `Profiler`, `RuntimeDumps`, `St05Trace`, `DdicActivation`, `AtcLog` — all as standalone domain objects with `getX()` factory accessors.
+
+### Fixed
+- **GatewayErrorLog**: Use `username` attribute for user filter instead of `author`.
+
 ## [3.14.5] - 2026-04-05
 
 ### Fixed
