@@ -8,6 +8,7 @@
  * Options (env vars):
  *   GW_USER=CB9980000974       — filter by user
  *   GW_MAX=10                  — max results
+ *   GW_TRUNCATE=5000           — truncate output to N chars (0 or unset = no limit)
  *   MCP_ENV_PATH=trial.env     — switch SAP system
  */
 
@@ -29,12 +30,25 @@ const sessionConfigPath = path.resolve(
 );
 const { getConfig } = require(sessionConfigPath);
 
+const truncateLimit = process.env.GW_TRUNCATE
+  ? Number.parseInt(process.env.GW_TRUNCATE, 10)
+  : 0;
+
+function printXml(xml: string) {
+  if (truncateLimit > 0 && xml.length > truncateLimit) {
+    console.log(xml.slice(0, truncateLimit));
+    console.log('\n... (truncated)');
+  } else {
+    console.log(xml);
+  }
+}
+
 async function main() {
   const config = getConfig();
   const errorType = process.argv[2];
   const errorId = process.argv[3];
 
-  console.log(`Connecting to ${config.url}...`);
+  console.error(`Connecting to ${config.url}...`);
   const connection: IAbapConnection = createAbapConnection(config);
   await (connection as any).connect();
 
@@ -51,15 +65,12 @@ async function main() {
         : 10,
     };
 
-    console.log(
-      `\n=== Gateway Error Log (user=${options.user || 'all'}, max=${options.maxResults}) ===\n`,
+    console.error(
+      `Gateway Error Log (user=${options.user || 'all'}, max=${options.maxResults})`,
     );
     const response = await gw.list(options);
     const xml = String(response.data);
-    console.log(xml.slice(0, 5000));
-    if (xml.length > 5000) {
-      console.log('\n... (truncated)');
-    }
+    printXml(xml);
     return;
   }
 
@@ -70,12 +81,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`\n=== Gateway Error: ${errorType} / ${errorId} ===\n`);
+  console.error(`Gateway Error: ${errorType} / ${errorId}`);
   const response = await gw.getById(errorType, errorId);
-  console.log(String(response.data).slice(0, 5000));
-  if (String(response.data).length > 5000) {
-    console.log('\n... (truncated)');
-  }
+  printXml(String(response.data));
 }
 
 main().catch((err) => {
