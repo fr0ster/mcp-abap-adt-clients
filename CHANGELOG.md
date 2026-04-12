@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [4.0.4] - 2026-04-13
+
+### Fixed
+- **Package create**: Validate that responsible person is provided (in package config or AdtClient options) before sending request to SAP — prevents cryptic SAP error when the field is missing. (#15)
+
 ## [4.0.3] - 2026-04-12
 
 ### Fixed
