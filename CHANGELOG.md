@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [4.0.3] - 2026-04-12
+
+### Fixed
+- **Package**: URL-encode `$` in query parameters and XML URI paths — fixes `ERR_UNESCAPED_CHARACTERS` when `super_package` is `$TMP`. Axios default serializer does not encode `$`; switched to `URLSearchParams` via new `buildQueryString()` utility. (#14)
+- **Package create**: Apply `escapeXml()` to `package_name` in XML attributes.
+- **ServiceBinding**: URL-encode query parameters in publish/unpublish, generate, OData read, and classify operations.
+- **ReadOperations**: URL-encode query parameters in `fetchNodeStructure`.
+
 ## [4.0.2] - 2026-04-11
 
 ### Changed

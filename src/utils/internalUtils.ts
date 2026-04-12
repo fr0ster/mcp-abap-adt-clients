@@ -18,6 +18,26 @@ export function encodeSapObjectName(objectName: string): string {
 }
 
 /**
+ * Builds a URL query string with proper encoding of special characters.
+ * Axios default serializer does not encode $ (and other sub-delimiters),
+ * which causes ERR_UNESCAPED_CHARACTERS in Node.js for names like $TMP.
+ * URLSearchParams encodes all non-alphanumeric characters correctly.
+ * @param params - Key-value pairs for query parameters (undefined values are omitted)
+ * @returns Encoded query string without leading '?'
+ */
+export function buildQueryString(
+  params: Record<string, string | boolean | number | undefined>,
+): string {
+  const entries: [string, string][] = [];
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) {
+      entries.push([key, String(value)]);
+    }
+  }
+  return new URLSearchParams(entries).toString();
+}
+
+/**
  * Limits description to 60 characters as per SAP ADT specification
  * SAP ADT has a maximum length of 60 characters for adtcore:description field
  * @param description - Description text

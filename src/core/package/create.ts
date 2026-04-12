@@ -7,7 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_PACKAGE, CT_PACKAGE } from '../../constants/contentTypes';
-import { limitDescription } from '../../utils/internalUtils';
+import { buildQueryString, limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
 
@@ -67,8 +67,8 @@ export async function createPackage(
     : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${params.package_name}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
-  <adtcore:packageRef adtcore:name="${params.package_name}"/>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${escapeXml(params.package_name)}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  <adtcore:packageRef adtcore:name="${escapeXml(params.package_name)}"/>
   <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="${params.record_changes ? 'true' : 'false'}"/>
   ${superPackageXml}
   ${applicationComponentXml}
@@ -82,16 +82,15 @@ export async function createPackage(
   <pak:subPackages/>
 </pak:package>`;
 
-  const queryParams = params.transport_request
-    ? { corrNr: params.transport_request }
-    : undefined;
+  const fullUrl = params.transport_request
+    ? `${url}?${buildQueryString({ corrNr: params.transport_request })}`
+    : url;
 
   return connection.makeAdtRequest({
-    url,
+    url: fullUrl,
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    params: queryParams,
     headers: {
       Accept: ACCEPT_PACKAGE,
       'Content-Type': CT_PACKAGE,

@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_VALIDATION } from '../../constants/contentTypes';
+import { buildQueryString } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
 
@@ -18,20 +19,19 @@ export async function validatePackageBasic(
   connection: IAbapConnection,
   args: ICreatePackageParams,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/packages/validation`;
-  const params = {
+  const qs = buildQueryString({
     objname: args.package_name,
     packagename: args.super_package,
     description: args.description || args.package_name,
     packagetype: args.package_type || 'development',
     checkmode: 'basic',
-  };
+  });
+  const url = `/sap/bc/adt/packages/validation?${qs}`;
 
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    params,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },
@@ -48,8 +48,7 @@ export async function validatePackageFull(
   swcomp: string,
   transportLayer: string,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/packages/validation`;
-  const params = {
+  const qs = buildQueryString({
     objname: args.package_name,
     packagename: args.super_package,
     description: args.description || args.package_name,
@@ -58,13 +57,13 @@ export async function validatePackageFull(
     transportlayer: transportLayer,
     recordChanges: 'false',
     checkmode: 'full',
-  };
+  });
+  const url = `/sap/bc/adt/packages/validation?${qs}`;
 
   return connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
-    params,
     headers: {
       Accept: ACCEPT_VALIDATION,
     },

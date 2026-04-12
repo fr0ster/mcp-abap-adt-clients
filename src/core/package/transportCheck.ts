@@ -8,6 +8,10 @@ import {
   ACCEPT_TRANSPORT_CHECK,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
+import {
+  buildQueryString,
+  encodeSapObjectName,
+} from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { ICreatePackageParams } from './types';
 
@@ -19,7 +23,11 @@ export async function checkTransportRequirements(
   args: ICreatePackageParams,
   transportLayer: string,
 ): Promise<string[]> {
-  const url = `/sap/bc/adt/cts/transportchecks`;
+  const qs = buildQueryString({ transportLayer });
+  const url = `/sap/bc/adt/cts/transportchecks?${qs}`;
+  const encodedPackageName = encodeSapObjectName(
+    args.package_name.toLowerCase(),
+  );
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
@@ -31,7 +39,7 @@ export async function checkTransportRequirements(
       <SUPER_PACKAGE>${args.super_package}</SUPER_PACKAGE>
       <RECORD_CHANGES/>
       <OPERATION>I</OPERATION>
-      <URI>/sap/bc/adt/packages/${args.package_name.toLowerCase()}</URI>
+      <URI>/sap/bc/adt/packages/${encodedPackageName}</URI>
     </DATA>
   </asx:values>
 </asx:abap>`;
@@ -41,7 +49,6 @@ export async function checkTransportRequirements(
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,
-    params: { transportLayer },
     headers: {
       Accept: ACCEPT_TRANSPORT_CHECK,
       'Content-Type': CT_TRANSPORT_CHECK,

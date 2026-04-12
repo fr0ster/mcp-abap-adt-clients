@@ -14,6 +14,7 @@ import {
   CT_DELETION,
   CT_TRANSPORT_CHECK,
 } from '../../constants/contentTypes';
+import { buildQueryString } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
 import type {
@@ -204,12 +205,12 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(bindingName)}`;
     const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="${bindingUri}" adtcore:name="${bindingName.toUpperCase()}"/></adtcore:objectReferences>`;
 
+    const publishQs = buildQueryString({ servicename, serviceversion });
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/${serviceType}/publishjobs`,
+      url: `/sap/bc/adt/businessservices/${serviceType}/publishjobs?${publishQs}`,
       method: 'POST',
       timeout: getTimeout('long'),
       data: xml,
-      params: { servicename, serviceversion },
       headers: {
         Accept: ACCEPT_VALIDATION,
         'Content-Type': 'application/xml',
@@ -226,12 +227,12 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     const bindingUri = `/sap/bc/adt/businessservices/bindings/${AdtServiceBinding.encodeName(bindingName)}`;
     const xml = `<?xml version="1.0" encoding="UTF-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="${bindingUri}" adtcore:name="${bindingName.toUpperCase()}"/></adtcore:objectReferences>`;
 
+    const unpublishQs = buildQueryString({ servicename, serviceversion });
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/${serviceType}/unpublishjobs`,
+      url: `/sap/bc/adt/businessservices/${serviceType}/unpublishjobs?${unpublishQs}`,
       method: 'POST',
       timeout: getTimeout('long'),
       data: xml,
-      params: { servicename, serviceversion },
       headers: {
         Accept: ACCEPT_VALIDATION,
         'Content-Type': 'application/xml',
@@ -886,15 +887,15 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         ? 'application/vnd.sap.adt.businessservices.odatav2.v2+xml, application/vnd.sap.adt.businessservices.odatav2.v3+xml'
         : 'application/vnd.sap.adt.businessservices.odatav4.v1+xml, application/vnd.sap.adt.businessservices.odatav4.v2+xml';
 
+    const genQs = buildQueryString({
+      servicename: params.serviceName.toUpperCase(),
+      serviceversion: params.serviceVersion,
+      srvdname: params.serviceDefinitionName.toUpperCase(),
+    });
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/${path}/${encodeURIComponent(params.bindingName.toUpperCase())}`,
+      url: `/sap/bc/adt/businessservices/${path}/${encodeURIComponent(params.bindingName.toUpperCase())}?${genQs}`,
       method: 'GET',
       timeout: getTimeout('default'),
-      params: {
-        servicename: params.serviceName.toUpperCase(),
-        serviceversion: params.serviceVersion,
-        srvdname: params.serviceDefinitionName.toUpperCase(),
-      },
       headers: {
         Accept: accept,
       },
@@ -959,15 +960,15 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       throw new Error('objectname is required');
     }
 
+    const v2Qs = buildQueryString({
+      servicename: params.servicename,
+      serviceversion: params.serviceversion,
+      srvdname: params.srvdname,
+    });
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav2/${encodeURIComponent(params.objectname)}`,
+      url: `/sap/bc/adt/businessservices/odatav2/${encodeURIComponent(params.objectname)}?${v2Qs}`,
       method: 'GET',
       timeout: getTimeout('default'),
-      params: {
-        servicename: params.servicename,
-        serviceversion: params.serviceversion,
-        srvdname: params.srvdname,
-      },
       headers: {
         Accept: 'application/vnd.sap.adt.businessservices.odatav2.v3+xml',
       },
@@ -981,15 +982,15 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       throw new Error('objectname is required');
     }
 
+    const v4Qs = buildQueryString({
+      servicename: params.servicename,
+      serviceversion: params.serviceversion,
+      srvdname: params.srvdname,
+    });
     return this.connection.makeAdtRequest({
-      url: `/sap/bc/adt/businessservices/odatav4/${encodeURIComponent(params.objectname)}`,
+      url: `/sap/bc/adt/businessservices/odatav4/${encodeURIComponent(params.objectname)}?${v4Qs}`,
       method: 'GET',
       timeout: getTimeout('default'),
-      params: {
-        servicename: params.servicename,
-        serviceversion: params.serviceversion,
-        srvdname: params.srvdname,
-      },
       headers: {
         Accept: 'application/vnd.sap.adt.businessservices.odatav4.v2+xml',
       },
@@ -1002,11 +1003,14 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     }
 
     this.logger?.info?.('Publishing OData V2 service', params);
+    const pubV2Qs = buildQueryString({
+      servicename: params.servicename,
+      serviceversion: params.serviceversion,
+    });
     return this.connection.makeAdtRequest({
-      url: '/sap/bc/adt/businessservices/odatav2/publishjobs',
+      url: `/sap/bc/adt/businessservices/odatav2/publishjobs?${pubV2Qs}`,
       method: 'GET',
       timeout: getTimeout('default'),
-      params,
       headers: {
         Accept:
           'application/vnd.sap.adt.businessservices.odatav2.v3+xml, application/json, text/plain',
@@ -1022,11 +1026,14 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     }
 
     this.logger?.info?.('Unpublishing OData V2 service', params);
+    const unpubV2Qs = buildQueryString({
+      servicename: params.servicename,
+      serviceversion: params.serviceversion,
+    });
     return this.connection.makeAdtRequest({
-      url: '/sap/bc/adt/businessservices/odatav2/unpublishjobs',
+      url: `/sap/bc/adt/businessservices/odatav2/unpublishjobs?${unpubV2Qs}`,
       method: 'GET',
       timeout: getTimeout('default'),
-      params,
       headers: {
         Accept:
           'application/vnd.sap.adt.businessservices.odatav2.v3+xml, application/json, text/plain',
@@ -1041,11 +1048,17 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       throw new Error('objectname is required');
     }
 
+    const classifyQs = buildQueryString({
+      objectname: params.objectname,
+      bindtype: params.bindtype,
+      bindtypeversion: params.bindtypeversion,
+      repositoryid: params.repositoryid,
+      servicename: params.servicename,
+    });
     return this.connection.makeAdtRequest({
-      url: '/sap/bc/adt/businessservices/release',
+      url: `/sap/bc/adt/businessservices/release?${classifyQs}`,
       method: 'GET',
       timeout: getTimeout('default'),
-      params,
       headers: {
         Accept: 'application/xml, application/json, text/plain',
       },

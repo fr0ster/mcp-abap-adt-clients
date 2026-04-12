@@ -8,7 +8,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_NODE_STRUCTURE } from '../constants/contentTypes';
-import { encodeSapObjectName } from '../utils/internalUtils';
+import { buildQueryString, encodeSapObjectName } from '../utils/internalUtils';
 import { getTimeout } from './timeouts';
 
 /**
@@ -183,14 +183,13 @@ export async function fetchNodeStructure(
   nodeKey: string,
   withShortDescriptions: boolean = true,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/repository/nodestructure`;
-
-  const params = {
+  const qs = buildQueryString({
     parent_name: parentName,
     parent_tech_name: parentTechName,
     parent_type: parentType,
     withShortDescriptions: withShortDescriptions.toString(),
-  };
+  });
+  const url = `/sap/bc/adt/repository/nodestructure?${qs}`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
 <asx:values>
@@ -200,9 +199,17 @@ export async function fetchNodeStructure(
 </asx:values>
 </asx:abap>`;
 
-  return makeAdtRequest(connection, url, 'POST', 'default', xmlBody, params, {
-    Accept: ACCEPT_NODE_STRUCTURE,
-  });
+  return makeAdtRequest(
+    connection,
+    url,
+    'POST',
+    'default',
+    xmlBody,
+    undefined,
+    {
+      Accept: ACCEPT_NODE_STRUCTURE,
+    },
+  );
 }
 
 /**
