@@ -107,6 +107,11 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     if (!config.softwareComponent) {
       throw new Error('Software component is required');
     }
+    if (!config.responsible && !this.systemContext.responsible) {
+      throw new Error(
+        'Responsible person is required: provide it in package config or in AdtClient options',
+      );
+    }
 
     let objectCreated = false;
 
