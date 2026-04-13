@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [4.0.5] - 2026-04-13
+
+### Fixed
+- **BehaviorDefinition lock**: Add missing `Content-Type: application/xml` header to `lock()` and `lockForUpdate()` requests — without it the XML body was sent as `text/plain`. (#16)
+
 ## [4.0.4] - 2026-04-13
 
 ### Fixed
