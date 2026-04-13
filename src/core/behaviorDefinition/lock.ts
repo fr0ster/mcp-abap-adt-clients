@@ -51,6 +51,7 @@ export async function lock(
 
   const headers = {
     Accept: ACCEPT_LOCK,
+    'Content-Type': 'application/xml',
   };
 
   const response = await connection.makeAdtRequest({
@@ -117,6 +118,7 @@ export async function lockForUpdate(
 
   const headers = {
     Accept: ACCEPT_LOCK,
+    'Content-Type': 'application/xml',
   };
 
   const response = await connection.makeAdtRequest({
