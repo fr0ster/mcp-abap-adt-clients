@@ -7,7 +7,7 @@ Related: fr0ster/mcp-abap-adt#60
 
 Replace separate `bindingType`/`bindingVersion`/`bindingCategory` parameters with a single required `ServiceBindingVariant` constant that maps to all three values plus `serviceType`. Breaking change — old parameters removed from public API.
 
-Not a real breaking change in practice: in `mcp-abap-adt` those parameters existed but were never passed through; now consumers pass one of 6 variant constants instead.
+Not a real breaking change in practice: in `mcp-abap-adt` those parameters existed but were never passed through; now consumers pass one of 4 currently supported variant constants, with 2 more reserved for future INA/SQL variants.
 
 ## ServiceBindingVariant Type
 
@@ -67,6 +67,8 @@ export interface ICreateServiceBindingParams {
 ### IServiceBindingConfig
 
 Replace `bindingType?`, `bindingVersion?`, `bindingCategory?` with `bindingVariant?: ServiceBindingVariant`.
+
+`bindingVariant` remains optional at the raw config type level because `IServiceBindingConfig` is also used outside pure create input typing, but create-flow methods (`validate()`, `create()`, `createServiceBinding()`, `createAndGenerateServiceBinding()`) require it at runtime.
 
 ### ICreateAndGenerateServiceBindingParams
 
