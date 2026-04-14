@@ -102,11 +102,20 @@ For `serviceType` in `createAndGenerate()`:
 - `serviceType` becomes optional in `ICreateAndGenerateServiceBindingParams` — existing callers providing it still compile
 - Default behavior when no variant: same as before (category defaults to `'1'`)
 
+## Notes / Recommendations
+
+- The spec should explicitly apply variant resolution to all public create-flow APIs, not only `buildServiceBindingCreateXml()` and `createAndGenerate()`. In practice this means `validate()`, `create()`, `createServiceBinding()`, and `createAndGenerateServiceBinding()` should all accept `bindingVariant` as a first-class input and normalize it before existing validation/runtime logic runs.
+- The export story for `SERVICE_BINDING_VARIANT_MAP` should be clarified. If consumers are expected to inspect it, export it consistently from both `src/core/service/index.ts` and the top-level `src/index.ts`. If not, remove the public-inspection wording.
+- Conflict handling between `bindingVariant` and legacy fields should be defined explicitly. Recommended behavior: if `bindingVariant` is provided and `bindingType` / `bindingVersion` / `bindingCategory` / `serviceType` are also provided with non-matching values, throw an explicit error instead of silently preferring one source.
+- The compatibility section should also state the runtime contract: legacy callers keep the current behavior unchanged, while `bindingVariant` is an additive input path that resolves into the same normalized fields.
+- The implementation would be cleaner and less error-prone if the spec called for a shared helper such as `resolveServiceBindingVariantParams()` that returns normalized `bindingType`, `bindingVersion`, `bindingCategory`, and optional `serviceType`.
+
 ## Testing
 
 - Existing tests with `bindingType`/`bindingVersion` remain unchanged
 - Add test case with `bindingVariant: 'ODATA_V4_UI'` to verify new path and category `0`
 - Optional: additional test cases for other variants if system supports them
+- Add tests for variant-only create flow, legacy flow without variant, and conflict cases where `bindingVariant` disagrees with legacy fields
 
 ## Follow-up Issues
 
