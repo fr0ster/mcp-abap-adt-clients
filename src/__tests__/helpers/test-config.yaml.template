@@ -1025,6 +1025,60 @@ create_access_control:
             where ( ) = aspect pfcg_auth ( 'S_TABU_NAM', ACTVT = '03', TABLE = 'ZAC_SHR_CDSUT_DDLS' );
           }
 
+# Create Transformation
+create_transformation:
+  test_cases:
+    - name: "adt_simple_transformation"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Simple Transformation reserved for AdtTransformation tests"
+      params:
+        transformation_name: "ZAC_ST01"
+        transformation_type: "SimpleTransformation"
+        description: "AdtTransformation workflow simple transformation"
+        # package_name: uses environment.default_package if omitted
+        # transport_request: uses environment.default_transport if omitted
+        source_code: |
+          <?sap.transform simple?>
+          <tt:transform xmlns:tt="http://www.sap.com/transformation-templates">
+            <tt:root name="ROOT"/>
+            <tt:template>
+              <root>
+                <tt:value ref="ROOT"/>
+              </root>
+            </tt:template>
+          </tt:transform>
+    - name: "adt_xslt_program"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "XSLT Program reserved for AdtTransformation tests"
+      params:
+        transformation_name: "ZAC_XSLT01"
+        transformation_type: "XSLTProgram"
+        description: "AdtTransformation workflow XSLT program"
+        # package_name: uses environment.default_package if omitted
+        # transport_request: uses environment.default_transport if omitted
+        source_code: |
+          <xsl:transform xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+            <xsl:template match="/">
+              <output>
+                <xsl:copy-of select="."/>
+              </output>
+            </xsl:template>
+          </xsl:transform>
+
+# Read Transformation
+read_transformation:
+  test_cases:
+    - name: "read_standard_transformation"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Read standard SAP transformation"
+      params:
+        # transformation_name: "ZAC_SHR_ST01"
+        # transformation_name_cloud: "ZAC_SHR_ST01"
+        # transformation_name_onprem: "ZAC_SHR_ST01"
+
 # Create Service Binding
 create_service_binding:
   test_cases:
