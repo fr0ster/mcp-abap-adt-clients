@@ -109,6 +109,11 @@ import {
   type ITableTypeConfig,
   type ITableTypeState,
 } from '../core/tabletype';
+import {
+  AdtTransformation,
+  type ITransformationConfig,
+  type ITransformationState,
+} from '../core/transformation';
 import { AdtRequest } from '../core/transport';
 import {
   AdtCdsUnitTest,
@@ -306,6 +311,19 @@ export class AdtClient {
    */
   getAccessControl(): IAdtObject<IAccessControlConfig, IAccessControlState> {
     return new AdtAccessControl(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for Transformation objects (XSLT)
+   * Supports both SimpleTransformation and XSLTProgram types
+   * @returns IAdtObject instance for Transformation operations
+   */
+  getTransformation(): IAdtObject<ITransformationConfig, ITransformationState> {
+    return new AdtTransformation(
       this.connection,
       this.logger,
       this.systemContext,

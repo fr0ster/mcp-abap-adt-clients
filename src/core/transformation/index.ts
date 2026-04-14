@@ -1,14 +1,10 @@
-export { activateTransformation } from './activation';
-export { checkTransformation } from './check';
-export { create } from './create';
-export { checkDeletion, deleteTransformation } from './delete';
-export { lockTransformation } from './lock';
-export {
-  getTransformation,
-  getTransformationSource,
-  getTransformationTransport,
-} from './read';
+import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { ITransformationConfig, ITransformationState } from './types';
+
+export { AdtTransformation } from './AdtTransformation';
 export * from './types';
-export { unlockTransformation } from './unlock';
-export { updateTransformation } from './update';
-export { validateTransformationName } from './validation';
+
+export type AdtTransformationType = IAdtObject<
+  ITransformationConfig,
+  ITransformationState
+>;

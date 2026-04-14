@@ -206,6 +206,12 @@ export type {
   ITableTypeState,
 } from './core/tabletype';
 export type {
+  AdtTransformationType,
+  ITransformationConfig,
+  ITransformationState,
+  TransformationType,
+} from './core/transformation';
+export type {
   AdtRequestType,
   IListTransportsParams,
   ITransportConfig,
