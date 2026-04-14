@@ -113,6 +113,12 @@ describe('ServiceBinding (using AdtClient)', () => {
           const packageName =
             params.test_subpackage_name || `${parentPackage}_SRVB`;
 
+          const bindingVariant = params.binding_variant || 'ODATA_V4_WEB_API';
+          const {
+            resolveBindingVariant,
+          } = require('../../../../core/service/types');
+          const resolved = resolveBindingVariant(bindingVariant);
+
           return {
             bindingName: params.binding_name,
             packageName,
@@ -123,7 +129,8 @@ describe('ServiceBinding (using AdtClient)', () => {
             serviceDefinitionName: params.service_definition_name,
             serviceName: params.service_name || params.service_definition_name,
             serviceVersion: params.service_version || '0001',
-            bindingVariant: params.binding_variant || 'ODATA_V4_WEB_API',
+            bindingVariant,
+            serviceType: resolved.serviceType,
             desiredPublicationState:
               params.desired_publication_state || 'unchanged',
           } as IServiceBindingConfig;
