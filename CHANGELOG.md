@@ -5,6 +5,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-04-14
+
+### Breaking Changes
+
+- **ServiceBinding**: `ICreateServiceBindingParams` now requires `bindingVariant: ServiceBindingVariant` instead of separate `bindingType`/`bindingVersion`/`bindingCategory` fields (#17)
+- **ServiceBinding**: `ICreateAndGenerateServiceBindingParams` no longer has a `serviceType` field — derived from variant automatically
+- **Dependencies**: `@mcp-abap-adt/interfaces` upgraded to `^7.0.0`, `@mcp-abap-adt/connection` to `^1.7.0`
+
+### Added
+
+- **Transformation module**: Full CRUD support for SAP XSLT transformations (`SimpleTransformation` and `XSLTProgram`) via new `AdtClient.getTransformation()` factory method
+  - Types: `ITransformationConfig`, `ITransformationState`, `TransformationType`
+  - Operations: validate, create, read, readMetadata, readTransport, update, delete, lock, unlock, check, activate
+  - Endpoint: `/sap/bc/adt/xslt/transformations`
+  - Content-Type: `application/vnd.sap.adt.transformations+xml`
+- **ServiceBindingVariant**: `resolveBindingVariant()` helper, `SERVICE_BINDING_VARIANT_MAP` re-exported from interfaces
+  - Variants: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`
+- **checkRun**: Added `transformation` / `xslt/vt` object type support
+
+### Fixed
+
+- **BatchRecordingConnection**: Add missing `connect()` method required by `IAbapConnection` interface (interfaces v7.0.0)
+- **Transformation validation**: Handle 404 on `/sap/bc/adt/xslt/validation` endpoint (not available on all systems)
+
 ## [4.0.5] - 2026-04-13
 
 ### Fixed
