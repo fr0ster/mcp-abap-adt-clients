@@ -34,7 +34,7 @@ const SERVICE_BINDING_VARIANT_MAP: Record<ServiceBindingVariant, {
 };
 ```
 
-The mapping object is exported from `types.ts` so consumers can inspect it if needed.
+The mapping object is exported as part of the public service API so consumers can inspect it if needed.
 
 ## Interface Changes
 
@@ -78,22 +78,43 @@ export interface ICreateAndGenerateServiceBindingParams
 
 ## Resolution Logic
 
-In `buildServiceBindingCreateXml()` and `createAndGenerate()`:
+Introduce a shared helper (for example `resolveServiceBindingVariantParams()`) that normalizes input into:
 
-1. If `bindingVariant` is provided — resolve from `SERVICE_BINDING_VARIANT_MAP`
-2. Else if `bindingType` + `bindingVersion` are provided — use them directly, `bindingCategory` defaults to `'1'`
+- `bindingType`
+- `bindingVersion`
+- `bindingCategory`
+- `serviceType` (when relevant for generate flow)
+
+Apply this normalization in all public create-flow APIs:
+
+- `validate()`
+- `create()`
+- `createServiceBinding()`
+- `createAndGenerateServiceBinding()`
+- `buildServiceBindingCreateXml()`
+
+Resolution rules:
+
+1. If `bindingVariant` is provided — resolve all normalized fields from `SERVICE_BINDING_VARIANT_MAP`
+2. Else if `bindingType` + `bindingVersion` are provided — use them directly, and `bindingCategory` defaults to `'1'`
 3. Else — throw Error: `'Either bindingVariant or bindingType+bindingVersion is required'`
 
-For `serviceType` in `createAndGenerate()`:
-1. If `bindingVariant` is provided — derive from map
+Conflict handling:
+
+- If `bindingVariant` is provided together with `bindingType`, `bindingVersion`, `bindingCategory`, or `serviceType`, and any provided legacy value does not match the variant mapping, throw an explicit error
+- If both forms are provided and values match, proceed with normalized values from the variant mapping
+
+For `serviceType` in generate flow:
+
+1. If `bindingVariant` is provided — derive `serviceType` from the variant map
 2. Else — use `params.serviceType` (required in legacy path)
 
 ## Files Changed
 
 - `src/core/service/types.ts` — add `ServiceBindingVariant`, `SERVICE_BINDING_VARIANT_MAP`, update interfaces
-- `src/core/service/AdtService.ts` — update `buildServiceBindingCreateXml()` and `createAndGenerate()` with resolution logic
+- `src/core/service/AdtService.ts` — add shared normalization helper and update `validate()`, `create()`, `createServiceBinding()`, `createAndGenerateServiceBinding()`, and `buildServiceBindingCreateXml()` to use it
 - `src/core/service/index.ts` — export new type and map
-- `src/index.ts` — export `ServiceBindingVariant` type
+- `src/index.ts` — export `ServiceBindingVariant` type and `SERVICE_BINDING_VARIANT_MAP`
 
 ## Backward Compatibility
 
@@ -101,14 +122,7 @@ For `serviceType` in `createAndGenerate()`:
 - `bindingType` and `bindingVersion` change from required to optional in `ICreateServiceBindingParams` — this is not a breaking change (callers providing them still compile)
 - `serviceType` becomes optional in `ICreateAndGenerateServiceBindingParams` — existing callers providing it still compile
 - Default behavior when no variant: same as before (category defaults to `'1'`)
-
-## Notes / Recommendations
-
-- The spec should explicitly apply variant resolution to all public create-flow APIs, not only `buildServiceBindingCreateXml()` and `createAndGenerate()`. In practice this means `validate()`, `create()`, `createServiceBinding()`, and `createAndGenerateServiceBinding()` should all accept `bindingVariant` as a first-class input and normalize it before existing validation/runtime logic runs.
-- The export story for `SERVICE_BINDING_VARIANT_MAP` should be clarified. If consumers are expected to inspect it, export it consistently from both `src/core/service/index.ts` and the top-level `src/index.ts`. If not, remove the public-inspection wording.
-- Conflict handling between `bindingVariant` and legacy fields should be defined explicitly. Recommended behavior: if `bindingVariant` is provided and `bindingType` / `bindingVersion` / `bindingCategory` / `serviceType` are also provided with non-matching values, throw an explicit error instead of silently preferring one source.
-- The compatibility section should also state the runtime contract: legacy callers keep the current behavior unchanged, while `bindingVariant` is an additive input path that resolves into the same normalized fields.
-- The implementation would be cleaner and less error-prone if the spec called for a shared helper such as `resolveServiceBindingVariantParams()` that returns normalized `bindingType`, `bindingVersion`, `bindingCategory`, and optional `serviceType`.
+- Runtime behavior for legacy callers remains unchanged; `bindingVariant` is an additive input path that resolves into the same normalized fields before existing validation and create logic runs
 
 ## Testing
 
