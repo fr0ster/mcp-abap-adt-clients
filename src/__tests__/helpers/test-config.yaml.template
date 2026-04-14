@@ -1091,9 +1091,7 @@ create_service_binding:
         service_definition_name: "ZAC_SRVD01"  # Existing SRVD name used by ServiceBinding integration test
         service_name: "ZAC_SRVD01"  # Usually same as service_definition_name
         service_version: "0001"
-        binding_type: "ODATA"
-        binding_version: "V4"  # V2 or V4
-        service_type: "odatav4"  # odatav2 or odatav4 (must match binding_version)
+        binding_variant: "ODATA_V4_WEB_API"
         desired_publication_state: "published"  # published | unpublished | unchanged
         description: "AdtServiceBinding workflow service binding"
         # software_component: "HOME"  # Optional; if omitted, inherited from parent package metadata
