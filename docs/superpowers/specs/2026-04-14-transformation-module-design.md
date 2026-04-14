@@ -81,6 +81,24 @@ interface ITransformationState extends IAdtObjectState {
 }
 ```
 
+## API Contract
+
+### High-level methods
+
+- `create()` requires: `transformationName`, `transformationType`, `packageName`
+- `update()` requires: `transformationName`, `sourceCode`
+- `delete()` requires: `transformationName`
+- `validate()` requires: `transformationName`
+
+### `sourceCode` behavior
+
+High-level `create()` must define one explicit contract:
+
+- **Preferred:** `sourceCode` is required for high-level `create()` because the create flow includes source update
+- **Fallback option:** if `sourceCode` is omitted, `create()` performs only metadata creation (`POST`) and skips `lock → update → check → activate`
+
+Implementation should choose one behavior and keep it consistent across docs, runtime code, and tests. Preferred option is to require `sourceCode` for high-level `create()`.
+
 ## Create XML
 
 ```xml
@@ -124,7 +142,7 @@ src/core/transformation/
 
 ## Class `AdtTransformation`
 
-Follows the exact same pattern as `AdtAccessControl`:
+Follows the same overall architectural pattern as `AdtAccessControl`, but the exact high-level create/update flow must be defined explicitly in this module spec and not inferred from the current `AdtAccessControl` implementation:
 
 - Constructor: `connection`, `logger?`, `systemContext?`
 - `objectType = 'Transformation'`
@@ -132,15 +150,23 @@ Follows the exact same pattern as `AdtAccessControl`:
 
 ### Operation Chains
 
-- **Create:** validate → create → check → lock → update (source) → unlock → activate (optional)
+- **Create:** validate → create → check (optional, if source exists) → lock → update (source) → read(longPolling) → unlock → check → activate (optional)
 - **Update:** lock → check(inactive) → update → read(longPolling) → unlock → check → activate (optional)
 - **Delete:** checkDeletion → delete
+
+Notes:
+
+- If `create()` allows missing `sourceCode`, it must stop after `create` and skip the source-related steps
+- Pre-update check should run against the inactive version and may include the new source payload
+- Final check should run after unlock
+- If activation is enabled, an additional `read(longPolling)` after activation is recommended to wait until the object is ready
 
 ### Session Management
 
 - Stateful only during lock/unlock
 - Always restore stateless after operations and on error cleanup
-- Automatic unlock on error with `setSessionType('stateless')`
+- On error, if `lockHandle` exists, attempt explicit unlock first
+- `setSessionType('stateless')` restores connection mode but does **not** replace an explicit unlock request
 
 ## Client Registration
 
@@ -173,21 +199,54 @@ export type { AdtTransformationType, ITransformationConfig, ITransformationState
 Add to `src/constants/contentTypes.ts`:
 
 ```typescript
+export const ACCEPT_TRANSFORMATION = 'application/vnd.sap.adt.transformations+xml';
 export const CT_TRANSFORMATION = 'application/vnd.sap.adt.transformations+xml';
 ```
 
 Source code read/write, lock, unlock, check, activation, deletion, validation — use existing shared content type constants.
 
+If metadata reads need compatibility across system versions, `ACCEPT_TRANSFORMATION` may later be extended with fallback media types. `CT_TRANSFORMATION` should remain a single concrete media type.
+
+If this module participates in negotiated header handling like other object types, follow the existing split between:
+
+- `src/constants/contentTypes.ts` for low-level CRUD constants
+- `src/core/shared/contentTypes.ts` for pluggable content-type providers
+
 ## Object Names
 
 - Support both flat names (`ZOK_TRANS_0001`) and namespace names (`/RRR/XML_TEST`)
 - Use existing `encodeSapObjectName()` for URL encoding
+- Encode URL names as `encodeSapObjectName(name.toLowerCase())`
 - Uppercase in XML payloads
+- Preserve enum literal value of `transformationType` exactly as provided by config
 
 ## Environment Support
 
 - Works on Cloud, On-Premise, and Legacy systems
 - No environment-specific branching initially (may be added later)
+
+## Read Semantics
+
+- `read()` returns source code from `/source/main`
+- `readMetadata()` returns object metadata from the base object URL
+- `readTransport()` returns transport information from `/transport`
+- Default read version is `inactive` unless a caller explicitly requests `active`
+- `read()` should return `undefined` on `404 Not Found` instead of throwing
+
+## Check and Validation Contract
+
+- `check.ts` uses the shared `checkRun` infrastructure
+- The spec must define which repository object type / URI is passed into the shared check payload for transformations
+- Pre-update check runs against the inactive version
+- Final check runs after unlock
+- `validation.ts` uses `POST /sap/bc/adt/xslt/validation?objname=...`
+- Validation request/response headers must be aligned with existing shared validation constants unless transformation-specific headers are proven necessary
+
+Low-level helper signatures should document:
+
+- input object name normalization rules
+- whether source payload is included in pre-update check
+- expected response shape for validation and check operations
 
 ## Testing (TDD)
 
@@ -196,9 +255,36 @@ Tests in `src/__tests__/integration/core/transformation/` — written **before**
 - Test-first for each CRUD operation
 - Cover both `SimpleTransformation` and `XSLTProgram` types
 - Support namespace names in test objects
-- Config section `transformation` in `test-config.yaml`
+- Config section `transformations` in `test-config.yaml` to match existing plural object registries
 - Idempotent: CREATE tests delete existing objects first
 - Sequential execution (maxWorkers: 1)
+- Add at least one standard flat-name test object and one namespace test object
+- Add explicit test cases for:
+  - create/update/read/delete of `SimpleTransformation`
+  - create/update/read/delete of `XSLTProgram`
+  - metadata read
+  - transport read
+  - validation
+  - check flow before and after update
+
+## State Contract
+
+Prefer the existing `IAdtObjectState` conventions already used by other modules:
+
+- `readResult` for source reads
+- `metadataResult` for metadata reads
+- `transportResult` for transport reads
+- `checkResult`, `activateResult`, `deleteResult`, `unlockResult`, `createResult`, `updateResult`
+
+`readSourceResult` should be added only if the module really needs a second, source-specific field beyond `readResult`. Otherwise, omit it to stay consistent with other object modules.
+
+## Open Questions / Assumptions
+
+- Assume `adtcore:type="XSLT/VT"` is valid for both `SimpleTransformation` and `XSLTProgram`
+- Assume both transformation kinds share the same base endpoint and XML namespace
+- Confirm whether validation endpoint and media-type behavior are identical on Cloud, On-Premise, and Legacy systems
+- Confirm whether metadata read needs Accept negotiation or version fallback
+- Confirm the exact shared-check object reference payload required by ADT for transformations
 
 ## Approach
 
