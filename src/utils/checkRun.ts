@@ -79,6 +79,9 @@ export function getObjectUri(objectType: string, objectName: string): string {
     case 'access_control':
     case 'dcls/dl':
       return `/sap/bc/adt/acm/dcl/sources/${encodedName}`;
+    case 'transformation':
+    case 'xslt/vt':
+      return `/sap/bc/adt/xslt/transformations/${encodedName}`;
     default:
       throw new Error(`Unsupported object type: ${objectType}`);
   }

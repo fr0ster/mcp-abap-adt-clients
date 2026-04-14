@@ -167,6 +167,11 @@ export const CT_METADATA_EXTENSION = 'application/vnd.sap.adt.ddic.ddlx.v1+xml';
 // Access Controls
 export const CT_ACCESS_CONTROL = 'application/vnd.sap.adt.dclSource+xml';
 
+// Transformations (XSLT)
+export const ACCEPT_TRANSFORMATION =
+  'application/vnd.sap.adt.transformations+xml';
+export const CT_TRANSFORMATION = 'application/vnd.sap.adt.transformations+xml';
+
 // Enhancements
 export const ACCEPT_ENHANCEMENT =
   'application/vnd.sap.adt.enhancements.v1+xml, application/xml';
