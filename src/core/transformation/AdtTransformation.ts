@@ -84,6 +84,15 @@ export class AdtTransformation
       state.validationResponse = response;
       return state;
     } catch (error) {
+      // Validation endpoint may not exist on all systems (e.g. cloud trial)
+      const e = error as HttpError;
+      if (e.response?.status === 404) {
+        this.logger?.warn?.(
+          'Validation endpoint not available, skipping validation',
+        );
+        state.validationResponse = { status: 200, data: '' } as any;
+        return state;
+      }
       const err = error instanceof Error ? error : new Error(String(error));
       state.errors.push({
         method: 'validate',
