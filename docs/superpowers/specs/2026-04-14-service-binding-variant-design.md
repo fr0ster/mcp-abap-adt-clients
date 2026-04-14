@@ -36,7 +36,9 @@ const SERVICE_BINDING_VARIANT_MAP: Record<ServiceBindingVariant, {
 };
 ```
 
-The mapping object is exported as part of the public service API so consumers can inspect it if needed.
+### Package Location
+
+`ServiceBindingVariant` type and `SERVICE_BINDING_VARIANT_MAP` are defined in `@mcp-abap-adt/interfaces` so that consumers (e.g. MCP tool layer) can import them directly without depending on `adt-clients`. The `adt-clients` package re-exports them.
 
 ## Interface Changes
 
@@ -95,10 +97,15 @@ No conflict handling needed — there is only one input path.
 
 ## Files Changed
 
-- `src/core/service/types.ts` — add `ServiceBindingVariant`, `SERVICE_BINDING_VARIANT_MAP`, update interfaces (remove old fields, add `bindingVariant`)
+### `@mcp-abap-adt/interfaces` (separate repo/package)
+- Add `ServiceBindingVariant` type and `SERVICE_BINDING_VARIANT_MAP` constant
+- Publish new version
+
+### `@mcp-abap-adt/adt-clients` (this repo)
+- `src/core/service/types.ts` — import from `@mcp-abap-adt/interfaces`, update interfaces (remove old fields, add `bindingVariant`)
 - `src/core/service/AdtService.ts` — add `resolveBindingVariant()` helper, update all create-flow methods to use it
-- `src/core/service/index.ts` — export new type and map
-- `src/index.ts` — export `ServiceBindingVariant` type and `SERVICE_BINDING_VARIANT_MAP`
+- `src/core/service/index.ts` — re-export type and map from interfaces
+- `src/index.ts` — re-export `ServiceBindingVariant` type and `SERVICE_BINDING_VARIANT_MAP`
 
 ## Testing
 
