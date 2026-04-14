@@ -1,0 +1,40 @@
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+} from '@mcp-abap-adt/interfaces';
+import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
+import { encodeSapObjectName } from '../../utils/internalUtils';
+import { getTimeout } from '../../utils/timeouts';
+import type { IUpdateTransformationParams } from './types';
+
+/**
+ * Update transformation source code
+ * Requires object to be locked first (lockHandle must be provided)
+ */
+export async function updateTransformation(
+  connection: IAbapConnection,
+  args: IUpdateTransformationParams,
+  lockHandle: string,
+): Promise<AxiosResponse> {
+  const transformationNameEncoded = encodeSapObjectName(
+    args.transformation_name.toLowerCase(),
+  );
+
+  const corrNrParam = args.transport_request
+    ? `&corrNr=${args.transport_request}`
+    : '';
+  const url = `/sap/bc/adt/xslt/transformations/${transformationNameEncoded}/source/main?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
+
+  const headers: Record<string, string> = {
+    Accept: ACCEPT_SOURCE,
+    'Content-Type': CT_SOURCE,
+  };
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'PUT',
+    timeout: getTimeout('default'),
+    data: args.source_code,
+    headers,
+  });
+}
