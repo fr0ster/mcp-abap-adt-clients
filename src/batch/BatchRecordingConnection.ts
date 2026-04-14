@@ -19,6 +19,10 @@ export class BatchRecordingConnection implements IAbapConnection {
     this.realConnection = realConnection;
   }
 
+  async connect(): Promise<void> {
+    return this.realConnection.connect();
+  }
+
   getBaseUrl(): Promise<string> {
     return this.realConnection.getBaseUrl();
   }
