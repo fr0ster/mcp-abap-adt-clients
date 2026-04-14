@@ -36,6 +36,7 @@ import type {
   IUpdateServiceBindingParams,
   IValidateServiceBindingParams,
 } from './types';
+import { resolveBindingVariant } from './types';
 
 export class AdtServiceBinding implements IAdtServiceBinding {
   private readonly connection: IAbapConnection;
@@ -63,7 +64,8 @@ export class AdtServiceBinding implements IAdtServiceBinding {
   private buildServiceBindingCreateXml(
     params: ICreateServiceBindingParams,
   ): string {
-    const bindingCategory = params.bindingCategory ?? '1';
+    const { bindingType, bindingVersion, bindingCategory } =
+      resolveBindingVariant(params.bindingVariant);
     const masterLanguage = params.masterLanguage ?? 'EN';
     const masterSystem = params.masterSystem;
     const responsible = params.responsible;
@@ -88,7 +90,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       <srvb:serviceDefinition adtcore:name="${escapedServiceDefinition}"/>
     </srvb:content>
   </srvb:services>
-  <srvb:binding srvb:category="${bindingCategory}" srvb:type="${params.bindingType}" srvb:version="${params.bindingVersion}">
+  <srvb:binding srvb:category="${bindingCategory}" srvb:type="${bindingType}" srvb:version="${bindingVersion}">
     <srvb:implementation adtcore:name=""/>
   </srvb:binding>
 </srvb:serviceBinding>`;
@@ -252,12 +254,12 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     if (!config.packageName) {
       throw new Error('packageName is required for validation');
     }
-    if (!config.bindingType) {
-      throw new Error('bindingType is required for validation');
+    if (!config.bindingVariant) {
+      throw new Error('bindingVariant is required for validation');
     }
-    if (!config.bindingVersion) {
-      throw new Error('bindingVersion is required for validation');
-    }
+    const { bindingType, bindingVersion } = resolveBindingVariant(
+      config.bindingVariant,
+    );
 
     // Validation flow:
     // 1) Read available binding types (GET discovery endpoint)
@@ -266,12 +268,12 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     const availableBindingTypes =
       this.extractAvailableBindingTypes(serviceTypesResult);
     const availabilityKey = this.getBindingTypeAvailabilityKey(
-      config.bindingType,
-      config.bindingVersion,
+      bindingType,
+      bindingVersion,
     );
     if (!availableBindingTypes.has(availabilityKey)) {
       throw new Error(
-        `Binding type ${config.bindingType}/${config.bindingVersion} is not available on current ADT system`,
+        `Binding variant ${config.bindingVariant} (${bindingType}/${bindingVersion}) is not available on current ADT system`,
       );
     }
 
@@ -312,12 +314,14 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     if (!config.serviceVersion) {
       throw new Error('serviceVersion is required');
     }
-    if (!config.bindingType) {
-      throw new Error('bindingType is required');
+    if (!config.bindingVariant) {
+      throw new Error('bindingVariant is required');
     }
-    if (!config.bindingVersion) {
-      throw new Error('bindingVersion is required');
-    }
+    const {
+      bindingType,
+      bindingVersion,
+      serviceType: generatedServiceType,
+    } = resolveBindingVariant(config.bindingVariant);
 
     const state: IServiceBindingState = { errors: [] };
 
@@ -326,12 +330,12 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     const availableBindingTypes =
       this.extractAvailableBindingTypes(serviceTypesResult);
     const availabilityKey = this.getBindingTypeAvailabilityKey(
-      config.bindingType,
-      config.bindingVersion,
+      bindingType,
+      bindingVersion,
     );
     if (!availableBindingTypes.has(availabilityKey)) {
       throw new Error(
-        `Binding type ${config.bindingType}/${config.bindingVersion} is not available on current ADT system`,
+        `Binding variant ${config.bindingVariant} (${bindingType}/${bindingVersion}) is not available on current ADT system`,
       );
     }
 
@@ -351,9 +355,7 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       serviceDefinitionName: config.serviceDefinitionName,
       serviceName: config.serviceName,
       serviceVersion: config.serviceVersion,
-      bindingType: config.bindingType,
-      bindingVersion: config.bindingVersion,
-      bindingCategory: config.bindingCategory,
+      bindingVariant: config.bindingVariant,
       masterLanguage: config.masterLanguage,
       masterSystem: config.masterSystem,
       responsible: config.responsible,
@@ -379,12 +381,6 @@ export class AdtServiceBinding implements IAdtServiceBinding {
       bindingName: config.bindingName,
       version: activateAfterCreate ? 'active' : 'inactive',
     });
-
-    const generatedServiceType =
-      config.serviceType ??
-      (config.bindingType === 'ODATA' && String(config.bindingVersion) === 'V2'
-        ? 'odatav2'
-        : 'odatav4');
 
     state.generatedInfoResult = await this.generateServiceBinding({
       serviceType: generatedServiceType,
@@ -679,11 +675,8 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     if (!params.serviceVersion) {
       throw new Error('serviceVersion is required');
     }
-    if (!params.bindingType) {
-      throw new Error('bindingType is required');
-    }
-    if (!params.bindingVersion) {
-      throw new Error('bindingVersion is required');
+    if (!params.bindingVariant) {
+      throw new Error('bindingVariant is required');
     }
 
     const systemInfo = await getSystemInformation(this.connection);
@@ -920,13 +913,10 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         serviceDefinitionName: params.serviceDefinitionName,
         serviceName: params.serviceName,
         serviceVersion: params.serviceVersion,
-        bindingType: params.bindingType,
-        bindingVersion: params.bindingVersion,
-        bindingCategory: params.bindingCategory,
+        bindingVariant: params.bindingVariant,
         masterLanguage: params.masterLanguage,
         masterSystem: params.masterSystem,
         responsible: params.responsible,
-        serviceType: params.serviceType,
         runTransportCheck: params.runTransportCheck,
       },
       { activateOnCreate: true },

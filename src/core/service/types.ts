@@ -1,14 +1,28 @@
-import type {
-  IAdtObject,
-  IAdtObjectState,
-  IAdtOperationOptions,
-  IAdtResponse,
+import {
+  type IAdtObject,
+  type IAdtObjectState,
+  type IAdtOperationOptions,
+  type IAdtResponse,
+  SERVICE_BINDING_VARIANT_MAP,
+  type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces';
+
+export type { ServiceBindingVariant } from '@mcp-abap-adt/interfaces';
+export { SERVICE_BINDING_VARIANT_MAP } from '@mcp-abap-adt/interfaces';
 
 export type ServiceBindingType = 'ODATA' | 'INA' | 'SQL';
 export type ServiceBindingVersion = 'V2' | 'V4' | '0001' | '0000' | string;
 export type GeneratedServiceType = 'odatav2' | 'odatav4';
 export type DesiredPublicationState = 'published' | 'unpublished' | 'unchanged';
+
+export function resolveBindingVariant(variant: ServiceBindingVariant): {
+  bindingType: ServiceBindingType;
+  bindingVersion: ServiceBindingVersion;
+  bindingCategory: '0' | '1';
+  serviceType: GeneratedServiceType;
+} {
+  return SERVICE_BINDING_VARIANT_MAP[variant];
+}
 
 export interface IServiceBindingConfig {
   bindingName: string;
@@ -17,9 +31,7 @@ export interface IServiceBindingConfig {
   serviceDefinitionName?: string;
   serviceName?: string;
   serviceVersion?: string;
-  bindingType?: ServiceBindingType;
-  bindingVersion?: ServiceBindingVersion;
-  bindingCategory?: '0' | '1' | string;
+  bindingVariant?: ServiceBindingVariant;
   masterLanguage?: string;
   masterSystem?: string;
   responsible?: string;
@@ -84,9 +96,7 @@ export interface ICreateServiceBindingParams {
   serviceDefinitionName: string;
   serviceName: string;
   serviceVersion: string;
-  bindingType: ServiceBindingType;
-  bindingVersion: ServiceBindingVersion;
-  bindingCategory?: '0' | '1' | string;
+  bindingVariant: ServiceBindingVariant;
   masterLanguage?: string;
   masterSystem?: string;
   responsible?: string;
@@ -132,9 +142,7 @@ export interface IGenerateServiceBindingParams {
 }
 
 export interface ICreateAndGenerateServiceBindingParams
-  extends ICreateServiceBindingParams {
-  serviceType: GeneratedServiceType;
-}
+  extends ICreateServiceBindingParams {}
 
 export interface IAdtServiceBinding
   extends IAdtObject<IServiceBindingConfig, IServiceBindingState> {

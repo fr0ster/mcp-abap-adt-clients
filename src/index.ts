@@ -162,9 +162,15 @@ export type {
   IUpdateServiceBindingParams,
   IValidateServiceBindingParams,
   ServiceBindingType,
+  ServiceBindingVariant,
   ServiceBindingVersion,
 } from './core/service';
-export { AdtService, AdtServiceBinding } from './core/service';
+export {
+  AdtService,
+  AdtServiceBinding,
+  resolveBindingVariant,
+  SERVICE_BINDING_VARIANT_MAP,
+} from './core/service';
 export type {
   AdtServiceDefinitionType,
   IServiceDefinitionConfig,

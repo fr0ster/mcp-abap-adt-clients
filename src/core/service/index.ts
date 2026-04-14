@@ -22,5 +22,7 @@ export type {
   IUpdateServiceBindingParams,
   IValidateServiceBindingParams,
   ServiceBindingType,
+  ServiceBindingVariant,
   ServiceBindingVersion,
 } from './types';
+export { resolveBindingVariant, SERVICE_BINDING_VARIANT_MAP } from './types';
