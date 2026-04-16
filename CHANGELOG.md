@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-04-16
+
+### Changed
+
+- **Dependencies**: `@mcp-abap-adt/connection` upgraded to `^1.8.0`
+
 ## [5.0.0] - 2026-04-14
 
 ### Breaking Changes

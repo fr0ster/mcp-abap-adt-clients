@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/adt-clients",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "description": "ADT clients for SAP ABAP systems - AdtClient and AdtRuntimeClient",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -78,7 +78,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
-    "@mcp-abap-adt/connection": "^1.7.0",
+    "@mcp-abap-adt/connection": "^1.8.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.3.3",
     "dotenv": "^17.3.1",
