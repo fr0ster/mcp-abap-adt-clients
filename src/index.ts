@@ -63,6 +63,10 @@ export type {
   IAccessControlState,
 } from './core/accessControl';
 export type {
+  IAuthorizationFieldConfig,
+  IAuthorizationFieldState,
+} from './core/authorizationField';
+export type {
   AdtBehaviorDefinitionType,
   BehaviorDefinitionImplementationType,
   CheckReporter,
@@ -111,6 +115,10 @@ export type {
   IFunctionGroupConfig,
   IFunctionGroupState,
 } from './core/functionGroup';
+export type {
+  IFunctionIncludeConfig,
+  IFunctionIncludeState,
+} from './core/functionInclude';
 export type {
   AdtFunctionModuleType,
   IFunctionModuleConfig,
