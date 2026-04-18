@@ -119,6 +119,12 @@ export const ACCEPT_FUNCTION_MODULE =
 export const CT_FUNCTION_MODULE =
   'application/vnd.sap.adt.functions.fmodules+xml';
 
+// Function Includes (FUGR/I)
+export const ACCEPT_FUNCTION_INCLUDE =
+  'application/vnd.sap.adt.functions.fincludes.v2+xml, application/vnd.sap.adt.functions.fincludes+xml';
+export const CT_FUNCTION_INCLUDE =
+  'application/vnd.sap.adt.functions.fincludes.v2+xml';
+
 // Tables
 export const ACCEPT_TABLE =
   'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml';
