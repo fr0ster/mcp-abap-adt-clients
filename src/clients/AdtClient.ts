@@ -24,6 +24,11 @@ import {
   type IAccessControlState,
 } from '../core/accessControl';
 import {
+  AdtAuthorizationField,
+  type IAuthorizationFieldConfig,
+  type IAuthorizationFieldState,
+} from '../core/authorizationField';
+import {
   AdtBehaviorDefinition,
   type IBehaviorDefinitionConfig,
   type IBehaviorDefinitionState,
@@ -66,6 +71,11 @@ import {
   type IFunctionGroupConfig,
   type IFunctionGroupState,
 } from '../core/functionGroup';
+import {
+  AdtFunctionInclude,
+  type IFunctionIncludeConfig,
+  type IFunctionIncludeState,
+} from '../core/functionInclude';
 import {
   AdtFunctionModule,
   type IFunctionModuleConfig,
@@ -236,6 +246,21 @@ export class AdtClient {
   }
 
   /**
+   * Get high-level operations for AuthorizationField objects
+   * @returns IAdtObject instance for AuthorizationField operations
+   */
+  getAuthorizationField(): IAdtObject<
+    IAuthorizationFieldConfig,
+    IAuthorizationFieldState
+  > {
+    return new AdtAuthorizationField(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
    * Get high-level operations for Structure objects
    * @returns IAdtObject instance for Structure operations
    */
@@ -290,6 +315,22 @@ export class AdtClient {
    */
   getFunctionModule(): IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
     return new AdtFunctionModule(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.contentTypes,
+    );
+  }
+
+  /**
+   * Get high-level operations for FunctionInclude objects
+   * @returns IAdtObject instance for FunctionInclude operations
+   */
+  getFunctionInclude(): IAdtObject<
+    IFunctionIncludeConfig,
+    IFunctionIncludeState
+  > {
+    return new AdtFunctionInclude(
       this.connection,
       this.logger,
       this.systemContext,
