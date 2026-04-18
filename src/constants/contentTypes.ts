@@ -134,6 +134,12 @@ export const ACCEPT_DOMAIN =
   'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml';
 export const CT_DOMAIN = 'application/vnd.sap.adt.domains.v2+xml';
 
+// Authorization Fields (SUSO / AUTH)
+// Shared blues envelope used by APS IAM auth endpoints
+export const ACCEPT_AUTHORIZATION_FIELD =
+  'application/vnd.sap.adt.blues.v1+xml';
+export const CT_AUTHORIZATION_FIELD = 'application/vnd.sap.adt.blues.v1+xml';
+
 // Data Elements
 export const ACCEPT_DATA_ELEMENT =
   'application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml';
