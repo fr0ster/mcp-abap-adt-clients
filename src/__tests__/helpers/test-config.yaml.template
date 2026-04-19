@@ -863,12 +863,12 @@ create_authorization_field:
       available_in: ["onprem"]
       description: "Authorization field reserved for AdtAuthorizationField tests"
       params:
-        authorization_field_name: "ZAC_AUTHFLD01"
+        authorization_field_name: "ZAC_AUTH01"
         description: "AdtAuthorizationField workflow field"
         # package_name: "ZAC_PKG01"
         # transport_request: ""
         # Optional content fields — left commented; CRUD flow exercises them via update:
-        # field_name: "ZAC_AUTHFLD01"
+        # field_name: "ZAC_AUTH01"
         # roll_name: "CHAR10"
         # domname: "CHAR10"
         # outputlen: "10"
