@@ -3,12 +3,16 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.2.0] - 2026-04-19
 
 ### Added
 
 - **authorizationField** core module: SUSO / AUTH type handler with full CRUD + lifecycle. New `AdtClient.getAuthorizationField()` factory. Endpoint `/sap/bc/adt/aps/iam/auth/{name}`. Available on modern on-prem (E19+) and cloud MDD; absent on legacy systems. (#19)
 - **functionInclude** core module: FUGR/I source-bearing handler with full CRUD + lifecycle and dedicated `readSource()`. New `AdtClient.getFunctionInclude()` factory. Endpoint `/sap/bc/adt/functions/groups/{groupName}/includes/{includeName}`. Available on all systems (legacy, modern on-prem, cloud). (#19)
+
+### Documentation
+
+- README, CLIENT_API_REFERENCE, ARCHITECTURE, LEGACY, ADT_OBJECT_ENTITIES updated for the two new modules. (#21)
 
 ## [5.1.0] - 2026-04-16
 
