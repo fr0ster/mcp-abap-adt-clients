@@ -4,6 +4,8 @@ Date: 2026-04-19
 Status: Three-variant proposal awaiting user decision
 Parent: `docs/superpowers/specs/2026-04-19-sapcli-separate-clients-proposal.md` (roadmap item #1)
 
+> **Per-class variant-selection pattern.** Each class in the sapcli-separate-clients roadmap gets its own design document of this shape. The variant choice (A / B / C) is resolved **independently per class**, not once for the whole roadmap. Implementation planning for a class does not start until its own variant is picked.
+
 ## 1. Goal
 
 Add feature-toggle support to `@mcp-abap-adt/adt-clients`. This document presents **three architectural variants** with different scope and placement. The user picks one before implementation planning starts.
