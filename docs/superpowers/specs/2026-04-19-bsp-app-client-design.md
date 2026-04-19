@@ -26,7 +26,13 @@ Variant A explores whether BSP fits IAdtObject. Variant B is a narrow sapcli-par
 Dependencies and style:
 
 - Uses `pyodata` OData v2 client — not raw HTTP.
-- Entity set: `Repositories` (inferred — sapcli does not print the service URL, but pyodata clients are typically bound at construction to `UI5/ABAP_REPOSITORY_SRV`).
+- Entity set: `Repositories`.
+- Service URL: **`UI5/ABAP_REPOSITORY_SRV`** — explicitly bound at the command-group registration site (`sap/cli/__init__.py:111`):
+  ```python
+  (partial(odata_connection_from_args, 'UI5/ABAP_REPOSITORY_SRV'), sap.cli.bsp.CommandGroup())
+  ```
+- sapcli shares this OData-v2 pattern across all its UI-related commands — BSP uses `UI5/ABAP_REPOSITORY_SRV`, FLP uses `UI2/PAGE_BUILDER_CUST` (same line 112). Any minimal OData-v2 helper we implement is reusable between the two.
+- **sapcli does NOT use ADT filestore.** A repo-wide grep for `filestore`, `ui5-bsp`, `deploy-storage`, and `ui5-rt-version` returns zero hits in sapcli's source tree. There are no code comments or docstrings explaining the choice — the OData-v2 path appears historically established, not argued for in code. Our design therefore treats ADT filestore as a new transport that needs live verification, while OData v2 is the fully-sapcli-documented fallback.
 
 Commands:
 
