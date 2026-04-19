@@ -14,6 +14,7 @@ TypeScript clients for SAP ABAP Development Tools (ADT).
   - `AdtRuntimeClientBatch` – batch mode for runtime operations
   - `AdtRuntimeClientExperimental` – runtime APIs in progress (for example AMDP debugger)
   - `AdtClientsWS` – realtime WebSocket facade for event-driven workflows
+  - `AdtAbapGitClient` – standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+)
 - ✅ **ABAP Unit test support** – run and manage ABAP Unit tests (class and CDS view tests)
 - ✅ **Stateful session management** – maintains `sap-adt-connection-id` across operations
 - ✅ **Lock registry** – persistent `.locks/active-locks.json` with CLI tools for recovery
