@@ -51,7 +51,7 @@ All clients accept `IAbapConnection` + `ILogger`. Optional: `options.enableAccep
 
 ### Core Modules (`src/core/`)
 
-24 object-type modules (class, program, interface, view, table, structure, domain, dataElement, package, functionGroup, functionModule, functionInclude, accessControl, serviceDefinition, service, behaviorDefinition, behaviorImplementation, metadataExtension, enhancement, tabletype, transport, unitTest, authorizationField). Each follows this structure:
+25 object-type modules (class, program, interface, view, table, structure, domain, dataElement, package, functionGroup, functionModule, functionInclude, accessControl, serviceDefinition, service, behaviorDefinition, behaviorImplementation, metadataExtension, enhancement, tabletype, transport, unitTest, authorizationField, featureToggle). Each follows this structure:
 
 - `AdtXxx.ts` — High-level class implementing `IAdtObject<Config, State>`
 - `types.ts` — `IXxxConfig` (camelCase, public API) and `IXxxState` (operation results, errors array) and `ICreateXxxParams` (snake_case, low-level internal)
