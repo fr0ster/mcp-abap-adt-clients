@@ -141,6 +141,7 @@ npm install @mcp-abap-adt/adt-clients
 | Metadata Extensions (DDLX) | ✅ |
 | Packages (DEVC) | ✅ |
 | Authorization Fields (SUSO / AUTH) | ✅ |
+| Feature Toggles (FTG2/FT) | ✅ |
 | Transports (TRNS) | ✅ |
 
 ## Quick Start
