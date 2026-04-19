@@ -1137,46 +1137,11 @@ git commit -m "feat(abapGit): add handler class and barrel export"
 
 ---
 
-## Phase E: Wiring into AdtClient and public exports
+## Phase E: Public exports (standalone top-level client)
 
-### Task E1: AdtClient factory
+**Architectural rule.** `AdtClient` is reserved for `IAdtObject` factories. Separate clients like `AdtAbapGitClient` are **standalone top-level classes** — consumers instantiate them directly via `new AdtAbapGitClient(connection, logger, options)`. This phase does **not** touch `src/clients/AdtClient.ts`; it only exposes the new class and its types from the public entry point.
 
-**Files:**
-- Modify: `src/clients/AdtClient.ts`
-
-- [ ] **Step 1: Read** `src/clients/AdtClient.ts` — find the region where factory methods for other top-level clients live (probably near `getRuntime()` or similar, not in the `src/core/*` factories).
-
-- [ ] **Step 2: Add imports at the top**
-
-```typescript
-import { AdtAbapGitClient } from './AdtAbapGitClient';
-import type {
-  IAdtAbapGitClient,
-  IAdtAbapGitClientOptions,
-} from './abapGit/index';
-```
-
-- [ ] **Step 3: Add factory method near other top-level factories**
-
-```typescript
-getAbapGit(options?: IAdtAbapGitClientOptions): IAdtAbapGitClient {
-  return new AdtAbapGitClient(this.connection, this.logger, options);
-}
-```
-
-Return type is `IAdtAbapGitClient` — specialized interface, not a narrower base type.
-
-- [ ] **Step 4: Type-check and commit**
-
-```bash
-npm run build:fast
-git add src/clients/AdtClient.ts
-git commit -m "feat(AdtClient): add getAbapGit factory returning IAdtAbapGitClient"
-```
-
----
-
-### Task E2: Public exports in `src/index.ts`
+### Task E1: Public exports in `src/index.ts`
 
 **Files:**
 - Modify: `src/index.ts`
@@ -1217,8 +1182,10 @@ Expected: clean (Biome + tsc).
 
 ```bash
 git add src/index.ts
-git commit -m "feat: export AdtAbapGitClient and IAdtAbapGitClient*"
+git commit -m "feat(abapGit): export AdtAbapGitClient and IAdtAbapGitClient*"
 ```
+
+Note: `src/clients/AdtClient.ts` is **not** modified in this phase. The architectural rule is that `AdtClient` only produces `IAdtObject<Config, State>` factories; separate clients stand alone.
 
 ---
 
@@ -1285,6 +1252,10 @@ mkdir -p src/__tests__/integration/clients/abapGit
 /**
  * AbapGit client integration tests.
  *
+ * AdtAbapGitClient is a standalone top-level class, instantiated
+ * directly — not accessed via a factory on AdtClient (which is
+ * reserved for IAdtObject implementations only).
+ *
  * - listRepos: always runs (read-only, no mutation)
  * - checkExternalRepo: always runs (read-only probe)
  * - link_pull_unlink_flow: gated behind the test-config enabled flag
@@ -1303,26 +1274,22 @@ import {
   createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
-import {
-  createTestAdtClient,
-  getConfig,
-  resolveSystemContext,
-} from '../../../helpers/sessionConfig';
+import { getConfig } from '../../../helpers/sessionConfig';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
-import type { AdtClient } from '../../../../clients/AdtClient';
+import { AdtAbapGitClient } from '../../../../clients/AdtAbapGitClient';
+import type { IAdtAbapGitClient } from '../../../../clients/abapGit';
 
 dotenv.config();
 
 const {
   getEnabledTestCase,
-  getEnvironmentConfig,
   getTestCaseDefinition,
   getTimeout,
 } = require('../../../helpers/test-helper');
 
-describe('AbapGit (using AdtClient)', () => {
+describe('AbapGit (standalone AdtAbapGitClient)', () => {
   let connection: IAbapConnection;
-  let client: AdtClient;
+  let abapGit: IAdtAbapGitClient;
   let isCloudSystem = false;
   let hasConfig = false;
 
@@ -1332,13 +1299,7 @@ describe('AbapGit (using AdtClient)', () => {
       connection = createAbapConnection(config, createConnectionLogger('abapgit'));
       await (connection as any).connect();
       isCloudSystem = await isCloudEnvironment(connection);
-      const systemContext = await resolveSystemContext(connection, isCloudSystem);
-      const { client: resolvedClient } = await createTestAdtClient(
-        connection,
-        createLibraryLogger('abapgit'),
-        systemContext,
-      );
-      client = resolvedClient;
+      abapGit = new AdtAbapGitClient(connection, createLibraryLogger('abapgit'));
       hasConfig = true;
     } catch (err) {
       createTestsLogger('abapgit').warn(
@@ -1360,7 +1321,6 @@ describe('AbapGit (using AdtClient)', () => {
     'should list abapGit repositories',
     async () => {
       if (!hasConfig) throw new Error('test config missing');
-      const abapGit = client.getAbapGit();
       const repos = await abapGit.listRepos();
       expect(Array.isArray(repos)).toBe(true);
       for (const r of repos) {
@@ -1377,7 +1337,6 @@ describe('AbapGit (using AdtClient)', () => {
     'should probe an external repo',
     async () => {
       if (!hasConfig || !checkCase) throw new Error('test config missing');
-      const abapGit = client.getAbapGit();
       const info = await abapGit.checkExternalRepo({
         url: checkCase.params.url,
       });
@@ -1391,7 +1350,6 @@ describe('AbapGit (using AdtClient)', () => {
     'should execute link → pull → unlink flow',
     async () => {
       if (!hasConfig || !flowCase) throw new Error('test config missing');
-      const abapGit = client.getAbapGit();
 
       await abapGit.link({
         package: flowCase.params.package,
@@ -1473,7 +1431,7 @@ rm test-abapgit.log
 - Modify: `docs/architecture/ARCHITECTURE.md`
 - Modify: `docs/architecture/LEGACY.md`
 
-- [ ] **Step 1: `CLAUDE.md`** — add a one-line entry about `AdtAbapGitClient` next to the other top-level clients (near `AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, `AdtClientsWS`).
+- [ ] **Step 1: `CLAUDE.md`** — add a short paragraph about `AdtAbapGitClient` in the "Client Classes" section, next to `AdtClient` / `AdtRuntimeClient` / `AdtExecutor` / `AdtClientsWS`. Note it's a standalone top-level class (not a factory on AdtClient).
 
 - [ ] **Step 2: `README.md`** — add a row "abapGit repositories" in the Supported Features table with `✅` gated on modern systems.
 
@@ -1482,13 +1440,15 @@ rm test-abapgit.log
 ````markdown
 ### AbapGit (ADT-integrated)
 
+`AdtAbapGitClient` is a **standalone top-level class**, not a factory on `AdtClient`. `AdtClient` is reserved for `IAdtObject<Config, State>` implementations — separate clients stand on their own and are instantiated directly, same pattern as `AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, and `AdtClientsWS`.
+
 ```typescript
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
+import type { IAdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
 
 const connection = createAbapConnection({ /* ... */ });
-const client = new AdtClient(connection);
-const abapGit = client.getAbapGit();
+const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection);
 
 // Probe a remote repo before linking
 const info = await abapGit.checkExternalRepo({

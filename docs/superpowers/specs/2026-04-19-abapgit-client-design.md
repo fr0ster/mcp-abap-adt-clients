@@ -96,13 +96,19 @@ Variant C fills the first, fourth, fifth, and sixth via `unlink`, `checkExternal
 
 ## 4. Public API shape
 
-### 4.1 Factory on `AdtClient`
+### 4.1 Standalone top-level class
+
+Per the roadmap's architectural constraint (§4 and §4.2), `AdtClient` is reserved for `IAdtObject` factories. For non-`IAdtObject` surfaces, we ship separate top-level client classes that consumers instantiate directly — same pattern as `AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, and `AdtClientsWS`.
 
 ```ts
-getAbapGit(options?: IAdtAbapGitClientOptions): IAdtAbapGitClient;
+import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
+
+const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection, logger, options);
 ```
 
-Returns an `AdtAbapGitClient` instance typed as the specialized public interface (per roadmap §4.2). No cast required at call sites. The optional per-instance options object is the only supported way to opt into non-default abapGit content-type behaviour.
+The class's concrete type (`AdtAbapGitClient`) implements `IAdtAbapGitClient`. Consumers typically annotate the variable as the interface so the full supported API stays visible without casts and the concrete class can evolve internally.
+
+There is **no** `AdtClient.getAbapGit()` method. Adding one would violate the `AdtClient` = IAdtObject-only invariant.
 
 ### 4.2 Specialized public interface
 

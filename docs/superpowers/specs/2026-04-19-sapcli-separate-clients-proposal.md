@@ -70,9 +70,10 @@ Kept as paper designs for when investigation resumes:
 
 All candidate classes must:
 
+- **Be standalone top-level classes**, following the existing pattern used by `AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, and `AdtClientsWS`. Users instantiate them directly: `new AdtAbapGitClient(connection, logger, options)`. There is **no** factory method on `AdtClient` — `AdtClient` only produces `IAdtObject<Config, State>` implementations. For every non-`IAdtObject` interface, a separate top-level client class serves as its own factory surface.
 - Accept `IAbapConnection` + `ILogger` via constructor. The **options contract** (`IAdtClientOptions`-style vs a reduced runtime-style object vs a new shared contract) is NOT yet standard across the repo — `AdtClient` and `AdtRuntimeClient` currently differ. Each per-class spec **must explicitly choose** one of these shapes and justify the pick; a cross-cutting decision can happen later if a pattern emerges.
 - Depend only on the `IAbapConnection` interface. No RFC, no direct transport.
-- Expose zero-argument factory methods — identity / repo-name / toggle-id lives in config objects, not factory parameters.
+- Expose zero-argument (or config-object-only) public methods — per-operation identity (repo name, toggle id) lives in the argument objects, not in the constructor or as additional factories.
 - Live under `src/clients/` (or `src/runtime/` if runtime-adjacent) alongside existing top-level clients, NOT under `src/core/`.
 - Integrate with the existing Accept/content-type correction wrapper when applicable.
 - Ship with integration tests under `src/__tests__/integration/clients/{clientName}/` (new fixture path; no existing folder) using the established `TestConfigResolver` / `BaseTester` helpers where they fit.
@@ -101,7 +102,8 @@ Applied to the current roadmap:
 - Every new public class with API beyond a shared base contract must have its own **specialized public interface**.
 - Separate clients therefore expose dedicated interfaces such as `IAdtBspAppClient`, `IAdtFlpBuilderClient`, `IAdtAbapGitClient`, `IAdtGctsClient` (final names decided per spec).
 - Core modules that extend `IAdtObject<Config, State>` with domain methods must expose a specialized interface that extends `IAdtObject<...>` and includes those methods.
-- Factory methods must return the specialized interface, **not** the narrower base type, so the full supported API remains statically visible without casts.
+- **Separate clients are standalone top-level classes**, not factory methods on `AdtClient`. `AdtClient` only manufactures `IAdtObject` implementations. Each separate client's concrete class implements its own specialized interface; consumers `new` the class directly.
+- For core-module domain methods, the (existing) `AdtClient.getXxx()` factory returns the specialized interface (e.g. `IFeatureToggleObject`), not the narrower `IAdtObject<...>` — so the full supported API stays statically visible without casts.
 
 ## 5. Recommended PR ordering
 
