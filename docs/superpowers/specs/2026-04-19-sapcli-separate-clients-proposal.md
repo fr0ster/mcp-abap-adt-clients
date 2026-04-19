@@ -76,6 +76,31 @@ All candidate classes must:
 - Ship with integration tests under `src/__tests__/integration/clients/{clientName}/` (new fixture path; no existing folder) using the established `TestConfigResolver` / `BaseTester` helpers where they fit.
 - Use the **3-level environment vocabulary** in `available_in`: `cloud`, `onprem`, `legacy` — matching the existing `test-config.yaml.template` convention (e.g. `["onprem", "legacy"]`, `["legacy"]`). Each per-class spec must explicitly state legacy behaviour (supported, read-only, or unsupported) rather than collapsing it into a single non-cloud bucket.
 
+### 4.1 Variant-selection rule (`A` / `B` / `C`)
+
+Per-class design docs use the same three-variant pattern, but the default choice differs by surface shape:
+
+- **Variant A** fits only when the ADT surface is fundamentally a **repository object** with a real object identity and lifecycle: collection endpoint, object URI, metadata payload, package binding, lock/unlock, activation, source/main or equivalent.
+- **Variant B** is a narrow fallback for a deliberately reduced wrapper. It is acceptable only when v1 intentionally exposes a subset of the surface and explicitly does **not** aim to be the main long-term API.
+- **Variant C** is the default for **separate clients** in this roadmap: service-like, orchestration-heavy, repository-management, OData multi-entity, or long-running operational surfaces that do not naturally map to `IAdtObject<Config, State>`.
+
+Applied to the current roadmap:
+
+- `AdtBspAppClient`: default starting assumption is **Variant C**
+- `AdtFlpBuilderClient`: default starting assumption is **Variant C**
+- `AdtAbapGitClient`: default starting assumption is **Variant C**
+- `AdtGctsClient`: default starting assumption is **Variant C**
+- `FeatureToggle`: selected **Variant A** in its own design doc because the evidence points to a real ADT artifact (`FTG2/FT`) rather than a service-only surface
+
+`~/prj/sapcli` is useful for endpoint traces, headers, payloads, and operation sequences, but **not** as the primary architectural argument for `A` vs `B` vs `C`, because sapcli models many unrelated surfaces as separate manager classes.
+
+### 4.2 Public typing rule
+
+- Every new public class with API beyond a shared base contract must have its own **specialized public interface**.
+- Separate clients therefore expose dedicated interfaces such as `IAdtBspAppClient`, `IAdtFlpBuilderClient`, `IAdtAbapGitClient`, `IAdtGctsClient` (final names decided per spec).
+- Core modules that extend `IAdtObject<Config, State>` with domain methods must expose a specialized interface that extends `IAdtObject<...>` and includes those methods.
+- Factory methods must return the specialized interface, **not** the narrower base type, so the full supported API remains statically visible without casts.
+
 ## 5. Recommended PR ordering
 
 One PR per class. Rationale: each endpoint family has its own semantics, auth quirks, and test needs. Bundling would produce a review nightmare.

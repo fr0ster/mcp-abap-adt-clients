@@ -8,12 +8,12 @@ Parent: `docs/superpowers/specs/2026-04-19-sapcli-separate-clients-proposal.md` 
 
 ## 1. Goal
 
-Add full feature-toggle support to `@mcp-abap-adt/adt-clients` as a core module under `src/core/featureToggle/`, following the same `IAdtObject<Config, State>` architecture that backs the existing 24 core modules. Extend the canonical interface with three feature-toggle-specific methods (`switchOn`, `switchOff`, `getRuntimeState`) to cover the sapcli use cases on top of the standard CRUD + lifecycle.
+Add full feature-toggle support to `@mcp-abap-adt/adt-clients` as a core module under `src/core/featureToggle/`, following the same `IAdtObject<Config, State>` architecture that backs the existing 24 core modules. The public API must be exposed through a **specialized interface** (`IFeatureToggleObject extends IAdtObject<...>`) so the feature-toggle-specific methods stay statically visible on the factory return type instead of being hidden behind casts.
 
 ## 2. Scope
 
 **In scope:**
-- Full CRUD + lifecycle per `IAdtObject<IFeatureToggleConfig, IFeatureToggleState>`: `validate`, `create`, `read`, `readMetadata`, `update`, `delete`, `lock`, `unlock`, `check`, `activate`, `readTransport`.
+- Full CRUD + lifecycle per `IFeatureToggleObject extends IAdtObject<IFeatureToggleConfig, IFeatureToggleState>`: `validate`, `create`, `read`, `readMetadata`, `update`, `delete`, `lock`, `unlock`, `check`, `activate`, `readTransport`.
 - Hybrid payload handling: XML metadata (`blue:blueSource`) + JSON source (rollout / toggledPackages / attributes) + JSON state/check/toggle responses.
 - Feature-toggle domain methods layered on top of the generic interface: `switchOn`, `switchOff`, `getRuntimeState`, plus `check` for pre-flight and `readSource` for the JSON rollout body.
 - New `adtClient.getFeatureToggle()` factory method on `AdtClient`.
@@ -74,10 +74,10 @@ Availability planning: `available_in: ["cloud", "onprem"]` provisionally; keep `
 ### 4.1 Factory on `AdtClient`
 
 ```ts
-getFeatureToggle(): IAdtObject<IFeatureToggleConfig, IFeatureToggleState>;
+getFeatureToggle(): IFeatureToggleObject;
 ```
 
-The returned handler is a standalone instance of `AdtFeatureToggle` with a richer surface than the plain `IAdtObject` contract. The extra methods (`switchOn`, `switchOff`, `getRuntimeState`, `readSource`) are exposed on the concrete class; consumers who need them cast the handler to `AdtFeatureToggle` (matching how `AdtFunctionInclude` exposes the extra `readSource()` method that is not part of `IAdtObject`).
+The returned handler is a standalone instance of `AdtFeatureToggle`, but the factory returns the specialized public interface `IFeatureToggleObject`, not the narrower `IAdtObject`. This preserves static type visibility for `switchOn`, `switchOff`, `getRuntimeState`, `checkState`, and `readSource` and avoids a cast-based API.
 
 ### 4.2 Config type
 
@@ -179,10 +179,41 @@ export interface IFeatureToggleCheckResult {
 }
 ```
 
-### 4.4 Domain methods (layered on top of `IAdtObject`)
+### 4.4 Specialized object interface
 
 ```ts
-class AdtFeatureToggle implements IAdtObject<IFeatureToggleConfig, IFeatureToggleState> {
+export interface IFeatureToggleObject
+  extends IAdtObject<IFeatureToggleConfig, IFeatureToggleState> {
+  switchOn(
+    config: Partial<IFeatureToggleConfig>,
+    opts: { transportRequest: string; userSpecific?: boolean },
+  ): Promise<IFeatureToggleState>;
+
+  switchOff(
+    config: Partial<IFeatureToggleConfig>,
+    opts: { transportRequest: string; userSpecific?: boolean },
+  ): Promise<IFeatureToggleState>;
+
+  getRuntimeState(
+    config: Partial<IFeatureToggleConfig>,
+  ): Promise<IFeatureToggleState>;
+
+  checkState(
+    config: Partial<IFeatureToggleConfig>,
+    opts?: { userSpecific?: boolean },
+  ): Promise<IFeatureToggleState>;
+
+  readSource(
+    config: Partial<IFeatureToggleConfig>,
+    version?: 'active' | 'inactive',
+  ): Promise<IFeatureToggleState>;
+}
+```
+
+### 4.5 Domain methods (layered on top of `IAdtObject`)
+
+```ts
+class AdtFeatureToggle implements IFeatureToggleObject {
   // ...standard IAdtObject methods...
 
   /**
@@ -259,8 +290,8 @@ export interface IToggleFeatureToggleParams {
 
 ```
 src/core/featureToggle/
-  AdtFeatureToggle.ts        # handler class — IAdtObject + domain methods
-  types.ts                   # IFeatureToggleConfig, IFeatureToggleState, ICreateFeatureToggleParams, sub-types
+  AdtFeatureToggle.ts        # handler class — implements IFeatureToggleObject
+  types.ts                   # IFeatureToggleConfig, IFeatureToggleState, IFeatureToggleObject, ICreateFeatureToggleParams, sub-types
   xmlBuilder.ts              # builds the blue:blueSource root element for create/update metadata
   create.ts                  # POST /sfw/featuretoggles — metadata only
   read.ts                    # GET /sfw/featuretoggles/{name} — metadata XML
