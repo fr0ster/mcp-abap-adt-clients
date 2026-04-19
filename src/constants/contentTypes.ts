@@ -205,3 +205,21 @@ export const CT_TRACE_PARAMETERS = 'application/xml';
 
 // System Information
 export const ACCEPT_SYSTEM_INFO = 'application/json';
+
+// Feature Toggles (FTG2/FT) — metadata uses the shared blues envelope
+// same as APS IAM; state and domain endpoints use dedicated JSON types.
+export const ACCEPT_FEATURE_TOGGLE_METADATA =
+  'application/vnd.sap.adt.blues.v1+xml';
+export const CT_FEATURE_TOGGLE_METADATA =
+  'application/vnd.sap.adt.blues.v1+xml';
+export const ACCEPT_FEATURE_TOGGLE_STATES =
+  'application/vnd.sap.adt.states.v1+asjson';
+export const ACCEPT_FEATURE_TOGGLE_CHECK_RESULT =
+  'application/vnd.sap.adt.toggle.check.result.v1+asjson';
+export const CT_FEATURE_TOGGLE_CHECK_PARAMETERS =
+  'application/vnd.sap.adt.toggle.check.parameters.v1+asjson';
+export const CT_FEATURE_TOGGLE_TOGGLE_PARAMETERS =
+  'application/vnd.sap.adt.related.toggle.parameters.v1+asjson';
+export const CT_FEATURE_TOGGLE_SOURCE =
+  'application/vnd.sap.adt.toggle.content.v2+json';
+export const ACCEPT_FEATURE_TOGGLE_SOURCE = CT_FEATURE_TOGGLE_SOURCE;

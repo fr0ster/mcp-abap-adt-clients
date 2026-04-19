@@ -86,6 +86,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 | Metadata Extension | `getMetadataExtension()` | `/sap/bc/adt/ddic/ddlx/sources` |
 | Enhancement | `getEnhancement()` | `/sap/bc/adt/enhancements/*` |
 | Authorization Field | `getAuthorizationField()` | `/sap/bc/adt/aps/iam/auth` (modern kernel only; absent on legacy) |
+| Feature Toggle | `getFeatureToggle()` | `/sap/bc/adt/sfw/featuretoggles` (modern kernel only; absent on legacy) |
 
 ### Unblocked but endpoint is absent
 

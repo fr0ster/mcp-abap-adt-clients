@@ -111,6 +111,22 @@ export type {
   IEnhancementState,
 } from './core/enhancement';
 export type {
+  FeatureToggleState,
+  IFeatureToggleAttribute,
+  IFeatureToggleCheckStateResult,
+  IFeatureToggleClientLevel,
+  IFeatureToggleConfig,
+  IFeatureToggleHeader,
+  IFeatureToggleObject,
+  IFeatureTogglePlanning,
+  IFeatureToggleReleasePlan,
+  IFeatureToggleRollout,
+  IFeatureToggleRuntimeState,
+  IFeatureToggleSource,
+  IFeatureToggleState,
+  IFeatureToggleUserLevel,
+} from './core/featureToggle';
+export type {
   AdtFunctionGroupType,
   IFunctionGroupConfig,
   IFunctionGroupState,

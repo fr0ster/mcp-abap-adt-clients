@@ -67,6 +67,10 @@ import {
   type IEnhancementState,
 } from '../core/enhancement';
 import {
+  AdtFeatureToggle,
+  type IFeatureToggleObject,
+} from '../core/featureToggle';
+import {
   AdtFunctionGroup,
   type IFunctionGroupConfig,
   type IFunctionGroupState,
@@ -454,6 +458,18 @@ export class AdtClient {
    */
   getEnhancement(): IAdtObject<IEnhancementConfig, IEnhancementState> {
     return new AdtEnhancement(this.connection, this.logger, this.systemContext);
+  }
+
+  /**
+   * Get high-level operations for FeatureToggle objects
+   * @returns IFeatureToggleObject instance for FeatureToggle operations
+   */
+  getFeatureToggle(): IFeatureToggleObject {
+    return new AdtFeatureToggle(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**

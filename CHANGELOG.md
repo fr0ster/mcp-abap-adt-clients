@@ -3,6 +3,12 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **featureToggle** core module: FTG2/FT type handler with full CRUD + lifecycle, plus five domain methods (switchOn, switchOff, getRuntimeState, checkState, readSource) through the specialized IFeatureToggleObject interface. New AdtClient.getFeatureToggle() factory. Endpoint /sap/bc/adt/sfw/featuretoggles/{name}. Hybrid XML metadata + JSON source payload — first JSON-source-bearing core module. Available on modern on-prem and cloud MDD; absent on legacy kernels. (#27)
+
 ## [5.2.1] - 2026-04-19
 
 ### Fixed
