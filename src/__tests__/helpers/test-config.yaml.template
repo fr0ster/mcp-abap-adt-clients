@@ -1124,6 +1124,21 @@ create_service_binding:
         # parent_package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # test_subpackage_name: "ZAC_PKG01_SRVB"  # Created automatically if missing
         # transport_request: ""  # Uses environment.default_transport if omitted
+
+# Create Feature Toggle (FTG2/FT) — core module; users need both to create
+# custom feature toggles and to switch their state. Start onprem-only: the
+# FTG2/FT create authorization is usually SAP-reserved on cloud trial.
+create_feature_toggle:
+  test_cases:
+    - name: "adt_feature_toggle"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Feature toggle reserved for AdtFeatureToggle tests"
+      params:
+        feature_toggle_name: "ZAC_FT01"
+        description: "AdtFeatureToggle workflow toggle"
+        update_description: "AdtFeatureToggle workflow toggle (updated)"
+
 # Create Function Group
 create_function_group:
   test_cases:
