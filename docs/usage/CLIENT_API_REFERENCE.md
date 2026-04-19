@@ -71,26 +71,114 @@ const source = await fincl.readSource({
 });
 
 // Feature Toggle (FTG2/FT) — SAP feature-gate artifact with JSON source payload.
-// Available on modern on-prem and cloud MDD; absent on legacy kernels.
+// Available on modern on-prem and cloud MDD; absent on legacy kernels (E77).
 // Endpoint: /sap/bc/adt/sfw/featuretoggles/{name}
-// Factory returns IFeatureToggleObject — extends IAdtObject with five domain methods:
-//   switchOn, switchOff, getRuntimeState, checkState, readSource.
+// Factory returns IFeatureToggleObject — extends IAdtObject<IFeatureToggleConfig,
+// IFeatureToggleState> and adds five domain methods (switchOn, switchOff,
+// getRuntimeState, checkState, readSource). The full surface is statically
+// visible on the factory return — no casts required at call sites.
 const toggle = client.getFeatureToggle();
+
+// --- 1. Create a custom feature toggle ---
+// CREATE typically requires SAP_DEVELOPER-equivalent authorization. On cloud
+// trial systems FTG2/FT creation is usually SAP-reserved — expect HTTP 403.
+// On modern on-prem (BASIS ≥ 7.50) with developer auth, this works.
 await toggle.create({
   featureToggleName: 'ZMY_FEATURE',
   packageName: 'ZMY_PKG',
   description: 'My feature toggle',
   transportRequest: 'DEVK900123',
+  source: {
+    // Optional structured source body. If omitted, the toggle is created
+    // empty and the JSON source can be updated later via update() with
+    // config.source set, or by calling the low-level uploadFeatureToggleSource.
+    rollout: {
+      lifecycleStatus: 'inValidation',
+      strategy: 'immediate',
+      configurable: false,
+      defaultEnabledFor: 'none',
+      reversible: true,
+    },
+    toggledPackages: ['ZMY_PKG'],
+  },
 });
+
+// --- 2. Switch the toggle ON (client-level) ---
+// transportRequest is REQUIRED for client-level toggling (captures the change
+// into a CTS request). For user-specific toggling, set userSpecific: true;
+// depending on system configuration, transportRequest may still be needed.
 await toggle.switchOn(
   { featureToggleName: 'ZMY_FEATURE' },
   { transportRequest: 'DEVK900123' },
 );
 
-// Read runtime state (client + user level aggregate + per-client/user breakdown)
-const { runtimeState } = await toggle.getRuntimeState({ featureToggleName: 'ZMY_FEATURE' });
-console.log(runtimeState?.clientState); // 'on' | 'off' | 'undefined'
+// --- 3. Switch the toggle OFF ---
+// rollout.reversible must be true for the toggle definition to accept OFF
+// after it has been switched ON. Otherwise the server returns an error.
+await toggle.switchOff(
+  { featureToggleName: 'ZMY_FEATURE' },
+  { transportRequest: 'DEVK900123' },
+);
+
+// --- 4. Pre-flight check before toggling ---
+// checkState() returns current state plus transport binding info. Call this
+// before switchOn/switchOff when you need to know whether a customising
+// transport is allowed and which package / object URI the change would bind to.
+const preflight = await toggle.checkState({ featureToggleName: 'ZMY_FEATURE' });
+console.log(preflight.checkStateResult);
+// { currentState: 'off', transportPackage: 'ZMY_PKG',
+//   transportUri: '/sap/bc/adt/vit/wb/object_type/sf01/object_name/zmy_feature',
+//   customizingTransportAllowed: true }
+
+// --- 5. Read runtime state (all levels) ---
+// Returns the client-level aggregate for the current session plus the full
+// per-client and per-user breakdowns.
+const runtime = await toggle.getRuntimeState({ featureToggleName: 'ZMY_FEATURE' });
+console.log(runtime.runtimeState);
+// {
+//   name: 'ZMY_FEATURE',
+//   clientState: 'on',
+//   userState: 'undefined',
+//   clientStates: [{ client: '100', description: '...', state: 'on' }, ...],
+//   userStates:   [],
+// }
+
+// --- 6. Read the JSON source body (rollout / toggledPackages / attributes) ---
+// Unlike ABAP source, feature-toggle source is structured JSON. readSource()
+// parses it and returns IFeatureToggleSource via state.sourceResult.
+const sourceState = await toggle.readSource(
+  { featureToggleName: 'ZMY_FEATURE' },
+  'active', // or 'inactive'
+);
+console.log(sourceState.sourceResult?.rollout?.defaultEnabledFor);
+// 'none' | 'someCustomers' | 'allCustomers' | ...
+
+// --- 7. Update the toggle (metadata + optional source) ---
+// The update chain is the canonical IAdtObject flow: lock → check → update →
+// (if source provided) uploadSource → unlock → check → activate. Pass
+// config.source to change rollout, toggledPackages, or attributes.
+await toggle.update(
+  { featureToggleName: 'ZMY_FEATURE' },
+  {
+    sourceCode: undefined,          // not used (source is JSON)
+    xmlContent: undefined,
+    activateOnUpdate: true,
+  },
+);
+
+// --- 8. Unsupported on feature toggles ---
+// readTransport() returns a state with a single error entry rather than
+// throwing — there is no /transport sub-resource for FTG2/FT. Feature-toggle
+// changes bind to transports via the /toggle and /check endpoints instead.
 ```
+
+### Feature Toggle — environment-specific behavior
+
+| Environment | Create / delete | Update metadata + source | switchOn / switchOff | getRuntimeState / checkState / readSource |
+|-------------|-----------------|--------------------------|---------------------|-------------------------------------------|
+| Modern on-prem (BASIS ≥ 7.50) | ✅ with S_DEVELOP | ✅ with lock + transport | ✅ with transport | ✅ |
+| Cloud MDD | ⚠️ usually SAP-reserved; HTTP 403 for customer creation | ⚠️ typically limited to SAP-provided toggles | ⚠️ depends on toggle's `configurable` flag | ✅ against SAP-provided toggles |
+| Legacy (BASIS < 7.50, e.g. E77) | ❌ endpoint absent | ❌ | ❌ | ❌ |
 
 ### Accept Negotiation
 
