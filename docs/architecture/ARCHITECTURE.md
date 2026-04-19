@@ -12,6 +12,7 @@ Primary public entry points:
 - `AdtRuntimeClientExperimental` - runtime APIs in progress (currently AMDP debugger/data preview).
 - `AdtClientsWS` - WebSocket request/event facade.
 - `AdtExecutor` - execution-oriented facade (currently class execution with optional profiling helpers).
+- `AdtAbapGitClient` - standalone client (not a factory on `AdtClient`) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`); available on cloud and modern on-prem (ABAP Platform 2022+).
 
 Design constraint:
 - External integrations are interface-driven via `@mcp-abap-adt/interfaces` (`IAbapConnection`, `ILogger`, `IAdtObject`, `IWebSocketTransport`, etc.).
