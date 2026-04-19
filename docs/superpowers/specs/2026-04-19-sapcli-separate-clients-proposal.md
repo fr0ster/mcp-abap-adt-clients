@@ -41,13 +41,9 @@ All names are working titles; final names may be refined during the per-class br
   - Shares surface semantics with gCTS but uses the abapGit app-specific handler instead of the cts_abapvcs handler.
   - **Cloud presence verified** in `docs/discovery/discovery_cloud_mdd_raw.xml` and `discovery_trial_raw.xml` (`/sap/bc/adt/abapgit/repos`, `/sap/bc/adt/abapgit/externalrepoinfo`). The open question is feature parity (push, branch management), not baseline endpoint presence.
 
-### 3.3 `AdtFeatureToggleClient`
+### 3.3 ~~`AdtFeatureToggleClient`~~ — graduated to `src/core/featureToggle/`
 
-- **Purpose:** Read and toggle state of ABAP feature toggles (`cl_abap_feature*` family), tied to CTS via corrnr.
-- **sapcli references:** `sap/cli/featuretoggle.py`, `sap/adt/featuretoggle.py`.
-- **Endpoint family:** `/sap/bc/adt/sfw/featuretoggles*` (verified in `docs/discovery/discovery_cloud_mdd_raw.xml`). Sub-resources include per-object access at `{name}{?corrNr,lockHandle,version,accessMode,_action}`, plus `{name}/check`, `{name}/dependencies/validate`, `{name}/logs`, `{name}/objects`, `$configuration`, `$schema`, and `attributes/{attributeKeys,attributeValues}`.
-- **Complexity:** Small. State machine (off / on / deleted) with corrnr binding and standard lock/unlock via the `_action` query parameter.
-- **Special considerations:** Use this class as the **pattern baseline** for "separate client in the current architecture" — small enough to exercise conventions (constructor shape, public API style, test harness wiring) before committing to larger classes.
+**Removed from separate-clients scope.** The per-class design for feature toggle (`docs/superpowers/specs/2026-04-19-feature-toggle-client-design.md`) selected Variant A: feature toggle is a legitimate ADT artifact (`adtcore:type="FTG2/FT"` with packageRef, lock/unlock, activation), and users need both to **create** custom feature toggles and to **switch** their state. The natural home is `src/core/featureToggle/` alongside the other 24 core modules, with domain methods (`switchOn` / `switchOff` / `getRuntimeState` / `checkState` / `readSource`) layered on top of the canonical `IAdtObject` surface. It ships through the ordinary core-module PR workflow, not through this roadmap.
 
 ### 3.4 `AdtFlpBuilderClient`
 
@@ -86,11 +82,12 @@ One PR per class. Rationale: each endpoint family has its own semantics, auth qu
 
 | Order | Class | Why this slot |
 |---|---|---|
-| 1 | `AdtFeatureToggleClient` | **Pattern baseline.** Small, fast to ship, validates the "separate client in current architecture" contract end-to-end (factory placement, public API style, test harness) before tackling larger scopes. |
-| 2 | `AdtBspAppClient` | Introduces the minimal OData v2 helper that `AdtFlpBuilderClient` can then reuse. Small surface, isolated. |
-| 3 | `AdtFlpBuilderClient` | Reuses the OData v2 helper from #2. |
-| 4 | `AdtAbapGitClient` | Medium scope. Prepares the ground for gCTS (shared repo-lifecycle vocabulary). |
-| 5 | `AdtGctsClient` | Largest scope, most unknowns. Benefits from lessons learned in #1–#4 (async polling, OData helpers, error parsing). |
+| 1 | `AdtBspAppClient` | **Pattern baseline.** Small, isolated surface; introduces whatever minimal OData v2 / ADT filestore helper is chosen so `AdtFlpBuilderClient` can reuse it. Validates the "separate client in current architecture" contract end-to-end (factory placement, public API style, test harness). |
+| 2 | `AdtFlpBuilderClient` | Reuses the transport helper from #1. |
+| 3 | `AdtAbapGitClient` | Medium scope. Prepares the ground for gCTS (shared repo-lifecycle vocabulary). |
+| 4 | `AdtGctsClient` | Largest scope, most unknowns. Benefits from lessons learned in #1–#3 (async polling, OData / filestore helpers, error parsing). |
+
+(Feature toggle is no longer in this list — see section 3.3; it ships as a core module.)
 
 Each PR is self-contained and independently releasable as a **minor** version bump per semver (new public API, no breaking changes).
 
@@ -120,7 +117,7 @@ Each spec may independently drop a candidate from scope if verification against 
 ## 8. What this proposal is not
 
 - Not a design spec for any individual class — those come one per class in their own documents.
-- Not a commitment to implement all five. The ordering is a recommendation; at any point after a completed PR the user may stop, reorder, or drop remaining items.
+- Not a commitment to implement all four remaining candidates. The ordering is a recommendation; at any point after a completed PR the user may stop, reorder, or drop remaining items. (Feature toggle graduated to the `src/core/` workflow after its own per-class design chose Variant A.)
 - Not a schedule. No dates, no velocity estimates. Each class ships when its spec/plan/PR cycle completes.
 
 ## 9. Verification sources
@@ -135,4 +132,4 @@ Endpoint paths, content types, and availability claims in sections 3 and 4 are d
 
 ## 10. Next step
 
-After this proposal is accepted, start the spec cycle for **#1: `AdtFeatureToggleClient`** (or a different ordering if the user reprioritises).
+Feature toggle (formerly #1) has been graduated to `src/core/featureToggle/` and moves ahead via the core-module workflow. Next in the separate-clients roadmap: **#1: `AdtBspAppClient`** (or a different ordering if the user reprioritises).
