@@ -87,6 +87,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 | Enhancement | `getEnhancement()` | `/sap/bc/adt/enhancements/*` |
 | Authorization Field | `getAuthorizationField()` | `/sap/bc/adt/aps/iam/auth` (modern kernel only; absent on legacy) |
 | Feature Toggle | `getFeatureToggle()` | `/sap/bc/adt/sfw/featuretoggles` (modern kernel only; absent on legacy) |
+| abapGit (ADT-integrated) | `new AdtAbapGitClient()` | `/sap/bc/adt/abapgit/*` (ships with ABAP Platform 2022+ / Steampunk; absent on legacy) |
 
 ### Unblocked but endpoint is absent
 
