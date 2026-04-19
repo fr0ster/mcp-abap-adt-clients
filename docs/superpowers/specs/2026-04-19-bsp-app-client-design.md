@@ -1,10 +1,10 @@
-# Design: BSP Application Client (three variants — DEFERRED)
+# Design: BSP Application Client (three variants — PENDING INVESTIGATION)
 
 Date: 2026-04-19
-Status: **Deferred.** Spec kept for future reference; BSP client is not scheduled for near-term implementation.
+Status: **Pending investigation.** Part of the UI-tier investigation group alongside FLP (§3.4–3.5 of the roadmap proposal). Not shipped to production until a concrete consumer workflow justifies the class. Spec kept as a paper design so work can resume when the need surfaces.
 Parent: `docs/superpowers/specs/2026-04-19-sapcli-separate-clients-proposal.md`
 
-> **Deferral rationale.** BSP client covers only the final "upload zip → BSP namespace" step of a longer UI5/Fiori deploy pipeline; the archive must be pre-built by external tooling (ui5 CLI, webpack, vite). Other roadmap candidates — especially abapGit — have broader everyday use-cases and higher priority. This spec is preserved so that when BSP work does start, the variant analysis is already available.
+> **Why on hold.** BSP client covers only the final "upload zip → BSP namespace" step of a longer UI5/Fiori deploy pipeline; the archive must be pre-built by external tooling (ui5 CLI, webpack, vite). A meaningful BSP story needs an accompanying build-integration design — out of scope for this library until a real user workflow demands it. Other roadmap candidates — especially abapGit — have broader everyday use-cases and higher priority.
 
 > **Per-class variant-selection pattern.** Each class in the sapcli-separate-clients roadmap gets its own three-variant design document. The variant choice is resolved independently per class. Per the roadmap's variant-selection rule (§4.1), the default starting assumption for BSP is **Variant C** (service-like, orchestration-heavy). Variants A and B remain on the table for completeness and to make the architectural argument explicit.
 

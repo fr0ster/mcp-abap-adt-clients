@@ -45,23 +45,26 @@ All names are working titles; final names may be refined during the per-class br
 
 **Removed from separate-clients scope.** The per-class design for feature toggle (`docs/superpowers/specs/2026-04-19-feature-toggle-client-design.md`) selected Variant A: feature toggle is a legitimate ADT artifact (`adtcore:type="FTG2/FT"` with packageRef, lock/unlock, activation), and users need both to **create** custom feature toggles and to **switch** their state. The natural home is `src/core/featureToggle/` alongside the other 24 core modules, with domain methods (`switchOn` / `switchOff` / `getRuntimeState` / `checkState` / `readSource`) layered on top of the canonical `IAdtObject` surface. It ships through the ordinary core-module PR workflow, not through this roadmap.
 
-### 3.4 `AdtFlpBuilderClient` — DEFERRED
+### 3.4–3.5 UI-tier group (BSP + FLP) — PENDING INVESTIGATION
 
-**Not in near-term scope.** Fiori Launchpad page-builder customisation (catalogs, groups, tiles via YAML → OData v2 on `UI2/PAGE_BUILDER_CUST`) is niche; no current user workflow demands it. Reactivate only on concrete demand. Original details preserved below for future reference.
+**Not shipped to production until a concrete consumer workflow justifies them.** Both surfaces concern UI-tier artifacts (Fiori app upload via BSP; Fiori Launchpad page-builder customisation via FLP) and neither has a proven demand from the library's current user base. They form one group because they share the same constraint: we don't yet know **what we actually need from them**. Each may be reactivated, reshaped, or dropped outright once a real use-case surfaces.
+
+Kept as paper designs for when investigation resumes:
+
+#### 3.4 `AdtFlpBuilderClient`
 
 - **Purpose:** Fiori Launchpad page builder — catalogs, groups, tiles driven by YAML/JSON config.
 - **sapcli references:** `sap/cli/flp.py`, `sap/flp/builder.py`.
 - **Endpoint family:** OData v2 service `/sap/opu/odata/UI2/PAGE_BUILDER_CUST` (+ related).
 
-### 3.5 `AdtBspAppClient` — DEFERRED
-
-**Not in near-term scope.** Covers only the final "upload zip → BSP namespace" step of a longer UI5/Fiori deploy pipeline — the archive must be pre-built by external tooling (ui5 CLI, webpack, vite). Useful when build-tool integration becomes in-scope or a user workflow explicitly requires BSP upload. Per-class three-variant design already written: `docs/superpowers/specs/2026-04-19-bsp-app-client-design.md`. Reactivate from there.
+#### 3.5 `AdtBspAppClient`
 
 - **Purpose:** Upload and manage BSP / UI5 applications in the ABAP repository.
 - **sapcli references:** `sap/cli/bsp.py`.
-- **Endpoint family:** Two candidate surfaces (see per-class design):
+- **Endpoint family:** Two candidate surfaces (see per-class design `docs/superpowers/specs/2026-04-19-bsp-app-client-design.md`):
   - **ADT filestore** at `/sap/bc/adt/filestore/ui5-bsp/*` — discovery-verified on all targets including E77 legacy.
   - **External OData v2** via `UI5/ABAP_REPOSITORY_SRV` — the sapcli-documented path.
+- **Limitation noted during review:** BSP covers only the final "upload zip → BSP namespace" step; the archive must be pre-built by external tooling (ui5 CLI, webpack, vite). A meaningful BSP client needs an accompanying build-integration story that is out of scope for this library.
 
 ## 4. Architectural constraints (shared across all candidates)
 
