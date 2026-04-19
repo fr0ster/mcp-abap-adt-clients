@@ -69,6 +69,27 @@ const source = await fincl.readSource({
   functionGroupName: 'ZFGROUP',
   includeName: 'LZFGROUPF01',
 });
+
+// Feature Toggle (FTG2/FT) — SAP feature-gate artifact with JSON source payload.
+// Available on modern on-prem and cloud MDD; absent on legacy kernels.
+// Endpoint: /sap/bc/adt/sfw/featuretoggles/{name}
+// Factory returns IFeatureToggleObject — extends IAdtObject with five domain methods:
+//   switchOn, switchOff, getRuntimeState, checkState, readSource.
+const toggle = client.getFeatureToggle();
+await toggle.create({
+  featureToggleName: 'ZMY_FEATURE',
+  packageName: 'ZMY_PKG',
+  description: 'My feature toggle',
+  transportRequest: 'DEVK900123',
+});
+await toggle.switchOn(
+  { featureToggleName: 'ZMY_FEATURE' },
+  { transportRequest: 'DEVK900123' },
+);
+
+// Read runtime state (client + user level aggregate + per-client/user breakdown)
+const { runtimeState } = await toggle.getRuntimeState({ featureToggleName: 'ZMY_FEATURE' });
+console.log(runtimeState?.clientState); // 'on' | 'off' | 'undefined'
 ```
 
 ### Accept Negotiation
