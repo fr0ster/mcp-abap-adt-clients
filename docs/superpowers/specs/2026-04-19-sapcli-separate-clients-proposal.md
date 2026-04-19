@@ -45,24 +45,23 @@ All names are working titles; final names may be refined during the per-class br
 
 **Removed from separate-clients scope.** The per-class design for feature toggle (`docs/superpowers/specs/2026-04-19-feature-toggle-client-design.md`) selected Variant A: feature toggle is a legitimate ADT artifact (`adtcore:type="FTG2/FT"` with packageRef, lock/unlock, activation), and users need both to **create** custom feature toggles and to **switch** their state. The natural home is `src/core/featureToggle/` alongside the other 24 core modules, with domain methods (`switchOn` / `switchOff` / `getRuntimeState` / `checkState` / `readSource`) layered on top of the canonical `IAdtObject` surface. It ships through the ordinary core-module PR workflow, not through this roadmap.
 
-### 3.4 `AdtFlpBuilderClient`
+### 3.4 `AdtFlpBuilderClient` — DEFERRED
+
+**Not in near-term scope.** Fiori Launchpad page-builder customisation (catalogs, groups, tiles via YAML → OData v2 on `UI2/PAGE_BUILDER_CUST`) is niche; no current user workflow demands it. Reactivate only on concrete demand. Original details preserved below for future reference.
 
 - **Purpose:** Fiori Launchpad page builder — catalogs, groups, tiles driven by YAML/JSON config.
 - **sapcli references:** `sap/cli/flp.py`, `sap/flp/builder.py`.
 - **Endpoint family:** OData v2 service `/sap/opu/odata/UI2/PAGE_BUILDER_CUST` (+ related).
-- **Complexity:** Small–Medium. Most of the work is mapping YAML → CRUD sequence on known OData entities.
-- **Special considerations:**
-  - OData v2 — first OData v2 consumer in this library. Must decide whether to lean on an existing OData client (if any is already a dev-dep elsewhere) or implement a minimal inline client. Proposal recommends the latter to keep the dependency footprint unchanged.
 
-### 3.5 `AdtBspAppClient`
+### 3.5 `AdtBspAppClient` — DEFERRED
+
+**Not in near-term scope.** Covers only the final "upload zip → BSP namespace" step of a longer UI5/Fiori deploy pipeline — the archive must be pre-built by external tooling (ui5 CLI, webpack, vite). Useful when build-tool integration becomes in-scope or a user workflow explicitly requires BSP upload. Per-class three-variant design already written: `docs/superpowers/specs/2026-04-19-bsp-app-client-design.md`. Reactivate from there.
 
 - **Purpose:** Upload and manage BSP / UI5 applications in the ABAP repository.
 - **sapcli references:** `sap/cli/bsp.py`.
-- **Endpoint family:** Two candidate surfaces to evaluate in the per-class spec:
-  - **ADT filestore** at `/sap/bc/adt/filestore/ui5-bsp/*` (sub-resources `objects`, `deploy-storage`, `ui5-rt-version`) — verified in `docs/discovery/discovery_{cloud_mdd,e19,e77,trial}_raw.xml`. This is the modern ADT-native path.
-  - **External OData v2** via `UI5/ABAP_REPOSITORY_SRV` — the path used by sapcli, still available on systems that expose it.
-- **Complexity:** Small. Straightforward binary-upload + corrnr binding on either surface.
-- **Special considerations:** The per-class spec must pick one surface (or document a mixed flow) **before** deciding whether `AdtFlpBuilderClient` should share an OData v2 helper with BSP — if BSP goes ADT filestore, the helper stops being shared.
+- **Endpoint family:** Two candidate surfaces (see per-class design):
+  - **ADT filestore** at `/sap/bc/adt/filestore/ui5-bsp/*` — discovery-verified on all targets including E77 legacy.
+  - **External OData v2** via `UI5/ABAP_REPOSITORY_SRV` — the sapcli-documented path.
 
 ## 4. Architectural constraints (shared across all candidates)
 
@@ -86,10 +85,10 @@ Per-class design docs use the same three-variant pattern, but the default choice
 
 Applied to the current roadmap:
 
-- `AdtBspAppClient`: default starting assumption is **Variant C**
-- `AdtFlpBuilderClient`: default starting assumption is **Variant C**
 - `AdtAbapGitClient`: default starting assumption is **Variant C**
 - `AdtGctsClient`: default starting assumption is **Variant C**
+- `AdtBspAppClient`: default starting assumption is **Variant C** — **deferred** (see §3.5)
+- `AdtFlpBuilderClient`: default starting assumption is **Variant C** — **deferred** (see §3.4)
 - `FeatureToggle`: selected **Variant A** in its own design doc because the evidence points to a real ADT artifact (`FTG2/FT`) rather than a service-only surface
 
 `~/prj/sapcli` is useful for endpoint traces, headers, payloads, and operation sequences, but **not** as the primary architectural argument for `A` vs `B` vs `C`, because sapcli models many unrelated surfaces as separate manager classes.
@@ -107,10 +106,10 @@ One PR per class. Rationale: each endpoint family has its own semantics, auth qu
 
 | Order | Class | Why this slot |
 |---|---|---|
-| 1 | `AdtBspAppClient` | **Pattern baseline.** Small, isolated surface; introduces whatever minimal OData v2 / ADT filestore helper is chosen so `AdtFlpBuilderClient` can reuse it. Validates the "separate client in current architecture" contract end-to-end (factory placement, public API style, test harness). |
-| 2 | `AdtFlpBuilderClient` | Reuses the transport helper from #1. |
-| 3 | `AdtAbapGitClient` | Medium scope. Prepares the ground for gCTS (shared repo-lifecycle vocabulary). |
-| 4 | `AdtGctsClient` | Largest scope, most unknowns. Benefits from lessons learned in #1–#3 (async polling, OData / filestore helpers, error parsing). |
+| 1 | `AdtAbapGitClient` | **Pattern baseline.** Widest everyday use-case (ABAP source version control); discovery-verified on cloud + on-prem; medium scope. Validates the "separate client in current architecture" contract end-to-end (factory placement, public API style, test harness) with a broadly-useful feature rather than a niche one. |
+| 2 | `AdtGctsClient` | Largest scope, most unknowns, but complements #1 — abapGit is VCS, gCTS is transport-system-with-git. Different workloads, different audiences. Benefits from lessons learned in #1 (async polling, repo-lifecycle vocabulary, error parsing). |
+| (deferred) | `AdtBspAppClient` | Covers only the final "upload zip → BSP namespace" step of a longer UI5/Fiori deploy pipeline (archive must be pre-built by external tooling). See `2026-04-19-bsp-app-client-design.md` (Deferred). Reactivate when build-tool integration becomes in-scope or a user workflow explicitly requires BSP upload. |
+| (deferred) | `AdtFlpBuilderClient` | Fiori Launchpad page-builder customisation is even narrower than BSP. Deferred alongside BSP — reactivate only if a concrete consumer workflow demands it. |
 
 (Feature toggle is no longer in this list — see section 3.3; it ships as a core module.)
 
@@ -157,4 +156,4 @@ Endpoint paths, content types, and availability claims in sections 3 and 4 are d
 
 ## 10. Next step
 
-Feature toggle (formerly #1) has been graduated to `src/core/featureToggle/` and moves ahead via the core-module workflow. Next in the separate-clients roadmap: **#1: `AdtBspAppClient`** (or a different ordering if the user reprioritises).
+Feature toggle graduated to `src/core/featureToggle/` and moves ahead via the core-module workflow. BSP and FLP have been deferred (see §3.4, §3.5). Next in the separate-clients roadmap: **#1: `AdtAbapGitClient`** — broadest everyday use-case and discovery-verified on cloud + on-prem.
