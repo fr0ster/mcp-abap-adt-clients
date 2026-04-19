@@ -1,265 +1,316 @@
-# Design: abapGit Client (three variants for review)
+# Design: abapGit Client (`AdtAbapGitClient`)
 
 Date: 2026-04-19
-Status: Three-variant proposal awaiting user decision
-Parent: `docs/superpowers/specs/2026-04-19-sapcli-separate-clients-proposal.md` (roadmap item #1 — pattern baseline)
+Status: Variant C selected — ready for implementation planning
+Parent: `docs/superpowers/specs/2026-04-19-sapcli-separate-clients-proposal.md` (roadmap item #1)
 
-> **Per-class variant-selection pattern.** Each class in the sapcli-separate-clients roadmap gets its own three-variant design document. The variant choice is resolved independently per class. Per the roadmap variant-selection rule (§4.1), the default starting assumption for abapGit is **Variant C** (service-like, orchestration-heavy; multiple repos managed, polling lifecycle, not a single ADT object). Variants A and B remain on the table for completeness.
+> **Per-class variant-selection pattern.** Each class in the sapcli-separate-clients roadmap gets its own three-variant design document. The variant choice is resolved independently per class. abapGit — Variant C: users need the full lifecycle (link / pull / unlink) plus introspection (list, status, error log) and pre-link validation (check external repo). Variant A (core module) was rejected because abapGit has no ADT-artefact lifecycle (no activation / lock / source / canonical check). Variant B (minimal sapcli parity) was rejected because it would leave unlink, standalone status-read, error-log, and external-repo validation to a follow-up PR.
 
 ## 1. Goal
 
-Add a client that wraps the SAP-official **ADT-integrated abapGit** — not the community abapGit (which is a separately-installed ABAP program). The ADT-integrated variant lets a consumer bind an ABAP package to a remote git repository, pull branches, inspect status, and retrieve error logs, all via the ADT HTTP API.
+Add a client that wraps the SAP-official **ADT-integrated abapGit** — not the community abapGit (which is a separately-installed ABAP program). The ADT-integrated variant lets a consumer bind an ABAP package to a remote git repository, pull branches, inspect status, retrieve error logs, unlink when done, and probe a remote repository before committing to a link.
 
-## 2. Why three variants
+The class must cover every operation evidenced by either sapcli or our discovery corpus, expose them through a specialized `IAdtAbapGitClient` interface, and encapsulate the server-side async status polling (`R`/`E`/`A`/OK) so consumers see a synchronous API.
 
-The abapGit surface presents the usual architectural choice — full IAdtObject lifecycle vs narrow sapcli-parity vs extended separate client — plus a domain-specific wrinkle: `link` and `pull` are **asynchronous** on the server, with a status-poll cycle (`R` = running, `E` = error, `A` = abort, others = OK). How we model the wait matters.
+## 2. Scope
+
+**In scope:**
+
+- `link` — bind a package to a remote URL (matches sapcli `link`).
+- `pull` — trigger a pull and wait for terminal state, with optional progress heartbeat (matches sapcli `pull`).
+- `unlink` — remove an existing binding (beyond sapcli; discovery evidence needs live verification on the repo entity's edit/delete link).
+- `listRepos` — enumerate all linked repositories on the system.
+- `getRepo(packageName)` — fetch a single repo's current status without side effects.
+- `getErrorLog(packageName)` — fetch the error log as a first-class operation, not only as a side effect of a failed pull.
+- `checkExternalRepo` — probe a remote URL + credentials before the irreversible `link` (uses `/sap/bc/adt/abapgit/externalrepoinfo`).
+
+**Explicitly out of scope for v1 (may be added later):**
+
+- **Push.** The ADT abapGit service does not universally support push via this endpoint family; sapcli does not implement it. Excluded until a concrete workflow demands it.
+- **Branch management** (switch branch, list branches beyond `checkExternalRepo`'s branch list). The `branchName` is already carried on `link` and `pull`; dedicated branch ops wait for demand.
+- **Content-Type v4** (discovery's newest version). Default to v3 for sapcli compatibility; implementation exposes `options.contentTypeVersion` only if a consumer explicitly needs v4.
 
 ## 3. Verified evidence
 
 ### 3.1 sapcli reference (`sap/cli/abapgit.py`, `sap/adt/abapgit.py`)
 
-Two CLI commands, two repository operations:
+Implemented surface:
 
-- **`link <package> <url> [--branch] [--remote-user] [--remote-password] [--corrnr]`**
-  - `POST /sap/bc/adt/abapgit/repos`
+- **`link`** → `POST /sap/bc/adt/abapgit/repos`
   - Content-Type: `application/abapgit.adt.repo.v3+xml`
-  - Body: XML envelope `<abapgitrepo:repository xmlns:abapgitrepo="http://www.sap.com/adt/abapgit/repositories">` with children `package`, `url`, `branchName`, `remoteUser`, `remotePassword`, `transportRequest` (all text; null-valued entries omitted).
-  - Expected: HTTP 200.
-- **`pull <package> [--branch] [--remote-user] [--remote-password] [--corrnr]`**
-  - Fetch step: `GET /sap/bc/adt/abapgit/repos` with Accept `application/abapgit.adt.repos.v2+xml`. Parse XML, find repo whose child `<abapgitrepo:package>` equals the requested name. Extract atom links: `pull_link`, `log_link`.
-  - Pull trigger: `POST <pull_link>` with Content-Type `application/abapgit.adt.repo.v3+xml`, same body envelope as link.
-  - Expected: HTTP 202 (async accepted).
-  - Poll: re-fetch the repo list every 1s; repository status `R` means running; loop until state is different.
-  - Final states in sapcli code: `'E'` (error), `'A'` (abort), other (OK). On error/abort, fetch `log_link` and print log entries.
-- **Error log retrieval** (invoked inside `pull`):
+  - Body:
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <abapgitrepo:repository xmlns:abapgitrepo="http://www.sap.com/adt/abapgit/repositories">
+      <abapgitrepo:package>…</abapgitrepo:package>
+      <abapgitrepo:url>…</abapgitrepo:url>
+      <abapgitrepo:branchName>…</abapgitrepo:branchName>
+      <abapgitrepo:remoteUser>…</abapgitrepo:remoteUser>
+      <abapgitrepo:remotePassword>…</abapgitrepo:remotePassword>
+      <abapgitrepo:transportRequest>…</abapgitrepo:transportRequest>
+    </abapgitrepo:repository>
+    ```
+  - Null-valued entries are omitted (sapcli `repo_request_body` filters them).
+  - Expected HTTP 200.
+- **`pull`** — two-step async flow:
+  - Fetch: `GET /sap/bc/adt/abapgit/repos` with Accept `application/abapgit.adt.repos.v2+xml`. Parse, find repo where `<abapgitrepo:package>` matches. Extract atom links: `pull_link`, `log_link`.
+  - Trigger: `POST <pull_link>` with same Content-Type and XML envelope as link. Expect HTTP 202.
+  - Poll: every 1000ms re-fetch the list; repository status `R` = running; loop until status differs.
+  - Terminal states: `E` (error), `A` (abort), other = OK.
+- **Error log** (invoked inside sapcli's `pull` on non-OK terminal):
   - `GET <log_link>` with Accept `application/abapgit.adt.repo.object.v2+xml`
-  - XML: list of `<object:abapObject xmlns:object="http://www.sap.com/adt/abapgit/abapObjects">` with children `msgType`, `type`, `name`, `msgText`. sapcli filters out `msgType == 'S'` (success noise).
+  - Response XML: `<abapObjects:abapObject>` list with `msgType`, `type`, `name`, `msgText` children. sapcli filters out `msgType == 'S'`.
 
-Namespaces used by the XML envelopes:
-- `abapgitrepo = http://www.sap.com/adt/abapgit/repositories` — repo entity
-- `abapObjects = http://www.sap.com/adt/abapgit/abapObjects` — error log objects
+XML namespaces:
+
+- `abapgitrepo = http://www.sap.com/adt/abapgit/repositories`
+- `abapObjects = http://www.sap.com/adt/abapgit/abapObjects`
+
+Default branch when not provided by the caller (sapcli): `refs/heads/master`. sapcli's `pull` reuses the current binding's branch when `--branch` is omitted.
 
 ### 3.2 Discovery corpus
 
 Only in `docs/discovery/discovery_cloud_mdd_raw.xml` and `discovery_trial_raw.xml`:
 
-- `/sap/bc/adt/abapgit/repos` — collection (link + list)
-- `/sap/bc/adt/abapgit/externalrepoinfo` — probe endpoint (NOT used by sapcli)
-- Accept/Content-Type versions advertised: `abapgit.adt.repo.v1+xml`, `…v2+xml`, `…v3+xml`, `…v4+xml`; plus `abapgit.adt.repo.info.ext.request.v1+xml`, `…v2+xml` for `externalrepoinfo`.
+- `/sap/bc/adt/abapgit/repos` — collection (link + list).
+- `/sap/bc/adt/abapgit/externalrepoinfo` — probe endpoint (NOT wrapped by sapcli).
+- Accept/Content-Type versions advertised on `repos`: `abapgit.adt.repo.v1+xml` through `v4+xml`.
+- Accept/Content-Type versions advertised on `externalrepoinfo`: `abapgit.adt.repo.info.ext.request.v1+xml` and `v2+xml`.
 
-**Not in** `endpoints_onprem_modern_e19.txt` or `endpoints_onprem_old_e77.txt`. ADT-integrated abapGit ships with ABAP Platform / Steampunk — the E19 and E77 snapshots predate it or it was simply not activated on those systems. **Availability is cloud-only in our corpus.**
+**Not in** `endpoints_onprem_modern_e19.txt` or `endpoints_onprem_old_e77.txt`. ADT-integrated abapGit ships with ABAP Platform / Steampunk — the E19 and E77 snapshots predate it or it was simply not activated on those systems.
 
-Real-world: ADT abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Our gating starts at `["cloud"]` and widens only after live on-prem verification on a qualifying system.
+**Real-world availability:** ADT abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Gating starts `["cloud"]` and widens to `["cloud", "onprem"]` only after a live verification on a qualifying modern on-prem system.
 
-### 3.3 sapcli coverage gaps
+### 3.3 sapcli gaps Variant C fills
 
-sapcli implements only `link` and `pull` (+ the log retrieval inside `pull`). It does NOT cover:
+sapcli implements only `link` and `pull`. It does NOT cover:
 
-- **Unlink / delete** a repository binding (no `sap.adt.abapgit.Repository.unlink()`).
-- **Push** (the ADT abapGit service does not universally support push; depends on the remote repo permissions and server configuration).
-- **Branch management** (switch branch, list branches).
-- **External repo info probe** (`externalrepoinfo` — discovery-only, no sapcli wrapper).
+- **Unlink / delete** a repository binding.
+- **Push** (intentionally excluded from v1).
+- **Branch management** (intentionally excluded from v1; branch name is still carried in args).
+- **External repo info probe** (`externalrepoinfo` — discovery evidence only).
 - **Read-only status check** without triggering pull.
-- **Standalone log retrieval** (log is only printed as a side-effect of failed pulls in sapcli's CLI).
-- **Content-Type v4** (sapcli hard-codes v3; discovery shows v4 available on cloud).
+- **Standalone log retrieval** outside the pull flow.
 
-## 4. Variant A — core module under `src/core/abapGitRepo/`
+Variant C fills the first, fourth, fifth, and sixth via `unlink`, `checkExternalRepo`, `getRepo`, and `getErrorLog`. Push and branch management remain out of scope.
 
-**Shape.** Treat a repository-package binding as an `IAdtObject<IAbapGitRepoConfig, IAbapGitRepoState>` with canonical CRUD + lifecycle. The "object" identity is the ABAP package name — one package, one linked repo. `create` = link; `read` = fetch entity; `update` = re-link (change URL / branch); `delete` = unlink; `activate` = no-op; `readMetadata` = same as read; `check` = no-op.
+## 4. Public API shape
 
-**Why it could fit.**
-
-- Package-to-repo binding does have an identity (package name) and a lifecycle (create / read / update / delete).
-- Consumers discover `getAbapGitRepo()` next to other `getXxx()` factories and get a familiar shape.
-
-**Why it does NOT fit.**
-
-- **No canonical activation.** `/sap/bc/adt/activation` is meaningless for a repo binding — there is nothing to activate. The method becomes a stub.
-- **No lock/unlock.** abapGit has no `?_action=LOCK` contract in sapcli or discovery. Concurrent access control is handled server-side via the async status machine, not ADT locks. `lock()` / `unlock()` become stubs.
-- **No canonical check.** `/checkruns?reporters=abapCheckRun` does not apply to a repo binding. `check()` is a stub.
-- **`pull` is not any canonical IAdtObject operation.** It does not fit `create`, `read`, `update`, `delete`, or `activate`. Forcing it into `update` would be misleading — a pull doesn't rewrite the binding metadata, it fetches remote code and applies it.
-- **Async status polling is alien to the IAdtObject contract.** Every other core module operation is synchronous from the client's perspective. Adding polling to the base interface is a semantic stretch.
-
-**Verdict.** Variant A leaves roughly half of the IAdtObject interface as stubs and still needs a `pull()` domain method tacked on. Reject — it shares BSP's problem of forcing an unrelated surface into the CRUD template.
-
-## 5. Variant B — minimal separate client (sapcli parity)
-
-**Shape.** New file `src/clients/AdtAbapGitClient.ts`. Factory: `AdtClient.getAbapGit()` returns `IAdtAbapGitClient`. Exactly sapcli's two operations:
+### 4.1 Factory on `AdtClient`
 
 ```ts
-interface IAbapGitLinkArgs {
-  package: string;                 // ABAP package to bind
-  url: string;                     // remote git repo URL
-  branchName?: string;             // defaults to 'refs/heads/master' (sapcli parity)
-  remoteUser?: string;
-  remotePassword?: string;
-  transportRequest?: string;
-}
+getAbapGit(): IAdtAbapGitClient;
+```
 
-interface IAbapGitPullArgs {
-  package: string;                 // locate binding by package
-  branchName?: string;             // if absent, reuse the binding's current branch
-  remoteUser?: string;
-  remotePassword?: string;
-  transportRequest?: string;
-  pollIntervalMs?: number;         // default 1000 (sapcli parity)
-  onProgress?: (status: IAbapGitRepoStatus) => void;   // optional heartbeat callback
-}
+Returns an `AdtAbapGitClient` instance typed as the specialized public interface (per roadmap §4.2). No cast required at call sites.
 
-type AbapGitStatus = 'R' | 'E' | 'A' | string;   // 'R'=running, 'E'=error, 'A'=abort, other=OK
+### 4.2 Specialized public interface
 
-interface IAbapGitRepoStatus {
+```ts
+export type AbapGitStatus = 'R' | 'E' | 'A' | string;   // 'R'=running, 'E'=error, 'A'=abort, any other value = OK
+
+export interface IAbapGitRepoStatus {
   package: string;
   url: string;
   branchName: string;
   status: AbapGitStatus;
   statusText: string;
+  createdBy?: string;
+  createdAt?: string;
+  // Repository ID exposed by the entity (used internally for unlink; surfaced here
+  // because some consumers may want to correlate across calls).
+  repositoryId?: string;
 }
 
-interface IAbapGitPullResult {
-  finalStatus: IAbapGitRepoStatus;
-  errorLog?: IAbapGitErrorLogEntry[];   // populated only on 'E' or 'A' (sapcli parity)
-}
-
-interface IAbapGitErrorLogEntry {
-  msgType: string;   // 'E'|'W'|'I'|'S' — 'S' entries are filtered out
+export interface IAbapGitErrorLogEntry {
+  msgType: 'E' | 'W' | 'I' | 'S' | string;
   objectType: string;
   objectName: string;
   messageText: string;
 }
 
-interface IAdtAbapGitClient {
+export interface IAbapGitLinkArgs {
+  package: string;
+  url: string;
+  branchName?: string;      // default 'refs/heads/master'
+  remoteUser?: string;
+  remotePassword?: string;
+  transportRequest?: string;
+}
+
+export interface IAbapGitPullArgs {
+  package: string;
+  branchName?: string;      // if omitted, the binding's current branch is reused
+  remoteUser?: string;
+  remotePassword?: string;
+  transportRequest?: string;
+  pollIntervalMs?: number;  // default 1000
+  maxPollDurationMs?: number; // default 600_000 (10 min); throws on timeout
+  signal?: AbortSignal;     // optional external cancellation
+  onProgress?: (status: IAbapGitRepoStatus) => void;
+}
+
+export interface IAbapGitUnlinkArgs {
+  package: string;
+  transportRequest?: string;
+}
+
+export interface IAbapGitPullResult {
+  finalStatus: IAbapGitRepoStatus;
+  errorLog?: IAbapGitErrorLogEntry[];   // populated only on 'E' or 'A'
+}
+
+export interface IAbapGitExternalRepoCredentials {
+  url: string;
+  remoteUser?: string;
+  remotePassword?: string;
+}
+
+export interface IAbapGitExternalRepoBranch {
+  name: string;
+  sha1: string;
+  isHead: boolean;
+  type?: string;
+}
+
+export interface IAbapGitExternalRepoInfo {
+  branches: IAbapGitExternalRepoBranch[];
+  access?: 'read' | 'write' | string;
+  // Additional fields filled from the live response during implementation.
+}
+
+export interface IAdtAbapGitClient {
   link(args: IAbapGitLinkArgs): Promise<void>;
   pull(args: IAbapGitPullArgs): Promise<IAbapGitPullResult>;
+  unlink(args: IAbapGitUnlinkArgs): Promise<void>;
+  listRepos(): Promise<IAbapGitRepoStatus[]>;
+  getRepo(packageName: string): Promise<IAbapGitRepoStatus | undefined>;
+  getErrorLog(packageName: string): Promise<IAbapGitErrorLogEntry[]>;
+  checkExternalRepo(args: IAbapGitExternalRepoCredentials): Promise<IAbapGitExternalRepoInfo>;
 }
 ```
 
-Internally the `pull` method encapsulates: locate → POST pull → poll every `pollIntervalMs` → fetch error log on terminal non-OK → return.
-
-**Pros.**
-
-- **Exact sapcli parity.** Everything proven in sapcli is covered, nothing more. YAGNI-clean.
-- Smallest code surface; fastest to ship; smallest review footprint.
-- Polling abstraction lives inside `pull` as an internal detail — consumers don't have to think about it unless they want `onProgress` heartbeats.
-
-**Cons.**
-
-- **No unlink.** If a consumer needs to remove a repo binding, they have to drop to raw HTTP or wait for v2.
-- **No status-only check.** Every status probe triggers a full pull attempt — expensive and side-effectful.
-- **No external repo info probe** — `externalrepoinfo` endpoint unused.
-- **No way to enumerate linked repos** on a system — `listRepos` is a natural API that sapcli exposes only internally.
-
-**Verdict.** Right if "port exactly what sapcli ships" is the priority and follow-up extensions are acceptable.
-
-## 6. Variant C — extended separate client (recommended)
-
-**Shape.** Same file and factory as B, but the surface is broader:
+### 4.3 Options shape
 
 ```ts
-interface IAdtAbapGitClient {
-  // Core (sapcli parity)
-  link(args: IAbapGitLinkArgs): Promise<void>;
-  pull(args: IAbapGitPullArgs): Promise<IAbapGitPullResult>;
-
-  // Introspection (no sapcli wrapper, but all evidence-backed)
-  listRepos(): Promise<IAbapGitRepoStatus[]>;                          // GET /repos
-  getRepo(packageName: string): Promise<IAbapGitRepoStatus | undefined>;
-  getErrorLog(packageName: string): Promise<IAbapGitErrorLogEntry[]>;  // uses the repo's log_link
-
-  // Lifecycle (beyond sapcli)
-  unlink(args: { package: string; transportRequest?: string }): Promise<void>;
-
-  // External-repo probe (discovery-verified but unused in sapcli)
-  checkExternalRepo(args: {
-    url: string;
-    remoteUser?: string;
-    remotePassword?: string;
-  }): Promise<IAbapGitExternalRepoInfo>;
-}
-
-interface IAbapGitExternalRepoInfo {
-  branches: Array<{ name: string; sha1: string; isHead: boolean; type?: string }>;
-  access?: 'read' | 'write' | string;
-  // Concrete shape derived during implementation from a live probe of the endpoint.
+export interface IAdtAbapGitClientOptions {
+  contentTypeVersion?: 'v3' | 'v4';  // default 'v3' for sapcli compatibility
 }
 ```
 
-`unlink` likely maps to `DELETE /sap/bc/adt/abapgit/repos/{id}` (the ID is the resource identifier returned on link) — the exact URI template has to be confirmed during implementation via a live call or a deeper parse of the existing `repos` entity's atom links (`delete_link` or `edit_link`). If the endpoint is missing on the target system, the method throws `NotSupportedError`.
+Per the roadmap's options-contract note (§4.1), this is an independent per-class contract, not an attempt to standardise across all separate clients.
 
-`checkExternalRepo` hits `POST /sap/bc/adt/abapgit/externalrepoinfo` with Content-Type `application/abapgit.adt.repo.info.ext.request.v2+xml` (discovery advertises v1 and v2). Used to probe a remote URL for branch list and credentials validity before committing a link.
+## 5. Module layout
 
-**Pros.**
+```
+src/clients/
+  AdtAbapGitClient.ts            # handler — implements IAdtAbapGitClient
+  abapGit/
+    types.ts                     # public and internal types
+    xmlBuilder.ts                # builds <abapgitrepo:repository> envelope
+    xmlParser.ts                 # parses repo list, error log, externalrepoinfo
+    link.ts                      # POST /repos (link a package)
+    pull.ts                      # POST <pull_link> + poll logic
+    unlink.ts                    # DELETE <edit_link> (URI from live response)
+    listRepos.ts                 # GET /repos
+    getErrorLog.ts               # GET <log_link>
+    checkExternalRepo.ts         # POST /externalrepoinfo
+    poll.ts                      # internal polling helper with AbortSignal support
+```
 
-- Covers every useful operation that discovery evidences or sapcli needs.
-- `checkExternalRepo` is genuinely valuable: lets a caller validate a URL + credentials before the irreversible `link` step.
-- `listRepos` and `getRepo(name)` expose read-only status checking without triggering side-effects (fixing one of Variant B's real gaps).
-- `unlink` closes the lifecycle so consumers don't need to drop to raw HTTP for cleanup.
+Nine files under `src/clients/abapGit/` + the handler. Corresponds to a single-file-per-operation convention used by the core modules and keeps each file focused.
 
-**Cons.**
+## 6. Operation semantics
 
-- **Three endpoints beyond sapcli** require live verification of request/response shape. Specifically: `unlink` URI template, `externalrepoinfo` response schema, and whether `listRepos` / `getRepo` should use Accept v2 (sapcli) or v4 (discovery's newest).
-- More surface = more tests, more docs, more maintenance.
-- Medium risk: if `unlink` turns out to be server-gated by transport-authorization in a way that doesn't fit a simple DELETE, the API has to grow or the method has to return an error.
+### 6.1 `link`
 
-**Verdict.** Recommended. Fits the roadmap's Variant C default, closes sapcli's gaps in a principled way, and introduces only evidence-backed new methods.
+1. Build XML body (`buildLinkBody(args)`) with all non-null fields.
+2. `POST /sap/bc/adt/abapgit/repos` with Content-Type `application/abapgit.adt.repo.v${n}+xml` where `n = options.contentTypeVersion ?? 3`.
+3. On 200 → resolve. Non-2xx → throw.
 
-## 7. Non-decisions (fixed constraints shared across all variants)
+### 6.2 `pull`
 
-Regardless of A/B/C:
+1. `listRepos()` to locate the binding by package; extract `pull_link` from atom links. If missing → throw `NotFoundError`.
+2. Resolve `branchName`: caller-supplied or the binding's current `branchName`.
+3. `POST <pull_link>` with the XML envelope. Expect HTTP 202.
+4. **Poll loop** (`poll.ts`):
+   - Every `pollIntervalMs` (default 1000): `listRepos()` → find by package → inspect `status`.
+   - While status is `R`: continue. Invoke `onProgress(status)` if provided.
+   - Respect `signal`: throw `AbortError` if aborted.
+   - Respect `maxPollDurationMs` (default 600000): throw `TimeoutError` if exceeded.
+   - On non-`R` status: break loop. Return status.
+5. Terminal state handling:
+   - `E` or `A` → also fetch error log via `getErrorLog(package)`; attach to result.
+   - Anything else → treat as OK; no error log fetched.
+
+### 6.3 `unlink`
+
+Depends on the server-side URI template for removal. Two likely options, resolved during implementation:
+
+1. **Preferred:** extract the `edit_link` (or `delete_link`) from the repo entity's atom links in `listRepos`, then `DELETE <edit_link>`. Transport request carried as a query param `?corrNr=…` if provided.
+2. **Fallback:** if the entity does not expose a delete link, derive the URI as `/sap/bc/adt/abapgit/repos/{repositoryId}` and issue `DELETE`.
+
+Implementation chooses whichever the live server actually accepts. Fail fast with a clear error if neither works.
+
+### 6.4 `listRepos`
+
+`GET /sap/bc/adt/abapgit/repos` with Accept `application/abapgit.adt.repos.v2+xml`. Parse into `IAbapGitRepoStatus[]`.
+
+### 6.5 `getRepo(packageName)`
+
+Calls `listRepos()` internally and filters. Returns `undefined` if absent (no throw on 404-equivalent).
+
+### 6.6 `getErrorLog(packageName)`
+
+1. `listRepos()` to locate the binding and extract `log_link`.
+2. `GET <log_link>` with Accept `application/abapgit.adt.repo.object.v2+xml`.
+3. Parse entries; do **not** filter out `msgType == 'S'` here. That's sapcli's CLI formatting choice; library-level consumers decide for themselves.
+
+### 6.7 `checkExternalRepo`
+
+`POST /sap/bc/adt/abapgit/externalrepoinfo` with:
+- Content-Type: `application/abapgit.adt.repo.info.ext.request.v2+xml` (prefer v2 over v1).
+- Accept: same.
+- Body: XML envelope with `url`, `remoteUser`, `remotePassword`. Namespace and element names confirmed against a live response during implementation.
+
+Parse into `IAbapGitExternalRepoInfo`. Final response-shape confirmed at live-probe time; if the shape differs from the proposal, the spec and interface are adjusted in the implementation plan.
+
+## 7. Non-decisions (fixed constraints)
 
 - **Transport layer.** Only `IAbapConnection`. No direct axios.
-- **XML parsing.** `fast-xml-parser` as elsewhere. abapGit namespaces: `abapgitrepo` and `abapObjects`.
-- **Namespace handling.** The repo envelope uses atom links (`<atom:link rel="pull_link" href="…"/>`); the client must extract these links dynamically rather than hard-coding the pull URL. This matches sapcli's `_get_link` helper.
-- **Content-Type version.** Default to `v3` (sapcli-compatible) with a config override for `v4` if a consumer needs the newer schema. Runtime transparent fallback NOT planned for v1; fallback is opt-in.
-- **Async polling.** Default interval 1000ms (sapcli parity), configurable via `pollIntervalMs`. Maximum poll duration bounded by `AbortSignal` or a default cap (e.g. 10 minutes) — TBD in implementation plan but documented as bounded.
-- **Environment gating.** `available_in: ["cloud"]` initially. Widen to on-prem after a live verification on a system with ABAP Platform 2022+ that activates the ADT abapGit app.
-- **Transport binding.** `transportRequest` optional on `link` and `pull` (sapcli treats it as optional); required only if the target system enforces transport binding on package changes.
-- **Credentials.** `remoteUser` / `remotePassword` are forwarded verbatim in the XML body. Never logged. The server handles credential storage; client does not cache them.
+- **XML parsing.** `fast-xml-parser`; namespaces `abapgitrepo` and `abapObjects`.
+- **Credentials.** `remoteUser` / `remotePassword` forwarded verbatim in XML body; never logged.
+- **Atom links.** All sub-operations (`pull`, `unlink`, `getErrorLog`) extract their URLs from atom links on the repo entity rather than hard-coding paths. Matches sapcli's `_get_link` approach.
+- **Content-Type version.** Default `v3` (sapcli compat). v4 is opt-in via `options.contentTypeVersion`.
+- **Async polling.** Default 1000ms interval, 10-minute max duration. Abortable via `AbortSignal`.
+- **Environment gating.** `available_in: ["cloud"]` initially. Implementation plan probes a modern on-prem target if one is available; otherwise widens on first positive report.
+- **Error semantics.** `NotFoundError` on missing repo; `AbortError` on aborted poll; `TimeoutError` on exceeded max-duration; all others propagate as thrown `Error` with status details.
 - **Public typing rule.** Factory returns `IAdtAbapGitClient`, not a narrower base type. Specialized interface per roadmap §4.2.
-- **Client placement.** `src/clients/AdtAbapGitClient.ts`. Low-level helpers under `src/clients/abapGit/*`.
+- **Client placement.** `src/clients/AdtAbapGitClient.ts` (handler) and `src/clients/abapGit/` (helpers).
 - **Documentation.** README, CLIENT_API_REFERENCE, ARCHITECTURE, LEGACY, CHANGELOG, ADT_OBJECT_ENTITIES updates follow the #21 / #28 pattern.
 
-## 8. Comparison summary
+## 8. Open questions for the implementation plan
 
-| Aspect | A (core module) | B (minimal client) | C (extended client) |
-|---|---|---|---|
-| Architectural fit | Forced; ~50% of IAdtObject methods are stubs | Clean separate client | Clean separate client |
-| Scope | link + pull + CRUD stubs | link + pull (sapcli parity) | + unlink + listRepos + getRepo + getErrorLog + checkExternalRepo |
-| sapcli parity | Partial | Exact | Exact + extras |
-| Async polling | Awkward in IAdtObject | Encapsulated in `pull` | Encapsulated in `pull` |
-| Cloud support | Yes | Yes | Yes |
-| On-prem support | Unverified (ADT abapGit is Steampunk-era) | Unverified | Unverified |
-| Legacy (E77) support | No endpoint | No endpoint | No endpoint |
-| Code surface | Medium | Small | Medium |
-| Risk | Architectural misfit | Low — fully sapcli-documented | Medium — 3 endpoints need live verification |
-| Matches roadmap default | No | Acceptable narrow-fallback | **Yes** |
+These do not block variant selection but must be resolved during implementation:
 
-## 9. What is NOT decided here
+- **Unlink URI template.** Atom `edit_link` vs `/repos/{id}` — live probe during first implementation pass.
+- **`externalrepoinfo` response shape.** Confirmed against a live trace; the `IAbapGitExternalRepoInfo` type may gain or lose fields.
+- **`repositoryId`** on `IAbapGitRepoStatus` — where in the response XML it lives, whether it's surfaced on every version of the Accept type.
+- **`v3` vs `v4` Content-Type behaviour.** If `v3` response shape differs from `v4`, decide whether `listRepos()` parsing branches or whether we mandate a single version.
+- **On-prem availability.** Test on a modern on-prem system from `ABAP Platform 2022+` to confirm endpoints activate and to widen `available_in`.
 
-- Exact `unlink` URI template — probably `DELETE` on the repo entity's `edit_link` or `delete_link`; must confirm during implementation.
-- Exact `externalrepoinfo` response schema — only the Accept type is known from discovery; content-shape derived during a live probe.
-- Whether to default Content-Type to `v3` (sapcli) or `v4` (newest in discovery). Recommendation: `v3` for compatibility; expose `options.contentTypeVersion` for opt-in newer.
-- Whether `pull`'s `AbortSignal` / max-duration cap lives in args or in client options.
-- Final method names (bikeshed in implementation plan): `link` vs `linkRepo`, `pull` vs `pullRepo`, `listRepos` vs `getRepos`, `checkExternalRepo` vs `probeRemote`.
+## 9. Verification sources
 
-## 10. Decision criteria
+This design was adjusted after cross-checking against:
 
-Pick **A** if:
-- You want uniformity with `src/core/` and accept stub methods for half the interface.
-- (Recommendation: don't pick A. abapGit doesn't match the pattern.)
+- `~/prj/sapcli` — `sap/cli/abapgit.py`, `sap/adt/abapgit.py`.
+- `docs/discovery/discovery_{cloud_mdd,trial,e19,e77}_raw.xml` + `docs/discovery/endpoints_*.txt`.
+- Proposal rules: `docs/superpowers/specs/2026-04-19-sapcli-separate-clients-proposal.md` §4.1 (variant selection), §4.2 (public typing).
 
-Pick **B** if:
-- "Ship narrow sapcli parity fast" is the priority.
-- You accept that `unlink`, `listRepos`, `getErrorLog` outside of pull, and `externalrepoinfo` will need a v2 PR later.
+Not every claim is discovery-backed to the same degree. Specifically:
+- `unlink`, `checkExternalRepo` response shape, and `repositoryId` location require **live probing** during implementation.
+- On-prem availability is a real-world-known fact (ABAP Platform 2022+) that the captured discovery snapshots don't reflect.
 
-Pick **C** if:
-- You want one authoritative abapGit client covering everything discovery evidences.
-- Pre-link validation (`checkExternalRepo`) and side-effect-free status queries matter for your workflow.
-- You're budgeted for live verification of three endpoints during implementation.
+## 10. Next step
 
-## 11. Next step
-
-User picks A, B, or C. After selection:
-
-1. Update this document to carry only the chosen variant.
-2. Proceed to `writing-plans` skill for the implementation plan.
+Invoke `writing-plans` to produce `docs/superpowers/plans/2026-04-19-abapgit-client.md` with task-by-task TDD-oriented implementation.
