@@ -38,15 +38,15 @@ All names are working titles; final names may be refined during the per-class br
 - **Endpoint family:** `/sap/bc/adt/abapgit/repos`, per-repo sub-resources.
 - **Complexity:** Medium. Simpler than gCTS but still involves status polling and per-repo operation queueing.
 - **Special considerations:**
-  - Shares surface semantics with gCTS but uses the abapGit app-specific OData/REST instead of the cts_abapvcs handler.
-  - On-prem-only in most systems; cloud variant should be probed during spec stage.
+  - Shares surface semantics with gCTS but uses the abapGit app-specific handler instead of the cts_abapvcs handler.
+  - **Cloud presence verified** in `docs/discovery/discovery_cloud_mdd_raw.xml` and `discovery_trial_raw.xml` (`/sap/bc/adt/abapgit/repos`, `/sap/bc/adt/abapgit/externalrepoinfo`). The open question is feature parity (push, branch management), not baseline endpoint presence.
 
 ### 3.3 `AdtFeatureToggleClient`
 
 - **Purpose:** Read and toggle state of ABAP feature toggles (`cl_abap_feature*` family), tied to CTS via corrnr.
 - **sapcli references:** `sap/cli/featuretoggle.py`, `sap/adt/featuretoggle.py`.
-- **Endpoint family:** `/sap/bc/adt/feature-toggles/*`.
-- **Complexity:** Small. State machine (off / on / deleted) with corrnr binding.
+- **Endpoint family:** `/sap/bc/adt/sfw/featuretoggles*` (verified in `docs/discovery/discovery_cloud_mdd_raw.xml`). Sub-resources include per-object access at `{name}{?corrNr,lockHandle,version,accessMode,_action}`, plus `{name}/check`, `{name}/dependencies/validate`, `{name}/logs`, `{name}/objects`, `$configuration`, `$schema`, and `attributes/{attributeKeys,attributeValues}`.
+- **Complexity:** Small. State machine (off / on / deleted) with corrnr binding and standard lock/unlock via the `_action` query parameter.
 - **Special considerations:** Use this class as the **pattern baseline** for "separate client in the current architecture" — small enough to exercise conventions (constructor shape, public API style, test harness wiring) before committing to larger classes.
 
 ### 3.4 `AdtFlpBuilderClient`
@@ -62,21 +62,23 @@ All names are working titles; final names may be refined during the per-class br
 
 - **Purpose:** Upload and manage BSP / UI5 applications in the ABAP repository.
 - **sapcli references:** `sap/cli/bsp.py`.
-- **Endpoint family:** UI5 `ABAP_REPOSITORY_SRV` OData v2 service (binary archive as base64 payload).
-- **Complexity:** Small. Straightforward binary-upload + corrnr binding.
-- **Special considerations:** Uses the same OData v2 transport as `AdtFlpBuilderClient` — share the minimal v2 helper between them if we implement one.
+- **Endpoint family:** Two candidate surfaces to evaluate in the per-class spec:
+  - **ADT filestore** at `/sap/bc/adt/filestore/ui5-bsp/*` (sub-resources `objects`, `deploy-storage`, `ui5-rt-version`) — verified in `docs/discovery/discovery_{cloud_mdd,e19,e77,trial}_raw.xml`. This is the modern ADT-native path.
+  - **External OData v2** via `UI5/ABAP_REPOSITORY_SRV` — the path used by sapcli, still available on systems that expose it.
+- **Complexity:** Small. Straightforward binary-upload + corrnr binding on either surface.
+- **Special considerations:** The per-class spec must pick one surface (or document a mixed flow) **before** deciding whether `AdtFlpBuilderClient` should share an OData v2 helper with BSP — if BSP goes ADT filestore, the helper stops being shared.
 
 ## 4. Architectural constraints (shared across all candidates)
 
 All candidate classes must:
 
-- Accept `IAbapConnection` + `ILogger` (and optionally `IAdtSystemContext` / `IAdtClientOptions`) via constructor, matching `AdtClient` / `AdtRuntimeClient` conventions.
+- Accept `IAbapConnection` + `ILogger` via constructor. The **options contract** (`IAdtClientOptions`-style vs a reduced runtime-style object vs a new shared contract) is NOT yet standard across the repo — `AdtClient` and `AdtRuntimeClient` currently differ. Each per-class spec **must explicitly choose** one of these shapes and justify the pick; a cross-cutting decision can happen later if a pattern emerges.
 - Depend only on the `IAbapConnection` interface. No RFC, no direct transport.
 - Expose zero-argument factory methods — identity / repo-name / toggle-id lives in config objects, not factory parameters.
 - Live under `src/clients/` (or `src/runtime/` if runtime-adjacent) alongside existing top-level clients, NOT under `src/core/`.
 - Integrate with the existing Accept/content-type correction wrapper when applicable.
 - Ship with integration tests under `src/__tests__/integration/clients/{clientName}/` (new fixture path; no existing folder) using the established `TestConfigResolver` / `BaseTester` helpers where they fit.
-- Add `on-prem` vs `cloud` `available_in` gating from day one (some surfaces are on-prem-only — gCTS cloud story differs from on-prem).
+- Use the **3-level environment vocabulary** in `available_in`: `cloud`, `onprem`, `legacy` — matching the existing `test-config.yaml.template` convention (e.g. `["onprem", "legacy"]`, `["legacy"]`). Each per-class spec must explicitly state legacy behaviour (supported, read-only, or unsupported) rather than collapsing it into a single non-cloud bucket.
 
 ## 5. Recommended PR ordering
 
@@ -112,7 +114,7 @@ Each spec may independently drop a candidate from scope if verification against 
 
 - **JSON vs XML responses.** gCTS is JSON-first. The library has a heavily XML-centric parsing pipeline. Need to decide: per-client JSON handling (simpler) vs shared JSON utility (DRY). Recommendation: per-client for now; extract shared helper only after the second JSON-consuming client appears.
 - **OData v2 surface.** We will consume two OData v2 services (BSP, FLP). Decision on minimal inline helper vs shared utility should be taken in the #2 spec, not here.
-- **Cloud availability matrix.** Several of these surfaces are on-prem-only (gCTS cloud story is partial; abapGit largely on-prem). Each spec must verify cloud availability from `docs/discovery/` and set `available_in` accordingly before implementation.
+- **Cloud availability matrix.** The cloud story differs per surface: `abapgit/repos` and `abapgit/externalrepoinfo` are present on cloud MDD and trial; `sfw/featuretoggles*` is present on cloud MDD; `filestore/ui5-bsp/*` is present across all targets. gCTS cloud coverage is partial. Each per-class spec must still verify its specific surface against `docs/discovery/*.xml` and set `available_in` using the 3-level vocabulary (`cloud` / `onprem` / `legacy`) accordingly.
 - **Test environment.** Some operations (git push / pull, BSP upload) require test fixtures (remote git repos, BSP archives) that do not exist in the current test infrastructure. Each spec must enumerate what fixtures it needs and how they are provisioned.
 
 ## 8. What this proposal is not
@@ -121,15 +123,15 @@ Each spec may independently drop a candidate from scope if verification against 
 - Not a commitment to implement all five. The ordering is a recommendation; at any point after a completed PR the user may stop, reorder, or drop remaining items.
 - Not a schedule. No dates, no velocity estimates. Each class ships when its spec/plan/PR cycle completes.
 
-## 9. Review notes
+## 9. Verification sources
 
-These notes record mismatches spotted during proposal review so they are resolved before per-class specs lock in the wrong assumptions.
+This proposal was adjusted after cross-checking against:
 
-- **Feature toggle endpoint family must be corrected.** The proposal currently says `/sap/bc/adt/feature-toggles/*`, but the local discovery corpus exposes `/sap/bc/adt/sfw/featuretoggles*`. The per-class spec must use the discovery-backed family and not the provisional path written above.
-- **BSP transport assumptions need to be re-verified.** The proposal currently describes BSP as an OData v2 client over `ABAP_REPOSITORY_SRV`, while the local discovery corpus already exposes ADT filestore endpoints under `/sap/bc/adt/filestore/ui5-bsp/*`. Before PR ordering depends on a shared OData helper, the BSP spec must confirm whether the implementation target is ADT filestore, external OData, or a mixed flow.
-- **Environment gating should use the repo's real vocabulary.** Current test/config infrastructure distinguishes `cloud`, `onprem`, and `legacy`, not just "on-prem" vs "cloud". Each per-class spec should explicitly state legacy behaviour (supported, read-only, or unsupported) instead of collapsing everything non-cloud into one bucket.
-- **abapGit cloud availability should not be described as merely speculative.** The local discovery corpus already contains `/sap/bc/adt/abapgit/repos` and `/sap/bc/adt/abapgit/externalrepoinfo` on cloud. The open question is feature parity, not baseline endpoint presence.
-- **Constructor conventions need tighter wording.** `AdtClient` and `AdtRuntimeClient` do not currently expose identical option contracts. Per-class specs should define whether a separate client follows the richer `IAdtClientOptions` shape, a reduced runtime-style options object, or a new shared options contract.
+- `~/prj/sapcli` — reference implementation, especially `sap/cli/{gcts,abapgit,featuretoggle,flp,bsp}.py` and corresponding `sap/adt/*.py` modules.
+- `docs/discovery/discovery_{cloud_mdd,e19,e77,trial}_raw.xml` + `docs/discovery/endpoints_{cloud_mdd,onprem_modern_e19,onprem_old_e77}.txt` — live discovery snapshots.
+- `src/__tests__/helpers/test-config.yaml.template` — for the 3-level `cloud` / `onprem` / `legacy` environment vocabulary.
+
+All endpoint paths, content types, and cloud-availability claims in sections 3 and 4 come from these sources. Per-class specs must re-verify their own surface against the same sources, because this proposal compresses evidence — it does not replace it.
 
 ## 10. Next step
 
