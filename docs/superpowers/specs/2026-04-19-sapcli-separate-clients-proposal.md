@@ -121,6 +121,16 @@ Each spec may independently drop a candidate from scope if verification against 
 - Not a commitment to implement all five. The ordering is a recommendation; at any point after a completed PR the user may stop, reorder, or drop remaining items.
 - Not a schedule. No dates, no velocity estimates. Each class ships when its spec/plan/PR cycle completes.
 
-## 9. Next step
+## 9. Review notes
+
+These notes record mismatches spotted during proposal review so they are resolved before per-class specs lock in the wrong assumptions.
+
+- **Feature toggle endpoint family must be corrected.** The proposal currently says `/sap/bc/adt/feature-toggles/*`, but the local discovery corpus exposes `/sap/bc/adt/sfw/featuretoggles*`. The per-class spec must use the discovery-backed family and not the provisional path written above.
+- **BSP transport assumptions need to be re-verified.** The proposal currently describes BSP as an OData v2 client over `ABAP_REPOSITORY_SRV`, while the local discovery corpus already exposes ADT filestore endpoints under `/sap/bc/adt/filestore/ui5-bsp/*`. Before PR ordering depends on a shared OData helper, the BSP spec must confirm whether the implementation target is ADT filestore, external OData, or a mixed flow.
+- **Environment gating should use the repo's real vocabulary.** Current test/config infrastructure distinguishes `cloud`, `onprem`, and `legacy`, not just "on-prem" vs "cloud". Each per-class spec should explicitly state legacy behaviour (supported, read-only, or unsupported) instead of collapsing everything non-cloud into one bucket.
+- **abapGit cloud availability should not be described as merely speculative.** The local discovery corpus already contains `/sap/bc/adt/abapgit/repos` and `/sap/bc/adt/abapgit/externalrepoinfo` on cloud. The open question is feature parity, not baseline endpoint presence.
+- **Constructor conventions need tighter wording.** `AdtClient` and `AdtRuntimeClient` do not currently expose identical option contracts. Per-class specs should define whether a separate client follows the richer `IAdtClientOptions` shape, a reduced runtime-style options object, or a new shared options contract.
+
+## 10. Next step
 
 After this proposal is accepted, start the spec cycle for **#1: `AdtFeatureToggleClient`** (or a different ordering if the user reprioritises).
