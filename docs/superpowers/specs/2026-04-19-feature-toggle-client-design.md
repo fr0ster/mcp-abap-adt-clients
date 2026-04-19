@@ -44,7 +44,7 @@ Referenced metadata surface (from the GET of the object itself):
 
 State enum: `"on" | "off" | "undefined"`.
 
-### 3.2 Discovery corpus (`docs/discovery/discovery_cloud_mdd_raw.xml`, `endpoints_cloud_mdd.txt`)
+### 3.2 Discovery corpus (`docs/discovery/discovery_cloud_mdd_raw.xml`, `endpoints_cloud_mdd.txt`, `endpoints_onprem_modern_e19.txt`)
 
 All under `/sap/bc/adt/sfw/`:
 
@@ -57,9 +57,9 @@ All under `/sap/bc/adt/sfw/`:
 - `featuretoggles/{object_name}/logs`
 - `featuretoggles/{object_name}/objects`
 
-Only verified on cloud MDD in the captured snapshots. Not seen on E77 (legacy) or E19 (modern on-prem) in current discovery — per-class implementation must probe on-prem systems once the target is chosen.
+Verified in the captured snapshots for **cloud MDD** and **modern on-prem E19**. Not seen on E77 (legacy) in current discovery. Per-class implementation should still probe a live modern on-prem target before promising write support, but `available_in` does not need to start cloud-only on discovery grounds.
 
-Availability planning: `available_in: ["cloud"]` initially; widen to `onprem` after probing a modern on-prem target; likely `unsupported` on `legacy`.
+Availability planning: `available_in: ["cloud", "onprem"]` provisionally; keep `legacy` unsupported unless later evidence proves otherwise. The implementation plan should decide whether write operations stay enabled on both environments immediately or whether tests roll out cloud-first while on-prem write support is validated.
 
 ## 4. Variant A — core module under `src/core/featureToggle/`
 
@@ -89,7 +89,6 @@ class AdtFeatureToggleClient {
   getRuntimeState(name: string): Promise<IFeatureToggleRuntimeState>;
   switchOn(name: string, opts: { transportRequest: string; userSpecific?: boolean }): Promise<void>;
   switchOff(name: string, opts: { transportRequest: string; userSpecific?: boolean }): Promise<void>;
-  check(name: string, opts?: { userSpecific?: boolean }): Promise<IFeatureToggleCheckResult>;  // optional
 }
 ```
 
@@ -120,7 +119,7 @@ interface IFeatureToggleCheckResult {
 }
 ```
 
-No create / no read-definition / no update / no delete / no lock / no activate / no analytics. Just the three operations sapcli ships.
+No create / no read-definition / no update / no delete / no lock / no activate / no analytics. Just the three operations sapcli ships: `state`, `on`, `off`.
 
 **Pros.**
 - **Matches the roadmap proposal exactly** — baseline size, baseline pattern for "separate client in current architecture".
@@ -186,7 +185,7 @@ Regardless of A/B/C:
 - **JSON parsing:** Native `JSON.parse`; no new dependencies. Hand-roll types.
 - **Content-type constants:** Added to `src/constants/contentTypes.ts` alongside the established `ACCEPT_*` / `CT_*` entries.
 - **Accept negotiation:** Integrate with the existing `wrapConnectionAcceptNegotiation` wrapper. Feature-toggle endpoints are strict about Accept — expect 406 handling to matter.
-- **Environment gating:** `available_in: ["cloud"]` initially. Probe on-prem modern + legacy during bring-up; widen or narrow based on evidence. Tests default to `onprem`-first convention only if the on-prem probe succeeds; otherwise cloud-only.
+- **Environment gating:** `available_in: ["cloud", "onprem"]` provisionally based on current discovery; keep `legacy` unsupported unless later evidence proves otherwise. The implementation plan should decide whether tests run on both environments immediately or stage write coverage after one live on-prem verification pass.
 - **Transport-request binding:** `switchOn` / `switchOff` always require `transportRequest` (matches sapcli — `--corrnr` is marked `required`); `user-specific` toggles may skip it but the proposal keeps it required for safety. Final decision in the implementation plan.
 - **Encoding:** `quote_plus` in sapcli → `encodeURIComponent` in TypeScript, applied to the feature-toggle name segment.
 - **Documentation:** Updates to README, CLIENT_API_REFERENCE, ARCHITECTURE, LEGACY, ADT_OBJECT_ENTITIES follow the `#21` pattern from the auth-field / function-include release.
