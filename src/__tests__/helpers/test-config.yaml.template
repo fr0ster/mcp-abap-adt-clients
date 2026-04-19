@@ -1830,6 +1830,30 @@ execute_class:
             amdp_trace: true
             max_time_for_tracing: 1800
 
+# abapGit client — only on systems that activate the ADT abapGit app
+# (ABAP Platform 2022+ or SAP BTP ABAP Environment / Steampunk).
+abapgit:
+  test_cases:
+    - name: "list_repos"
+      enabled: true
+      available_in: ["cloud"]
+      description: "List all linked abapGit repositories"
+      params: {}
+    - name: "check_external_repo"
+      enabled: true
+      available_in: ["cloud"]
+      description: "Probe a public read-only git repo"
+      params:
+        url: "https://github.com/SAP-samples/cloud-abap-rap.git"
+    - name: "link_pull_unlink_flow"
+      enabled: false   # disabled by default: mutates the target system
+      available_in: ["cloud"]
+      description: "Full link → pull → unlink cycle against a disposable package"
+      params:
+        package: "ZAC_SHR_ABAPGIT_TEST"
+        url: "https://github.com/SAP-samples/cloud-abap-rap.git"
+        branch: "refs/heads/main"
+
 # Run Program (direct runProgram call)
 # Requires: program must already exist and be activated
 # Uses shared_dependencies.programs (ZAC_SHR_PROG)
