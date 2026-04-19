@@ -119,6 +119,12 @@ export const ACCEPT_FUNCTION_MODULE =
 export const CT_FUNCTION_MODULE =
   'application/vnd.sap.adt.functions.fmodules+xml';
 
+// Function Includes (FUGR/I)
+export const ACCEPT_FUNCTION_INCLUDE =
+  'application/vnd.sap.adt.functions.fincludes.v2+xml, application/vnd.sap.adt.functions.fincludes+xml';
+export const CT_FUNCTION_INCLUDE =
+  'application/vnd.sap.adt.functions.fincludes.v2+xml';
+
 // Tables
 export const ACCEPT_TABLE =
   'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml';
@@ -133,6 +139,12 @@ export const CT_TABLE_TYPE = 'application/vnd.sap.adt.tabletype.v1+xml';
 export const ACCEPT_DOMAIN =
   'application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml';
 export const CT_DOMAIN = 'application/vnd.sap.adt.domains.v2+xml';
+
+// Authorization Fields (SUSO / AUTH)
+// Shared blues envelope used by APS IAM auth endpoints
+export const ACCEPT_AUTHORIZATION_FIELD =
+  'application/vnd.sap.adt.blues.v1+xml';
+export const CT_AUTHORIZATION_FIELD = 'application/vnd.sap.adt.blues.v1+xml';
 
 // Data Elements
 export const ACCEPT_DATA_ELEMENT =

@@ -851,6 +851,31 @@ create_data_element:
         long_label: "Adt Data Element"
         heading_label: "Adt Data Element"
 
+# Create Authorization Field
+# Authorization fields (SUSO/AUTH, endpoint /sap/bc/adt/aps/iam/auth/{name}) are
+# DDIC-style XML-only objects — no source code. Creation rights on BTP trial
+# are typically restricted, so the test is gated to on-prem initially; flip
+# available_in once a cloud tenant with the required authorization exists.
+create_authorization_field:
+  test_cases:
+    - name: "adt_authorization_field"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Authorization field reserved for AdtAuthorizationField tests"
+      params:
+        authorization_field_name: "ZAC_AUTH01"
+        description: "AdtAuthorizationField workflow field"
+        # package_name: "ZAC_PKG01"
+        # transport_request: ""
+        # Optional content fields — left commented; CRUD flow exercises them via update:
+        # field_name: "ZAC_AUTH01"
+        # roll_name: "CHAR10"
+        # domname: "CHAR10"
+        # outputlen: "10"
+        update_description: "AdtAuthorizationField workflow field (updated)"
+        update_domname: "CHAR10"
+        update_roll_name: "CHAR10"
+
 # Create Interface
 create_interface:
   test_cases:
@@ -1131,6 +1156,32 @@ create_function_module:
               VALUE(EV_RESULT) TYPE STRING.
             ev_result = |Result: { iv_param }|.
           ENDFUNCTION.
+
+# Create Function Include
+# Function includes (FUGR/I) live inside an existing function group. Tests rely
+# on the shared FUGR (ZAC_SHR_FUGR — see shared_dependencies.function_groups);
+# FunctionModule tests already ensure this group exists.
+create_function_include:
+  test_cases:
+    - name: "adt_function_include"
+      enabled: true
+      available_in: ["onprem"]
+      description: "Function include reserved for AdtFunctionInclude tests"
+      params:
+        function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups
+        include_name: "LZAC_SHR_FUGRZ01"      # FUGR include names follow L<fugr>Znn pattern
+        description: "AdtFunctionInclude workflow include"
+        # transport_request: ""
+        source_code: |
+          *&---------------------------------------------------------------------*
+          *& Include LZAC_SHR_FUGRZ01
+          *&---------------------------------------------------------------------*
+          DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude test'.
+        update_source_code: |
+          *&---------------------------------------------------------------------*
+          *& Include LZAC_SHR_FUGRZ01 (updated)
+          *&---------------------------------------------------------------------*
+          DATA: gv_adt_fi_test TYPE string VALUE 'AdtFunctionInclude updated'.
 
 # Create Transport
 create_transport:
