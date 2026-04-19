@@ -1165,7 +1165,7 @@ create_function_include:
   test_cases:
     - name: "adt_function_include"
       enabled: true
-      available_in: ["onprem", "cloud"]
+      available_in: ["onprem"]
       description: "Function include reserved for AdtFunctionInclude tests"
       params:
         function_group_name: "ZAC_SHR_FUGR"  # → shared_dependencies.function_groups

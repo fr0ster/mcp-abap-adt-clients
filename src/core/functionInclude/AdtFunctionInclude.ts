@@ -122,12 +122,15 @@ export class AdtFunctionInclude
         'Include name is required for function include validation',
       );
     }
-    await validateFunctionIncludeName(
+    const validationResponse = await validateFunctionIncludeName(
       this.connection,
       config.functionGroupName,
       config.includeName,
     );
-    return { errors: [] };
+    return {
+      validationResponse,
+      errors: [],
+    };
   }
 
   /**
