@@ -93,6 +93,7 @@ src/
 - `getClass()`, `getProgram()`, `getInterface()`, `getDomain()`, `getDataElement()`, `getStructure()`, `getTable()`, `getTableType()`, `getView()`
 - `getFunctionGroup()`, `getFunctionModule()`, `getFunctionInclude()`, `getPackage()`, `getServiceDefinition()`
 - `getAuthorizationField()` for SUSO / AUTH authorization-field CRUD (modern on-prem and cloud only)
+- `getFeatureToggle()` for FTG2/FT feature-toggle CRUD plus domain methods (switchOn, switchOff, getRuntimeState, checkState, readSource); modern on-prem and cloud only
 - `getServiceBinding()` for RAP BO service binding CRUD + lifecycle
 - `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`, `getEnhancement()`
 - `getUnitTest()`, `getCdsUnitTest()`, `getRequest()`
