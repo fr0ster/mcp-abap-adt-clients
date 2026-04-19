@@ -383,7 +383,7 @@ standard_objects:
       available_in: ["onprem"]
     - name: "ZLOCAL"
       description: "Placeholder for ABAP Cloud package – replace with existing package"
-      available_in: ["cloud"]
+      available_in: ["onprem", "cloud"]
 
   programs:
     - name: "ZAC_SHR_PROG"
@@ -427,7 +427,7 @@ standard_objects:
 # 
 # Each test case can specify `available_in` parameter to conditionally enable/disable
 # tests for specific environments:
-#   - available_in: ["cloud"] - only run on cloud systems
+#   - available_in: ["onprem", "cloud"] - only run on cloud systems
 #   - available_in: ["onprem"] - only run on modern on-premise systems (BASIS >= 7.50)
 #   - available_in: ["legacy"] - only run on legacy on-premise systems (BASIS < 7.50)
 #   - available_in: ["onprem", "legacy"] - run on all on-premise systems
@@ -603,7 +603,7 @@ read_transport:
 #
 # Flow tests support available_in parameter to conditionally enable/disable tests
 # based on environment (cloud/on-premise):
-#   - available_in: ["cloud"] - only run on cloud systems
+#   - available_in: ["onprem", "cloud"] - only run on cloud systems
 #   - available_in: ["onprem"] - only run on modern on-premise systems (BASIS >= 7.50)
 #   - available_in: ["legacy"] - only run on legacy on-premise systems (BASIS < 7.50)
 #   - available_in: ["onprem", "legacy"] - run on all on-premise systems
@@ -1836,18 +1836,18 @@ abapgit:
   test_cases:
     - name: "list_repos"
       enabled: true
-      available_in: ["cloud"]
+      available_in: ["onprem", "cloud"]
       description: "List all linked abapGit repositories"
       params: {}
     - name: "check_external_repo"
       enabled: true
-      available_in: ["cloud"]
+      available_in: ["onprem", "cloud"]
       description: "Probe a public read-only git repo"
       params:
         url: "https://github.com/SAP-samples/cloud-abap-rap.git"
     - name: "link_pull_unlink_flow"
       enabled: false   # disabled by default: mutates the target system
-      available_in: ["cloud"]
+      available_in: ["onprem", "cloud"]
       description: "Full link → pull → unlink cycle against a disposable package"
       params:
         package: "ZAC_SHR_ABAPGIT_TEST"

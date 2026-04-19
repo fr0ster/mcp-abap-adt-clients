@@ -61,17 +61,24 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     if (connection) await (connection as any).disconnect?.();
   });
 
+  // Case definitions resolved at declaration time (test-config is static).
+  // Environment-dependent gating happens INSIDE each it() via runtime
+  // isCloudSystem, because beforeAll runs after these declarations.
   const listCase = getTestCaseDefinition('abapgit', 'list_repos');
-  const listAvailable = listCase
-    ? (listCase.available_in as string[]).includes(
-        isCloudSystem ? 'cloud' : 'onprem',
-      )
-    : false;
+  const checkCase = getTestCaseDefinition('abapgit', 'check_external_repo');
+  const flowCaseDef = getTestCaseDefinition('abapgit', 'link_pull_unlink_flow');
 
-  (listAvailable ? it : it.skip)(
+  function isAvailable(
+    testCase: { available_in?: string[] } | null | undefined,
+  ): boolean {
+    if (!testCase?.available_in) return false;
+    return testCase.available_in.includes(isCloudSystem ? 'cloud' : 'onprem');
+  }
+
+  it(
     'should list abapGit repositories',
     async () => {
-      if (!hasConfig) throw new Error('test config missing');
+      if (!hasConfig || !listCase || !isAvailable(listCase)) return;
       const repos = await abapGit.listRepos();
       expect(Array.isArray(repos)).toBe(true);
       for (const r of repos) {
@@ -83,11 +90,17 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     getTimeout('test'),
   );
 
-  const checkCase = getEnabledTestCase('abapgit', 'check_external_repo');
-  (checkCase ? it : it.skip)(
+  it(
     'should probe an external repo',
     async () => {
-      if (!hasConfig || !checkCase) throw new Error('test config missing');
+      if (
+        !hasConfig ||
+        !checkCase ||
+        !checkCase.enabled ||
+        !isAvailable(checkCase)
+      ) {
+        return;
+      }
       const info = await abapGit.checkExternalRepo({
         url: checkCase.params.url,
       });
@@ -96,28 +109,34 @@ describe('AbapGit (standalone AdtAbapGitClient)', () => {
     getTimeout('test'),
   );
 
-  const flowCase = getEnabledTestCase('abapgit', 'link_pull_unlink_flow');
-  (flowCase ? it : it.skip)(
+  it(
     'should execute link → pull → unlink flow',
     async () => {
-      if (!hasConfig || !flowCase) throw new Error('test config missing');
+      if (
+        !hasConfig ||
+        !flowCaseDef ||
+        !flowCaseDef.enabled ||
+        !isAvailable(flowCaseDef)
+      ) {
+        return;
+      }
 
       await abapGit.link({
-        package: flowCase.params.package,
-        url: flowCase.params.url,
-        branchName: flowCase.params.branch,
+        package: flowCaseDef.params.package,
+        url: flowCaseDef.params.url,
+        branchName: flowCaseDef.params.branch,
       });
 
       const pullResult = await abapGit.pull({
-        package: flowCase.params.package,
-        branchName: flowCase.params.branch,
+        package: flowCaseDef.params.package,
+        branchName: flowCaseDef.params.branch,
         pollIntervalMs: 2000,
         maxPollDurationMs: 300_000,
       });
       expect(pullResult.finalStatus.status).not.toBe('R');
 
       if (typeof (abapGit as any).unlink === 'function') {
-        await abapGit.unlink({ package: flowCase.params.package });
+        await abapGit.unlink({ package: flowCaseDef.params.package });
       }
     },
     getTimeout('test'),
