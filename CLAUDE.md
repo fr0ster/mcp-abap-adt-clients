@@ -45,6 +45,7 @@ npm run test:check:integration  # Integration tests only (runs as pretest)
 - **AdtRuntimeClient** (`AdtRuntimeClient.ts`): Runtime operations exposed via factory accessors — `getProfiler()`, `getCrossTrace()`, `getSt05Trace()`, `getDebugger()` (composite: `getAbap()`, `getAmdp()`, `getMemorySnapshots()`), `getApplicationLog()`, `getAtcLog()`, `getDdicActivation()`, `getDumps()`, `getFeeds()` (FeedRepository), `getSystemMessages()`, `getGatewayErrorLog()`.
 - **AdtExecutor** (`AdtExecutor.ts`): Program/class execution with optional profiling — `getClassExecutor()`, `getProgramExecutor()`.
 - **AdtClientsWS** (`AdtClientsWS.ts`): WebSocket facade (request/response + event model) wrapping `IWebSocketTransport`.
+- **AdtAbapGitClient** (`AdtAbapGitClient.ts`): Standalone client for SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Seven public methods — link, pull (async with abort/timeout + lastKnownStatus recovery), unlink (`/repos/{key}`), listRepos, getRepo, getErrorLog, checkExternalRepo. Not a factory on AdtClient — consumers `new` it directly per the "AdtClient = IAdtObject-only" architectural rule. Available on cloud + modern on-prem (ABAP Platform 2022+).
 - **Batch clients** (`AdtClientBatch`, `AdtRuntimeClientBatch`): Mirror main clients but collect requests into `multipart/mixed` batch via `BatchRecordingConnection`.
 
 All clients accept `IAbapConnection` + `ILogger`. Optional: `options.enableAcceptCorrection` for automatic `Accept` header negotiation on HTTP 406.

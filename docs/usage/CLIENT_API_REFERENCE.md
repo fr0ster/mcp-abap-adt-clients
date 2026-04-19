@@ -180,6 +180,76 @@ await toggle.update(
 | Cloud MDD | ⚠️ usually SAP-reserved; HTTP 403 for customer creation | ⚠️ typically limited to SAP-provided toggles | ⚠️ depends on toggle's `configurable` flag | ✅ against SAP-provided toggles |
 | Legacy (BASIS < 7.50, e.g. E77) | ❌ endpoint absent | ❌ | ❌ | ❌ |
 
+### AbapGit (ADT-integrated)
+
+`AdtAbapGitClient` is a **standalone top-level class**, not a factory on `AdtClient`. `AdtClient` is reserved for `IAdtObject<Config, State>` implementations — separate clients stand on their own and are instantiated directly, same pattern as `AdtClient`, `AdtRuntimeClient`, `AdtExecutor`, and `AdtClientsWS`.
+
+```typescript
+import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
+import type { IAdtAbapGitClient } from '@mcp-abap-adt/adt-clients';
+
+const connection = createAbapConnection({ /* ... */ });
+const abapGit: IAdtAbapGitClient = new AdtAbapGitClient(connection);
+
+// Probe a remote repo before linking
+const info = await abapGit.checkExternalRepo({
+  url: 'https://github.com/SAP-samples/cloud-abap-rap.git',
+});
+console.log(info.accessMode);                        // 'PUBLIC' | 'PRIVATE' | ...
+console.log(info.branches.map((b) => b.name));       // ['HEAD', 'refs/heads/main', ...]
+
+// Link a package to a remote repo
+await abapGit.link({
+  package: 'ZMY_PKG',
+  url: 'https://github.com/SAP-samples/cloud-abap-rap.git',
+  branchName: 'refs/heads/main',
+});
+
+// Pull — awaits the async server-side job. AbortSignal stops only the
+// client-side wait loop; the server may still be running.
+try {
+  const result = await abapGit.pull({
+    package: 'ZMY_PKG',
+    pollIntervalMs: 2000,
+    maxPollDurationMs: 600_000,
+    onProgress: (s) => console.log(`status: ${s.status} — ${s.statusText}`),
+  });
+  if (result.finalStatus.status === 'E' || result.finalStatus.status === 'A') {
+    console.error('pull failed:', result.errorLog);
+  }
+} catch (err: any) {
+  // AbortError / TimeoutError carry lastKnownStatus when a read succeeded
+  // before the client gave up waiting. The server-side job may still be
+  // running — poll getRepo(package) until status !== 'R' before retrying.
+  if (err.name === 'AbortError' || err.name === 'TimeoutError') {
+    console.warn('pull wait stopped:', err.lastKnownStatus);
+  } else {
+    throw err;
+  }
+}
+
+// Read status without triggering a pull
+const repo = await abapGit.getRepo('ZMY_PKG');
+
+// List all linked repos on this system
+const all = await abapGit.listRepos();
+
+// Fetch the error log as a first-class operation (not only on failed pulls)
+const log = await abapGit.getErrorLog('ZMY_PKG');
+
+// Remove the binding. DELETE /sap/bc/adt/abapgit/repos/{repositoryId}
+// under the hood — repositoryId is resolved automatically from the
+// package name.
+await abapGit.unlink({ package: 'ZMY_PKG' });
+```
+
+**Availability.** ADT-integrated abapGit ships with SAP BTP ABAP Environment (Steampunk) and modern on-prem from ABAP Platform 2022+. Legacy kernels (E77 and older) do not expose `/sap/bc/adt/abapgit/*`. This is **not** the community abapGit that installs via SE38 — that one is a separate ABAP program with its own UI and does not go through ADT.
+
+**Async pull contract.** The server-side pull continues independently of the client-side wait. If you abort or hit `maxPollDurationMs`, the thrown `AbortError` / `TimeoutError` carries `lastKnownStatus` (when the last `listRepos` succeeded before the client gave up). The client **must** poll `getRepo(package)` until `status !== 'R'` before re-issuing `pull` or `unlink`. Retrying `pull` while the previous server-side job is still `R` is unsupported and fails fast.
+
+**Content-type version.** Defaults to `v3` for sapcli compatibility. Cloud MDD advertises `v4`; consumers can opt in via `new AdtAbapGitClient(conn, logger, { contentTypeVersion: 'v4' })`.
+
 ### Accept Negotiation
 
 The client can optionally auto-correct `Accept` headers after a 406 response:
