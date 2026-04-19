@@ -223,3 +223,23 @@ export const CT_FEATURE_TOGGLE_TOGGLE_PARAMETERS =
 export const CT_FEATURE_TOGGLE_SOURCE =
   'application/vnd.sap.adt.toggle.content.v2+json';
 export const ACCEPT_FEATURE_TOGGLE_SOURCE = CT_FEATURE_TOGGLE_SOURCE;
+
+// abapGit (/sap/bc/adt/abapgit/*)
+// Envelope for the repository entity (sapcli parity: v3; v4 advertised
+// in discovery but kept opt-in via IAdtAbapGitClientOptions.contentTypeVersion).
+export const CT_ABAPGIT_REPO_V3 = 'application/abapgit.adt.repo.v3+xml';
+export const CT_ABAPGIT_REPO_V4 = 'application/abapgit.adt.repo.v4+xml';
+
+// Accept for the repo list (sapcli uses v2; v4 advertised in discovery).
+export const ACCEPT_ABAPGIT_REPOS_V2 = 'application/abapgit.adt.repos.v2+xml';
+
+// Accept/Content-Type for the error log (sapcli parity).
+export const CT_ABAPGIT_REPO_OBJECT_V2 =
+  'application/abapgit.adt.repo.object.v2+xml';
+
+// External-repo probe — Phase Z confirmed that request and response
+// use different media-type families (request vs response sub-path).
+export const CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2 =
+  'application/abapgit.adt.repo.info.ext.request.v2+xml';
+export const ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2 =
+  'application/abapgit.adt.repo.info.ext.response.v2+xml';
