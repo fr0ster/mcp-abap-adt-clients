@@ -131,7 +131,7 @@ This proposal was adjusted after cross-checking against:
 - `docs/discovery/discovery_{cloud_mdd,e19,e77,trial}_raw.xml` + `docs/discovery/endpoints_{cloud_mdd,onprem_modern_e19,onprem_old_e77}.txt` — live discovery snapshots.
 - `src/__tests__/helpers/test-config.yaml.template` — for the 3-level `cloud` / `onprem` / `legacy` environment vocabulary.
 
-All endpoint paths, content types, and cloud-availability claims in sections 3 and 4 come from these sources. Per-class specs must re-verify their own surface against the same sources, because this proposal compresses evidence — it does not replace it.
+Endpoint paths, content types, and availability claims in sections 3 and 4 are derived from a combination of sapcli references and local discovery snapshots; not every claim is discovery-backed to the same degree. Per-class specs must re-verify their own surface against the same sources, because this proposal compresses evidence — it does not replace it.
 
 ## 10. Next step
 
