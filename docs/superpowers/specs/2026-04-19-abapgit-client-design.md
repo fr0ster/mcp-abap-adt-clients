@@ -327,3 +327,96 @@ Not every claim is discovery-backed to the same degree. Specifically:
 ## 10. Next step
 
 Invoke `writing-plans` to produce `docs/superpowers/plans/2026-04-19-abapgit-client.md` with task-by-task TDD-oriented implementation.
+
+## 12. Live-probe findings (2026-04-19)
+
+Pre-coding verification pass executed against cloud trial
+(`.abap.ap21.hana.ondemand.com`). All three unknowns in §8 resolved;
+unlink ships in v1.
+
+### 12.1 `GET /sap/bc/adt/abapgit/repos` (`listRepos`)
+
+Request `Accept: application/abapgit.adt.repos.v2+xml` → HTTP 200.
+
+Response shape (actual, from live trace):
+
+- **Root:** `<abapgitrepo:repositories>` with namespace `abapgitrepo = http://www.sap.com/adt/abapgit/repositories`.
+- **Entry:** `<abapgitrepo:repository>` with child elements (all `abapgitrepo:`-prefixed):
+  - `key` — repository ID, 12-digit zero-padded, e.g. `000000000001`
+  - `package`
+  - `folderLogic` — e.g. `PREFIX`
+  - `url`
+  - `branchName`
+  - `createdBy`, `createdEmail`, `createdAt` (format: `YYYYMMDDHHMMSS.ffffff`, not ISO-8601)
+  - `deserializedBy`, `deserializedEmail`, `deserializedAt` (same format as createdAt)
+  - `status` — observed value: `S` (success / terminal OK). sapcli's `R`/`E`/`A` codes and "other = OK" bucket remain correct; `S` falls into the OK bucket.
+  - `statusText` — e.g. `Pulled successfully`, `Pushed successfully`.
+- **Atom links per repo** (via `<atom:link>` children):
+  - `pull_link` — `/sap/bc/adt/abapgit/repos/{key}/pull`
+  - `log_link`
+  - `check_link`
+  - `status_link`
+  - `stage_link` (push flow; out of v1 scope)
+  - `push_link` (push flow; out of v1 scope)
+  - `modifiedobjects_link`
+  - **No `edit_link` or `delete_link`.**
+
+**Implications for the parser:** `repositoryId` = `<abapgitrepo:key>`. There are more link types than the three originally listed in §4.2; the parser must ignore unknown link types gracefully. `status = 'S'` goes through the "other = OK" bucket in `pull`'s terminal handling.
+
+### 12.2 `DELETE /sap/bc/adt/abapgit/repos/{id}` (`unlink`)
+
+Probed with a nonexistent ID `999999999999`. Server returned HTTP 404 with `<exc:exception>` message `repo not found, get`. The endpoint is wired for DELETE and correctly routed — the only failure was the nonexistent ID. Had the endpoint not supported DELETE, we would expect 405 Method Not Allowed or similar.
+
+**Contract confirmed:** `DELETE /sap/bc/adt/abapgit/repos/{key}` removes a linked repository. No `?corrNr` parameter observed in the sample response; keep the argument in `IAbapGitUnlinkArgs` but pass `corrNr` as a query param only when supplied — server will ignore it if unused.
+
+**Implication for the plan:** Task C4 ships with **Option B** (URL-by-id). `match.repositoryId` presence check replaces the atom-link check.
+
+### 12.3 `POST /sap/bc/adt/abapgit/externalrepoinfo` (`checkExternalRepo`)
+
+Request must use:
+
+- Content-Type: `application/abapgit.adt.repo.info.ext.request.v2+xml`
+- Accept: `application/abapgit.adt.repo.info.ext.response.v2+xml` — **note the `.response.` vs `.request.` split in the media-type family**
+- Body namespace: `http://www.sap.com/adt/abapgit/externalRepo` (capital R, **no `info` suffix**) — different from the `repositories` namespace used by `link`/`pull`.
+- Request root element: `<abapgitexternalrepo:externalRepoInfoRequest>`
+
+Response shape:
+
+- **Root:** `<abapgitexternalrepo:externalRepoInfo>` with namespace `abapgitexternalrepo = http://www.sap.com/adt/abapgit/externalRepo`.
+- **`<abapgitexternalrepo:accessMode>`** — e.g. `PUBLIC`. (Was `access` in the spec's draft type; actual field name is `accessMode`.)
+- **List of `<abapgitexternalrepo:branch>` entries**, each with children:
+  - `<sha1>`
+  - `<name>` (e.g. `refs/heads/main`, `HEAD`)
+  - `<type>` (e.g. `HD`)
+  - `<isHead>` — SAP-XML boolean: `X` = true, empty element `<isHead/>` = false. **Not lowercase `true`/`false`.**
+  - `<displayName>`
+  - Atom link to `branchinfo` (per-branch deep-dive endpoint; out of v1 scope).
+
+**Implications for the parser and types:**
+
+1. `IAbapGitExternalRepoInfo.access` renames to **`accessMode`** to match wire protocol.
+2. `IAbapGitExternalRepoBranch.isHead` parsing: `String(raw).toUpperCase() === 'X'` (not `.toLowerCase() === 'true'`).
+3. Envelope tag name constant in `checkExternalRepo.ts` is `externalRepoInfoRequest` (confirmed).
+4. Builder must emit the body in the `externalRepo` (not `repositories`) namespace.
+5. Parser must use the `externalRepo` namespace for responses.
+
+### 12.4 Content-Type version (`v3` vs `v4`)
+
+Not probed directly in this pass. sapcli's `v3` content-type is confirmed to work with `link` / `pull` against cloud MDD implicitly (the discovery declares both, and `v3` is sapcli-compatible). Default stays `v3`; `v4` opt-in via `IAdtAbapGitClientOptions.contentTypeVersion`. If a consumer reports a case where `v3` returns a stale payload and `v4` does not, we add version-aware parsing.
+
+### 12.5 On-prem availability
+
+Not probed (no on-prem endpoint available in this pass). Gating stays at `available_in: ["cloud"]` until an on-prem target with ABAP Platform 2022+ is available. Widening happens post-merge via a follow-up test run; no code change required.
+
+### 12.6 Summary — what the plan must adjust
+
+- **Types (`types.ts`):** `IAbapGitExternalRepoInfo.access` → `accessMode`.
+- **Parser (`xmlParser.ts`):**
+  - Root element for `externalRepoInfo` is confirmed singular; drop the `?? parsed?.externalRepoInfoResponse` branch.
+  - `isHead` parsing: `X`-boolean, not `true`/`false`-string.
+  - Root namespace for externalrepoinfo response: `externalRepo` (not `externalrepoinfo`).
+- **`xmlBuilder.ts`:** `buildExternalRepoInfoBody` must emit the `externalRepo` namespace for the request envelope, not `repositories`.
+- **`unlink.ts`:** Use Option B (`/repos/{key}`), not Option A. Check `match.repositoryId` presence, not atom-link presence.
+- **`listRepos` parser:** ignore unknown atom link types gracefully (`check_link`, `status_link`, `push_link`, `stage_link`, `modifiedobjects_link`) — these are not consumed in v1 but must not break the parser.
+
+The implementation plan (`docs/superpowers/plans/2026-04-19-abapgit-client.md`) must be amended to reflect these findings before coding starts.

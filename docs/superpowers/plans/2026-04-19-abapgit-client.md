@@ -274,7 +274,7 @@ export interface IAbapGitExternalRepoBranch {
 
 export interface IAbapGitExternalRepoInfo {
   branches: IAbapGitExternalRepoBranch[];
-  access?: 'read' | 'write' | string;
+  accessMode?: 'PUBLIC' | 'PRIVATE' | string;   // from live probe — field is 'accessMode', not 'access'
 }
 
 export interface IAbapGitAbortedError extends Error {
@@ -344,9 +344,12 @@ export const ACCEPT_ABAPGIT_REPOS_V2 =
 export const CT_ABAPGIT_REPO_OBJECT_V2 =
   'application/abapgit.adt.repo.object.v2+xml';
 
-// External-repo probe (discovery-only; confirmed during Phase Z).
-export const CT_ABAPGIT_EXTERNAL_REPO_INFO_V2 =
+// External-repo probe — Phase Z confirmed that request and response
+// use different media-type families (request vs response sub-path).
+export const CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2 =
   'application/abapgit.adt.repo.info.ext.request.v2+xml';
+export const ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2 =
+  'application/abapgit.adt.repo.info.ext.response.v2+xml';
 ```
 
 - [ ] **Step 3: Verify and commit**
@@ -384,6 +387,8 @@ import type {
 } from './types';
 
 const NS_ABAPGITREPO = 'http://www.sap.com/adt/abapgit/repositories';
+// Phase Z confirmed: externalrepoinfo uses a distinct namespace (capital R, no "info" suffix).
+const NS_ABAPGIT_EXTERNAL_REPO = 'http://www.sap.com/adt/abapgit/externalRepo';
 
 function escapeXml(value: string): string {
   return value
@@ -393,21 +398,26 @@ function escapeXml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function child(tag: string, value: string | undefined): string {
+function childRepo(tag: string, value: string | undefined): string {
   if (value === undefined || value === null) return '';
   return `<abapgitrepo:${tag}>${escapeXml(value)}</abapgitrepo:${tag}>`;
+}
+
+function childExternalRepo(tag: string, value: string | undefined): string {
+  if (value === undefined || value === null) return '';
+  return `<abapgitexternalrepo:${tag}>${escapeXml(value)}</abapgitexternalrepo:${tag}>`;
 }
 
 export function buildLinkBody(args: IAbapGitLinkArgs): string {
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<abapgitrepo:repository xmlns:abapgitrepo="${NS_ABAPGITREPO}">` +
-    child('package', args.package) +
-    child('url', args.url) +
-    child('branchName', args.branchName ?? 'refs/heads/master') +
-    child('remoteUser', args.remoteUser) +
-    child('remotePassword', args.remotePassword) +
-    child('transportRequest', args.transportRequest) +
+    childRepo('package', args.package) +
+    childRepo('url', args.url) +
+    childRepo('branchName', args.branchName ?? 'refs/heads/master') +
+    childRepo('remoteUser', args.remoteUser) +
+    childRepo('remotePassword', args.remotePassword) +
+    childRepo('transportRequest', args.transportRequest) +
     `</abapgitrepo:repository>`
   );
 }
@@ -419,31 +429,29 @@ export function buildPullBody(
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
     `<abapgitrepo:repository xmlns:abapgitrepo="${NS_ABAPGITREPO}">` +
-    child('package', args.package) +
-    child('branchName', resolvedBranch) +
-    child('remoteUser', args.remoteUser) +
-    child('remotePassword', args.remotePassword) +
-    child('transportRequest', args.transportRequest) +
+    childRepo('package', args.package) +
+    childRepo('branchName', resolvedBranch) +
+    childRepo('remoteUser', args.remoteUser) +
+    childRepo('remotePassword', args.remotePassword) +
+    childRepo('transportRequest', args.transportRequest) +
     `</abapgitrepo:repository>`
   );
 }
 
 export function buildExternalRepoInfoBody(
   args: IAbapGitExternalRepoCredentials,
-  envelopeTagName: string,
 ): string {
+  // Phase Z confirmed the request envelope element name and namespace.
   return (
     `<?xml version="1.0" encoding="UTF-8"?>` +
-    `<abapgitrepo:${envelopeTagName} xmlns:abapgitrepo="${NS_ABAPGITREPO}">` +
-    child('url', args.url) +
-    child('remoteUser', args.remoteUser) +
-    child('remotePassword', args.remotePassword) +
-    `</abapgitrepo:${envelopeTagName}>`
+    `<abapgitexternalrepo:externalRepoInfoRequest xmlns:abapgitexternalrepo="${NS_ABAPGIT_EXTERNAL_REPO}">` +
+    childExternalRepo('url', args.url) +
+    childExternalRepo('remoteUser', args.remoteUser) +
+    childExternalRepo('remotePassword', args.remotePassword) +
+    `</abapgitexternalrepo:externalRepoInfoRequest>`
   );
 }
 ```
-
-`envelopeTagName` is a parameter because the Phase-Z verification determines the exact element name (likely `externalRepoInfoRequest` but confirmed live).
 
 - [ ] **Step 2: Type-check and commit**
 
@@ -500,7 +508,11 @@ function asString(value: unknown): string {
 export interface IRepoEntityAtomLinks {
   pullLink?: string;
   logLink?: string;
-  editLink?: string;
+  // Phase Z confirmed no edit_link / delete_link is ever emitted by the
+  // server. Delete is performed via DELETE /repos/{key}, not via an
+  // atom link. Additional link types (check_link, status_link,
+  // stage_link, push_link, modifiedobjects_link) exist but are out
+  // of v1 scope.
 }
 
 export interface IRepoEntityParsed extends IAbapGitRepoStatus {
@@ -514,9 +526,12 @@ function parseAtomLinks(repoNode: any): IRepoEntityAtomLinks {
     const type = asString(link?.type);
     const href = asString(link?.href);
     if (!href) continue;
+    // Phase Z confirmed available link types: pull_link, log_link,
+    // check_link, status_link, stage_link, push_link, modifiedobjects_link.
+    // Only pull_link and log_link are consumed in v1; unknown types are
+    // ignored silently (stage/push are out of v1 scope per spec §2).
     if (type === 'pull_link') out.pullLink = href;
     else if (type === 'log_link') out.logLink = href;
-    else if (type === 'edit_link' || type === 'delete_link') out.editLink = href;
   }
   return out;
 }
@@ -557,25 +572,28 @@ export function parseErrorLog(xml: string): IAbapGitErrorLogEntry[] {
 
 export function parseExternalRepoInfo(xml: string): IAbapGitExternalRepoInfo {
   const parsed = parser.parse(xml) as any;
-  // Root element name and branch element name confirmed in Phase Z.
-  const root = parsed?.externalRepoInfo ?? parsed?.externalRepoInfoResponse ?? {};
-  const rawBranches = root?.branches?.branch ?? root?.branch ?? [];
+  // Root confirmed by Phase Z: <abapgitexternalrepo:externalRepoInfo>
+  // in namespace http://www.sap.com/adt/abapgit/externalRepo (capital R).
+  // The parser strips namespace prefixes, so we read 'externalRepoInfo'.
+  const root = parsed?.externalRepoInfo ?? {};
+  const rawBranches = root?.branch ?? [];
   const branches: IAbapGitExternalRepoBranch[] = (Array.isArray(rawBranches) ? rawBranches : [rawBranches])
     .filter(Boolean)
     .map((b: any) => ({
       name: asString(b?.name),
       sha1: asString(b?.sha1),
-      isHead: String(asString(b?.isHead)).toLowerCase() === 'true',
+      // SAP-XML boolean convention: 'X' = true, empty element = false.
+      isHead: String(asString(b?.isHead)).toUpperCase() === 'X',
       type: asString(b?.type) || undefined,
     }));
   return {
     branches,
-    access: asString(root?.access) || undefined,
+    accessMode: asString(root?.accessMode) || undefined,
   };
 }
 ```
 
-Implementation detail: the `parseExternalRepoInfo` root name has two candidates — the actual name comes from Phase Z step 4. If Phase Z showed a single fixed root, drop the `??` branch and keep only the verified one.
+Phase-Z-confirmed: the externalrepoinfo response uses a distinct namespace (`externalRepo`) and a `<branch>` list directly under the root (no `<branches>` wrapper). The `isHead` flag uses SAP-XML `X`/empty boolean convention, not lowercase `true`/`false`.
 
 - [ ] **Step 3: Type-check and commit**
 
@@ -880,7 +898,10 @@ export async function getErrorLog(
 
 ```typescript
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
-import { CT_ABAPGIT_EXTERNAL_REPO_INFO_V2 } from '../../constants/contentTypes';
+import {
+  ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
+  CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
+} from '../../constants/contentTypes';
 import { getTimeout } from '../../utils/timeouts';
 import type {
   IAbapGitExternalRepoCredentials,
@@ -889,25 +910,22 @@ import type {
 import { buildExternalRepoInfoBody } from './xmlBuilder';
 import { parseExternalRepoInfo } from './xmlParser';
 
-/**
- * envelopeTagName confirmed during Phase Z live probe.
- * If Phase Z recorded a different name, update here.
- */
-const EXTERNAL_REPO_INFO_REQUEST_TAG = 'externalRepoInfoRequest';
-
 export async function checkExternalRepo(
   connection: IAbapConnection,
   args: IAbapGitExternalRepoCredentials,
 ): Promise<IAbapGitExternalRepoInfo> {
+  // Phase Z confirmed: request/response use DIFFERENT media-type families:
+  //   Content-Type = application/abapgit.adt.repo.info.ext.request.v2+xml
+  //   Accept       = application/abapgit.adt.repo.info.ext.response.v2+xml
   const resp = await connection.makeAdtRequest({
     method: 'POST',
     url: '/sap/bc/adt/abapgit/externalrepoinfo',
     timeout: getTimeout('default'),
     headers: {
-      'Content-Type': CT_ABAPGIT_EXTERNAL_REPO_INFO_V2,
-      Accept: CT_ABAPGIT_EXTERNAL_REPO_INFO_V2,
+      'Content-Type': CT_ABAPGIT_EXTERNAL_REPO_INFO_REQUEST_V2,
+      Accept: ACCEPT_ABAPGIT_EXTERNAL_REPO_INFO_RESPONSE_V2,
     },
-    data: buildExternalRepoInfoBody(args, EXTERNAL_REPO_INFO_REQUEST_TAG),
+    data: buildExternalRepoInfoBody(args),
   });
   return parseExternalRepoInfo(String(resp.data));
 }
@@ -923,18 +941,14 @@ git commit -m "feat(abapGit): add getErrorLog and checkExternalRepo low-level op
 
 ---
 
-### Task C4: `unlink.ts` (conditional on Phase Z)
+### Task C4: `unlink.ts`
 
-**Files:** (only if Phase Z confirmed the delete contract)
+Phase Z confirmed **Option B** for unlink: `DELETE /sap/bc/adt/abapgit/repos/{key}` is wired (nonexistent-ID probe returned 404 "repo not found, get", not 405 Method Not Allowed). No `edit_link` / `delete_link` atom entry exists on the repo entity. `repositoryId` = `<abapgitrepo:key>`.
+
+**Files:**
 - Create: `src/clients/abapGit/unlink.ts`
 
-- [ ] **Step 1: Re-read Phase Z §12 findings** in the spec. Confirm one of:
-  - Option A: `DELETE` at the atom `edit_link` / `delete_link`
-  - Option B: `DELETE /sap/bc/adt/abapgit/repos/{repositoryId}`
-
-- [ ] **Step 2: Write `unlink.ts` using the confirmed option**
-
-If Option A was confirmed:
+- [ ] **Step 1: Write `unlink.ts`**
 
 ```typescript
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
@@ -953,33 +967,29 @@ export async function unlinkRepo(
   if (!match) {
     throw new Error(`abapGit repository for package '${args.package}' not found`);
   }
-  if (!match.atomLinks.editLink) {
+  if (!match.repositoryId) {
     throw new Error(
-      `abapGit repository '${args.package}': response missing edit_link / delete_link atom link`,
+      `abapGit repository '${args.package}': response missing <abapgitrepo:key>`,
     );
   }
   const params: Record<string, string> = {};
   if (args.transportRequest) params.corrNr = args.transportRequest;
   await connection.makeAdtRequest({
     method: 'DELETE',
-    url: match.atomLinks.editLink,
+    url: `/sap/bc/adt/abapgit/repos/${encodeURIComponent(match.repositoryId)}`,
     timeout: getTimeout('default'),
     params,
   });
 }
 ```
 
-If Option B was confirmed, the URL becomes `/sap/bc/adt/abapgit/repos/${encodeURIComponent(match.repositoryId ?? '')}` and the `match.atomLinks.editLink` check is replaced with a `match.repositoryId` presence check.
-
-- [ ] **Step 3: Type-check and commit**
+- [ ] **Step 2: Type-check and commit**
 
 ```bash
 npm run build:fast
 git add src/clients/abapGit/unlink.ts
-git commit -m "feat(abapGit): add unlink (verified delete contract)"
+git commit -m "feat(abapGit): add unlink via /repos/{key} (Phase Z verified)"
 ```
-
-**If Phase Z did NOT confirm either option**, skip Task C4 entirely and remove `unlink` from `IAdtAbapGitClient` in `types.ts`.
 
 ---
 
