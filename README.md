@@ -132,6 +132,7 @@ npm install @mcp-abap-adt/adt-clients
 | Programs (PROG) | ✅ |
 | Function Groups (FUGR) | ✅ |
 | Function Modules (FUGR/FF) | ✅ |
+| Function Includes (FUGR/I) | ✅ |
 | Domains (DOMA) | ✅ |
 | Data Elements (DTEL) | ✅ |
 | Structures (TABL/DS) | ✅ |
@@ -139,6 +140,7 @@ npm install @mcp-abap-adt/adt-clients
 | Views (DDLS) | ✅ |
 | Metadata Extensions (DDLX) | ✅ |
 | Packages (DEVC) | ✅ |
+| Authorization Fields (SUSO / AUTH) | ✅ |
 | Transports (TRNS) | ✅ |
 
 ## Quick Start

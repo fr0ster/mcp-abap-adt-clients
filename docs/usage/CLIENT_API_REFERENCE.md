@@ -39,6 +39,38 @@ const createState = await client.getFunctionModule().create({
 console.log(createState.createResult?.status);
 ```
 
+Additional factory methods follow the same `IAdtObject<Config, State>` pattern:
+
+```typescript
+// Authorization Field (SUSO / AUTH) — DDIC-style, XML-only.
+// Available on modern on-prem (E19+) and cloud MDD; absent on legacy systems.
+// Endpoint: /sap/bc/adt/aps/iam/auth/{name}
+await client.getAuthorizationField().create({
+  authorizationFieldName: 'ZAUTHF01',
+  packageName: 'ZPACKAGE',
+  description: 'Test authorization field',
+  rollName: 'ZDTEL_AUTH',
+  domname: 'ZDOM_AUTH',
+});
+
+// Function Include (FUGR/I) — source-bearing, scoped to a function group.
+// Available on all systems (legacy, modern on-prem, cloud).
+// Endpoint: /sap/bc/adt/functions/groups/{groupName}/includes/{includeName}
+const fincl = client.getFunctionInclude();
+await fincl.create({
+  functionGroupName: 'ZFGROUP',
+  includeName: 'LZFGROUPF01',
+  description: 'Forms include',
+  sourceCode: '* report source',
+});
+
+// Dedicated source reader
+const source = await fincl.readSource({
+  functionGroupName: 'ZFGROUP',
+  includeName: 'LZFGROUPF01',
+});
+```
+
 ### Accept Negotiation
 
 The client can optionally auto-correct `Accept` headers after a 406 response:

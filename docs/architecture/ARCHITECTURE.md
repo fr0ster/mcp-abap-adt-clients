@@ -91,7 +91,8 @@ src/
 
 `AdtClient` is a factory of `IAdtObject` implementations and returns a new instance per call:
 - `getClass()`, `getProgram()`, `getInterface()`, `getDomain()`, `getDataElement()`, `getStructure()`, `getTable()`, `getTableType()`, `getView()`
-- `getFunctionGroup()`, `getFunctionModule()`, `getPackage()`, `getServiceDefinition()`
+- `getFunctionGroup()`, `getFunctionModule()`, `getFunctionInclude()`, `getPackage()`, `getServiceDefinition()`
+- `getAuthorizationField()` for SUSO / AUTH authorization-field CRUD (modern on-prem and cloud only)
 - `getServiceBinding()` for RAP BO service binding CRUD + lifecycle
 - `getBehaviorDefinition()`, `getBehaviorImplementation()`, `getMetadataExtension()`, `getEnhancement()`
 - `getUnitTest()`, `getCdsUnitTest()`, `getRequest()`

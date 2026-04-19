@@ -59,6 +59,7 @@ These types have dedicated `*Legacy` handler classes with legacy-compatible dele
 | Interface | `getInterface()` | `/sap/bc/adt/oo/interfaces` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | Function Group | `getFunctionGroup()` | `/sap/bc/adt/functions/groups` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | Function Module | `getFunctionModule()` | `/sap/bc/adt/functions/groups/.../fmodules` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
+| Function Include | `getFunctionInclude()` | `/sap/bc/adt/functions/groups/.../includes` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | View (DDL Source) | `getView()` | `/sap/bc/adt/ddic/views` | ✅ | ✅ | ✅ | ✅ | ✅¹ | ✅ | ✅ |
 | Package | `getPackage()` | `/sap/bc/adt/packages` | ❌² | ❌³ | ✅ | ✅ | ✅¹ | — | — |
 
@@ -84,6 +85,7 @@ These types throw an error with the exact missing endpoint when the getter is ca
 | Behavior Implementation | `getBehaviorImplementation()` | `/sap/bc/adt/bo/behaviordefinitions` |
 | Metadata Extension | `getMetadataExtension()` | `/sap/bc/adt/ddic/ddlx/sources` |
 | Enhancement | `getEnhancement()` | `/sap/bc/adt/enhancements/*` |
+| Authorization Field | `getAuthorizationField()` | `/sap/bc/adt/aps/iam/auth` (modern kernel only; absent on legacy) |
 
 ### Unblocked but endpoint is absent
 

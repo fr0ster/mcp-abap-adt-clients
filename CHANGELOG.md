@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- **authorizationField** core module: SUSO / AUTH type handler with full CRUD + lifecycle. New `AdtClient.getAuthorizationField()` factory. Endpoint `/sap/bc/adt/aps/iam/auth/{name}`. Available on modern on-prem (E19+) and cloud MDD; absent on legacy systems. (#19)
+- **functionInclude** core module: FUGR/I source-bearing handler with full CRUD + lifecycle and dedicated `readSource()`. New `AdtClient.getFunctionInclude()` factory. Endpoint `/sap/bc/adt/functions/groups/{groupName}/includes/{includeName}`. Available on all systems (legacy, modern on-prem, cloud). (#19)
+
 ## [5.1.0] - 2026-04-16
 
 ### Changed
