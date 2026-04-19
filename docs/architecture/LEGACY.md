@@ -19,7 +19,7 @@ Legacy systems do not support the `x-sap-adt-sessiontype: stateful` HTTP header 
 | Content negotiation | Standard HTTP Accept | Some endpoints only accept `*/*` |
 | sap-client | URL query parameter | Set in RFC connection params |
 | Authentication | Basic / JWT / XSUAA | Username + password only |
-| Dependencies | axios | node-rfc + SAP NW RFC SDK |
+| Dependencies | axios | @mcp-abap-adt/sap-rfc-lite + SAP NW RFC SDK |
 | Systems | Modern (>= 7.50) | All (primary use: legacy) |
 
 See [RFC_CONNECTION.md](../usage/RFC_CONNECTION.md) for setup and configuration.

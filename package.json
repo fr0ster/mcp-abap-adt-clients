@@ -73,9 +73,6 @@
     "fast-xml-parser": "^5.4.1",
     "yaml": "^2.3.4"
   },
-  "optionalDependencies": {
-    "node-rfc": "^3.3.1"
-  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
     "@mcp-abap-adt/connection": "^1.8.0",

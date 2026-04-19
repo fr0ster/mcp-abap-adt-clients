@@ -115,7 +115,7 @@ RFC connections are required for legacy SAP systems (BASIS < 7.50) where HTTP st
 
 **Prerequisites:**
 1. SAP NW RFC SDK installed (download from SAP Support Portal, requires S-user)
-2. `node-rfc` package installed (`npm install node-rfc`) — loaded dynamically at runtime
+2. RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite` (transitive dependency via `@mcp-abap-adt/connection`) — nothing to install in this package
 3. SAP user has `S_RFC` authorization for `SADT_REST_RFC_ENDPOINT` (SAP Note 3569684)
 
 **Ensure `test-config.yaml` has `connection_type: "rfc"`:**
