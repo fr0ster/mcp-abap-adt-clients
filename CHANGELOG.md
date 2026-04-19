@@ -3,6 +3,16 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.1] - 2026-04-19
+
+### Fixed
+
+- Remove vestigial `optionalDependencies.node-rfc` from `package.json` and regenerate `package-lock.json`; RFC transport has been provided by `@mcp-abap-adt/sap-rfc-lite` via `@mcp-abap-adt/connection` for several releases, and the direct `node-rfc` entry was dead metadata. (#23, #24)
+
+### Documentation
+
+- Align `docs/usage/RFC_CONNECTION.md`, `docs/architecture/LEGACY.md`, and `CLAUDE.md` to reference `@mcp-abap-adt/sap-rfc-lite` instead of `node-rfc`. (#24)
+
 ## [5.2.0] - 2026-04-19
 
 ### Added
