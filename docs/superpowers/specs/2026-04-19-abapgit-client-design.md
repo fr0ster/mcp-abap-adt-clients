@@ -1,7 +1,7 @@
 # Design: abapGit Client (`AdtAbapGitClient`)
 
 Date: 2026-04-19
-Status: Variant C selected — ready for implementation planning
+Status: Variant C selected — ready for implementation planning after protocol-contract clarifications
 Parent: `docs/superpowers/specs/2026-04-19-sapcli-separate-clients-proposal.md` (roadmap item #1)
 
 > **Per-class variant-selection pattern.** Each class in the sapcli-separate-clients roadmap gets its own three-variant design document. The variant choice is resolved independently per class. abapGit — Variant C: users need the full lifecycle (link / pull / unlink) plus introspection (list, status, error log) and pre-link validation (check external repo). Variant A (core module) was rejected because abapGit has no ADT-artefact lifecycle (no activation / lock / source / canonical check). Variant B (minimal sapcli parity) was rejected because it would leave unlink, standalone status-read, error-log, and external-repo validation to a follow-up PR.
@@ -18,7 +18,7 @@ The class must cover every operation evidenced by either sapcli or our discovery
 
 - `link` — bind a package to a remote URL (matches sapcli `link`).
 - `pull` — trigger a pull and wait for terminal state, with optional progress heartbeat (matches sapcli `pull`).
-- `unlink` — remove an existing binding (beyond sapcli; discovery evidence needs live verification on the repo entity's edit/delete link).
+- `unlink` — remove an existing binding, but only against a delete contract verified before implementation starts. If live probing cannot confirm a supported delete path, `unlink` drops from v1 instead of shipping a guessed protocol.
 - `listRepos` — enumerate all linked repositories on the system.
 - `getRepo(packageName)` — fetch a single repo's current status without side effects.
 - `getErrorLog(packageName)` — fetch the error log as a first-class operation, not only as a side effect of a failed pull.
@@ -99,10 +99,10 @@ Variant C fills the first, fourth, fifth, and sixth via `unlink`, `checkExternal
 ### 4.1 Factory on `AdtClient`
 
 ```ts
-getAbapGit(): IAdtAbapGitClient;
+getAbapGit(options?: IAdtAbapGitClientOptions): IAdtAbapGitClient;
 ```
 
-Returns an `AdtAbapGitClient` instance typed as the specialized public interface (per roadmap §4.2). No cast required at call sites.
+Returns an `AdtAbapGitClient` instance typed as the specialized public interface (per roadmap §4.2). No cast required at call sites. The optional per-instance options object is the only supported way to opt into non-default abapGit content-type behaviour.
 
 ### 4.2 Specialized public interface
 
@@ -242,15 +242,22 @@ Nine files under `src/clients/abapGit/` + the handler. Corresponds to a single-f
 5. Terminal state handling:
    - `E` or `A` → also fetch error log via `getErrorLog(package)`; attach to result.
    - Anything else → treat as OK; no error log fetched.
+6. Abort / timeout recovery contract:
+   - `AbortSignal` and max-duration stop only the **client-side wait loop**. They do **not** imply cancellation of the server-side abapGit job.
+   - Before throwing `AbortError` / `TimeoutError`, the client performs one best-effort final `getRepo(package)` read and attaches the result as `lastKnownStatus` on the thrown error when available.
+   - After `AbortError` / `TimeoutError`, callers must treat the repository as potentially still running and use `getRepo(package)` until `status !== 'R'` before issuing another `pull` or `unlink`.
+   - Retrying `pull` while the previous server-side job is still `R` is unsupported and must fail fast with a clear error.
 
 ### 6.3 `unlink`
 
-Depends on the server-side URI template for removal. Two likely options, resolved during implementation:
+`unlink` is included in v1 only if the delete contract is verified up front on a live target. The implementation plan starts with that verification step and must not proceed with a guessed delete protocol.
+
+If the contract is confirmed, use one of these server-accepted forms:
 
 1. **Preferred:** extract the `edit_link` (or `delete_link`) from the repo entity's atom links in `listRepos`, then `DELETE <edit_link>`. Transport request carried as a query param `?corrNr=…` if provided.
 2. **Fallback:** if the entity does not expose a delete link, derive the URI as `/sap/bc/adt/abapgit/repos/{repositoryId}` and issue `DELETE`.
 
-Implementation chooses whichever the live server actually accepts. Fail fast with a clear error if neither works.
+If neither form is verified, `unlink` is removed from the v1 implementation plan and from the public interface before coding starts. We do not ship a speculative delete path.
 
 ### 6.4 `listRepos`
 
@@ -284,7 +291,7 @@ Parse into `IAbapGitExternalRepoInfo`. Final response-shape confirmed at live-pr
 - **Content-Type version.** Default `v3` (sapcli compat). v4 is opt-in via `options.contentTypeVersion`.
 - **Async polling.** Default 1000ms interval, 10-minute max duration. Abortable via `AbortSignal`.
 - **Environment gating.** `available_in: ["cloud"]` initially. Implementation plan probes a modern on-prem target if one is available; otherwise widens on first positive report.
-- **Error semantics.** `NotFoundError` on missing repo; `AbortError` on aborted poll; `TimeoutError` on exceeded max-duration; all others propagate as thrown `Error` with status details.
+- **Error semantics.** `NotFoundError` on missing repo. `AbortError` / `TimeoutError` from `pull` mean only that client-side waiting stopped; they do not imply remote-job cancellation and should carry `lastKnownStatus?: IAbapGitRepoStatus`. All others propagate as thrown `Error` with status details.
 - **Public typing rule.** Factory returns `IAdtAbapGitClient`, not a narrower base type. Specialized interface per roadmap §4.2.
 - **Client placement.** `src/clients/AdtAbapGitClient.ts` (handler) and `src/clients/abapGit/` (helpers).
 - **Documentation.** README, CLIENT_API_REFERENCE, ARCHITECTURE, LEGACY, CHANGELOG, ADT_OBJECT_ENTITIES updates follow the #21 / #28 pattern.
@@ -293,7 +300,7 @@ Parse into `IAbapGitExternalRepoInfo`. Final response-shape confirmed at live-pr
 
 These do not block variant selection but must be resolved during implementation:
 
-- **Unlink URI template.** Atom `edit_link` vs `/repos/{id}` — live probe during first implementation pass.
+- **Unlink URI template.** Atom `edit_link` vs `/repos/{id}` — resolve before coding the v1 surface; if unresolved, defer `unlink`.
 - **`externalrepoinfo` response shape.** Confirmed against a live trace; the `IAbapGitExternalRepoInfo` type may gain or lose fields.
 - **`repositoryId`** on `IAbapGitRepoStatus` — where in the response XML it lives, whether it's surfaced on every version of the Accept type.
 - **`v3` vs `v4` Content-Type behaviour.** If `v3` response shape differs from `v4`, decide whether `listRepos()` parsing branches or whether we mandate a single version.
