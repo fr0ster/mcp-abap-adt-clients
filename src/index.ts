@@ -41,6 +41,7 @@ export type {
   IBatchRequestPart,
   IBatchResponsePart,
 } from './batch/types';
+export { AdtAbapGitClient } from './clients/AdtAbapGitClient';
 export type { IAdtClientOptions, IAdtSystemContext } from './clients/AdtClient';
 export { AdtClient } from './clients/AdtClient';
 export { AdtClientLegacy } from './clients/AdtClientLegacy';
@@ -48,6 +49,20 @@ export { AdtClientsWS } from './clients/AdtClientsWS';
 export { AdtExecutor } from './clients/AdtExecutor';
 export { AdtRuntimeClient } from './clients/AdtRuntimeClient';
 export { AdtRuntimeClientExperimental } from './clients/AdtRuntimeClientExperimental';
+export type {
+  AbapGitStatus,
+  IAbapGitErrorLogEntry,
+  IAbapGitExternalRepoBranch,
+  IAbapGitExternalRepoCredentials,
+  IAbapGitExternalRepoInfo,
+  IAbapGitLinkArgs,
+  IAbapGitPullArgs,
+  IAbapGitPullResult,
+  IAbapGitRepoStatus,
+  IAbapGitUnlinkArgs,
+  IAdtAbapGitClient,
+  IAdtAbapGitClientOptions,
+} from './clients/abapGit/index';
 export { createAdtClient } from './clients/createAdtClient';
 export type {
   DebuggerStepAction,
