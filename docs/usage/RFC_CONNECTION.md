@@ -39,13 +39,11 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:$LD_LIBRARY_PATH
 
 > **Note:** These variables must be set in the shell before running the application. They cannot be loaded from `.env` files because `dotenv` does not expand `$PATH`/`%PATH%` and does not modify the system PATH.
 
-### 2. node-rfc Package
+### 2. RFC transport
 
-```bash
-npm install node-rfc
-```
+RFC transport is provided by `@mcp-abap-adt/sap-rfc-lite`, which is pulled in automatically as a dependency of `@mcp-abap-adt/connection`. Nothing needs to be installed manually in this package — `adt-clients` consumes the `IAbapConnection` interface and does not depend on any RFC library directly.
 
-`node-rfc` is NOT a declared dependency of this package — it is loaded dynamically at runtime only when RFC connections are used.
+`@mcp-abap-adt/sap-rfc-lite` binds to the SAP NW RFC SDK at runtime; the SDK libraries must be on the shared-library path as shown in step 1.
 
 ### 3. SAP Authorization
 
@@ -110,7 +108,7 @@ If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setti
 
 ## How It Works
 
-1. `RfcAbapConnection.connect()` opens an RFC connection via `node-rfc`
+1. `RfcAbapConnection.connect()` opens an RFC connection via `@mcp-abap-adt/sap-rfc-lite`
 2. Each `makeAdtRequest()` call invokes `SADT_REST_RFC_ENDPOINT` FM
 3. The FM proxies HTTP-like requests internally within the ABAP system
 4. The RFC session is inherently stateful — lock handles persist across calls
@@ -125,19 +123,19 @@ If omitted, the library defaults to `text/plain; charset=utf-8` (unicode). Setti
 | Content negotiation | Standard HTTP Accept | Some endpoints only accept `*/*` |
 | sap-client | Added to URL query | Not needed (set in RFC params) |
 | Authentication | Basic/JWT/XSUAA | Username/password only |
-| Dependencies | axios | node-rfc + SAP NW RFC SDK |
+| Dependencies | axios | @mcp-abap-adt/sap-rfc-lite + SAP NW RFC SDK |
 
 ## Troubleshooting
 
-### "node-rfc is not available"
+### "sap-rfc-lite is not available" / "RFC transport not loadable"
 
 SAP NW RFC SDK is not installed or not in PATH. Verify:
 ```bash
 # Check SAPNWRFC_HOME
 echo $SAPNWRFC_HOME
 
-# Check lib is in PATH
-node -e "try { require('node-rfc'); console.log('OK'); } catch(e) { console.log(e.message.substring(0, 200)); }"
+# Check the SDK loads (adjust the require() to the actual sap-rfc-lite entry point if needed)
+node -e "try { require('@mcp-abap-adt/sap-rfc-lite'); console.log('OK'); } catch(e) { console.log(e.message.substring(0, 200)); }"
 ```
 
 ### "The specified module could not be found: sapnwrfc.node"
