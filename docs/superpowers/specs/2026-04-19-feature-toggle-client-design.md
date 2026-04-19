@@ -195,7 +195,7 @@ Regardless of A/B/C:
 | Aspect | A (core module) | B (minimal client) | C (extended client) |
 |---|---|---|---|
 | Architectural fit | Consistent with 24 existing core modules | New pattern (but sapcli-backed) | Same pattern as B, bigger surface |
-| Scope | Full CRUD + state-toggle + maybe analytics | `state`, `on`, `off`, optional `check` | +`validate`, +`readMetadata/readSource`, +analytics |
+| Scope | Full CRUD + state-toggle + maybe analytics | `state`, `on`, `off` | +`check`, +`validate`, +`readMetadata/readSource`, +analytics |
 | Payload | Hybrid XML + JSON | JSON only | Hybrid XML + JSON |
 | Effort | Medium–Large | Small | Medium |
 | Matches roadmap proposal | No — requires updating proposal section 3.3 | Yes | Yes |
