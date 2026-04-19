@@ -3,11 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.4.0] - 2026-04-20
 
 ### Added
 
-- **AdtAbapGitClient** — standalone top-level client (not a factory on AdtClient) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Covers link, pull (with async status polling and an abort/timeout recovery contract that attaches `lastKnownStatus` to thrown errors), unlink (via `DELETE /repos/{key}`), listRepos, getRepo, getErrorLog, and checkExternalRepo (pre-link probe with access mode and branch list). Specialized `IAdtAbapGitClient` interface. Available on SAP BTP ABAP Environment / cloud and modern on-prem from ABAP Platform 2022+; absent on legacy kernels. (#XX — PR number TBD at merge time)
+- **AdtAbapGitClient** — standalone top-level client (not a factory on AdtClient) wrapping the SAP-official ADT-integrated abapGit (`/sap/bc/adt/abapgit/*`). Covers link, pull (with async status polling and an abort/timeout recovery contract that attaches `lastKnownStatus` to thrown errors), unlink (via `DELETE /repos/{key}`), listRepos, getRepo, getErrorLog, and checkExternalRepo (pre-link probe with access mode and branch list). Specialized `IAdtAbapGitClient` interface. Available on SAP BTP ABAP Environment / cloud and modern on-prem from ABAP Platform 2022+; absent on legacy kernels. (#30)
 
 ## [5.3.0] - 2026-04-19
 
