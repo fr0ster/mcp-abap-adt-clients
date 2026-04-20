@@ -170,3 +170,7 @@ See `docs/usage/RFC_CONNECTION.md` and `docs/development/RFC_TESTING.md` for ful
 ## Public API (`src/index.ts`)
 
 Exports all client classes, batch classes, all `IXxxConfig`/`IXxxState` types for every object type, shared types (`AdtObjectType`, `ObjectReference`, `PackageHierarchyNode`, `WhereUsedListResult`, `SearchObjectsParams`, etc.), and `AdtService`/`AdtServiceBinding` classes.
+
+## Plans and Specs
+
+After a plan under `docs/superpowers/plans/` or spec under `docs/superpowers/specs/` has been fully implemented, delete the file. Keep only active (not yet implemented) plans and specs in the tree — implementation history lives in git, not in these directories.
