@@ -8,8 +8,8 @@
  *   node tools/adt-object-entities.js --output docs/usage/ADT_OBJECT_ENTITIES.md
  */
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const DEFAULT_OUTPUT = path.resolve(
   __dirname,
@@ -22,6 +22,11 @@ const CLIENT_FILES = {
 
 const SKIP_OBJECTS = new Set(['Utils']);
 const CORE_ROOT = path.resolve(__dirname, '../src/core');
+const CLIENTS_ROOT = path.resolve(__dirname, '../src/clients');
+
+// AdtClient is enumerated separately via its getXxx() factories.
+// The `createAdtClient` helper is a factory function, not a class.
+const SKIP_STANDALONE_CLIENTS = new Set(['AdtClient', 'createAdtClient']);
 
 function readFileSafe(filePath) {
   return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
@@ -34,45 +39,42 @@ function uniqueSorted(values) {
 function extractExportedClasses(text) {
   const classRegex = /export\s+class\s+([A-Za-z0-9_]+)/g;
   const classes = [];
-  let match = null;
-
-  while ((match = classRegex.exec(text)) !== null) {
+  let match = classRegex.exec(text);
+  while (match !== null) {
     classes.push(match[1]);
+    match = classRegex.exec(text);
   }
-
   return classes;
 }
 
 function extractExportedFunctions(text) {
   const funcRegex = /export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)/g;
   const functions = [];
-  let match = null;
-
-  while ((match = funcRegex.exec(text)) !== null) {
+  let match = funcRegex.exec(text);
+  while (match !== null) {
     functions.push(match[1]);
+    match = funcRegex.exec(text);
   }
-
   return functions;
 }
 
 function extractImports(text) {
-  const importRegex = /import\s+\{([^}]+)\}\s+from\s+['"]\.\.\/core\/([^'"]+)['"]/g;
+  const importRegex =
+    /import\s+\{([^}]+)\}\s+from\s+['"]\.\.\/core\/([^'"]+)['"]/g;
   const map = {};
-  let match = null;
-
-  while ((match = importRegex.exec(text)) !== null) {
+  let match = importRegex.exec(text);
+  while (match !== null) {
     const names = match[1]
       .split(',')
       .map((name) => name.replace(/\btype\b/g, '').trim())
       .filter(Boolean);
     const modulePath = match[2].trim();
     const moduleDir = modulePath.split('/')[0];
-
     names.forEach((name) => {
       map[name] = moduleDir;
     });
+    match = importRegex.exec(text);
   }
-
   return map;
 }
 
@@ -82,12 +84,11 @@ function extractMethodBases(text, prefix) {
     'gm',
   );
   const bases = [];
-  let match = null;
-
-  while ((match = regex.exec(text)) !== null) {
+  let match = regex.exec(text);
+  while (match !== null) {
     bases.push(match[1]);
+    match = regex.exec(text);
   }
-
   return uniqueSorted(bases);
 }
 
@@ -116,9 +117,7 @@ function listCoreFunctions(modulePath, fileNames) {
       .readdirSync(modulePath)
       .filter(
         (entry) =>
-          entry.endsWith('.ts') &&
-          entry !== 'index.ts' &&
-          entry !== 'types.ts',
+          entry.endsWith('.ts') && entry !== 'index.ts' && entry !== 'types.ts',
       );
 
   const functions = targetFiles.flatMap((fileName) => {
@@ -220,6 +219,80 @@ function parseArgs(argv) {
   return { output };
 }
 
+/**
+ * Public method names on a class, excluding constructor, private/protected,
+ * and inherited-from-Object boilerplate. Purely regex-driven — no TS parsing.
+ *
+ * Only matches actual method DECLARATIONS (name(...) : Type { OR name(...) {),
+ * not method calls inside the body. Skips any method whose line starts with
+ * the `private` or `protected` modifier.
+ */
+function extractPublicMethodNames(classBody) {
+  // Name must be followed by (params) optional return-type and `{` body.
+  // This rejects calls like `super(arg)` or `helper()` that aren't followed
+  // by an opening brace.
+  const methodRegex =
+    /^\s*(?!private\b|protected\b)(?:public\s+)?(?:static\s+)?(?:async\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>]*>)?\s*\([^)]*\)(?:\s*:\s*[^{;]+)?\s*\{/gm;
+  const names = new Set();
+  let match = methodRegex.exec(classBody);
+  while (match !== null) {
+    const name = match[1];
+    if (
+      name !== 'constructor' &&
+      name !== 'super' &&
+      !/^(if|for|while|switch|return|throw|await|new|typeof)$/.test(name)
+    ) {
+      names.add(name);
+    }
+    match = methodRegex.exec(classBody);
+  }
+  return uniqueSorted(Array.from(names));
+}
+
+function extractClassBody(text, className) {
+  const classStart = text.search(
+    new RegExp(`export\\s+class\\s+${className}\\b`),
+  );
+  if (classStart < 0) return '';
+  const openBrace = text.indexOf('{', classStart);
+  if (openBrace < 0) return '';
+  let depth = 1;
+  let i = openBrace + 1;
+  while (i < text.length && depth > 0) {
+    const ch = text[i];
+    if (ch === '{') depth += 1;
+    else if (ch === '}') depth -= 1;
+    i += 1;
+  }
+  return text.slice(openBrace + 1, i - 1);
+}
+
+function listStandaloneClients() {
+  if (!fs.existsSync(CLIENTS_ROOT)) return [];
+  const rootEntries = fs
+    .readdirSync(CLIENTS_ROOT)
+    .filter((entry) => entry.endsWith('.ts'));
+
+  const clients = [];
+  for (const entry of rootEntries) {
+    const filePath = path.join(CLIENTS_ROOT, entry);
+    const text = readFileSafe(filePath);
+    const exportedClasses = extractExportedClasses(text);
+    for (const className of exportedClasses) {
+      if (SKIP_STANDALONE_CLIENTS.has(className)) continue;
+      const body = extractClassBody(text, className);
+      const methods = extractPublicMethodNames(body);
+      clients.push({
+        className,
+        file: path.relative(path.resolve(__dirname, '..'), filePath),
+        methods,
+      });
+    }
+  }
+
+  return clients.sort((a, b) => a.className.localeCompare(b.className));
+}
+
 function generateMarkdown(objects, clientText) {
   const lines = [];
   lines.push('# ADT Object Entities');
@@ -230,11 +303,7 @@ function generateMarkdown(objects, clientText) {
   lines.push('');
 
   objects.forEach((object) => {
-    const modulePath = path.resolve(
-      __dirname,
-      '../src/core',
-      object.moduleDir,
-    );
+    const modulePath = path.resolve(__dirname, '../src/core', object.moduleDir);
     const classes =
       object.moduleDir === 'unknown' ? [] : listModuleClasses(modulePath);
     const functions =
@@ -258,6 +327,25 @@ function generateMarkdown(objects, clientText) {
     );
     lines.push('');
   });
+
+  // Standalone top-level clients (not AdtClient factories).
+  const standalone = listStandaloneClients();
+  if (standalone.length > 0) {
+    lines.push('## Standalone Clients');
+    lines.push('');
+    lines.push(
+      'Top-level client classes instantiated directly (not via `AdtClient.getXxx()`). They live under `src/clients/` alongside `AdtClient` and wrap non-`IAdtObject` surfaces.',
+    );
+    lines.push('');
+    for (const client of standalone) {
+      lines.push(`### ${client.className}`);
+      lines.push(`- Source: \`${client.file}\``);
+      lines.push(
+        `- Public methods: ${client.methods.length ? client.methods.map((name) => `\`${name}\``).join(', ') : '—'}`,
+      );
+      lines.push('');
+    }
+  }
 
   return lines.join('\n');
 }
