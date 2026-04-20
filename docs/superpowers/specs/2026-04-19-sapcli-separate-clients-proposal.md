@@ -1,7 +1,7 @@
 # Proposal: Separate ADT clients ported from sapcli
 
-Date: 2026-04-19
-Status: Proposal for per-class scoping and PR ordering
+Date: 2026-04-19 (last updated 2026-04-20)
+Status: Active queue empty — featureToggle graduated (v5.3.0), abapGit shipped (v5.4.0), BSP+FLP deferred, gCTS out of scope
 
 ## 1. Goal
 
@@ -20,16 +20,24 @@ This proposal **does not design any individual class**. It lists the candidates,
 
 All names are working titles; final names may be refined during the per-class brainstorming.
 
-### 3.1 `AdtGctsClient`
+### 3.1 ~~`AdtGctsClient`~~ — OUT OF SCOPE for this library
 
-- **Purpose:** gCTS (git-enabled CTS) — repository lifecycle on the SAP server-side (clone, pull, push, branch management, commit history).
-- **sapcli references:** `sap/cli/gcts.py`, `sap/rest/gcts/*`.
-- **Endpoint family:** `/sap/bc/cts_abapvcs/repository/{rid}/*`, `/sap/bc/cts_abapvcs/gcts/*`.
-- **Complexity:** Large. Requires async activity-tracking, long-running request handling, structured error parsing for git-specific failures.
-- **Special considerations:**
-  - gCTS responses are JSON, not XML — first non-XML dominant surface in this library.
-  - Operations can be long-running (clone of large repos) → need cancellation / timeout policy.
-  - Authentication for remote git — secrets stored server-side; client must pass credential-pointer, not secrets.
+**Removed from the sapcli-separate-clients roadmap.** gCTS is **not** an ADT service — it lives under `/sap/bc/cts_abapvcs/*`, a separate REST service family that is deliberately absent from every ADT discovery snapshot captured in `docs/discovery/`. Shipping it inside `@mcp-abap-adt/adt-clients` would violate the package's stated scope ("ADT clients for SAP ABAP systems").
+
+Surface facts for the record:
+
+- sapcli references: `sap/cli/gcts.py` (~1060 lines) + `sap/rest/gcts/*` (7 modules).
+- Endpoint family: `/sap/bc/cts_abapvcs/repository/{rid}/*`, `/sap/bc/cts_abapvcs/config/*`, `/sap/bc/cts_abapvcs/system/*`, plus repo-task endpoints and activity-tracking.
+- JSON-only responses (not XML); async activity-tracking; long-running operations; server-side credential pointers for remote git.
+- sapcli-parity v1 would expose ~30 commands (clone, checkout, commit, push, pull, delete, list/create/delete branch, config, user credentials, system config, messages, objects, activities, tasks, repolist, history, etc.).
+
+**If gCTS support is wanted, it belongs in a separate repository with its own npm package** (working title `@mcp-abap-adt/gcts-client` under a repo of its own). That repo would:
+
+- Reuse the existing `IAbapConnection` interface as a peer dependency for transport.
+- Own its own specs, roadmap, PR flow, CI, and release cadence — independent of `@mcp-abap-adt/adt-clients`.
+- Not pretend to be ADT; its scope would be gCTS (`/sap/bc/cts_abapvcs/*`) and any related non-ADT CTS-over-git surfaces.
+
+Brainstorming, spec-writing, and implementation for `@mcp-abap-adt/gcts-client`, if and when it starts, happen in that separate repository — not in this one.
 
 ### 3.2 `AdtAbapGitClient`
 
@@ -89,10 +97,10 @@ Per-class design docs use the same three-variant pattern, but the default choice
 
 Applied to the current roadmap:
 
-- `AdtAbapGitClient`: default starting assumption is **Variant C**
-- `AdtGctsClient`: default starting assumption is **Variant C**
+- `AdtAbapGitClient`: default starting assumption was **Variant C** — **shipped** (v5.4.0)
 - `AdtBspAppClient`: default starting assumption is **Variant C** — **deferred** (see §3.5)
 - `AdtFlpBuilderClient`: default starting assumption is **Variant C** — **deferred** (see §3.4)
+- ~~`AdtGctsClient`~~: **out of scope** (see §3.1) — would be a separate sibling repo
 - `FeatureToggle`: selected **Variant A** in its own design doc because the evidence points to a real ADT artifact (`FTG2/FT`) rather than a service-only surface
 
 `~/prj/sapcli` is useful for endpoint traces, headers, payloads, and operation sequences, but **not** as the primary architectural argument for `A` vs `B` vs `C`, because sapcli models many unrelated surfaces as separate manager classes.
@@ -100,7 +108,7 @@ Applied to the current roadmap:
 ### 4.2 Public typing rule
 
 - Every new public class with API beyond a shared base contract must have its own **specialized public interface**.
-- Separate clients therefore expose dedicated interfaces such as `IAdtBspAppClient`, `IAdtFlpBuilderClient`, `IAdtAbapGitClient`, `IAdtGctsClient` (final names decided per spec).
+- Separate clients therefore expose dedicated interfaces such as `IAdtBspAppClient`, `IAdtFlpBuilderClient`, `IAdtAbapGitClient` (final names decided per spec).
 - Core modules that extend `IAdtObject<Config, State>` with domain methods must expose a specialized interface that extends `IAdtObject<...>` and includes those methods.
 - **Separate clients are standalone top-level classes**, not factory methods on `AdtClient`. `AdtClient` only manufactures `IAdtObject` implementations. Each separate client's concrete class implements its own specialized interface; consumers `new` the class directly.
 - For core-module domain methods, the (existing) `AdtClient.getXxx()` factory returns the specialized interface (e.g. `IFeatureToggleObject`), not the narrower `IAdtObject<...>` — so the full supported API stays statically visible without casts.
@@ -109,14 +117,16 @@ Applied to the current roadmap:
 
 One PR per class. Rationale: each endpoint family has its own semantics, auth quirks, and test needs. Bundling would produce a review nightmare.
 
-| Order | Class | Why this slot |
+| Order | Class | Status |
 |---|---|---|
-| 1 | `AdtAbapGitClient` | **Pattern baseline.** Widest everyday use-case (ABAP source version control); discovery-verified on cloud + on-prem; medium scope. Validates the "separate client in current architecture" contract end-to-end (factory placement, public API style, test harness) with a broadly-useful feature rather than a niche one. |
-| 2 | `AdtGctsClient` | Largest scope, most unknowns, but complements #1 — abapGit is VCS, gCTS is transport-system-with-git. Different workloads, different audiences. Benefits from lessons learned in #1 (async polling, repo-lifecycle vocabulary, error parsing). |
-| (deferred) | `AdtBspAppClient` | Covers only the final "upload zip → BSP namespace" step of a longer UI5/Fiori deploy pipeline (archive must be pre-built by external tooling). See `2026-04-19-bsp-app-client-design.md` (Deferred). Reactivate when build-tool integration becomes in-scope or a user workflow explicitly requires BSP upload. |
-| (deferred) | `AdtFlpBuilderClient` | Fiori Launchpad page-builder customisation is even narrower than BSP. Deferred alongside BSP — reactivate only if a concrete consumer workflow demands it. |
+| shipped | `AdtAbapGitClient` | v5.4.0 — standalone top-level client, see §3.2 |
+| (deferred) | `AdtBspAppClient` | Covers only the final "upload zip → BSP namespace" step of a longer UI5/Fiori deploy pipeline. UI-tier investigation group, §3.5. |
+| (deferred) | `AdtFlpBuilderClient` | Fiori Launchpad page-builder customisation. UI-tier investigation group, §3.4. |
+| (out of scope) | ~~`AdtGctsClient`~~ | Non-ADT service at `/sap/bc/cts_abapvcs/*`. Belongs in a separate repo with its own package. See §3.1. |
 
-(Feature toggle is no longer in this list — see section 3.3; it ships as a core module.)
+Feature toggle is no longer in this list — see the old §3.3 (removed); it shipped as a core module in v5.3.0.
+
+With `AdtAbapGitClient` shipped, the active queue of this roadmap is **empty**: all remaining candidates are either deferred (BSP, FLP) or out of scope (gCTS). Reactivation of any deferred candidate happens on explicit user demand.
 
 Each PR is self-contained and independently releasable as a **minor** version bump per semver (new public API, no breaking changes).
 
@@ -138,15 +148,15 @@ Each spec may independently drop a candidate from scope if verification against 
 
 ## 7. Risks and open questions
 
-- **JSON vs XML responses.** gCTS is JSON-first. The library has a heavily XML-centric parsing pipeline. Need to decide: per-client JSON handling (simpler) vs shared JSON utility (DRY). Recommendation: per-client for now; extract shared helper only after the second JSON-consuming client appears.
+- **JSON vs XML responses.** Feature toggle already introduced per-module JSON handling for `source/main` + state/check endpoints. Further JSON-heavy clients would push for a shared JSON helper; per-client remains the default until a second one lands. (gCTS — originally flagged as the second JSON-first candidate — is out of scope for this repo, see §3.1.)
 - **OData v2 surface.** We will consume two OData v2 services (BSP, FLP). Decision on minimal inline helper vs shared utility should be taken in the #2 spec, not here.
-- **Cloud availability matrix.** The cloud story differs per surface: `abapgit/repos` and `abapgit/externalrepoinfo` are present on cloud MDD and trial; `sfw/featuretoggles*` is present on cloud MDD; `filestore/ui5-bsp/*` is present across all targets. gCTS cloud coverage is partial. Each per-class spec must still verify its specific surface against `docs/discovery/*.xml` and set `available_in` using the 3-level vocabulary (`cloud` / `onprem` / `legacy`) accordingly.
+- **Cloud availability matrix.** The cloud story differs per surface: `abapgit/repos` and `abapgit/externalrepoinfo` are present on cloud MDD and trial; `sfw/featuretoggles*` is present on cloud MDD; `filestore/ui5-bsp/*` is present across all targets. Each per-class spec must still verify its specific surface against `docs/discovery/*.xml` and set `available_in` using the 3-level vocabulary (`cloud` / `onprem` / `legacy`) accordingly.
 - **Test environment.** Some operations (git push / pull, BSP upload) require test fixtures (remote git repos, BSP archives) that do not exist in the current test infrastructure. Each spec must enumerate what fixtures it needs and how they are provisioned.
 
 ## 8. What this proposal is not
 
 - Not a design spec for any individual class — those come one per class in their own documents.
-- Not a commitment to implement all four remaining candidates. The ordering is a recommendation; at any point after a completed PR the user may stop, reorder, or drop remaining items. (Feature toggle graduated to the `src/core/` workflow after its own per-class design chose Variant A.)
+- Not a commitment to implement all listed candidates. The ordering was a recommendation; at any point after a completed PR the user may stop, reorder, or drop remaining items. Final disposition (post-execution): featureToggle graduated to `src/core/`, abapGit shipped, BSP and FLP deferred as the UI-tier investigation group, gCTS moved out of scope (separate repo if ever built).
 - Not a schedule. No dates, no velocity estimates. Each class ships when its spec/plan/PR cycle completes.
 
 ## 9. Verification sources
@@ -161,4 +171,11 @@ Endpoint paths, content types, and availability claims in sections 3 and 4 are d
 
 ## 10. Next step
 
-Feature toggle graduated to `src/core/featureToggle/` and moves ahead via the core-module workflow. BSP and FLP have been deferred (see §3.4, §3.5). Next in the separate-clients roadmap: **#1: `AdtAbapGitClient`** — broadest everyday use-case and discovery-verified on cloud + on-prem.
+Roadmap execution summary:
+
+- **Graduated:** `featureToggle` → `src/core/featureToggle/` (shipped in v5.3.0 via the ordinary core-module workflow).
+- **Shipped:** `AdtAbapGitClient` (v5.4.0).
+- **Deferred:** `AdtBspAppClient`, `AdtFlpBuilderClient` — UI-tier investigation group (§3.4, §3.5). Not scheduled.
+- **Out of scope:** `AdtGctsClient` (§3.1). If needed, it goes into a separate repo with its own npm package (`@mcp-abap-adt/gcts-client`).
+
+The active queue of this roadmap is **empty**. No further per-class work planned under this proposal unless a deferred candidate is reactivated or a new candidate surfaces.
