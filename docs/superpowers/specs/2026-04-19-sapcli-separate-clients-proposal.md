@@ -1,7 +1,9 @@
 # Proposal: Separate ADT clients ported from sapcli
 
 Date: 2026-04-19 (last updated 2026-04-20)
-Status: Active queue empty — featureToggle graduated (v5.3.0), abapGit shipped (v5.4.0), BSP+FLP deferred, gCTS out of scope
+Status: Active queue empty — featureToggle graduated (v5.3.0), abapGit shipped (v5.4.0), BSP+FLP deferred pending investigation, gCTS extracted to a separate repo (`fr0ster/mcp-abap-adt-gcts-client`, private).
+
+> **About this branch.** `proposal/sapcli-separate-clients` remains open as a working document for the two **deferred** candidates (BSP + FLP). Reactivation of either requires a concrete consumer workflow. The branch is not on a merge path; it is a pending-investigation log. See §3.4 and §3.5 for the deferral rationale. gCTS has moved out of this repository — see `fr0ster/mcp-abap-adt-gcts-client` for future work.
 
 ## 1. Goal
 
