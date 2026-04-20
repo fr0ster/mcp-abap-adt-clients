@@ -3,6 +3,12 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.1] - 2026-04-20
+
+### Fixed
+
+- `tools/adt-object-entities.js` now enumerates standalone top-level clients under `src/clients/` (AdtAbapGitClient, AdtRuntimeClient, AdtExecutor, AdtClientsWS, DebuggerSessionClient). Previously the generator only scanned `src/core/*` and `AdtClient.ts`, so clients added as non-IAdtObject siblings were invisible in `docs/usage/ADT_OBJECT_ENTITIES.md`. Regenerated. (#32)
+
 ## [5.4.0] - 2026-04-20
 
 ### Added
