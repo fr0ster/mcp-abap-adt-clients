@@ -3,6 +3,12 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.3] - 2026-05-13
+
+### Fixed
+
+- `checkAccessControl` no longer throws with an empty message when the ADT CHECK reporter intermittently returns `has_errors=true` with zero items in `errors`. Under sustained load on cloud trial (full integration suite), the async validation occasionally has not materialized yet — `parseCheckRunResponse` sets `has_errors=true` because `status='notProcessed'`, even with no real findings. The check now retries once with a 2 s delay and treats the state as a warning if it persists, matching the retry-on-transient pattern used in `src/core/view/check.ts`. Real findings (`errors` non-empty) still throw with the full message as before. (#20)
+
 ## [5.4.2] - 2026-05-13
 
 ### Changed
