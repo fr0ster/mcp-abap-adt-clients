@@ -3,6 +3,12 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.2] - 2026-05-13
+
+### Changed
+
+- Bumped `@mcp-abap-adt/connection` dev dependency from `^1.8.0` to `^1.8.1` to pick up the stale-CSRF token recovery fix. On on-prem SAP with basic auth, a cached CSRF token could become stale and cause `401 + HTML login form` on POST/PUT/DELETE; the connection layer now recognizes this as a stale-token signal, clears the cached token/cookies, and retries. (#34)
+
 ## [5.4.1] - 2026-04-20
 
 ### Fixed
