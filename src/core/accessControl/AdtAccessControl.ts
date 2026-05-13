@@ -317,6 +317,7 @@ export class AdtAccessControl
           config.accessControlName,
           'inactive',
           codeToCheck,
+          this.logger,
         );
         this.logger?.info?.('Check inactive with update content passed');
       }
@@ -373,6 +374,8 @@ export class AdtAccessControl
         this.connection,
         config.accessControlName,
         'inactive',
+        undefined,
+        this.logger,
       );
       this.logger?.info?.('Final check passed');
 
@@ -552,6 +555,8 @@ export class AdtAccessControl
       this.connection,
       config.accessControlName,
       version,
+      undefined,
+      this.logger,
     );
     return state;
   }
