@@ -23,6 +23,7 @@ import {
   type IAccessControlConfig,
   type IAccessControlState,
 } from '../core/accessControl';
+import { AdtAtc } from '../core/atc';
 import {
   AdtAppendStructure,
   type IAppendStructureConfig,
@@ -576,6 +577,14 @@ export class AdtClient {
    */
   getUnitTest(): IAdtObject<IUnitTestConfig, IUnitTestState> {
     return new AdtUnitTest(this.connection, this.logger);
+  }
+
+  /**
+   * Get high-level operations for ATC (ABAP Test Cockpit) checks
+   * @returns AdtAtc instance with worklist+run flow plus convenience methods
+   */
+  getAtc(): AdtAtc {
+    return new AdtAtc(this.connection, this.logger);
   }
 
   /**
