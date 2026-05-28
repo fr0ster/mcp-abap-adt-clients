@@ -77,6 +77,18 @@ export type {
   IAccessControlConfig,
   IAccessControlState,
 } from './core/accessControl';
+export { AdtAtc } from './core/atc';
+export type {
+  AdtAtcType,
+  AtcFindingsFormat,
+  AtcObjectType,
+  IAtcConfig,
+  IAtcFindingsOptions,
+  IAtcListVariantsOptions,
+  IAtcPollOptions,
+  IAtcRunOptions,
+  IAtcState,
+} from './core/atc';
 export type {
   IAuthorizationFieldConfig,
   IAuthorizationFieldState,

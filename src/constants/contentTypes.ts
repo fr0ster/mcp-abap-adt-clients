@@ -61,6 +61,22 @@ export const ACCEPT_UNIT_TEST_RESULT =
 export const ACCEPT_JUNIT_RESULT =
   'application/vnd.sap.adt.api.junit.run-result.v1+xml';
 
+// ATC (ABAP Test Cockpit)
+export const CT_ATC_WORKLIST_CREATE = 'text/plain';
+export const ACCEPT_ATC_WORKLIST_ID = 'text/plain';
+export const CT_ATC_RUN = 'application/xml';
+export const ACCEPT_ATC_RUN_RESPONSE = 'application/xml';
+export const ACCEPT_ATC_RUN_STATUS =
+  'application/vnd.sap.adt.backgroundrun.v1+xml';
+export const ACCEPT_ATC_WORKLIST_XML =
+  'application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml';
+export const ACCEPT_ATC_WORKLIST_CHECKSTYLE =
+  'application/vnd.sap.atc.checkstyle.v1+xml, application/vnd.sap.atc.checkstyle+xml';
+export const ACCEPT_ATC_VARIANTS =
+  'application/vnd.sap.adt.nameditems.v1+xml, application/xml';
+export const ACCEPT_ATC_CUSTOMIZING =
+  'application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml';
+
 // Discovery
 export const ACCEPT_DISCOVERY = 'application/atomsvc+xml';
 
