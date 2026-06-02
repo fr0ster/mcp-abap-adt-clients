@@ -54,6 +54,13 @@ export const CT_TRANSPORT_CHECK =
 // Unit Test
 export const CT_UNIT_TEST_RUN =
   'application/vnd.sap.adt.api.abapunit.run.v2+xml';
+// Synchronous object-based run via /sap/bc/adt/abapunit/testruns — returns the
+// full result in a single response (no run_id polling). This is the endpoint
+// Eclipse ADT uses for "Run As → ABAP Unit Test" and is supported on 7.5x.
+export const CT_UNIT_TEST_RUNS_CONFIG =
+  'application/vnd.sap.adt.abapunit.testruns.config.v4+xml';
+export const ACCEPT_UNIT_TEST_RUNS_RESULT =
+  'application/vnd.sap.adt.abapunit.testruns.result.v2+xml';
 export const ACCEPT_UNIT_TEST_STATUS =
   'application/vnd.sap.adt.api.abapunit.run-status.v1+xml';
 export const ACCEPT_UNIT_TEST_RESULT =
