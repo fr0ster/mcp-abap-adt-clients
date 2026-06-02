@@ -482,6 +482,14 @@ export class AdtClient {
   }
 
   /**
+   * Get the concrete AdtUnitTest runner (exposes runSync for synchronous,
+   * object-based ABAP Unit runs that return a parsed pass/fail summary).
+   */
+  getUnitTestRunner(): AdtUnitTest {
+    return new AdtUnitTest(this.connection, this.logger);
+  }
+
+  /**
    * Get high-level operations for ATC (ABAP Test Cockpit) checks
    * @returns AdtAtc instance with worklist+run flow plus convenience methods
    */

@@ -33,12 +33,19 @@ import {
 } from '../../utils/internalUtils';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
-import { startClassUnitTestRun } from './run';
+import {
+  parseUnitTestRunResult,
+  startClassUnitTestRun,
+  startObjectUnitTestRunSync,
+} from './run';
 import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
   IUnitTestConfig,
+  IUnitTestRunSyncOptions,
   IUnitTestState,
+  IUnitTestSummary,
+  UnitTestObjectType,
 } from './types';
 
 export class AdtUnitTest
@@ -273,6 +280,30 @@ export class AdtUnitTest
     });
     this.lastRunId = result.runId;
     return result.runId as string;
+  }
+
+  /**
+   * Run ABAP Unit tests for a single object synchronously and return a parsed
+   * pass/fail summary plus the raw result XML. Uses the /testruns endpoint
+   * (full result in one response, no run_id polling) — works on 7.5x where the
+   * async /runs API path is unavailable.
+   */
+  async runSync(
+    objectType: UnitTestObjectType,
+    objectName: string,
+    options?: IUnitTestRunSyncOptions,
+  ): Promise<{ summary: IUnitTestSummary; raw: string }> {
+    this.logger?.info?.(
+      `Running ABAP Unit (sync) for ${objectType} ${objectName.toUpperCase()}`,
+    );
+    const response = await startObjectUnitTestRunSync(
+      this.connection,
+      objectType,
+      objectName,
+      options,
+    );
+    const raw = typeof response.data === 'string' ? response.data : '';
+    return { summary: parseUnitTestRunResult(raw), raw };
   }
 
   /**
