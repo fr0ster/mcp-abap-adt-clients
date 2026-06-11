@@ -359,7 +359,6 @@ export class AdtBehaviorDefinition
       this.logger?.info?.('Step 1: Locking behavior definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
@@ -634,7 +633,6 @@ export class AdtBehaviorDefinition
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lock(this.connection, config.name);
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

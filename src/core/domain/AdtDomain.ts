@@ -288,7 +288,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.logger?.info?.('lock');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('locked');
 
@@ -600,7 +599,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockDomain(this.connection, config.domainName);
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

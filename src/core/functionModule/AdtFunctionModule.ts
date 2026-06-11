@@ -344,7 +344,6 @@ export class AdtFunctionModule
         config.functionGroupName,
         config.functionModuleName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Function module locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -640,7 +639,6 @@ export class AdtFunctionModule
       config.functionGroupName,
       config.functionModuleName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

@@ -318,7 +318,6 @@ export class AdtDataElement
         this.connection,
         config.dataElementName,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Data element locked, handle:', lockHandle);
 
@@ -649,7 +648,6 @@ export class AdtDataElement
       this.connection,
       config.dataElementName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

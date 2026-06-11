@@ -186,7 +186,6 @@ export class AdtFunctionInclude
           config.includeName,
           this.logger,
         );
-        this.connection.setSessionType('stateless');
         state.lockHandle = lockHandle;
         config.onLock?.(lockHandle);
 
@@ -452,7 +451,6 @@ export class AdtFunctionInclude
         fullConfig.includeName,
         this.logger,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Function include locked, handle:', lockHandle);
@@ -743,7 +741,6 @@ export class AdtFunctionInclude
       config.includeName,
       this.logger,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

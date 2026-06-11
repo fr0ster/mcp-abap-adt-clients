@@ -311,7 +311,6 @@ export class AdtMetadataExtension
       this.logger?.info?.('Step 1: Locking metadata extension');
       this.connection.setSessionType('stateful');
       lockHandle = await lockMetadataExtension(this.connection, config.name);
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -579,7 +578,6 @@ export class AdtMetadataExtension
       this.connection,
       config.name,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

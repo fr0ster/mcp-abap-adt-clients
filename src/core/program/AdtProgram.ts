@@ -296,7 +296,6 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.logger?.info?.('Step 1: Locking program');
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Program locked, handle:', lockHandle);
 
@@ -616,7 +615,6 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockProgram(this.connection, config.programName);
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

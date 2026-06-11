@@ -309,7 +309,6 @@ export class AdtServiceDefinition
         this.connection,
         config.serviceDefinitionName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Service definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -581,7 +580,6 @@ export class AdtServiceDefinition
       this.connection,
       config.serviceDefinitionName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

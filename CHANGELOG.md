@@ -3,6 +3,12 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.4.4] - 2026-06-11
+
+### Fixed
+
+- Object writes (update/delete) no longer fail with `423 … not locked (invalid lock handle)` on older ABAP systems (e.g. BASIS 7.55) over HTTP. The handlers acquired the lock in a **stateful** request but then immediately switched the connection back to **stateless** (`setSessionType('stateless')`) before sending the lock-bound PUT, so the lock handle was no longer valid on kernels where it is only honoured inside stateful requests. The connection now stays **stateful for the whole lock→check→update→unlock chain**; `unlock()` (and error/cleanup paths) restores stateless afterwards. Newer kernels (758/816) tolerated the stateless write, which is why this only surfaced on older BASIS. Applied uniformly across all object types — both the standalone `lock()` methods and the inline create/update/delete chains (class, interface, program, function module/group/include, domain, package, table, structure, view, table type, data element, service definition, metadata extension, access control, transformation, behavior definition, enhancement, authorization field, feature toggle). `AdtClassLegacy` already followed this pattern. (#106)
+
 ## [5.4.3] - 2026-05-13
 
 ### Fixed

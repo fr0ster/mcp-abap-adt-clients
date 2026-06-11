@@ -299,7 +299,6 @@ export class AdtDdicTableType
         this.connection,
         config.tableTypeName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Table type locked, handle:', lockHandle);
 
       // 2. Check inactive (TableType is XML-based, no source code check needed)
@@ -581,7 +580,6 @@ export class AdtDdicTableType
       this.connection,
       config.tableTypeName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

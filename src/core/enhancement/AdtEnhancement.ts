@@ -434,7 +434,6 @@ export class AdtEnhancement
         config.enhancementType,
         config.enhancementName,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Enhancement locked, handle:', lockHandle);
 
@@ -765,7 +764,6 @@ export class AdtEnhancement
       config.enhancementType,
       config.enhancementName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
