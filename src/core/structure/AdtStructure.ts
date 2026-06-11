@@ -305,7 +305,6 @@ export class AdtStructure
       this.logger?.info?.('Step 1: Locking structure');
       this.connection.setSessionType('stateful');
       lockHandle = await lockStructure(this.connection, config.structureName);
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Structure locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -572,7 +571,6 @@ export class AdtStructure
       this.connection,
       config.structureName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

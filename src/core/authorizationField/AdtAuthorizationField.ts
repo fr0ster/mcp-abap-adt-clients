@@ -308,7 +308,6 @@ export class AdtAuthorizationField
         fullConfig.authorizationFieldName,
         this.logger,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Authorization field locked, handle:', lockHandle);
@@ -573,7 +572,6 @@ export class AdtAuthorizationField
       config.authorizationFieldName,
       this.logger,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

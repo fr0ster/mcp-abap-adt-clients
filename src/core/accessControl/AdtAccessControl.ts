@@ -303,7 +303,6 @@ export class AdtAccessControl
         this.connection,
         config.accessControlName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Access control locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -574,7 +573,6 @@ export class AdtAccessControl
       this.connection,
       config.accessControlName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

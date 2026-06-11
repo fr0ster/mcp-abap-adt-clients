@@ -159,7 +159,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
           config.featureToggleName,
           this.logger,
         );
-        this.connection.setSessionType('stateless');
         state.lockHandle = lockHandle;
         config.onLock?.(lockHandle);
         this.logger?.info?.('Feature toggle locked, handle:', lockHandle);
@@ -384,7 +383,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         fullConfig.featureToggleName,
         this.logger,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Feature toggle locked, handle:', lockHandle);
@@ -664,7 +662,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
       config.featureToggleName,
       this.logger,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

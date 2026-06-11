@@ -333,11 +333,13 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     };
 
     try {
-      // 1. Lock (update always starts with lock, stateful only for lock)
+      // 1. Lock — stay stateful for the whole lock→check→update→unlock chain.
+      // On older BASIS (#106) the lock handle is only valid inside stateful
+      // requests; a stateless write in between fails with 423. unlock() below
+      // restores stateless.
       this.logger?.info?.('Step 1: Locking class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Class locked, handle:', lockHandle);
 
@@ -688,10 +690,12 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       throw new Error('Class name is required');
     }
 
+    // Stay stateful while the lock is held — the caller must release it via
+    // unlock(), which restores stateless. On older BASIS (#106) the lock handle
+    // is only valid inside stateful requests, so a stateless write between lock
+    // and unlock fails with 423.
     this.connection.setSessionType('stateful');
-    const lockHandle = await lockClass(this.connection, config.className);
-    this.connection.setSessionType('stateless');
-    return lockHandle;
+    return await lockClass(this.connection, config.className);
   }
 
   /**
@@ -725,10 +729,10 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     if (!config.className) {
       throw new Error('Class name is required');
     }
+    // Stay stateful while the lock is held (see lock()); unlockTestClasses()
+    // restores stateless. Avoids 423 on older BASIS (#106).
     this.connection.setSessionType('stateful');
-    const lockHandle = await lockClass(this.connection, config.className);
-    this.connection.setSessionType('stateless');
-    return lockHandle;
+    return await lockClass(this.connection, config.className);
   }
 
   /**
@@ -796,7 +800,6 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.info?.('Step 1: Locking parent class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Update test classes (uses parent class lock handle)

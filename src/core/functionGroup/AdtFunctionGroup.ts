@@ -476,7 +476,6 @@ export class AdtFunctionGroup
         config.functionGroupName,
         sessionId,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Function group locked, handle:', lockHandle);
 
       // 2. Update metadata (description)
@@ -723,7 +722,6 @@ export class AdtFunctionGroup
       this.connection,
       config.functionGroupName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

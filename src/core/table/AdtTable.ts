@@ -286,7 +286,6 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.connection,
         config.tableName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Table locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -534,7 +533,6 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       this.connection,
       config.tableName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

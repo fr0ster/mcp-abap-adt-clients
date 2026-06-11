@@ -376,7 +376,6 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       const lockResult = await lockPackage(this.connection, config.packageName);
       lockHandle = lockResult.lockHandle;
       lockCorrNr = lockResult.corrNr;
-      this.connection.setSessionType('stateless');
       this.logger?.info?.(
         `Package locked, handle: ${lockHandle}, corrNr: ${lockCorrNr}`,
       );
@@ -575,7 +574,6 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
 
     this.connection.setSessionType('stateful');
     const lockResult = await lockPackage(this.connection, config.packageName);
-    this.connection.setSessionType('stateless');
     return lockResult.lockHandle;
   }
 

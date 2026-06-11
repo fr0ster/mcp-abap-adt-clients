@@ -275,7 +275,6 @@ export class AdtInterface
         this.connection,
         config.interfaceName,
       );
-      this.connection.setSessionType('stateless');
       lockHandle = lockResult.lockHandle;
       state.lockHandle = lockHandle;
       this.logger?.info?.('Interface locked, handle:', lockHandle);
@@ -592,7 +591,6 @@ export class AdtInterface
 
     this.connection.setSessionType('stateful');
     const result = await lockInterface(this.connection, config.interfaceName);
-    this.connection.setSessionType('stateless');
     return result.lockHandle;
   }
 

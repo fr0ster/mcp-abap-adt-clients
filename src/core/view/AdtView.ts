@@ -303,7 +303,6 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       this.logger?.info?.('Step 1: Locking view');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDDLS(this.connection, config.viewName);
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('View locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -557,7 +556,6 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockDDLS(this.connection, config.viewName);
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 

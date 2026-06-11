@@ -315,7 +315,6 @@ export class AdtTransformation
         this.connection,
         config.transformationName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Transformation locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -581,7 +580,6 @@ export class AdtTransformation
       this.connection,
       config.transformationName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
