@@ -130,17 +130,27 @@ export async function resolveSystemContext(
   connection: IAbapConnection,
   isCloud: boolean,
 ): Promise<
-  Pick<IAdtClientOptions, 'masterSystem' | 'responsible' | 'unicode'>
+  Pick<
+    IAdtClientOptions,
+    'masterSystem' | 'responsible' | 'unicode' | 'masterLanguage'
+  >
 > {
+  const { getEnvironmentConfig } = require('./test-helper');
+  // Optional master/original language for created objects (e.g. "DE", "ZH").
+  // Empty/undefined → the library defaults to EN. Sourced from test-config so
+  // each system can pin a language it actually has installed.
+  const masterLanguage =
+    getEnvironmentConfig().default_master_language || undefined;
+
   if (isCloud) {
     const systemInfo = await getSystemInformation(connection);
     return {
       masterSystem: systemInfo?.systemID,
       responsible: systemInfo?.userName,
       unicode: true,
+      masterLanguage,
     };
   }
-  const { getEnvironmentConfig } = require('./test-helper');
   const envConfig = getEnvironmentConfig();
   const rawUnicode = process.env.SAP_UNICODE;
   const unicode = rawUnicode
@@ -150,6 +160,7 @@ export async function resolveSystemContext(
     masterSystem: envConfig.default_master_system,
     responsible: process.env.SAP_USERNAME,
     unicode,
+    masterLanguage,
   };
 }
 

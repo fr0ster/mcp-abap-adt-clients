@@ -88,6 +88,7 @@ environment:
   default_package: "ZADT_TEST"               # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
+  default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → EN. Must be a language installed on the system, else SAP normalizes it to the system default.
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
   # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type.
   # is_legacy: true         # Uncomment for BASIS < 7.50 systems (e.g. E77). Also set SAP_UNICODE=false in .env for non-unicode systems.
