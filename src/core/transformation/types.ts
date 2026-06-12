@@ -11,6 +11,7 @@ export interface ICreateTransformationParams {
   transport_request?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateTransformationParams {

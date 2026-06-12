@@ -3,6 +3,17 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.0] - 2026-06-12
+
+### Added
+
+- **Master/original language for newly created objects is now configurable** instead of always hardcoded to `EN`. `IAdtClientOptions.masterLanguage` (carried into `IAdtSystemContext.masterLanguage`) sets the `adtcore:masterLanguage` and `adtcore:language` attributes for `create` across object types: class, program, interface, view, domain, structure, table, table type, data element, function group, service definition, access control, transformation, enhancement. When unset it still defaults to `EN`, so existing behaviour is unchanged. Consumers are expected to source this from the logon language (`SAP_LANGUAGE`) and/or an explicit per-call override. Fixes objects being created with `masterLanguage=EN` regardless of the configured language. (fr0ster/mcp-abap-adt#105)
+- New optional `masterLanguage?` field on each `ICreate*Params` for the low-level create functions. Additive; no breaking change.
+
+### Note
+
+- `package` is intentionally not covered here — its `ICreatePackageParams` lives in `@mcp-abap-adt/interfaces` and will follow in a separate change once that field is added upstream.
+
 ## [5.4.4] - 2026-06-11
 
 ### Fixed

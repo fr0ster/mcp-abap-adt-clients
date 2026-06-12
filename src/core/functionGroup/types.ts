@@ -12,6 +12,7 @@ export interface ICreateFunctionGroupParams {
   transportRequest?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateFunctionGroupParams {

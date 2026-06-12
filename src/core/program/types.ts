@@ -12,6 +12,7 @@ export interface ICreateProgramParams {
   transportRequest?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
   programType?: string;
   application?: string;
   sourceCode?: string;

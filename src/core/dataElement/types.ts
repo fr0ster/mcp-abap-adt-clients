@@ -24,6 +24,7 @@ export interface ICreateDataElementParams {
   transport_request?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
   type_kind?:
     | 'domain'
     | 'predefinedAbapType'

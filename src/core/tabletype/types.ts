@@ -12,6 +12,7 @@ export interface ICreateTableTypeParams {
   transport_request?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateTableTypeParams {

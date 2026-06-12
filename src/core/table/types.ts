@@ -12,6 +12,7 @@ export interface ICreateTableParams {
   ddl_code?: string; // Optional - can be added via update() later
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateTableParams {

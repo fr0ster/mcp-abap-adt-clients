@@ -15,6 +15,7 @@ export interface ICreateInterfaceParams {
   transportRequest?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateInterfaceSourceParams {

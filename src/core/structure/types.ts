@@ -29,6 +29,7 @@ export interface ICreateStructureParams {
   transportRequest?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateStructureParams {

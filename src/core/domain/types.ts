@@ -17,6 +17,7 @@ export interface ICreateDomainParams {
   transport_request?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
   datatype?: string;
   length?: number;
   decimals?: number;

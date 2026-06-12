@@ -13,6 +13,7 @@ export interface ICreateServiceDefinitionParams {
   source_code?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateServiceDefinitionParams {

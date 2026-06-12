@@ -35,7 +35,7 @@ export async function create(
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.domain_name.toUpperCase()}" adtcore:type="DOMA/DD" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.domain_name.toUpperCase()}" adtcore:type="DOMA/DD" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </doma:domain>`;
 

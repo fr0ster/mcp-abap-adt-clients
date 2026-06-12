@@ -152,6 +152,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           create_protected: config.createProtected,
           master_system: config.masterSystem ?? this.systemContext.masterSystem,
           responsible: config.responsible ?? this.systemContext.responsible,
+          masterLanguage: this.systemContext.masterLanguage,
           template_xml: config.classTemplate,
         },
         this.logger,

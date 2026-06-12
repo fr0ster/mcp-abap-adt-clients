@@ -13,6 +13,7 @@ export interface ICreateViewParams {
   description?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateViewSourceParams {

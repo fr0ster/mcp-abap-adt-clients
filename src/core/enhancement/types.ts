@@ -46,6 +46,7 @@ export interface ICreateEnhancementParams {
   source_code?: string; // For enhoxhh only
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateEnhancementParams {

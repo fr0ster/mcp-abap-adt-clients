@@ -118,6 +118,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         ddl_source: options?.sourceCode || config.ddlSource,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage: this.systemContext.masterLanguage,
       });
       objectCreated = true;
       state.createResult = createResponse;

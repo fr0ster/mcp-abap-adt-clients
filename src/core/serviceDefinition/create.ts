@@ -35,7 +35,7 @@ export async function create(
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${serviceDefinitionName}" adtcore:type="SRVD/SRV" adtcore:masterLanguage="EN"${masterSystemAttr} adtcore:responsible="${username}" srvd:srvdSourceType="S">
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><srvd:srvdSource xmlns:srvd="http://www.sap.com/adt/ddic/srvdsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${serviceDefinitionName}" adtcore:type="SRVD/SRV" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr} adtcore:responsible="${username}" srvd:srvdSourceType="S">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </srvd:srvdSource>`;
 
