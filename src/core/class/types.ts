@@ -33,6 +33,7 @@ export interface IDeleteClassParams {
 // description is required for create/validate operations
 export interface IClassConfig {
   className: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   description?: string; // Required for create/validate operations, optional for others
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter

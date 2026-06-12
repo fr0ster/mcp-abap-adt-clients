@@ -28,6 +28,7 @@ export interface IDeleteTransformationParams {
 // Builder configuration (camelCase)
 export interface ITransformationConfig {
   transformationName: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   transformationType: TransformationType;
   packageName?: string;
   transportRequest?: string;

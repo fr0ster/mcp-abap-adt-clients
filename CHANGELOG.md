@@ -7,12 +7,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Added
 
-- **Master/original language for newly created objects is now configurable** instead of always hardcoded to `EN`. `IAdtClientOptions.masterLanguage` (carried into `IAdtSystemContext.masterLanguage`) sets the `adtcore:masterLanguage` and `adtcore:language` attributes for `create` across object types: class, program, interface, view, domain, structure, table, table type, data element, function group, service definition, access control, transformation, enhancement. When unset it still defaults to `EN`, so existing behaviour is unchanged. Consumers are expected to source this from the logon language (`SAP_LANGUAGE`) and/or an explicit per-call override. Fixes objects being created with `masterLanguage=EN` regardless of the configured language. (fr0ster/mcp-abap-adt#105)
-- New optional `masterLanguage?` field on each `ICreate*Params` for the low-level create functions. Additive; no breaking change.
+- **Master/original language for newly created objects is now configurable** instead of always hardcoded to `EN`. `IAdtClientOptions.masterLanguage` is carried into `IAdtSystemContext.masterLanguage`, and every language-aware `create` now resolves `config.masterLanguage ?? this.systemContext.masterLanguage` and writes the result to **both** `adtcore:language` and `adtcore:masterLanguage`. Covered: class, program, interface, view, domain, structure, table, table type, data element, function group, service definition, access control, transformation, enhancement, behavior definition, metadata extension. When unset it still defaults to `EN`, so existing behaviour is unchanged. Consumers source this from the logon language (`SAP_LANGUAGE`) with an optional per-call `config.masterLanguage` override. (fr0ster/mcp-abap-adt#105)
+- Optional `masterLanguage?` on each `IXxxConfig` and `ICreate*Params`. Additive; no breaking change.
+
+### Fixed
+
+- **metadata extension** create no longer emits a contradictory payload: `adtcore:language` was hardcoded to `EN` while `adtcore:masterLanguage` honoured the configured language. Both now use the resolved language. It also gained the missing `systemContext` fallback (previously only `config.masterLanguage`).
+- **behavior definition** create now passes the resolved master language (it previously ignored it and always created as `EN`).
 
 ### Note
 
-- `package` is intentionally not covered here — its `ICreatePackageParams` lives in `@mcp-abap-adt/interfaces` and will follow in a separate change once that field is added upstream.
+- **ServiceBinding** already resolves `masterLanguage` via `getSystemInformation()` (`params.masterLanguage ?? systemInfo.language ?? 'EN'`), so it honours the logon language without `systemContext`; left as-is.
+- `package` is intentionally not covered — its `ICreatePackageParams` lives in `@mcp-abap-adt/interfaces` and will follow once that field is added upstream.
 
 ## [5.4.4] - 2026-06-11
 

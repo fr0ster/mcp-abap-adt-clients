@@ -127,7 +127,8 @@ export class AdtDataElement
         set_get_parameter: config.setGetParameter,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
-        masterLanguage: this.systemContext.masterLanguage,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       state.createResult = createResponse;
       objectCreated = true;

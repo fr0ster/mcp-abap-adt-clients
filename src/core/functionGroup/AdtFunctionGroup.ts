@@ -161,7 +161,8 @@ export class AdtFunctionGroup
           description: config.description,
           masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
           responsible: config.responsible ?? this.systemContext.responsible,
-          masterLanguage: this.systemContext.masterLanguage,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.logger,
         this.contentTypes,

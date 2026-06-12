@@ -83,6 +83,7 @@ export interface IValidateEnhancementParams {
  */
 export interface IEnhancementConfig {
   enhancementName: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   enhancementType: EnhancementType;
   description?: string;
   packageName?: string;

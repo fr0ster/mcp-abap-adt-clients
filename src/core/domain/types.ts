@@ -57,6 +57,7 @@ export interface IDeleteDomainParams {
 // description is required for create/update/validate operations
 export interface IDomainConfig {
   domainName: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   packageName?: string; // Required for create/update operations, optional for others
   transportRequest?: string; // Only optional parameter
   description?: string; // Required for create/update/validate operations, optional for others

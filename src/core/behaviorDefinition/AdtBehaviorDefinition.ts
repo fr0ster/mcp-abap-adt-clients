@@ -151,6 +151,7 @@ export class AdtBehaviorDefinition
         description: config.description,
         implementationType: config.implementationType,
         transportRequest: config.transportRequest,
+        language: config.masterLanguage ?? this.systemContext.masterLanguage,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
       });

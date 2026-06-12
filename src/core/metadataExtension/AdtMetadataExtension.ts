@@ -125,7 +125,8 @@ export class AdtMetadataExtension
         packageName: config.packageName,
         transportRequest: config.transportRequest,
         description: config.description,
-        masterLanguage: config.masterLanguage,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
         masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
         responsible: config.responsible ?? this.systemContext.responsible,
       });
