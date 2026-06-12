@@ -14,10 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 - **metadata extension** create no longer emits a contradictory payload: `adtcore:language` was hardcoded to `EN` while `adtcore:masterLanguage` honoured the configured language. Both now use the resolved language. It also gained the missing `systemContext` fallback (previously only `config.masterLanguage`).
 - **behavior definition** create now passes the resolved master language (it previously ignored it and always created as `EN`).
+- **ServiceBinding** now receives `systemContext` (`getServiceBinding()` previously constructed it without one), so the global `IAdtClientOptions.masterLanguage`/`masterSystem`/`responsible` are honoured. Resolution order is `params → systemContext → getSystemInformation() auto-detect → default` — an explicit override now wins over auto-detection.
 
 ### Note
 
-- **ServiceBinding** already resolves `masterLanguage` via `getSystemInformation()` (`params.masterLanguage ?? systemInfo.language ?? 'EN'`), so it honours the logon language without `systemContext`; left as-is.
 - `package` is intentionally not covered — its `ICreatePackageParams` lives in `@mcp-abap-adt/interfaces` and will follow once that field is added upstream.
 
 ## [5.4.4] - 2026-06-11

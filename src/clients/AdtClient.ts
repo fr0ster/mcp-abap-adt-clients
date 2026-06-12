@@ -400,7 +400,11 @@ export class AdtClient {
    * @returns IAdtServiceBinding instance for ServiceBinding CRUD and lifecycle operations
    */
   getServiceBinding(): IAdtServiceBinding {
-    return new AdtServiceBinding(this.connection, this.logger);
+    return new AdtServiceBinding(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**

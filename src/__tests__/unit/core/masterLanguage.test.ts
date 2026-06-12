@@ -3,6 +3,7 @@ import { create as createBehaviorDefinition } from '../../../core/behaviorDefini
 import { createMetadataExtension } from '../../../core/metadataExtension/create';
 import { AdtProgram } from '../../../core/program/AdtProgram';
 import { create as createProgram } from '../../../core/program/create';
+import { AdtServiceBinding } from '../../../core/service/AdtService';
 
 /**
  * Master/original language wiring (fr0ster/mcp-abap-adt#105).
@@ -83,6 +84,46 @@ describe('masterLanguage on create', () => {
         implementationType: 'managed',
       } as never);
       expect(bodyOf(c2)).toContain('adtcore:masterLanguage="EN"');
+    });
+  });
+
+  describe('ServiceBinding honours the global systemContext override', () => {
+    function bindingBody(connection: IAbapConnection): string {
+      const call = (connection.makeAdtRequest as jest.Mock).mock.calls.find(
+        (c) => String(c[0]?.data).includes('srvb:serviceBinding'),
+      );
+      return String(call?.[0]?.data);
+    }
+
+    const baseParams = {
+      bindingName: 'ZSB',
+      packageName: '$TMP',
+      description: 'x',
+      serviceDefinitionName: 'ZSD',
+      serviceName: 'ZSRV',
+      serviceVersion: '0001',
+      bindingVariant: 'ODATA_V4_UI',
+    } as never;
+
+    it('uses systemContext.masterLanguage (global option) when params omit it', async () => {
+      const c = mockConnection();
+      const binding = new AdtServiceBinding(c, undefined, {
+        masterLanguage: 'FR',
+      });
+      await binding.createServiceBinding(baseParams);
+      expect(bindingBody(c)).toContain('adtcore:masterLanguage="FR"');
+    });
+
+    it('explicit params.masterLanguage overrides the global option', async () => {
+      const c = mockConnection();
+      const binding = new AdtServiceBinding(c, undefined, {
+        masterLanguage: 'FR',
+      });
+      await binding.createServiceBinding({
+        ...(baseParams as object),
+        masterLanguage: 'ZH',
+      } as never);
+      expect(bindingBody(c)).toContain('adtcore:masterLanguage="ZH"');
     });
   });
 
