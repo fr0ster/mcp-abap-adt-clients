@@ -100,6 +100,8 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         ddl_code: options?.sourceCode || config.ddlCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       objectCreated = true;
       state.createResult = createResponse;

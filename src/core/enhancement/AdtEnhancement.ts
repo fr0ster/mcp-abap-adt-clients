@@ -153,6 +153,8 @@ export class AdtEnhancement
           badi_definition: config.badiDefinition,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.logger,
       );

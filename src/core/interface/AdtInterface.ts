@@ -120,6 +120,8 @@ export class AdtInterface
           description: config.description,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.logger,
       );

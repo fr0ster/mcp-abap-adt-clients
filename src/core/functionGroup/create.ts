@@ -62,7 +62,7 @@ export async function create(
   const limitedDescription = limitDescription(params.description);
   // Build XML payload - no escaping (same as old working code)
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
-<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="EN" adtcore:name="${params.functionGroupName}" adtcore:type="FUGR/F" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+<group:abapFunctionGroup xmlns:group="http://www.sap.com/adt/functions/groups" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${limitedDescription}" adtcore:language="${params.masterLanguage || 'EN'}" adtcore:name="${params.functionGroupName}" adtcore:type="FUGR/F" adtcore:masterLanguage="${params.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${params.packageName}"/>
 </group:abapFunctionGroup>`;
 

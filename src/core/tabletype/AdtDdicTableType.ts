@@ -103,6 +103,8 @@ export class AdtDdicTableType
         transport_request: config.transportRequest,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       objectCreated = true;
       state.createResult = createResponse;

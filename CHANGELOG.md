@@ -3,6 +3,23 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.0] - 2026-06-12
+
+### Added
+
+- **Master/original language for newly created objects is now configurable** instead of always hardcoded to `EN`. `IAdtClientOptions.masterLanguage` is carried into `IAdtSystemContext.masterLanguage`, and every language-aware `create` now resolves `config.masterLanguage ?? this.systemContext.masterLanguage` and writes the result to **both** `adtcore:language` and `adtcore:masterLanguage`. Covered: class, program, interface, view, domain, structure, table, table type, data element, function group, service definition, access control, transformation, enhancement, behavior definition, metadata extension. When unset it still defaults to `EN`, so existing behaviour is unchanged. Consumers source this from the logon language (`SAP_LANGUAGE`) with an optional per-call `config.masterLanguage` override. (fr0ster/mcp-abap-adt#105)
+- Optional `masterLanguage?` on each `IXxxConfig` and `ICreate*Params`. Additive; no breaking change.
+
+### Fixed
+
+- **metadata extension** create no longer emits a contradictory payload: `adtcore:language` was hardcoded to `EN` while `adtcore:masterLanguage` honoured the configured language. Both now use the resolved language. It also gained the missing `systemContext` fallback (previously only `config.masterLanguage`).
+- **behavior definition** create now passes the resolved master language (it previously ignored it and always created as `EN`).
+- **ServiceBinding** now receives `systemContext` (`getServiceBinding()` previously constructed it without one), so the global `IAdtClientOptions.masterLanguage`/`masterSystem`/`responsible` are honoured. Resolution order is `params → systemContext → getSystemInformation() auto-detect → default` — an explicit override now wins over auto-detection.
+
+### Note
+
+- `package` is intentionally not covered — its `ICreatePackageParams` lives in `@mcp-abap-adt/interfaces` and will follow once that field is added upstream.
+
 ## [5.4.4] - 2026-06-11
 
 ### Fixed

@@ -5,6 +5,7 @@ import type {
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,
@@ -41,12 +42,18 @@ import { resolveBindingVariant } from './types';
 export class AdtServiceBinding implements IAdtServiceBinding {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
 
   public readonly objectType: string = 'ServiceBinding';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   private parser = new XMLParser({
@@ -682,9 +689,19 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     const systemInfo = await getSystemInformation(this.connection);
     const createParams: ICreateServiceBindingParams = {
       ...params,
-      masterLanguage: params.masterLanguage ?? systemInfo?.language ?? 'EN',
-      masterSystem: params.masterSystem ?? systemInfo?.systemID,
-      responsible: params.responsible ?? systemInfo?.userName,
+      masterLanguage:
+        params.masterLanguage ??
+        this.systemContext.masterLanguage ??
+        systemInfo?.language ??
+        'EN',
+      masterSystem:
+        params.masterSystem ??
+        this.systemContext.masterSystem ??
+        systemInfo?.systemID,
+      responsible:
+        params.responsible ??
+        this.systemContext.responsible ??
+        systemInfo?.userName,
     };
 
     const queryParams = params.transportRequest

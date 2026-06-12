@@ -141,6 +141,8 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           sourceCode: options?.sourceCode || config.sourceCode,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.contentTypes,
       );

@@ -24,6 +24,7 @@ export interface ICreateDataElementParams {
   transport_request?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
   type_kind?:
     | 'domain'
     | 'predefinedAbapType'
@@ -88,6 +89,7 @@ export interface IDeleteDataElementParams {
 // description is required for create/validate operations
 export interface IDataElementConfig {
   dataElementName: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
   description?: string; // Required for create/validate operations, optional for others

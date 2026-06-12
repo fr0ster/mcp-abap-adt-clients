@@ -122,6 +122,8 @@ export class AdtStructure
         description: config.description,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       objectCreated = true;
       state.createResult = createResponse;

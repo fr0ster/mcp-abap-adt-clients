@@ -12,6 +12,7 @@ export interface ICreateTableParams {
   ddl_code?: string; // Optional - can be added via update() later
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateTableParams {
@@ -31,6 +32,7 @@ export interface IDeleteTableParams {
 // description is required for create/validate operations
 export interface ITableConfig {
   tableName: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
   ddlCode?: string;

@@ -15,6 +15,7 @@ export interface ICreateInterfaceParams {
   transportRequest?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateInterfaceSourceParams {
@@ -33,6 +34,7 @@ export interface IDeleteInterfaceParams {
 // description is required for create/validate operations
 export interface IInterfaceConfig extends IAdtObjectConfig {
   interfaceName: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
   description?: string; // Required for create/validate operations, optional for others

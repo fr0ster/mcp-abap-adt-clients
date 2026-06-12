@@ -30,7 +30,7 @@ export async function create(
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
 
-  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><dcl:dclSource xmlns:dcl="http://www.sap.com/adt/acm/dclsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${accessControlName}" adtcore:type="DCLS/DL" adtcore:masterLanguage="EN"${masterSystemAttr} adtcore:responsible="${username}">
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><dcl:dclSource xmlns:dcl="http://www.sap.com/adt/acm/dclsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${accessControlName}" adtcore:type="DCLS/DL" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr} adtcore:responsible="${username}">
   <adtcore:packageRef adtcore:name="${args.package_name.toUpperCase()}"/>
 </dcl:dclSource>`;
 

@@ -142,12 +142,16 @@ import { AdtView, type IViewConfig, type IViewState } from '../core/view';
 export interface IAdtSystemContext {
   masterSystem?: string;
   responsible?: string;
+  /** Master/original language for newly created objects (adtcore:masterLanguage). Sourced from SAP_LANGUAGE; defaults to EN when unset. */
+  masterLanguage?: string;
 }
 
 export interface IAdtClientOptions {
   enableAcceptCorrection?: boolean;
   masterSystem?: string;
   responsible?: string;
+  /** Master/original language for newly created objects. Falls back to EN when unset. */
+  masterLanguage?: string;
   contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
   /** Whether the SAP system uses Unicode encoding. Affects Content-Type headers for source code operations. */
   unicode?: boolean;
@@ -174,6 +178,7 @@ export class AdtClient {
     this.systemContext = {
       masterSystem: options?.masterSystem,
       responsible: options?.responsible,
+      masterLanguage: options?.masterLanguage,
     };
     this.contentTypes = options?.contentTypes;
     if (options?.enableAcceptCorrection !== undefined) {
@@ -395,7 +400,11 @@ export class AdtClient {
    * @returns IAdtServiceBinding instance for ServiceBinding CRUD and lifecycle operations
    */
   getServiceBinding(): IAdtServiceBinding {
-    return new AdtServiceBinding(this.connection, this.logger);
+    return new AdtServiceBinding(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**
