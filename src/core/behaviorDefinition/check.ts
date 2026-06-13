@@ -10,6 +10,7 @@ import {
   ACCEPT_CHECK_MESSAGES,
   CT_CHECK_OBJECTS,
 } from '../../constants/contentTypes';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { CheckReporter } from './types';
 
@@ -50,9 +51,9 @@ export async function check(
     // TODO: analyze whether chkrun:contentType can be extracted to a constant
     const base64Content = Buffer.from(sourceCode, 'utf-8').toString('base64');
     xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
-    <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}" chkrun:version="${version}">
+    <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}" chkrun:version="${version}">
         <chkrun:artifacts>
-            <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main">
+            <chkrun:artifact chkrun:contentType="text/plain; charset=utf-8" chkrun:uri="/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}/source/main">
                 <chkrun:content>${base64Content}</chkrun:content>
             </chkrun:artifact>
         </chkrun:artifacts>
@@ -61,7 +62,7 @@ export async function check(
   } else {
     // Check saved version
     xmlBody = `<?xml version="1.0" encoding="UTF-8"?><chkrun:checkObjectList xmlns:chkrun="http://www.sap.com/adt/checkrun" xmlns:adtcore="http://www.sap.com/adt/core">
-    <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}" chkrun:version="${version}"/>
+    <chkrun:checkObject adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}" chkrun:version="${version}"/>
 </chkrun:checkObjectList>`;
   }
 

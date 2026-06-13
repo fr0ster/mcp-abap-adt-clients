@@ -13,6 +13,7 @@ import {
   CT_BEHAVIOR_DEFINITION,
 } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IReadOptions } from '../shared/types';
 
@@ -42,7 +43,7 @@ export async function read(
   logger?: ILogger,
 ): Promise<AxiosResponse> {
   const query = options?.withLongPolling ? `&withLongPolling=true` : '';
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?version=${version}${query}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?version=${version}${query}`;
 
   const headers = {
     Accept: options?.accept ?? CT_BEHAVIOR_DEFINITION,
@@ -85,7 +86,7 @@ export async function readSource(
   logger?: ILogger,
 ): Promise<AxiosResponse> {
   const query = options?.withLongPolling ? `&withLongPolling=true` : '';
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/source/main?version=${version}${query}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}/source/main?version=${version}${query}`;
 
   const headers = {
     Accept: options?.accept ?? ACCEPT_SOURCE,
@@ -115,7 +116,7 @@ export async function getBehaviorDefinitionTransport(
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}/transport${query}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}/transport${query}`;
 
   const headers = {
     Accept: options?.accept ?? ACCEPT_TRANSPORT,

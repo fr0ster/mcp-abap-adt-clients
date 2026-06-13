@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { activateObjectInSession } from '../../utils/activationUtils';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 
 /**
  * Activate behavior definition
@@ -31,7 +32,7 @@ export async function activate(
   name: string,
   preauditRequested: boolean = true,
 ): Promise<AxiosResponse> {
-  const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}`;
+  const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}`;
   return await activateObjectInSession(
     connection,
     objectUri,

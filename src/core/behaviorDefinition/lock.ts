@@ -8,6 +8,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { ACCEPT_LOCK } from '../../constants/contentTypes';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -32,7 +33,7 @@ export async function lock(
   name: string,
   accessMode: string = 'MODIFY',
 ): Promise<string> {
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
@@ -99,7 +100,7 @@ export async function lockForUpdate(
   _sessionId: string,
   accessMode: string = 'MODIFY',
 ): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {
-  const url = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
+  const url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}?_action=LOCK&accessMode=${accessMode}`;
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>

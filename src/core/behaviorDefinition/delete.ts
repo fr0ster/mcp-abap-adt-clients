@@ -12,6 +12,7 @@ import {
   CT_DELETION,
   CT_DELETION_CHECK,
 } from '../../constants/contentTypes';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
 /**
@@ -35,7 +36,7 @@ export async function checkDeletion(
   connection: IAbapConnection,
   name: string,
 ): Promise<AxiosResponse> {
-  const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}`;
+  const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}`;
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?><del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
     <del:object adtcore:uri="${objectUri}"/>
@@ -82,7 +83,7 @@ export async function deleteBehaviorDefinition(
   name: string,
   transportRequest?: string,
 ): Promise<AxiosResponse> {
-  const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${name.toLowerCase()}`;
+  const objectUri = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(name).toLowerCase()}`;
 
   const transportXml = transportRequest
     ? `<del:transportNumber>${transportRequest}</del:transportNumber>`
