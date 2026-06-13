@@ -145,6 +145,10 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         application_component: config.applicationComponent,
         responsible: config.responsible ?? this.systemContext.responsible,
         master_system: this.systemContext.masterSystem,
+        master_language:
+          config.masterLanguage?.trim() ||
+          this.systemContext.masterLanguage?.trim() ||
+          undefined,
         record_changes: config.recordChanges ?? false,
       });
       this.logger?.info?.('Package created');

@@ -3,6 +3,17 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.6.0] - 2026-06-13
+
+### Added
+- **`package` create now honours the configurable master language** (fr0ster/mcp-abap-adt#105). `IPackageConfig.masterLanguage` + `ICreatePackageParams.master_language` (interfaces 7.3.0) feed both `adtcore:language` and `adtcore:masterLanguage`; resolves `config.masterLanguage → systemContext.masterLanguage → EN`, with blank (empty/whitespace) treated as unset and surrounding spaces trimmed. Default stays EN. Brings `package` in line with the other object types.
+
+### Changed
+- Bumped `@mcp-abap-adt/interfaces` from `^7.0.0` to `^7.3.0` (adds `ICreatePackageParams.master_language`).
+
+### Fixed
+- **behaviorDefinition: URL-encode namespaced object names in ADT paths** (#37, thanks @eseuve). Namespaced behavior definitions (`/NSP/…`) could not be read/locked/updated/activated/checked/unlocked/deleted because the raw `/` broke the ADT path; names are now wrapped with `encodeSapObjectName(...)` across all path-based operations, matching class/interface/view.
+
 ## [5.5.0] - 2026-06-12
 
 ### Added
