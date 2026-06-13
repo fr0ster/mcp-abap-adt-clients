@@ -1,6 +1,8 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { create as createBehaviorDefinition } from '../../../core/behaviorDefinition/create';
 import { createMetadataExtension } from '../../../core/metadataExtension/create';
+import { AdtPackage } from '../../../core/package/AdtPackage';
+import { createPackage } from '../../../core/package/create';
 import { AdtProgram } from '../../../core/program/AdtProgram';
 import { create as createProgram } from '../../../core/program/create';
 import { AdtServiceBinding } from '../../../core/service/AdtService';
@@ -124,6 +126,106 @@ describe('masterLanguage on create', () => {
         masterLanguage: 'ZH',
       } as never);
       expect(bindingBody(c)).toContain('adtcore:masterLanguage="ZH"');
+    });
+  });
+
+  describe('package create master language', () => {
+    function pkgBody(connection: IAbapConnection): string {
+      const call = (connection.makeAdtRequest as jest.Mock).mock.calls.find(
+        (c) => String(c[0]?.data).includes('pak:package'),
+      );
+      return String(call?.[0]?.data);
+    }
+
+    const baseParams = {
+      package_name: 'ZAC_PKG_ML',
+      super_package: 'ZLOCAL',
+      description: 'master language probe',
+      software_component: 'ZLOCAL',
+      record_changes: false,
+    };
+    const baseConfig = {
+      packageName: 'ZAC_PKG_ML',
+      superPackage: 'ZLOCAL',
+      description: 'master language probe',
+      softwareComponent: 'ZLOCAL',
+      responsible: 'TESTUSER',
+    };
+
+    it('high-level: config language in both attributes', async () => {
+      const c = mockConnection();
+      await new AdtPackage(c, undefined, {}).create({
+        ...baseConfig,
+        masterLanguage: 'DE',
+      } as never);
+      expect(pkgBody(c)).toContain('adtcore:language="DE"');
+      expect(pkgBody(c)).toContain('adtcore:masterLanguage="DE"');
+    });
+    it('high-level: systemContext fallback', async () => {
+      const c = mockConnection();
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
+        ...baseConfig,
+      } as never);
+      expect(pkgBody(c)).toContain('adtcore:language="IT"');
+      expect(pkgBody(c)).toContain('adtcore:masterLanguage="IT"');
+    });
+    it('high-level: config overrides systemContext', async () => {
+      const c = mockConnection();
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
+        ...baseConfig,
+        masterLanguage: 'FR',
+      } as never);
+      expect(pkgBody(c)).toContain('adtcore:language="FR"');
+      expect(pkgBody(c)).toContain('adtcore:masterLanguage="FR"');
+    });
+    it('high-level: neither set -> EN', async () => {
+      const c = mockConnection();
+      await new AdtPackage(c, undefined, {}).create({ ...baseConfig } as never);
+      expect(pkgBody(c)).toContain('adtcore:language="EN"');
+      expect(pkgBody(c)).toContain('adtcore:masterLanguage="EN"');
+    });
+    it('high-level: empty config falls through to systemContext', async () => {
+      const c = mockConnection();
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
+        ...baseConfig,
+        masterLanguage: '',
+      } as never);
+      expect(pkgBody(c)).toContain('adtcore:language="IT"');
+      expect(pkgBody(c)).toContain('adtcore:masterLanguage="IT"');
+    });
+    it('high-level: whitespace config falls through to systemContext', async () => {
+      const c = mockConnection();
+      await new AdtPackage(c, undefined, { masterLanguage: 'IT' }).create({
+        ...baseConfig,
+        masterLanguage: '   ',
+      } as never);
+      expect(pkgBody(c)).toContain('adtcore:language="IT"');
+      expect(pkgBody(c)).toContain('adtcore:masterLanguage="IT"');
+    });
+    it('high-level: surrounding spaces are trimmed', async () => {
+      const c = mockConnection();
+      await new AdtPackage(c, undefined, {}).create({
+        ...baseConfig,
+        masterLanguage: ' DE ',
+      } as never);
+      expect(pkgBody(c)).toContain('adtcore:language="DE"');
+      expect(pkgBody(c)).toContain('adtcore:masterLanguage="DE"');
+    });
+    it('low-level: blank -> EN, surrounding spaces trimmed', async () => {
+      const c1 = mockConnection();
+      await createPackage(c1, {
+        ...baseParams,
+        master_language: '   ',
+      } as never);
+      expect(pkgBody(c1)).toContain('adtcore:language="EN"');
+      expect(pkgBody(c1)).toContain('adtcore:masterLanguage="EN"');
+      const c2 = mockConnection();
+      await createPackage(c2, {
+        ...baseParams,
+        master_language: ' DE ',
+      } as never);
+      expect(pkgBody(c2)).toContain('adtcore:language="DE"');
+      expect(pkgBody(c2)).toContain('adtcore:masterLanguage="DE"');
     });
   });
 

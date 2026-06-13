@@ -26,6 +26,7 @@ export interface IPackageConfig {
   applicationComponent?: string;
   responsible?: string;
   masterSystem?: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   recordChanges?: boolean;
   onLock?: (lockHandle: string) => void;
 }
