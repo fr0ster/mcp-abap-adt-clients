@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ## [5.7.0] - 2026-06-15
 
 ### Added
-- **`AdtUtils.listFunctionModules(functionGroupName)`** (`getUtils().listFunctionModules(...)`) — read-only listing of a function group's function modules via an ADT nodestructure drill-down (root → `FUGR/FF` type node → module names). `NODE_ID`s are read as strings (`parseTagValue: false`, so zero-padded ids like `000007` are preserved). Responses are validated in two layers — well-formedness (`XMLValidator`) and expected `asx:abap/asx:values/DATA` envelope (plus `OBJECT_TYPES` on the root) — and a malformed, non-2xx, or wrong-shape response throws rather than silently returning `[]`. Function-module names are deduped by uppercased key (first occurrence wins, order preserved). Additive; `getIncludesList` is unchanged.
+- **`AdtUtils.listFunctionModules(functionGroupName)`** and **`AdtUtils.listFunctionGroupIncludes(functionGroupName)`** (`getUtils().list…(...)`) — read-only listing of a function group's function modules (`FUGR/FF`) and includes (`FUGR/I` — TOP, UXX collector, custom FORM includes) via an ADT nodestructure drill-down (root → child-type node → names). Both share one core (`listFunctionGroupChildren`). `NODE_ID`s are read as strings (`parseTagValue: false`, so zero-padded ids like `000007` are preserved). Responses are validated in two layers — well-formedness (`XMLValidator`) and expected `asx:abap/asx:values/DATA` envelope (plus `OBJECT_TYPES` on the root) — and a malformed, non-2xx, or wrong-shape response throws rather than silently returning `[]`. Names are deduped by uppercased key (first occurrence wins, order preserved). Additive; `getIncludesList` is unchanged.
 
 ## [5.6.0] - 2026-06-13
 
