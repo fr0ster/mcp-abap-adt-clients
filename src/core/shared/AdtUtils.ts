@@ -42,6 +42,8 @@ import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
 import { getEnhancements } from './enhancements';
+import { listFunctionGroupIncludes } from './functionGroupIncludesList';
+import { listFunctionModules } from './functionModulesList';
 import { getInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
@@ -628,6 +630,34 @@ export class AdtUtils {
     timeout: number = 30000,
   ): Promise<string[]> {
     return getIncludesList(this.connection, objectName, objectType, timeout);
+  }
+
+  /**
+   * List the function modules of a function group.
+   *
+   * @example
+   * const fms = await utils.listFunctionModules('ZMY_FUGR');
+   * // Returns: ['Z_MY_FM1', 'Z_MY_FM2']
+   */
+  async listFunctionModules(functionGroupName: string): Promise<string[]> {
+    return listFunctionModules(this.connection, functionGroupName);
+  }
+
+  /**
+   * List the includes of a function group (TOP, UXX collector, custom includes).
+   *
+   * Complements listFunctionModules: includes hold code that is not part of any
+   * function module (global data/types in TOP, FORM routines in custom includes),
+   * so a complete function-group backup needs them.
+   *
+   * @example
+   * const includes = await utils.listFunctionGroupIncludes('ZMY_FUGR');
+   * // Returns: ['LZMY_FUGRTOP', 'LZMY_FUGRUXX', ...]
+   */
+  async listFunctionGroupIncludes(
+    functionGroupName: string,
+  ): Promise<string[]> {
+    return listFunctionGroupIncludes(this.connection, functionGroupName);
   }
 
   /**
