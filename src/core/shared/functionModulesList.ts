@@ -66,7 +66,18 @@ function dataNode(
     );
   }
   const data = values.DATA;
-  return isObject(data) ? data : {};
+  // An empty <DATA/> is parsed as "" (valid-empty payload) -> {}. Any other
+  // non-object value (e.g. <DATA>error</DATA> -> "error") is an unexpected shape
+  // and must throw rather than be silently treated as empty.
+  if (data === '') {
+    return {};
+  }
+  if (!isObject(data)) {
+    throw new Error(
+      `Unexpected node structure (${context}): DATA is not an element`,
+    );
+  }
+  return data;
 }
 
 export async function listFunctionModules(
