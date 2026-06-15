@@ -128,6 +128,23 @@ describe('listFunctionModules', () => {
     await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
   });
 
+  it('throws when an OBJECT_TYPES entry is a scalar (<SEU_ADT_OBJECT_TYPE_INFO>error</…>)', async () => {
+    const conn = connFrom(
+      () =>
+        '<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO>error</SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>',
+    );
+    await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
+  });
+
+  it('throws when a TREE_CONTENT entry is a scalar (<SEU_ADT_REPOSITORY_OBJ_NODE>error</…>)', async () => {
+    const conn = connFrom((id) =>
+      id === '000000'
+        ? ROOT_XML()
+        : '<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE>error</SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>',
+    );
+    await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
+  });
+
   it('throws on a non-2xx response that resolves (does not return [])', async () => {
     const makeAdtRequest = jest.fn(async () => ({
       status: 500,

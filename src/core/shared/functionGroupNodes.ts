@@ -58,6 +58,11 @@ function asArray<T>(v: T | T[] | undefined): T[] {
 // An absent container or an empty one (`<TREE_CONTENT/>` -> "") is valid-empty
 // -> []. Any other scalar (`<TREE_CONTENT>error</TREE_CONTENT>` -> "error") is an
 // unexpected shape and must throw rather than be silently treated as empty.
+//
+// The same applies one level deeper: each inner entry (SEU_ADT_OBJECT_TYPE_INFO /
+// SEU_ADT_REPOSITORY_OBJ_NODE) must be an element. A scalar entry (e.g.
+// `<SEU_ADT_OBJECT_TYPE_INFO>error</...>`) would otherwise be silently skipped
+// (no OBJECT_TYPE -> no match), yielding a wrong [] instead of a throw.
 function extractNodeList(
   container: unknown,
   innerKey: string,
@@ -72,7 +77,15 @@ function extractNodeList(
       `Unexpected node structure (${context}): ${containerName} is not an element`,
     );
   }
-  return asArray<Record<string, unknown>>(container[innerKey] as never);
+  const list = asArray<unknown>(container[innerKey]);
+  for (const item of list) {
+    if (!isObject(item)) {
+      throw new Error(
+        `Unexpected node structure (${context}): ${containerName} contains a non-element entry`,
+      );
+    }
+  }
+  return list as Record<string, unknown>[];
 }
 
 // Layer 2: expected structure. XMLValidator only proves well-formedness; a
