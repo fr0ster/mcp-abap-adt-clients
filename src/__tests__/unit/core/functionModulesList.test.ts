@@ -145,6 +145,35 @@ describe('listFunctionModules', () => {
     await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
   });
 
+  it('throws on duplicate <DATA/> (parser yields an array, not an element)', async () => {
+    const conn = connFrom(
+      () =>
+        '<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA/><DATA/></asx:values></asx:abap>',
+    );
+    await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
+  });
+
+  it('throws on duplicate <OBJECT_TYPES> (array container)', async () => {
+    const types =
+      '<OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><NODE_ID>000007</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES>';
+    const conn = connFrom(
+      () =>
+        `<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA>${types}${types}</DATA></asx:values></asx:abap>`,
+    );
+    await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
+  });
+
+  it('throws on duplicate <TREE_CONTENT> in the drill (array container)', async () => {
+    const tc =
+      '<TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><OBJECT_NAME>Z_FM</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT>';
+    const conn = connFrom((id) =>
+      id === '000000'
+        ? ROOT_XML()
+        : `<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA>${tc}${tc}</DATA></asx:values></asx:abap>`,
+    );
+    await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
+  });
+
   it('throws on a non-2xx response that resolves (does not return [])', async () => {
     const makeAdtRequest = jest.fn(async () => ({
       status: 500,

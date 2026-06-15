@@ -23,8 +23,13 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
+// True only for a single element record. Arrays are excluded: the parser
+// represents structurally-invalid duplicate containers (two <DATA/>, two
+// <TREE_CONTENT>, two <OBJECT_TYPES>) as arrays, which must be rejected as a
+// wrong shape, not silently treated as empty. Legitimate repeated entries
+// (multiple SEU_ADT_* nodes) are arrays handled by asArray, not isObject.
 function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null;
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 // fetchNodeStructure may resolve (not reject) on a non-2xx depending on the
