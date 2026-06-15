@@ -111,6 +111,23 @@ describe('listFunctionModules', () => {
     await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
   });
 
+  it('throws when OBJECT_TYPES holds a scalar value (<OBJECT_TYPES>error</OBJECT_TYPES>)', async () => {
+    const conn = connFrom(
+      () =>
+        '<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><OBJECT_TYPES>error</OBJECT_TYPES></DATA></asx:values></asx:abap>',
+    );
+    await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
+  });
+
+  it('throws when TREE_CONTENT holds a scalar value (<TREE_CONTENT>error</TREE_CONTENT>)', async () => {
+    const conn = connFrom((id) =>
+      id === '000000'
+        ? ROOT_XML()
+        : '<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>error</TREE_CONTENT></DATA></asx:values></asx:abap>',
+    );
+    await expect(listFunctionModules(conn, 'G')).rejects.toThrow();
+  });
+
   it('throws on a non-2xx response that resolves (does not return [])', async () => {
     const makeAdtRequest = jest.fn(async () => ({
       status: 500,

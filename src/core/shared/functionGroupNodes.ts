@@ -54,6 +54,27 @@ function asArray<T>(v: T | T[] | undefined): T[] {
   return v === undefined || v === null ? [] : Array.isArray(v) ? v : [v];
 }
 
+// Read the node list inside a container element (OBJECT_TYPES / TREE_CONTENT).
+// An absent container or an empty one (`<TREE_CONTENT/>` -> "") is valid-empty
+// -> []. Any other scalar (`<TREE_CONTENT>error</TREE_CONTENT>` -> "error") is an
+// unexpected shape and must throw rather than be silently treated as empty.
+function extractNodeList(
+  container: unknown,
+  innerKey: string,
+  containerName: string,
+  context: string,
+): Record<string, unknown>[] {
+  if (container === undefined || container === null || container === '') {
+    return [];
+  }
+  if (!isObject(container)) {
+    throw new Error(
+      `Unexpected node structure (${context}): ${containerName} is not an element`,
+    );
+  }
+  return asArray<Record<string, unknown>>(container[innerKey] as never);
+}
+
 // Layer 2: expected structure. XMLValidator only proves well-formedness; a
 // valid <html/> error page or bare <asx:abap/> would pass it and be misread as
 // "no children". Assert the asx:abap -> asx:values -> DATA chain of KEYS is
@@ -126,11 +147,11 @@ export async function listFunctionGroupChildren(
       `Unexpected node structure (root ${name}): missing OBJECT_TYPES`,
     );
   }
-  const objectTypes = rootData.OBJECT_TYPES;
-  const types = asArray<Record<string, unknown>>(
-    isObject(objectTypes)
-      ? (objectTypes.SEU_ADT_OBJECT_TYPE_INFO as never)
-      : undefined,
+  const types = extractNodeList(
+    rootData.OBJECT_TYPES,
+    'SEU_ADT_OBJECT_TYPE_INFO',
+    'OBJECT_TYPES',
+    `root ${name}`,
   );
   const typeInfo = types.find((t) => t?.OBJECT_TYPE === childType);
   const nodeId = typeInfo?.NODE_ID;
@@ -151,9 +172,11 @@ export async function listFunctionGroupChildren(
     parseValidated(String(drillRes.data), `drill ${name}`),
     `drill ${name}`,
   );
-  const nodes = asArray<Record<string, unknown>>(
-    (drillData.TREE_CONTENT as Record<string, unknown>)
-      ?.SEU_ADT_REPOSITORY_OBJ_NODE as never,
+  const nodes = extractNodeList(
+    drillData.TREE_CONTENT,
+    'SEU_ADT_REPOSITORY_OBJ_NODE',
+    'TREE_CONTENT',
+    `drill ${name}`,
   );
 
   const seen = new Set<string>();
