@@ -3,6 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.7.1] - 2026-06-16
+
+### Fixed
+- **`getFunctionInclude().delete()` no longer reports a phantom success.** The ADT deletion service answers HTTP 200 even when it refuses to delete (e.g. `<del:object del:isDeleted="false"><del:message del:type="E"><del:text>Only delete function module includes using Function Builder</del:text>`); the low-level `deleteFunctionInclude` previously hardcoded `{ success: true }` and ignored the result. It now parses `del:deletionResult` and throws with the server's message when `isDeleted` is not `true` (verified against a real system). Lets callers distinguish a real delete from a server-refused one (some FUGR includes can only be removed via the Function Builder).
+
 ## [5.7.0] - 2026-06-15
 
 ### Added
