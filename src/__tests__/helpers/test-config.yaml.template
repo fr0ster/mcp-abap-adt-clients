@@ -283,14 +283,11 @@ shared_dependencies:
       function_group: "ZAC_SHR_FUGR"
       description: "Shared FM for read-only tests"
       source: |
-        FUNCTION z_ac_shr_fm01.
-        *"----------------------------------------------------------------------
-        *"*"Local Interface:
-        *"  IMPORTING
-        *"     VALUE(IV_INPUT) TYPE  STRING
-        *"  EXPORTING
-        *"     VALUE(EV_OUTPUT) TYPE  STRING
-        *"----------------------------------------------------------------------
+        FUNCTION z_ac_shr_fm01
+          IMPORTING
+            VALUE(IV_INPUT) TYPE STRING
+          EXPORTING
+            VALUE(EV_OUTPUT) TYPE STRING.
           ev_output = |Result: { iv_input }|.
         ENDFUNCTION.
 
@@ -324,6 +321,7 @@ shared_dependencies:
       service_version: "0001"
       binding_type: "ODATA"
       binding_version: "V4"
+      binding_variant: "ODATA_V4_WEB_API"
 
   programs:
     - name: "ZAC_SHR_PROG"

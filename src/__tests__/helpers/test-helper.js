@@ -2459,8 +2459,13 @@ async function ensureSharedDependency(client, type, name, logger) {
           serviceDefinitionName: depConfig.service_definition,
           serviceName: depConfig.service_name || name,
           serviceVersion: depConfig.service_version || '0001',
-          bindingType: depConfig.binding_type || 'ODATA',
-          bindingVersion: depConfig.binding_version || 'V4',
+          // adt-clients takes a single bindingVariant (e.g. ODATA_V4_WEB_API),
+          // not separate type/version. Prefer an explicit binding_variant;
+          // otherwise derive it from binding_type/binding_version (defaulting
+          // the category to WEB_API).
+          bindingVariant:
+            depConfig.binding_variant ||
+            `${depConfig.binding_type || 'ODATA'}_${depConfig.binding_version || 'V4'}_WEB_API`,
           transportRequest,
         },
         { activateOnCreate: !depConfig.skip_activation },
