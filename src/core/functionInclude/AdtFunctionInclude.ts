@@ -267,9 +267,28 @@ export class AdtFunctionInclude
   }
 
   /**
-   * Read function include metadata.
+   * Read function include SOURCE code.
+   *
+   * Per the IAdtObject contract, `read()` returns source for objects that have
+   * it (metadata is available via `readMetadata()`). This object has source, so
+   * `read()` is an alias of `readSource()`. (Historically it returned metadata,
+   * which was inconsistent with class/program/function-module `read()`.)
    */
   async read(
+    config: Partial<IFunctionIncludeConfig>,
+    version?: 'active' | 'inactive',
+    _options?: IReadOptions,
+  ): Promise<IFunctionIncludeState | undefined> {
+    return this.readSource(config, version);
+  }
+
+  /**
+   * Low-level metadata read (the object's `finclude` XML), with 404 -> undefined.
+   * Used by readMetadata() and by the create/update readiness polling, which
+   * need metadata semantics and long-polling options (the source endpoint does
+   * not take them).
+   */
+  private async readMetadataRaw(
     config: Partial<IFunctionIncludeConfig>,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
@@ -359,7 +378,7 @@ export class AdtFunctionInclude
       throw error;
     }
     try {
-      const readState = await this.read(
+      const readState = await this.readMetadataRaw(
         config,
         options?.version ?? 'active',
         options,
@@ -498,7 +517,7 @@ export class AdtFunctionInclude
         // Wait for object to be ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read(
+          await this.readMetadataRaw(
             {
               functionGroupName: fullConfig.functionGroupName,
               includeName: fullConfig.includeName,
@@ -548,7 +567,7 @@ export class AdtFunctionInclude
         state.activateResult = activateResponse;
 
         try {
-          const readState = await this.read(
+          const readState = await this.readMetadataRaw(
             {
               functionGroupName: fullConfig.functionGroupName,
               includeName: fullConfig.includeName,
