@@ -3,6 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.8.0] - 2026-06-17
+
+### Changed
+- **`getFunctionInclude().read()` now returns the include SOURCE**, matching the `IAdtObject` contract and the behaviour of `class`/`program`/`functionModule` `read()`. It previously returned the include's `finclude` metadata XML, which was inconsistent. The metadata is now obtained via **`readMetadata()`** (unchanged). `readSource()` remains available and `read()` is an alias of it. Internal create/update readiness polling and `readMetadata()` use a private metadata read, so the CRUD chain is unchanged. **Migration:** if you called `getFunctionInclude().read()` expecting metadata XML, switch to `readMetadata()`.
+
 ## [5.7.1] - 2026-06-16
 
 ### Fixed
