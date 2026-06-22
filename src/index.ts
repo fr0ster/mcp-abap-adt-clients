@@ -179,6 +179,12 @@ export type {
   IProgramState,
 } from './core/program';
 export type {
+  AdtScalarFunctionType,
+  IScalarFunctionConfig,
+  IScalarFunctionState,
+} from './core/scalarFunction';
+export { AdtScalarFunction } from './core/scalarFunction';
+export type {
   AdtServiceBindingType,
   DesiredPublicationState,
   GeneratedServiceType,
