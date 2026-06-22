@@ -60,20 +60,18 @@ const testsLogger: ILogger = createTestsLogger();
 /** HTTP status codes that indicate the DSFD feature is absent on this system. */
 const SKIP_STATUSES = new Set([404, 405, 501]);
 
-/** ADT discovery endpoint for scalar functions. */
-const DSFD_ENDPOINT = '/sap/bc/adt/ddic/dsfd/sources';
-
 describe('ScalarFunction (DSFD/SCF) integration', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isCloudSystem = false;
 
   beforeAll(async () => {
     try {
       const config = getConfig();
       connection = createAbapConnection(config, connectionLogger);
       await (connection as any).connect();
-      const isCloudSystem = await isCloudEnvironment(connection);
+      isCloudSystem = await isCloudEnvironment(connection);
       const systemContext = await resolveSystemContext(
         connection,
         isCloudSystem,
@@ -105,7 +103,7 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
         // Determine object name and package from config or defaults
         const resolver = new TestConfigResolver({
           testCase,
-          isCloud: false,
+          isCloud: isCloudSystem,
           logger: testsLogger,
         });
 
