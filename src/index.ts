@@ -78,6 +78,12 @@ export type {
   IAccessControlState,
 } from './core/accessControl';
 export type {
+  AdtAppendStructureType,
+  IAppendStructureConfig,
+  IAppendStructureState,
+} from './core/appendStructure';
+export { AdtAppendStructure } from './core/appendStructure';
+export type {
   IAuthorizationFieldConfig,
   IAuthorizationFieldState,
 } from './core/authorizationField';

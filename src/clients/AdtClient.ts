@@ -24,6 +24,11 @@ import {
   type IAccessControlState,
 } from '../core/accessControl';
 import {
+  AdtAppendStructure,
+  type IAppendStructureConfig,
+  type IAppendStructureState,
+} from '../core/appendStructure';
+import {
   AdtAuthorizationField,
   type IAuthorizationFieldConfig,
   type IAuthorizationFieldState,
@@ -405,6 +410,20 @@ export class AdtClient {
    */
   getScalarFunction(): IAdtObject<IScalarFunctionConfig, IScalarFunctionState> {
     return new AdtScalarFunction(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for Append Structure (TABL/DS) objects
+   */
+  getAppendStructure(): IAdtObject<
+    IAppendStructureConfig,
+    IAppendStructureState
+  > {
+    return new AdtAppendStructure(
       this.connection,
       this.logger,
       this.systemContext,
