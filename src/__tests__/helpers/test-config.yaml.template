@@ -36,6 +36,7 @@
 # - TableTypes: ZAC_TTYP01, ZAC_TTYP02, etc.
 # - Structures: ZAC_STRU01, ZAC_STRU02, etc.
 # - Views: ZAC_VIEW01, ZAC_VIEW02, etc.
+# - Scalar Functions: ZADT_SCALAR_FUNC, ZAC_DSFD01, etc.
 # - Service Definitions: ZAC_SRVD01, ZAC_SRVD02, etc.
 # - Service Bindings: ZAC_SRVB01, ZAC_SRVB02, etc.
 # - Packages: ZAC_PKG01, ZAC_PKG02, etc.
@@ -1028,6 +1029,22 @@ create_service_definition:
           define service ZAC_SRVD01 {
             expose ZAC_SHR_CDSUT_DDLS;
           }
+
+# Create Scalar Function (CDS DSFD/SCF)
+# ScalarFunction is a CDS object (DDL source) available on ABAP Cloud and modern
+# on-premise systems that support the /sap/bc/adt/ddic/dsfd/* endpoints.
+# The suite probes discovery + create at runtime and skips on HTTP 404/405/501.
+create_scalar_function:
+  test_cases:
+    - name: "adt_scalar_function"
+      enabled: true
+      # available_in is a hint only; the suite probes discovery + create at runtime
+      description: "Scalar function reserved for AdtScalarFunction tests"
+      params:
+        scalar_function_name: "ZADT_SCALAR_FUNC"  # ← CHANGE if needed
+        description: "AdtScalarFunction integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
 
 # Create Access Control
 create_access_control:
