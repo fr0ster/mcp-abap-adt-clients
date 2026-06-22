@@ -1046,6 +1046,24 @@ create_scalar_function:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
 
+# Create Append Structure (TABL/DS append)
+# Append structures extend an existing transparent table or structure with
+# additional fields. The suite creates two variants — one with a structure base
+# and one with a table base — and skips silently on HTTP 404/405/501.
+create_append_structure:
+  test_cases:
+    - name: "adt_append_structure"
+      enabled: true
+      # available_in is a hint only; the suite probes create at runtime and skips on 404/405/501
+      description: "Append structure reserved for AdtAppendStructure tests"
+      params:
+        append_structure_name: "ZADT_S_APPEND"  # ← CHANGE if needed (suffixed _S/_T per variant)
+        base_structure: "ZADT_BASE_STRU"        # ← CHANGE: existing DDIC structure to extend
+        base_table: "ZADT_BASE_TABLE"           # ← CHANGE: existing transparent table to extend
+        description: "AdtAppendStructure integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+
 # Create Access Control
 create_access_control:
   test_cases:
