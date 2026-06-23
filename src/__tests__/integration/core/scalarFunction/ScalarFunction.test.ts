@@ -173,26 +173,40 @@ describe('ScalarFunction (DSFD/SCF) integration', () => {
         }
 
         try {
-          // ── 3) Update source + activate ──
-          // The DDL body is illustrative; an implementing method need not exist for
-          // the activation to succeed — the system validates syntax independently.
-          const source =
-            `define scalar function ${scalarFunctionName}\n` +
-            `  with parameters p_input : abap.int4\n` +
-            `  returns abap.int4\n` +
-            `  implemented by method zcl_x=>scalar;`;
+          // A CDS scalar function can only ACTIVATE when its source is backed by an
+          // AMDP method (`CLASS-METHODS ... FOR SCALAR FUNCTION ... BY DATABASE
+          // FUNCTION FOR HDB LANGUAGE SQLSCRIPT`) that exists on the target system —
+          // an environment-specific fixture. So the update/activate flow runs ONLY
+          // when a valid `source_code` is configured in
+          // create_scalar_function.params.source_code (and the companion AMDP class
+          // is deployed). Otherwise we validate the DSFD wire contract via
+          // create → read → delete, which needs no AMDP fixture.
+          const configuredSource: string | undefined =
+            testCase?.params?.source_code;
 
-          await sf.update(
-            { scalarFunctionName, transportRequest, sourceCode: source },
-            { activateOnUpdate: true },
-          );
+          if (configuredSource) {
+            // ── 3a) Full flow: update source + activate ──
+            await sf.update(
+              {
+                scalarFunctionName,
+                transportRequest,
+                sourceCode: configuredSource,
+              },
+              { activateOnUpdate: true },
+            );
 
-          // ── 4) Read back ──
-          const readState = await sf.read({ scalarFunctionName }, 'active');
-          expect(readState).toBeDefined();
-          expect(readState?.readResult).toBeDefined();
-          // HTTP status 200 is expected from the read operation
-          expect((readState?.readResult as any)?.status).toBe(200);
+            // ── 4a) Read active ──
+            const readState = await sf.read({ scalarFunctionName }, 'active');
+            expect(readState).toBeDefined();
+            expect(readState?.readResult).toBeDefined();
+            expect((readState?.readResult as any)?.status).toBe(200);
+          } else {
+            // ── 3b) Metadata-only validation: read the inactive object back ──
+            const readState = await sf.read({ scalarFunctionName }, 'inactive');
+            expect(readState).toBeDefined();
+            expect(readState?.readResult).toBeDefined();
+            expect((readState?.readResult as any)?.status).toBe(200);
+          }
 
           // ── 5) Delete ──
           const deleteState = await sf.delete({

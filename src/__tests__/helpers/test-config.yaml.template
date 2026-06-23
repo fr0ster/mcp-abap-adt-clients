@@ -1045,6 +1045,17 @@ create_scalar_function:
         description: "AdtScalarFunction integration test"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
+        # source_code (OPTIONAL): when set, the suite runs the FULL update→activate
+        # flow. A CDS scalar function only activates when implemented by an AMDP method
+        # that already exists on the target system:
+        #   CLASS-METHODS m FOR SCALAR FUNCTION zadt_scalar_func.
+        #   METHOD m BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT OPTIONS READ-ONLY. ...
+        # Without source_code the suite validates create → read → delete only.
+        # source_code: |
+        #   define scalar function ZADT_SCALAR_FUNC
+        #     with parameters p_input : abap.int4
+        #     returns abap.int4
+        #     implemented by method zcl_your_amdp=>m;
 
 # Create Append Structure (TABL/DS append)
 # Append structures extend an existing transparent table or structure with
