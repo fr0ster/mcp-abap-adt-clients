@@ -13,17 +13,17 @@ import { getTimeout } from '../../utils/timeouts';
 /**
  * Update view DDL source code
  * Low-level: Only uploads DDL source with lock handle, does NOT lock/unlock/activate
- * For complete workflow, use AdtView
+ * For complete workflow, use AdtDdl
  */
-export async function updateView(
+export async function updateDdl(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
   ddlSource: string,
   lockHandle: string,
   transportRequest?: string,
 ): Promise<AxiosResponse> {
   const queryParams = `lockHandle=${encodeURIComponent(lockHandle)}${transportRequest ? `&corrNr=${transportRequest}` : ''}`;
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}/source/main?${queryParams}`;
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}/source/main?${queryParams}`;
 
   const headers = {
     'Content-Type': CT_SOURCE,

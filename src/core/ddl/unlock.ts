@@ -14,10 +14,10 @@ import { getTimeout } from '../../utils/timeouts';
  */
 export async function unlockDDLS(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
   lockHandle: string,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}?_action=UNLOCK&lockHandle=${encodeURIComponent(lockHandle)}`;
 
   return connection.makeAdtRequest({
     url,

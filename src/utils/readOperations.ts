@@ -163,11 +163,11 @@ export async function getPackage(
 /**
  * Get ABAP view (CDS or Classic)
  */
-export async function getView(
+export async function getDdl(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
 ): Promise<AxiosResponse> {
-  const encodedName = encodeSapObjectName(viewName);
+  const encodedName = encodeSapObjectName(ddlName);
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/source/main`;
   return makeAdtRequest(connection, url, 'GET', 'default');
 }

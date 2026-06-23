@@ -29,9 +29,9 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function checkView(
+export async function checkDdl(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
   version: string = 'active',
   sourceCode?: string,
   logger?: ILogger,
@@ -42,7 +42,7 @@ export async function checkView(
     const response = await runCheckRun(
       connection,
       'view',
-      viewName,
+      ddlName,
       version,
       'abapCheckRun',
       sourceCode,
@@ -55,7 +55,7 @@ export async function checkView(
       if (attempt === 0 && shouldRetryMissingVersion(checkResult)) {
         if (process.env.DEBUG_ADT_LIBS === 'true') {
           logger?.warn?.(
-            `Check retry for view ${viewName}: ${errorMessage} (waiting for inactive version)`,
+            `Check retry for view ${ddlName}: ${errorMessage} (waiting for inactive version)`,
           );
         }
         attempt += 1;
@@ -66,7 +66,7 @@ export async function checkView(
       if (shouldRetryMissingVersion(checkResult)) {
         if (process.env.DEBUG_ADT_LIBS === 'true') {
           logger?.warn?.(
-            `Check warning for view ${viewName}: ${errorMessage} (version not available, continue)`,
+            `Check warning for view ${ddlName}: ${errorMessage} (version not available, continue)`,
           );
         }
         return response;
@@ -83,6 +83,6 @@ export async function checkView(
 
   // Should not reach here because loop returns on success
   throw new Error(
-    `View check failed: Version ${version} not available for ${viewName}`,
+    `View check failed: Version ${version} not available for ${ddlName}`,
   );
 }

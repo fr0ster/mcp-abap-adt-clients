@@ -21,7 +21,7 @@ import {
 } from '../../utils/internalUtils';
 import { startClassUnitTestRunByObject } from '../class/run';
 import type { IClassState } from '../class/types';
-import { AdtView } from '../view/AdtView';
+import { AdtDdl } from '../ddl/AdtDdl';
 import { AdtUnitTest } from './AdtUnitTest';
 import { checkCdsTestDoublesAvailability } from './checkCdsTestDoublesAvailability';
 import type {
@@ -53,7 +53,7 @@ export interface ICdsUnitTestState extends IUnitTestState {
  * Combines AdtClass for test class lifecycle and AdtUnitTest for test execution
  */
 export class AdtCdsUnitTest extends AdtUnitTest {
-  protected adtView: AdtView;
+  protected adtView: AdtDdl;
   private cdsViewName?: string;
   private className?: string;
 
@@ -61,7 +61,7 @@ export class AdtCdsUnitTest extends AdtUnitTest {
     super(connection, logger);
     // adtClass and adtLocalTestClass are already available from parent class
     // adtView is for working with CDS views
-    this.adtView = new AdtView(connection, logger);
+    this.adtView = new AdtDdl(connection, logger);
   }
 
   /**

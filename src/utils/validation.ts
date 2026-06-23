@@ -3,7 +3,7 @@
  *
  * NOTE: This generic validation function uses /sap/bc/adt/functions/validation endpoint.
  * Most object types now have their own specific validation endpoints and functions:
- * - View: /sap/bc/adt/ddic/ddl/validation (validateViewName)
+ * - DDL source: /sap/bc/adt/ddic/ddl/validation (validateDdlName)
  * - Program: /sap/bc/adt/programs/validation (validateProgramName)
  * - Interface: /sap/bc/adt/oo/interfaces/validation (validateInterfaceName)
  * - Structure: /sap/bc/adt/ddic/structures/validation (validateStructureName)

@@ -1,5 +1,8 @@
 /**
- * AdtView - High-level CRUD operations for View (DDLS) objects
+ * Generic client for ABAP DDL source objects (`/sap/bc/adt/ddic/ddl/sources/`):
+ * CDS views, AMDP table functions, and other DDL sources. Classic DDIC structures
+ * (`/ddic/structures/`), tables (`/ddic/tables/`), and scalar functions
+ * (`/ddic/dsfd/sources/`) have their own clients.
  *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
@@ -29,17 +32,17 @@ import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { activateDDLS } from './activation';
-import { checkView } from './check';
-import { createView } from './create';
-import { checkDeletion, deleteView } from './delete';
+import { checkDdl } from './check';
+import { createDdl } from './create';
+import { checkDeletion, deleteDdl } from './delete';
 import { lockDDLS } from './lock';
-import { getViewMetadata, getViewSource, getViewTransport } from './read';
-import type { IViewConfig, IViewState } from './types';
+import { getDdlMetadata, getDdlSource, getDdlTransport } from './read';
+import type { IDdlConfig, IDdlState } from './types';
 import { unlockDDLS } from './unlock';
-import { updateView } from './update';
-import { validateViewName } from './validation';
+import { updateDdl } from './update';
+import { validateDdlName } from './validation';
 
-export class AdtView implements IAdtObject<IViewConfig, IViewState> {
+export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -58,16 +61,16 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   /**
    * Validate view configuration before creation
    */
-  async validate(config: Partial<IViewConfig>): Promise<IViewState> {
-    if (!config.viewName) {
+  async validate(config: Partial<IDdlConfig>): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required for validation');
     }
 
-    const state: IViewState = { errors: [] };
+    const state: IDdlState = { errors: [] };
     try {
-      const response = await validateViewName(
+      const response = await validateDdlName(
         this.connection,
-        config.viewName,
+        config.ddlName,
         config.packageName,
         config.description,
       );
@@ -89,10 +92,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * Create view with full operation chain
    */
   async create(
-    config: IViewConfig,
+    config: IDdlConfig,
     options?: IAdtOperationOptions,
-  ): Promise<IViewState> {
-    if (!config.viewName) {
+  ): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
     if (!config.packageName) {
@@ -103,15 +106,15 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
     }
 
     let objectCreated = false;
-    const state: IViewState = {
+    const state: IDdlState = {
       errors: [],
     };
 
     try {
       // Create view
       this.logger?.info?.('Creating view');
-      const createResponse = await createView(this.connection, {
-        view_name: config.viewName,
+      const createResponse = await createDdl(this.connection, {
+        ddl_name: config.ddlName,
         package_name: config.packageName,
         transport_request: config.transportRequest,
         description: config.description,
@@ -134,8 +137,8 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         try {
           this.logger?.warn?.('Deleting view after failure');
           // No stateful needed - delete doesn't use lock/unlock
-          await deleteView(this.connection, {
-            view_name: config.viewName,
+          await deleteDdl(this.connection, {
+            ddl_name: config.ddlName,
             transport_request: config.transportRequest,
           });
         } catch (deleteError) {
@@ -155,18 +158,18 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * Read view
    */
   async read(
-    config: Partial<IViewConfig>,
+    config: Partial<IDdlConfig>,
     version?: 'active' | 'inactive',
     options?: IReadOptions,
-  ): Promise<IViewState | undefined> {
-    if (!config.viewName) {
+  ): Promise<IDdlState | undefined> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
     try {
-      const response = await getViewSource(
+      const response = await getDdlSource(
         this.connection,
-        config.viewName,
+        config.ddlName,
         version,
         options,
       );
@@ -187,11 +190,11 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * Read view metadata (object characteristics: package, responsible, description, etc.)
    */
   async readMetadata(
-    config: Partial<IViewConfig>,
+    config: Partial<IDdlConfig>,
     options?: IReadOptions,
-  ): Promise<IViewState> {
-    const state: IViewState = { errors: [] };
-    if (!config.viewName) {
+  ): Promise<IDdlState> {
+    const state: IDdlState = { errors: [] };
+    if (!config.ddlName) {
       const error = new Error('View name is required');
       state.errors.push({
         method: 'readMetadata',
@@ -201,9 +204,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       throw error;
     }
     try {
-      const response = await getViewMetadata(
+      const response = await getDdlMetadata(
         this.connection,
-        config.viewName,
+        config.ddlName,
         options,
       );
       state.metadataResult = response;
@@ -225,11 +228,11 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * Read transport request information for the view
    */
   async readTransport(
-    config: Partial<IViewConfig>,
+    config: Partial<IDdlConfig>,
     options?: { withLongPolling?: boolean },
-  ): Promise<IViewState> {
-    const state: IViewState = { errors: [] };
-    if (!config.viewName) {
+  ): Promise<IDdlState> {
+    const state: IDdlState = { errors: [] };
+    if (!config.ddlName) {
       const error = new Error('View name is required');
       state.errors.push({
         method: 'readTransport',
@@ -239,9 +242,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       throw error;
     }
     try {
-      const response = await getViewTransport(
+      const response = await getDdlTransport(
         this.connection,
-        config.viewName,
+        config.ddlName,
         options?.withLongPolling !== undefined
           ? { withLongPolling: options.withLongPolling }
           : undefined,
@@ -267,10 +270,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * If options.lockHandle is provided, performs only low-level update without lock/check/unlock chain
    */
   async update(
-    config: Partial<IViewConfig>,
+    config: Partial<IDdlConfig>,
     options?: IAdtOperationOptions,
-  ): Promise<IViewState> {
-    if (!config.viewName) {
+  ): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
@@ -284,9 +287,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       this.logger?.info?.(
         'Low-level update: performing update only (lockHandle provided)',
       );
-      const updateResponse = await updateView(
+      const updateResponse = await updateDdl(
         this.connection,
-        config.viewName,
+        config.ddlName,
         codeToUpdate,
         options.lockHandle,
         config.transportRequest,
@@ -304,7 +307,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       // 1. Lock (update always starts with lock, stateful ONLY before lock)
       this.logger?.info?.('Step 1: Locking view');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockDDLS(this.connection, config.viewName);
+      lockHandle = await lockDDLS(this.connection, config.ddlName);
       this.logger?.info?.('View locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -313,9 +316,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.logger?.info?.(
           'Step 2: Checking inactive version with update content',
         );
-        await checkView(
+        await checkDdl(
           this.connection,
-          config.viewName,
+          config.ddlName,
           'inactive',
           codeToCheck,
           this.logger,
@@ -326,9 +329,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       // 3. Update
       if (codeToCheck && lockHandle) {
         this.logger?.info?.('Step 3: Updating view');
-        await updateView(
+        await updateDdl(
           this.connection,
-          config.viewName,
+          config.ddlName,
           codeToCheck,
           lockHandle,
           config.transportRequest,
@@ -338,7 +341,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ viewName: config.viewName }, 'active', {
+          await this.read({ ddlName: config.ddlName }, 'active', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');
@@ -355,7 +358,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       if (lockHandle) {
         this.logger?.info?.('Step 4: Unlocking view');
         this.connection.setSessionType('stateful');
-        await unlockDDLS(this.connection, config.viewName, lockHandle);
+        await unlockDDLS(this.connection, config.ddlName, lockHandle);
         this.connection.setSessionType('stateless');
         lockHandle = undefined;
         this.logger?.info?.('View unlocked');
@@ -363,9 +366,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
 
       // 5. Final check (no stateful needed)
       this.logger?.info?.('Step 5: Final check');
-      await checkView(
+      await checkDdl(
         this.connection,
-        config.viewName,
+        config.ddlName,
         'inactive',
         undefined,
         this.logger,
@@ -377,7 +380,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.logger?.info?.('Step 6: Activating view');
         const activateResponse = await activateDDLS(
           this.connection,
-          config.viewName,
+          config.ddlName,
         );
         this.logger?.info?.('View activated, status:', activateResponse.status);
 
@@ -385,7 +388,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         this.logger?.info?.('read (wait for object ready after activation)');
         try {
           const readState = await this.read(
-            { viewName: config.viewName },
+            { ddlName: config.ddlName },
             'active',
             { withLongPolling: true },
           );
@@ -410,9 +413,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       }
 
       // Read and return result (no stateful needed)
-      const readResponse = await getViewSource(
+      const readResponse = await getDdlSource(
         this.connection,
-        config.viewName,
+        config.ddlName,
         'inactive',
       );
       const _ddlSource =
@@ -430,7 +433,7 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         try {
           this.logger?.warn?.('Unlocking view during error cleanup');
           this.connection.setSessionType('stateful');
-          await unlockDDLS(this.connection, config.viewName, lockHandle);
+          await unlockDDLS(this.connection, config.ddlName, lockHandle);
           this.connection.setSessionType('stateless');
         } catch (unlockError) {
           this.logger?.warn?.(
@@ -447,8 +450,8 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
         try {
           this.logger?.warn?.('Deleting view after failure');
           // No stateful needed - delete doesn't use lock/unlock
-          await deleteView(this.connection, {
-            view_name: config.viewName,
+          await deleteDdl(this.connection, {
+            ddl_name: config.ddlName,
             transport_request: config.transportRequest,
           });
         } catch (deleteError) {
@@ -467,8 +470,8 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   /**
    * Delete view
    */
-  async delete(config: Partial<IViewConfig>): Promise<IViewState> {
-    if (!config.viewName) {
+  async delete(config: Partial<IDdlConfig>): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
@@ -476,15 +479,15 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
       // Check for deletion (no stateful needed)
       this.logger?.info?.('Checking view for deletion');
       await checkDeletion(this.connection, {
-        view_name: config.viewName,
+        ddl_name: config.ddlName,
         transport_request: config.transportRequest,
       });
       this.logger?.info?.('Deletion check passed');
 
       // Delete (no stateful needed - no lock/unlock)
       this.logger?.info?.('Deleting view');
-      const result = await deleteView(this.connection, {
-        view_name: config.viewName,
+      const result = await deleteDdl(this.connection, {
+        ddl_name: config.ddlName,
         transport_request: config.transportRequest,
       });
       this.logger?.info?.('View deleted');
@@ -503,13 +506,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * Activate view
    * No stateful needed - uses same session/cookies
    */
-  async activate(config: Partial<IViewConfig>): Promise<IViewState> {
-    if (!config.viewName) {
+  async activate(config: Partial<IDdlConfig>): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
     try {
-      const result = await activateDDLS(this.connection, config.viewName);
+      const result = await activateDDLS(this.connection, config.ddlName);
       return {
         activateResult: result,
         errors: [],
@@ -524,10 +527,10 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * Check view
    */
   async check(
-    config: Partial<IViewConfig>,
+    config: Partial<IDdlConfig>,
     status?: string,
-  ): Promise<IViewState> {
-    if (!config.viewName) {
+  ): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
@@ -537,9 +540,9 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
     // Support ddlSource for checking with source code (standard operation)
     const sourceCode = config.ddlSource;
     return {
-      checkResult: await checkView(
+      checkResult: await checkDdl(
         this.connection,
-        config.viewName,
+        config.ddlName,
         version,
         sourceCode,
         this.logger,
@@ -551,13 +554,13 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
   /**
    * Lock view for modification
    */
-  async lock(config: Partial<IViewConfig>): Promise<string> {
-    if (!config.viewName) {
+  async lock(config: Partial<IDdlConfig>): Promise<string> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
     this.connection.setSessionType('stateful');
-    const lockHandle = await lockDDLS(this.connection, config.viewName);
+    const lockHandle = await lockDDLS(this.connection, config.ddlName);
     return lockHandle;
   }
 
@@ -565,17 +568,17 @@ export class AdtView implements IAdtObject<IViewConfig, IViewState> {
    * Unlock view
    */
   async unlock(
-    config: Partial<IViewConfig>,
+    config: Partial<IDdlConfig>,
     lockHandle: string,
-  ): Promise<IViewState> {
-    if (!config.viewName) {
+  ): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
     this.connection.setSessionType('stateful');
     const result = await unlockDDLS(
       this.connection,
-      config.viewName,
+      config.ddlName,
       lockHandle,
     );
     this.connection.setSessionType('stateless');

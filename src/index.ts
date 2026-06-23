@@ -116,6 +116,7 @@ export type {
   IDataElementConfig,
   IDataElementState,
 } from './core/dataElement';
+export type { AdtDdlType, IDdlConfig, IDdlState } from './core/ddl';
 export type { AdtDomainType, IDomainConfig, IDomainState } from './core/domain';
 export type {
   AdtEnhancement as AdtEnhancementType,
@@ -269,7 +270,6 @@ export type {
   IUnitTestConfig,
   IUnitTestState,
 } from './core/unitTest';
-export type { AdtViewType, IViewConfig, IViewState } from './core/view';
 export type {
   IClassExecuteWithProfilerOptions,
   IClassExecuteWithProfilingOptions,

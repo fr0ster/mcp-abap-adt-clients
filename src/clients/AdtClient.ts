@@ -56,6 +56,7 @@ import {
   type IDataElementConfig,
   type IDataElementState,
 } from '../core/dataElement';
+import { AdtDdl, type IDdlConfig, type IDdlState } from '../core/ddl';
 import {
   AdtDomain,
   type IDomainConfig,
@@ -137,7 +138,6 @@ import {
   type IUnitTestConfig,
   type IUnitTestState,
 } from '../core/unitTest';
-import { AdtView, type IViewConfig, type IViewState } from '../core/view';
 
 export interface IAdtSystemContext {
   masterSystem?: string;
@@ -298,11 +298,14 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for View objects
-   * @returns IAdtObject instance for View operations
+   * Generic client for ABAP DDL source objects (`/sap/bc/adt/ddic/ddl/sources/`):
+   * CDS views, AMDP table functions, and other DDL sources. Classic DDIC structures
+   * (`/ddic/structures/`), tables (`/ddic/tables/`), and scalar functions
+   * (`/ddic/dsfd/sources/`) have their own clients.
+   * @returns IAdtObject instance for DDL source operations
    */
-  getView(): IAdtObject<IViewConfig, IViewState> {
-    return new AdtView(this.connection, this.logger, this.systemContext);
+  getDdl(): IAdtObject<IDdlConfig, IDdlState> {
+    return new AdtDdl(this.connection, this.logger, this.systemContext);
   }
 
   /**

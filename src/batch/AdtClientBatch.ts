@@ -49,8 +49,8 @@ export class AdtClientBatch {
   getTableType() {
     return this.innerClient.getTableType();
   }
-  getView() {
-    return this.innerClient.getView();
+  getDdl() {
+    return this.innerClient.getDdl();
   }
   getFunctionGroup() {
     return this.innerClient.getFunctionGroup();
