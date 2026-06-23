@@ -84,4 +84,42 @@ describe('AdtScalarFunction handler', () => {
     ).rejects.toThrow('unlock boom');
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
+
+  it('update() happy path: lock→check→PUT→long-poll-read→unlock→check→read, ends stateless', async () => {
+    const LOCK_HANDLE = 'LOCK_HANDLE_42';
+    const lockXml = `<?xml version="1.0" encoding="utf-8"?>
+<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+    <DATA>
+      <LOCK_HANDLE>${LOCK_HANDLE}</LOCK_HANDLE>
+    </DATA>
+  </asx:values>
+</asx:abap>`;
+
+    const { conn, sessionTypes, calls } = makeConn((r) => {
+      if (r.url.includes('_action=LOCK')) return { data: lockXml };
+      if (r.url.includes('checkruns')) return { data: '' };
+      if (r.method === 'PUT') return { data: '' };
+      if (r.url.includes('_action=UNLOCK')) return { data: '' };
+      if (r.method === 'GET') return { data: 'source code' };
+      return { data: '' };
+    });
+
+    const sf = new AdtScalarFunction(conn);
+    await sf.update({ scalarFunctionName: 'ZOK_X', sourceCode: 'new source' });
+
+    const putCall = calls.find((c) => c.method === 'PUT');
+    expect(putCall).toBeDefined();
+    expect(putCall?.url).toContain('/source/main');
+
+    const longPollCall = calls.find(
+      (c) =>
+        c.method === 'GET' &&
+        c.url.includes('version=active') &&
+        c.url.includes('withLongPolling=true'),
+    );
+    expect(longPollCall).toBeDefined();
+
+    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+  });
 });

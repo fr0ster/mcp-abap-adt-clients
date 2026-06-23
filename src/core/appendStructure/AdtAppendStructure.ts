@@ -208,6 +208,18 @@ export class AdtAppendStructure
           },
           lockHandle,
         );
+        try {
+          await this.read(
+            { appendStructureName: config.appendStructureName },
+            'active',
+            { withLongPolling: true },
+          );
+        } catch (readError) {
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            safeErrorMessage(readError),
+          );
+        }
       }
 
       if (lockHandle) {
@@ -235,6 +247,18 @@ export class AdtAppendStructure
           this.connection,
           config.appendStructureName,
         );
+        try {
+          await this.read(
+            { appendStructureName: config.appendStructureName },
+            'active',
+            { withLongPolling: true },
+          );
+        } catch (readError) {
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            safeErrorMessage(readError),
+          );
+        }
         return { activateResult, errors: [] };
       }
 

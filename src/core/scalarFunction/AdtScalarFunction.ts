@@ -206,6 +206,18 @@ export class AdtScalarFunction
           },
           lockHandle,
         );
+        try {
+          await this.read(
+            { scalarFunctionName: config.scalarFunctionName },
+            'active',
+            { withLongPolling: true },
+          );
+        } catch (readError) {
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            safeErrorMessage(readError),
+          );
+        }
       }
 
       if (lockHandle) {
@@ -233,6 +245,18 @@ export class AdtScalarFunction
           this.connection,
           config.scalarFunctionName,
         );
+        try {
+          await this.read(
+            { scalarFunctionName: config.scalarFunctionName },
+            'active',
+            { withLongPolling: true },
+          );
+        } catch (readError) {
+          this.logger?.warn?.(
+            'read with long polling failed (object may not be ready yet):',
+            safeErrorMessage(readError),
+          );
+        }
         return { activateResult, errors: [] };
       }
 
