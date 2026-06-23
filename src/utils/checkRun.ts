@@ -79,6 +79,9 @@ export function getObjectUri(objectType: string, objectName: string): string {
     case 'scalar_function':
     case 'dsfd/scf':
       return `/sap/bc/adt/ddic/dsfd/sources/${encodedName}`;
+    case 'scalar_function_implementation':
+    case 'dsfi/sfi':
+      return `/sap/bc/adt/ddic/dsfi/${encodedName}`;
     case 'append_structure':
     case 'tabl/ds':
       return `/sap/bc/adt/ddic/structures/${encodedName}`;
