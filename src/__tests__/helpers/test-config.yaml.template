@@ -991,16 +991,16 @@ create_view:
   test_cases:
     - name: "adt_view"
       enabled: true
-      description: "View reserved for AdtView tests"
+      description: "View reserved for AdtDdl tests"
       params:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         table_name: "ZAC_SHR_VTABL"    # → shared_dependencies.tables
-        view_name: "ZAC_VIEW_DDLS"     # View created/deleted by this test
-        description: "AdtView workflow view"
+        ddl_name: "ZAC_VIEW_DDLS"     # View created/deleted by this test
+        description: "AdtDdl workflow view"
         # transport_request: ""  # Uses environment.default_transport if omitted
         # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
         ddl_source: |
-          @EndUserText.label: 'AdtView workflow view'
+          @EndUserText.label: 'AdtDdl workflow view'
           @AccessControl.authorizationCheck: #NOT_REQUIRED
           define view entity ZAC_VIEW_DDLS
             as select from zac_shr_vtabl
@@ -1010,6 +1010,18 @@ create_view:
             fld3,
             fld4
           }
+
+# Read DDL Table Function (AdtClient getDdl)
+# References a pre-existing AMDP table function (adt-clients cannot create extend/AMDP-backed objects)
+read_ddl_table_function:
+  test_cases:
+    - name: "readonly_read_table_function"
+      enabled: true
+      description: "Read an AMDP table function via getDdl (DDL source)"
+      params:
+        # Pre-existing AMDP table function on the target system (adt-clients
+        # cannot create extend/AMDP-backed objects). Leave empty to skip.
+        ddl_name: "ZTOK_TF_ORD_TOTALS"
 
 # Create Service Definition
 create_service_definition:
@@ -1366,7 +1378,7 @@ create_cds_unit_test:
       description: "CDS view with ABAP Unit verification (dependencies auto-created)"
       params:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
-        view_name: "ZAC_SHR_CDSUT_DDLS"     # → shared_dependencies.views
+        ddl_name: "ZAC_SHR_CDSUT_DDLS"     # → shared_dependencies.views
         description: "CDS Unit Test for ZAC_SHR_CDSUT_DDLS"
         # transport_request: ""  # Uses environment.default_transport if omitted
         dep_table_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1664,7 +1676,7 @@ read_accept:
       params: {}
         # Optional overrides (if standard_objects registry doesn't cover these)
         # program_name: ""
-        # view_name: ""
+        # ddl_name: ""
         # tabletype_name: ""
         # service_definition_name: ""
         # behavior_definition_name: ""

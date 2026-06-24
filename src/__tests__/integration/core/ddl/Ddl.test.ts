@@ -16,7 +16,7 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
-import type { IViewConfig, IViewState } from '../../../../core/view';
+import type { IDdlConfig, IDdlState } from '../../../../core/ddl';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
 import {
@@ -38,6 +38,7 @@ const {
   getTimeout,
   ensureSharedPackage,
   ensureSharedDependency,
+  getEnabledTestCase,
 } = require('../../../helpers/test-helper');
 
 const envPath =
@@ -63,7 +64,7 @@ describe('View (using AdtClient)', () => {
   let defaultPackage: string = '';
   let defaultTransport: string = '';
   let systemContext: Awaited<ReturnType<typeof resolveSystemContext>>;
-  let tester: BaseTester<IViewConfig, IViewState>;
+  let tester: BaseTester<IDdlConfig, IDdlState>;
 
   beforeAll(async () => {
     try {
@@ -95,7 +96,7 @@ describe('View (using AdtClient)', () => {
       await ensureSharedPackage(client, testsLogger);
 
       tester = new BaseTester(
-        client.getView(),
+        client.getDdl(),
         'View',
         'create_view',
         'adt_view',
@@ -118,7 +119,7 @@ describe('View (using AdtClient)', () => {
             resolver?.getTransportRequest?.() ||
             resolveTransportRequest(params.transport_request);
           return {
-            viewName: params.view_name,
+            ddlName: params.ddl_name,
             packageName,
             transportRequest,
             description: params.description,
@@ -169,6 +170,32 @@ describe('View (using AdtClient)', () => {
   });
 
   afterAll(() => tester?.afterAll()());
+
+  it(
+    'reads an AMDP table function (DDL source) when configured',
+    async () => {
+      if (!hasConfig || !client) return; // no connection/config → skip
+      const tfCase = getEnabledTestCase(
+        'read_ddl_table_function',
+        'readonly_read_table_function',
+      );
+      const ddlName = tfCase?.params?.ddl_name;
+      if (!ddlName) return; // not configured / disabled → skip
+
+      let res: any;
+      try {
+        res = await client.getDdl().read({ ddlName }, 'active');
+      } catch {
+        return; // object absent on this system → skip, not fail
+      }
+      const src = String(
+        res?.readResult?.data ?? res?.data ?? '',
+      ).toLowerCase();
+      expect(src).toContain('define table function');
+      expect(src).toContain('implemented by method');
+    },
+    getTimeout('test'),
+  );
 
   describe('Full workflow', () => {
     beforeEach(async () => {
@@ -248,7 +275,7 @@ describe('View (using AdtClient)', () => {
         await tester.flowTestAuto({
           sourceCode: updatedDdlSource,
           updateConfig: {
-            viewName: config.viewName,
+            ddlName: config.ddlName,
             packageName: config.packageName,
             description: config.description || '',
             ddlSource: updatedDdlSource,

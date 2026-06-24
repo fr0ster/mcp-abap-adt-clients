@@ -357,10 +357,10 @@ export class BaseTester<TConfig, TState> {
           version,
         );
       }
-      if (configAny.viewName) {
+      if (configAny.ddlName) {
         return utils.getObjectSourceUri(
           'view',
-          configAny.viewName,
+          configAny.ddlName,
           undefined,
           version,
         );
