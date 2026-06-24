@@ -70,10 +70,12 @@ describe('AdtScalarFunctionImplementation handler', () => {
       sourceCode: 'src',
     });
     const put = calls.find((c) => c.method === 'PUT');
-    expect(put?.url).toContain('/sap/bc/adt/ddic/dsfi/zi/source/main');
+    expect(put?.url).toContain('/sap/bc/adt/ddic/dsfi/zi?');
+    expect(put?.url).not.toContain('/source/main');
     const poll = calls.find(
       (c) =>
         c.method === 'GET' &&
+        c.url.includes('/sap/bc/adt/ddic/dsfi/zi?') &&
         c.url.includes('version=active') &&
         c.url.includes('withLongPolling=true'),
     );

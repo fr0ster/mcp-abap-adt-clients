@@ -197,15 +197,18 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             throw createError;
           }
 
-          // ── 3) Write DSFD signature via low-level lock→update→unlock (inactive, no activate) ──
-          // The DSFI check requires the companion DSFD to have a signature defined.
-          // We bypass the full update() chain to avoid activation (no AMDP required).
-          const sfLock = await sf.lock({ scalarFunctionName: funcName });
+          // ── 3) Write DSFD signature and ACTIVATE it ──
+          // A scalar function DEFINITION (signature only) activates standalone — the
+          // implementation is the separate DSFI. The DSFI create requires the
+          // referenced DSFD to exist in the ACTIVE version (HTTP 422 otherwise).
           await sf.update(
-            { scalarFunctionName: funcName, transportRequest },
-            { lockHandle: sfLock, sourceCode: sigSource },
+            {
+              scalarFunctionName: funcName,
+              transportRequest,
+              sourceCode: sigSource,
+            },
+            { activateOnUpdate: true },
           );
-          await sf.unlock({ scalarFunctionName: funcName }, sfLock);
 
           // ── 4) Create DSFI ──
           try {
