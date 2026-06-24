@@ -114,16 +114,6 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           testCase?.params?.scalar_function_source_code;
         const implSource: string | undefined = testCase?.params?.source_code;
 
-        // REQUIRED-source gate: without BOTH sources the whole suite skips (no downgrade).
-        if (!hasConfig || !sigSource || !implSource) {
-          logTestSkip(
-            testsLogger,
-            TEST_LABEL,
-            'requires scalar_function_source_code + source_code in test-config.yaml',
-          );
-          return;
-        }
-
         const implName: string =
           testCase?.params?.implementation_name ?? 'ZADT_SCALAR_FUNC_SQL';
         const funcName: string =
@@ -143,6 +133,21 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             package_name: packageName,
           },
         });
+
+        if (!hasConfig) {
+          logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
+          return;
+        }
+
+        // REQUIRED-source gate: without BOTH sources the whole suite skips (no downgrade).
+        if (!sigSource || !implSource) {
+          logTestSkip(
+            testsLogger,
+            TEST_LABEL,
+            'requires scalar_function_source_code + source_code in test-config.yaml',
+          );
+          return;
+        }
 
         if (!packageName) {
           logTestSkip(
