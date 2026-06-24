@@ -3,10 +3,14 @@ import { AdtScalarFunctionImplementation } from '../../../../core/scalarFunction
 
 function makeConn(handler: (r: any) => Partial<IAdtResponse> | Error) {
   const sessionTypes: string[] = [];
-  const calls: Array<{ url: string; method?: string }> = [];
+  const calls: Array<{
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+  }> = [];
   const conn = {
     makeAdtRequest: async (r: any): Promise<IAdtResponse> => {
-      calls.push({ url: r.url, method: r.method });
+      calls.push({ url: r.url, method: r.method, headers: r.headers });
       const res = handler(r);
       if (res instanceof Error) throw res;
       return {
@@ -58,7 +62,7 @@ describe('AdtScalarFunctionImplementation handler', () => {
     expect(calls[0].url).toBe('/sap/bc/adt/ddic/dsfi');
   });
 
-  it('update() happy path: PUT then long-poll GET(active,withLongPolling); ends stateless', async () => {
+  it('update() happy path: lock → PUT /source/main → unlock; no long-poll GET; ends stateless', async () => {
     const { conn, calls, sessionTypes } = makeConn((r) => {
       if (r.url.includes('_action=LOCK')) return { data: LOCK_XML };
       return { data: '' };
@@ -70,16 +74,32 @@ describe('AdtScalarFunctionImplementation handler', () => {
       sourceCode: 'src',
     });
     const put = calls.find((c) => c.method === 'PUT');
-    expect(put?.url).toContain('/sap/bc/adt/ddic/dsfi/zi?');
-    expect(put?.url).not.toContain('/source/main');
-    const poll = calls.find(
-      (c) =>
-        c.method === 'GET' &&
-        c.url.includes('/sap/bc/adt/ddic/dsfi/zi/source/main') &&
-        c.url.includes('version=active') &&
-        c.url.includes('withLongPolling=true'),
+    expect(put?.url).toContain('/sap/bc/adt/ddic/dsfi/zi/source/main');
+    expect(put?.headers?.['Content-Type']).toBe('application/json');
+    // No long-poll GET should be present
+    const longPoll = calls.find(
+      (c) => c.method === 'GET' && c.url.includes('withLongPolling=true'),
     );
-    expect(poll).toBeDefined();
+    expect(longPoll).toBeUndefined();
+    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+  });
+
+  it('updateMetadata() happy path: lock → PUT /dsfi/{name} (blues) → unlock; ends stateless', async () => {
+    const { conn, calls, sessionTypes } = makeConn((r) => {
+      if (r.url.includes('_action=LOCK')) return { data: LOCK_XML };
+      return { data: '' };
+    });
+    const h = new AdtScalarFunctionImplementation(conn);
+    await h.updateMetadata({
+      implementationName: 'ZI',
+      sourceCode: '<blues/>',
+    });
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.url).toMatch(/\/sap\/bc\/adt\/ddic\/dsfi\/zi\?lockHandle=/);
+    expect(put?.url).not.toContain('/source/main');
+    expect(put?.headers?.['Content-Type']).toBe(
+      'application/vnd.sap.adt.blues.v2+xml; charset=utf-8',
+    );
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 

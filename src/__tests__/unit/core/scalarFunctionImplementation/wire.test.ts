@@ -2,6 +2,7 @@ import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { getScalarFunctionImplementationSource } from '../../../../core/scalarFunctionImplementation/read';
 import { unlockScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/unlock';
 import { updateScalarFunctionImplementation } from '../../../../core/scalarFunctionImplementation/update';
+import { updateScalarFunctionImplementationMetadata } from '../../../../core/scalarFunctionImplementation/updateMetadata';
 
 function cap() {
   const c: { url?: string; method?: string; headers?: Record<string, string> } =
@@ -24,13 +25,31 @@ function cap() {
 }
 
 describe('scalarFunctionImplementation wire', () => {
-  it('update PUTs object URI with encoded lockHandle+corrNr, blues v2 Content-Type', async () => {
+  it('update PUTs /source/main with encoded lockHandle+corrNr, Content-Type application/json', async () => {
     const { c, conn } = cap();
     await updateScalarFunctionImplementation(
       conn,
       {
         implementation_name: 'ZOK_IMPL',
         source_code: 'x',
+        transport_request: 'TRLK9 1',
+      },
+      'LH/1',
+    );
+    expect(c.method).toBe('PUT');
+    expect(c.url).toBe(
+      '/sap/bc/adt/ddic/dsfi/zok_impl/source/main?lockHandle=LH%2F1&corrNr=TRLK9%201',
+    );
+    expect(c.headers?.['Content-Type']).toBe('application/json');
+  });
+
+  it('updateMetadata PUTs object URI (no /source/main) with encoded lockHandle+corrNr, blues v2 Content-Type', async () => {
+    const { c, conn } = cap();
+    await updateScalarFunctionImplementationMetadata(
+      conn,
+      {
+        implementation_name: 'ZOK_IMPL',
+        source_code: '<blues/>',
         transport_request: 'TRLK9 1',
       },
       'LH/1',

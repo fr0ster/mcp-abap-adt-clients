@@ -28,6 +28,7 @@ import type {
 } from './types';
 import { unlockScalarFunctionImplementation } from './unlock';
 import { updateScalarFunctionImplementation } from './update';
+import { updateScalarFunctionImplementationMetadata } from './updateMetadata';
 import { validateScalarFunctionImplementationName } from './validation';
 
 const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
@@ -171,6 +172,11 @@ export class AdtScalarFunctionImplementation
     return { transportResult: response, errors: [] };
   }
 
+  /**
+   * Update the implementation source (JSON) via PUT /source/main.
+   * No check/long-poll/auto-activate — those don't apply to DSFI.
+   * Trio activation (DSFD+AMDP+DSFI) is the consumer's responsibility.
+   */
   async update(
     config: Partial<IScalarFunctionImplementationConfig>,
     options?: IAdtOperationOptions,
@@ -178,14 +184,15 @@ export class AdtScalarFunctionImplementation
     if (!config.implementationName)
       throw new Error('Implementation name is required');
 
+    const sourceCode = options?.sourceCode ?? config.sourceCode;
+    if (!sourceCode) throw new Error('Source code is required for update');
+
     if (options?.lockHandle) {
-      const codeToUpdate = options?.sourceCode || config.sourceCode;
-      if (!codeToUpdate) throw new Error('Source code is required for update');
       const updateResult = await updateScalarFunctionImplementation(
         this.connection,
         {
           implementation_name: config.implementationName,
-          source_code: codeToUpdate,
+          source_code: sourceCode,
           transport_request: config.transportRequest,
         },
         options.lockHandle,
@@ -200,87 +207,25 @@ export class AdtScalarFunctionImplementation
         this.connection,
         config.implementationName,
       );
-
-      const codeToCheck = options?.sourceCode || config.sourceCode;
-      if (codeToCheck) {
-        await checkScalarFunctionImplementation(
-          this.connection,
-          config.implementationName,
-          'inactive',
-          codeToCheck,
-        );
-        await updateScalarFunctionImplementation(
-          this.connection,
-          {
-            implementation_name: config.implementationName,
-            source_code: codeToCheck,
-            transport_request: config.transportRequest,
-          },
-          lockHandle,
-        );
-        try {
-          await this.read(
-            { implementationName: config.implementationName },
-            'active',
-            { withLongPolling: true },
-          );
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-        }
-      }
-
-      if (lockHandle) {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockScalarFunctionImplementation(
-            this.connection,
-            config.implementationName,
-            lockHandle,
-          );
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-        lockHandle = undefined;
-      }
-
-      await checkScalarFunctionImplementation(
+      const updateResult = await updateScalarFunctionImplementation(
+        this.connection,
+        {
+          implementation_name: config.implementationName,
+          source_code: sourceCode,
+          transport_request: config.transportRequest,
+        },
+        lockHandle,
+      );
+      await unlockScalarFunctionImplementation(
         this.connection,
         config.implementationName,
-        'inactive',
+        lockHandle,
       );
-
-      if (options?.activateOnUpdate) {
-        const activateResult = await activateScalarFunctionImplementation(
-          this.connection,
-          config.implementationName,
-        );
-        try {
-          await this.read(
-            { implementationName: config.implementationName },
-            'active',
-            { withLongPolling: true },
-          );
-        } catch (readError) {
-          this.logger?.warn?.(
-            'read with long polling failed (object may not be ready yet):',
-            safeErrorMessage(readError),
-          );
-        }
-        return { activateResult, errors: [] };
-      }
-
-      const readResult = await getScalarFunctionImplementationSource(
-        this.connection,
-        config.implementationName,
-      );
-      return { readResult, errors: [] };
+      lockHandle = undefined;
+      return { updateResult, errors: [] };
     } catch (error) {
       if (lockHandle) {
         try {
-          this.connection.setSessionType('stateful');
           await unlockScalarFunctionImplementation(
             this.connection,
             config.implementationName,
@@ -291,27 +236,85 @@ export class AdtScalarFunctionImplementation
             'Failed to unlock during cleanup:',
             safeErrorMessage(unlockError),
           );
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      } else {
-        this.connection.setSessionType('stateless');
-      }
-      if (options?.deleteOnFailure) {
-        try {
-          await deleteScalarFunctionImplementation(this.connection, {
-            implementation_name: config.implementationName,
-            transport_request: config.transportRequest,
-          });
-        } catch (deleteError) {
-          this.logger?.warn?.(
-            'Failed to delete after failure:',
-            safeErrorMessage(deleteError),
-          );
         }
       }
       this.logger?.error('Update failed:', safeErrorMessage(error));
       throw error;
+    } finally {
+      this.connection.setSessionType('stateless');
+    }
+  }
+
+  /**
+   * Update the metadata (blues v2 XML) via PUT /dsfi/{name}.
+   * Same lock/unlock/finally-stateless hardening as update().
+   */
+  async updateMetadata(
+    config: Partial<IScalarFunctionImplementationConfig>,
+    options?: IAdtOperationOptions,
+  ): Promise<IScalarFunctionImplementationState> {
+    if (!config.implementationName)
+      throw new Error('Implementation name is required');
+
+    const sourceCode = options?.sourceCode ?? config.sourceCode;
+    if (!sourceCode)
+      throw new Error('Source code is required for updateMetadata');
+
+    if (options?.lockHandle) {
+      const updateResult = await updateScalarFunctionImplementationMetadata(
+        this.connection,
+        {
+          implementation_name: config.implementationName,
+          source_code: sourceCode,
+          transport_request: config.transportRequest,
+        },
+        options.lockHandle,
+      );
+      return { updateResult, errors: [] };
+    }
+
+    let lockHandle: string | undefined;
+    try {
+      this.connection.setSessionType('stateful');
+      lockHandle = await lockScalarFunctionImplementation(
+        this.connection,
+        config.implementationName,
+      );
+      const updateResult = await updateScalarFunctionImplementationMetadata(
+        this.connection,
+        {
+          implementation_name: config.implementationName,
+          source_code: sourceCode,
+          transport_request: config.transportRequest,
+        },
+        lockHandle,
+      );
+      await unlockScalarFunctionImplementation(
+        this.connection,
+        config.implementationName,
+        lockHandle,
+      );
+      lockHandle = undefined;
+      return { updateResult, errors: [] };
+    } catch (error) {
+      if (lockHandle) {
+        try {
+          await unlockScalarFunctionImplementation(
+            this.connection,
+            config.implementationName,
+            lockHandle,
+          );
+        } catch (unlockError) {
+          this.logger?.warn?.(
+            'Failed to unlock during cleanup:',
+            safeErrorMessage(unlockError),
+          );
+        }
+      }
+      this.logger?.error('UpdateMetadata failed:', safeErrorMessage(error));
+      throw error;
+    } finally {
+      this.connection.setSessionType('stateless');
     }
   }
 
