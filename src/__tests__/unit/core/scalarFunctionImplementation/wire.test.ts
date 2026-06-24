@@ -44,13 +44,13 @@ describe('scalarFunctionImplementation wire', () => {
     );
   });
 
-  it('read source GETs object URI with version + Accept blues v2', async () => {
+  it('read source GETs /source/main with version + Accept application/json', async () => {
     const { c, conn } = cap();
     await getScalarFunctionImplementationSource(conn, 'ZOK_IMPL', 'inactive');
-    expect(c.url).toBe('/sap/bc/adt/ddic/dsfi/zok_impl?version=inactive');
-    expect(c.headers?.Accept).toBe(
-      'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.blues.v2+xml',
+    expect(c.url).toBe(
+      '/sap/bc/adt/ddic/dsfi/zok_impl/source/main?version=inactive',
     );
+    expect(c.headers?.Accept).toBe('application/json');
   });
 
   it('unlock POSTs _action=UNLOCK with encoded lockHandle', async () => {

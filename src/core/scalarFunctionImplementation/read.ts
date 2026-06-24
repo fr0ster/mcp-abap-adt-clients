@@ -5,6 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import {
   ACCEPT_SCALAR_FUNCTION_IMPL,
+  ACCEPT_SCALAR_FUNCTION_IMPL_SOURCE,
   ACCEPT_TRANSPORT,
 } from '../../constants/contentTypes';
 import { makeAdtRequestWithAcceptNegotiation } from '../../utils/acceptNegotiation';
@@ -46,14 +47,16 @@ export async function getScalarFunctionImplementationSource(
   options?: IReadOptions,
   logger?: ILogger,
 ): Promise<AxiosResponse> {
-  const url = `/sap/bc/adt/ddic/dsfi/${encodeSapObjectName(name.toLowerCase())}${buildQuery(version, options)}`;
+  const url = `/sap/bc/adt/ddic/dsfi/${encodeSapObjectName(name.toLowerCase())}/source/main${buildQuery(version, options)}`;
   return makeAdtRequestWithAcceptNegotiation(
     connection,
     {
       url,
       method: 'GET',
       timeout: getTimeout('default'),
-      headers: { Accept: options?.accept ?? ACCEPT_SCALAR_FUNCTION_IMPL },
+      headers: {
+        Accept: options?.accept ?? ACCEPT_SCALAR_FUNCTION_IMPL_SOURCE,
+      },
     },
     { logger },
   );
