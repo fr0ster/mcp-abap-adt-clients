@@ -1285,7 +1285,7 @@ async function createDependencyTable(client, config, testCase) {
  * Includes cleanup (unlock + delete) if update fails
  * @param {Object} client - CrudClient instance
  * @param {Object} config - View configuration
- *   - ddlName: string - View name
+ *   - viewName: string - View name
  *   - packageName: string - Package name
  *   - description: string - View description
  *   - ddlSource: string - DDL source code
