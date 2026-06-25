@@ -414,7 +414,7 @@ See [Tools Documentation](tools/README.md) for complete details and options.
 
 ### AdtClient Overview
 
-- Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getView()`, `client.getTable()`, `client.getRequest()`, `client.getUtils()`, etc.
+- Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`), `client.getTable()`, `client.getScalarFunction()`, `client.getScalarFunctionImplementation()`, `client.getAppendStructure()`, `client.getRequest()`, `client.getUtils()`, etc.
 - Each accessor returns an `Adt*` object implementing `IAdtObject` operations.
 - See `src/index.ts` for the full type exports and object configs.
 
@@ -583,7 +583,7 @@ await client.getClass().read(
 ### Builderless API
 
 - `CrudClient`, `ReadOnlyClient`, and Builder classes are removed in the builderless API.
-- Use `AdtClient` and the `Adt*` objects (`client.getClass()`, `client.getView()`, etc.).
+- Use `AdtClient` and the `Adt*` objects (`client.getClass()`, `client.getDdl()`, etc.).
 
 ## Documentation
 
