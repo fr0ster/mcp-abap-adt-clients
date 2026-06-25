@@ -12,7 +12,6 @@ export interface ICreateScalarFunctionImplementationParams {
   description?: string;
   package_name: string;
   transport_request?: string;
-  source_code?: string;
   masterSystem?: string;
   responsible?: string;
   masterLanguage?: string;
