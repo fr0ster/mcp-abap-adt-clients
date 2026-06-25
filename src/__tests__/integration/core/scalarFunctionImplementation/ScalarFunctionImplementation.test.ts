@@ -178,7 +178,10 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
         // Idempotent cleanup (impl → amdp → func) of any leftovers.
         const cleanup = async () => {
           try {
-            await dsfi.delete({ implementationName: implName });
+            await dsfi.delete({
+              implementationName: implName,
+              transportRequest,
+            });
           } catch {
             /* ignore */
           }
@@ -258,6 +261,7 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
           }
           await dsfi.update({
             implementationName: implName,
+            transportRequest,
             sourceCode: implSource,
           });
 
