@@ -163,6 +163,36 @@ describe('AppendStructure (TABL/DS) integration', () => {
             testCase?.params?.transport_request,
           );
 
+          // Preflight: the base object is a PREREQUISITE (like the root package) —
+          // the suite does not create base tables/structures. If the configured base
+          // does not exist, skip with a clear reason instead of hard-failing on create.
+          let baseExists = true;
+          try {
+            const baseState =
+              baseKey === 'base_table'
+                ? await client.getTable().read({ tableName: baseObject })
+                : await client
+                    .getStructure()
+                    .read({ structureName: baseObject });
+            baseExists = !!baseState;
+          } catch (baseError) {
+            const status = (baseError as { response?: { status?: number } })
+              .response?.status;
+            if (status === 404) {
+              baseExists = false;
+            } else {
+              throw baseError;
+            }
+          }
+          if (!baseExists) {
+            logTestSkip(
+              testsLogger,
+              TEST_LABEL,
+              `base ${baseKey} '${baseObject}' does not exist — create it or set create_append_structure.params.${baseKey} to an existing object`,
+            );
+            return;
+          }
+
           const as = client.getAppendStructure();
 
           // ── 1) Idempotent cleanup of any leftover object from a previous run ──
