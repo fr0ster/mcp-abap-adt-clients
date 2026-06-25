@@ -168,13 +168,20 @@ describe('AppendStructure (TABL/DS) integration', () => {
           // does not exist, skip with a clear reason instead of hard-failing on create.
           let baseExists = true;
           try {
-            const baseState =
-              baseKey === 'base_table'
-                ? await client.getTable().read({ tableName: baseObject })
-                : await client
-                    .getStructure()
-                    .read({ structureName: baseObject });
-            baseExists = !!baseState;
+            // NOTE: read() 404 semantics differ — getStructure().read() returns
+            // undefined, but getTable().read() returns { readResult: undefined }.
+            // Check readResult for the table case to detect a missing base.
+            if (baseKey === 'base_table') {
+              const baseState = await client
+                .getTable()
+                .read({ tableName: baseObject });
+              baseExists = !!baseState?.readResult;
+            } else {
+              const baseState = await client
+                .getStructure()
+                .read({ structureName: baseObject });
+              baseExists = !!baseState;
+            }
           } catch (baseError) {
             const status = (baseError as { response?: { status?: number } })
               .response?.status;
