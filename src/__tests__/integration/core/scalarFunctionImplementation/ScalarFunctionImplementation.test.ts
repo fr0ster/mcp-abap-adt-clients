@@ -1,19 +1,18 @@
 /**
- * Integration test for ScalarFunctionImplementation (CDS DSFI/SFI)
- * Tests using AdtClient for unified CRUD operations.
+ * Integration test for ScalarFunctionImplementation (CDS DSFI/SFI).
  *
- * The suite requires BOTH source params in test-config.yaml:
- *   - scalar_function_source_code: DSFD signature (inactive, no activate required)
- *   - source_code: DSFI sqlEngine body
- * Without either, the WHOLE suite is skipped (no downgrade to create-only).
+ * Builds the full, self-contained scalar-function fixture and verifies the DSFI
+ * client end-to-end (the sources are deterministic, so they are built inline —
+ * no source params required in test-config.yaml):
+ *   1. DSFD signature (define scalar function ... with parameters ... returns ...) + activate
+ *   2. AMDP class (IF_AMDP_MARKER_HDB, CLASS-METHODS ... FOR SCALAR FUNCTION ...,
+ *      BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT) — created, group-activated
+ *   3. DSFI: create (blues v2 + base64 binding) → update() the implementation JSON
+ *      (PUT /source/main, application/json, sets amdpReference) → group-activate the trio
+ *   4. read (JSON source, verifies amdpReference) + readMetadata (blues v2) + delete all three
  *
- * The test probes the DSFI endpoint via create; on HTTP 404/405/501 the suite
- * is skipped — DSFI is only available on systems that support the CDS DSFI feature.
- *
- * Enable debug logs:
- *  DEBUG_ADT_TESTS=true   - Integration test execution logs
- *  DEBUG_ADT_LIBS=true    - ScalarFunctionImplementation library logs
- *  DEBUG_CONNECTORS=true   - Connection logs (@mcp-abap-adt/connection)
+ * Skip gate: HTTP 404/405/501 from the DSFD/DSFI create → the feature is absent
+ * on this system; the suite is skipped. All other errors fail the test.
  *
  * Run: npm test -- --testPathPatterns=scalarFunctionImplementation/ScalarFunctionImplementation
  */
@@ -61,8 +60,13 @@ const connectionLogger: ILogger = createConnectionLogger();
 const libraryLogger: ILogger = createLibraryLogger();
 const testsLogger: ILogger = createTestsLogger();
 
-/** HTTP status codes that indicate the DSFI feature is absent on this system. */
+/** HTTP status codes that indicate the DSFI/DSFD feature is absent on this system. */
 const SKIP_STATUSES = new Set([404, 405, 501]);
+
+function isSkippable(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } }).response?.status;
+  return !!status && SKIP_STATUSES.has(status);
+}
 
 describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
   let connection: IAbapConnection;
@@ -94,30 +98,26 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
 
   describe('Full workflow', () => {
     it(
-      'companion DSFD signature → DSFI create → update → read → readMetadata → delete',
+      'DSFD + AMDP + DSFI fixture: create → impl update → group-activate → read → updateMetadata → delete',
       async () => {
         const TEST_LABEL = 'ScalarFunctionImplementation - full workflow';
 
-        // Resolve test-case params from test-config.yaml
         const testCase = getEnabledTestCase(
           'create_scalar_function_implementation',
           'adt_scalar_function_implementation',
         );
-
         const resolver = new TestConfigResolver({
           testCase,
           isCloud: isCloudSystem,
           logger: testsLogger,
         });
 
-        const sigSource: string | undefined =
-          testCase?.params?.scalar_function_source_code;
-        const implSource: string | undefined = testCase?.params?.source_code;
-
         const implName: string =
           testCase?.params?.implementation_name ?? 'ZADT_SCALAR_FUNC_SQL';
         const funcName: string =
           testCase?.params?.scalar_function_name ?? 'ZADT_SCALAR_FUNC';
+        const amdpName: string =
+          testCase?.params?.amdp_class_name ?? 'ZADT_SCALAR_AMDP';
         const packageName: string | null =
           resolver.getPackageName() ||
           resolvePackageName(testCase?.params?.package_name);
@@ -127,80 +127,94 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
 
         logTestStart(testsLogger, TEST_LABEL, {
           name: implName,
-          params: {
-            implementation_name: implName,
-            scalar_function_name: funcName,
-            package_name: packageName,
-          },
+          params: { function: funcName, amdp: amdpName, package: packageName },
         });
 
         if (!hasConfig) {
           logTestSkip(testsLogger, TEST_LABEL, 'No SAP configuration');
           return;
         }
-
-        // REQUIRED-source gate: without BOTH sources the whole suite skips (no downgrade).
-        if (!sigSource || !implSource) {
-          logTestSkip(
-            testsLogger,
-            TEST_LABEL,
-            'requires scalar_function_source_code + source_code in test-config.yaml',
-          );
-          return;
-        }
-
         if (!packageName) {
           logTestSkip(
             testsLogger,
             TEST_LABEL,
-            'package_name not configured — set environment.default_package in test-config.yaml',
+            'package_name not configured — set environment.default_package',
           );
           return;
         }
 
         const sf = client.getScalarFunction();
+        const cls = client.getClass();
         const dsfi = client.getScalarFunctionImplementation();
 
-        // ── 1) Idempotent cleanup of any leftover objects from a previous run ──
-        try {
-          await dsfi.delete({ implementationName: implName });
-        } catch {
-          // Ignore — object may not exist yet
-        }
-        try {
-          await sf.delete({ scalarFunctionName: funcName, transportRequest });
-        } catch {
-          // Ignore — object may not exist yet
-        }
+        // Deterministic, self-contained sources for the fixture.
+        const sigSource =
+          `define scalar function ${funcName}\n` +
+          `  with parameters\n    p_a: abap.int1,\n    p_b: abap.int1\n` +
+          `  returns abap.int1`;
+        const amdpSource =
+          `CLASS ${amdpName.toLowerCase()} DEFINITION PUBLIC FINAL CREATE PUBLIC.\n` +
+          `  PUBLIC SECTION.\n    INTERFACES if_amdp_marker_hdb.\n` +
+          `    CLASS-METHODS get_sum FOR SCALAR FUNCTION ${funcName}.\n` +
+          `  PROTECTED SECTION.\n  PRIVATE SECTION.\nENDCLASS.\n\n` +
+          `CLASS ${amdpName.toLowerCase()} IMPLEMENTATION.\n` +
+          `  METHOD get_sum BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT OPTIONS READ-ONLY.\n` +
+          `    result = :p_a + :p_b;\n  ENDMETHOD.\nENDCLASS.`;
+        const implSource = JSON.stringify({
+          formatVersion: '1',
+          header: {
+            description: 'AdtScalarFunctionImplementation integration test',
+            originalLanguage: 'en',
+            abapLanguageVersion: 'cloudDevelopment',
+          },
+          scalarFunctionName: funcName,
+          engine: 'sqlEngine',
+          sqlProperties: {
+            amdpReference: `${amdpName}=>GET_SUM`,
+            autoExposedInSqlServices: true,
+          },
+        });
+
+        // Idempotent cleanup (impl → amdp → func) of any leftovers.
+        const cleanup = async () => {
+          try {
+            await dsfi.delete({ implementationName: implName });
+          } catch {
+            /* ignore */
+          }
+          try {
+            await cls.delete({ className: amdpName });
+          } catch {
+            /* ignore */
+          }
+          try {
+            await sf.delete({ scalarFunctionName: funcName, transportRequest });
+          } catch {
+            /* ignore */
+          }
+        };
+        await cleanup();
 
         try {
-          // ── 2) Create companion DSFD ──
+          // 1) DSFD signature + activate (a definition activates standalone).
           try {
             await sf.create({
               scalarFunctionName: funcName,
               packageName,
               transportRequest,
-              description: 'companion DSFD for DSFI integration test',
+              description: 'DSFI integration companion function',
             });
-          } catch (createError) {
-            const status = (createError as { response?: { status?: number } })
-              .response?.status;
-            if (status && SKIP_STATUSES.has(status)) {
+          } catch (e) {
+            if (isSkippable(e)) {
               logTestSkip(
                 testsLogger,
                 TEST_LABEL,
-                `DSFD unsupported on this system (HTTP ${status})`,
+                'DSFD/DSFI unsupported here',
               );
               return;
             }
-            logTestError(testsLogger, TEST_LABEL, createError);
-            throw createError;
+            throw e;
           }
-
-          // ── 3) Write DSFD signature and ACTIVATE it ──
-          // A scalar function DEFINITION (signature only) activates standalone — the
-          // implementation is the separate DSFI. The DSFI create requires the
-          // referenced DSFD to exist in the ACTIVE version (HTTP 422 otherwise).
           await sf.update(
             {
               scalarFunctionName: funcName,
@@ -210,7 +224,21 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
             { activateOnUpdate: true },
           );
 
-          // ── 4) Create DSFI ──
+          // 2) AMDP class (do NOT solo-activate — it activates with the group).
+          await cls.create({
+            className: amdpName,
+            packageName,
+            transportRequest,
+            description: 'DSFI integration AMDP implementation',
+          });
+          const amdpLock = await cls.lock({ className: amdpName });
+          await cls.update(
+            { className: amdpName, transportRequest, sourceCode: amdpSource },
+            { lockHandle: amdpLock },
+          );
+          await cls.unlock({ className: amdpName }, amdpLock);
+
+          // 3) DSFI create + implementation update (PUT /source/main JSON).
           try {
             await dsfi.create({
               implementationName: implName,
@@ -218,76 +246,59 @@ describe('ScalarFunctionImplementation (DSFI/SFI) integration', () => {
               engineValue: 'sqlEngine',
               packageName,
               transportRequest,
-              description: 'AdtScalarFunctionImplementation integration test',
+              description: 'DSFI integration implementation',
             });
-          } catch (createError) {
-            const status = (createError as { response?: { status?: number } })
-              .response?.status;
-            if (status && SKIP_STATUSES.has(status)) {
-              logTestSkip(
-                testsLogger,
-                TEST_LABEL,
-                `DSFI unsupported on this system (HTTP ${status})`,
-              );
-              // Best-effort cleanup of companion DSFD
-              try {
-                await sf.delete({
-                  scalarFunctionName: funcName,
-                  transportRequest,
-                });
-              } catch {
-                // Ignore cleanup errors
-              }
+          } catch (e) {
+            if (isSkippable(e)) {
+              logTestSkip(testsLogger, TEST_LABEL, 'DSFI unsupported here');
+              await cleanup();
               return;
             }
-            logTestError(testsLogger, TEST_LABEL, createError);
-            throw createError;
+            throw e;
           }
-
-          // ── 5) Update DSFI source (exercises full lock→check→update→unlock→check chain) ──
           await dsfi.update({
             implementationName: implName,
             sourceCode: implSource,
-            transportRequest,
           });
 
-          // ── 6) Read DSFI source (inactive version) ──
+          // 4) Group-activate the trio (synchronous).
+          await client.getUtils().activateObjectsGroup([
+            { type: 'DSFD/SCF', name: funcName },
+            { type: 'CLAS/OC', name: amdpName },
+            { type: 'DSFI/SFI', name: implName },
+          ]);
+
+          // 5) Read implementation source (JSON) — must contain the amdpReference.
           const readState = await dsfi.read(
             { implementationName: implName },
-            'inactive',
+            'active',
           );
-          expect(readState).toBeDefined();
           expect(readState?.readResult).toBeDefined();
+          const sourceText =
+            typeof readState?.readResult?.data === 'string'
+              ? readState.readResult.data
+              : JSON.stringify(readState?.readResult?.data);
+          expect(sourceText).toContain(`${amdpName}=>GET_SUM`);
 
-          // ── 7) Read DSFI metadata ──
+          // 6) Read metadata (blues v2 XML).
           const metaState = await dsfi.readMetadata({
             implementationName: implName,
           });
           expect(metaState.metadataResult).toBeDefined();
 
-          // ── 8) Delete DSFI then companion DSFD ──
-          const deleteImplState = await dsfi.delete({
+          // 7) Delete the trio.
+          const del = await dsfi.delete({
             implementationName: implName,
             transportRequest,
           });
-          expect(deleteImplState.deleteResult).toBeDefined();
-
+          expect(del.deleteResult).toBeDefined();
+          await cls.delete({ className: amdpName, transportRequest });
           await sf.delete({ scalarFunctionName: funcName, transportRequest });
 
           logTestSuccess(testsLogger, TEST_LABEL);
         } catch (error) {
           logTestError(testsLogger, TEST_LABEL, error);
-          // Best-effort cleanup (impl first, then companion DSFD)
-          try {
-            await dsfi.delete({ implementationName: implName });
-          } catch {
-            // Ignore cleanup errors
-          }
-          try {
-            await sf.delete({ scalarFunctionName: funcName, transportRequest });
-          } catch {
-            // Ignore cleanup errors
-          }
+          await cleanup();
           throw error;
         } finally {
           logTestEnd(testsLogger, TEST_LABEL);

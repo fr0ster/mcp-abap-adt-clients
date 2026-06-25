@@ -1058,35 +1058,25 @@ create_scalar_function:
         #     implemented by method zcl_your_amdp=>m;
 
 # Create Scalar Function Implementation (DSFI/SFI)
-# Requires BOTH source params (scalar_function_source_code + source_code) to run.
-# Without either, the WHOLE suite is skipped — there is no create-only downgrade.
-# The suite creates a companion DSFD (scalar_function_name), writes its signature
-# via lock→update→unlock (inactive, no activate), then creates and tests the DSFI.
-# Cleanup order: delete DSFI first, then companion DSFD.
-# The suite probes create at runtime and skips on HTTP 404/405/501.
+# SELF-CONTAINED suite: it builds the DSFD signature, the AMDP class
+# (FOR SCALAR FUNCTION, BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT), and the
+# DSFI implementation JSON inline from the names below — no source params needed.
+# Flow: create DSFD (+activate) → create AMDP class → create DSFI → update() the
+# implementation JSON (PUT /source/main, sets amdpReference) → group-activate the
+# trio → read/readMetadata → delete all three. Skips on HTTP 404/405/501.
 create_scalar_function_implementation:
   test_cases:
     - name: "adt_scalar_function_implementation"
       enabled: true
-      # available_in is a hint only; the suite probes create at runtime and skips on 404/405/501
       description: "DSFI reserved for AdtScalarFunctionImplementation tests"
       params:
         implementation_name: "ZADT_SCALAR_FUNC_SQL"  # ← CHANGE if needed
         scalar_function_name: "ZADT_SCALAR_FUNC"     # companion DSFD created by the test
+        amdp_class_name: "ZADT_SCALAR_AMDP"          # AMDP class created by the test
         engine_value: "sqlEngine"
         description: "AdtScalarFunctionImplementation integration test"
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         # transport_request: ""  # Uses environment.default_transport if omitted
-        # REQUIRED to run the suite — without BOTH sources the whole DSFI suite SKIPS.
-        # scalar_function_source_code: the DSFD signature written inactive (no AMDP required).
-        # source_code: the DSFI sqlEngine body applied via the full update() chain.
-        # Exact valid syntax must be confirmed live on the target system and stored here.
-        # scalar_function_source_code: |
-        #   define scalar function ZADT_SCALAR_FUNC
-        #     with parameters p_input : abap.int4
-        #     returns abap.int4
-        # source_code: |
-        #   <DSFI sqlEngine body — confirmed live>
 
 # Create Append Structure (TABL/DS append)
 # Append structures extend an existing transparent table or structure with
