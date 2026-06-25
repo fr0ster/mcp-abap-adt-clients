@@ -64,6 +64,12 @@ export class AdtClientBatch {
   getServiceDefinition() {
     return this.innerClient.getServiceDefinition();
   }
+  getScalarFunction() {
+    return this.innerClient.getScalarFunction();
+  }
+  getAppendStructure() {
+    return this.innerClient.getAppendStructure();
+  }
   getServiceBinding() {
     return this.innerClient.getServiceBinding();
   }
