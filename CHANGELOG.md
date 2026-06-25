@@ -3,6 +3,18 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.0] - 2026-06-25
+
+### Added
+- **`AdtClient.getScalarFunction()`** — CRUD + lifecycle client for **CDS scalar functions** (`DSFD/SCF`, `/sap/bc/adt/ddic/dsfd/sources`). Source-based object created via the `blue:blueSource` envelope; full create → check → lock → update → unlock → activate chain mirroring `serviceDefinition`. Exposes `IScalarFunctionConfig`/`IScalarFunctionState`.
+- **`AdtClient.getAppendStructure()`** — CRUD + lifecycle client for **append structures** (`TABL/DS`, `/sap/bc/adt/ddic/structures`) that extend a base **table or structure** via the `adtcore:adtTemplate`/`base_structure` create property and `extend type …` source (both base kinds use the same `base_structure` key — verified live). Exposes `IAppendStructureConfig`/`IAppendStructureState`.
+- **`AdtClient.getScalarFunctionImplementation()`** — CRUD + lifecycle client for **scalar function implementations** (`DSFI/SFI`, `/sap/bc/adt/ddic/dsfi`), completing the scalar-function feature (definition + implementation). Created via the blues **v2** envelope + base64 `additionalCreationProperties` (`scalarFunctionName`/`engineValue`: `sqlEngine`|`amdpEngine`). Asymmetric contract: `read()` returns the implementation **JSON** (`/source/main`), `update()` writes that JSON, `updateMetadata()` writes the blues v2 XML object. The DSFD+AMDP+DSFI trio is activated by the consumer via `getUtils().activateObjectsGroup`. Exposes `IScalarFunctionImplementationConfig`/`IScalarFunctionImplementationState`.
+- All three new factory methods are mirrored on **`AdtClientBatch`**.
+- Shared: `escapeXmlAttr` (`src/utils/xml.ts`); `getObjectUri` (checkRun) and `buildObjectUri` (group activation) mappings for `dsfd/scf`, `tabl/ds`/`append_structure`, and `dsfi/sfi`.
+
+### Changed
+- **BREAKING — `View` client renamed to `Ddl`** (fr0ster/mcp-abap-adt#49). The client always targeted the generic DDL-source endpoint `/sap/bc/adt/ddic/ddl/sources/` (CDS views, AMDP table functions, other DDL sources), so the `View` name was misleading. **Migration:** `AdtClient.getView()` → **`getDdl()`**; `AdtView`/`AdtViewLegacy` → `AdtDdl`/`AdtDdlLegacy`; `IViewConfig`/`IViewState` → `IDdlConfig`/`IDdlState`; config field `viewName` → `ddlName`. No endpoint or behaviour changes — mechanical rename only.
+
 ## [5.8.0] - 2026-06-17
 
 ### Changed
