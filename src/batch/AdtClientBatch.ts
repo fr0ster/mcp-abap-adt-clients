@@ -67,6 +67,9 @@ export class AdtClientBatch {
   getScalarFunction() {
     return this.innerClient.getScalarFunction();
   }
+  getScalarFunctionImplementation() {
+    return this.innerClient.getScalarFunctionImplementation();
+  }
   getAppendStructure() {
     return this.innerClient.getAppendStructure();
   }

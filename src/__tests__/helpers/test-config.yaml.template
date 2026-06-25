@@ -1057,6 +1057,27 @@ create_scalar_function:
         #     returns abap.int4
         #     implemented by method zcl_your_amdp=>m;
 
+# Create Scalar Function Implementation (DSFI/SFI)
+# SELF-CONTAINED suite: it builds the DSFD signature, the AMDP class
+# (FOR SCALAR FUNCTION, BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT), and the
+# DSFI implementation JSON inline from the names below — no source params needed.
+# Flow: create DSFD (+activate) → create AMDP class → create DSFI → update() the
+# implementation JSON (PUT /source/main, sets amdpReference) → group-activate the
+# trio → read/readMetadata → delete all three. Skips on HTTP 404/405/501.
+create_scalar_function_implementation:
+  test_cases:
+    - name: "adt_scalar_function_implementation"
+      enabled: true
+      description: "DSFI reserved for AdtScalarFunctionImplementation tests"
+      params:
+        implementation_name: "ZADT_SCALAR_FUNC_SQL"  # ← CHANGE if needed
+        scalar_function_name: "ZADT_SCALAR_FUNC"     # companion DSFD created by the test
+        amdp_class_name: "ZADT_SCALAR_AMDP"          # AMDP class created by the test
+        engine_value: "sqlEngine"
+        description: "AdtScalarFunctionImplementation integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+
 # Create Append Structure (TABL/DS append)
 # Append structures extend an existing transparent table or structure with
 # additional fields. The suite creates two variants — one with a structure base

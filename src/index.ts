@@ -191,6 +191,12 @@ export type {
 } from './core/scalarFunction';
 export { AdtScalarFunction } from './core/scalarFunction';
 export type {
+  AdtScalarFunctionImplementationType,
+  IScalarFunctionImplementationConfig,
+  IScalarFunctionImplementationState,
+} from './core/scalarFunctionImplementation';
+export { AdtScalarFunctionImplementation } from './core/scalarFunctionImplementation';
+export type {
   AdtServiceBindingType,
   DesiredPublicationState,
   GeneratedServiceType,

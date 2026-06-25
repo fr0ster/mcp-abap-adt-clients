@@ -115,6 +115,11 @@ import {
   type IScalarFunctionConfig,
   type IScalarFunctionState,
 } from '../core/scalarFunction';
+import {
+  AdtScalarFunctionImplementation,
+  type IScalarFunctionImplementationConfig,
+  type IScalarFunctionImplementationState,
+} from '../core/scalarFunctionImplementation';
 import { AdtServiceBinding, type IAdtServiceBinding } from '../core/service';
 import {
   AdtServiceDefinition,
@@ -410,6 +415,20 @@ export class AdtClient {
    */
   getScalarFunction(): IAdtObject<IScalarFunctionConfig, IScalarFunctionState> {
     return new AdtScalarFunction(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for Scalar Function Implementation (DSFI/SFI) objects
+   */
+  getScalarFunctionImplementation(): IAdtObject<
+    IScalarFunctionImplementationConfig,
+    IScalarFunctionImplementationState
+  > {
+    return new AdtScalarFunctionImplementation(
       this.connection,
       this.logger,
       this.systemContext,

@@ -166,6 +166,16 @@ export const CT_VIEW = 'application/vnd.sap.adt.ddlSource+xml';
 export const ACCEPT_SCALAR_FUNCTION = 'application/vnd.sap.adt.blues.v1+xml';
 export const CT_SCALAR_FUNCTION = 'application/vnd.sap.adt.blues.v1+xml';
 
+// Scalar Function Implementations (DSFI/SFI) — blues v2 envelope
+export const CT_SCALAR_FUNCTION_IMPL = 'application/vnd.sap.adt.blues.v2+xml';
+export const CT_SCALAR_FUNCTION_IMPL_UPDATE =
+  'application/vnd.sap.adt.blues.v2+xml; charset=utf-8';
+export const ACCEPT_SCALAR_FUNCTION_IMPL =
+  'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.blues.v2+xml';
+// Source endpoint (/source/main) — JSON for both read and implementation update
+export const ACCEPT_SCALAR_FUNCTION_IMPL_SOURCE = 'application/json';
+export const CT_SCALAR_FUNCTION_IMPL_SOURCE = 'application/json';
+
 // Append Structures (TABL/DS) — blues envelope, structures media type for create
 export const ACCEPT_APPEND_STRUCTURE =
   'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.structures.v2+xml';
