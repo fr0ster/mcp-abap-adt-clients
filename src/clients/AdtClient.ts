@@ -24,6 +24,11 @@ import {
   type IAccessControlState,
 } from '../core/accessControl';
 import {
+  AdtAppendStructure,
+  type IAppendStructureConfig,
+  type IAppendStructureState,
+} from '../core/appendStructure';
+import {
   AdtAuthorizationField,
   type IAuthorizationFieldConfig,
   type IAuthorizationFieldState,
@@ -105,6 +110,11 @@ import {
   type IProgramConfig,
   type IProgramState,
 } from '../core/program';
+import {
+  AdtScalarFunction,
+  type IScalarFunctionConfig,
+  type IScalarFunctionState,
+} from '../core/scalarFunction';
 import { AdtServiceBinding, type IAdtServiceBinding } from '../core/service';
 import {
   AdtServiceDefinition,
@@ -389,6 +399,31 @@ export class AdtClient {
     IServiceDefinitionState
   > {
     return new AdtServiceDefinition(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for CDS Scalar Function (DSFD/SCF) objects
+   */
+  getScalarFunction(): IAdtObject<IScalarFunctionConfig, IScalarFunctionState> {
+    return new AdtScalarFunction(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for Append Structure (TABL/DS) objects
+   */
+  getAppendStructure(): IAdtObject<
+    IAppendStructureConfig,
+    IAppendStructureState
+  > {
+    return new AdtAppendStructure(
       this.connection,
       this.logger,
       this.systemContext,

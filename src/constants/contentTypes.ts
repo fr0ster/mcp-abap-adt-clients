@@ -162,6 +162,14 @@ export const ACCEPT_VIEW =
 export const ACCEPT_VIEW_METADATA = 'application/vnd.sap.adt.ddlSource+xml';
 export const CT_VIEW = 'application/vnd.sap.adt.ddlSource+xml';
 
+// Scalar Functions (CDS DSFD/SCF) — uses the shared blues envelope
+export const ACCEPT_SCALAR_FUNCTION = 'application/vnd.sap.adt.blues.v1+xml';
+export const CT_SCALAR_FUNCTION = 'application/vnd.sap.adt.blues.v1+xml';
+
+// Append Structures (TABL/DS) — blues envelope, structures media type for create
+export const ACCEPT_APPEND_STRUCTURE =
+  'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.structures.v2+xml';
+
 // Packages
 export const ACCEPT_PACKAGE =
   'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml';

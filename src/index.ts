@@ -78,6 +78,12 @@ export type {
   IAccessControlState,
 } from './core/accessControl';
 export type {
+  AdtAppendStructureType,
+  IAppendStructureConfig,
+  IAppendStructureState,
+} from './core/appendStructure';
+export { AdtAppendStructure } from './core/appendStructure';
+export type {
   IAuthorizationFieldConfig,
   IAuthorizationFieldState,
 } from './core/authorizationField';
@@ -178,6 +184,12 @@ export type {
   IProgramConfig,
   IProgramState,
 } from './core/program';
+export type {
+  AdtScalarFunctionType,
+  IScalarFunctionConfig,
+  IScalarFunctionState,
+} from './core/scalarFunction';
+export { AdtScalarFunction } from './core/scalarFunction';
 export type {
   AdtServiceBindingType,
   DesiredPublicationState,
