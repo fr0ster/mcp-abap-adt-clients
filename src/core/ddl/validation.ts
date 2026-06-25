@@ -20,16 +20,16 @@ import { getTimeout } from '../../utils/timeouts';
  * - Success: <CHECK_RESULT>X</CHECK_RESULT>
  * - Error: <exc:exception> with message about existing object or validation failure
  */
-export async function validateViewName(
+export async function validateDdlName(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
   packageName?: string,
   description?: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/ddic/ddl/validation`;
   const queryParams = new URLSearchParams({
     objtype: 'ddls',
-    objname: viewName,
+    objname: ddlName,
   });
 
   if (packageName) {

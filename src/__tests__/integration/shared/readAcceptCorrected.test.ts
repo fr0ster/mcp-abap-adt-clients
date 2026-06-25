@@ -489,11 +489,11 @@ describe('Shared - read Accept headers (corrected)', () => {
   });
 
   it('should read view source', async () => {
-    const viewName =
+    const ddlName =
       resolveStandardObject('view', isCloudSystem, testCase)?.name ||
-      testCase?.params?.view_name ||
+      testCase?.params?.ddl_name ||
       null;
-    if (!hasConfig || !hasTestCase || !viewName) {
+    if (!hasConfig || !hasTestCase || !ddlName) {
       testsLogger.warn?.(
         '⚠️ Skipping test: No SAP configuration, read_accept not configured, or view not configured',
       );
@@ -503,15 +503,15 @@ describe('Shared - read Accept headers (corrected)', () => {
     logTestStep('read view source', testsLogger);
     const state = await runReadWithAcceptLogging(
       'read view source',
-      client.getView().read({ viewName }, 'active'),
+      client.getDdl().read({ ddlName }, 'active'),
     );
-    assertReadResult(state, 'view source', viewName);
+    assertReadResult(state, 'view source', ddlName);
 
     const metadataState = await runReadMetadataWithAcceptLogging(
       'read view metadata',
-      client.getView().readMetadata({ viewName }),
+      client.getDdl().readMetadata({ ddlName }),
     );
-    assertMetadataResult(metadataState, 'view metadata', viewName);
+    assertMetadataResult(metadataState, 'view metadata', ddlName);
   });
 
   it('should read function group', async () => {

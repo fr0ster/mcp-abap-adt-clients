@@ -14,22 +14,22 @@ import {
 } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { IDeleteViewParams } from './types';
+import type { IDeleteDdlParams } from './types';
 
 /**
  * Low-level: Check if view can be deleted
  */
 export async function checkDeletion(
   connection: IAbapConnection,
-  params: IDeleteViewParams,
+  params: IDeleteDdlParams,
 ): Promise<AxiosResponse> {
-  const { view_name } = params;
+  const { ddl_name } = params;
 
-  if (!view_name) {
-    throw new Error('view_name is required');
+  if (!ddl_name) {
+    throw new Error('ddl_name is required');
   }
 
-  const encodedName = encodeSapObjectName(view_name);
+  const encodedName = encodeSapObjectName(ddl_name);
   const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
 
   const checkUrl = `/sap/bc/adt/deletion/check`;
@@ -56,17 +56,17 @@ export async function checkDeletion(
 /**
  * Low-level: Delete view (DDLS)
  */
-export async function deleteView(
+export async function deleteDdl(
   connection: IAbapConnection,
-  params: IDeleteViewParams,
+  params: IDeleteDdlParams,
 ): Promise<AxiosResponse> {
-  const { view_name, transport_request } = params;
+  const { ddl_name, transport_request } = params;
 
-  if (!view_name) {
-    throw new Error('view_name is required');
+  if (!ddl_name) {
+    throw new Error('ddl_name is required');
   }
 
-  const encodedName = encodeSapObjectName(view_name);
+  const encodedName = encodeSapObjectName(ddl_name);
   const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodedName}`;
 
   const deletionUrl = `/sap/bc/adt/deletion/delete`;
@@ -103,10 +103,10 @@ export async function deleteView(
     ...response,
     data: {
       success: true,
-      view_name,
+      ddl_name,
       object_uri: objectUri,
       transport_request: transport_request || 'local',
-      message: `View ${view_name} deleted successfully`,
+      message: `View ${ddl_name} deleted successfully`,
     },
   } as AxiosResponse;
 }

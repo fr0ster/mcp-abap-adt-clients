@@ -20,14 +20,14 @@ function getUtils(connection: IAbapConnection): AdtUtils {
 /**
  * Get ABAP view metadata (without source code)
  */
-export async function getViewMetadata(
+export async function getDdlMetadata(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectMetadata(
     'view',
-    viewName,
+    ddlName,
     undefined,
     options,
   );
@@ -36,15 +36,15 @@ export async function getViewMetadata(
 /**
  * Get ABAP view source code
  */
-export async function getViewSource(
+export async function getDdlSource(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
   version?: 'active' | 'inactive',
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
   return getUtils(connection).readObjectSource(
     'view',
-    viewName,
+    ddlName,
     undefined,
     version,
     options,
@@ -53,27 +53,27 @@ export async function getViewSource(
 
 /**
  * Get ABAP view (source code by default for backward compatibility)
- * @deprecated Use getViewSource() or getViewMetadata() instead
+ * @deprecated Use getDdlSource() or getDdlMetadata() instead
  */
-export async function getView(
+export async function getDdl(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
 ): Promise<AxiosResponse> {
-  return getViewSource(connection, viewName);
+  return getDdlSource(connection, ddlName);
 }
 
 /**
  * Get transport request for ABAP view
  * @param connection - SAP connection
- * @param viewName - View name
+ * @param ddlName - View name
  * @returns Transport request information
  */
-export async function getViewTransport(
+export async function getDdlTransport(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
   options?: IReadOptions,
 ): Promise<AxiosResponse> {
-  const encodedName = encodeSapObjectName(viewName);
+  const encodedName = encodeSapObjectName(ddlName);
   const query = options?.withLongPolling ? '?withLongPolling=true' : '';
   const url = `/sap/bc/adt/ddic/ddl/sources/${encodedName}/transport${query}`;
 

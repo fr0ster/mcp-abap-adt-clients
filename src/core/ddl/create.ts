@@ -9,17 +9,17 @@ import type {
 import { ACCEPT_VIEW, CT_VIEW } from '../../constants/contentTypes';
 import { limitDescription } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import type { ICreateViewParams } from './types';
+import type { ICreateDdlParams } from './types';
 
 /**
  * Create DDLS object with metadata
  */
 async function createDDLSObject(
   connection: IAbapConnection,
-  args: ICreateViewParams,
+  args: ICreateDdlParams,
 ): Promise<AxiosResponse> {
   // Description is limited to 60 characters in SAP ADT
-  const description = limitDescription(args.description || args.view_name);
+  const description = limitDescription(args.description || args.ddl_name);
   // Check if transport_request is provided and not empty
   // Handle both string and undefined/null cases safely
   const transportRequest = args.transport_request?.trim();
@@ -36,7 +36,7 @@ async function createDDLSObject(
     ? ` adtcore:responsible="${responsible}"`
     : '';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.view_name}" adtcore:type="DDLS/DF" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><ddl:ddlSource xmlns:ddl="http://www.sap.com/adt/ddic/ddlsources" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${args.masterLanguage || 'EN'}" adtcore:name="${args.ddl_name}" adtcore:type="DDLS/DF" adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
 </ddl:ddlSource>`;
 
@@ -57,14 +57,14 @@ async function createDDLSObject(
 /**
  * Create ABAP view (CDS DDLS object)
  * Low-level: Only creates the DDLS object metadata, does NOT lock/upload/activate
- * For complete workflow, use AdtView
+ * For complete workflow, use AdtDdl
  */
-export async function createView(
+export async function createDdl(
   connection: IAbapConnection,
-  params: ICreateViewParams,
+  params: ICreateDdlParams,
 ): Promise<AxiosResponse> {
-  if (!params.view_name || !params.package_name) {
-    throw new Error('Missing required parameters: view_name and package_name');
+  if (!params.ddl_name || !params.package_name) {
+    throw new Error('Missing required parameters: ddl_name and package_name');
   }
 
   return createDDLSObject(connection, params);

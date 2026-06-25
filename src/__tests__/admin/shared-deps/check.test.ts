@@ -28,7 +28,7 @@ const DEP_PARAM_MAP: Record<string, string> = {
 /** Map generic param names to shared_dependencies section names */
 const PARAM_TO_TYPE: Record<string, string> = {
   table_name: 'tables',
-  view_name: 'views',
+  ddl_name: 'views',
   access_control_name: 'access_controls',
   function_group_name: 'function_groups',
   function_module_name: 'function_modules',
@@ -237,14 +237,14 @@ describe('Config: shared_dependencies consistency', () => {
       if (typeof ac.source !== 'string') continue;
       const matches = ac.source.match(/grant\s+select\s+on\s+(\w+)/gi) || [];
       for (const match of matches) {
-        const viewName = match
+        const ddlName = match
           .replace(/grant\s+select\s+on\s+/i, '')
           .trim()
           .toUpperCase();
-        if (!allSharedNames.has(viewName)) continue;
-        if (!sharedViewNames.includes(viewName)) {
+        if (!allSharedNames.has(ddlName)) continue;
+        if (!sharedViewNames.includes(ddlName)) {
           errors.push(
-            `shared_dependencies.access_controls.${ac.name}: DDL references "${viewName}" not in shared_dependencies.views`,
+            `shared_dependencies.access_controls.${ac.name}: DDL references "${ddlName}" not in shared_dependencies.views`,
           );
         }
       }

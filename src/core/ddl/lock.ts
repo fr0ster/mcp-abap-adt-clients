@@ -16,9 +16,9 @@ import { getTimeout } from '../../utils/timeouts';
  */
 export async function lockDDLS(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
 ): Promise<string> {
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
     Accept: ACCEPT_LOCK,
@@ -51,9 +51,9 @@ export async function lockDDLS(
  */
 export async function lockDDLSForUpdate(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
 ): Promise<{ response: AxiosResponse; lockHandle: string; corrNr?: string }> {
-  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
+  const url = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}?_action=LOCK&accessMode=MODIFY`;
 
   const headers = {
     Accept: ACCEPT_LOCK,

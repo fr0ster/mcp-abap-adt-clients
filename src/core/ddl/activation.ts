@@ -14,8 +14,8 @@ import { encodeSapObjectName } from '../../utils/internalUtils';
  */
 export async function activateDDLS(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
 ): Promise<AxiosResponse> {
-  const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`;
-  return await activateObjectInSession(connection, objectUri, viewName, true);
+  const objectUri = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`;
+  return await activateObjectInSession(connection, objectUri, ddlName, true);
 }

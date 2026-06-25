@@ -1,5 +1,5 @@
 /**
- * AdtViewLegacy - View handler for legacy SAP systems (BASIS < 7.50)
+ * AdtDdlLegacy - View handler for legacy SAP systems (BASIS < 7.50)
  *
  * Overrides delete() to use direct DELETE instead of /sap/bc/adt/deletion/ API.
  */
@@ -9,27 +9,27 @@ import {
   safeErrorMessage,
 } from '../../utils/internalUtils';
 import { deleteObjectDirect } from '../shared/deleteLegacy';
-import { AdtView } from './AdtView';
+import { AdtDdl } from './AdtDdl';
 import { lockDDLS } from './lock';
-import type { IViewConfig, IViewState } from './types';
+import type { IDdlConfig, IDdlState } from './types';
 import { unlockDDLS } from './unlock';
 
-export class AdtViewLegacy extends AdtView {
-  override async delete(config: Partial<IViewConfig>): Promise<IViewState> {
-    if (!config.viewName) {
+export class AdtDdlLegacy extends AdtDdl {
+  override async delete(config: Partial<IDdlConfig>): Promise<IDdlState> {
+    if (!config.ddlName) {
       throw new Error('View name is required');
     }
 
-    const state: IViewState = { errors: [] };
+    const state: IDdlState = { errors: [] };
     let lockHandle: string | undefined;
 
     try {
       this.logger?.info?.('Locking view for deletion');
       this.connection.setSessionType('stateful');
-      lockHandle = await lockDDLS(this.connection, config.viewName);
+      lockHandle = await lockDDLS(this.connection, config.ddlName);
 
       this.logger?.info?.('Deleting view (direct DELETE)');
-      const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(config.viewName).toLowerCase()}`;
+      const objectUrl = `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(config.ddlName).toLowerCase()}`;
       state.deleteResult = await deleteObjectDirect(
         this.connection,
         objectUrl,
@@ -43,7 +43,7 @@ export class AdtViewLegacy extends AdtView {
       this.logger?.error?.('Delete failed:', safeErrorMessage(error));
       if (lockHandle) {
         try {
-          await unlockDDLS(this.connection, config.viewName, lockHandle);
+          await unlockDDLS(this.connection, config.ddlName, lockHandle);
         } catch (unlockError: unknown) {
           this.logger?.error?.(
             'Unlock after delete failure also failed:',

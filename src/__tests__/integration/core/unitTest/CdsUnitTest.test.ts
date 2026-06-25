@@ -144,7 +144,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
         const cdsUnitTestConfig = testCase.params.cds_unit_test;
         const className = cdsUnitTestConfig.class_name;
         const testClassName = cdsUnitTestConfig.test_class_name;
-        const viewName = testCase.params.view_name;
+        const ddlName = testCase.params.ddl_name;
         const classTemplate = cdsUnitTestConfig.template_xml;
         const testClassSource = cdsUnitTestConfig.test_class_source;
         const transportRequest = resolveTransportRequest(
@@ -155,7 +155,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
         if (
           !className ||
           !testClassName ||
-          !viewName ||
+          !ddlName ||
           !classTemplate ||
           !testClassSource
         ) {
@@ -170,7 +170,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           logTestSkip(
             testsLogger,
             'CdsUnitTest - create CDS unit test class',
-            'Required parameters missing: class_name, test_class_name, view_name, template_xml, or test_class_source',
+            'Required parameters missing: class_name, test_class_name, ddl_name, template_xml, or test_class_source',
           );
           return;
         }
@@ -180,7 +180,7 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           params: {
             class_name: className,
             test_class_name: testClassName,
-            view_name: viewName,
+            ddl_name: ddlName,
             package_name: packageName,
           },
         });
@@ -207,11 +207,11 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
             );
           }
 
-          if (viewName) {
+          if (ddlName) {
             const viewResult = await ensureSharedDependency(
               client,
               'views',
-              viewName,
+              ddlName,
               testsLogger,
             );
 
@@ -239,15 +239,15 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           }
 
           // Step 1: Check CDS view availability for unit test doubles
-          if (viewName) {
+          if (ddlName) {
             logTestStep('checkCdsTestDoubles', testsLogger);
             testsLogger.info?.(
               'Checking CDS view for unit test doubles:',
-              viewName,
+              ddlName,
             );
             const checkResponse = await checkCdsTestDoublesAvailability(
               connection,
-              viewName,
+              ddlName,
             );
             expect(checkResponse).toBeDefined();
             expect(checkResponse.status).toBe(200);
@@ -259,11 +259,11 @@ describe('AdtCdsUnitTest (using AdtClient)', () => {
           const cdsUnitTestConfigForCreate: ICdsUnitTestConfig = {
             className,
             packageName,
-            cdsViewName: viewName,
+            cdsViewName: ddlName,
             classTemplate,
             testClassSource,
             description:
-              cdsUnitTestConfig.description || `CDS unit test for ${viewName}`,
+              cdsUnitTestConfig.description || `CDS unit test for ${ddlName}`,
             transportRequest,
           };
 

@@ -5,8 +5,8 @@
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 // Low-level function parameters (snake_case)
-export interface ICreateViewParams {
-  view_name: string;
+export interface ICreateDdlParams {
+  ddl_name: string;
   ddl_source?: string; // Optional - only metadata creation in low-level function
   package_name: string;
   transport_request?: string;
@@ -16,24 +16,24 @@ export interface ICreateViewParams {
   masterLanguage?: string;
 }
 
-export interface IUpdateViewSourceParams {
-  view_name: string;
+export interface IUpdateDdlSourceParams {
+  ddl_name: string;
   ddl_source: string;
   activate?: boolean;
   lock_handle?: string;
   transport_request?: string;
 }
 
-export interface IDeleteViewParams {
-  view_name: string;
+export interface IDeleteDdlParams {
+  ddl_name: string;
   transport_request?: string;
 }
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)
 // description is required for create/validate operations
-export interface IViewConfig {
-  viewName: string;
+export interface IDdlConfig {
+  ddlName: string;
   masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
@@ -43,4 +43,4 @@ export interface IViewConfig {
   onLock?: (lockHandle: string) => void;
 }
 
-export interface IViewState extends IAdtObjectState {}
+export interface IDdlState extends IAdtObjectState {}
