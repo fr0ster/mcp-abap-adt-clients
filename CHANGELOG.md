@@ -3,6 +3,14 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.1.0] - 2026-06-26
+
+### Added
+- **`getWhereUsedList` type filtering** — new `enableOnlyTypes?: string[]` and `disableTypes?: string[]` on `IGetWhereUsedListParams`. `enableOnlyTypes` restricts the where-used search to specific ADT object types (e.g. `['TABL/DS', 'TABL/DT']`), so SAP applies the selection server-side and never searches — nor returns — the unwanted types (e.g. hundreds of `CLAS/OC`). `disableTypes` prunes types from the default scope. `enableOnlyTypes` takes precedence over `enableAllTypes`; `disableTypes` is applied on top.
+
+### Fixed
+- **`modifyWhereUsedScope` attribute-order bug** — the `enableOnly` / `enable` / `disable` options silently never matched, because the implementation assumed the scope XML emits `name` before `isSelected`, whereas SAP emits `isDefault isSelected name` (name LAST). Reworked to flip `isSelected` per `<usagereferences:type>` tag independent of attribute order, preserving tag order and the opaque `payload` blob. `enableAll` was unaffected.
+
 ## [6.0.0] - 2026-06-25
 
 ### Added
