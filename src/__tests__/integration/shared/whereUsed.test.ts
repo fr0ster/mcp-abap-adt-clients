@@ -7,12 +7,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { createAbapConnection, type SapConfig } from '@mcp-abap-adt/connection';
+import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../clients/AdtClient';
 import { isCloudEnvironment } from '../../../utils/systemInfo';
-import { createTestAdtClient } from '../../helpers/sessionConfig';
+import { createTestAdtClient, getConfig } from '../../helpers/sessionConfig';
 import { TestConfigResolver } from '../../helpers/TestConfigResolver';
 import { createTestsLogger } from '../../helpers/testLogger';
 import { logTestSkip, logTestStep } from '../../helpers/testProgressLogger';
@@ -26,64 +26,6 @@ if (fs.existsSync(envPath)) {
 }
 
 const testsLogger = createTestsLogger();
-
-function getConfig(): SapConfig {
-  const rawUrl = process.env.SAP_URL;
-  const url = rawUrl ? rawUrl.split('#')[0].trim() : rawUrl;
-  const rawClient = process.env.SAP_CLIENT;
-  const client = rawClient ? rawClient.split('#')[0].trim() : rawClient;
-  const rawAuthType = process.env.SAP_AUTH_TYPE || 'basic';
-  const authType = rawAuthType.split('#')[0].trim();
-
-  if (!url || !/^https?:\/\//.test(url)) {
-    throw new Error(`Missing or invalid SAP_URL: ${url}`);
-  }
-
-  const config: SapConfig = {
-    url,
-    authType: authType === 'xsuaa' ? 'jwt' : (authType as 'basic' | 'jwt'),
-  };
-
-  if (client) {
-    config.client = client;
-  }
-
-  if (authType === 'jwt' || authType === 'xsuaa') {
-    const jwtToken = process.env.SAP_JWT_TOKEN;
-    if (!jwtToken) {
-      throw new Error('Missing SAP_JWT_TOKEN for JWT authentication');
-    }
-    config.jwtToken = jwtToken;
-
-    // Add refresh credentials for auto-refresh (if available)
-    const refreshToken = process.env.SAP_REFRESH_TOKEN;
-    if (refreshToken) {
-      config.refreshToken = refreshToken;
-    }
-
-    const uaaUrl = process.env.SAP_UAA_URL || process.env.UAA_URL;
-    const uaaClientId =
-      process.env.SAP_UAA_CLIENT_ID || process.env.UAA_CLIENT_ID;
-    const uaaClientSecret =
-      process.env.SAP_UAA_CLIENT_SECRET || process.env.UAA_CLIENT_SECRET;
-
-    if (uaaUrl) config.uaaUrl = uaaUrl;
-    if (uaaClientId) config.uaaClientId = uaaClientId;
-    if (uaaClientSecret) config.uaaClientSecret = uaaClientSecret;
-  } else {
-    const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
-    if (!username || !password) {
-      throw new Error(
-        'Missing SAP_USERNAME or SAP_PASSWORD for basic authentication',
-      );
-    }
-    config.username = username;
-    config.password = password;
-  }
-
-  return config;
-}
 
 describe('Shared - getWhereUsed', () => {
   let connection: IAbapConnection;
@@ -569,4 +511,108 @@ describe('Shared - getWhereUsed', () => {
     testsLogger.info?.(`📊 Raw XML size: ${result.rawXml?.length} bytes`);
     testsLogger.info?.('✅ Test complete: raw XML included');
   }, 30000);
+
+  it('narrows results to selected object types (enableOnlyTypes vs enableAllTypes)', async () => {
+    if (!hasConfig) {
+      testsLogger.warn?.(
+        '⚠️ Skipping test: No .env file or SAP configuration found',
+      );
+      return;
+    }
+
+    const resolver = new TestConfigResolver({
+      isCloud: isCloudSystem,
+      isLegacy,
+      logger: testsLogger,
+      handlerName: 'where_used',
+      testCaseName: 'where_used_list_filtered',
+    });
+    if (!resolver.isAvailableForEnvironment()) {
+      logTestSkip(
+        testsLogger,
+        'Shared - getWhereUsed',
+        'Test not available for current environment',
+      );
+      return;
+    }
+
+    const params = resolver.getParams();
+    const objectName =
+      params.object_name || resolver.getObjectName('object_name', 'table');
+    const objectType = params.object_type || 'table';
+    const onlyTypes: string[] = params.enable_only_types || ['DDLS/DF'];
+    if (!objectName) {
+      logTestSkip(testsLogger, 'Shared - getWhereUsed', 'No object configured');
+      return;
+    }
+
+    const utils = client.getUtils();
+
+    // Step 1: search ALL types — the "select all" baseline.
+    logTestStep('where-used: ALL types (baseline)', testsLogger);
+    const all = await utils.getWhereUsedList({
+      object_name: objectName,
+      object_type: objectType,
+      enableAllTypes: true,
+    });
+    const allTypes = [...new Set(all.references.map((r) => r.type))].sort();
+    testsLogger.info?.(
+      `📊 ALL: ${all.references.length} refs across types [${allTypes.join(', ')}]`,
+    );
+
+    // The baseline must actually reference the type we keep, otherwise the
+    // "keep" comparison below proves nothing about server-side filtering.
+    const keepType =
+      onlyTypes.find((t) => allTypes.includes(t)) ||
+      allTypes[0] ||
+      onlyTypes[0];
+
+    // Step 2a (KEEP): narrow to a type that IS referenced — count is unchanged
+    // for that type, and no other type leaks in.
+    logTestStep(`where-used: ONLY [${keepType}] (present)`, testsLogger);
+    const kept = await utils.getWhereUsedList({
+      object_name: objectName,
+      object_type: objectType,
+      enableOnlyTypes: [keepType],
+    });
+    const keptTypes = [...new Set(kept.references.map((r) => r.type))].sort();
+    testsLogger.info?.(
+      `📊 KEEP [${keepType}]: ${kept.references.length} refs across types [${keptTypes.join(', ')}]`,
+    );
+
+    // Every returned reference must be the type we asked for — proves SAP did
+    // not search (and did not return) any of the other ~40 object types.
+    for (const ref of kept.references) {
+      expect(ref.type).toBe(keepType);
+    }
+    expect(kept.references.length).toBeLessThanOrEqual(all.references.length);
+    if (allTypes.includes(keepType)) {
+      expect(kept.references.length).toBeGreaterThan(0);
+    }
+
+    // Step 2b (EXCLUDE): narrow to a type that is NOT referenced — the result
+    // must collapse, demonstrating the filter is applied server-side.
+    const KNOWN_TYPES = ['CLAS/OC', 'INTF/OI', 'PROG/1P', 'FUGR/FF', 'DOMA/DD'];
+    const absentType = KNOWN_TYPES.find((t) => !allTypes.includes(t));
+    if (absentType) {
+      logTestStep(`where-used: ONLY [${absentType}] (absent)`, testsLogger);
+      const excluded = await utils.getWhereUsedList({
+        object_name: objectName,
+        object_type: objectType,
+        enableOnlyTypes: [absentType],
+      });
+      testsLogger.info?.(
+        `📊 EXCLUDE [${absentType}]: ${excluded.references.length} refs (baseline had ${all.references.length})`,
+      );
+      // Filtering to a type the object does not reference yields no results,
+      // even though enableAllTypes returned matches.
+      expect(excluded.references.length).toBe(0);
+    } else {
+      testsLogger.warn?.(
+        '⚠️ Could not pick an absent type — skipping the exclude assertion',
+      );
+    }
+
+    testsLogger.info?.('✅ Test complete: type filtering verified against SAP');
+  }, 45000);
 });

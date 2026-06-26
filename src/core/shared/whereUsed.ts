@@ -67,45 +67,48 @@ export function modifyWhereUsedScope(
     disable?: string[];
   },
 ): string {
-  let result = scopeXml;
+  // Each available type is a self-closing <usagereferences:type .../> tag.
+  // We rewrite ONLY the isSelected attribute per tag and never touch the
+  // opaque <usagereferences:payload> blob or attribute ordering — SAP emits
+  // attributes as `isDefault isSelected name`, so logic must read `name`
+  // wherever it appears, not assume it precedes isSelected.
+  const typeTagRegex = /<usagereferences:type\b[^>]*?\/>/g;
 
-  if (options.enableAll) {
-    // Enable all object types
-    result = result.replace(/isSelected="false"/g, 'isSelected="true"');
-  } else if (options.enableOnly) {
-    // First disable all, then enable only specified
-    result = result.replace(/isSelected="true"/g, 'isSelected="false"');
-    for (const typeName of options.enableOnly) {
-      const typeRegex = new RegExp(
-        `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`,
-        'g',
-      );
-      result = result.replace(typeRegex, '$1 $2"true"');
+  return scopeXml.replace(typeTagRegex, (tag) => {
+    const nameMatch = tag.match(/\bname="([^"]*)"/);
+    const name = nameMatch ? nameMatch[1] : '';
+
+    let selected: boolean | undefined;
+    if (options.enableAll) {
+      selected = true;
+    } else if (options.enableOnly) {
+      selected = options.enableOnly.includes(name);
+    } else {
+      if (options.enable?.includes(name)) selected = true;
+      if (options.disable?.includes(name)) selected = false;
     }
-  } else {
-    // Enable specific types (keep existing selections)
-    if (options.enable) {
-      for (const typeName of options.enable) {
-        const typeRegex = new RegExp(
-          `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`,
-          'g',
-        );
-        result = result.replace(typeRegex, '$1 $2"true"');
-      }
-    }
-    // Disable specific types
-    if (options.disable) {
-      for (const typeName of options.disable) {
-        const typeRegex = new RegExp(
-          `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"true"`,
-          'g',
-        );
-        result = result.replace(typeRegex, '$1 $2"false"');
-      }
-    }
+
+    if (selected === undefined) return tag;
+    return setIsSelected(tag, selected);
+  });
+}
+
+/**
+ * Set the isSelected attribute on a single <usagereferences:type> tag,
+ * inserting it if absent. Leaves all other attributes and their order intact.
+ */
+function setIsSelected(typeTag: string, selected: boolean): string {
+  const value = selected ? 'true' : 'false';
+  if (/\bisSelected="(?:true|false)"/.test(typeTag)) {
+    return typeTag.replace(
+      /\bisSelected="(?:true|false)"/,
+      `isSelected="${value}"`,
+    );
   }
-
-  return result;
+  return typeTag.replace(
+    /<usagereferences:type\b/,
+    `<usagereferences:type isSelected="${value}"`,
+  );
 }
 
 /**
@@ -294,14 +297,23 @@ export async function getWhereUsed(
  *
  * @example
  * ```typescript
- * const result = await getWhereUsedList(connection, {
+ * // Search every object type (Eclipse 'select all') — may return many results
+ * const all = await getWhereUsedList(connection, {
  *   object_name: 'ZMY_TABLE',
  *   object_type: 'table',
  *   enableAllTypes: true
  * });
  *
- * console.log(`Found ${result.totalReferences} references`);
- * for (const ref of result.references) {
+ * // Or restrict to just the types you care about (e.g. only structures/tables),
+ * // so SAP never searches — and never returns — hundreds of classes.
+ * const structuresOnly = await getWhereUsedList(connection, {
+ *   object_name: 'ZMY_TABLE',
+ *   object_type: 'table',
+ *   enableOnlyTypes: ['TABL/DS', 'TABL/DT']
+ * });
+ *
+ * console.log(`Found ${structuresOnly.totalReferences} references`);
+ * for (const ref of structuresOnly.references) {
  *   console.log(`${ref.name} (${ref.type}) in package ${ref.packageName}`);
  * }
  * ```
@@ -319,13 +331,32 @@ export async function getWhereUsedList(
 
   let scopeXml: string | undefined;
 
-  // If enableAllTypes, fetch scope and modify it
-  if (params.enableAllTypes) {
+  // Fetch and modify the scope only when the caller wants to constrain which
+  // object types are searched. Otherwise getWhereUsed() falls back to SAP's
+  // default scope.
+  const enableOnly = params.enableOnlyTypes?.length
+    ? params.enableOnlyTypes
+    : undefined;
+  const disable = params.disableTypes?.length ? params.disableTypes : undefined;
+
+  if (params.enableAllTypes || enableOnly || disable) {
     const scopeResponse = await getWhereUsedScope(connection, {
       object_name: params.object_name,
       object_type: params.object_type,
     });
-    scopeXml = modifyWhereUsedScope(scopeResponse.data, { enableAll: true });
+
+    // enableOnly wins over enableAll; disable is then applied on top so callers
+    // can both narrow to a set and prune one of those, in a single pass.
+    let modified = scopeResponse.data;
+    if (enableOnly) {
+      modified = modifyWhereUsedScope(modified, { enableOnly });
+    } else if (params.enableAllTypes) {
+      modified = modifyWhereUsedScope(modified, { enableAll: true });
+    }
+    if (disable) {
+      modified = modifyWhereUsedScope(modified, { disable });
+    }
+    scopeXml = modified;
   }
 
   // Execute where-used search
