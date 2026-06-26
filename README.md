@@ -185,6 +185,14 @@ for (const ref of result.references) {
   console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
 }
 
+// Restrict to specific object types — SAP filters server-side, so it never
+// returns the unwanted types (e.g. hundreds of classes when you want structures)
+await utils.getWhereUsedList({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+  enableOnlyTypes: ['TABL/DS', 'TABL/DT']  // or disableTypes: ['CLAS/OC']
+});
+
 // Where-used with raw XML (legacy)
 await utils.getWhereUsed({ object_name: 'ZCL_TEST', object_type: 'class' });
 ```

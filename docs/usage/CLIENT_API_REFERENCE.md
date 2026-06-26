@@ -323,6 +323,37 @@ const result = await utils.getWhereUsed({
 });
 ```
 
+`getWhereUsedList` is a convenience wrapper that performs the scope fetch, search, and
+XML parsing in one call and returns structured `references`. Use `enableOnlyTypes` to
+restrict the search to specific ADT object types — SAP applies the selection server-side,
+so it never searches (nor returns) the unwanted types, e.g. hundreds of `CLAS/OC`:
+
+```typescript
+const utils = client.getUtils();
+
+// Only structures/tables — not the dozens of other referencing types.
+const result = await utils.getWhereUsedList({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+  enableOnlyTypes: ['TABL/DS', 'TABL/DT'],
+});
+
+console.log(`Found ${result.totalReferences} references`);
+for (const ref of result.references) {
+  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+}
+
+// Or keep the default SAP scope but prune a noisy type:
+await utils.getWhereUsedList({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+  disableTypes: ['CLAS/OC'],
+});
+
+// `enableAllTypes: true` selects every type (Eclipse "select all"); `enableOnlyTypes`
+// takes precedence over it, and `disableTypes` is applied on top.
+```
+
 ## AdtClientBatch
 
 `AdtClientBatch` wraps `AdtClient` with a recording connection that collects requests

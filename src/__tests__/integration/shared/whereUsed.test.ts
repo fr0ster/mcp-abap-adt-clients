@@ -590,10 +590,27 @@ describe('Shared - getWhereUsed', () => {
       expect(kept.references.length).toBeGreaterThan(0);
     }
 
-    // Step 2b (EXCLUDE): narrow to a type that is NOT referenced — the result
-    // must collapse, demonstrating the filter is applied server-side.
-    const KNOWN_TYPES = ['CLAS/OC', 'INTF/OI', 'PROG/1P', 'FUGR/FF', 'DOMA/DD'];
-    const absentType = KNOWN_TYPES.find((t) => !allTypes.includes(t));
+    // Step 2b (EXCLUDE): narrow to a type that SAP CAN search for this object
+    // (it is offered in the scope) but which the object does not reference.
+    // Deriving the candidate from the live scope — not a hardcoded list —
+    // guarantees enableOnlyTypes actually selects a searchable type, so a zero
+    // result proves the filter excluded the referenced type rather than simply
+    // selecting nothing.
+    const scopeResponse = await utils.getWhereUsedScope({
+      object_name: objectName,
+      object_type: objectType,
+    });
+    const scopeTypes = [
+      ...new Set(
+        [...String(scopeResponse.data).matchAll(/name="([^"]+)"/g)].map(
+          (m) => m[1],
+        ),
+      ),
+    ];
+    const absentType = scopeTypes.find((t) => !allTypes.includes(t));
+    testsLogger.info?.(
+      `🔎 Scope offers ${scopeTypes.length} types; picking absent-but-searchable: ${absentType}`,
+    );
     if (absentType) {
       logTestStep(`where-used: ONLY [${absentType}] (absent)`, testsLogger);
       const excluded = await utils.getWhereUsedList({
