@@ -164,7 +164,8 @@ Critical conventions used across object modules:
 Notably, where-used supports:
 - scope fetch (`getWhereUsedScope`),
 - local scope mutation (`modifyWhereUsedScope`),
-- execution (`getWhereUsed`) and parsed convenience (`getWhereUsedList`).
+- execution (`getWhereUsed`) and parsed convenience (`getWhereUsedList`),
+- server-side type filtering via `getWhereUsedList({ enableOnlyTypes, disableTypes })` — SAP searches (and returns) only the selected object types.
 
 ## Accept Negotiation (406 Recovery)
 
