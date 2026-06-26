@@ -1733,6 +1733,15 @@ where_used:
         object_type: "table"
         include_raw_xml: true
 
+    - name: "where_used_list_filtered"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Compare enableAllTypes (everything) vs enableOnlyTypes (narrowed to one type). ZAC_SHR_VTABL is referenced by the CDS view ZAC_SHR_CDSUT_DDLS (DDLS/DF)."
+      params:
+        object_name: "ZAC_SHR_VTABL"  # → referenced by ZAC_SHR_CDSUT_DDLS
+        object_type: "table"
+        enable_only_types: ["DDLS/DF"]  # keep only CDS DDL sources
+
 # Read Accept (read methods should return 2xx; 406 is error)
 read_accept:
   test_cases:
