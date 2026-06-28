@@ -92,15 +92,31 @@ Inside the interface body, after the existing members:
   getVersionSource(contentUri: string): Promise<string>;
 ```
 
-- [ ] **Step 4: Build interfaces**
+- [ ] **Step 4: Export `IObjectVersion` from the package root**
+
+`interfaces/src/index.ts` uses a **selective** export for this module
+(`export type { IAdtObject, IAdtOperationOptions } from './adt/IAdtObject';` on
+line 87) — `export *` is NOT used, so a new type is not re-exported
+automatically. `AdtObjectErrorCodes` is already re-exported (line 88), so
+`UNSUPPORTED_OPERATION` needs no change. Add `IObjectVersion` to the type export:
+```ts
+export type {
+  IAdtObject,
+  IAdtOperationOptions,
+  IObjectVersion,
+} from './adt/IAdtObject';
+```
+
+- [ ] **Step 5: Build interfaces**
 
 Run: `cd /home/okyslytsia/prj/mcp-abap-adt-interfaces && npm run build`
-Expected: clean compile. (`IObjectVersion` is exported because `IAdtObject.ts` is re-exported by `src/index.ts`; confirm with `grep -n "IAdtObject" src/index.ts`.)
+Expected: clean compile. Confirm the root export resolves:
+`node -e "const i=require('./dist/index.js'); console.log(i.AdtObjectErrorCodes.UNSUPPORTED_OPERATION)"` → prints `ADT_UNSUPPORTED_OPERATION`.
 
-- [ ] **Step 5: Commit (interfaces repo)**
+- [ ] **Step 6: Commit (interfaces repo)**
 
 ```bash
-git add src/adt/IAdtObject.ts
+git add src/adt/IAdtObject.ts src/index.ts
 git commit -m "feat!: add IObjectVersion + getVersions/getVersionSource to IAdtObject (UNSUPPORTED_OPERATION)"
 ```
 
@@ -647,17 +663,23 @@ Expected: FAIL — `getVersions` not implemented on `AdtPackage`.
 
 - [ ] **Step 3: Implement on each non-source `AdtXxx`**
 
+The methods MUST be `async` so the throw becomes a **rejected promise** (the
+interface returns `Promise<…>`, and the unit test uses `.rejects`). A
+synchronous `return throwUnsupportedVersions(...)` would throw before a promise
+is returned and break `.rejects`.
 ```ts
 import { throwUnsupportedVersions } from '../shared/versions';
 // …inside the class…
-getVersions(_config: Partial<IPackageConfig>) {
-  return throwUnsupportedVersions('package');
+async getVersions(_config: Partial<IPackageConfig>): Promise<IObjectVersion[]> {
+  throwUnsupportedVersions('package'); // throws; in an async fn → rejected promise
 }
-getVersionSource(_contentUri: string): Promise<string> {
-  return throwUnsupportedVersions('package');
+async getVersionSource(_contentUri: string): Promise<string> {
+  throwUnsupportedVersions('package');
 }
 ```
-(`throwUnsupportedVersions` returns `never`, so it satisfies both `Promise<...>` return types — it throws synchronously; if a strict signature needs a Promise, wrap as `return Promise.reject(...)` by calling the helper inside an `async` method.)
+(`throwUnsupportedVersions` is typed `: never`, so no `return` is needed and TS
+accepts the `async` method's return type. Import `IObjectVersion` from
+`@mcp-abap-adt/interfaces` for the annotation.)
 
 - [ ] **Step 4: Run unit tests + build**
 
@@ -678,10 +700,18 @@ git commit -m "feat(versions): non-source types throw UNSUPPORTED_OPERATION"
 ### Task 7.1: Full build + unit suite + docs
 
 - [ ] **Step 1:** `npm run build && SAP_URL= npx jest src/__tests__/unit` — all green; every `AdtXxx` compiles against the new `IAdtObject`.
-- [ ] **Step 2:** Add a short `getVersions`/`getVersionSource` example to `docs/usage/CLIENT_API_REFERENCE.md` (list + fetch source), matching the where-used example style.
-- [ ] **Step 3:** Update `CHANGELOG.md` only on explicit user request, noting the interfaces **major** (added required `IAdtObject` methods) and adt-clients support.
-- [ ] **Step 4:** Delete the spec and this plan file once implemented (history lives in git), per repo convention.
-- [ ] **Step 5:** Commit.
+- [ ] **Step 2 (MANDATORY — normalize the interfaces dependency):** Task 1.2 installed a **local tarball/file** dependency for development. Before any release/final commit it MUST be replaced with the **published** interfaces major. After the user publishes interfaces:
+  ```bash
+  # set the published major in package.json (e.g. "^8.0.0"), then:
+  npm install --package-lock-only
+  grep -nE '"@mcp-abap-adt/interfaces".*(file:|\.tgz)' package-lock.json   # must be EMPTY
+  grep -c '"link": true' package-lock.json                                # must be 0
+  ```
+  Expected: no `file:`/`.tgz` reference to interfaces remains, `0` link entries. Commit `package.json` + `package-lock.json`. The build (`npm run build`) must still pass against the registry version. Do NOT proceed to release while a tarball/file dependency is present.
+- [ ] **Step 3:** Add a short `getVersions`/`getVersionSource` example to `docs/usage/CLIENT_API_REFERENCE.md` (list + fetch source), matching the where-used example style.
+- [ ] **Step 4:** Update `CHANGELOG.md` only on explicit user request, noting the interfaces **major** (added required `IAdtObject` methods) and adt-clients support.
+- [ ] **Step 5:** Delete the spec and this plan file once implemented (history lives in git), per repo convention.
+- [ ] **Step 6:** Commit.
 
 ---
 
