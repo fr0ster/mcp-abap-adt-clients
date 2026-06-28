@@ -106,6 +106,46 @@ git commit -m "feat!: add IObjectVersion + getVersions/getVersionSource to IAdtO
 
 This is a **breaking** (major) change — required methods added to an exported interface. Version bump is done at release time on explicit request.
 
+### Task 1.2: Bridge the interfaces change into adt-clients (dependency update)
+
+adt-clients currently depends on `@mcp-abap-adt/interfaces` **`^7.3.0`**, which does NOT contain `IObjectVersion` or `AdtObjectErrorCodes.UNSUPPORTED_OPERATION`. Phase 2 imports them, so the dependency must be updated first. This is an explicit, executable step — not an assumption.
+
+**Files:**
+- Modify: `adt-clients/package.json` (interfaces dep), `adt-clients/package-lock.json`
+
+- [ ] **Step 1: Make the new interfaces build available locally**
+
+From the interfaces repo (already built in Task 1.1):
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
+npm pack            # produces mcp-abap-adt-interfaces-<version>.tgz
+```
+Note the tarball path. (For the real release the user publishes the interfaces **major** to npm instead; the local tarball is only to develop/iterate before that publish.)
+
+- [ ] **Step 2: Install the tarball into adt-clients**
+
+```bash
+cd /home/okyslytsia/prj/mcp-abap-adt-clients
+npm install /home/okyslytsia/prj/mcp-abap-adt-interfaces/mcp-abap-adt-interfaces-<version>.tgz
+```
+
+- [ ] **Step 3: Verify the new exports resolve and the lockfile is clean**
+
+```bash
+node -e "const i=require('@mcp-abap-adt/interfaces'); if(!i.AdtObjectErrorCodes.UNSUPPORTED_OPERATION) throw new Error('missing'); console.log('ok')"
+grep -c '"link": true' package-lock.json   # must be 0
+```
+Expected: `ok`, and `0` link entries.
+
+- [ ] **Step 4: Commit the dependency bump**
+
+```bash
+git add package.json package-lock.json
+git commit -m "build(deps): bump @mcp-abap-adt/interfaces for IObjectVersion + UNSUPPORTED_OPERATION"
+```
+
+> **Release note:** at release, repoint `package.json` to the **published** interfaces major version (not the tarball) and re-run Step 3's link check; the tarball/file dependency must NOT ship in the released `package-lock.json`.
+
 ---
 
 ## Phase 2 — shared pure helpers (adt-clients)
@@ -117,7 +157,7 @@ This is a **breaking** (major) change — required methods added to an exported 
 - Test: `adt-clients/src/__tests__/unit/versionsParse.test.ts`
 
 **Interfaces:**
-- Consumes: `IObjectVersion`, `AdtOperationError`, `AdtObjectErrorCodes` from `@mcp-abap-adt/interfaces` (Task 1.1 — bump the dep first if resolving from registry).
+- Consumes: `IObjectVersion`, `AdtOperationError`, `AdtObjectErrorCodes` from `@mcp-abap-adt/interfaces` — available only after Task 1.2 (dependency bridge).
 - Produces: `parseVersionsFeed(xml: string): IObjectVersion[]`; `throwUnsupportedVersions(detail?: string): never`.
 
 - [ ] **Step 1: Write the failing test**
@@ -470,7 +510,8 @@ export type ClassIncludeType =
   | 'main'
   | 'definitions'
   | 'implementations'
-  | 'testclasses';
+  | 'testclasses'
+  | 'macros';
 
 export async function getClassIncludeVersions(
   connection: IAbapConnection,
@@ -512,7 +553,22 @@ export async function getClassVersionSource(
 
 - [ ] **Step 4: Wire into `AdtClass` and the local-include handlers**
 
-`AdtClass.getVersions(config)` → `getClassIncludeVersions(this.connection, config.className!, 'main')`; `getVersionSource` → `getClassVersionSource`. Each local-include handler passes its own `includeType` (`getLocalTypes` → `'definitions'`, `getLocalTestClass` → `'testclasses'`, etc.). Inspect the classes those accessors return (`src/core/class/...`) and add the two methods to each.
+`AdtClass.getVersions(config)` → `getClassIncludeVersions(this.connection, config.className!, 'main')`; `getVersionSource` → `getClassVersionSource`.
+
+The local-include accessor → `includeType` mapping is **verified against the code** (each `AdtLocalXxx.read()` calls the matching `getClass*Include`), so use exactly:
+
+| Accessor | Class | reads include | `includeType` |
+|---|---|---|---|
+| `getLocalDefinitions()` | `AdtLocalDefinitions` | `getClassDefinitionsInclude` | `'definitions'` (CCDEF) |
+| `getLocalTypes()` | `AdtLocalTypes` | `getClassImplementationsInclude` | **`'implementations'`** (CCIMP) |
+| `getLocalTestClass()` | `AdtLocalTestClass` | (testclasses) | `'testclasses'` (CCAU) |
+| `getLocalMacros()` | `AdtLocalMacros` | `getClassMacrosInclude` | `'macros'` — **UNVERIFIED** (see below) |
+
+Add `getVersions`/`getVersionSource` to each of `AdtLocalDefinitions`, `AdtLocalTypes`, `AdtLocalTestClass`, `AdtLocalMacros` (in `src/core/class/AdtLocal*.ts`), each passing its own `includeType` per the table.
+
+**Macros caveat:** `includes/macros/versions` was NOT probe-verified (only main/definitions/implementations/testclasses were). In this step, **probe** `/sap/bc/adt/oo/classes/zac_shr_dmp01/includes/macros/versions` (Accept `application/atom+xml;type=feed`) on trial:
+- if 200 → `AdtLocalMacros.getVersions` uses `getClassIncludeVersions(..., 'macros')` like the others;
+- if 404/406 → `AdtLocalMacros.getVersions` instead calls `throwUnsupportedVersions('class macros')` (non-source pattern). Record which path was taken.
 
 - [ ] **Step 5: Run unit tests + build**
 
@@ -545,9 +601,10 @@ For each remaining source-bearing type, repeat the Task 3.1 pattern in its own `
 | function module | `AdtFunctionModule` | `/sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main/versions` |
 | ddl / CDS | `AdtDdl` | `/sap/bc/adt/ddic/ddl/sources/{name}/source/main/versions` |
 | structure | `AdtStructure` | `/sap/bc/adt/ddic/structures/{name}/source/main/versions` |
-| (others with `/source/main`) | … | `<sourceUri>/source/main/versions` |
 
-- [ ] **Per type, Step A: probe** the candidate URI on trial (a throwaway probe like the ones in the spec's findings — GET with `Accept: application/atom+xml;type=feed`). If 200 → supported, record the exact URI; if 404/406 → it is NOT a `source/main/versions` type (treat as non-source in Phase 6, or find its real shape and record it).
+There is **no generic catch-all row**: every type ships its own exact, probed URI. A type not in this table is not in scope for Phase 5 — add it explicitly with its probed URI, or treat it as non-source in Phase 6.
+
+- [ ] **Per type, Step A: probe** the candidate URI on trial (a throwaway probe like the ones in the spec's findings — GET with `Accept: application/atom+xml;type=feed`). If 200 → supported, **record the exact probed URI** in the type's `versions.ts`; if 404/406 → it is NOT a `source/main/versions` type (treat as non-source in Phase 6, or find its real shape by probing and record it).
 - [ ] **Per type, Step B:** implement `{type}/versions.ts` + `AdtXxx` methods + unit test mirroring Task 3.1 (fake-connection: asserts the verified URL + Accept + parse; 404 → `UNSUPPORTED_OPERATION`).
 - [ ] **Per type, Step C:** `SAP_URL= npx jest src/__tests__/unit/{type}Versions.test.ts && npm run build`; commit `feat(versions): Adt{Type} versions`.
 
