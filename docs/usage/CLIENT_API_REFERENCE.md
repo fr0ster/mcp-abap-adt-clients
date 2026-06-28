@@ -328,6 +328,11 @@ XML parsing in one call and returns structured `references`. Use `enableOnlyType
 restrict the search to specific ADT object types — SAP applies the selection server-side,
 so it never searches (nor returns) the unwanted types, e.g. hundreds of `CLAS/OC`:
 
+> On systems that do not expose the `/usageReferences/scope` sub-resource (some S/4
+> releases answer it with HTTP 404), server-side filtering is unavailable: the search
+> falls back to an unscoped query and `enableOnlyTypes` / `disableTypes` are then applied
+> to the parsed `references` client-side, so callers still receive the narrowed set.
+
 ```typescript
 const utils = client.getUtils();
 

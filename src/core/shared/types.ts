@@ -137,8 +137,10 @@ export interface IGetWhereUsedParams {
   object_name: string;
   object_type: string;
   /**
-   * Optional: scope XML from getWhereUsedScope() with user-modified selections
-   * If not provided, will fetch default scope automatically
+   * Optional: scope XML from getWhereUsedScope() with user-modified selections.
+   * When omitted, the search runs unscoped (SAP's default scope) — getWhereUsed()
+   * does NOT fetch a scope itself, so it works on systems that do not expose the
+   * /usageReferences/scope sub-resource.
    */
   scopeXml?: string;
 }

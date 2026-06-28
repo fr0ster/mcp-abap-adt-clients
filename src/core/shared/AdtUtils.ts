@@ -218,19 +218,18 @@ export class AdtUtils {
   }
 
   /**
-   * Where-used Step 2: execute search.
+   * Where-used: execute search.
    *
-   * This performs the where-used search for an object using a scope XML. If you
-   * do not pass a scope, the server's default selection is used.
-   *
-   * Two-step ADT operation:
-   * 1. Fetch scope configuration (if not provided)
-   * 2. Execute where-used search with the scope
+   * Performs the where-used search for an object. When a scope XML is supplied
+   * the search is narrowed to those object types; when omitted it runs unscoped
+   * against SAP's default selection. This posts directly to /usageReferences and
+   * does NOT fetch the /usageReferences/scope sub-resource, so it works on
+   * systems that do not expose it.
    *
    * @param params - Where-used parameters
    * @param params.object_name - Name of the object to search
    * @param params.object_type - Type of the object (class, table, etc.)
-   * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). If not provided, uses default SAP selection.
+   * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). When omitted, the search runs unscoped (SAP's default selection); no scope is fetched.
    * @returns Where-used references in XML format
    *
    * @example
