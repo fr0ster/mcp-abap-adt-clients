@@ -3,6 +3,17 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.1.0] - 2026-06-28
+
+### Added
+- **Per-group subpath exports.** New entry points let a consumer load only the subgraph it needs instead of the whole barrel: `@mcp-abap-adt/adt-clients/core` (CRUD: `AdtClient`, `createAdtClient`, all object-type types + `AdtUtils`), `./runtime`, `./batch`, `./ws`, `./abapgit`, `./executors`. `AdtClient` has zero static edges into runtime/batch/ws/abapgit/executors, so `/core` never evaluates those barrels. The root `'.'` import is unchanged (re-exports every group barrel) — fully backward compatible.
+
+### Changed
+- `yaml` moved from `dependencies` to `devDependencies` (only a non-shipped `tools/` script used it).
+
+### Fixed
+- **Where-used result parsing is namespace-prefix agnostic.** `getWhereUsedList` now parses the `usageReferences` response whether SAP returns the `usagereferences:` or `usageReferences:` namespace prefix (some systems differ), instead of silently returning zero references (fr0ster/mcp-abap-adt-clients#60).
+
 ## [7.0.1] - 2026-06-28
 
 ### Fixed
