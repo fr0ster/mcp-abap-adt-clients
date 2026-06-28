@@ -186,7 +186,10 @@ for (const ref of result.references) {
 }
 
 // Restrict to specific object types — SAP filters server-side, so it never
-// returns the unwanted types (e.g. hundreds of classes when you want structures)
+// returns the unwanted types (e.g. hundreds of classes when you want structures).
+// On systems without the /usageReferences/scope sub-resource (some S/4 releases
+// 404 it) the search falls back to unscoped and the filter is applied to the
+// parsed references client-side, so you still get the narrowed set.
 await utils.getWhereUsedList({
   object_name: 'ZMY_TABLE',
   object_type: 'table',

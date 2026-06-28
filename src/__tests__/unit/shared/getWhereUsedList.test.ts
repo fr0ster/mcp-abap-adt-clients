@@ -70,4 +70,106 @@ describe('getWhereUsedList type filtering', () => {
     expect(searchBodies).toHaveLength(1);
     expect(selectedTypes(searchBodies[0]).sort()).toEqual(['INTF/OI']);
   });
+
+  it('does NOT call the /scope sub-resource when no type filter is requested', async () => {
+    const urls: string[] = [];
+    const searchBodies: string[] = [];
+    const connection = {
+      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+        urls.push(options.url);
+        searchBodies.push(String(options.data));
+        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+      },
+    } as unknown as IAbapConnection;
+
+    await getWhereUsedList(connection, {
+      object_name: 'ZAC_SHR_BTABL',
+      object_type: 'table',
+    });
+
+    // Only the direct /usageReferences search runs — no /scope round-trip — and
+    // the body carries no <scope> (SAP applies its default scope).
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).not.toContain('/usageReferences/scope');
+    expect(searchBodies[0]).not.toContain('<usagereferences:scope>');
+  });
+
+  it('falls back to an unscoped search when /scope answers 404', async () => {
+    const urls: string[] = [];
+    const searchBodies: string[] = [];
+    const connection = {
+      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+        urls.push(options.url);
+        if (options.url.includes('/usageReferences/scope')) {
+          // Some S/4 releases do not expose the scope sub-resource.
+          const err: any = new Error('Request failed with status code 404');
+          err.status = 404;
+          throw err;
+        }
+        searchBodies.push(String(options.data));
+        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+      },
+    } as unknown as IAbapConnection;
+
+    const result = await getWhereUsedList(connection, {
+      object_name: 'VBAK',
+      object_type: 'table',
+      enableOnlyTypes: ['TABL/DS'],
+    });
+
+    // The search still runs (unscoped) instead of throwing, so the caller can
+    // filter references client-side.
+    expect(urls.some((u) => u.includes('/usageReferences/scope'))).toBe(true);
+    expect(searchBodies).toHaveLength(1);
+    expect(searchBodies[0]).not.toContain('<usagereferences:scope>');
+    expect(result.totalReferences).toBe(0);
+  });
+
+  it('filters references client-side by enableOnlyTypes when /scope is 404', async () => {
+    // Unscoped fallback returns a mix of types (as a real S/4 would for a
+    // heavily-used base). Only the requested TABL/DS must come back.
+    const MIXED = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences" xmlns:adtcore="http://www.sap.com/adt/core" numberOfResults="3" resultDescription="Found 3"><usagereferences:referencedObjects><usagereferences:referencedObject uri="/a"><usagereferences:adtObject adtcore:type="CLAS/OC" adtcore:name="CL_FOO"/></usagereferences:referencedObject><usagereferences:referencedObject uri="/b"><usagereferences:adtObject adtcore:type="TABL/DS" adtcore:name="ZAPPEND_VBAK"/></usagereferences:referencedObject><usagereferences:referencedObject uri="/c"><usagereferences:adtObject adtcore:type="PROG/P" adtcore:name="ZREPORT"/></usagereferences:referencedObject></usagereferences:referencedObjects></usagereferences:usageReferenceResult>`;
+
+    const connection = {
+      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+        if (options.url.includes('/usageReferences/scope')) {
+          const err: any = new Error('Request failed with status code 404');
+          err.status = 404;
+          throw err;
+        }
+        return { data: MIXED, status: 200, headers: {} } as IAdtResponse;
+      },
+    } as unknown as IAbapConnection;
+
+    const result = await getWhereUsedList(connection, {
+      object_name: 'VBAK',
+      object_type: 'table',
+      enableOnlyTypes: ['TABL/DS'],
+    });
+
+    expect(result.references.map((r) => r.type)).toEqual(['TABL/DS']);
+    expect(result.references[0].name).toBe('ZAPPEND_VBAK');
+    expect(result.totalReferences).toBe(1);
+  });
+
+  it('re-throws non-404 scope errors instead of falling back', async () => {
+    const connection = {
+      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+        if (options.url.includes('/usageReferences/scope')) {
+          const err: any = new Error('Request failed with status code 500');
+          err.status = 500;
+          throw err;
+        }
+        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+      },
+    } as unknown as IAbapConnection;
+
+    await expect(
+      getWhereUsedList(connection, {
+        object_name: 'VBAK',
+        object_type: 'table',
+        enableOnlyTypes: ['TABL/DS'],
+      }),
+    ).rejects.toThrow('500');
+  });
 });

@@ -165,6 +165,20 @@ function buildObjectUri(objectName: string, objectType: string): string {
 }
 
 /**
+ * True when an error indicates the /usageReferences/scope sub-resource is not
+ * available on the target system. SAP answers such requests with HTTP 404
+ * ("No suitable resource found") — and 406 for an unaccepted media type — on
+ * releases that do not expose the scope step. Callers use this to fall back to
+ * an unscoped where-used search rather than failing outright.
+ */
+function isScopeResourceUnavailable(error: unknown): boolean {
+  const status =
+    // biome-ignore lint/suspicious/noExplicitAny: error shape is provider-defined
+    (error as any)?.response?.status ?? (error as any)?.status;
+  return status === 404 || status === 406;
+}
+
+/**
  * Get where-used scope configuration (Step 1 of 2)
  *
  * Returns available object types for where-used search.
@@ -221,15 +235,17 @@ export async function getWhereUsedScope(
 }
 
 /**
- * Get where-used references for ABAP object (Step 2 of 2)
+ * Get where-used references for ABAP object
  *
- * Eclipse ADT uses a two-step process:
- * 1. GET scope configuration (getWhereUsedScope) - returns available object types
- * 2. POST actual search with scope (this function) - executes search
+ * Posts directly to /usageReferences (the request the Eclipse ADT client
+ * sends). An optional scope can be supplied to narrow the searched object types
+ * server-side; when omitted, SAP applies its default scope. This function never
+ * calls the /usageReferences/scope sub-resource itself — that resource is not
+ * available on every system (see getWhereUsedScope).
  *
  * @param connection - ABAP connection
  * @param params - Where-used parameters
- * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). If not provided, will fetch default scope.
+ * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). When omitted, the search runs against SAP's default scope (unscoped).
  * @returns Where-used references
  */
 export async function getWhereUsed(
@@ -245,31 +261,30 @@ export async function getWhereUsed(
 
   const objectUri = buildObjectUri(params.object_name, params.object_type);
 
-  // If scope not provided, fetch default scope
-  let scopeXml: string = params.scopeXml || '';
-  if (!scopeXml) {
-    const scopeResponse = await getWhereUsedScope(connection, {
-      object_name: params.object_name,
-      object_type: params.object_type,
-    });
-    scopeXml = scopeResponse.data;
-  }
-
-  // Step 2: Perform actual where-used search with scope
+  // Step 2: perform the actual where-used search.
+  // We do NOT auto-fetch a default scope here. The Eclipse ADT client posts
+  // directly to /usageReferences with a minimal request body and lets SAP apply
+  // its default scope; the /usageReferences/scope sub-resource is not exposed on
+  // every system (some S/4 releases answer 404 "No suitable resource found"), so
+  // depending on it would break an otherwise-supported search. An explicit
+  // <scope> is embedded only when the caller supplied one (the optional 2-step
+  // optimisation that narrows the searched object types server-side).
   const searchUrl = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
 
-  // Build request body with scope from step 1
-  // Extract inner content of usageScopeResult and wrap it in usageReferenceRequest
-  const scopeContent = scopeXml
-    .replace(/<\?xml[^>]*\?>/, '')
-    .replace(
-      /<usagereferences:usageScopeResult[^>]*>/,
-      '<usagereferences:scope>',
-    )
-    .replace(
-      /<\/usagereferences:usageScopeResult>/,
-      '</usagereferences:scope>',
-    );
+  // When a scope is provided, extract the inner content of usageScopeResult and
+  // re-wrap it as <usagereferences:scope>. Otherwise omit the scope element.
+  const scopeContent = params.scopeXml
+    ? params.scopeXml
+        .replace(/<\?xml[^>]*\?>/, '')
+        .replace(
+          /<usagereferences:usageScopeResult[^>]*>/,
+          '<usagereferences:scope>',
+        )
+        .replace(
+          /<\/usagereferences:usageScopeResult>/,
+          '</usagereferences:scope>',
+        )
+    : '';
 
   const searchRequestBody = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/>${scopeContent}</usagereferences:usageReferenceRequest>`;
 
@@ -304,8 +319,9 @@ export async function getWhereUsed(
  *   enableAllTypes: true
  * });
  *
- * // Or restrict to just the types you care about (e.g. only structures/tables),
- * // so SAP never searches — and never returns — hundreds of classes.
+ * // Or restrict to just the types you care about (e.g. only structures/tables)
+ * // so you never get hundreds of classes back. Filtered server-side via the
+ * // scope sub-resource where available, else client-side on the unscoped result.
  * const structuresOnly = await getWhereUsedList(connection, {
  *   object_name: 'ZMY_TABLE',
  *   object_type: 'table',
@@ -330,6 +346,10 @@ export async function getWhereUsedList(
   }
 
   let scopeXml: string | undefined;
+  // Set when the /usageReferences/scope sub-resource is unavailable and we fell
+  // back to an unscoped search. The requested type filter could not be applied
+  // server-side, so it is applied to the parsed references instead (below).
+  let scopeUnavailable = false;
 
   // Fetch and modify the scope only when the caller wants to constrain which
   // object types are searched. Otherwise getWhereUsed() falls back to SAP's
@@ -340,23 +360,35 @@ export async function getWhereUsedList(
   const disable = params.disableTypes?.length ? params.disableTypes : undefined;
 
   if (params.enableAllTypes || enableOnly || disable) {
-    const scopeResponse = await getWhereUsedScope(connection, {
-      object_name: params.object_name,
-      object_type: params.object_type,
-    });
+    try {
+      const scopeResponse = await getWhereUsedScope(connection, {
+        object_name: params.object_name,
+        object_type: params.object_type,
+      });
 
-    // enableOnly wins over enableAll; disable is then applied on top so callers
-    // can both narrow to a set and prune one of those, in a single pass.
-    let modified = scopeResponse.data;
-    if (enableOnly) {
-      modified = modifyWhereUsedScope(modified, { enableOnly });
-    } else if (params.enableAllTypes) {
-      modified = modifyWhereUsedScope(modified, { enableAll: true });
+      // enableOnly wins over enableAll; disable is then applied on top so callers
+      // can both narrow to a set and prune one of those, in a single pass.
+      let modified = scopeResponse.data;
+      if (enableOnly) {
+        modified = modifyWhereUsedScope(modified, { enableOnly });
+      } else if (params.enableAllTypes) {
+        modified = modifyWhereUsedScope(modified, { enableAll: true });
+      }
+      if (disable) {
+        modified = modifyWhereUsedScope(modified, { disable });
+      }
+      scopeXml = modified;
+    } catch (error) {
+      // The /usageReferences/scope sub-resource is not exposed on every system
+      // (some S/4 releases answer 404 "No suitable resource found"). Server-side
+      // type filtering is then impossible, so fall back to an unscoped search —
+      // SAP's default scope, exactly what the Eclipse ADT client sends — and let
+      // the caller filter the references client-side. Only the missing-resource
+      // case is swallowed; anything else (auth, network, 5xx) is re-thrown.
+      if (!isScopeResourceUnavailable(error)) throw error;
+      scopeXml = undefined;
+      scopeUnavailable = true;
     }
-    if (disable) {
-      modified = modifyWhereUsedScope(modified, { disable });
-    }
-    scopeXml = modified;
   }
 
   // Execute where-used search
@@ -423,12 +455,35 @@ export async function getWhereUsedList(
     }
   }
 
+  // When server-side scoping was unavailable, the search ran unscoped and the
+  // parsed list holds every reference type (potentially thousands). Apply the
+  // requested type filter here so callers receive the same narrowed set they
+  // would have gotten from a server-side scope — the SAP round-trip cannot be
+  // avoided on such systems, but the result handed back (and ultimately the
+  // load on the consumer/LLM) is reduced to the types actually asked for.
+  let resultRefs = references;
+  if (scopeUnavailable && (enableOnly || disable)) {
+    if (enableOnly) {
+      const allow = new Set(enableOnly);
+      resultRefs = resultRefs.filter((r) => allow.has(r.type));
+    }
+    if (disable) {
+      const deny = new Set(disable);
+      resultRefs = resultRefs.filter((r) => !deny.has(r.type));
+    }
+  }
+
   return {
     objectName: params.object_name,
     objectType: params.object_type,
-    totalReferences: numberOfResults,
+    // After a client-side narrow the server's numberOfResults no longer matches
+    // what we return, so report the size of the references actually handed back.
+    totalReferences:
+      scopeUnavailable && (enableOnly || disable)
+        ? resultRefs.length
+        : numberOfResults,
     resultDescription,
-    references,
+    references: resultRefs,
     rawXml: params.includeRawXml ? xml : undefined,
   };
 }
