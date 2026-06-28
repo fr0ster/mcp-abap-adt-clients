@@ -3,6 +3,13 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.1] - 2026-06-28
+
+### Fixed
+- **Where-used resilient to systems without `/usageReferences/scope`.** Some S/4 releases answer the `/sap/bc/adt/repository/informationsystem/usageReferences/scope` sub-resource with HTTP 404 for every object type, which aborted the whole search and silently returned zero references (surfacing downstream as `GetStructuresList` reporting 0 append structures). `getWhereUsed` no longer auto-fetches a default scope — with no `scopeXml` it posts the minimal Eclipse-style `usageReferenceRequest` and lets SAP apply its default scope; it never calls `/scope` itself. `getWhereUsedList` still uses the two-step scope flow for server-side type filtering where available, but catches a missing-scope-resource (404/406) and falls back to an unscoped search with client-side type narrowing; auth/network/5xx still propagate (fr0ster/mcp-abap-adt-clients#58).
+
+> Note: 7.0.0 (object version history) was tagged and GitHub-released but not published to npm; 7.0.1 is the first npm release of the 7.x line and includes both 7.0.0 and this fix.
+
 ## [7.0.0] - 2026-06-28
 
 ### Added
