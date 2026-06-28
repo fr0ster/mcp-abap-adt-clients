@@ -86,23 +86,32 @@ export interface IObjectVersion {
   contentUri: string;
 }
 
-interface IAdtObject<Config, State> {
+interface IAdtObject<TConfig, TReadResult> {
   // …existing members…
 
   /**
-   * List the version history of this object's source.
+   * List the version history of this object's source. Identity is passed per
+   * call, like every other IAdtObject method (the implementations are stateless
+   * factories) — e.g. `getVersions({ className: 'ZCL_X' })`.
    * @throws AdtOperationError with code UNSUPPORTED_OPERATION when the object
-   *         has no version resource (SAP 404/406). Never leaks raw HTTP.
+   *         has no version resource (SAP 404/406, or a non-source object type).
+   *         Never leaks raw HTTP.
    */
-  getVersions(): Promise<IObjectVersion[]>;
+  getVersions(config: Partial<TConfig>): Promise<IObjectVersion[]>;
 
   /**
    * Fetch the source code of a specific version.
-   * @param contentUri the opaque `contentUri` from a getVersions() entry.
+   * @param contentUri the opaque `contentUri` from a getVersions() entry. It is
+   *        a complete URI, so no config is needed.
    */
   getVersionSource(contentUri: string): Promise<string>;
 }
 ```
+
+> **Identity per call.** `IAdtObject<TConfig, TReadResult>` is a stateless
+> factory — every method takes `config: Partial<TConfig>` (`read(config, …)`,
+> `lock(config)`, …). `getVersions` follows that shape; `getVersionSource` does
+> not, because its `contentUri` already encodes the full path.
 
 A new error code is added to the interface package's error set
 (`AdtObjectErrorCodes`), e.g. `UNSUPPORTED_OPERATION`, so the consumer can catch
@@ -111,44 +120,63 @@ A new error code is added to the interface package's error set
 ## Implementation (`@mcp-abap-adt/adt-clients`)
 
 - **Every `AdtXxx` in `src/core/*` implements `getVersions()` / `getVersionSource()`.**
-  Each builds its own version-list URI from its own endpoint knowledge:
+  Two implementation patterns:
+
+  **(a) Source-bearing types** build their own version-list URI and GET it:
   - `AdtTable` → `/ddic/tables/{name}/source/main/versions`
   - `AdtClass` (main) → `/oo/classes/{name}/includes/main/versions`
   - class local-include handlers (returned by `getLocalTypes()` /
     `getLocalDefinitions()` / `getLocalTestClass()` / `getLocalMacros()`) →
     their own `/oo/classes/{name}/includes/{includeType}/versions`
-  - other source-bearing types → their `<sourceUri>/versions` (probe-verified)
-- **GET semantics:** `Accept: application/atom+xml;type=feed` for the list,
-  `Accept: text/plain` for `getVersionSource`.
-- **Error translation:** on a 404/406 "no suitable resource", throw
+  - every other source-bearing type → `<sourceUri>/versions` is a **candidate
+    shape that MUST be probe-verified per type before the type is marked
+    supported** (only table + class are verified so far — see Coverage caveat).
+
+  **(b) Non-source / pseudo objects** (`AdtPackage` (DEVC), `AdtTransport`,
+  unit-test, and any test-only `IAdtObject` implementation) have no source URI,
+  so they do NOT build one. They use an explicit shared helper
+  `throwUnsupportedVersions(): never` (zero endpoint knowledge — it only throws
+  `AdtOperationError(UNSUPPORTED_OPERATION)`), satisfying the contract without a
+  pointless HTTP call. `getVersionSource` does the same.
+
+- **GET semantics (pattern a):** `Accept: application/atom+xml;type=feed` for the
+  list, `Accept: text/plain` for `getVersionSource`.
+- **Error translation (pattern a):** on a 404/406 "no suitable resource", throw
   `AdtOperationError(UNSUPPORTED_OPERATION, …)`. Other failures are surfaced as
   interface-level errors too — no raw `IAdtResponse`/axios outward.
-- **Shared (zero endpoint knowledge):** a single pure helper
-  `parseVersionsFeed(xml: string): IObjectVersion[]` in `src/core/shared/`
-  (Atom feed → `IObjectVersion[]`, handles one/many/zero `atom:entry`). This is
-  the ONLY shared piece; URI construction and the GET stay in each `AdtXxx`.
+- **Shared, zero endpoint knowledge:** exactly two pure helpers in
+  `src/core/shared/` — `parseVersionsFeed(xml): IObjectVersion[]` (Atom feed →
+  list; one/many/zero `atom:entry`) and `throwUnsupportedVersions(): never`.
+  URI construction and the GET stay in each `AdtXxx`.
 
 ## Cross-package sequencing (each step externally reviewed)
 
-1. **interfaces (minor):** add `IObjectVersion`, the two methods on
-   `IAdtObject`, and the `UNSUPPORTED_OPERATION` error code. Publish.
-2. **adt-clients:** bump interfaces dep; add `parseVersionsFeed` (SAP-free unit
-   test on a captured Atom fixture); implement the two methods on **all**
-   `AdtXxx`; per-type integration probe on trial to verify each URI shape.
-   adt-clients **major** is not required by this addition alone, but if it lands
-   together with the modularization breaking changes
-   ([[2026-06-27-adt-clients-modularization]]) it rides that major.
+1. **interfaces — MAJOR (breaking):** add `IObjectVersion`, the two methods on
+   `IAdtObject`, and the `UNSUPPORTED_OPERATION` error code. Adding **required**
+   methods to an exported interface is source-breaking for every implementer
+   (all `AdtXxx`, plus any consumer/test mocks of `IAdtObject`), so this is a
+   major bump — not minor. (Making the methods optional was rejected: the design
+   requires every implementation to provide them.) Publish.
+2. **adt-clients — MAJOR:** bump interfaces dep; add `parseVersionsFeed` and
+   `throwUnsupportedVersions` (SAP-free unit tests); implement the two methods on
+   **all** `AdtXxx` (pattern a for source types, pattern b for non-source);
+   per-type integration probe on trial to verify each source-type URI shape
+   before marking it supported. This is breaking too (interface dep major); it
+   can ride the modularization major
+   ([[2026-06-27-adt-clients-modularization]]) if they land together.
 3. The consumer is untouched; it picks up the new methods on its own update.
 
 ## Testing strategy
 
 - **Unit (SAP-free):** `parseVersionsFeed` against a captured Atom fixture
-  (single entry, multiple entries, empty feed); error-translation logic with a
-  fake connection that returns 404/406 → asserts `UNSUPPORTED_OPERATION`.
+  (single entry, multiple entries, empty feed); error-translation for a
+  source-type `AdtXxx` with a fake connection returning 404/406 → asserts
+  `UNSUPPORTED_OPERATION`; a non-source `AdtXxx` (e.g. `AdtPackage`) →
+  `getVersions(config)` throws `UNSUPPORTED_OPERATION` with **no** HTTP call.
 - **Integration (trial, browser profile required):** for each verified type,
-  `getVersions()` returns a non-empty list with a usable `contentUri`, and
-  `getVersionSource(contentUri)` returns source text. Probe each candidate type
-  to confirm its URI shape before claiming support.
+  `getVersions(config)` returns a non-empty list with a usable `contentUri`, and
+  `getVersionSource(contentUri)` returns source text. Probe each candidate
+  source type to confirm its URI shape **before** marking it supported.
 
 ## Out of scope
 
