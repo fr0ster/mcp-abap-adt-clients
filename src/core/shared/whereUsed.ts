@@ -345,6 +345,10 @@ export async function getWhereUsedList(
   }
 
   let scopeXml: string | undefined;
+  // Set when the /usageReferences/scope sub-resource is unavailable and we fell
+  // back to an unscoped search. The requested type filter could not be applied
+  // server-side, so it is applied to the parsed references instead (below).
+  let scopeUnavailable = false;
 
   // Fetch and modify the scope only when the caller wants to constrain which
   // object types are searched. Otherwise getWhereUsed() falls back to SAP's
@@ -382,6 +386,7 @@ export async function getWhereUsedList(
       // case is swallowed; anything else (auth, network, 5xx) is re-thrown.
       if (!isScopeResourceUnavailable(error)) throw error;
       scopeXml = undefined;
+      scopeUnavailable = true;
     }
   }
 
@@ -449,12 +454,35 @@ export async function getWhereUsedList(
     }
   }
 
+  // When server-side scoping was unavailable, the search ran unscoped and the
+  // parsed list holds every reference type (potentially thousands). Apply the
+  // requested type filter here so callers receive the same narrowed set they
+  // would have gotten from a server-side scope — the SAP round-trip cannot be
+  // avoided on such systems, but the result handed back (and ultimately the
+  // load on the consumer/LLM) is reduced to the types actually asked for.
+  let resultRefs = references;
+  if (scopeUnavailable && (enableOnly || disable)) {
+    if (enableOnly) {
+      const allow = new Set(enableOnly);
+      resultRefs = resultRefs.filter((r) => allow.has(r.type));
+    }
+    if (disable) {
+      const deny = new Set(disable);
+      resultRefs = resultRefs.filter((r) => !deny.has(r.type));
+    }
+  }
+
   return {
     objectName: params.object_name,
     objectType: params.object_type,
-    totalReferences: numberOfResults,
+    // After a client-side narrow the server's numberOfResults no longer matches
+    // what we return, so report the size of the references actually handed back.
+    totalReferences:
+      scopeUnavailable && (enableOnly || disable)
+        ? resultRefs.length
+        : numberOfResults,
     resultDescription,
-    references,
+    references: resultRefs,
     rawXml: params.includeRawXml ? xml : undefined,
   };
 }
