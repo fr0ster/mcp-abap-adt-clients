@@ -319,8 +319,9 @@ export async function getWhereUsed(
  *   enableAllTypes: true
  * });
  *
- * // Or restrict to just the types you care about (e.g. only structures/tables),
- * // so SAP never searches — and never returns — hundreds of classes.
+ * // Or restrict to just the types you care about (e.g. only structures/tables)
+ * // so you never get hundreds of classes back. Filtered server-side via the
+ * // scope sub-resource where available, else client-side on the unscoped result.
  * const structuresOnly = await getWhereUsedList(connection, {
  *   object_name: 'ZMY_TABLE',
  *   object_type: 'table',
