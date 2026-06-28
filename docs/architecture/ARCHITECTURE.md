@@ -165,7 +165,7 @@ Notably, where-used supports:
 - scope fetch (`getWhereUsedScope`),
 - local scope mutation (`modifyWhereUsedScope`),
 - execution (`getWhereUsed`) and parsed convenience (`getWhereUsedList`),
-- server-side type filtering via `getWhereUsedList({ enableOnlyTypes, disableTypes })` — SAP searches (and returns) only the selected object types.
+- type filtering via `getWhereUsedList({ enableOnlyTypes, disableTypes })` — applied server-side through the `/usageReferences/scope` sub-resource where available, otherwise (some S/4 releases 404 that resource) the search falls back to unscoped and the filter is applied to the parsed references client-side. Either way the caller receives only the selected object types.
 
 ## Accept Negotiation (406 Recovery)
 

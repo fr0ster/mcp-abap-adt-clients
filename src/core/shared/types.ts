@@ -157,11 +157,15 @@ export interface IGetWhereUsedListParams {
    */
   enableAllTypes?: boolean;
   /**
-   * Restrict the search to ONLY these object types (e.g. ['TABL/DS', 'TABL/DT']).
-   * All other types are deselected, so SAP does not search them at all — this is
-   * how you avoid getting 1000 classes back when you only want structures/tables.
-   * Type names are the ADT global types from the scope (e.g. 'CLAS/OC', 'STRU/DT').
-   * Takes precedence over `enableAllTypes`. Ignored if empty.
+   * Restrict the result to ONLY these object types (e.g. ['TABL/DS', 'TABL/DT']) —
+   * this is how you avoid getting 1000 classes back when you only want
+   * structures/tables. Where the `/usageReferences/scope` sub-resource is
+   * available the other types are deselected server-side (SAP never searches
+   * them); where it is not (some S/4 releases 404 it) the search runs unscoped
+   * and the filter is applied to the parsed references client-side instead — the
+   * returned set is the same either way. Type names are the ADT global types
+   * (e.g. 'CLAS/OC', 'STRU/DT'). Takes precedence over `enableAllTypes`. Ignored
+   * if empty.
    */
   enableOnlyTypes?: string[];
   /**
