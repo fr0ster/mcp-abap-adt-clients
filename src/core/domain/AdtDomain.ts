@@ -24,10 +24,12 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
 import { create as createDomain } from './create';
@@ -38,7 +40,6 @@ import type { IDomainConfig, IDomainState } from './types';
 import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';
-
 export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -626,5 +627,15 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  async getVersions(
+    _config: Partial<IDomainConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('domain');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('domain');
   }
 }

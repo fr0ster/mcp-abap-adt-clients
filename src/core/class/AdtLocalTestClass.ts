@@ -5,7 +5,11 @@
  * All operations require the parent class to be locked.
  */
 
-import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type {
+  HttpError,
+  IAdtOperationOptions,
+  IObjectVersion,
+} from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
@@ -363,4 +367,11 @@ export class AdtLocalTestClass extends AdtClass {
   // - Need to verify if /includes/testclasses?_action=LOCK endpoint exists in ADT discovery
   // - Delete operation currently uses update() with empty code, but validation prevents empty strings
   // - Consider: Should delete() bypass validation or use a different approach?
+
+  getVersions(
+    config: Partial<{ className: string }>,
+  ): Promise<IObjectVersion[]> {
+    if (!config.className) throw new Error('className is required');
+    return this.getIncludeVersions(config.className, 'testclasses');
+  }
 }

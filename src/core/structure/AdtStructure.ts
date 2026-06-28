@@ -43,6 +43,7 @@ import { unlockStructure } from './unlock';
 import { upload } from './update';
 import { validateStructureName } from './validation';
 
+import { getStructureVersionSource, getStructureVersions } from './versions';
 export class AdtStructure
   implements IAdtObject<IStructureConfig, IStructureState>
 {
@@ -598,5 +599,13 @@ export class AdtStructure
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IStructureConfig>) {
+    return getStructureVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getStructureVersionSource(this.connection, contentUri);
   }
 }

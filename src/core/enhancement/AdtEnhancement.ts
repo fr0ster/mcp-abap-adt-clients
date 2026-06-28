@@ -54,6 +54,10 @@ import { unlockEnhancement } from './unlock';
 import { update } from './update';
 import { validate } from './validation';
 
+import {
+  getEnhancementVersionSource,
+  getEnhancementVersions,
+} from './versions';
 export class AdtEnhancement
   implements IAdtObject<IEnhancementConfig, IEnhancementState>
 {
@@ -793,5 +797,13 @@ export class AdtEnhancement
       errors: [],
       enhancementType: config.enhancementType,
     };
+  }
+
+  getVersions(config: Partial<IEnhancementConfig>) {
+    return getEnhancementVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getEnhancementVersionSource(this.connection, contentUri);
   }
 }

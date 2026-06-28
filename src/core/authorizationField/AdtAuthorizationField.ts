@@ -21,9 +21,11 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { activateAuthorizationField } from './activation';
 import { checkAuthorizationField } from './check';
 import { create as createAuthorizationField } from './create';
@@ -42,7 +44,6 @@ import type {
 import { unlockAuthorizationField } from './unlock';
 import { updateAuthorizationField } from './update';
 import { validateAuthorizationFieldName } from './validation';
-
 export class AdtAuthorizationField
   implements IAdtObject<IAuthorizationFieldConfig, IAuthorizationFieldState>
 {
@@ -594,5 +595,15 @@ export class AdtAuthorizationField
     );
     this.connection.setSessionType('stateless');
     return { errors: [] };
+  }
+
+  async getVersions(
+    _config: Partial<IAuthorizationFieldConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('authorization field');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('authorization field');
   }
 }

@@ -26,6 +26,7 @@ import {
   type IAdtObject,
   type IAdtOperationOptions,
   type ILogger,
+  type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
@@ -45,6 +46,11 @@ import type { IClassConfig, IClassState } from './types';
 import { unlockClass } from './unlock';
 import { updateClass } from './update';
 import { validateClassName } from './validation';
+import {
+  type ClassIncludeType,
+  getClassIncludeVersions,
+  getClassVersionSource,
+} from './versions';
 
 export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly connection: IAbapConnection;
@@ -901,5 +907,22 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.error('Read transport failed:', safeErrorMessage(err));
       throw err;
     }
+  }
+
+  getVersions(config: Partial<IClassConfig>): Promise<IObjectVersion[]> {
+    if (!config.className) throw new Error('className is required');
+    return getClassIncludeVersions(this.connection, config.className, 'main');
+  }
+
+  getVersionSource(contentUri: string): Promise<string> {
+    return getClassVersionSource(this.connection, contentUri);
+  }
+
+  /** Shared by local-include subclasses to target their own include. */
+  protected getIncludeVersions(
+    className: string,
+    includeType: ClassIncludeType,
+  ): Promise<IObjectVersion[]> {
+    return getClassIncludeVersions(this.connection, className, includeType);
   }
 }

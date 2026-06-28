@@ -43,6 +43,10 @@ import { unlockAccessControl } from './unlock';
 import { updateAccessControl } from './update';
 import { validateAccessControlName } from './validation';
 
+import {
+  getAccessControlVersionSource,
+  getAccessControlVersions,
+} from './versions';
 export class AdtAccessControl
   implements IAdtObject<IAccessControlConfig, IAccessControlState>
 {
@@ -600,5 +604,13 @@ export class AdtAccessControl
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IAccessControlConfig>) {
+    return getAccessControlVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getAccessControlVersionSource(this.connection, contentUri);
   }
 }

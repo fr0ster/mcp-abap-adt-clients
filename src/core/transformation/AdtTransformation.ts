@@ -43,6 +43,10 @@ import { unlockTransformation } from './unlock';
 import { updateTransformation } from './update';
 import { validateTransformationName } from './validation';
 
+import {
+  getTransformationVersionSource,
+  getTransformationVersions,
+} from './versions';
 export class AdtTransformation
   implements IAdtObject<ITransformationConfig, ITransformationState>
 {
@@ -607,5 +611,13 @@ export class AdtTransformation
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<ITransformationConfig>) {
+    return getTransformationVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getTransformationVersionSource(this.connection, contentUri);
   }
 }

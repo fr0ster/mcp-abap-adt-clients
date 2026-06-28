@@ -26,6 +26,7 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import {
   headerValueToString,
@@ -33,6 +34,7 @@ import {
 } from '../../utils/internalUtils';
 import { AdtClass, AdtLocalTestClass } from '../class';
 import { getClassUnitTestResult, getClassUnitTestStatus } from '../class/run';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { startClassUnitTestRun } from './run';
 import type {
   IClassUnitTestDefinition,
@@ -40,7 +42,6 @@ import type {
   IUnitTestConfig,
   IUnitTestState,
 } from './types';
-
 export class AdtUnitTest
   implements IAdtObject<IUnitTestConfig, IUnitTestState>
 {
@@ -406,5 +407,15 @@ export class AdtUnitTest
     _lockHandle: string,
   ): Promise<IUnitTestState> {
     throw new Error('Unlock operation is not supported for unit tests');
+  }
+
+  async getVersions(
+    _config: Partial<IUnitTestConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('unit test');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('unit test');
   }
 }

@@ -46,6 +46,10 @@ import { updateFunctionInclude } from './update';
 import { uploadFunctionIncludeSource } from './updateSource';
 import { validateFunctionIncludeName } from './validation';
 
+import {
+  getFunctionIncludeVersionSource,
+  getFunctionIncludeVersions,
+} from './versions';
 export class AdtFunctionInclude
   implements IAdtObject<IFunctionIncludeConfig, IFunctionIncludeState>
 {
@@ -783,5 +787,13 @@ export class AdtFunctionInclude
     );
     this.connection.setSessionType('stateless');
     return { errors: [] };
+  }
+
+  getVersions(config: Partial<IFunctionIncludeConfig>) {
+    return getFunctionIncludeVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getFunctionIncludeVersionSource(this.connection, contentUri);
   }
 }

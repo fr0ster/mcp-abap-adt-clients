@@ -29,6 +29,10 @@ import { validateScalarFunctionName } from './validation';
 
 const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
 
+import {
+  getScalarFunctionVersionSource,
+  getScalarFunctionVersions,
+} from './versions';
 export class AdtScalarFunction
   implements IAdtObject<IScalarFunctionConfig, IScalarFunctionState>
 {
@@ -375,5 +379,13 @@ export class AdtScalarFunction
     } finally {
       this.connection.setSessionType('stateless');
     }
+  }
+
+  getVersions(config: Partial<IScalarFunctionConfig>) {
+    return getScalarFunctionVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getScalarFunctionVersionSource(this.connection, contentUri);
   }
 }

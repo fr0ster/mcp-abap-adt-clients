@@ -46,6 +46,10 @@ import { unlockServiceDefinition } from './unlock';
 import { updateServiceDefinition } from './update';
 import { validateServiceDefinitionName } from './validation';
 
+import {
+  getServiceDefinitionVersionSource,
+  getServiceDefinitionVersions,
+} from './versions';
 export class AdtServiceDefinition
   implements IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState>
 {
@@ -607,5 +611,13 @@ export class AdtServiceDefinition
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IServiceDefinitionConfig>) {
+    return getServiceDefinitionVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getServiceDefinitionVersionSource(this.connection, contentUri);
   }
 }
