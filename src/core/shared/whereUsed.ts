@@ -23,10 +23,18 @@ import type {
   IWhereUsedReference,
 } from './types';
 
+// removeNSPrefix strips the namespace prefix from every element and attribute
+// name. The where-used result is namespaced under http://www.sap.com/adt/ris/
+// usageReferences, but the *prefix* SAP binds to it is system-dependent — some
+// releases emit `usagereferences:` (lower-case), others `usageReferences:`
+// (camel-case). Stripping the prefix lets us read the result regardless of which
+// alias the server chose, instead of hard-coding one and silently parsing 0
+// references on the other. (adtcore:* attributes are normalised the same way.)
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   parseAttributeValue: false,
+  removeNSPrefix: true,
 });
 
 /**
@@ -400,9 +408,12 @@ export async function getWhereUsedList(
 
   const xml: string = response.data;
 
-  // Parse XML response
+  // Parse XML response. Element/attribute names are namespace-prefix-free
+  // (see xmlParser config — removeNSPrefix), so `usageReferenceResult`,
+  // `referencedObject`, `adtObject`, `@_type`, `@_name`, … regardless of whether
+  // the server used the `usagereferences:` or `usageReferences:` prefix.
   const parsed = xmlParser.parse(xml);
-  const root = parsed['usagereferences:usageReferenceResult'];
+  const root = parsed.usageReferenceResult;
 
   if (!root) {
     return {
@@ -420,11 +431,10 @@ export async function getWhereUsedList(
 
   // Parse referenced objects
   const references: IWhereUsedReference[] = [];
-  const referencedObjectsNode = root['usagereferences:referencedObjects'];
+  const referencedObjectsNode = root.referencedObjects;
 
   if (referencedObjectsNode) {
-    const refObjects =
-      referencedObjectsNode['usagereferences:referencedObject'];
+    const refObjects = referencedObjectsNode.referencedObject;
     const refArray = Array.isArray(refObjects)
       ? refObjects
       : refObjects
@@ -432,22 +442,22 @@ export async function getWhereUsedList(
         : [];
 
     for (const refObj of refArray) {
-      const adtObject = refObj['usagereferences:adtObject'];
+      const adtObject = refObj.adtObject;
       if (!adtObject) continue;
 
       // Skip packages (DEVC/K) - they are container nodes, not actual references
-      const objType = adtObject['@_adtcore:type'] || '';
+      const objType = adtObject['@_type'] || '';
       if (objType === 'DEVC/K') continue;
 
-      const packageRef = adtObject['adtcore:packageRef'];
+      const packageRef = adtObject.packageRef;
 
       references.push({
         uri: refObj['@_uri'] || '',
-        name: adtObject['@_adtcore:name'] || '',
+        name: adtObject['@_name'] || '',
         type: objType,
         parentUri: refObj['@_parentUri'],
-        packageName: packageRef?.['@_adtcore:name'],
-        responsible: adtObject['@_adtcore:responsible'],
+        packageName: packageRef?.['@_name'],
+        responsible: adtObject['@_responsible'],
         isResult: refObj['@_isResult'] === 'true',
         usageInformation: refObj['@_usageInformation'],
         objectIdentifier: refObj.objectIdentifier,

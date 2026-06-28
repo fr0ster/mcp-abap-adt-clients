@@ -152,6 +152,50 @@ describe('getWhereUsedList type filtering', () => {
     expect(result.totalReferences).toBe(1);
   });
 
+  // The namespace PREFIX bound to http://www.sap.com/adt/ris/usageReferences is
+  // system-dependent: some releases emit `usagereferences:` (lower-case), others
+  // `usageReferences:` (camel-case, observed live on an S/4 system). The parser
+  // must read references regardless of which alias the server chose.
+  const resultWith = (prefix: string) =>
+    `<?xml version="1.0" encoding="utf-8"?>` +
+    `<${prefix}:usageReferenceResult xmlns:${prefix}="http://www.sap.com/adt/ris/usageReferences" numberOfResults="2" resultDescription="References for: VBAK">` +
+    `<${prefix}:referencedObjects>` +
+    `<${prefix}:referencedObject uri="/a" parentUri="/p" isResult="false" usageInformation="gradeDirect">` +
+    `<${prefix}:adtObject adtcore:responsible="DEV" adtcore:name="ZAPPEND_VBAK" adtcore:type="TABL/DS" adtcore:description="d" xmlns:adtcore="http://www.sap.com/adt/core">` +
+    `<adtcore:packageRef adtcore:name="ZPKG"/></${prefix}:adtObject></${prefix}:referencedObject>` +
+    `<${prefix}:referencedObject uri="/b">` +
+    `<${prefix}:adtObject adtcore:name="CL_FOO" adtcore:type="CLAS/OC" xmlns:adtcore="http://www.sap.com/adt/core"/>` +
+    `</${prefix}:referencedObject></${prefix}:referencedObjects></${prefix}:usageReferenceResult>`;
+
+  for (const prefix of ['usagereferences', 'usageReferences']) {
+    it(`parses the result regardless of the "${prefix}:" namespace prefix`, async () => {
+      const connection = {
+        makeAdtRequest: async (): Promise<IAdtResponse> =>
+          ({
+            data: resultWith(prefix),
+            status: 200,
+            headers: {},
+          }) as IAdtResponse,
+      } as unknown as IAbapConnection;
+
+      const result = await getWhereUsedList(connection, {
+        object_name: 'VBAK',
+        object_type: 'table',
+      });
+
+      expect(result.totalReferences).toBe(2);
+      expect(result.references).toHaveLength(2);
+      const append = result.references.find((r) => r.type === 'TABL/DS');
+      expect(append?.name).toBe('ZAPPEND_VBAK');
+      expect(append?.packageName).toBe('ZPKG');
+      expect(append?.responsible).toBe('DEV');
+      expect(result.references.map((r) => r.type).sort()).toEqual([
+        'CLAS/OC',
+        'TABL/DS',
+      ]);
+    });
+  }
+
   it('re-throws non-404 scope errors instead of falling back', async () => {
     const connection = {
       makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
