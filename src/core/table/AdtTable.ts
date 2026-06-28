@@ -38,6 +38,7 @@ import type { ITableConfig, ITableState } from './types';
 import { unlockTable } from './unlock';
 import { updateTable } from './update';
 import { validateTableName } from './validation';
+import { getTableVersionSource, getTableVersions } from './versions';
 
 export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   private readonly connection: IAbapConnection;
@@ -560,5 +561,13 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<ITableConfig>) {
+    return getTableVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getTableVersionSource(this.connection, contentUri);
   }
 }
