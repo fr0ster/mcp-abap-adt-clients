@@ -180,9 +180,11 @@ git commit -m "build(deps): bump @mcp-abap-adt/interfaces for IObjectVersion + U
 
 ```ts
 // adt-clients/src/__tests__/unit/versionsParse.test.ts
+import { AdtOperationError } from '@mcp-abap-adt/interfaces';
 import {
   parseVersionsFeed,
   throwUnsupportedVersions,
+  throwVersionsError,
 } from '../../core/shared/versions';
 
 const FEED = `<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:adtcore="http://www.sap.com/adt/core"><atom:title>Version List of ZAC_SHR_BTABL (TABL)</atom:title><atom:entry><atom:author><atom:name>CB9980008038</atom:name></atom:author><atom:content type="text/plain" src="/sap/bc/adt/ddic/tables/zac_shr_btabl/source/main/versions/19700101101123/00000/content"/><atom:id>00000</atom:id><atom:updated>2026-06-14T16:25:57Z</atom:updated></atom:entry></atom:feed>`;
@@ -243,8 +245,6 @@ describe('throwVersionsError', () => {
   });
 });
 ```
-
-(Add `AdtOperationError` to the test's imports: `import { AdtOperationError } from '@mcp-abap-adt/interfaces';`.)
 
 - [ ] **Step 2: Run to verify it fails**
 
