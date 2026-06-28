@@ -46,6 +46,10 @@ import { unlockMetadataExtension } from './unlock';
 import { updateMetadataExtension } from './update';
 import { validateMetadataExtension } from './validation';
 
+import {
+  getMetadataExtensionVersionSource,
+  getMetadataExtensionVersions,
+} from './versions';
 export class AdtMetadataExtension
   implements IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState>
 {
@@ -604,5 +608,13 @@ export class AdtMetadataExtension
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IMetadataExtensionConfig>) {
+    return getMetadataExtensionVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getMetadataExtensionVersionSource(this.connection, contentUri);
   }
 }

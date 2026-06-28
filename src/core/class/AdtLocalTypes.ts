@@ -5,7 +5,11 @@
  * All operations require the parent class to be locked.
  */
 
-import type { HttpError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type {
+  HttpError,
+  IAdtOperationOptions,
+  IObjectVersion,
+} from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
 import { AdtClass } from './AdtClass';
@@ -336,4 +340,11 @@ export class AdtLocalTypes extends AdtClass {
   // - Eclipse ADT logs show parent class lock is used before updating local includes
   // - Delete operation currently uses update() with empty code, but validation prevents empty strings
   // - Consider: Should delete() bypass validation or use a different approach?
+
+  getVersions(
+    config: Partial<{ className: string }>,
+  ): Promise<IObjectVersion[]> {
+    if (!config.className) throw new Error('className is required');
+    return this.getIncludeVersions(config.className, 'implementations');
+  }
 }

@@ -27,10 +27,12 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { checkPackage } from './check';
 import { createPackage } from './create';
 import { checkPackageDeletion, deletePackage } from './delete';
@@ -40,7 +42,6 @@ import type { IPackageConfig, IPackageState } from './types';
 import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
-
 export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -603,5 +604,15 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  async getVersions(
+    _config: Partial<IPackageConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('package');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('package');
   }
 }

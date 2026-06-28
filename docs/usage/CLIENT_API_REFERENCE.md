@@ -293,6 +293,42 @@ await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
 await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST', undefined, 'active');
 ```
 
+### Object version history
+
+Every object handler exposes `getVersions(config)` (list the SAP version history)
+and `getVersionSource(contentUri)` (fetch a specific version's source). Identity is
+passed per call, like the other handler methods.
+
+```typescript
+import { AdtObjectErrorCodes, type AdtOperationError } from '@mcp-abap-adt/interfaces';
+
+const versions = await client.getClass().getVersions({ className: 'ZCL_MY_CLASS' });
+for (const v of versions) {
+  console.log(`${v.versionId} by ${v.author ?? '?'} at ${v.updatedAt ?? '?'}`);
+}
+
+// Fetch the source of a specific version via its opaque contentUri.
+if (versions.length > 0) {
+  const src = await client.getClass().getVersionSource(versions[0].contentUri);
+  console.log(src);
+}
+```
+
+Object types that do not expose a version resource (e.g. packages, transports, or a
+type whose version endpoint is not available on the target system) throw
+`AdtOperationError` with `code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — the
+raw HTTP error is never surfaced:
+
+```typescript
+try {
+  await client.getPackage().getVersions({ packageName: 'ZMY_PKG' });
+} catch (e) {
+  if ((e as AdtOperationError).code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
+    // this object has no version history
+  }
+}
+```
+
 ### AdtUtils (Where-used)
 
 Where-used is a two-step flow:

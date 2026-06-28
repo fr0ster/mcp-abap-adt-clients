@@ -29,6 +29,10 @@ import { validateAppendStructureName } from './validation';
 
 const VALIDATION_UNSUPPORTED_STATUSES = new Set([404, 405, 501]);
 
+import {
+  getAppendStructureVersionSource,
+  getAppendStructureVersions,
+} from './versions';
 export class AdtAppendStructure
   implements IAdtObject<IAppendStructureConfig, IAppendStructureState>
 {
@@ -377,5 +381,13 @@ export class AdtAppendStructure
     } finally {
       this.connection.setSessionType('stateless');
     }
+  }
+
+  getVersions(config: Partial<IAppendStructureConfig>) {
+    return getAppendStructureVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getAppendStructureVersionSource(this.connection, contentUri);
   }
 }

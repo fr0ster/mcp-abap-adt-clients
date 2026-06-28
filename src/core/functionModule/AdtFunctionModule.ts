@@ -44,6 +44,10 @@ import { unlockFunctionModule } from './unlock';
 import { update } from './update';
 import { validateFunctionModuleName } from './validation';
 
+import {
+  getFunctionModuleVersionSource,
+  getFunctionModuleVersions,
+} from './versions';
 export class AdtFunctionModule
   implements IAdtObject<IFunctionModuleConfig, IFunctionModuleState>
 {
@@ -667,5 +671,13 @@ export class AdtFunctionModule
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IFunctionModuleConfig>) {
+    return getFunctionModuleVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getFunctionModuleVersionSource(this.connection, contentUri);
   }
 }

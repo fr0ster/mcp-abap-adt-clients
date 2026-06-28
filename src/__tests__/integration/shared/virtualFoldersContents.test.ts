@@ -64,6 +64,14 @@ class VirtualFoldersContentsObject
     );
   }
 
+  getVersions() {
+    return this.rejectUnsupported<never>('getVersions');
+  }
+
+  getVersionSource() {
+    return this.rejectUnsupported<never>('getVersionSource');
+  }
+
   validate(
     _config: Partial<GetVirtualFoldersContentsParams>,
   ): Promise<AxiosResponse> {

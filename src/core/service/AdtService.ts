@@ -3,6 +3,7 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -18,6 +19,7 @@ import {
 import { buildQueryString } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
+import { throwUnsupportedVersions } from '../shared/versions';
 import type {
   IActivateServiceBindingParams,
   IAdtServiceBinding,
@@ -38,7 +40,6 @@ import type {
   IValidateServiceBindingParams,
 } from './types';
 import { resolveBindingVariant } from './types';
-
 export class AdtServiceBinding implements IAdtServiceBinding {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -1070,6 +1071,16 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         Accept: 'application/xml, application/json, text/plain',
       },
     });
+  }
+
+  async getVersions(
+    _config: Partial<IServiceBindingConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('service binding');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('service binding');
   }
 }
 

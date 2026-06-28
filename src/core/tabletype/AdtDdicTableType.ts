@@ -39,6 +39,7 @@ import { unlockTableType } from './unlock';
 import { updateTableType } from './update';
 import { validateTableTypeName } from './validation';
 
+import { getTableTypeVersionSource, getTableTypeVersions } from './versions';
 export class AdtDdicTableType
   implements IAdtObject<ITableTypeConfig, ITableTypeState>
 {
@@ -607,5 +608,13 @@ export class AdtDdicTableType
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<ITableTypeConfig>) {
+    return getTableTypeVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getTableTypeVersionSource(this.connection, contentUri);
   }
 }

@@ -44,6 +44,7 @@ import { unlockInterface } from './unlock';
 import { upload } from './update';
 import { validateInterfaceName } from './validation';
 
+import { getInterfaceVersionSource, getInterfaceVersions } from './versions';
 export class AdtInterface
   implements IAdtObject<IInterfaceConfig, IInterfaceState>
 {
@@ -618,5 +619,13 @@ export class AdtInterface
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IInterfaceConfig>) {
+    return getInterfaceVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getInterfaceVersionSource(this.connection, contentUri);
   }
 }

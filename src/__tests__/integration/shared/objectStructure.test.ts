@@ -60,6 +60,14 @@ class ObjectStructureObject
     );
   }
 
+  getVersions() {
+    return this.rejectUnsupported<never>('getVersions');
+  }
+
+  getVersionSource() {
+    return this.rejectUnsupported<never>('getVersionSource');
+  }
+
   validate(_config: Partial<IObjectStructureParams>): Promise<AxiosResponse> {
     return this.rejectUnsupported('validate');
   }

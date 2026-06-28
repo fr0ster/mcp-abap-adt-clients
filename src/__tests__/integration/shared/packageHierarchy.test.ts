@@ -59,6 +59,14 @@ class PackageHierarchyObject
     );
   }
 
+  getVersions() {
+    return this.rejectUnsupported<never>('getVersions');
+  }
+
+  getVersionSource() {
+    return this.rejectUnsupported<never>('getVersionSource');
+  }
+
   validate(_config: Partial<IPackageHierarchyParams>): Promise<any> {
     return this.rejectUnsupported('validate');
   }

@@ -42,6 +42,7 @@ import { unlockDDLS } from './unlock';
 import { updateDdl } from './update';
 import { validateDdlName } from './validation';
 
+import { getDdlVersionSource, getDdlVersions } from './versions';
 export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -586,5 +587,13 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IDdlConfig>) {
+    return getDdlVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getDdlVersionSource(this.connection, contentUri);
   }
 }

@@ -25,14 +25,15 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { createTransport } from './create';
 import { listTransports } from './list';
 import { getTransport } from './read';
 import type { ITransportConfig, ITransportState } from './types';
-
 export class AdtRequest
   implements IAdtObject<ITransportConfig, ITransportState>
 {
@@ -254,5 +255,15 @@ export class AdtRequest
     _lockHandle: string,
   ): Promise<ITransportState> {
     throw new Error('Unlock operation is not supported for transport requests');
+  }
+
+  async getVersions(
+    _config: Partial<ITransportConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('transport request');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('transport request');
   }
 }

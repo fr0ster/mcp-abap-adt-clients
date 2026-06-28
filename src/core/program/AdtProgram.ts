@@ -44,6 +44,7 @@ import { unlockProgram } from './unlock';
 import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 
+import { getProgramVersionSource, getProgramVersions } from './versions';
 export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -642,5 +643,13 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IProgramConfig>) {
+    return getProgramVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getProgramVersionSource(this.connection, contentUri);
   }
 }

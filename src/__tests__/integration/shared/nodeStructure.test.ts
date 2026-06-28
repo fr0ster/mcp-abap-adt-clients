@@ -62,6 +62,14 @@ class NodeStructureObject
     );
   }
 
+  getVersions() {
+    return this.rejectUnsupported<never>('getVersions');
+  }
+
+  getVersionSource() {
+    return this.rejectUnsupported<never>('getVersionSource');
+  }
+
   validate(_config: Partial<INodeStructureParams>): Promise<AxiosResponse> {
     return this.rejectUnsupported('validate');
   }

@@ -3,6 +3,14 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2026-06-28
+
+### Added
+- **Object version history.** Every object handler now implements `getVersions(config)` (list the SAP version history as `IObjectVersion[]`) and `getVersionSource(contentUri)` (fetch a specific version's source). Each handler owns its own version endpoint: source-bearing types GET `<sourceUri>/versions` (classes use `/includes/{type}/versions`) as an Atom feed; non-source types and types without a version resource throw `AdtOperationError(code = UNSUPPORTED_OPERATION)` — raw HTTP is never surfaced. Trial-verified end-to-end for table, class, interface, and serviceDefinition; other source types build a candidate URL that safely degrades to `UNSUPPORTED_OPERATION` where the endpoint is absent.
+
+### Changed (BREAKING)
+- **Requires `@mcp-abap-adt/interfaces@^9.0.0`** (up from `^7.3.0`), which adds the required `getVersions`/`getVersionSource` methods and `IObjectVersion`/`AdtObjectErrorCodes.UNSUPPORTED_OPERATION` to `IAdtObject`. Consumers that implement `IAdtObject` themselves must add the two methods; consumers pinned to an older `interfaces` major must upgrade. Major bump.
+
 ## [6.1.0] - 2026-06-26
 
 ### Added

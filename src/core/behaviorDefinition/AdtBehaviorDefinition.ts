@@ -46,6 +46,10 @@ import { unlock } from './unlock';
 import { update } from './update';
 import { validate } from './validation';
 
+import {
+  getBehaviorDefinitionVersionSource,
+  getBehaviorDefinitionVersions,
+} from './versions';
 export class AdtBehaviorDefinition
   implements IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState>
 {
@@ -655,5 +659,13 @@ export class AdtBehaviorDefinition
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IBehaviorDefinitionConfig>) {
+    return getBehaviorDefinitionVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getBehaviorDefinitionVersionSource(this.connection, contentUri);
   }
 }
