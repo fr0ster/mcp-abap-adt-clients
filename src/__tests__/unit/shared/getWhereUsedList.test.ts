@@ -14,10 +14,10 @@ const SCOPE_XML = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageS
 
 const RESULT_XML = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences" numberOfResults="0" resultDescription="Found 0"><usagereferences:referencedObjects/></usagereferences:usageReferenceResult>`;
 
-/** Type names selected in a search request body. */
+/** Type names selected in a search request body (prefix-agnostic). */
 function selectedTypes(xml: string): string[] {
   const selected: string[] = [];
-  for (const m of xml.matchAll(/<usagereferences:type\b[^>]*\/>/g)) {
+  for (const m of xml.matchAll(/<[A-Za-z][\w-]*:type\b[^>]*\/>/g)) {
     if (/isSelected="true"/.test(m[0])) {
       const name = m[0].match(/name="([^"]+)"/);
       if (name) selected.push(name[1]);
@@ -25,6 +25,13 @@ function selectedTypes(xml: string): string[] {
   }
   return selected;
 }
+
+/** Same scope payload as SCOPE_XML but bound under a camel-case prefix —
+ * mirrors the system-dependent `usageReferences:` alias seen live on S/4. */
+const SCOPE_XML_CAMEL = SCOPE_XML.replace(
+  /usagereferences/g,
+  'usageReferences',
+);
 
 function makeFakeConnection(): {
   connection: IAbapConnection;
@@ -69,6 +76,39 @@ describe('getWhereUsedList type filtering', () => {
 
     expect(searchBodies).toHaveLength(1);
     expect(selectedTypes(searchBodies[0]).sort()).toEqual(['INTF/OI']);
+  });
+
+  it('applies the type filter when the scope uses a camel-case prefix', async () => {
+    const searchBodies: string[] = [];
+    const connection = {
+      makeAdtRequest: async (options: any): Promise<IAdtResponse> => {
+        if (options.url.includes('/usageReferences/scope')) {
+          return {
+            data: SCOPE_XML_CAMEL,
+            status: 200,
+            headers: {},
+          } as IAdtResponse;
+        }
+        searchBodies.push(String(options.data));
+        return { data: RESULT_XML, status: 200, headers: {} } as IAdtResponse;
+      },
+    } as unknown as IAbapConnection;
+
+    await getWhereUsedList(connection, {
+      object_name: 'ZAC_SHR_BTABL',
+      object_type: 'table',
+      enableOnlyTypes: ['TABL/DS'],
+    });
+
+    expect(searchBodies).toHaveLength(1);
+    // The isSelected flip worked despite the camel-case prefix...
+    expect(selectedTypes(searchBodies[0]).sort()).toEqual(['TABL/DS']);
+    // ...and the re-wrapped <scope> stays namespace-bound (prefix + xmlns kept).
+    expect(searchBodies[0]).toContain('<usageReferences:scope');
+    expect(searchBodies[0]).toContain(
+      'xmlns:usageReferences="http://www.sap.com/adt/ris/usageReferences"',
+    );
+    expect(searchBodies[0]).not.toContain('usageScopeResult');
   });
 
   it('does NOT call the /scope sub-resource when no type filter is requested', async () => {
@@ -151,6 +191,50 @@ describe('getWhereUsedList type filtering', () => {
     expect(result.references[0].name).toBe('ZAPPEND_VBAK');
     expect(result.totalReferences).toBe(1);
   });
+
+  // The namespace PREFIX bound to http://www.sap.com/adt/ris/usageReferences is
+  // system-dependent: some releases emit `usagereferences:` (lower-case), others
+  // `usageReferences:` (camel-case, observed live on an S/4 system). The parser
+  // must read references regardless of which alias the server chose.
+  const resultWith = (prefix: string) =>
+    `<?xml version="1.0" encoding="utf-8"?>` +
+    `<${prefix}:usageReferenceResult xmlns:${prefix}="http://www.sap.com/adt/ris/usageReferences" numberOfResults="2" resultDescription="References for: VBAK">` +
+    `<${prefix}:referencedObjects>` +
+    `<${prefix}:referencedObject uri="/a" parentUri="/p" isResult="false" usageInformation="gradeDirect">` +
+    `<${prefix}:adtObject adtcore:responsible="DEV" adtcore:name="ZAPPEND_VBAK" adtcore:type="TABL/DS" adtcore:description="d" xmlns:adtcore="http://www.sap.com/adt/core">` +
+    `<adtcore:packageRef adtcore:name="ZPKG"/></${prefix}:adtObject></${prefix}:referencedObject>` +
+    `<${prefix}:referencedObject uri="/b">` +
+    `<${prefix}:adtObject adtcore:name="CL_FOO" adtcore:type="CLAS/OC" xmlns:adtcore="http://www.sap.com/adt/core"/>` +
+    `</${prefix}:referencedObject></${prefix}:referencedObjects></${prefix}:usageReferenceResult>`;
+
+  for (const prefix of ['usagereferences', 'usageReferences']) {
+    it(`parses the result regardless of the "${prefix}:" namespace prefix`, async () => {
+      const connection = {
+        makeAdtRequest: async (): Promise<IAdtResponse> =>
+          ({
+            data: resultWith(prefix),
+            status: 200,
+            headers: {},
+          }) as IAdtResponse,
+      } as unknown as IAbapConnection;
+
+      const result = await getWhereUsedList(connection, {
+        object_name: 'VBAK',
+        object_type: 'table',
+      });
+
+      expect(result.totalReferences).toBe(2);
+      expect(result.references).toHaveLength(2);
+      const append = result.references.find((r) => r.type === 'TABL/DS');
+      expect(append?.name).toBe('ZAPPEND_VBAK');
+      expect(append?.packageName).toBe('ZPKG');
+      expect(append?.responsible).toBe('DEV');
+      expect(result.references.map((r) => r.type).sort()).toEqual([
+        'CLAS/OC',
+        'TABL/DS',
+      ]);
+    });
+  }
 
   it('re-throws non-404 scope errors instead of falling back', async () => {
     const connection = {
