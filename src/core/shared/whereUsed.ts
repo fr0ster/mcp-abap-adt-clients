@@ -75,12 +75,14 @@ export function modifyWhereUsedScope(
     disable?: string[];
   },
 ): string {
-  // Each available type is a self-closing <usagereferences:type .../> tag.
-  // We rewrite ONLY the isSelected attribute per tag and never touch the
-  // opaque <usagereferences:payload> blob or attribute ordering — SAP emits
-  // attributes as `isDefault isSelected name`, so logic must read `name`
-  // wherever it appears, not assume it precedes isSelected.
-  const typeTagRegex = /<usagereferences:type\b[^>]*?\/>/g;
+  // Each available type is a self-closing <ns:type .../> tag. The namespace
+  // PREFIX is system-dependent (usagereferences: vs usageReferences:), so match
+  // any prefix — hard-coding one made the rewrite a silent no-op on the other.
+  // We rewrite ONLY the isSelected attribute per tag and never touch the opaque
+  // <ns:payload> blob or attribute ordering — SAP emits attributes as
+  // `isDefault isSelected name`, so logic must read `name` wherever it appears,
+  // not assume it precedes isSelected.
+  const typeTagRegex = /<[A-Za-z][\w-]*:type\b[^>]*?\/>/g;
 
   return scopeXml.replace(typeTagRegex, (tag) => {
     const nameMatch = tag.match(/\bname="([^"]*)"/);
@@ -102,8 +104,9 @@ export function modifyWhereUsedScope(
 }
 
 /**
- * Set the isSelected attribute on a single <usagereferences:type> tag,
- * inserting it if absent. Leaves all other attributes and their order intact.
+ * Set the isSelected attribute on a single <ns:type> tag, inserting it if
+ * absent. Leaves all other attributes and their order intact. The namespace
+ * prefix is matched (and preserved) rather than hard-coded.
  */
 function setIsSelected(typeTag: string, selected: boolean): string {
   const value = selected ? 'true' : 'false';
@@ -114,8 +117,8 @@ function setIsSelected(typeTag: string, selected: boolean): string {
     );
   }
   return typeTag.replace(
-    /<usagereferences:type\b/,
-    `<usagereferences:type isSelected="${value}"`,
+    /<([A-Za-z][\w-]*:type)\b/,
+    `<$1 isSelected="${value}"`,
   );
 }
 
@@ -280,18 +283,15 @@ export async function getWhereUsed(
   const searchUrl = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
 
   // When a scope is provided, extract the inner content of usageScopeResult and
-  // re-wrap it as <usagereferences:scope>. Otherwise omit the scope element.
+  // re-wrap it as <ns:scope>. The namespace prefix is system-dependent
+  // (usagereferences: vs usageReferences:), so capture and reuse it, and KEEP the
+  // open tag's attributes ($2, i.e. the xmlns declaration) on <scope> so the
+  // re-wrapped element stays namespace-bound regardless of which prefix SAP used.
   const scopeContent = params.scopeXml
     ? params.scopeXml
         .replace(/<\?xml[^>]*\?>/, '')
-        .replace(
-          /<usagereferences:usageScopeResult[^>]*>/,
-          '<usagereferences:scope>',
-        )
-        .replace(
-          /<\/usagereferences:usageScopeResult>/,
-          '</usagereferences:scope>',
-        )
+        .replace(/<([A-Za-z][\w-]*):usageScopeResult\b([^>]*)>/, '<$1:scope$2>')
+        .replace(/<\/([A-Za-z][\w-]*):usageScopeResult>/, '</$1:scope>')
     : '';
 
   const searchRequestBody = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/>${scopeContent}</usagereferences:usageReferenceRequest>`;
