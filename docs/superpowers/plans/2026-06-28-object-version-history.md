@@ -122,45 +122,53 @@ git commit -m "feat!: add IObjectVersion + getVersions/getVersionSource to IAdtO
 
 This is a **breaking** (major) change — required methods added to an exported interface. Version bump is done at release time on explicit request.
 
-### Task 1.2: Bridge the interfaces change into adt-clients (dependency update)
+### Task 1.2: Bump adt-clients to the PUBLISHED interfaces major
 
-adt-clients currently depends on `@mcp-abap-adt/interfaces` **`^7.3.0`**, which does NOT contain `IObjectVersion` or `AdtObjectErrorCodes.UNSUPPORTED_OPERATION`. Phase 2 imports them, so the dependency must be updated first. This is an explicit, executable step — not an assumption.
+**HARD GATE — publish first, then consume.** adt-clients currently depends on
+`@mcp-abap-adt/interfaces` **`^7.3.0`**, which lacks `IObjectVersion` /
+`UNSUPPORTED_OPERATION`. Phase 2+ import them, so the dependency must move to the
+**published** interfaces major (`9.0.0`). There is **no local tarball / `file:` /
+link bridge** — that violates the registry-only rule and the publish-first order.
+All Phase 2-7 work is BLOCKED until interfaces 9.0.0 is on npm.
+
+**Precondition (user action):** the interfaces `feat/object-version-history`
+branch (PR for `IObjectVersion` + `UNSUPPORTED_OPERATION`, bumped to `9.0.0`) is
+**merged to master and published to npm**. Do not start this task before
+`npm view @mcp-abap-adt/interfaces version` returns `9.0.0` (or later).
 
 **Files:**
 - Modify: `adt-clients/package.json` (interfaces dep), `adt-clients/package-lock.json`
 
-- [ ] **Step 1: Make the new interfaces build available locally**
+- [ ] **Step 1: Confirm the published version is available**
 
-From the interfaces repo (already built in Task 1.1):
 ```bash
-cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-npm pack            # produces mcp-abap-adt-interfaces-<version>.tgz
+npm view @mcp-abap-adt/interfaces version    # must be >= 9.0.0
 ```
-Note the tarball path. (For the real release the user publishes the interfaces **major** to npm instead; the local tarball is only to develop/iterate before that publish.)
 
-- [ ] **Step 2: Install the tarball into adt-clients**
+- [ ] **Step 2: Bump the dependency to the published major**
 
+Set `"@mcp-abap-adt/interfaces": "^9.0.0"` in `adt-clients/package.json`, then:
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt-clients
-npm install /home/okyslytsia/prj/mcp-abap-adt-interfaces/mcp-abap-adt-interfaces-<version>.tgz
+npm install --package-lock-only
 ```
 
-- [ ] **Step 3: Verify the new exports resolve and the lockfile is clean**
+- [ ] **Step 3: Verify the new exports resolve from the REGISTRY, lockfile clean**
 
 ```bash
+npm install
 node -e "const i=require('@mcp-abap-adt/interfaces'); if(!i.AdtObjectErrorCodes.UNSUPPORTED_OPERATION) throw new Error('missing'); console.log('ok')"
+grep -nE 'file:|\.tgz' package-lock.json | grep -i interfaces || echo 'no file:/tgz interfaces ref'
 grep -c '"link": true' package-lock.json   # must be 0
 ```
-Expected: `ok`, and `0` link entries.
+Expected: `ok`; no `file:`/`.tgz` interfaces reference; `0` link entries.
 
 - [ ] **Step 4: Commit the dependency bump**
 
 ```bash
 git add package.json package-lock.json
-git commit -m "build(deps): bump @mcp-abap-adt/interfaces for IObjectVersion + UNSUPPORTED_OPERATION"
+git commit -m "build(deps): bump @mcp-abap-adt/interfaces to ^9.0.0 (IObjectVersion + UNSUPPORTED_OPERATION)"
 ```
-
-> **Release note:** at release, repoint `package.json` to the **published** interfaces major version (not the tarball) and re-run Step 3's link check; the tarball/file dependency must NOT ship in the released `package-lock.json`.
 
 ---
 
@@ -173,7 +181,7 @@ git commit -m "build(deps): bump @mcp-abap-adt/interfaces for IObjectVersion + U
 - Test: `adt-clients/src/__tests__/unit/versionsParse.test.ts`
 
 **Interfaces:**
-- Consumes: `IObjectVersion`, `AdtOperationError`, `AdtObjectErrorCodes` from `@mcp-abap-adt/interfaces` — available only after Task 1.2 (dependency bridge).
+- Consumes: `IObjectVersion`, `AdtOperationError`, `AdtObjectErrorCodes` from `@mcp-abap-adt/interfaces` — available only after Task 1.2 (bump to the published `^9.0.0`).
 - Produces: `parseVersionsFeed(xml: string): IObjectVersion[]`; `throwUnsupportedVersions(detail?: string): never`; `throwVersionsError(error: unknown, detail: string): never`.
 
 - [ ] **Step 1: Write the failing test**
@@ -741,14 +749,13 @@ git commit -m "feat(versions): non-source types throw UNSUPPORTED_OPERATION"
 ### Task 7.1: Full build + unit suite + docs
 
 - [ ] **Step 1:** `npm run build && SAP_URL= npx jest src/__tests__/unit` — all green; every `AdtXxx` compiles against the new `IAdtObject`.
-- [ ] **Step 2 (MANDATORY — normalize the interfaces dependency):** Task 1.2 installed a **local tarball/file** dependency for development. Before any release/final commit it MUST be replaced with the **published** interfaces major. After the user publishes interfaces:
+- [ ] **Step 2 (dependency hygiene check):** confirm the interfaces dependency is the **published registry** major (set in Task 1.2), with no stray local reference:
   ```bash
-  # set the published major in package.json (e.g. "^8.0.0"), then:
-  npm install --package-lock-only
-  grep -nE '"@mcp-abap-adt/interfaces".*(file:|\.tgz)' package-lock.json   # must be EMPTY
+  node -e "console.log(require('./package.json').dependencies['@mcp-abap-adt/interfaces'])"  # ^9.0.0
+  grep -nE 'file:|\.tgz' package-lock.json | grep -i interfaces || echo 'no file:/tgz interfaces ref'
   grep -c '"link": true' package-lock.json                                # must be 0
   ```
-  Expected: no `file:`/`.tgz` reference to interfaces remains, `0` link entries. Commit `package.json` + `package-lock.json`. The build (`npm run build`) must still pass against the registry version. Do NOT proceed to release while a tarball/file dependency is present.
+  Expected: `^9.0.0`, no `file:`/`.tgz` interfaces reference, `0` link entries. (Task 1.2 already pins the registry version — this is the final guard, since this feature never uses a tarball/file bridge.)
 - [ ] **Step 3:** Add a short `getVersions`/`getVersionSource` example to `docs/usage/CLIENT_API_REFERENCE.md` (list + fetch source), matching the where-used example style.
 - [ ] **Step 4:** Update `CHANGELOG.md` only on explicit user request, noting the interfaces **major** (added required `IAdtObject` methods) and adt-clients support.
 - [ ] **Step 5:** Delete the spec and this plan file once implemented (history lives in git), per repo convention.
