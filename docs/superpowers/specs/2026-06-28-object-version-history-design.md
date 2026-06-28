@@ -141,13 +141,18 @@ A new error code is added to the interface package's error set
 
 - **GET semantics (pattern a):** `Accept: application/atom+xml;type=feed` for the
   list, `Accept: text/plain` for `getVersionSource`.
-- **Error translation (pattern a):** on a 404/406 "no suitable resource", throw
-  `AdtOperationError(UNSUPPORTED_OPERATION, …)`. Other failures are surfaced as
-  interface-level errors too — no raw `IAdtResponse`/axios outward.
-- **Shared, zero endpoint knowledge:** exactly two pure helpers in
-  `src/core/shared/` — `parseVersionsFeed(xml): IObjectVersion[]` (Atom feed →
-  list; one/many/zero `atom:entry`) and `throwUnsupportedVersions(): never`.
-  URI construction and the GET stay in each `AdtXxx`.
+- **Error translation (pattern a):** BOTH the list GET and the content GET wrap
+  every failure so nothing raw leaks. 404/406 "no suitable resource" →
+  `AdtOperationError(code = UNSUPPORTED_OPERATION)`. Any other failure →
+  `AdtOperationError` carrying `.status` and `.originalError` (no `code`
+  required) — never a raw `IAdtResponse`/axios object outward.
+- **Shared, zero endpoint knowledge:** three pure helpers in
+  `src/core/shared/versions.ts` — `parseVersionsFeed(xml): IObjectVersion[]`
+  (Atom feed → list; one/many/zero `atom:entry`), `throwUnsupportedVersions():
+  never`, and `throwVersionsError(error, detail): never` (the shared translator:
+  404/406 → unsupported, else wrap in `AdtOperationError`). They have no endpoint
+  knowledge; URI construction and the GET stay in each `AdtXxx`, which call
+  `throwVersionsError` from their catch.
 
 ## Cross-package sequencing (each step externally reviewed)
 

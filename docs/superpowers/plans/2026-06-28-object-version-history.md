@@ -4,7 +4,7 @@
 
 **Goal:** Add `getVersions(config)` / `getVersionSource(contentUri)` to the `IAdtObject` contract and implement them in every `AdtXxx`, so consumers can list an object's SAP version history and fetch a specific version's source.
 
-**Architecture:** `@mcp-abap-adt/interfaces` gains the contract (types, two methods, one error code) — a MAJOR bump. `@mcp-abap-adt/adt-clients` implements it: source-bearing types build their own `<sourceUri>/versions` (or class `includes/{type}/versions`) URI, GET an Atom feed, parse it; non-source types throw `UNSUPPORTED_OPERATION`. Only two pure helpers are shared (`parseVersionsFeed`, `throwUnsupportedVersions`); all endpoint/URI knowledge stays in each `AdtXxx`.
+**Architecture:** `@mcp-abap-adt/interfaces` gains the contract (types, two methods, one error code) — a MAJOR bump. `@mcp-abap-adt/adt-clients` implements it: source-bearing types build their own `<sourceUri>/versions` (or class `includes/{type}/versions`) URI, GET an Atom feed, parse it; non-source types throw `UNSUPPORTED_OPERATION`. Three pure helpers are shared (`parseVersionsFeed`, `throwUnsupportedVersions`, `throwVersionsError`); all endpoint/URI knowledge stays in each `AdtXxx`. Both the list GET and the content GET wrap every failure via `throwVersionsError` — nothing raw leaks outward.
 
 **Tech Stack:** TypeScript (strict, CommonJS), Jest (ts-jest; unit tests SAP-free, integration trial-gated), Biome, `fast-xml-parser`.
 
@@ -15,7 +15,7 @@
 - All artifacts in English; Biome = single quotes, semicolons, 2-space indent.
 - Never bump `package.json` version without explicit user request; after a bump run `npm install --package-lock-only` and commit the lockfile in the same commit. No `"link": true` in any lockfile.
 - Outward, expose ONLY the interface + typed errors — never raw `IAdtResponse`/axios.
-- Each `AdtXxx` owns its own endpoint URIs; the only shared code is the two pure helpers.
+- Each `AdtXxx` owns its own endpoint URIs; the only shared code is the three pure helpers. Both GETs (list + content) must wrap failures via `throwVersionsError` — no raw `IAdtResponse`/axios outward.
 - Unit-test verification baseline for every adt-clients task: `npm run build` clean (Biome + tsc) and `SAP_URL= npx jest src/__tests__/unit` green. Integration tests are trial-gated (need the trial browser profile up) and run only when explicitly requested.
 - Version-list URI shape is probe-verified ONLY for table + class so far. Any other source type's URI is a candidate that MUST be probe-verified before the type is marked supported.
 
@@ -24,11 +24,11 @@
 ## File Structure
 
 - `interfaces/src/adt/IAdtObject.ts` — add `IObjectVersion`, `UNSUPPORTED_OPERATION` to `AdtObjectErrorCodes`, and the two methods on `IAdtObject`.
-- `interfaces/src/index.ts` — already re-exports `IAdtObject` module; confirm `IObjectVersion` is exported.
-- `adt-clients/src/core/shared/versions.ts` — **new**: the two pure helpers `parseVersionsFeed(xml)` and `throwUnsupportedVersions()`. Zero endpoint knowledge.
+- `interfaces/src/index.ts` — uses a **selective** export for `./adt/IAdtObject` (not `export *`); Task 1.1 adds `IObjectVersion` to that export list. `AdtObjectErrorCodes` is already re-exported.
+- `adt-clients/src/core/shared/versions.ts` — **new**: the three pure helpers `parseVersionsFeed(xml)`, `throwUnsupportedVersions()`, `throwVersionsError(error, detail)`. Zero endpoint knowledge.
 - `adt-clients/src/core/{type}/versions.ts` — **new per type**: low-level `getXxxVersions(connection, config)` (build URI, GET feed, parse) and `getXxxVersionSource(connection, contentUri)`.
 - `adt-clients/src/core/{type}/AdtXxx.ts` — add the two methods, delegating to `{type}/versions.ts` (source types) or `throwUnsupportedVersions` (non-source).
-- `adt-clients/src/__tests__/unit/versionsParse.test.ts` — **new**: `parseVersionsFeed` + `throwUnsupportedVersions` unit tests.
+- `adt-clients/src/__tests__/unit/versionsParse.test.ts` — **new**: `parseVersionsFeed` + `throwUnsupportedVersions` + `throwVersionsError` unit tests.
 - `adt-clients/src/__tests__/integration/core/{type}/...Versions.test.ts` — per verified type.
 
 ---
@@ -174,7 +174,7 @@ git commit -m "build(deps): bump @mcp-abap-adt/interfaces for IObjectVersion + U
 
 **Interfaces:**
 - Consumes: `IObjectVersion`, `AdtOperationError`, `AdtObjectErrorCodes` from `@mcp-abap-adt/interfaces` — available only after Task 1.2 (dependency bridge).
-- Produces: `parseVersionsFeed(xml: string): IObjectVersion[]`; `throwUnsupportedVersions(detail?: string): never`.
+- Produces: `parseVersionsFeed(xml: string): IObjectVersion[]`; `throwUnsupportedVersions(detail?: string): never`; `throwVersionsError(error: unknown, detail: string): never`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -218,7 +218,33 @@ describe('throwUnsupportedVersions', () => {
     }
   });
 });
+
+describe('throwVersionsError', () => {
+  it('maps 404/406 to UNSUPPORTED_OPERATION', () => {
+    for (const status of [404, 406]) {
+      try {
+        throwVersionsError({ response: { status } }, 'ZT');
+      } catch (e: any) {
+        expect(e.code).toBe('ADT_UNSUPPORTED_OPERATION');
+      }
+    }
+  });
+
+  it('wraps any other failure in AdtOperationError (status + originalError, no raw axios)', () => {
+    const original = { response: { status: 500 }, message: 'boom' };
+    try {
+      throwVersionsError(original, 'ZT');
+    } catch (e: any) {
+      expect(e).toBeInstanceOf(AdtOperationError); // not the raw object
+      expect(e.code).toBeUndefined(); // 500 is not "unsupported"
+      expect(e.status).toBe(500);
+      expect(e.originalError).toBe(original);
+    }
+  });
+});
 ```
+
+(Add `AdtOperationError` to the test's imports: `import { AdtOperationError } from '@mcp-abap-adt/interfaces';`.)
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -280,18 +306,33 @@ export function throwUnsupportedVersions(detail?: string): never {
   e.code = AdtObjectErrorCodes.UNSUPPORTED_OPERATION;
   throw e;
 }
+
+/** Translate ANY version-request failure into an interface-level error so no
+ *  raw IAdtResponse/axios object ever leaks outward. 404/406 → unsupported;
+ *  everything else → AdtOperationError carrying status + originalError.
+ *  Call this from the catch of every version list/content GET. */
+export function throwVersionsError(error: unknown, detail: string): never {
+  const status = (error as any)?.response?.status ?? (error as any)?.status;
+  if (status === 404 || status === 406) {
+    throwUnsupportedVersions(detail);
+  }
+  const e = new AdtOperationError(`Failed to read version history for ${detail}`);
+  if (typeof status === 'number') e.status = status;
+  e.originalError = error;
+  throw e;
+}
 ```
 
 - [ ] **Step 4: Run to verify it passes**
 
 Run: `SAP_URL= npx jest src/__tests__/unit/versionsParse.test.ts`
-Expected: PASS (3 assertions).
+Expected: PASS (parse: 2, throwUnsupportedVersions: 1, throwVersionsError: 2).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/core/shared/versions.ts src/__tests__/unit/versionsParse.test.ts
-git commit -m "feat(versions): shared parseVersionsFeed + throwUnsupportedVersions helpers"
+git commit -m "feat(versions): shared parseVersionsFeed + throwUnsupportedVersions + throwVersionsError helpers"
 ```
 
 ---
@@ -306,7 +347,7 @@ git commit -m "feat(versions): shared parseVersionsFeed + throwUnsupportedVersio
 - Test: `adt-clients/src/__tests__/unit/tableVersions.test.ts`
 
 **Interfaces:**
-- Consumes: `parseVersionsFeed`, `throwUnsupportedVersions` (Task 2.1); `encodeSapObjectName` (`src/utils/internalUtils`); `getTimeout` (`src/utils/timeouts`).
+- Consumes: `parseVersionsFeed`, `throwVersionsError` (Task 2.1); `encodeSapObjectName` (`src/utils/internalUtils`); `getTimeout` (`src/utils/timeouts`).
 - Produces: `getTableVersions(connection, config)`, `getTableVersionSource(connection, contentUri)`; `AdtTable.getVersions`, `AdtTable.getVersionSource`.
 
 - [ ] **Step 1: Write the failing unit test (fake connection)**
@@ -377,7 +418,7 @@ Expected: FAIL — `../../core/table/versions` not found.
 import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { parseVersionsFeed, throwUnsupportedVersions } from '../shared/versions';
+import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 import type { ITableConfig } from './types';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
@@ -396,12 +437,8 @@ export async function getTableVersions(
       headers: { Accept: ACCEPT_VERSION_FEED },
     });
     return parseVersionsFeed(String(res.data));
-  } catch (e: any) {
-    const status = e?.response?.status ?? e?.status;
-    if (status === 404 || status === 406) {
-      throwUnsupportedVersions(`table ${config.tableName}`);
-    }
-    throw e;
+  } catch (e) {
+    throwVersionsError(e, `table ${config.tableName}`);
   }
 }
 
@@ -409,13 +446,17 @@ export async function getTableVersionSource(
   connection: IAbapConnection,
   contentUri: string,
 ): Promise<string> {
-  const res = await connection.makeAdtRequest({
-    url: contentUri,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: { Accept: 'text/plain' },
-  });
-  return String(res.data);
+  try {
+    const res = await connection.makeAdtRequest({
+      url: contentUri,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: { Accept: 'text/plain' },
+    });
+    return String(res.data);
+  } catch (e) {
+    throwVersionsError(e, 'version content');
+  }
 }
 ```
 
@@ -518,7 +559,7 @@ Expected: FAIL — module not found.
 import type { IAbapConnection, IObjectVersion } from '@mcp-abap-adt/interfaces';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
-import { parseVersionsFeed, throwUnsupportedVersions } from '../shared/versions';
+import { parseVersionsFeed, throwVersionsError } from '../shared/versions';
 
 const ACCEPT_VERSION_FEED = 'application/atom+xml;type=feed';
 
@@ -544,12 +585,8 @@ export async function getClassIncludeVersions(
       headers: { Accept: ACCEPT_VERSION_FEED },
     });
     return parseVersionsFeed(String(res.data));
-  } catch (e: any) {
-    const status = e?.response?.status ?? e?.status;
-    if (status === 404 || status === 406) {
-      throwUnsupportedVersions(`class ${className} (${includeType})`);
-    }
-    throw e;
+  } catch (e) {
+    throwVersionsError(e, `class ${className} (${includeType})`);
   }
 }
 
@@ -557,13 +594,17 @@ export async function getClassVersionSource(
   connection: IAbapConnection,
   contentUri: string,
 ): Promise<string> {
-  const res = await connection.makeAdtRequest({
-    url: contentUri,
-    method: 'GET',
-    timeout: getTimeout('default'),
-    headers: { Accept: 'text/plain' },
-  });
-  return String(res.data);
+  try {
+    const res = await connection.makeAdtRequest({
+      url: contentUri,
+      method: 'GET',
+      timeout: getTimeout('default'),
+      headers: { Accept: 'text/plain' },
+    });
+    return String(res.data);
+  } catch (e) {
+    throwVersionsError(e, 'version content');
+  }
 }
 ```
 
@@ -718,5 +759,5 @@ git commit -m "feat(versions): non-source types throw UNSUPPORTED_OPERATION"
 ## Self-Review Notes
 
 - **Spec coverage:** contract (Task 1.1) ✓; shared pure helpers only (Task 2.1) ✓; per-impl URI ownership + source pattern (Tasks 3,4,5) ✓; non-source explicit pattern (Task 6) ✓; error translation 404/406 → `UNSUPPORTED_OPERATION`, no raw HTTP (Tasks 2,3,4,6) ✓; `getVersions(config)` identity-per-call (Task 1.1) ✓; probe-verify-before-support (Task 5) ✓; interfaces MAJOR (Task 1.1) ✓; consumer untouched ✓.
-- **Type consistency:** `parseVersionsFeed`/`throwUnsupportedVersions` names used identically across Tasks 2–6; `getVersions(config: Partial<TConfig>)` / `getVersionSource(contentUri: string)` consistent with the spec contract; `UNSUPPORTED_OPERATION` = `'ADT_UNSUPPORTED_OPERATION'` consistent.
+- **Type consistency:** `parseVersionsFeed` / `throwUnsupportedVersions` / `throwVersionsError` names used identically across Tasks 2–6; source-type list+content GETs both wrap via `throwVersionsError` (no raw HTTP outward); `getVersions(config: Partial<TConfig>)` / `getVersionSource(contentUri: string)` consistent with the spec contract; `UNSUPPORTED_OPERATION` = `'ADT_UNSUPPORTED_OPERATION'` consistent.
 - **Probe caveat honored:** Phase 5 forbids claiming support for any type before its URI is probe-verified.
