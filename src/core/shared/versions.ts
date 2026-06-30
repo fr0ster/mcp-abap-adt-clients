@@ -27,6 +27,7 @@ export function parseVersionsFeed(xml: string): IObjectVersion[] {
   return entries.map((e: Record<string, any>) => {
     const content = e['atom:content'] ?? e.content ?? {};
     const author = e['atom:author'] ?? e.author;
+    const transport = extractTransport(e);
     return {
       versionId: String(e['atom:id'] ?? e.id ?? ''),
       author: author
@@ -38,8 +39,31 @@ export function parseVersionsFeed(xml: string): IObjectVersion[] {
           : undefined,
       title: title ? String(title) : undefined,
       contentUri: String(content['@_src'] ?? ''),
+      transportRequest: transport.request,
+      transportDescription: transport.description,
     };
   });
+}
+
+const TRANSPORT_REL = 'http://www.sap.com/adt/relations/transport/request';
+
+/** Pull the transport request (id + description) from a version entry's
+ *  transport-request <atom:link>. An entry may carry two such links (sapgui +
+ *  adt) with the same name — the first wins. Entries without a transport leave
+ *  both undefined. */
+function extractTransport(entry: Record<string, any>): {
+  request?: string;
+  description?: string;
+} {
+  const raw = entry['atom:link'] ?? entry.link;
+  const links = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const link = links.find(
+    (l: Record<string, any>) => l?.['@_rel'] === TRANSPORT_REL,
+  );
+  if (!link) return {};
+  const request = String(link['@_adtcore:name'] ?? '') || undefined;
+  const description = String(link['@_title'] ?? '') || undefined;
+  return { request, description };
 }
 
 /** Throw a typed "no version history" error. Used by non-source types and by

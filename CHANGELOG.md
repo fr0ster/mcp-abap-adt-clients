@@ -3,6 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.2.0] - 2026-06-30
+
+### Added
+- **Version history now surfaces the transport request.** `getVersions` (`parseVersionsFeed`) reads each version entry's transport-request `<atom:link>` and populates the new optional `IObjectVersion.transportRequest` (e.g. `'DS4K901917'`) and `transportDescription` (its short text). An entry may carry two such links (sapgui + adt) with the same request — the first wins; versions without a transport leave both undefined. Requires `@mcp-abap-adt/interfaces@^9.1.0`.
+
 ## [7.1.0] - 2026-06-28
 
 ### Added
