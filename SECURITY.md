@@ -2,13 +2,15 @@
 
 ## Supported versions
 
-Security fixes are released only for the latest `7.x` minor line. Older majors
-are not maintained — upgrade to the latest `7.x`.
+Security fixes are released only on the **latest `7.x` minor** (as a new patch).
+Older `7.x` minors and older majors are not maintained — upgrade to the latest
+`7.x`.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 7.x     | :white_check_mark: |
-| < 7.0   | :x:                |
+| Version                        | Supported          |
+| ------------------------------ | ------------------ |
+| Latest `7.x` minor (`7.2.x`)   | :white_check_mark: |
+| Older `7.x` minors (`< 7.2`)   | :x:                |
+| `< 7.0`                        | :x:                |
 
 ## Reporting a vulnerability
 
