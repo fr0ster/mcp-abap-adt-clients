@@ -3,6 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.2.1] - 2026-07-01
+
+### Security
+- **Bump vulnerable dependencies.** Raise `axios` floor to `^1.18.1` (fixes SSRF / prototype-pollution / credential-leak / ReDoS advisories) and `fast-xml-parser` to `^5.9.3` (fixes entity-expansion and injection advisories), refreshing their transitives (`form-data`, `follow-redirects`, `fast-xml-builder`). `npm audit` now reports 0 vulnerabilities. No API changes.
+
 ## [7.2.0] - 2026-06-30
 
 ### Added
