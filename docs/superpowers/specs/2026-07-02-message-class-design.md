@@ -50,6 +50,7 @@ interface IMessageClassMessageConfig {
   msgtext?: string;
   selfExplanatory?: boolean;
   description?: string;
+  transportRequest?: string; // message mutations are class PUTs → need corrNr for transportable packages
 }
 interface IMessageClassMessageState {
   createResult?: unknown;
@@ -87,7 +88,8 @@ sub-resource `GET /messages/{no}` returns an empty template and is NOT used.
 | `delete(config)` | `POST …/{name}?_action=LOCK&accessMode=MODIFY` → `DELETE …/{name}?lockHandle={classLock}` |
 | `lock(config)` | `POST …/{name}?_action=LOCK&accessMode=MODIFY` → returns `LOCK_HANDLE` |
 | `unlock(config, handle)` | `POST …/{name}?_action=UNLOCK&lockHandle={handle}` |
-| `activate` / `check` / `validate` / `getVersions` / `getVersionSource` | **throw** `AdtOperationError(UNSUPPORTED_OPERATION)` |
+| `validate(config)` | `GET /sap/bc/adt/messageclass/validation?objname={name}&description={description}` — name/description validation (endpoint present in ADT discovery; probe-verify the exact response/Accept during implementation) |
+| `activate` / `check` / `getVersions` / `getVersionSource` | **throw** `AdtOperationError(UNSUPPORTED_OPERATION)` |
 
 `AdtMessageClass.update` **must not drop existing messages** — it owns only the
 class-level attributes; messages are `AdtMessageClassMessage`'s domain, so update
@@ -105,14 +107,53 @@ reads the class and re-sends its current message set unchanged.
 Lock responses carry `<LOCK_HANDLE>…</LOCK_HANDLE>` (asx:abap envelope);
 `IS_LOCAL=X` for local-package objects.
 
-## Shared XML helper
+## Shared XML helper (round-trip preserving)
 
-`src/core/messageClass/xml.ts` (pure, used by both classes):
+`src/core/messageClass/xml.ts` (pure, used by both classes). Because `update` and
+every message operation rebuild and PUT the **full** class XML, the helper MUST
+preserve all class-level attributes across a read → modify → write cycle — never
+reconstruct from a minimal set (otherwise a non-EN class or other metadata is
+silently reset).
 
-- `parseMessageClass(xml: string): { name; description?; packageName?; messages: IParsedMessage[] }`
-- `buildMessageClassXml(input: { name; description?; packageName?; masterLanguage?; messages: Array<IParsedMessage & { lockHandle?: string }> }): string`
-  — emits `mc:messageClass` with nested `mc:messages`, including `mc:lockhandle`
-  per message when a lock handle is supplied (for the message write flow).
+```ts
+interface IParsedMessageClass {
+  name: string;
+  description?: string;
+  language?: string;        // adtcore:language
+  masterLanguage?: string;  // adtcore:masterLanguage
+  masterSystem?: string;    // adtcore:masterSystem
+  responsible?: string;     // adtcore:responsible
+  packageName?: string;
+  messages: IParsedMessage[];
+}
+
+// parse every class-level attr + the message set
+parseMessageClass(xml: string): IParsedMessageClass
+
+// rebuild from a full parsed class, carrying every attr through verbatim;
+// per-message `mc:lockhandle` is emitted when supplied (message write flow)
+buildMessageClassXml(
+  cls: IParsedMessageClass,
+  opts?: { messageLockHandles?: Record<string /*msgno*/, string> },
+): string
+```
+
+**Read-modify-write rule:** `update`/message flows call `parseMessageClass` on the
+current class, apply ONLY the explicitly-changed fields (a description, one
+message), and pass the whole preserved `IParsedMessageClass` to
+`buildMessageClassXml`. Unchanged attributes (language, masterLanguage,
+masterSystem, responsible) and untouched messages round-trip verbatim.
+
+## Transport handling (corrNr)
+
+Every mutating flow (class create/update/delete; message create/update/delete —
+which are class PUTs) must pass the transport as `corrNr={transportRequest}` when
+the target package is transportable; for local packages (`IS_LOCAL=X`, as in the
+probe) no transport is sent. `IMessageClassMessageConfig` therefore also carries
+`transportRequest?`. The probe verified the **local** flow (no corrNr); the exact
+`corrNr` placement (create `POST …?corrNr=`, the class `LOCK`, and/or the `PUT`)
+for a **transportable** package is not yet in the ADT discovery templates and
+MUST be probe-verified against a transportable package during implementation.
 
 ## Error handling
 
