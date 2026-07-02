@@ -66,6 +66,11 @@ interface IParsedMessage {
   msgtext: string;
   selfExplanatory?: boolean;
   description?: string;
+  /** Every attribute parsed off the `<mc:messages>` element (e.g. mc:documented,
+   *  adtcore:name, and any other mc:*/adtcore:* SAP emits). Preserved so that an
+   *  untouched message round-trips verbatim when the full class XML is rebuilt to
+   *  change a DIFFERENT message or the class description. */
+  rawAttrs?: Record<string, string>;
 }
 ```
 
@@ -141,8 +146,18 @@ buildMessageClassXml(
 **Read-modify-write rule:** `update`/message flows call `parseMessageClass` on the
 current class, apply ONLY the explicitly-changed fields (a description, one
 message), and pass the whole preserved `IParsedMessageClass` to
-`buildMessageClassXml`. Unchanged attributes (language, masterLanguage,
-masterSystem, responsible) and untouched messages round-trip verbatim.
+`buildMessageClassXml`. Unchanged class attributes (language, masterLanguage,
+masterSystem, responsible) round-trip verbatim.
+
+**Message-level preservation:** `buildMessageClassXml` emits each `<mc:messages>`
+entry as follows — an **untouched** message re-emits its `rawAttrs` verbatim (no
+`mc:lockhandle`); the **target** message being created/updated emits its explicit
+fields (`mc:msgno`, `mc:msgtext`, `mc:selfexplainatory`, description) plus
+`mc:lockhandle` from `opts.messageLockHandles`; a **deleted** message is omitted.
+This guarantees a message operation on one entry never mutates any other entry's
+attributes. During implementation, probe-verify the exact meaningful message
+attribute set and that an untouched message may be re-sent without a lock handle
+(the class `PUT` only locks the class + the one message being changed).
 
 ## Transport handling (corrNr)
 
@@ -190,10 +205,13 @@ adt-clients `core/messageClass/types.ts`, like every other object type.)
 ## Testing
 
 - **Unit (SAP-free):** `parseMessageClass` / `buildMessageClassXml` against the
-  real class XML captured in the probe (class with two messages, incl.
-  `mc:lockhandle`); round-trip (parse → build → parse); each object's
-  non-applicable ops throw `UNSUPPORTED_OPERATION` (fake connection);
-  error-translation on a 4xx.
+  real class XML captured in the probe (class with two messages carrying extra
+  `mc:*`/`adtcore:*` attributes). **Round-trip preservation test:** parse a
+  two-message class, change ONE message, rebuild → assert the OTHER message's
+  attributes (incl. `rawAttrs` like `mc:documented`/`adtcore:name`) and all
+  class-level attributes (language, masterLanguage, masterSystem, responsible)
+  are byte-preserved. Each object's non-applicable ops throw
+  `UNSUPPORTED_OPERATION` (fake connection); error-translation on a 4xx.
 - **Integration (trial, browser profile required):** full lifecycle mirroring
   the probe — create class, read, add a message, read the message (via class),
   update it, delete it, delete the class — self-skips without `.env`.
