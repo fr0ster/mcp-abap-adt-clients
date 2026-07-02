@@ -214,10 +214,14 @@ adt-clients `core/messageClass/types.ts`, like every other object type.)
 - **Unit (SAP-free):** `parseMessageClass` / `buildMessageClassXml` against the
   real class XML captured in the probe (class with two messages carrying extra
   `mc:*`/`adtcore:*` attributes). **Round-trip preservation test:** parse a
-  two-message class, change ONE message, rebuild → assert the OTHER message's
-  attributes (incl. `rawAttrs` like `mc:documented`/`adtcore:name`) and all
-  class-level attributes (language, masterLanguage, masterSystem, responsible)
-  are byte-preserved. Each object's non-applicable ops throw
+  two-message class, change ONE message's `mc:msgtext`, rebuild → assert:
+  (1) the OTHER (untouched) message's attributes are byte-preserved;
+  (2) the **target** (updated) message keeps its non-changed attributes
+  (`mc:documented`, `adtcore:name`, other `rawAttrs`) while only `mc:msgtext`
+  changed and `mc:lockhandle` was added;
+  (3) all class-level attributes (language, masterLanguage, masterSystem,
+  responsible) are byte-preserved.
+  Each object's non-applicable ops throw
   `UNSUPPORTED_OPERATION` (fake connection); error-translation on a 4xx.
 - **Integration (trial, browser profile required):** full lifecycle mirroring
   the probe — create class, read, add a message, read the message (via class),
