@@ -150,12 +150,19 @@ message), and pass the whole preserved `IParsedMessageClass` to
 masterSystem, responsible) round-trip verbatim.
 
 **Message-level preservation:** `buildMessageClassXml` emits each `<mc:messages>`
-entry as follows — an **untouched** message re-emits its `rawAttrs` verbatim (no
-`mc:lockhandle`); the **target** message being created/updated emits its explicit
-fields (`mc:msgno`, `mc:msgtext`, `mc:selfexplainatory`, description) plus
-`mc:lockhandle` from `opts.messageLockHandles`; a **deleted** message is omitted.
+entry as follows:
+- **Untouched** message → re-emit its `rawAttrs` verbatim (no `mc:lockhandle`).
+- **Updated existing** message → start from its `rawAttrs`, override only the
+  explicitly-changed fields (`mc:msgtext`, `mc:selfexplainatory`, description),
+  and add/replace `mc:lockhandle` from `opts.messageLockHandles`. Its other
+  attributes (`mc:documented`, `adtcore:name`, future SAP attrs) are carried
+  through, not dropped.
+- **New** message (create) → build attributes from scratch (`mc:msgno`,
+  `mc:msgtext`, `mc:selfexplainatory`, description) + `mc:lockhandle`.
+- **Deleted** message → omit the entry.
+
 This guarantees a message operation on one entry never mutates any other entry's
-attributes. During implementation, probe-verify the exact meaningful message
+attributes, and updating one field of a message never drops its other attributes. During implementation, probe-verify the exact meaningful message
 attribute set and that an untouched message may be re-sent without a lock handle
 (the class `PUT` only locks the class + the one message being changed).
 
