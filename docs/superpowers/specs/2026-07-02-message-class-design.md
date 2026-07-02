@@ -225,8 +225,11 @@ adt-clients `core/messageClass/types.ts`, like every other object type.)
   (2) the **target** (updated) message keeps its non-changed attributes
   (`mc:documented`, `adtcore:name`, other `rawAttrs`) while only `mc:msgtext`
   changed and `mc:lockhandle` was added;
-  (3) all class-level attributes (language, masterLanguage, masterSystem,
-  responsible) are byte-preserved.
+  (3) all class-level attributes are byte-preserved — both the named ones
+  (language, masterLanguage, masterSystem, responsible) AND an arbitrary
+  unknown/future root attribute injected into the fixture (via
+  `IParsedMessageClass.rawAttrs`), proving the "any attr verbatim" contract, not
+  just an allowlist.
   Each object's non-applicable ops throw
   `UNSUPPORTED_OPERATION` (fake connection); error-translation on a 4xx.
 - **Integration (trial, browser profile required):** full lifecycle mirroring
