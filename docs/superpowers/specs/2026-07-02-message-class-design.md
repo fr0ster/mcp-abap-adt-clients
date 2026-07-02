@@ -130,6 +130,10 @@ interface IParsedMessageClass {
   responsible?: string;     // adtcore:responsible
   packageName?: string;
   messages: IParsedMessage[];
+  /** Every attribute parsed off the root `<mc:messageClass>` element (incl. any
+   *  adtcore:*/mc:* SAP emits beyond the named fields above). Preserved so the
+   *  full-class PUT round-trips class-level metadata verbatim. */
+  rawAttrs?: Record<string, string>;
 }
 
 // parse every class-level attr + the message set
@@ -146,8 +150,10 @@ buildMessageClassXml(
 **Read-modify-write rule:** `update`/message flows call `parseMessageClass` on the
 current class, apply ONLY the explicitly-changed fields (a description, one
 message), and pass the whole preserved `IParsedMessageClass` to
-`buildMessageClassXml`. Unchanged class attributes (language, masterLanguage,
-masterSystem, responsible) round-trip verbatim.
+`buildMessageClassXml`. The root `<mc:messageClass>` is emitted from its
+`rawAttrs` verbatim, overridden only by explicitly-changed named fields — so any
+class-level attribute (named or not: language, masterLanguage, masterSystem,
+responsible, future SAP attrs) round-trips unchanged.
 
 **Message-level preservation:** `buildMessageClassXml` emits each `<mc:messages>`
 entry as follows:
