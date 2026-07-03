@@ -19,7 +19,7 @@
 - Message content lives in the CLASS XML; `GET /messages/{no}` is an empty template (do not use it for content). Message-level `DELETE /messages/{no}` returns 423 (do not use).
 - Round-trip preserving: both `IParsedMessageClass` and `IParsedMessage` carry `rawAttrs` so any class-level or message-level attribute (named or future) round-trips verbatim through the full-class PUT.
 - Non-applicable ops throw `AdtOperationError` with `code = AdtObjectErrorCodes.UNSUPPORTED_OPERATION`.
-- corrNr: pass `?corrNr={transportRequest}` on mutating flows for transportable packages (probe-verify exact placement for a transportable package — Task 6.2; local flow verified).
+- corrNr: Phases 4–5 implement the **local/no-transport path only** (probe-verified). `transport_request` is parsed into config but stays UNUSED until **Task 6.2**, which probe-verifies the exact `corrNr` placement on a transportable package and then wires it. Do not add `corrNr` before Task 6.2.
 - Verification baseline per adt-clients task: `npm run build` clean + `SAP_URL= npx jest src/__tests__/unit` green.
 
 ---
@@ -83,7 +83,14 @@ export interface ICreateMessageClassMessageParams {
   description?: string;
   transport_request?: string;
 }
-export type IUpdateMessageClassMessageParams = ICreateMessageClassMessageParams;
+export interface IUpdateMessageClassMessageParams {
+  class_name: string;
+  msgno: string;
+  msgtext?: string;         // optional: update may change only description or self_explanatory
+  self_explanatory?: boolean;
+  description?: string;
+  transport_request?: string;
+}
 export interface IDeleteMessageClassMessageParams {
   class_name: string;
   msgno: string;
@@ -243,6 +250,9 @@ describe('buildMessageClassXml round-trip preservation', () => {
     expect(m2.rawAttrs?.['mc:documented']).toBe('true');
     // lock handle emitted on the target
     expect(out).toContain('mc:lockhandle="LH1"');
+    // namespaces appear exactly once (rawAttrs must not duplicate xmlns:*)
+    expect(out.match(/xmlns:mc=/g)).toHaveLength(1);
+    expect(out.match(/xmlns:adtcore=/g)).toHaveLength(1);
   });
 
   it('omits a deleted message', () => {
@@ -287,10 +297,15 @@ const parser = new XMLParser({
   parseTagValue: false,
 });
 
+// Collect attributes, EXCLUDING namespace declarations (xmlns:*). fast-xml-parser
+// surfaces xmlns:mc / xmlns:adtcore as attributes; the builder re-emits the
+// namespaces from its template, so keeping them here would duplicate them and
+// produce invalid XML on round-trip.
 const A = (o: Record<string, any>): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(o))
-    if (k.startsWith('@_')) out[k.slice(2)] = String(v);
+    if (k.startsWith('@_') && !k.startsWith('@_xmlns'))
+      out[k.slice(2)] = String(v);
   return out;
 };
 
@@ -453,7 +468,7 @@ describe('AdtMessageClass', () => {
 ```
 
 - [ ] **Step 2:** run → FAIL.
-- [ ] **Step 3: Implement.** Create `types.ts` (`IMessageClassConfig`/`IMessageClassState` per the spec), `lock.ts` (POST `${base}/${name}?_action=LOCK&accessMode=MODIFY`, Accept `ACCEPT_LOCK`, parse `result['asx:abap']['asx:values'].DATA.LOCK_HANDLE`; requires `connection.setSessionType('stateful')`), `unlock.ts` (POST `?_action=UNLOCK&lockHandle=`), `create.ts` (POST `/messageclass${corrNr}` with `buildMessageClassXml` shell, `Content-Type: application/xml`), `read.ts` (GET `${base}/${name}` Accept `application/vnd.sap.adt.mc.messageclass+xml, application/xml` → `parseMessageClass`), `update.ts` (read current → apply description → `stateful` → lock → PUT `${base}/${name}?lockHandle=${lh}${corrNr}` Content-Type `application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8` with the FULL rebuilt XML (existing messages preserved) → unlock → `stateless`), `delete.ts` (`stateful` → lock → DELETE `${base}/${name}?lockHandle=${lh}${corrNr}` → `stateless`). Then `AdtMessageClass.ts` implementing `IAdtObject<IMessageClassConfig, IMessageClassState>`: `validate` → GET `/sap/bc/adt/messageclass/validation?objname=${name}&description=${description}`; `create/read/update/delete/lock/unlock` delegate to the low-level ops; `activate/check/getVersions/getVersionSource` → `throwUnsupportedOperation('<op>', 'message class ' + name)`. Wrap makeAdtRequest failures + always unlock + `setSessionType('stateless')` on error (mirror `AdtDomain`/`AdtPackage` cleanup). Add `getMessageClass()` to `AdtClient`, export config/state via `index.core.ts`, re-export from `index.ts`.
+- [ ] **Step 3: Implement.** Create `types.ts` (`IMessageClassConfig`/`IMessageClassState` per the spec), `lock.ts` (POST `${base}/${name}?_action=LOCK&accessMode=MODIFY`, Accept `ACCEPT_LOCK`, parse `result['asx:abap']['asx:values'].DATA.LOCK_HANDLE`; requires `connection.setSessionType('stateful')`), `unlock.ts` (POST `?_action=UNLOCK&lockHandle=`), `create.ts` (POST `/messageclass` with `buildMessageClassXml` shell, `Content-Type: application/xml`), `read.ts` (GET `${base}/${name}` Accept `application/vnd.sap.adt.mc.messageclass+xml, application/xml` → `parseMessageClass`), `update.ts` (read current → apply description → `stateful` → lock → PUT `${base}/${name}?lockHandle=${lh}` Content-Type `application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8` with the FULL rebuilt XML (existing messages preserved) → unlock → `stateless`), `delete.ts` (`stateful` → lock → DELETE `${base}/${name}?lockHandle=${lh}` → `stateless`). **No `corrNr` yet — implement the local/no-transport path only (verified by probe); `transport_request` stays parsed-but-unused until Task 6.2 wires it after a transportable-package probe.** Then `AdtMessageClass.ts` implementing `IAdtObject<IMessageClassConfig, IMessageClassState>`: `validate` → GET `/sap/bc/adt/messageclass/validation?objname=${name}&description=${description}`; `create/read/update/delete/lock/unlock` delegate to the low-level ops; `activate/check/getVersions/getVersionSource` → `throwUnsupportedOperation('<op>', 'message class ' + name)`. Wrap makeAdtRequest failures + always unlock + `setSessionType('stateless')` on error (mirror `AdtDomain`/`AdtPackage` cleanup). Add `getMessageClass()` to `AdtClient`, export config/state via `index.core.ts`, re-export from `index.ts`.
 - [ ] **Step 4:** run the unit test + `npm run build` → PASS/clean.
 - [ ] **Step 5:** commit `feat(messageClass): AdtMessageClass CRUD + validate + unsupported ops`.
 
@@ -543,7 +558,7 @@ describe('AdtMessageClassMessage', () => {
 ```
 
 - [ ] **Step 2:** run → FAIL.
-- [ ] **Step 3: Implement.** Add message locks to `lock.ts` (`lockMessage`: POST `${base}/${name}/messages/${no}?_action=LOCK_MSG&accessMode=MODIFY`, Accept the StatusMessage type, parse `LOCK_HANDLE`; `lockClassForMessage`: POST `${base}/${name}?_action=LOCK&accessMode=MODIFY&msgNo=${no}&onSave=X`) and `unlock.ts` (`unlockAllMessages`: POST `${base}/${name}/messages/${no}?_action=UNLOCK_ALL` body `[${no}]`). Implement `AdtMessageClassMessage` (`IMessageClassMessageConfig`/`State`): `read` = class `read` → find `messages[msgno]` (throw `OBJECT_NOT_FOUND` if absent); `create`/`update` = read class → set/merge the message into `messages` → `stateful` → `lockMessage` (MH) + `lockClassForMessage` (CH) → PUT `${base}/${name}?lockHandle=${CH}${corrNr}` with `buildMessageClassXml(cls, { messageLockHandles: { [no]: MH } })` → `unlock` class (CH) + `unlockAllMessages` → `stateless`; `delete` = read class → drop the message → `stateful` → class LOCK (CH) → PUT without it → `unlock` → `stateless`; `activate/check/validate/lock/unlock/getVersions/getVersionSource` → `throwUnsupportedOperation`. Always unlock + `setSessionType('stateless')` on error. Wire `getMessageClassMessage()` into `AdtClient`; export types via `index.core.ts`.
+- [ ] **Step 3: Implement.** Add message locks to `lock.ts` (`lockMessage`: POST `${base}/${name}/messages/${no}?_action=LOCK_MSG&accessMode=MODIFY`, Accept the StatusMessage type, parse `LOCK_HANDLE`; `lockClassForMessage`: POST `${base}/${name}?_action=LOCK&accessMode=MODIFY&msgNo=${no}&onSave=X`) and `unlock.ts` (`unlockAllMessages`: POST `${base}/${name}/messages/${no}?_action=UNLOCK_ALL` body `[${no}]`). Implement `AdtMessageClassMessage` (`IMessageClassMessageConfig`/`State`): `read` = class `read` → find `messages[msgno]` (throw `OBJECT_NOT_FOUND` if absent); `create`/`update` = read class → set/merge the message into `messages` → `stateful` → `lockMessage` (MH) + `lockClassForMessage` (CH) → PUT `${base}/${name}?lockHandle=${CH}` (no `corrNr` yet — local path only, see Task 6.2) with `buildMessageClassXml(cls, { messageLockHandles: { [no]: MH } })` → `unlock` class (CH) + `unlockAllMessages` → `stateless`; `delete` = read class → drop the message → `stateful` → class LOCK (CH) → PUT without it → `unlock` → `stateless`; `activate/check/validate/lock/unlock/getVersions/getVersionSource` → `throwUnsupportedOperation`. Always unlock + `setSessionType('stateless')` on error. Wire `getMessageClassMessage()` into `AdtClient`; export types via `index.core.ts`.
 - [ ] **Step 4:** run unit + `npm run build` → PASS/clean; full `SAP_URL= npx jest src/__tests__/unit` green.
 - [ ] **Step 5:** commit `feat(messageClass): AdtMessageClassMessage (read-modify-write) + wiring`.
 
@@ -560,7 +575,7 @@ describe('AdtMessageClassMessage', () => {
 ### Task 6.2: corrNr for a transportable package (probe + wire)
 
 - [ ] **Step 1 (probe, on a transportable package):** create/update a message class in a TRANSPORTABLE package and capture whether `corrNr` goes on the create `POST`, the `LOCK`, and/or the `PUT`/`DELETE`. Record the verified placement.
-- [ ] **Step 2:** ensure `create/update/delete.ts` append `?corrNr=${transport_request}` at exactly the verified spots (already stubbed from config); add a unit test asserting corrNr is present on those requests when `transportRequest` is set.
+- [ ] **Step 2:** now (and only now) wire `corrNr` — thread `transport_request` from the configs into `create/update/delete.ts` and the message PUT, appending `?corrNr=${transport_request}` (or `&corrNr=` where the URL already has a query) at exactly the probe-verified spots; add a unit test asserting corrNr is present on those requests when `transportRequest` is set, and ABSENT when it is not.
 - [ ] **Step 3:** commit `feat(messageClass): corrNr on mutating flows for transportable packages`.
 
 ---
