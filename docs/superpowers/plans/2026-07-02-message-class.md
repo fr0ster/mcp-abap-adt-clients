@@ -262,6 +262,17 @@ describe('buildMessageClassXml round-trip preservation', () => {
     expect(out).not.toContain('mc:msgno="002"');
     expect(out).toContain('mc:msgno="001"');
   });
+
+  it('preserves an unknown/future namespace declaration + its attr (stays bound)', () => {
+    const withNs = `<?xml version="1.0"?><mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" xmlns:foo="urn:foo" adtcore:name="ZT" adtcore:type="MSAG/N" foo:bar="baz"><adtcore:packageRef adtcore:name="ZP"/></mc:messageClass>`;
+    const out = buildMessageClassXml(parseMessageClass(withNs));
+    // foo:bar kept AND its xmlns:foo declaration kept (no unbound prefix)
+    expect(out).toContain('foo:bar="baz"');
+    expect(out).toContain('xmlns:foo="urn:foo"');
+    // template-owned namespaces still exactly once
+    expect(out.match(/xmlns:mc=/g)).toHaveLength(1);
+    expect(out.match(/xmlns:adtcore=/g)).toHaveLength(1);
+  });
 });
 ```
 
@@ -297,15 +308,16 @@ const parser = new XMLParser({
   parseTagValue: false,
 });
 
-// Collect attributes, EXCLUDING namespace declarations (xmlns:*). fast-xml-parser
-// surfaces xmlns:mc / xmlns:adtcore as attributes; the builder re-emits the
-// namespaces from its template, so keeping them here would duplicate them and
-// produce invalid XML on round-trip.
+// Collect attributes, dropping ONLY the namespace declarations the builder
+// re-emits from its own template (xmlns:mc, xmlns:adtcore) — keeping those would
+// duplicate them and produce invalid XML. Any OTHER xmlns:* (an unknown/future
+// prefix SAP may add, e.g. xmlns:foo) MUST be preserved so its prefixed
+// attributes (foo:bar) stay bound on round-trip.
+const TEMPLATE_NS = new Set(['@_xmlns:mc', '@_xmlns:adtcore']);
 const A = (o: Record<string, any>): Record<string, string> => {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(o))
-    if (k.startsWith('@_') && !k.startsWith('@_xmlns'))
-      out[k.slice(2)] = String(v);
+    if (k.startsWith('@_') && !TEMPLATE_NS.has(k)) out[k.slice(2)] = String(v);
   return out;
 };
 
