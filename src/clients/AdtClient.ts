@@ -97,6 +97,11 @@ import {
   type IInterfaceState,
 } from '../core/interface';
 import {
+  AdtMessageClass,
+  type IMessageClassConfig,
+  type IMessageClassState,
+} from '../core/messageClass';
+import {
   AdtMetadataExtension,
   type IMetadataExtensionConfig,
   type IMetadataExtensionState,
@@ -371,6 +376,14 @@ export class AdtClient {
    */
   getPackage(): IAdtObject<IPackageConfig, IPackageState> {
     return new AdtPackage(this.connection, this.logger, this.systemContext);
+  }
+
+  /**
+   * Get high-level operations for MessageClass (MSAG/N) objects
+   * @returns IAdtObject instance for MessageClass operations
+   */
+  getMessageClass(): IAdtObject<IMessageClassConfig, IMessageClassState> {
+    return new AdtMessageClass(this.connection, this.logger);
   }
 
   /**
