@@ -102,6 +102,8 @@ export class AdtMessageClass
       this.logger?.info?.('Message class created');
       return { createResult, errors: [] };
     } catch (error: unknown) {
+      // Defensive reset: create never sets stateful, but this guard ensures the
+      // session is always left stateless if the caller had set it before this call.
       this.connection.setSessionType('stateless');
       this.logger?.error('Create failed:', safeErrorMessage(error));
       throw error;
