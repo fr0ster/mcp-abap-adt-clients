@@ -293,6 +293,49 @@ await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
 await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST', undefined, 'active');
 ```
 
+### Message class (MSAG) and its messages
+
+Message classes and their individual messages are two separate handlers.
+`getMessageClass()` manages the class shell (name, description, package,
+`masterLanguage`); `getMessageClassMessage()` manages a single message, which is
+read-modify-write over the parent class (a message has no independent write
+endpoint). Message classes are **not activated**, so `activate()`/`check()` throw
+`UNSUPPORTED_OPERATION`.
+
+```typescript
+// Create the class, then add/edit/remove messages on it.
+await client.getMessageClass().create({
+  name: 'ZMY_MSG',
+  description: 'My messages',
+  packageName: 'ZMY_PKG',
+});
+
+await client.getMessageClassMessage().create({
+  className: 'ZMY_MSG',
+  msgno: '001',
+  msgtext: 'Order &1 not found',
+  selfExplanatory: true,
+});
+
+// Update only the text (other message attributes round-trip unchanged).
+await client.getMessageClassMessage().update({
+  className: 'ZMY_MSG',
+  msgno: '001',
+  msgtext: 'Order &1 does not exist',
+});
+
+// Read one message (resolved from the class).
+const msg = await client.getMessageClassMessage().read({
+  className: 'ZMY_MSG',
+  msgno: '001',
+});
+console.log(msg?.message?.msgtext);
+
+// Remove a single message, then delete the whole class.
+await client.getMessageClassMessage().delete({ className: 'ZMY_MSG', msgno: '001' });
+await client.getMessageClass().delete({ name: 'ZMY_MSG' });
+```
+
 ### Object version history
 
 Every object handler exposes `getVersions(config)` (list the SAP version history)
