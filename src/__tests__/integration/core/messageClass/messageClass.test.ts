@@ -3,6 +3,10 @@
  * Exercises: create class → read → add message → read message → update →
  * delete message → verify removal → delete class.
  *
+ * Mirrors the Domain.test.ts pattern: BaseTester + TestConfigResolver +
+ * standard sessionConfig helpers.  Lifecycle is custom because messageClass
+ * has no activation step and carries a nested message sub-object.
+ *
  * Enable debug logs:
  *  DEBUG_ADT_TESTS=true   - Integration test execution logs
  *  DEBUG_ADT_LIBS=true    - MessageClass library logs
@@ -17,19 +21,37 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import type {
+  IMessageClassConfig,
+  IMessageClassState,
+} from '../../../../core/messageClass';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
+import { BaseTester } from '../../../helpers/BaseTester';
 import {
   createTestAdtClient,
   getConfig,
   resolveSystemContext,
 } from '../../../helpers/sessionConfig';
+import type { TestConfigResolver } from '../../../helpers/TestConfigResolver';
 import {
   createConnectionLogger,
   createLibraryLogger,
   createTestsLogger,
 } from '../../../helpers/testLogger';
+import {
+  logTestEnd,
+  logTestError,
+  logTestSkip,
+  logTestStart,
+  logTestStep,
+  logTestSuccess,
+} from '../../../helpers/testProgressLogger';
 
-const { getTimeout } = require('../../../helpers/test-helper');
+const {
+  resolvePackageName,
+  resolveTransportRequest,
+  getTimeout,
+} = require('../../../helpers/test-helper');
 
 const envPath =
   process.env.MCP_ENV_PATH || path.resolve(__dirname, '../../../../.env');
@@ -46,19 +68,13 @@ const libraryLogger: ILogger = createLibraryLogger();
 // Test execution logs use DEBUG_ADT_TESTS
 const testsLogger: ILogger = createTestsLogger();
 
-/** Local ($TMP) package — no transport request required. */
-const PACKAGE_NAME = 'ZOK_TEST';
-/** Unique Z-name for the test message class — must not exist before the run. */
-const MSG_CLASS_NAME = 'ZADT_MSG_ITEST';
-const MSG_NO = '001';
-const MSG_TEXT_INITIAL = 'ITEST 001';
-const MSG_TEXT_UPDATED = 'ITEST 001 upd';
-
-describe('MessageClass lifecycle (using AdtClient)', () => {
+describe('MessageClass (using AdtClient)', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
   let hasConfig = false;
+  let isLegacy = false;
   let isCloudSystem = false;
+  let tester: BaseTester<IMessageClassConfig, IMessageClassState>;
 
   beforeAll(async () => {
     try {
@@ -70,151 +86,218 @@ describe('MessageClass lifecycle (using AdtClient)', () => {
         connection,
         isCloudSystem,
       );
-      const { client: resolvedClient } = await createTestAdtClient(
-        connection,
-        libraryLogger,
-        systemContext,
-      );
+      const { client: resolvedClient, isLegacy: legacy } =
+        await createTestAdtClient(connection, libraryLogger, systemContext);
       client = resolvedClient;
+      isLegacy = legacy;
       hasConfig = true;
-    } catch (_error) {
-      testsLogger.warn?.(
-        '⚠️ Skipping MessageClass tests: No .env file or SAP configuration found',
+
+      tester = new BaseTester(
+        client.getMessageClass(),
+        'MessageClass',
+        'create_message_class',
+        'adt_message_class',
+        testsLogger,
       );
+
+      tester.setup({
+        connection,
+        client,
+        hasConfig,
+        isCloudSystem,
+        buildConfig: (testCase: any, resolver?: TestConfigResolver) => {
+          const params = testCase?.params || {};
+          const packageName =
+            resolver?.getPackageName?.() ||
+            resolvePackageName(params.package_name);
+          if (!packageName) throw new Error('package_name not configured');
+          const transportRequest =
+            resolver?.getTransportRequest?.() ||
+            resolveTransportRequest(params.transport_request);
+          return {
+            name: params.msg_class_name,
+            description: params.description || 'MessageClass integration test',
+            packageName,
+            transportRequest,
+          };
+        },
+        ensureObjectReady: async (msgClassName: string) => {
+          // Check whether the message class already exists by trying to read it.
+          // A 404 means the object is absent and the test can proceed.
+          if (!connection) return { success: true };
+          try {
+            const state = await client
+              .getMessageClass()
+              .read({ name: msgClassName });
+            if (state) {
+              return {
+                success: false,
+                objectExists: true,
+                reason: `⚠️ SAFETY: Message class ${msgClassName} already exists!`,
+              };
+            }
+          } catch (error: any) {
+            if (error?.response?.status !== 404) {
+              return {
+                success: false,
+                reason: `Cannot verify message class existence: ${error.message}`,
+              };
+            }
+          }
+          return { success: true };
+        },
+        // cleanupObject: called by BaseTester when a pre-existing object is detected
+        cleanupObject: async (config: IMessageClassConfig) => {
+          await client
+            .getMessageClass()
+            .delete(config as Partial<IMessageClassConfig>);
+        },
+      });
+    } catch (_error) {
       hasConfig = false;
     }
   });
 
-  afterAll(async () => {
-    if (connection) {
-      (connection as any).reset?.();
-    }
-  });
+  afterAll(() => tester?.afterAll()());
 
-  it(
-    'should execute the full MessageClass lifecycle',
-    async () => {
-      if (!hasConfig) {
-        testsLogger.warn?.(`⚠️ Skipping: no SAP configuration`);
-        return;
-      }
+  describe('Full workflow', () => {
+    beforeEach(() => tester?.beforeEach()());
+    afterEach(() => tester?.afterEach()());
 
-      const mcHandler = client.getMessageClass();
-      const msgHandler = client.getMessageClassMessage();
-
-      testsLogger.info?.(`Creating message class ${MSG_CLASS_NAME}...`);
-
-      // Defensive pre-cleanup: delete if a leftover exists from a prior failed run.
-      // Errors are intentionally swallowed — if the class does not exist the
-      // delete call will throw and we must proceed anyway.
-      try {
-        await mcHandler.delete({ name: MSG_CLASS_NAME });
-        testsLogger.warn?.(
-          `Pre-cleanup: deleted stale ${MSG_CLASS_NAME} before test`,
-        );
-      } catch {
-        // Object did not exist — this is the normal path.
-      }
-
-      try {
-        // ── Step 1: Create message class ────────────────────────────────────
-        const createState = await mcHandler.create({
-          name: MSG_CLASS_NAME,
-          description: 'ADT integration test message class',
-          packageName: PACKAGE_NAME,
-        });
-        expect(createState.errors).toHaveLength(0);
-        testsLogger.info?.(`Created ${MSG_CLASS_NAME} successfully.`);
-
-        // ── Step 2: Read message class ───────────────────────────────────────
-        const readState = await mcHandler.read({ name: MSG_CLASS_NAME });
-        expect(readState).toBeDefined();
-        if (!readState) throw new Error('read() returned undefined');
-        expect(readState.messageClass).toBeDefined();
-        expect(readState.messageClass?.name).toBe(MSG_CLASS_NAME);
-        testsLogger.info?.(
-          `Read ${MSG_CLASS_NAME}: description="${readState.messageClass?.description}"`,
-        );
-
-        // ── Step 3: Create message 001 ───────────────────────────────────────
-        const msgCreateState = await msgHandler.create({
-          className: MSG_CLASS_NAME,
-          msgno: MSG_NO,
-          msgtext: MSG_TEXT_INITIAL,
-        });
-        expect(msgCreateState.errors).toHaveLength(0);
-        testsLogger.info?.(`Added message ${MSG_NO} to ${MSG_CLASS_NAME}.`);
-
-        // ── Step 4: Read message 001 ─────────────────────────────────────────
-        const msgReadState = await msgHandler.read({
-          className: MSG_CLASS_NAME,
-          msgno: MSG_NO,
-        });
-        expect(msgReadState).toBeDefined();
-        if (!msgReadState)
-          throw new Error('msgHandler.read() returned undefined');
-        expect(msgReadState.message).toBeDefined();
-        expect(msgReadState.message?.msgtext).toBe(MSG_TEXT_INITIAL);
-        testsLogger.info?.(
-          `Read message ${MSG_NO}: "${msgReadState.message?.msgtext}"`,
-        );
-
-        // ── Step 5: Update message 001 ───────────────────────────────────────
-        const msgUpdateState = await msgHandler.update({
-          className: MSG_CLASS_NAME,
-          msgno: MSG_NO,
-          msgtext: MSG_TEXT_UPDATED,
-        });
-        expect(msgUpdateState.errors).toHaveLength(0);
-
-        // Read back to verify the update took effect.
-        const msgReadAfterUpdate = await msgHandler.read({
-          className: MSG_CLASS_NAME,
-          msgno: MSG_NO,
-        });
-        expect(msgReadAfterUpdate).toBeDefined();
-        if (!msgReadAfterUpdate)
-          throw new Error('msgHandler.read() after update returned undefined');
-        expect(msgReadAfterUpdate.message?.msgtext).toBe(MSG_TEXT_UPDATED);
-        testsLogger.info?.(
-          `Updated message ${MSG_NO}: "${msgReadAfterUpdate.message?.msgtext}"`,
-        );
-
-        // ── Step 6: Delete message 001 ───────────────────────────────────────
-        const msgDeleteState = await msgHandler.delete({
-          className: MSG_CLASS_NAME,
-          msgno: MSG_NO,
-        });
-        expect(msgDeleteState.errors).toHaveLength(0);
-
-        // Read the class again and verify that message 001 is gone.
-        const readAfterMsgDelete = await mcHandler.read({
-          name: MSG_CLASS_NAME,
-        });
-        expect(readAfterMsgDelete).toBeDefined();
-        if (!readAfterMsgDelete)
-          throw new Error(
-            'mcHandler.read() after message delete returned undefined',
-          );
-        const remainingMessages =
-          readAfterMsgDelete.messageClass?.messages ?? [];
-        const msg001 = remainingMessages.find((m) => m.msgno === MSG_NO);
-        expect(msg001).toBeUndefined();
-        testsLogger.info?.(
-          `Deleted message ${MSG_NO}; remaining messages: ${remainingMessages.length}`,
-        );
-      } finally {
-        // ── Cleanup: always delete the message class ─────────────────────────
-        try {
-          await mcHandler.delete({ name: MSG_CLASS_NAME });
-          testsLogger.info?.(`Cleanup: deleted ${MSG_CLASS_NAME}.`);
-        } catch (cleanupError: any) {
-          testsLogger.warn?.(
-            `Cleanup warning: could not delete ${MSG_CLASS_NAME}: ${cleanupError?.message}`,
-          );
+    it(
+      'should execute full MessageClass lifecycle',
+      async () => {
+        if (!tester) {
+          return;
         }
-      }
-    },
-    getTimeout('test'),
-  );
+
+        // Delegate standard skip/cleanup to tester.
+        // flowTestAuto() returns early (without calling validate/create) when shouldSkip() is true,
+        // and cleans up any pre-existing object that was detected by ensureObjectReady.
+        if (tester.shouldSkip()) {
+          await tester.flowTestAuto();
+          return;
+        }
+
+        const config = tester.getConfig();
+        if (!config) {
+          await tester.flowTestAuto();
+          return;
+        }
+
+        const testCase = tester.getTestCase();
+        const params = testCase?.params || {};
+        const msgNo: string = params.msg_no || '001';
+        const msgTextInitial: string = params.msg_text_initial || 'ITEST 001';
+        const msgTextUpdated: string =
+          params.msg_text_updated || 'ITEST 001 upd';
+
+        const msgClassName = config.name;
+        const mcHandler = client.getMessageClass();
+        const msgHandler = client.getMessageClassMessage();
+
+        const testName = 'MessageClass - Full workflow';
+        logTestStart(testsLogger, testName, testCase);
+
+        try {
+          // ── Step 1: Create message class ───────────────────────────────────
+          logTestStep('create message class', testsLogger);
+          const createState = await mcHandler.create(config);
+          expect(createState.errors).toHaveLength(0);
+
+          // ── Step 2: Read message class ─────────────────────────────────────
+          logTestStep('read message class', testsLogger);
+          const readState = await mcHandler.read({ name: msgClassName });
+          expect(readState).toBeDefined();
+          if (!readState)
+            throw new Error('mcHandler.read() returned undefined');
+          expect(readState.messageClass).toBeDefined();
+          expect(readState.messageClass?.name).toBe(msgClassName);
+
+          // ── Step 3: Create message ─────────────────────────────────────────
+          logTestStep(`create message ${msgNo}`, testsLogger);
+          const msgCreateState = await msgHandler.create({
+            className: msgClassName,
+            msgno: msgNo,
+            msgtext: msgTextInitial,
+          });
+          expect(msgCreateState.errors).toHaveLength(0);
+
+          // ── Step 4: Read message ───────────────────────────────────────────
+          logTestStep(`read message ${msgNo}`, testsLogger);
+          const msgReadState = await msgHandler.read({
+            className: msgClassName,
+            msgno: msgNo,
+          });
+          expect(msgReadState).toBeDefined();
+          if (!msgReadState)
+            throw new Error('msgHandler.read() returned undefined');
+          expect(msgReadState.message).toBeDefined();
+          expect(msgReadState.message?.msgtext).toBe(msgTextInitial);
+
+          // ── Step 5: Update message ─────────────────────────────────────────
+          logTestStep(`update message ${msgNo}`, testsLogger);
+          const msgUpdateState = await msgHandler.update({
+            className: msgClassName,
+            msgno: msgNo,
+            msgtext: msgTextUpdated,
+          });
+          expect(msgUpdateState.errors).toHaveLength(0);
+
+          // ── Step 6: Read-back to verify update ────────────────────────────
+          logTestStep(`read-back message ${msgNo} after update`, testsLogger);
+          const msgReadAfterUpdate = await msgHandler.read({
+            className: msgClassName,
+            msgno: msgNo,
+          });
+          expect(msgReadAfterUpdate).toBeDefined();
+          if (!msgReadAfterUpdate)
+            throw new Error(
+              'msgHandler.read() after update returned undefined',
+            );
+          expect(msgReadAfterUpdate.message?.msgtext).toBe(msgTextUpdated);
+
+          // ── Step 7: Delete message ─────────────────────────────────────────
+          logTestStep(`delete message ${msgNo}`, testsLogger);
+          const msgDeleteState = await msgHandler.delete({
+            className: msgClassName,
+            msgno: msgNo,
+          });
+          expect(msgDeleteState.errors).toHaveLength(0);
+
+          // ── Step 8: Verify message is gone from class ──────────────────────
+          logTestStep('verify message removal', testsLogger);
+          const readAfterMsgDelete = await mcHandler.read({
+            name: msgClassName,
+          });
+          expect(readAfterMsgDelete).toBeDefined();
+          if (!readAfterMsgDelete)
+            throw new Error(
+              'mcHandler.read() after message delete returned undefined',
+            );
+          const remainingMessages =
+            readAfterMsgDelete.messageClass?.messages ?? [];
+          const msg001 = remainingMessages.find((m) => m.msgno === msgNo);
+          expect(msg001).toBeUndefined();
+
+          logTestSuccess(testsLogger, testName);
+        } catch (error) {
+          logTestError(testsLogger, testName, error);
+          throw error;
+        } finally {
+          logTestEnd(testsLogger, testName);
+          // Cleanup: always delete the message class after the test.
+          // BaseTester.afterAll only closes the connection; object deletion
+          // must happen here so the next run starts with a clean state.
+          try {
+            await mcHandler.delete(config as Partial<IMessageClassConfig>);
+          } catch {
+            // Swallow — class may already be absent or delete may fail after a
+            // partial test run; this is best-effort cleanup.
+          }
+        }
+      },
+      getTimeout('test'),
+    );
+  });
 });
