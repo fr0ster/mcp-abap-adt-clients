@@ -204,7 +204,8 @@ export class AdtMessageClass
 
   /**
    * Delete a message class.
-   * Operation chain: stateful → lock → DELETE → stateless.
+   * Operation chain: check(deletion) → delete via the stateless ADT deletion
+   * service (/deletion/check + /deletion/delete). No lock, no direct DELETE.
    */
   async delete(
     config: Partial<IMessageClassConfig>,

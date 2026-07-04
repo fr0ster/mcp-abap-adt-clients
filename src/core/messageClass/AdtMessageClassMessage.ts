@@ -114,7 +114,7 @@ export class AdtMessageClassMessage
    */
   async create(
     config: IMessageClassMessageConfig,
-    options?: IAdtOperationOptions,
+    _options?: IAdtOperationOptions,
   ): Promise<IMessageClassMessageState> {
     return this._upsertMessage(config);
   }
@@ -258,8 +258,8 @@ export class AdtMessageClassMessage
    *
    * Chain: GET class → stateful → lockMessage (MH) + lockClassForMessage (CH)
    * → PUT class XML with target in <mc:deletedmessages mc:lockhandle=MH>,
-   * remaining messages in <mc:messages> → unlock class (CH) →
-   * unlockAllMessages → stateless.
+   * remaining messages in <mc:messages> → unlockAllMessages →
+   * unlock class (CH) → stateless.
    */
   async delete(
     config: Partial<IMessageClassMessageConfig>,
