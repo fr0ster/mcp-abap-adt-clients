@@ -133,6 +133,16 @@ describe('MessageClass (using AdtClient)', () => {
               .read({ name: msgClassName });
             if (state) {
               await client.getMessageClass().delete({ name: msgClassName });
+              // The deletion service is asynchronous — poll until the object is
+              // actually gone (read → 404) before recreating, so a same-name
+              // re-run does not race the still-completing delete.
+              for (let i = 0; i < 20; i++) {
+                await new Promise((r) => setTimeout(r, 500));
+                const still = await client
+                  .getMessageClass()
+                  .read({ name: msgClassName });
+                if (!still) break;
+              }
             }
           } catch (error: any) {
             if (error?.response?.status !== 404) {
@@ -289,6 +299,14 @@ describe('MessageClass (using AdtClient)', () => {
           // must happen here so the next run starts with a clean state.
           try {
             await mcHandler.delete(config as Partial<IMessageClassConfig>);
+            // The deletion service is asynchronous — wait until the class is
+            // actually gone so a back-to-back re-run does not race an in-flight
+            // delete (create-then-read would otherwise 404 on the same name).
+            for (let i = 0; i < 20; i++) {
+              await new Promise((r) => setTimeout(r, 500));
+              const still = await mcHandler.read({ name: msgClassName });
+              if (!still) break;
+            }
           } catch {
             // Swallow — class may already be absent or delete may fail after a
             // partial test run; this is best-effort cleanup.

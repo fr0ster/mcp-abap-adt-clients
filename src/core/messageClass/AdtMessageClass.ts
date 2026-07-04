@@ -64,9 +64,11 @@ export class AdtMessageClass
       params.set('description', config.description);
     }
 
+    // POST with the params in the query string (empty body) — matches Eclipse ADT
+    // and the other object types' validation (accessControl, transformation, …).
     const response = await this.connection.makeAdtRequest({
       url: `${VALIDATE_BASE}?${params.toString()}`,
-      method: 'GET',
+      method: 'POST',
       timeout: getTimeout('default'),
     });
 

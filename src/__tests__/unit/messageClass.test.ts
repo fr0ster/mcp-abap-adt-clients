@@ -57,6 +57,22 @@ describe('AdtMessageClass', () => {
     expect(String(seen.data)).toContain('adtcore:type="MSAG/N"');
   });
 
+  it('validate POSTs to /messageclass/validation with objname + description', async () => {
+    let seen: any;
+    const mc = new AdtMessageClass(
+      conn(async (o) => {
+        seen = o;
+        return { data: '', status: 200, headers: {} } as IAdtResponse;
+      }),
+      noopLogger,
+    );
+    await mc.validate({ name: 'ZT', description: 'Desc' });
+    expect(seen.method).toBe('POST');
+    expect(seen.url).toContain('/sap/bc/adt/messageclass/validation');
+    expect(seen.url).toContain('objname=ZT');
+    expect(seen.url).toContain('description=Desc');
+  });
+
   it('create POST body contains adtcore:masterLanguage="EN" by default', async () => {
     let seen: any;
     const mc = new AdtMessageClass(

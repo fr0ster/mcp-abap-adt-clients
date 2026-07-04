@@ -93,7 +93,7 @@ sub-resource `GET /messages/{no}` returns an empty template and is NOT used.
 | `delete(config)` | `POST …/{name}?_action=LOCK&accessMode=MODIFY` → `DELETE …/{name}?lockHandle={classLock}` |
 | `lock(config)` | `POST …/{name}?_action=LOCK&accessMode=MODIFY` → returns `LOCK_HANDLE` |
 | `unlock(config, handle)` | `POST …/{name}?_action=UNLOCK&lockHandle={handle}` |
-| `validate(config)` | `GET /sap/bc/adt/messageclass/validation?objname={name}&description={description}` — name/description validation (endpoint present in ADT discovery; probe-verify the exact response/Accept during implementation) |
+| `validate(config)` | `POST /sap/bc/adt/messageclass/validation?objname={name}&description={description}` — name/description validation (endpoint present in ADT discovery; probe-verify the exact response/Accept during implementation) |
 | `activate` / `check` / `getVersions` / `getVersionSource` | **throw** `AdtOperationError(UNSUPPORTED_OPERATION)` |
 
 `AdtMessageClass.update` **must not drop existing messages** — it owns only the
