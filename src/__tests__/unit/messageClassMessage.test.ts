@@ -63,6 +63,20 @@ describe('AdtMessageClassMessage', () => {
     ).toBe(true);
   });
 
+  it('appends &corrNr= on the class PUT when transportRequest is set', async () => {
+    const { conn, calls } = recorder();
+    const m = new AdtMessageClassMessage(conn, noopLogger);
+    await m.update({
+      className: 'ZT',
+      msgno: '001',
+      msgtext: 'NEW',
+      transportRequest: 'DEVK900001',
+    });
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put.url).toContain('lockHandle=');
+    expect(put.url).toContain('&corrNr=DEVK900001');
+  });
+
   it('delete: <mc:deletedmessages> for target + lockhandle; kept messages in <mc:messages>; correct lock chain; no HTTP DELETE', async () => {
     const { conn, calls } = recorder();
     const m = new AdtMessageClassMessage(conn, noopLogger);
