@@ -122,19 +122,17 @@ describe('MessageClass (using AdtClient)', () => {
           };
         },
         ensureObjectReady: async (msgClassName: string) => {
-          // Check whether the message class already exists by trying to read it.
-          // A 404 means the object is absent and the test can proceed.
+          // Idempotent: if the message class already exists (e.g. a prior run),
+          // delete it so the lifecycle can recreate it cleanly. A 404 means it is
+          // absent and we proceed. (Delete uses the stateless deletion service,
+          // so it leaves no lingering enqueue.)
           if (!connection) return { success: true };
           try {
             const state = await client
               .getMessageClass()
               .read({ name: msgClassName });
             if (state) {
-              return {
-                success: false,
-                objectExists: true,
-                reason: `⚠️ SAFETY: Message class ${msgClassName} already exists!`,
-              };
+              await client.getMessageClass().delete({ name: msgClassName });
             }
           } catch (error: any) {
             if (error?.response?.status !== 404) {

@@ -27,7 +27,7 @@ import { safeErrorMessage } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { throwUnsupportedOperation } from '../shared/unsupported';
 import { createMessageClass } from './create';
-import { deleteMessageClass } from './delete';
+import { checkDeletion, deleteMessageClass } from './delete';
 import { lockMessageClass } from './lock';
 import { getMessageClassSource } from './read';
 import type { IMessageClassConfig, IMessageClassState } from './types';
@@ -211,38 +211,22 @@ export class AdtMessageClass
       throw new Error('Message class name is required');
     }
 
-    let lockHandle: string | undefined;
-
     try {
-      this.logger?.info?.('lock');
-      this.connection.setSessionType('stateful');
-      lockHandle = await lockMessageClass(this.connection, config.name);
-      this.logger?.info?.('locked');
+      // Stateless deletion service (check → delete) — no lock. A stateful
+      // lock + direct DELETE leaves a lingering message-editing enqueue that
+      // blocks a same-name re-create, so it is not used. See delete.ts.
+      this.logger?.info?.('delete: check');
+      await checkDeletion(this.connection, config.name);
 
-      this.logger?.info?.('delete');
+      this.logger?.info?.('delete: delete');
       const deleteResult = await deleteMessageClass(
         this.connection,
         config.name,
-        lockHandle,
       );
-      this.connection.setSessionType('stateless');
-      lockHandle = undefined;
       this.logger?.info?.('deleted');
 
       return { deleteResult, errors: [] };
     } catch (error: unknown) {
-      if (lockHandle) {
-        try {
-          this.logger?.warn?.('Unlocking message class during error cleanup');
-          await unlockMessageClass(this.connection, config.name, lockHandle);
-        } catch (unlockError) {
-          this.logger?.warn?.(
-            'Failed to unlock during cleanup:',
-            safeErrorMessage(unlockError),
-          );
-        }
-      }
-      this.connection.setSessionType('stateless');
       this.logger?.error('Delete failed:', safeErrorMessage(error));
       throw error;
     }

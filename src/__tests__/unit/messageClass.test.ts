@@ -171,32 +171,33 @@ describe('AdtMessageClass', () => {
     expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
   });
 
-  it('delete: LOCK→DELETE(lockHandle) sequence', async () => {
-    const {
-      conn: c,
-      calls,
-      sessionTypes,
-    } = recorder(async (_rec, idx) => {
-      if (idx === 0)
-        return { data: LOCK_XML, status: 200, headers: {} } as IAdtResponse;
-      return { data: '', status: 200, headers: {} } as IAdtResponse;
-    });
+  it('delete: stateless deletion service (check → delete), no lock/DELETE', async () => {
+    const { conn: c, calls } = recorder(
+      async () => ({ data: '', status: 200, headers: {} }) as IAdtResponse,
+    );
 
     const mc = new AdtMessageClass(c, noopLogger);
     await mc.delete({ name: 'ZT' });
 
     expect(calls).toHaveLength(2);
 
-    // call[0]: LOCK
+    // call[0]: deletion check
     expect(calls[0].method).toBe('POST');
-    expect(calls[0].url).toContain('_action=LOCK');
+    expect(calls[0].url).toBe('/sap/bc/adt/deletion/check');
+    expect(String(calls[0].data)).toContain(
+      'adtcore:uri="/sap/bc/adt/messageclass/zt"',
+    );
 
-    // call[1]: DELETE with lockHandle
-    expect(calls[1].method).toBe('DELETE');
-    expect(calls[1].url).toContain('lockHandle=');
+    // call[1]: deletion delete (stateless service, NOT a direct DELETE)
+    expect(calls[1].method).toBe('POST');
+    expect(calls[1].url).toBe('/sap/bc/adt/deletion/delete');
+    expect(String(calls[1].data)).toContain('del:deletionRequest');
 
-    expect(sessionTypes[0]).toBe('stateful');
-    expect(sessionTypes[sessionTypes.length - 1]).toBe('stateless');
+    // no direct object DELETE, no lock cycle
+    expect(calls.some((c2) => c2.method === 'DELETE')).toBe(false);
+    expect(calls.some((c2) => String(c2.url).includes('_action=LOCK'))).toBe(
+      false,
+    );
   });
 
   it('update error-cleanup: UNLOCK + stateless called even if PUT throws', async () => {
