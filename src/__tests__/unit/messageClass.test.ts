@@ -83,6 +83,8 @@ describe('AdtMessageClass', () => {
       noopLogger,
     );
     await mc.create({ name: 'ZT', description: 'D', packageName: 'ZP' });
+    // both adtcore:language and adtcore:masterLanguage default to EN
+    expect(String(seen.data)).toContain('adtcore:language="EN"');
     expect(String(seen.data)).toContain('adtcore:masterLanguage="EN"');
   });
 
@@ -101,6 +103,22 @@ describe('AdtMessageClass', () => {
       packageName: 'ZP',
       masterLanguage: 'DE',
     });
+    expect(String(seen.data)).toContain('adtcore:language="DE"');
+    expect(String(seen.data)).toContain('adtcore:masterLanguage="DE"');
+  });
+
+  it('create falls back to systemContext.masterLanguage when config omits it', async () => {
+    let seen: any;
+    const mc = new AdtMessageClass(
+      conn(async (o) => {
+        seen = o;
+        return { data: '', status: 201, headers: {} } as IAdtResponse;
+      }),
+      noopLogger,
+      { masterLanguage: 'DE' },
+    );
+    await mc.create({ name: 'ZT', description: 'D', packageName: 'ZP' });
+    expect(String(seen.data)).toContain('adtcore:language="DE"');
     expect(String(seen.data)).toContain('adtcore:masterLanguage="DE"');
   });
 

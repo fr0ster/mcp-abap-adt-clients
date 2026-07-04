@@ -21,11 +21,15 @@ export async function createMessageClass(
   connection: IAbapConnection,
   params: ICreateMessageClassParams,
 ): Promise<IAdtResponse> {
+  // Emit BOTH adtcore:language and adtcore:masterLanguage (like domain/class),
+  // both set to the resolved language.
+  const lang = params.master_language ?? 'EN';
   const xmlBody = buildMessageClassXml({
     name: params.name.toUpperCase(),
     description: params.description,
     packageName: params.package_name.toUpperCase(),
-    masterLanguage: params.master_language ?? 'EN',
+    language: lang,
+    masterLanguage: lang,
     messages: [],
   });
 

@@ -386,7 +386,11 @@ export class AdtClient {
    * @returns IAdtObject instance for MessageClass operations
    */
   getMessageClass(): IAdtObject<IMessageClassConfig, IMessageClassState> {
-    return new AdtMessageClass(this.connection, this.logger);
+    return new AdtMessageClass(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**

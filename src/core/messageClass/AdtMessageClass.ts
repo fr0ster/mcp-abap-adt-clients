@@ -23,6 +23,7 @@ import type {
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { throwUnsupportedOperation } from '../shared/unsupported';
@@ -42,11 +43,17 @@ export class AdtMessageClass
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
   public readonly objectType: string = 'MessageClass';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   /**
@@ -99,7 +106,11 @@ export class AdtMessageClass
         name: config.name,
         description: config.description,
         package_name: config.packageName,
-        master_language: config.masterLanguage,
+        // config → global systemContext → 'EN', like class/domain/package.
+        master_language:
+          config.masterLanguage?.trim() ||
+          this.systemContext.masterLanguage?.trim() ||
+          'EN',
         // corrNr wiring deferred to the transportable-package task
         transport_request: config.transportRequest,
       });
