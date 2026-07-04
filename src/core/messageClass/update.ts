@@ -6,15 +6,13 @@
  */
 
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { getMessageClassSource } from './read';
 import { buildMessageClassXml, parseMessageClass } from './xml';
 
 const BASE = '/sap/bc/adt/messageclass';
-
-const CT_MESSAGE_CLASS_UPDATE =
-  'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8';
 
 /**
  * Update a message class description.
@@ -51,6 +49,6 @@ export async function updateMessageClass(
     method: 'PUT',
     timeout: getTimeout('default'),
     data: xmlBody,
-    headers: { 'Content-Type': CT_MESSAGE_CLASS_UPDATE },
+    headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
   });
 }

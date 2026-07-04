@@ -97,6 +97,8 @@ export class AdtMessageClass
         name: config.name,
         description: config.description,
         package_name: config.packageName,
+        master_language: config.masterLanguage,
+        // corrNr wiring deferred to the transportable-package task
         transport_request: config.transportRequest,
       });
       this.logger?.info?.('Message class created');

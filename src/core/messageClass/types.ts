@@ -11,6 +11,7 @@ export interface ICreateMessageClassParams {
   description: string;
   package_name: string;
   transport_request?: string;
+  master_language?: string;
 }
 
 export interface IDeleteMessageClassParams {
@@ -28,6 +29,8 @@ export interface IMessageClassConfig {
   packageName?: string;
   /** Transport request — parsed but not sent until Task 6.2 wires corrNr */
   transportRequest?: string;
+  /** Master language of the message class — defaults to 'EN' on create */
+  masterLanguage?: string;
 }
 
 // State returned from operations
@@ -46,6 +49,10 @@ export interface IMessageClassMessageConfig {
   msgno: string;
   /** Message text — required for create/update */
   msgtext?: string;
+  /** Whether the message is self-explanatory (mc:selfexplainatory attribute) */
+  selfExplanatory?: boolean;
+  /** Long description for the message (adtcore:description attribute) */
+  description?: string;
   /** Transport request — parsed but not sent until Task 6.2 wires corrNr */
   transportRequest?: string;
 }

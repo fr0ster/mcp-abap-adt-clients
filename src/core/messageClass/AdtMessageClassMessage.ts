@@ -35,6 +35,7 @@ import {
   AdtObjectErrorCodes,
   AdtOperationError,
 } from '@mcp-abap-adt/interfaces';
+import { MESSAGE_CLASS_UPDATE_CONTENT_TYPE } from '../../constants/contentTypes';
 import {
   encodeSapObjectName,
   safeErrorMessage,
@@ -51,7 +52,6 @@ import { unlockAllMessages, unlockMessageClass } from './unlock';
 import { buildMessageClassXml, parseMessageClass } from './xml';
 
 const BASE = '/sap/bc/adt/messageclass';
-const CT_UPDATE = 'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8';
 
 export class AdtMessageClassMessage
   implements IAdtObject<IMessageClassMessageConfig, IMessageClassMessageState>
@@ -147,16 +147,28 @@ export class AdtMessageClassMessage
     // 2. Merge/set the message in the messages array
     const existingIdx = cls.messages.findIndex((m) => m.msgno === no);
     if (existingIdx >= 0) {
-      // Update existing message — only override msgtext if provided
+      // Update existing message — only override fields when explicitly provided in config
       cls.messages[existingIdx] = {
         ...cls.messages[existingIdx],
         ...(config.msgtext !== undefined ? { msgtext: config.msgtext } : {}),
+        ...(config.selfExplanatory !== undefined
+          ? { selfExplanatory: config.selfExplanatory }
+          : {}),
+        ...(config.description !== undefined
+          ? { description: config.description }
+          : {}),
       };
     } else {
-      // Add new message
+      // Add new message with all authorable fields
       cls.messages.push({
         msgno: no,
         msgtext: config.msgtext ?? '',
+        ...(config.selfExplanatory !== undefined
+          ? { selfExplanatory: config.selfExplanatory }
+          : {}),
+        ...(config.description !== undefined
+          ? { description: config.description }
+          : {}),
       });
     }
 
@@ -186,7 +198,7 @@ export class AdtMessageClassMessage
         method: 'PUT',
         timeout: getTimeout('default'),
         data: xmlBody,
-        headers: { 'Content-Type': CT_UPDATE },
+        headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
 
       // 6. Unlock class
@@ -288,7 +300,7 @@ export class AdtMessageClassMessage
         method: 'PUT',
         timeout: getTimeout('default'),
         data: xmlBody,
-        headers: { 'Content-Type': CT_UPDATE },
+        headers: { 'Content-Type': MESSAGE_CLASS_UPDATE_CONTENT_TYPE },
       });
 
       // 5. Unlock class

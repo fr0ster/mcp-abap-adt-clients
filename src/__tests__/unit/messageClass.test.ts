@@ -57,6 +57,37 @@ describe('AdtMessageClass', () => {
     expect(String(seen.data)).toContain('adtcore:type="MSAG/N"');
   });
 
+  it('create POST body contains adtcore:masterLanguage="EN" by default', async () => {
+    let seen: any;
+    const mc = new AdtMessageClass(
+      conn(async (o) => {
+        seen = o;
+        return { data: '', status: 201, headers: {} } as IAdtResponse;
+      }),
+      noopLogger,
+    );
+    await mc.create({ name: 'ZT', description: 'D', packageName: 'ZP' });
+    expect(String(seen.data)).toContain('adtcore:masterLanguage="EN"');
+  });
+
+  it('create POST body uses the masterLanguage from config when provided', async () => {
+    let seen: any;
+    const mc = new AdtMessageClass(
+      conn(async (o) => {
+        seen = o;
+        return { data: '', status: 201, headers: {} } as IAdtResponse;
+      }),
+      noopLogger,
+    );
+    await mc.create({
+      name: 'ZT',
+      description: 'D',
+      packageName: 'ZP',
+      masterLanguage: 'DE',
+    });
+    expect(String(seen.data)).toContain('adtcore:masterLanguage="DE"');
+  });
+
   it('read GETs /messageclass/{name} and parses', async () => {
     const mc = new AdtMessageClass(
       conn(

@@ -14,6 +14,20 @@ const BASE = '/sap/bc/adt/messageclass';
 const ACCEPT_LOCK_MSG =
   'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage';
 
+/** Parse LOCK_HANDLE from the asx:abap lock response XML. Throws with errLabel if absent. */
+function parseLockHandle(data: string, errLabel: string): string {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+  });
+  const result = parser.parse(data);
+  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
+  if (!lockHandle) {
+    throw new Error(`Failed to extract lock handle from ${errLabel}`);
+  }
+  return lockHandle;
+}
+
 /**
  * Lock a message class for modification.
  * Returns the lock handle that must be used in subsequent update/delete requests.
@@ -35,20 +49,7 @@ export async function lockMessageClass(
     headers: { Accept: ACCEPT_LOCK },
   });
 
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error(
-      'Failed to extract lock handle from message class lock response',
-    );
-  }
-
-  return lockHandle;
+  return parseLockHandle(response.data, 'message class lock response');
 }
 
 /**
@@ -73,18 +74,7 @@ export async function lockMessage(
     headers: { Accept: ACCEPT_LOCK_MSG },
   });
 
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error('Failed to extract lock handle from message lock response');
-  }
-
-  return lockHandle;
+  return parseLockHandle(response.data, 'message lock response');
 }
 
 /**
@@ -109,18 +99,5 @@ export async function lockClassForMessage(
     headers: { Accept: ACCEPT_LOCK },
   });
 
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-  });
-  const result = parser.parse(response.data);
-  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
-
-  if (!lockHandle) {
-    throw new Error(
-      'Failed to extract lock handle from class-for-message lock response',
-    );
-  }
-
-  return lockHandle;
+  return parseLockHandle(response.data, 'class-for-message lock response');
 }

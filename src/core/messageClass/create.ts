@@ -25,6 +25,7 @@ export async function createMessageClass(
     name: params.name.toUpperCase(),
     description: params.description,
     packageName: params.package_name.toUpperCase(),
+    masterLanguage: params.master_language ?? 'EN',
     messages: [],
   });
 
