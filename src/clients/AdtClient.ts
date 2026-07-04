@@ -98,7 +98,10 @@ import {
 } from '../core/interface';
 import {
   AdtMessageClass,
+  AdtMessageClassMessage,
   type IMessageClassConfig,
+  type IMessageClassMessageConfig,
+  type IMessageClassMessageState,
   type IMessageClassState,
 } from '../core/messageClass';
 import {
@@ -384,6 +387,18 @@ export class AdtClient {
    */
   getMessageClass(): IAdtObject<IMessageClassConfig, IMessageClassState> {
     return new AdtMessageClass(this.connection, this.logger);
+  }
+
+  /**
+   * Get high-level operations for a single message within a MessageClass.
+   * Supports read, create/update (upsert), and delete of individual messages.
+   * @returns IAdtObject instance for MessageClassMessage operations
+   */
+  getMessageClassMessage(): IAdtObject<
+    IMessageClassMessageConfig,
+    IMessageClassMessageState
+  > {
+    return new AdtMessageClassMessage(this.connection, this.logger);
   }
 
   /**

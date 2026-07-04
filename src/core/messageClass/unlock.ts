@@ -28,3 +28,23 @@ export async function unlockMessageClass(
     data: null,
   });
 }
+
+/**
+ * Release all message-level locks for a specific message number.
+ * Must be called after the class PUT to release the LOCK_MSG handle.
+ */
+export async function unlockAllMessages(
+  connection: IAbapConnection,
+  name: string,
+  no: string,
+): Promise<IAdtResponse> {
+  const encoded = encodeSapObjectName(name.toLowerCase());
+  const url = `${BASE}/${encoded}/messages/${encodeURIComponent(no)}?_action=UNLOCK_ALL`;
+
+  return connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: `[${no}]`,
+  });
+}

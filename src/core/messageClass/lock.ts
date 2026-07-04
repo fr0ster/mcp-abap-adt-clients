@@ -10,6 +10,10 @@ import { getTimeout } from '../../utils/timeouts';
 
 const BASE = '/sap/bc/adt/messageclass';
 
+// Accept header for individual message lock (StatusMessage response type)
+const ACCEPT_LOCK_MSG =
+  'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.StatusMessage';
+
 /**
  * Lock a message class for modification.
  * Returns the lock handle that must be used in subsequent update/delete requests.
@@ -41,6 +45,80 @@ export async function lockMessageClass(
   if (!lockHandle) {
     throw new Error(
       'Failed to extract lock handle from message class lock response',
+    );
+  }
+
+  return lockHandle;
+}
+
+/**
+ * Lock an individual message for modification.
+ * Returns the message lock handle (MH) used in PUT XML as mc:lockhandle.
+ *
+ * NOTE: Caller must enable stateful session via connection.setSessionType('stateful') first.
+ */
+export async function lockMessage(
+  connection: IAbapConnection,
+  name: string,
+  no: string,
+): Promise<string> {
+  const encoded = encodeSapObjectName(name.toLowerCase());
+  const url = `${BASE}/${encoded}/messages/${encodeURIComponent(no)}?_action=LOCK_MSG&accessMode=MODIFY`;
+
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null,
+    headers: { Accept: ACCEPT_LOCK_MSG },
+  });
+
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+  });
+  const result = parser.parse(response.data);
+  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
+
+  if (!lockHandle) {
+    throw new Error('Failed to extract lock handle from message lock response');
+  }
+
+  return lockHandle;
+}
+
+/**
+ * Lock a message class in the context of a specific message save.
+ * Returns the class lock handle (CH) used in PUT ?lockHandle= parameter.
+ *
+ * NOTE: Caller must enable stateful session via connection.setSessionType('stateful') first.
+ */
+export async function lockClassForMessage(
+  connection: IAbapConnection,
+  name: string,
+  no: string,
+): Promise<string> {
+  const encoded = encodeSapObjectName(name.toLowerCase());
+  const url = `${BASE}/${encoded}?_action=LOCK&accessMode=MODIFY&msgNo=${encodeURIComponent(no)}&onSave=X`;
+
+  const response = await connection.makeAdtRequest({
+    url,
+    method: 'POST',
+    timeout: getTimeout('default'),
+    data: null,
+    headers: { Accept: ACCEPT_LOCK },
+  });
+
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: '',
+  });
+  const result = parser.parse(response.data);
+  const lockHandle = result['asx:abap']?.['asx:values']?.DATA?.LOCK_HANDLE;
+
+  if (!lockHandle) {
+    throw new Error(
+      'Failed to extract lock handle from class-for-message lock response',
     );
   }
 

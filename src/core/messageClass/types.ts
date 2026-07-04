@@ -3,7 +3,7 @@
  */
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
-import type { IParsedMessageClass } from './xml';
+import type { IParsedMessage, IParsedMessageClass } from './xml';
 
 // Low-level function parameters (snake_case)
 export interface ICreateMessageClassParams {
@@ -34,4 +34,24 @@ export interface IMessageClassConfig {
 export interface IMessageClassState extends IAdtObjectState {
   /** Parsed message class returned after read() */
   messageClass?: IParsedMessageClass;
+}
+
+// ── Individual message config/state ───────────────────────────────────────────
+
+/** Configuration for operating on a single message within a message class. */
+export interface IMessageClassMessageConfig {
+  /** Parent message class name (e.g. ZMY_MSGS) */
+  className: string;
+  /** Message number (e.g. '001') */
+  msgno: string;
+  /** Message text — required for create/update */
+  msgtext?: string;
+  /** Transport request — parsed but not sent until Task 6.2 wires corrNr */
+  transportRequest?: string;
+}
+
+/** State returned from operations on a single message. */
+export interface IMessageClassMessageState extends IAdtObjectState {
+  /** The individual message extracted from the parent class */
+  message?: IParsedMessage;
 }
