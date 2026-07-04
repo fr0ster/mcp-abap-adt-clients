@@ -75,6 +75,10 @@ describe('MessageClass (using AdtClient)', () => {
   let isLegacy = false;
   let isCloudSystem = false;
   let tester: BaseTester<IMessageClassConfig, IMessageClassState>;
+  // Transport resolved by buildConfig; reused by ensureObjectReady's cleanup
+  // delete so a pre-existing object in a transportable package is deleted
+  // with the same corrNr as the rest of the lifecycle.
+  let resolvedTransport: string | undefined;
 
   beforeAll(async () => {
     try {
@@ -114,6 +118,7 @@ describe('MessageClass (using AdtClient)', () => {
           const transportRequest =
             resolver?.getTransportRequest?.() ||
             resolveTransportRequest(params.transport_request);
+          resolvedTransport = transportRequest;
           return {
             name: params.msg_class_name,
             description: params.description || 'MessageClass integration test',
@@ -132,7 +137,10 @@ describe('MessageClass (using AdtClient)', () => {
               .getMessageClass()
               .read({ name: msgClassName });
             if (state) {
-              await client.getMessageClass().delete({ name: msgClassName });
+              await client.getMessageClass().delete({
+                name: msgClassName,
+                transportRequest: resolvedTransport,
+              });
               // The deletion service is asynchronous — poll until the object is
               // actually gone (read → 404) before recreating, so a same-name
               // re-run does not race the still-completing delete.
