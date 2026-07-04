@@ -26,6 +26,7 @@ export async function updateMessageClass(
   name: string,
   lockHandle: string,
   description: string | undefined,
+  transportRequest?: string,
 ): Promise<IAdtResponse> {
   // 1. Read current state to preserve existing messages and all SAP-managed attrs
   const currentResponse = await getMessageClassSource(connection, name);
@@ -42,7 +43,10 @@ export async function updateMessageClass(
 
   // 4. PUT with lock handle
   const encoded = encodeSapObjectName(name.toLowerCase());
-  const url = `${BASE}/${encoded}?lockHandle=${encodeURIComponent(lockHandle)}`;
+  const corrNrParam = transportRequest?.trim()
+    ? `&corrNr=${encodeURIComponent(transportRequest)}`
+    : '';
+  const url = `${BASE}/${encoded}?lockHandle=${encodeURIComponent(lockHandle)}${corrNrParam}`;
 
   return connection.makeAdtRequest({
     url,

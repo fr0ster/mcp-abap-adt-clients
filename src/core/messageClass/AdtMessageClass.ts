@@ -180,6 +180,7 @@ export class AdtMessageClass
         config.name,
         lockHandle,
         config.description,
+        config.transportRequest,
       );
       this.logger?.info?.('updated');
 
@@ -236,6 +237,7 @@ export class AdtMessageClass
       const deleteResult = await deleteMessageClass(
         this.connection,
         config.name,
+        config.transportRequest,
       );
       this.logger?.info?.('deleted');
 

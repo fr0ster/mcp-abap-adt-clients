@@ -228,6 +228,7 @@ describe('MessageClass (using AdtClient)', () => {
             className: msgClassName,
             msgno: msgNo,
             msgtext: msgTextInitial,
+            transportRequest: config.transportRequest,
           });
           expect(msgCreateState.errors).toHaveLength(0);
 
@@ -249,6 +250,7 @@ describe('MessageClass (using AdtClient)', () => {
             className: msgClassName,
             msgno: msgNo,
             msgtext: msgTextUpdated,
+            transportRequest: config.transportRequest,
           });
           expect(msgUpdateState.errors).toHaveLength(0);
 
@@ -270,6 +272,7 @@ describe('MessageClass (using AdtClient)', () => {
           const msgDeleteState = await msgHandler.delete({
             className: msgClassName,
             msgno: msgNo,
+            transportRequest: config.transportRequest,
           });
           expect(msgDeleteState.errors).toHaveLength(0);
 

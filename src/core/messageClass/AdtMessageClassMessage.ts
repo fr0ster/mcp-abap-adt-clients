@@ -21,7 +21,8 @@
  * Unsupported: activate, check, validate, lock, unlock, getVersions,
  * getVersionSource, readTransport → throwUnsupportedOperation.
  *
- * transport / corrNr: not sent yet — Task 6.2 will wire it.
+ * transport: when config.transportRequest is set (transportable package), it is
+ * appended as &corrNr= on the class PUT, like the other CRUD object types.
  */
 
 import type {
@@ -193,8 +194,11 @@ export class AdtMessageClassMessage
         messageLockHandles: { [no]: messageLockHandle },
       });
       const encoded = encodeSapObjectName(name.toLowerCase());
+      const corrNr = config.transportRequest?.trim()
+        ? `&corrNr=${encodeURIComponent(config.transportRequest)}`
+        : '';
       const updateResult = await this.connection.makeAdtRequest({
-        url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}`,
+        url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}${corrNr}`,
         method: 'PUT',
         timeout: getTimeout('default'),
         data: xmlBody,
@@ -297,8 +301,11 @@ export class AdtMessageClassMessage
         messageLockHandles: { [no]: messageLockHandle },
       });
       const encoded = encodeSapObjectName(name.toLowerCase());
+      const corrNr = config.transportRequest?.trim()
+        ? `&corrNr=${encodeURIComponent(config.transportRequest)}`
+        : '';
       const deleteResult = await this.connection.makeAdtRequest({
-        url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}`,
+        url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}${corrNr}`,
         method: 'PUT',
         timeout: getTimeout('default'),
         data: xmlBody,
