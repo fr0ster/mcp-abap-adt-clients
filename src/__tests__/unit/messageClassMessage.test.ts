@@ -63,6 +63,7 @@ describe('AdtMessageClassMessage', () => {
     await m.delete({ className: 'ZT', msgno: '001' });
     const put = calls.find((c) => c.method === 'PUT');
     expect(String(put.data)).not.toContain('mc:msgno="001"');
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
   });
 
   it('activate/lock/getVersions throw UNSUPPORTED', async () => {

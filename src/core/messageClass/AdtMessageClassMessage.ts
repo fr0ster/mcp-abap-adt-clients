@@ -14,7 +14,7 @@
  *           PUT class without message → unlock (CH) → stateless
  *
  * Unsupported: activate, check, validate, lock, unlock, getVersions,
- * getVersionSource, readMetadata, readTransport → throwUnsupportedOperation.
+ * getVersionSource, readTransport → throwUnsupportedOperation.
  *
  * transport / corrNr: not sent yet — Task 6.2 will wire it.
  */
@@ -30,7 +30,10 @@ import {
   AdtObjectErrorCodes,
   AdtOperationError,
 } from '@mcp-abap-adt/interfaces';
-import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  encodeSapObjectName,
+  safeErrorMessage,
+} from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { throwUnsupportedOperation } from '../shared/unsupported';
 import { lockClassForMessage, lockMessage, lockMessageClass } from './lock';
@@ -44,11 +47,6 @@ import { buildMessageClassXml, parseMessageClass } from './xml';
 
 const BASE = '/sap/bc/adt/messageclass';
 const CT_UPDATE = 'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8';
-
-/** Encode a lowercase class name for URL use. */
-function encodeClassName(name: string): string {
-  return encodeURIComponent(name.toLowerCase());
-}
 
 export class AdtMessageClassMessage
   implements IAdtObject<IMessageClassMessageConfig, IMessageClassMessageState>
@@ -177,7 +175,7 @@ export class AdtMessageClassMessage
       const xmlBody = buildMessageClassXml(cls, {
         messageLockHandles: { [no]: messageLockHandle },
       });
-      const encoded = encodeClassName(name);
+      const encoded = encodeSapObjectName(name.toLowerCase());
       const updateResult = await this.connection.makeAdtRequest({
         url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}`,
         method: 'PUT',
@@ -265,7 +263,7 @@ export class AdtMessageClassMessage
       // 4. PUT class XML without the deleted message
       this.logger?.info?.('deleteMessage: PUT');
       const xmlBody = buildMessageClassXml(cls);
-      const encoded = encodeClassName(name);
+      const encoded = encodeSapObjectName(name.toLowerCase());
       const deleteResult = await this.connection.makeAdtRequest({
         url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}`,
         method: 'PUT',
