@@ -10,9 +10,8 @@
  * Unsupported operations (message classes are not activatable):
  * - activate, check, getVersions, getVersionSource → throwUnsupportedOperation
  *
- * transport / corrNr: parsed in config but not sent in requests yet.
- * Task 6.2 will wire it for transportable packages after a probe confirms the
- * corrNr query parameter is accepted by the endpoint.
+ * transport: config.transportRequest is sent as corrNr on create/update and as
+ * <del:transportNumber> on delete (transportable packages); local packages send none.
  */
 
 import type {
@@ -111,7 +110,7 @@ export class AdtMessageClass
           config.masterLanguage?.trim() ||
           this.systemContext.masterLanguage?.trim() ||
           'EN',
-        // corrNr wiring deferred to the transportable-package task
+        // sent as ?corrNr= for a transportable package; empty for local
         transport_request: config.transportRequest,
       });
       this.logger?.info?.('Message class created');
@@ -180,6 +179,7 @@ export class AdtMessageClass
         config.name,
         lockHandle,
         config.description,
+        config.transportRequest,
       );
       this.logger?.info?.('updated');
 
@@ -236,6 +236,7 @@ export class AdtMessageClass
       const deleteResult = await deleteMessageClass(
         this.connection,
         config.name,
+        config.transportRequest,
       );
       this.logger?.info?.('deleted');
 

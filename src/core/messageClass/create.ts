@@ -11,11 +11,9 @@ const BASE = '/sap/bc/adt/messageclass';
 
 /**
  * Create a new message class (shell — no messages yet).
- * POST /sap/bc/adt/messageclass with Content-Type application/xml.
- *
- * corrNr (transport) is intentionally omitted here — the local/no-transport
- * path is the only one confirmed by probe. Task 6.2 will wire it for
- * transportable packages once a corrNr probe succeeds.
+ * POST /sap/bc/adt/messageclass[?corrNr={transport}] with Content-Type application/xml.
+ * For a transportable package pass `transport_request` (added as `?corrNr=`), like
+ * domain/class create; local packages send no corrNr.
  */
 export async function createMessageClass(
   connection: IAbapConnection,
@@ -33,8 +31,12 @@ export async function createMessageClass(
     messages: [],
   });
 
+  const corrNrParam = params.transport_request?.trim()
+    ? `?corrNr=${encodeURIComponent(params.transport_request)}`
+    : '';
+
   return connection.makeAdtRequest({
-    url: BASE,
+    url: `${BASE}${corrNrParam}`,
     method: 'POST',
     timeout: getTimeout('default'),
     data: xmlBody,

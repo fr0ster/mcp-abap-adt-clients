@@ -55,19 +55,24 @@ export async function checkDeletion(
  * Low-level: delete the message class via the deletion service.
  * POST /sap/bc/adt/deletion/delete (stateless — no lock handle).
  *
- * corrNr / transport_request is intentionally omitted — local/no-transport path
- * only, wired for transportable packages in the corrNr task.
+ * For a transportable package pass `transportRequest` (emitted as
+ * `<del:transportNumber>`), like domain; local packages send an empty tag.
  */
 export async function deleteMessageClass(
   connection: IAbapConnection,
   name: string,
+  transportRequest?: string,
 ): Promise<IAdtResponse> {
   if (!name) throw new Error('name is required');
+
+  const transportNumberTag = transportRequest?.trim()
+    ? `<del:transportNumber>${transportRequest}</del:transportNumber>`
+    : '<del:transportNumber/>';
 
   const xmlPayload = `<?xml version="1.0" encoding="UTF-8"?>
 <del:deletionRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">
   <del:object adtcore:uri="${objectUri(name)}">
-    <del:transportNumber/>
+    ${transportNumberTag}
   </del:object>
 </del:deletionRequest>`;
 
