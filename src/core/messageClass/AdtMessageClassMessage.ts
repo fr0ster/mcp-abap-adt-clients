@@ -10,8 +10,13 @@
  *           lockClassForMessage (CH) → PUT full class XML (message with
  *           mc:lockhandle=MH, lockHandle=CH) → unlock class (CH) →
  *           unlockAllMessages → stateless
- * - delete: GET class → remove message → stateful → lockMessageClass (CH) →
- *           PUT class without message → unlock (CH) → stateless
+ * - delete: GET class → stateful → lockMessage (MH) + lockClassForMessage (CH)
+ *           → PUT class XML with target message as <mc:deletedmessages
+ *           mc:lockhandle=MH>, all other messages as <mc:messages> →
+ *           unlock class (CH) → unlockAllMessages → stateless.
+ *           (SAP does NOT delete omitted messages on PUT — <mc:deletedmessages>
+ *           is the correct mechanism. A message-level DELETE /messages/{no}
+ *           returns 423 and is NOT used.)
  *
  * Unsupported: activate, check, validate, lock, unlock, getVersions,
  * getVersionSource, readTransport → throwUnsupportedOperation.
@@ -36,7 +41,7 @@ import {
 } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import { throwUnsupportedOperation } from '../shared/unsupported';
-import { lockClassForMessage, lockMessage, lockMessageClass } from './lock';
+import { lockClassForMessage, lockMessage } from './lock';
 import { getMessageClassSource } from './read';
 import type {
   IMessageClassMessageConfig,
@@ -231,8 +236,16 @@ export class AdtMessageClassMessage
 
   /**
    * Delete a single message from the parent class.
-   * Chain: GET class → remove message → stateful → lock class → PUT class
-   * without message → unlock → stateless.
+   *
+   * SAP does NOT remove messages that are merely omitted from a class PUT — it
+   * only upserts what is present.  The correct mechanism is to PUT the class
+   * with the target message placed in <mc:deletedmessages> (carrying its own
+   * message lock handle), while every other message remains in <mc:messages>.
+   *
+   * Chain: GET class → stateful → lockMessage (MH) + lockClassForMessage (CH)
+   * → PUT class XML with target in <mc:deletedmessages mc:lockhandle=MH>,
+   * remaining messages in <mc:messages> → unlock class (CH) →
+   * unlockAllMessages → stateless.
    */
   async delete(
     config: Partial<IMessageClassMessageConfig>,
@@ -243,26 +256,32 @@ export class AdtMessageClassMessage
     const name = config.className;
     const no = String(config.msgno);
 
-    // 1. Read current class state
+    // 1. Read current class state — keep ALL messages (including the one being
+    //    deleted) so the builder can emit <mc:deletedmessages> for the target
     const response = await getMessageClassSource(this.connection, name);
     const cls = parseMessageClass(String(response.data));
 
-    // 2. Remove the message
-    cls.messages = cls.messages.filter((m) => m.msgno !== no);
-
+    let messageLockHandle: string | undefined;
     let classLockHandle: string | undefined;
 
     try {
       this.logger?.info?.('deleteMessage: stateful');
       this.connection.setSessionType('stateful');
 
-      // 3. Lock the class
-      this.logger?.info?.('deleteMessage: lock');
-      classLockHandle = await lockMessageClass(this.connection, name);
+      // 2. Lock the individual message (required for <mc:deletedmessages>)
+      this.logger?.info?.('deleteMessage: lockMessage');
+      messageLockHandle = await lockMessage(this.connection, name, no);
 
-      // 4. PUT class XML without the deleted message
+      // 3. Lock the class for a message-save (msgNo + onSave=X)
+      this.logger?.info?.('deleteMessage: lockClassForMessage');
+      classLockHandle = await lockClassForMessage(this.connection, name, no);
+
+      // 4. PUT: target message → <mc:deletedmessages>; all others → <mc:messages>
       this.logger?.info?.('deleteMessage: PUT');
-      const xmlBody = buildMessageClassXml(cls);
+      const xmlBody = buildMessageClassXml(cls, {
+        deletedMsgnos: [no],
+        messageLockHandles: { [no]: messageLockHandle },
+      });
       const encoded = encodeSapObjectName(name.toLowerCase());
       const deleteResult = await this.connection.makeAdtRequest({
         url: `${BASE}/${encoded}?lockHandle=${encodeURIComponent(classLockHandle)}`,
@@ -273,9 +292,14 @@ export class AdtMessageClassMessage
       });
 
       // 5. Unlock class
-      this.logger?.info?.('deleteMessage: unlock');
+      this.logger?.info?.('deleteMessage: unlock class');
       await unlockMessageClass(this.connection, name, classLockHandle);
       classLockHandle = undefined;
+
+      // 6. Release message lock
+      this.logger?.info?.('deleteMessage: unlockAllMessages');
+      await unlockAllMessages(this.connection, name, no);
+      messageLockHandle = undefined;
 
       this.connection.setSessionType('stateless');
       this.logger?.info?.('deleteMessage: done');
@@ -288,6 +312,16 @@ export class AdtMessageClassMessage
         } catch (ue) {
           this.logger?.warn?.(
             'Failed to unlock class during cleanup:',
+            safeErrorMessage(ue),
+          );
+        }
+      }
+      if (messageLockHandle) {
+        try {
+          await unlockAllMessages(this.connection, name, no);
+        } catch (ue) {
+          this.logger?.warn?.(
+            'Failed to unlock messages during cleanup:',
             safeErrorMessage(ue),
           );
         }

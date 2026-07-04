@@ -93,9 +93,13 @@ function attrString(
 
 export function buildMessageClassXml(
   cls: IParsedMessageClass,
-  opts?: { messageLockHandles?: Record<string, string> },
+  opts?: {
+    messageLockHandles?: Record<string, string>;
+    deletedMsgnos?: string[];
+  },
 ): string {
   const locks = opts?.messageLockHandles ?? {};
+  const deleted = new Set(opts?.deletedMsgnos ?? []);
   const rootAttrs = attrString(cls.rawAttrs, {
     'adtcore:name': cls.name,
     'adtcore:description': cls.description,
@@ -120,6 +124,12 @@ export function buildMessageClassXml(
         'adtcore:description': m.description,
         'mc:lockhandle': locks[m.msgno],
       });
+      // Messages flagged for deletion are emitted as <mc:deletedmessages> carrying
+      // their lock handle; SAP uses this element to identify and remove them on PUT.
+      // All other messages stay as <mc:messages> so they are preserved (upserted).
+      if (deleted.has(m.msgno)) {
+        return `<mc:deletedmessages ${attrs}/>`;
+      }
       return `<mc:messages ${attrs}/>`;
     })
     .join('');

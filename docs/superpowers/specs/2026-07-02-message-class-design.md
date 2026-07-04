@@ -106,7 +106,7 @@ reads the class and re-sends its current message set unchanged.
 |---|---|
 | `read(config)` | read the parent class (`GET /messageclass/{className}`), extract the `mc:messages` entry with `msgno` → `state.message` (throws `OBJECT_NOT_FOUND` if absent) |
 | `create(config)` / `update(config)` | read the parent class → set/merge this message into the message set → `POST …/messages/{no}?_action=LOCK_MSG&accessMode=MODIFY` (→ `msgLock`) → `POST …/{className}?_action=LOCK&accessMode=MODIFY&msgNo={no}&onSave=X` (→ `classLock`) → `PUT …/{className}?lockHandle={classLock}` with the FULL class XML incl. `<mc:messages mc:lockhandle="{msgLock}" mc:msgno="{no}" mc:msgtext="…"/>` → `POST …?_action=UNLOCK&lockHandle={classLock}` → `POST …/messages/{no}?_action=UNLOCK_ALL` (body `[{no}]`) |
-| `delete(config)` | read the parent class → remove the message from the set → `POST …/{className}?_action=LOCK&accessMode=MODIFY` → `PUT …/{className}?lockHandle={classLock}` with the class XML **without** that message → `POST …?_action=UNLOCK&lockHandle={classLock}`. (A message-level `DELETE /messages/{no}` returns **423** — not used.) |
+| `delete(config)` | read the parent class (all messages kept) → `POST …/messages/{no}?_action=LOCK_MSG&accessMode=MODIFY` (→ `msgLock`) → `POST …/{className}?_action=LOCK&accessMode=MODIFY&msgNo={no}&onSave=X` (→ `classLock`) → `PUT …/{className}?lockHandle={classLock}` with the class XML where the target message is emitted as `<mc:deletedmessages mc:lockhandle="{msgLock}" mc:msgno="{no}" …/>` and all OTHER messages remain as `<mc:messages …/>` → `POST …?_action=UNLOCK&lockHandle={classLock}` → `POST …/messages/{no}?_action=UNLOCK_ALL`. (SAP does NOT delete messages that are omitted from a PUT — only `<mc:deletedmessages>` triggers actual removal. A message-level `DELETE /messages/{no}` returns **423** — not used.) |
 | `activate` / `check` / `validate` / `lock` / `unlock` / `getVersions` / `getVersionSource` | **throw** `AdtOperationError(UNSUPPORTED_OPERATION)` |
 
 Lock responses carry `<LOCK_HANDLE>…</LOCK_HANDLE>` (asx:abap envelope);
@@ -155,22 +155,29 @@ message), and pass the whole preserved `IParsedMessageClass` to
 class-level attribute (named or not: language, masterLanguage, masterSystem,
 responsible, future SAP attrs) round-trips unchanged.
 
-**Message-level preservation:** `buildMessageClassXml` emits each `<mc:messages>`
-entry as follows:
-- **Untouched** message → re-emit its `rawAttrs` verbatim (no `mc:lockhandle`).
+**Message-level preservation:** `buildMessageClassXml(cls, opts)` accepts two
+optional opt keys: `messageLockHandles` (per-msgno lock handle to emit) and
+`deletedMsgnos` (msgno values to route to `<mc:deletedmessages>`).  It emits
+each entry as follows:
+- **Untouched** message → re-emit its `rawAttrs` verbatim as `<mc:messages>`
+  (no `mc:lockhandle`).
 - **Updated existing** message → start from its `rawAttrs`, override only the
   explicitly-changed fields (`mc:msgtext`, `mc:selfexplainatory`, description),
-  and add/replace `mc:lockhandle` from `opts.messageLockHandles`. Its other
-  attributes (`mc:documented`, `adtcore:name`, future SAP attrs) are carried
-  through, not dropped.
+  and add/replace `mc:lockhandle` from `opts.messageLockHandles`; emit as
+  `<mc:messages>`. Its other attributes (`mc:documented`, `adtcore:name`,
+  future SAP attrs) are carried through, not dropped.
 - **New** message (create) → build attributes from scratch (`mc:msgno`,
-  `mc:msgtext`, `mc:selfexplainatory`, description) + `mc:lockhandle`.
-- **Deleted** message → omit the entry.
+  `mc:msgtext`, `mc:selfexplainatory`, description) + `mc:lockhandle`; emit as
+  `<mc:messages>`.
+- **Deleted** message → emit as `<mc:deletedmessages mc:lockhandle="{msgLock}"
+  mc:msgno="{no}" …/>` (same rawAttrs-merge logic + lockhandle override).
+  SAP uses this element to identify and remove the message — simply omitting a
+  message from the PUT body does NOT delete it.
 
 This guarantees a message operation on one entry never mutates any other entry's
-attributes, and updating one field of a message never drops its other attributes. During implementation, probe-verify the exact meaningful message
-attribute set and that an untouched message may be re-sent without a lock handle
-(the class `PUT` only locks the class + the one message being changed).
+attributes, and updating one field of a message never drops its other attributes.
+Probe-verified: an untouched message may be re-sent without a lock handle (the
+class PUT only locks the class + the one message being changed/deleted).
 
 ## Transport handling (corrNr)
 

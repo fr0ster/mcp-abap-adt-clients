@@ -47,12 +47,28 @@ describe('buildMessageClassXml round-trip preservation', () => {
     expect(out.match(/xmlns:adtcore=/g)).toHaveLength(1);
   });
 
-  it('omits a deleted message', () => {
+  it('omits a deleted message (old filter-based path)', () => {
     const c = parseMessageClass(XML);
     c.messages = c.messages.filter((m) => m.msgno !== '002');
     const out = buildMessageClassXml(c);
     expect(out).not.toContain('mc:msgno="002"');
     expect(out).toContain('mc:msgno="001"');
+  });
+
+  it('emits <mc:deletedmessages> with lockhandle for deleted msgno; keeps other in <mc:messages>', () => {
+    const c = parseMessageClass(XML);
+    // Pass 001 as the message to delete (with its lock handle); 002 should stay as <mc:messages>
+    const out = buildMessageClassXml(c, {
+      deletedMsgnos: ['001'],
+      messageLockHandles: { '001': 'LH' },
+    });
+    // 001 appears inside <mc:deletedmessages> carrying the lock handle
+    expect(out).toMatch(/<mc:deletedmessages[^>]*mc:msgno="001"/);
+    expect(out).toMatch(/<mc:deletedmessages[^>]*mc:lockhandle="LH"/);
+    // 002 stays in the regular <mc:messages> element (preserved, not deleted)
+    expect(out).toMatch(/<mc:messages[^>]*mc:msgno="002"/);
+    // 002 must NOT appear inside a <mc:deletedmessages> element
+    expect(out).not.toMatch(/<mc:deletedmessages[^>]*mc:msgno="002"/);
   });
 
   it('preserves an unknown/future namespace declaration + its attr (stays bound)', () => {
