@@ -1042,6 +1042,21 @@ create_service_definition:
             expose ZAC_SHR_CDSUT_DDLS;
           }
 
+# Create Message Class (MSAG/N)
+create_message_class:
+  test_cases:
+    - name: "adt_message_class"
+      enabled: true
+      description: "MessageClass lifecycle reserved for AdtMessageClass tests"
+      params:
+        msg_class_name: "ZADT_MSGX01"
+        description: "AdtMessageClass integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        msg_no: "001"
+        msg_text_initial: "ITEST 001"
+        msg_text_updated: "ITEST 001 upd"
+
 # Create Scalar Function (CDS DSFD/SCF)
 # ScalarFunction is a CDS object (DDL source) available on ABAP Cloud and modern
 # on-premise systems that support the /sap/bc/adt/ddic/dsfd/* endpoints.

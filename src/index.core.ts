@@ -118,6 +118,15 @@ export type {
   IInterfaceState,
 } from './core/interface';
 export type {
+  AdtMessageClassMessageType,
+  AdtMessageClassType,
+  IMessageClassConfig,
+  IMessageClassMessageConfig,
+  IMessageClassMessageState,
+  IMessageClassState,
+} from './core/messageClass';
+export { AdtMessageClass, AdtMessageClassMessage } from './core/messageClass';
+export type {
   AdtMetadataExtensionType,
   IMetadataExtensionConfig,
   IMetadataExtensionCreateParams,

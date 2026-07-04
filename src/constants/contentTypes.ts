@@ -242,6 +242,10 @@ export const CT_FEATURE_TOGGLE_SOURCE =
   'application/vnd.sap.adt.toggle.content.v2+json';
 export const ACCEPT_FEATURE_TOGGLE_SOURCE = CT_FEATURE_TOGGLE_SOURCE;
 
+// Message Classes (MSAG/N)
+export const MESSAGE_CLASS_UPDATE_CONTENT_TYPE =
+  'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8';
+
 // abapGit (/sap/bc/adt/abapgit/*)
 // Envelope for the repository entity (sapcli parity: v3; v4 advertised
 // in discovery but kept opt-in via IAdtAbapGitClientOptions.contentTypeVersion).

@@ -3,6 +3,13 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.3.0] - 2026-07-04
+
+### Added
+- **Message class (MSAG) CRUD.** Two new `IAdtObject` handlers via `AdtClient`: `getMessageClass()` (the class shell — create/read/update/delete/validate, no activation) and `getMessageClassMessage()` (an individual message, read-modify-write over the parent class). New config/state types `IMessageClassConfig`/`IMessageClassState` and `IMessageClassMessageConfig`/`IMessageClassMessageState`; requires `@mcp-abap-adt/interfaces` `^9.2.0` for the param types.
+  - Empirically verified against the ADT contract (SAP trial + Eclipse traces): class delete uses the stateless deletion service (`/sap/bc/adt/deletion/check` + `/delete`); a message is added/updated with a two-level lock (`LOCK_MSG` + class `LOCK …&onSave=X`) then a full-class PUT, and deleted by moving it into `<mc:deletedmessages>` (not by omission or a message-level DELETE); `validate` POSTs to `/messageclass/validation`.
+  - Non-applicable operations throw `AdtOperationError` with `code === UNSUPPORTED_OPERATION`. Message/class attributes round-trip verbatim (including unknown/future namespaces and attributes). Transport (`corrNr`) is not yet wired — local-package path only.
+
 ## [7.2.1] - 2026-07-01
 
 ### Security
