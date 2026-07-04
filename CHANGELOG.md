@@ -3,6 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.3.1] - 2026-07-04
+
+### Fixed
+- **Message class: wire `corrNr` (transport request) from config**, completing the deferred transport support. `transportRequest` now flows into every mutating call like the other CRUD object types: class create adds `?corrNr=`, class update and the message PUTs add `&corrNr=`, and class delete emits `<del:transportNumber>`. The value comes solely from `config.transportRequest` — local packages send no `corrNr`, transportable systems flow the configured transport.
+
 ## [7.3.0] - 2026-07-04
 
 ### Added
