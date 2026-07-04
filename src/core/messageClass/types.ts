@@ -53,7 +53,7 @@ export interface IMessageClassMessageConfig {
   selfExplanatory?: boolean;
   /** Long description for the message (adtcore:description attribute) */
   description?: string;
-  /** Transport request — sent as corrNr (create/update) or <del:transportNumber> (delete) for transportable packages */
+  /** Transport request — sent as &corrNr= on the parent-class PUT for create/update/delete (transportable packages) */
   transportRequest?: string;
 }
 
