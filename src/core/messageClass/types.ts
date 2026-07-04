@@ -27,7 +27,7 @@ export interface IMessageClassConfig {
   description?: string;
   /** Package name — required for create */
   packageName?: string;
-  /** Transport request — parsed but not sent until Task 6.2 wires corrNr */
+  /** Transport request — sent as corrNr (create/update) or <del:transportNumber> (delete) for transportable packages */
   transportRequest?: string;
   /** Master language of the message class — defaults to 'EN' on create */
   masterLanguage?: string;
@@ -53,7 +53,7 @@ export interface IMessageClassMessageConfig {
   selfExplanatory?: boolean;
   /** Long description for the message (adtcore:description attribute) */
   description?: string;
-  /** Transport request — parsed but not sent until Task 6.2 wires corrNr */
+  /** Transport request — sent as corrNr (create/update) or <del:transportNumber> (delete) for transportable packages */
   transportRequest?: string;
 }
 
