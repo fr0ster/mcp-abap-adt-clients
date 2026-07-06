@@ -38,6 +38,7 @@ import type { ITableConfig, ITableState } from './types';
 import { unlockTable } from './unlock';
 import { updateTable } from './update';
 import { validateTableName } from './validation';
+import { getTableVersionSource, getTableVersions } from './versions';
 
 export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
   private readonly connection: IAbapConnection;
@@ -100,6 +101,8 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         ddl_code: options?.sourceCode || config.ddlCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       objectCreated = true;
       state.createResult = createResponse;
@@ -286,7 +289,6 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
         this.connection,
         config.tableName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Table locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -534,7 +536,6 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       this.connection,
       config.tableName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -560,5 +561,13 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<ITableConfig>) {
+    return getTableVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getTableVersionSource(this.connection, contentUri);
   }
 }

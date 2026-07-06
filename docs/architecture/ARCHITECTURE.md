@@ -91,8 +91,9 @@ src/
 ### 1) `AdtClient` (object facade)
 
 `AdtClient` is a factory of `IAdtObject` implementations and returns a new instance per call:
-- `getClass()`, `getProgram()`, `getInterface()`, `getDomain()`, `getDataElement()`, `getStructure()`, `getTable()`, `getTableType()`, `getView()`
+- `getClass()`, `getProgram()`, `getInterface()`, `getDomain()`, `getDataElement()`, `getStructure()`, `getTable()`, `getTableType()`, `getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`)
 - `getFunctionGroup()`, `getFunctionModule()`, `getFunctionInclude()`, `getPackage()`, `getServiceDefinition()`
+- `getScalarFunction()` (CDS scalar function, `DSFD/SCF`), `getScalarFunctionImplementation()` (scalar function implementation, `DSFI/SFI`), `getAppendStructure()` (append structure, `TABL/DS`)
 - `getAuthorizationField()` for SUSO / AUTH authorization-field CRUD (modern on-prem and cloud only)
 - `getFeatureToggle()` for FTG2/FT feature-toggle CRUD plus domain methods (switchOn, switchOff, getRuntimeState, checkState, readSource); modern on-prem and cloud only
 - `getServiceBinding()` for RAP BO service binding CRUD + lifecycle
@@ -163,7 +164,8 @@ Critical conventions used across object modules:
 Notably, where-used supports:
 - scope fetch (`getWhereUsedScope`),
 - local scope mutation (`modifyWhereUsedScope`),
-- execution (`getWhereUsed`) and parsed convenience (`getWhereUsedList`).
+- execution (`getWhereUsed`) and parsed convenience (`getWhereUsedList`),
+- type filtering via `getWhereUsedList({ enableOnlyTypes, disableTypes })` — applied server-side through the `/usageReferences/scope` sub-resource where available, otherwise (some S/4 releases 404 that resource) the search falls back to unscoped and the filter is applied to the parsed references client-side. Either way the caller receives only the selected object types.
 
 ## Accept Negotiation (406 Recovery)
 

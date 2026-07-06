@@ -54,6 +54,10 @@ import { unlockEnhancement } from './unlock';
 import { update } from './update';
 import { validate } from './validation';
 
+import {
+  getEnhancementVersionSource,
+  getEnhancementVersions,
+} from './versions';
 export class AdtEnhancement
   implements IAdtObject<IEnhancementConfig, IEnhancementState>
 {
@@ -153,6 +157,8 @@ export class AdtEnhancement
           badi_definition: config.badiDefinition,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.logger,
       );
@@ -434,7 +440,6 @@ export class AdtEnhancement
         config.enhancementType,
         config.enhancementName,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Enhancement locked, handle:', lockHandle);
 
@@ -765,7 +770,6 @@ export class AdtEnhancement
       config.enhancementType,
       config.enhancementName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -793,5 +797,13 @@ export class AdtEnhancement
       errors: [],
       enhancementType: config.enhancementType,
     };
+  }
+
+  getVersions(config: Partial<IEnhancementConfig>) {
+    return getEnhancementVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getEnhancementVersionSource(this.connection, contentUri);
   }
 }

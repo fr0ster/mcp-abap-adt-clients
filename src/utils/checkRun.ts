@@ -76,6 +76,15 @@ export function getObjectUri(objectType: string, objectName: string): string {
     case 'service_definition':
     case 'srvd/srv':
       return `/sap/bc/adt/ddic/srvd/sources/${encodedName}`;
+    case 'scalar_function':
+    case 'dsfd/scf':
+      return `/sap/bc/adt/ddic/dsfd/sources/${encodedName}`;
+    case 'scalar_function_implementation':
+    case 'dsfi/sfi':
+      return `/sap/bc/adt/ddic/dsfi/${encodedName}`;
+    case 'append_structure':
+    case 'tabl/ds':
+      return `/sap/bc/adt/ddic/structures/${encodedName}`;
     case 'access_control':
     case 'dcls/dl':
       return `/sap/bc/adt/acm/dcl/sources/${encodedName}`;

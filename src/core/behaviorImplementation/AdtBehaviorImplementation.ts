@@ -47,6 +47,10 @@ import type {
 import { updateBehaviorImplementation } from './update';
 import { validateBehaviorImplementationName } from './validation';
 
+import {
+  getBehaviorImplementationVersionSource,
+  getBehaviorImplementationVersions,
+} from './versions';
 export class AdtBehaviorImplementation
   implements
     IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState>
@@ -648,5 +652,13 @@ ENDCLASS.`;
       unlockResult: unlockState.unlockResult,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IBehaviorImplementationConfig>) {
+    return getBehaviorImplementationVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getBehaviorImplementationVersionSource(this.connection, contentUri);
   }
 }

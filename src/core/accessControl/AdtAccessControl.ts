@@ -43,6 +43,10 @@ import { unlockAccessControl } from './unlock';
 import { updateAccessControl } from './update';
 import { validateAccessControlName } from './validation';
 
+import {
+  getAccessControlVersionSource,
+  getAccessControlVersions,
+} from './versions';
 export class AdtAccessControl
   implements IAdtObject<IAccessControlConfig, IAccessControlState>
 {
@@ -126,6 +130,8 @@ export class AdtAccessControl
         source_code: options?.sourceCode || config.sourceCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       state.createResult = createResponse;
       this.logger?.info?.('Access control created');
@@ -303,7 +309,6 @@ export class AdtAccessControl
         this.connection,
         config.accessControlName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Access control locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -574,7 +579,6 @@ export class AdtAccessControl
       this.connection,
       config.accessControlName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -600,5 +604,13 @@ export class AdtAccessControl
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IAccessControlConfig>) {
+    return getAccessControlVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getAccessControlVersionSource(this.connection, contentUri);
   }
 }

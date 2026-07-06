@@ -49,8 +49,8 @@ export class AdtClientBatch {
   getTableType() {
     return this.innerClient.getTableType();
   }
-  getView() {
-    return this.innerClient.getView();
+  getDdl() {
+    return this.innerClient.getDdl();
   }
   getFunctionGroup() {
     return this.innerClient.getFunctionGroup();
@@ -63,6 +63,15 @@ export class AdtClientBatch {
   }
   getServiceDefinition() {
     return this.innerClient.getServiceDefinition();
+  }
+  getScalarFunction() {
+    return this.innerClient.getScalarFunction();
+  }
+  getScalarFunctionImplementation() {
+    return this.innerClient.getScalarFunctionImplementation();
+  }
+  getAppendStructure() {
+    return this.innerClient.getAppendStructure();
   }
   getServiceBinding() {
     return this.innerClient.getServiceBinding();

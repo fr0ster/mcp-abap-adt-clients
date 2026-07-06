@@ -27,11 +27,13 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import type { IReadOptions } from '../shared/types';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { activateFunctionGroup } from './activation';
 import { checkFunctionGroup } from './check';
 import { create as createFunctionGroup } from './create';
@@ -41,7 +43,6 @@ import { getFunctionGroup, getFunctionGroupTransport } from './read';
 import type { IFunctionGroupConfig, IFunctionGroupState } from './types';
 import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';
-
 export class AdtFunctionGroup
   implements IAdtObject<IFunctionGroupConfig, IFunctionGroupState>
 {
@@ -161,6 +162,8 @@ export class AdtFunctionGroup
           description: config.description,
           masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
           responsible: config.responsible ?? this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.logger,
         this.contentTypes,
@@ -476,7 +479,6 @@ export class AdtFunctionGroup
         config.functionGroupName,
         sessionId,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Function group locked, handle:', lockHandle);
 
       // 2. Update metadata (description)
@@ -723,7 +725,6 @@ export class AdtFunctionGroup
       this.connection,
       config.functionGroupName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -749,5 +750,15 @@ export class AdtFunctionGroup
       unlockResult: result,
       errors: [],
     };
+  }
+
+  async getVersions(
+    _config: Partial<IFunctionGroupConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('function group');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('function group');
   }
 }

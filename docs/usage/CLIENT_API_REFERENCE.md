@@ -293,6 +293,85 @@ await utils.readObjectMetadata(metadataType, 'ZOK_I_CDS_TEST');
 await utils.readObjectSource(sourceType, 'ZOK_I_CDS_TEST', undefined, 'active');
 ```
 
+### Message class (MSAG) and its messages
+
+Message classes and their individual messages are two separate handlers.
+`getMessageClass()` manages the class shell (name, description, package,
+`masterLanguage`); `getMessageClassMessage()` manages a single message, which is
+read-modify-write over the parent class (a message has no independent write
+endpoint). Message classes are **not activated**, so `activate()`/`check()` throw
+`UNSUPPORTED_OPERATION`.
+
+```typescript
+// Create the class, then add/edit/remove messages on it.
+await client.getMessageClass().create({
+  name: 'ZMY_MSG',
+  description: 'My messages',
+  packageName: 'ZMY_PKG',
+});
+
+await client.getMessageClassMessage().create({
+  className: 'ZMY_MSG',
+  msgno: '001',
+  msgtext: 'Order &1 not found',
+  selfExplanatory: true,
+});
+
+// Update only the text (other message attributes round-trip unchanged).
+await client.getMessageClassMessage().update({
+  className: 'ZMY_MSG',
+  msgno: '001',
+  msgtext: 'Order &1 does not exist',
+});
+
+// Read one message (resolved from the class).
+const msg = await client.getMessageClassMessage().read({
+  className: 'ZMY_MSG',
+  msgno: '001',
+});
+console.log(msg?.message?.msgtext);
+
+// Remove a single message, then delete the whole class.
+await client.getMessageClassMessage().delete({ className: 'ZMY_MSG', msgno: '001' });
+await client.getMessageClass().delete({ name: 'ZMY_MSG' });
+```
+
+### Object version history
+
+Every object handler exposes `getVersions(config)` (list the SAP version history)
+and `getVersionSource(contentUri)` (fetch a specific version's source). Identity is
+passed per call, like the other handler methods.
+
+```typescript
+import { AdtObjectErrorCodes, type AdtOperationError } from '@mcp-abap-adt/interfaces';
+
+const versions = await client.getClass().getVersions({ className: 'ZCL_MY_CLASS' });
+for (const v of versions) {
+  console.log(`${v.versionId} by ${v.author ?? '?'} at ${v.updatedAt ?? '?'}`);
+}
+
+// Fetch the source of a specific version via its opaque contentUri.
+if (versions.length > 0) {
+  const src = await client.getClass().getVersionSource(versions[0].contentUri);
+  console.log(src);
+}
+```
+
+Object types that do not expose a version resource (e.g. packages, transports, or a
+type whose version endpoint is not available on the target system) throw
+`AdtOperationError` with `code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — the
+raw HTTP error is never surfaced:
+
+```typescript
+try {
+  await client.getPackage().getVersions({ packageName: 'ZMY_PKG' });
+} catch (e) {
+  if ((e as AdtOperationError).code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
+    // this object has no version history
+  }
+}
+```
+
 ### AdtUtils (Where-used)
 
 Where-used is a two-step flow:
@@ -321,6 +400,42 @@ const result = await utils.getWhereUsed({
   object_type: 'class',
   scopeXml,
 });
+```
+
+`getWhereUsedList` is a convenience wrapper that performs the scope fetch, search, and
+XML parsing in one call and returns structured `references`. Use `enableOnlyTypes` to
+restrict the search to specific ADT object types — SAP applies the selection server-side,
+so it never searches (nor returns) the unwanted types, e.g. hundreds of `CLAS/OC`:
+
+> On systems that do not expose the `/usageReferences/scope` sub-resource (some S/4
+> releases answer it with HTTP 404), server-side filtering is unavailable: the search
+> falls back to an unscoped query and `enableOnlyTypes` / `disableTypes` are then applied
+> to the parsed `references` client-side, so callers still receive the narrowed set.
+
+```typescript
+const utils = client.getUtils();
+
+// Only structures/tables — not the dozens of other referencing types.
+const result = await utils.getWhereUsedList({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+  enableOnlyTypes: ['TABL/DS', 'TABL/DT'],
+});
+
+console.log(`Found ${result.totalReferences} references`);
+for (const ref of result.references) {
+  console.log(`${ref.name} (${ref.type}) in ${ref.packageName}`);
+}
+
+// Or keep the default SAP scope but prune a noisy type:
+await utils.getWhereUsedList({
+  object_name: 'ZMY_TABLE',
+  object_type: 'table',
+  disableTypes: ['CLAS/OC'],
+});
+
+// `enableAllTypes: true` selects every type (Eclipse "select all"); `enableOnlyTypes`
+// takes precedence over it, and `disableTypes` is applied on top.
 ```
 
 ## AdtClientBatch

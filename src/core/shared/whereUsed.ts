@@ -23,10 +23,18 @@ import type {
   IWhereUsedReference,
 } from './types';
 
+// removeNSPrefix strips the namespace prefix from every element and attribute
+// name. The where-used result is namespaced under http://www.sap.com/adt/ris/
+// usageReferences, but the *prefix* SAP binds to it is system-dependent — some
+// releases emit `usagereferences:` (lower-case), others `usageReferences:`
+// (camel-case). Stripping the prefix lets us read the result regardless of which
+// alias the server chose, instead of hard-coding one and silently parsing 0
+// references on the other. (adtcore:* attributes are normalised the same way.)
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
   parseAttributeValue: false,
+  removeNSPrefix: true,
 });
 
 /**
@@ -67,45 +75,51 @@ export function modifyWhereUsedScope(
     disable?: string[];
   },
 ): string {
-  let result = scopeXml;
+  // Each available type is a self-closing <ns:type .../> tag. The namespace
+  // PREFIX is system-dependent (usagereferences: vs usageReferences:), so match
+  // any prefix — hard-coding one made the rewrite a silent no-op on the other.
+  // We rewrite ONLY the isSelected attribute per tag and never touch the opaque
+  // <ns:payload> blob or attribute ordering — SAP emits attributes as
+  // `isDefault isSelected name`, so logic must read `name` wherever it appears,
+  // not assume it precedes isSelected.
+  const typeTagRegex = /<[A-Za-z][\w-]*:type\b[^>]*?\/>/g;
 
-  if (options.enableAll) {
-    // Enable all object types
-    result = result.replace(/isSelected="false"/g, 'isSelected="true"');
-  } else if (options.enableOnly) {
-    // First disable all, then enable only specified
-    result = result.replace(/isSelected="true"/g, 'isSelected="false"');
-    for (const typeName of options.enableOnly) {
-      const typeRegex = new RegExp(
-        `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`,
-        'g',
-      );
-      result = result.replace(typeRegex, '$1 $2"true"');
+  return scopeXml.replace(typeTagRegex, (tag) => {
+    const nameMatch = tag.match(/\bname="([^"]*)"/);
+    const name = nameMatch ? nameMatch[1] : '';
+
+    let selected: boolean | undefined;
+    if (options.enableAll) {
+      selected = true;
+    } else if (options.enableOnly) {
+      selected = options.enableOnly.includes(name);
+    } else {
+      if (options.enable?.includes(name)) selected = true;
+      if (options.disable?.includes(name)) selected = false;
     }
-  } else {
-    // Enable specific types (keep existing selections)
-    if (options.enable) {
-      for (const typeName of options.enable) {
-        const typeRegex = new RegExp(
-          `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"false"`,
-          'g',
-        );
-        result = result.replace(typeRegex, '$1 $2"true"');
-      }
-    }
-    // Disable specific types
-    if (options.disable) {
-      for (const typeName of options.disable) {
-        const typeRegex = new RegExp(
-          `(<usagereferences:type[^>]*name="${typeName.replace(/\//g, '\\/')})"[^>]*(isSelected=)"true"`,
-          'g',
-        );
-        result = result.replace(typeRegex, '$1 $2"false"');
-      }
-    }
+
+    if (selected === undefined) return tag;
+    return setIsSelected(tag, selected);
+  });
+}
+
+/**
+ * Set the isSelected attribute on a single <ns:type> tag, inserting it if
+ * absent. Leaves all other attributes and their order intact. The namespace
+ * prefix is matched (and preserved) rather than hard-coded.
+ */
+function setIsSelected(typeTag: string, selected: boolean): string {
+  const value = selected ? 'true' : 'false';
+  if (/\bisSelected="(?:true|false)"/.test(typeTag)) {
+    return typeTag.replace(
+      /\bisSelected="(?:true|false)"/,
+      `isSelected="${value}"`,
+    );
   }
-
-  return result;
+  return typeTag.replace(
+    /<([A-Za-z][\w-]*:type)\b/,
+    `<$1 isSelected="${value}"`,
+  );
 }
 
 /**
@@ -159,6 +173,20 @@ function buildObjectUri(objectName: string, objectType: string): string {
     default:
       throw new Error(`Unsupported object type for where-used: ${objectType}`);
   }
+}
+
+/**
+ * True when an error indicates the /usageReferences/scope sub-resource is not
+ * available on the target system. SAP answers such requests with HTTP 404
+ * ("No suitable resource found") — and 406 for an unaccepted media type — on
+ * releases that do not expose the scope step. Callers use this to fall back to
+ * an unscoped where-used search rather than failing outright.
+ */
+function isScopeResourceUnavailable(error: unknown): boolean {
+  const status =
+    // biome-ignore lint/suspicious/noExplicitAny: error shape is provider-defined
+    (error as any)?.response?.status ?? (error as any)?.status;
+  return status === 404 || status === 406;
 }
 
 /**
@@ -218,15 +246,17 @@ export async function getWhereUsedScope(
 }
 
 /**
- * Get where-used references for ABAP object (Step 2 of 2)
+ * Get where-used references for ABAP object
  *
- * Eclipse ADT uses a two-step process:
- * 1. GET scope configuration (getWhereUsedScope) - returns available object types
- * 2. POST actual search with scope (this function) - executes search
+ * Posts directly to /usageReferences (the request the Eclipse ADT client
+ * sends). An optional scope can be supplied to narrow the searched object types
+ * server-side; when omitted, SAP applies its default scope. This function never
+ * calls the /usageReferences/scope sub-resource itself — that resource is not
+ * available on every system (see getWhereUsedScope).
  *
  * @param connection - ABAP connection
  * @param params - Where-used parameters
- * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). If not provided, will fetch default scope.
+ * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). When omitted, the search runs against SAP's default scope (unscoped).
  * @returns Where-used references
  */
 export async function getWhereUsed(
@@ -242,31 +272,27 @@ export async function getWhereUsed(
 
   const objectUri = buildObjectUri(params.object_name, params.object_type);
 
-  // If scope not provided, fetch default scope
-  let scopeXml: string = params.scopeXml || '';
-  if (!scopeXml) {
-    const scopeResponse = await getWhereUsedScope(connection, {
-      object_name: params.object_name,
-      object_type: params.object_type,
-    });
-    scopeXml = scopeResponse.data;
-  }
-
-  // Step 2: Perform actual where-used search with scope
+  // Step 2: perform the actual where-used search.
+  // We do NOT auto-fetch a default scope here. The Eclipse ADT client posts
+  // directly to /usageReferences with a minimal request body and lets SAP apply
+  // its default scope; the /usageReferences/scope sub-resource is not exposed on
+  // every system (some S/4 releases answer 404 "No suitable resource found"), so
+  // depending on it would break an otherwise-supported search. An explicit
+  // <scope> is embedded only when the caller supplied one (the optional 2-step
+  // optimisation that narrows the searched object types server-side).
   const searchUrl = `/sap/bc/adt/repository/informationsystem/usageReferences?uri=${encodeURIComponent(objectUri)}`;
 
-  // Build request body with scope from step 1
-  // Extract inner content of usageScopeResult and wrap it in usageReferenceRequest
-  const scopeContent = scopeXml
-    .replace(/<\?xml[^>]*\?>/, '')
-    .replace(
-      /<usagereferences:usageScopeResult[^>]*>/,
-      '<usagereferences:scope>',
-    )
-    .replace(
-      /<\/usagereferences:usageScopeResult>/,
-      '</usagereferences:scope>',
-    );
+  // When a scope is provided, extract the inner content of usageScopeResult and
+  // re-wrap it as <ns:scope>. The namespace prefix is system-dependent
+  // (usagereferences: vs usageReferences:), so capture and reuse it, and KEEP the
+  // open tag's attributes ($2, i.e. the xmlns declaration) on <scope> so the
+  // re-wrapped element stays namespace-bound regardless of which prefix SAP used.
+  const scopeContent = params.scopeXml
+    ? params.scopeXml
+        .replace(/<\?xml[^>]*\?>/, '')
+        .replace(/<([A-Za-z][\w-]*):usageScopeResult\b([^>]*)>/, '<$1:scope$2>')
+        .replace(/<\/([A-Za-z][\w-]*):usageScopeResult>/, '</$1:scope>')
+    : '';
 
   const searchRequestBody = `<?xml version="1.0" encoding="UTF-8"?><usagereferences:usageReferenceRequest xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:affectedObjects/>${scopeContent}</usagereferences:usageReferenceRequest>`;
 
@@ -294,14 +320,24 @@ export async function getWhereUsed(
  *
  * @example
  * ```typescript
- * const result = await getWhereUsedList(connection, {
+ * // Search every object type (Eclipse 'select all') — may return many results
+ * const all = await getWhereUsedList(connection, {
  *   object_name: 'ZMY_TABLE',
  *   object_type: 'table',
  *   enableAllTypes: true
  * });
  *
- * console.log(`Found ${result.totalReferences} references`);
- * for (const ref of result.references) {
+ * // Or restrict to just the types you care about (e.g. only structures/tables)
+ * // so you never get hundreds of classes back. Filtered server-side via the
+ * // scope sub-resource where available, else client-side on the unscoped result.
+ * const structuresOnly = await getWhereUsedList(connection, {
+ *   object_name: 'ZMY_TABLE',
+ *   object_type: 'table',
+ *   enableOnlyTypes: ['TABL/DS', 'TABL/DT']
+ * });
+ *
+ * console.log(`Found ${structuresOnly.totalReferences} references`);
+ * for (const ref of structuresOnly.references) {
  *   console.log(`${ref.name} (${ref.type}) in package ${ref.packageName}`);
  * }
  * ```
@@ -318,14 +354,49 @@ export async function getWhereUsedList(
   }
 
   let scopeXml: string | undefined;
+  // Set when the /usageReferences/scope sub-resource is unavailable and we fell
+  // back to an unscoped search. The requested type filter could not be applied
+  // server-side, so it is applied to the parsed references instead (below).
+  let scopeUnavailable = false;
 
-  // If enableAllTypes, fetch scope and modify it
-  if (params.enableAllTypes) {
-    const scopeResponse = await getWhereUsedScope(connection, {
-      object_name: params.object_name,
-      object_type: params.object_type,
-    });
-    scopeXml = modifyWhereUsedScope(scopeResponse.data, { enableAll: true });
+  // Fetch and modify the scope only when the caller wants to constrain which
+  // object types are searched. Otherwise getWhereUsed() falls back to SAP's
+  // default scope.
+  const enableOnly = params.enableOnlyTypes?.length
+    ? params.enableOnlyTypes
+    : undefined;
+  const disable = params.disableTypes?.length ? params.disableTypes : undefined;
+
+  if (params.enableAllTypes || enableOnly || disable) {
+    try {
+      const scopeResponse = await getWhereUsedScope(connection, {
+        object_name: params.object_name,
+        object_type: params.object_type,
+      });
+
+      // enableOnly wins over enableAll; disable is then applied on top so callers
+      // can both narrow to a set and prune one of those, in a single pass.
+      let modified = scopeResponse.data;
+      if (enableOnly) {
+        modified = modifyWhereUsedScope(modified, { enableOnly });
+      } else if (params.enableAllTypes) {
+        modified = modifyWhereUsedScope(modified, { enableAll: true });
+      }
+      if (disable) {
+        modified = modifyWhereUsedScope(modified, { disable });
+      }
+      scopeXml = modified;
+    } catch (error) {
+      // The /usageReferences/scope sub-resource is not exposed on every system
+      // (some S/4 releases answer 404 "No suitable resource found"). Server-side
+      // type filtering is then impossible, so fall back to an unscoped search —
+      // SAP's default scope, exactly what the Eclipse ADT client sends — and let
+      // the caller filter the references client-side. Only the missing-resource
+      // case is swallowed; anything else (auth, network, 5xx) is re-thrown.
+      if (!isScopeResourceUnavailable(error)) throw error;
+      scopeXml = undefined;
+      scopeUnavailable = true;
+    }
   }
 
   // Execute where-used search
@@ -337,9 +408,12 @@ export async function getWhereUsedList(
 
   const xml: string = response.data;
 
-  // Parse XML response
+  // Parse XML response. Element/attribute names are namespace-prefix-free
+  // (see xmlParser config — removeNSPrefix), so `usageReferenceResult`,
+  // `referencedObject`, `adtObject`, `@_type`, `@_name`, … regardless of whether
+  // the server used the `usagereferences:` or `usageReferences:` prefix.
   const parsed = xmlParser.parse(xml);
-  const root = parsed['usagereferences:usageReferenceResult'];
+  const root = parsed.usageReferenceResult;
 
   if (!root) {
     return {
@@ -357,11 +431,10 @@ export async function getWhereUsedList(
 
   // Parse referenced objects
   const references: IWhereUsedReference[] = [];
-  const referencedObjectsNode = root['usagereferences:referencedObjects'];
+  const referencedObjectsNode = root.referencedObjects;
 
   if (referencedObjectsNode) {
-    const refObjects =
-      referencedObjectsNode['usagereferences:referencedObject'];
+    const refObjects = referencedObjectsNode.referencedObject;
     const refArray = Array.isArray(refObjects)
       ? refObjects
       : refObjects
@@ -369,22 +442,22 @@ export async function getWhereUsedList(
         : [];
 
     for (const refObj of refArray) {
-      const adtObject = refObj['usagereferences:adtObject'];
+      const adtObject = refObj.adtObject;
       if (!adtObject) continue;
 
       // Skip packages (DEVC/K) - they are container nodes, not actual references
-      const objType = adtObject['@_adtcore:type'] || '';
+      const objType = adtObject['@_type'] || '';
       if (objType === 'DEVC/K') continue;
 
-      const packageRef = adtObject['adtcore:packageRef'];
+      const packageRef = adtObject.packageRef;
 
       references.push({
         uri: refObj['@_uri'] || '',
-        name: adtObject['@_adtcore:name'] || '',
+        name: adtObject['@_name'] || '',
         type: objType,
         parentUri: refObj['@_parentUri'],
-        packageName: packageRef?.['@_adtcore:name'],
-        responsible: adtObject['@_adtcore:responsible'],
+        packageName: packageRef?.['@_name'],
+        responsible: adtObject['@_responsible'],
         isResult: refObj['@_isResult'] === 'true',
         usageInformation: refObj['@_usageInformation'],
         objectIdentifier: refObj.objectIdentifier,
@@ -392,12 +465,35 @@ export async function getWhereUsedList(
     }
   }
 
+  // When server-side scoping was unavailable, the search ran unscoped and the
+  // parsed list holds every reference type (potentially thousands). Apply the
+  // requested type filter here so callers receive the same narrowed set they
+  // would have gotten from a server-side scope — the SAP round-trip cannot be
+  // avoided on such systems, but the result handed back (and ultimately the
+  // load on the consumer/LLM) is reduced to the types actually asked for.
+  let resultRefs = references;
+  if (scopeUnavailable && (enableOnly || disable)) {
+    if (enableOnly) {
+      const allow = new Set(enableOnly);
+      resultRefs = resultRefs.filter((r) => allow.has(r.type));
+    }
+    if (disable) {
+      const deny = new Set(disable);
+      resultRefs = resultRefs.filter((r) => !deny.has(r.type));
+    }
+  }
+
   return {
     objectName: params.object_name,
     objectType: params.object_type,
-    totalReferences: numberOfResults,
+    // After a client-side narrow the server's numberOfResults no longer matches
+    // what we return, so report the size of the references actually handed back.
+    totalReferences:
+      scopeUnavailable && (enableOnly || disable)
+        ? resultRefs.length
+        : numberOfResults,
     resultDescription,
-    references,
+    references: resultRefs,
     rawXml: params.includeRawXml ? xml : undefined,
   };
 }

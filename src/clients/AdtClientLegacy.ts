@@ -20,6 +20,8 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IClassConfig, IClassState } from '../core/class';
 import { AdtClassLegacy } from '../core/class/AdtClassLegacy';
+import type { IDdlConfig, IDdlState } from '../core/ddl';
+import { AdtDdlLegacy } from '../core/ddl/AdtDdlLegacy';
 import type {
   IFunctionGroupConfig,
   IFunctionGroupState,
@@ -43,8 +45,6 @@ import type { AdtRequest } from '../core/transport';
 import { AdtRequestLegacy } from '../core/transport/AdtRequestLegacy';
 import type { IUnitTestConfig, IUnitTestState } from '../core/unitTest';
 import { AdtUnitTestLegacy } from '../core/unitTest/AdtUnitTestLegacy';
-import type { IViewConfig, IViewState } from '../core/view';
-import { AdtViewLegacy } from '../core/view/AdtViewLegacy';
 import { AdtClient, type IAdtClientOptions } from './AdtClient';
 
 /**
@@ -134,8 +134,8 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getView(): IAdtObject<IViewConfig, IViewState> {
-    return new AdtViewLegacy(this.connection, this.logger, this.systemContext);
+  override getDdl(): IAdtObject<IDdlConfig, IDdlState> {
+    return new AdtDdlLegacy(this.connection, this.logger, this.systemContext);
   }
 
   // --- Unit tests with legacy endpoints ---

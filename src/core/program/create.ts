@@ -93,13 +93,14 @@ export async function create(
 
   const masterSystem = args.masterSystem || '';
   const username = args.responsible || '';
+  const lang = args.masterLanguage || 'EN';
 
   const masterSystemAttr = masterSystem
     ? ` adtcore:masterSystem="${masterSystem}"`
     : '';
   const responsibleAttr = username ? ` adtcore:responsible="${username}"` : '';
 
-  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${args.programName}" adtcore:type="PROG/P" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
+  const metadataXml = `<?xml version="1.0" encoding="UTF-8"?><program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${args.programName}" adtcore:type="PROG/P" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr} program:programType="${programType}" program:application="${application}">
   <adtcore:packageRef adtcore:name="${args.packageName}"/>
 </program:abapProgram>`;
 

@@ -42,6 +42,8 @@ import { getAllTypes as getAllTypesUtil } from './allTypes';
 import { getDiscovery as getDiscoveryUtil } from './discovery';
 import { getEnhancementImpl as getEnhancementImplUtil } from './enhancementImpl';
 import { getEnhancements } from './enhancements';
+import { listFunctionGroupIncludes } from './functionGroupIncludesList';
+import { listFunctionModules } from './functionModulesList';
 import { getInactiveObjects } from './getInactiveObjects';
 import { activateObjectsGroup } from './groupActivation';
 import { checkDeletionGroup, deleteObjectsGroup } from './groupDeletion';
@@ -216,19 +218,18 @@ export class AdtUtils {
   }
 
   /**
-   * Where-used Step 2: execute search.
+   * Where-used: execute search.
    *
-   * This performs the where-used search for an object using a scope XML. If you
-   * do not pass a scope, the server's default selection is used.
-   *
-   * Two-step ADT operation:
-   * 1. Fetch scope configuration (if not provided)
-   * 2. Execute where-used search with the scope
+   * Performs the where-used search for an object. When a scope XML is supplied
+   * the search is narrowed to those object types; when omitted it runs unscoped
+   * against SAP's default selection. This posts directly to /usageReferences and
+   * does NOT fetch the /usageReferences/scope sub-resource, so it works on
+   * systems that do not expose it.
    *
    * @param params - Where-used parameters
    * @param params.object_name - Name of the object to search
    * @param params.object_type - Type of the object (class, table, etc.)
-   * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). If not provided, uses default SAP selection.
+   * @param params.scopeXml - Optional scope XML from getWhereUsedScope(). When omitted, the search runs unscoped (SAP's default selection); no scope is fetched.
    * @returns Where-used references in XML format
    *
    * @example
@@ -628,6 +629,34 @@ export class AdtUtils {
     timeout: number = 30000,
   ): Promise<string[]> {
     return getIncludesList(this.connection, objectName, objectType, timeout);
+  }
+
+  /**
+   * List the function modules of a function group.
+   *
+   * @example
+   * const fms = await utils.listFunctionModules('ZMY_FUGR');
+   * // Returns: ['Z_MY_FM1', 'Z_MY_FM2']
+   */
+  async listFunctionModules(functionGroupName: string): Promise<string[]> {
+    return listFunctionModules(this.connection, functionGroupName);
+  }
+
+  /**
+   * List the includes of a function group (TOP, UXX collector, custom includes).
+   *
+   * Complements listFunctionModules: includes hold code that is not part of any
+   * function module (global data/types in TOP, FORM routines in custom includes),
+   * so a complete function-group backup needs them.
+   *
+   * @example
+   * const includes = await utils.listFunctionGroupIncludes('ZMY_FUGR');
+   * // Returns: ['LZMY_FUGRTOP', 'LZMY_FUGRUXX', ...]
+   */
+  async listFunctionGroupIncludes(
+    functionGroupName: string,
+  ): Promise<string[]> {
+    return listFunctionGroupIncludes(this.connection, functionGroupName);
   }
 
   /**

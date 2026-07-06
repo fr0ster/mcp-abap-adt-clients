@@ -7,8 +7,8 @@
 import type { IAdtObject } from '@mcp-abap-adt/interfaces';
 import type { IAtcConfig, IAtcState } from './types';
 
-export { AdtAtc } from './AdtAtc';
 export type { IAtcPollOptions } from './AdtAtc';
+export { AdtAtc } from './AdtAtc';
 export {
   buildAtcObjectUri,
   createAtcWorklist,

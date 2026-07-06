@@ -24,9 +24,11 @@ import type {
   IAbapConnection,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { activateFeatureToggle } from './activation';
 import { checkFeatureToggle } from './check';
 import { checkFeatureToggleState } from './checkState';
@@ -49,7 +51,6 @@ import { unlockFeatureToggle } from './unlock';
 import { updateFeatureToggle } from './update';
 import { uploadFeatureToggleSource } from './updateSource';
 import { validateFeatureToggleName } from './validation';
-
 export class AdtFeatureToggle implements IFeatureToggleObject {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -159,7 +160,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
           config.featureToggleName,
           this.logger,
         );
-        this.connection.setSessionType('stateless');
         state.lockHandle = lockHandle;
         config.onLock?.(lockHandle);
         this.logger?.info?.('Feature toggle locked, handle:', lockHandle);
@@ -384,7 +384,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         fullConfig.featureToggleName,
         this.logger,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Feature toggle locked, handle:', lockHandle);
@@ -664,7 +663,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
       config.featureToggleName,
       this.logger,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -806,5 +804,15 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
       throw new Error('Feature toggle name is required');
     }
     return config.featureToggleName;
+  }
+
+  async getVersions(
+    _config: Partial<IFeatureToggleConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('feature toggle');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('feature toggle');
   }
 }

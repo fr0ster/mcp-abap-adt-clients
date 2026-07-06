@@ -12,6 +12,7 @@ export interface ICreateTableTypeParams {
   transport_request?: string;
   masterSystem?: string;
   responsible?: string;
+  masterLanguage?: string;
 }
 
 export interface IUpdateTableTypeParams {
@@ -49,6 +50,7 @@ export interface IDeleteTableTypeParams {
 // description is required for create/validate operations
 export interface ITableTypeConfig {
   tableTypeName: string;
+  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
   packageName?: string; // Required for create operations, optional for others
   transportRequest?: string; // Only optional parameter
   // XML-based TableType parameters (TableType is XML-based entity like Domain/DataElement)

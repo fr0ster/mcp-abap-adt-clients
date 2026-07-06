@@ -39,6 +39,7 @@ import { unlockTableType } from './unlock';
 import { updateTableType } from './update';
 import { validateTableTypeName } from './validation';
 
+import { getTableTypeVersionSource, getTableTypeVersions } from './versions';
 export class AdtDdicTableType
   implements IAdtObject<ITableTypeConfig, ITableTypeState>
 {
@@ -103,6 +104,8 @@ export class AdtDdicTableType
         transport_request: config.transportRequest,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       objectCreated = true;
       state.createResult = createResponse;
@@ -299,7 +302,6 @@ export class AdtDdicTableType
         this.connection,
         config.tableTypeName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Table type locked, handle:', lockHandle);
 
       // 2. Check inactive (TableType is XML-based, no source code check needed)
@@ -581,7 +583,6 @@ export class AdtDdicTableType
       this.connection,
       config.tableTypeName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -607,5 +608,13 @@ export class AdtDdicTableType
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<ITableTypeConfig>) {
+    return getTableTypeVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getTableTypeVersionSource(this.connection, contentUri);
   }
 }

@@ -374,20 +374,20 @@ describe('AdtClient read operations', () => {
             return;
           }
 
-          const viewName = standardView.name;
+          const ddlName = standardView.name;
           logTestStart(testsLogger, 'AdtClient - readTable', {
             name: 'readonly_read_table',
             params: {
-              viewName,
+              ddlName,
               note: 'On cloud: using CDS view instead of table (99% of tables are not readable via ADT)',
             },
           });
 
           try {
-            const viewClient = client.getView();
+            const viewClient = client.getDdl();
             logTestStep('read active (cloud view)', testsLogger);
             const readActiveState = await viewClient.read(
-              { viewName },
+              { ddlName },
               'active',
             );
             expect(readActiveState).toBeDefined();
@@ -401,7 +401,7 @@ describe('AdtClient read operations', () => {
 
             logTestStep('read inactive (cloud view)', testsLogger);
             const readInactiveState = await viewClient.read(
-              { viewName },
+              { ddlName },
               'inactive',
             );
             expect(readInactiveState).toBeDefined();
@@ -415,7 +415,7 @@ describe('AdtClient read operations', () => {
 
             logTestStep('read metadata (active, cloud view)', testsLogger);
             const metadataActiveState = await viewClient.readMetadata(
-              { viewName },
+              { ddlName },
               { version: 'active' },
             );
             expect(metadataActiveState).toBeDefined();
@@ -435,7 +435,7 @@ describe('AdtClient read operations', () => {
 
             logTestStep('read metadata (inactive, cloud view)', testsLogger);
             const metadataInactiveState = await viewClient.readMetadata(
-              { viewName },
+              { ddlName },
               { version: 'inactive' },
             );
             expect(metadataInactiveState).toBeDefined();
@@ -575,8 +575,8 @@ describe('AdtClient read operations', () => {
       createReadTest(
         'readView',
         'view',
-        (name) => ({ viewName: name }),
-        () => client?.getView(),
+        (name) => ({ ddlName: name }),
+        () => client?.getDdl(),
         'read_view',
         'readonly_read_view',
       ),

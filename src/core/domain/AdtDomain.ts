@@ -24,10 +24,12 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDomain } from './activation';
 import { checkDomainSyntax } from './check';
 import { create as createDomain } from './create';
@@ -38,7 +40,6 @@ import type { IDomainConfig, IDomainState } from './types';
 import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';
-
 export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -116,6 +117,8 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         fixed_values: config.fixed_values,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       state.createResult = createResponse;
       objectCreated = true;
@@ -288,7 +291,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.logger?.info?.('lock');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('locked');
 
@@ -600,7 +602,6 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockDomain(this.connection, config.domainName);
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -626,5 +627,15 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  async getVersions(
+    _config: Partial<IDomainConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('domain');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('domain');
   }
 }

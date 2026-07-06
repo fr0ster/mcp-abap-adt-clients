@@ -105,7 +105,7 @@ Example debug output with `DEBUG_TESTS=true`:
 Example debug output with `DEBUG_ADT_TESTS=true`:
 ```
 [1/3] ▶ View - full workflow :: view
-  Params: {"view_name":"ZADT_BLD_VIEW02","description":"View workflow view",...}
+  Params: {"ddl_name":"ZADT_BLD_VIEW02","description":"View workflow view",...}
   → validate
   → create
   → lock

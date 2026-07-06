@@ -44,6 +44,7 @@ import { unlockInterface } from './unlock';
 import { upload } from './update';
 import { validateInterfaceName } from './validation';
 
+import { getInterfaceVersionSource, getInterfaceVersions } from './versions';
 export class AdtInterface
   implements IAdtObject<IInterfaceConfig, IInterfaceState>
 {
@@ -120,6 +121,8 @@ export class AdtInterface
           description: config.description,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.logger,
       );
@@ -275,7 +278,6 @@ export class AdtInterface
         this.connection,
         config.interfaceName,
       );
-      this.connection.setSessionType('stateless');
       lockHandle = lockResult.lockHandle;
       state.lockHandle = lockHandle;
       this.logger?.info?.('Interface locked, handle:', lockHandle);
@@ -592,7 +594,6 @@ export class AdtInterface
 
     this.connection.setSessionType('stateful');
     const result = await lockInterface(this.connection, config.interfaceName);
-    this.connection.setSessionType('stateless');
     return result.lockHandle;
   }
 
@@ -618,5 +619,13 @@ export class AdtInterface
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IInterfaceConfig>) {
+    return getInterfaceVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getInterfaceVersionSource(this.connection, contentUri);
   }
 }

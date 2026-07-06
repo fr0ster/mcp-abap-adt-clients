@@ -137,8 +137,10 @@ export interface IGetWhereUsedParams {
   object_name: string;
   object_type: string;
   /**
-   * Optional: scope XML from getWhereUsedScope() with user-modified selections
-   * If not provided, will fetch default scope automatically
+   * Optional: scope XML from getWhereUsedScope() with user-modified selections.
+   * When omitted, the search runs unscoped (SAP's default scope) — getWhereUsed()
+   * does NOT fetch a scope itself, so it works on systems that do not expose the
+   * /usageReferences/scope sub-resource.
    */
   scopeXml?: string;
 }
@@ -154,6 +156,23 @@ export interface IGetWhereUsedListParams {
    * Default: false (uses SAP default scope)
    */
   enableAllTypes?: boolean;
+  /**
+   * Restrict the result to ONLY these object types (e.g. ['TABL/DS', 'TABL/DT']) —
+   * this is how you avoid getting 1000 classes back when you only want
+   * structures/tables. Where the `/usageReferences/scope` sub-resource is
+   * available the other types are deselected server-side (SAP never searches
+   * them); where it is not (some S/4 releases 404 it) the search runs unscoped
+   * and the filter is applied to the parsed references client-side instead — the
+   * returned set is the same either way. Type names are the ADT global types
+   * (e.g. 'CLAS/OC', 'STRU/DT'). Takes precedence over `enableAllTypes`. Ignored
+   * if empty.
+   */
+  enableOnlyTypes?: string[];
+  /**
+   * Remove these object types from the default SAP scope, keeping the rest.
+   * Applied on top of the default scope (or after `enableOnlyTypes`/`enableAllTypes`).
+   */
+  disableTypes?: string[];
   /**
    * Include raw XML in response
    * Default: false

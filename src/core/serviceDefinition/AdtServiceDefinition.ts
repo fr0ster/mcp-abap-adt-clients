@@ -46,6 +46,10 @@ import { unlockServiceDefinition } from './unlock';
 import { updateServiceDefinition } from './update';
 import { validateServiceDefinitionName } from './validation';
 
+import {
+  getServiceDefinitionVersionSource,
+  getServiceDefinitionVersions,
+} from './versions';
 export class AdtServiceDefinition
   implements IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState>
 {
@@ -130,6 +134,8 @@ export class AdtServiceDefinition
         source_code: options?.sourceCode || config.sourceCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       state.createResult = createResponse;
       this.logger?.info?.('Service definition created');
@@ -309,7 +315,6 @@ export class AdtServiceDefinition
         this.connection,
         config.serviceDefinitionName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Service definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -581,7 +586,6 @@ export class AdtServiceDefinition
       this.connection,
       config.serviceDefinitionName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -607,5 +611,13 @@ export class AdtServiceDefinition
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IServiceDefinitionConfig>) {
+    return getServiceDefinitionVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getServiceDefinitionVersionSource(this.connection, contentUri);
   }
 }

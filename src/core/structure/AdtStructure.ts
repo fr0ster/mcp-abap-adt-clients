@@ -43,6 +43,7 @@ import { unlockStructure } from './unlock';
 import { upload } from './update';
 import { validateStructureName } from './validation';
 
+import { getStructureVersionSource, getStructureVersions } from './versions';
 export class AdtStructure
   implements IAdtObject<IStructureConfig, IStructureState>
 {
@@ -122,6 +123,8 @@ export class AdtStructure
         description: config.description,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       objectCreated = true;
       state.createResult = createResponse;
@@ -305,7 +308,6 @@ export class AdtStructure
       this.logger?.info?.('Step 1: Locking structure');
       this.connection.setSessionType('stateful');
       lockHandle = await lockStructure(this.connection, config.structureName);
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Structure locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -572,7 +574,6 @@ export class AdtStructure
       this.connection,
       config.structureName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -598,5 +599,13 @@ export class AdtStructure
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IStructureConfig>) {
+    return getStructureVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getStructureVersionSource(this.connection, contentUri);
   }
 }

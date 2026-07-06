@@ -39,6 +39,7 @@ export async function createPackage(
   const packageType = params.package_type || 'development';
 
   const masterSystem = params.master_system;
+  const lang = params.master_language?.trim() || 'EN';
   const responsibleUser = params.responsible || '';
 
   // Software component is required for package creation
@@ -67,7 +68,7 @@ export async function createPackage(
     : '';
 
   const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="EN" adtcore:name="${escapeXml(params.package_name)}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}" adtcore:language="${lang}" adtcore:name="${escapeXml(params.package_name)}" adtcore:type="DEVC/K" adtcore:version="active" adtcore:masterLanguage="${lang}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${escapeXml(params.package_name)}"/>
   <pak:attributes pak:isEncapsulated="false" pak:packageType="${packageType}" pak:recordChanges="${params.record_changes ? 'true' : 'false'}"/>
   ${superPackageXml}

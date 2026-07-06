@@ -44,6 +44,7 @@ import { unlockProgram } from './unlock';
 import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 
+import { getProgramVersionSource, getProgramVersions } from './versions';
 export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -141,6 +142,8 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           sourceCode: options?.sourceCode || config.sourceCode,
           masterSystem: this.systemContext.masterSystem,
           responsible: this.systemContext.responsible,
+          masterLanguage:
+            config.masterLanguage ?? this.systemContext.masterLanguage,
         },
         this.contentTypes,
       );
@@ -296,7 +299,6 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.logger?.info?.('Step 1: Locking program');
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Program locked, handle:', lockHandle);
 
@@ -616,7 +618,6 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockProgram(this.connection, config.programName);
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -642,5 +643,13 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IProgramConfig>) {
+    return getProgramVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getProgramVersionSource(this.connection, contentUri);
   }
 }

@@ -44,6 +44,10 @@ import { unlockFunctionModule } from './unlock';
 import { update } from './update';
 import { validateFunctionModuleName } from './validation';
 
+import {
+  getFunctionModuleVersionSource,
+  getFunctionModuleVersions,
+} from './versions';
 export class AdtFunctionModule
   implements IAdtObject<IFunctionModuleConfig, IFunctionModuleState>
 {
@@ -344,7 +348,6 @@ export class AdtFunctionModule
         config.functionGroupName,
         config.functionModuleName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Function module locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -640,7 +643,6 @@ export class AdtFunctionModule
       config.functionGroupName,
       config.functionModuleName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -669,5 +671,13 @@ export class AdtFunctionModule
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IFunctionModuleConfig>) {
+    return getFunctionModuleVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getFunctionModuleVersionSource(this.connection, contentUri);
   }
 }

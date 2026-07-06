@@ -322,7 +322,7 @@ function validateTestCaseForUserSpace(testCase, operation = 'operation') {
     'interface_name',
     'table_name',
     'structure_name',
-    'view_name',
+    'ddl_name',
     'data_element_name',
     'object_name',
   ];
@@ -449,7 +449,7 @@ function resolveStandardObject(
     },
     program: { yamlKey: 'programs', paramSuffix: 'program_name' },
     package: { yamlKey: 'packages', paramSuffix: 'package_name' },
-    view: { yamlKey: 'views', paramSuffix: 'view_name' },
+    view: { yamlKey: 'views', paramSuffix: 'ddl_name' },
     serviceDefinition: {
       yamlKey: 'service_definitions',
       paramSuffix: 'service_definition_name',
@@ -2080,9 +2080,9 @@ async function updateAndActivateShared(
       );
   } else if (type === 'views') {
     await client
-      .getView()
+      .getDdl()
       .update(
-        { viewName: name, ddlSource: depConfig.source, transportRequest },
+        { ddlName: name, ddlSource: depConfig.source, transportRequest },
         { activateOnUpdate: true, sourceCode: depConfig.source },
       );
   } else if (type === 'programs') {
@@ -2178,7 +2178,7 @@ async function ensureSharedDependency(client, type, name, logger) {
       // Table read returns { readResult: undefined } on 404 (quirk)
       exists = result?.readResult !== undefined;
     } else if (type === 'views') {
-      const result = await client.getView().read({ viewName: name });
+      const result = await client.getDdl().read({ ddlName: name });
       exists = result !== undefined;
     } else if (type === 'programs') {
       const result = await client.getProgram().read({ programName: name });
@@ -2272,8 +2272,8 @@ async function ensureSharedDependency(client, type, name, logger) {
         logger?.info?.(`Shared table ${name} activated`);
       }
     } else if (type === 'views') {
-      await client.getView().create({
-        viewName: name,
+      await client.getDdl().create({
+        ddlName: name,
         packageName,
         description: depConfig.description || 'Shared test view',
         ddlSource: depConfig.source,
@@ -2281,9 +2281,9 @@ async function ensureSharedDependency(client, type, name, logger) {
       });
       if (depConfig.source) {
         logger?.info?.(`Activating shared view ${name}...`);
-        await client.getView().update(
+        await client.getDdl().update(
           {
-            viewName: name,
+            ddlName: name,
             ddlSource: depConfig.source,
             transportRequest,
           },
@@ -2459,8 +2459,13 @@ async function ensureSharedDependency(client, type, name, logger) {
           serviceDefinitionName: depConfig.service_definition,
           serviceName: depConfig.service_name || name,
           serviceVersion: depConfig.service_version || '0001',
-          bindingType: depConfig.binding_type || 'ODATA',
-          bindingVersion: depConfig.binding_version || 'V4',
+          // adt-clients takes a single bindingVariant (e.g. ODATA_V4_WEB_API),
+          // not separate type/version. Prefer an explicit binding_variant;
+          // otherwise derive it from binding_type/binding_version (defaulting
+          // the category to WEB_API).
+          bindingVariant:
+            depConfig.binding_variant ||
+            `${depConfig.binding_type || 'ODATA'}_${depConfig.binding_version || 'V4'}_WEB_API`,
           transportRequest,
         },
         { activateOnCreate: !depConfig.skip_activation },

@@ -23,6 +23,11 @@ import {
   type IAccessControlConfig,
   type IAccessControlState,
 } from '../core/accessControl';
+import {
+  AdtAppendStructure,
+  type IAppendStructureConfig,
+  type IAppendStructureState,
+} from '../core/appendStructure';
 import { AdtAtc } from '../core/atc';
 import {
   AdtAuthorizationField,
@@ -57,6 +62,7 @@ import {
   type IDataElementConfig,
   type IDataElementState,
 } from '../core/dataElement';
+import { AdtDdl, type IDdlConfig, type IDdlState } from '../core/ddl';
 import {
   AdtDomain,
   type IDomainConfig,
@@ -92,6 +98,14 @@ import {
   type IInterfaceState,
 } from '../core/interface';
 import {
+  AdtMessageClass,
+  AdtMessageClassMessage,
+  type IMessageClassConfig,
+  type IMessageClassMessageConfig,
+  type IMessageClassMessageState,
+  type IMessageClassState,
+} from '../core/messageClass';
+import {
   AdtMetadataExtension,
   type IMetadataExtensionConfig,
   type IMetadataExtensionState,
@@ -106,6 +120,16 @@ import {
   type IProgramConfig,
   type IProgramState,
 } from '../core/program';
+import {
+  AdtScalarFunction,
+  type IScalarFunctionConfig,
+  type IScalarFunctionState,
+} from '../core/scalarFunction';
+import {
+  AdtScalarFunctionImplementation,
+  type IScalarFunctionImplementationConfig,
+  type IScalarFunctionImplementationState,
+} from '../core/scalarFunctionImplementation';
 import { AdtServiceBinding, type IAdtServiceBinding } from '../core/service';
 import {
   AdtServiceDefinition,
@@ -138,17 +162,20 @@ import {
   type IUnitTestConfig,
   type IUnitTestState,
 } from '../core/unitTest';
-import { AdtView, type IViewConfig, type IViewState } from '../core/view';
 
 export interface IAdtSystemContext {
   masterSystem?: string;
   responsible?: string;
+  /** Master/original language for newly created objects (adtcore:masterLanguage). Sourced from SAP_LANGUAGE; defaults to EN when unset. */
+  masterLanguage?: string;
 }
 
 export interface IAdtClientOptions {
   enableAcceptCorrection?: boolean;
   masterSystem?: string;
   responsible?: string;
+  /** Master/original language for newly created objects. Falls back to EN when unset. */
+  masterLanguage?: string;
   contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
   /** Whether the SAP system uses Unicode encoding. Affects Content-Type headers for source code operations. */
   unicode?: boolean;
@@ -175,6 +202,7 @@ export class AdtClient {
     this.systemContext = {
       masterSystem: options?.masterSystem,
       responsible: options?.responsible,
+      masterLanguage: options?.masterLanguage,
     };
     this.contentTypes = options?.contentTypes;
     if (options?.enableAcceptCorrection !== undefined) {
@@ -294,11 +322,14 @@ export class AdtClient {
   }
 
   /**
-   * Get high-level operations for View objects
-   * @returns IAdtObject instance for View operations
+   * Generic client for ABAP DDL source objects (`/sap/bc/adt/ddic/ddl/sources/`):
+   * CDS views, AMDP table functions, and other DDL sources. Classic DDIC structures
+   * (`/ddic/structures/`), tables (`/ddic/tables/`), and scalar functions
+   * (`/ddic/dsfd/sources/`) have their own clients.
+   * @returns IAdtObject instance for DDL source operations
    */
-  getView(): IAdtObject<IViewConfig, IViewState> {
-    return new AdtView(this.connection, this.logger, this.systemContext);
+  getDdl(): IAdtObject<IDdlConfig, IDdlState> {
+    return new AdtDdl(this.connection, this.logger, this.systemContext);
   }
 
   /**
@@ -352,6 +383,30 @@ export class AdtClient {
   }
 
   /**
+   * Get high-level operations for MessageClass (MSAG/N) objects
+   * @returns IAdtObject instance for MessageClass operations
+   */
+  getMessageClass(): IAdtObject<IMessageClassConfig, IMessageClassState> {
+    return new AdtMessageClass(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for a single message within a MessageClass.
+   * Supports read, create/update (upsert), and delete of individual messages.
+   * @returns IAdtObject instance for MessageClassMessage operations
+   */
+  getMessageClassMessage(): IAdtObject<
+    IMessageClassMessageConfig,
+    IMessageClassMessageState
+  > {
+    return new AdtMessageClassMessage(this.connection, this.logger);
+  }
+
+  /**
    * Get high-level operations for AccessControl objects
    * @returns IAdtObject instance for AccessControl operations
    */
@@ -392,11 +447,54 @@ export class AdtClient {
   }
 
   /**
+   * Get high-level operations for CDS Scalar Function (DSFD/SCF) objects
+   */
+  getScalarFunction(): IAdtObject<IScalarFunctionConfig, IScalarFunctionState> {
+    return new AdtScalarFunction(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for Scalar Function Implementation (DSFI/SFI) objects
+   */
+  getScalarFunctionImplementation(): IAdtObject<
+    IScalarFunctionImplementationConfig,
+    IScalarFunctionImplementationState
+  > {
+    return new AdtScalarFunctionImplementation(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
+   * Get high-level operations for Append Structure (TABL/DS) objects
+   */
+  getAppendStructure(): IAdtObject<
+    IAppendStructureConfig,
+    IAppendStructureState
+  > {
+    return new AdtAppendStructure(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
+  }
+
+  /**
    * Get high-level operations for ServiceBinding objects
    * @returns IAdtServiceBinding instance for ServiceBinding CRUD and lifecycle operations
    */
   getServiceBinding(): IAdtServiceBinding {
-    return new AdtServiceBinding(this.connection, this.logger);
+    return new AdtServiceBinding(
+      this.connection,
+      this.logger,
+      this.systemContext,
+    );
   }
 
   /**

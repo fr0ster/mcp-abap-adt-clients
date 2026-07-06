@@ -43,6 +43,10 @@ import { unlockTransformation } from './unlock';
 import { updateTransformation } from './update';
 import { validateTransformationName } from './validation';
 
+import {
+  getTransformationVersionSource,
+  getTransformationVersions,
+} from './versions';
 export class AdtTransformation
   implements IAdtObject<ITransformationConfig, ITransformationState>
 {
@@ -138,6 +142,8 @@ export class AdtTransformation
         description: config.description,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       state.createResult = createResponse;
       this.logger?.info?.('Transformation created');
@@ -315,7 +321,6 @@ export class AdtTransformation
         this.connection,
         config.transformationName,
       );
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Transformation locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -581,7 +586,6 @@ export class AdtTransformation
       this.connection,
       config.transformationName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -607,5 +611,13 @@ export class AdtTransformation
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<ITransformationConfig>) {
+    return getTransformationVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getTransformationVersionSource(this.connection, contentUri);
   }
 }

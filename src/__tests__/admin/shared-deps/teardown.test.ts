@@ -269,8 +269,8 @@ describe('Admin: Teardown shared dependencies', () => {
         const status = await safeDelete(
           `view ${item.name}`,
           async () => {
-            await client.getView().delete({
-              viewName: item.name,
+            await client.getDdl().delete({
+              ddlName: item.name,
               transportRequest,
             });
           },

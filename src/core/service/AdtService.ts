@@ -3,8 +3,10 @@ import type {
   IAdtOperationOptions,
   IAdtResponse,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import type { IAdtSystemContext } from '../../clients/AdtClient';
 import {
   ACCEPT_CHECK_MESSAGES,
   ACCEPT_DELETION,
@@ -17,6 +19,7 @@ import {
 import { buildQueryString } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { getTimeout } from '../../utils/timeouts';
+import { throwUnsupportedVersions } from '../shared/versions';
 import type {
   IActivateServiceBindingParams,
   IAdtServiceBinding,
@@ -37,16 +40,21 @@ import type {
   IValidateServiceBindingParams,
 } from './types';
 import { resolveBindingVariant } from './types';
-
 export class AdtServiceBinding implements IAdtServiceBinding {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
+  private readonly systemContext: IAdtSystemContext;
 
   public readonly objectType: string = 'ServiceBinding';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    systemContext?: IAdtSystemContext,
+  ) {
     this.connection = connection;
     this.logger = logger;
+    this.systemContext = systemContext ?? {};
   }
 
   private parser = new XMLParser({
@@ -682,9 +690,19 @@ export class AdtServiceBinding implements IAdtServiceBinding {
     const systemInfo = await getSystemInformation(this.connection);
     const createParams: ICreateServiceBindingParams = {
       ...params,
-      masterLanguage: params.masterLanguage ?? systemInfo?.language ?? 'EN',
-      masterSystem: params.masterSystem ?? systemInfo?.systemID,
-      responsible: params.responsible ?? systemInfo?.userName,
+      masterLanguage:
+        params.masterLanguage ??
+        this.systemContext.masterLanguage ??
+        systemInfo?.language ??
+        'EN',
+      masterSystem:
+        params.masterSystem ??
+        this.systemContext.masterSystem ??
+        systemInfo?.systemID,
+      responsible:
+        params.responsible ??
+        this.systemContext.responsible ??
+        systemInfo?.userName,
     };
 
     const queryParams = params.transportRequest
@@ -1053,6 +1071,16 @@ export class AdtServiceBinding implements IAdtServiceBinding {
         Accept: 'application/xml, application/json, text/plain',
       },
     });
+  }
+
+  async getVersions(
+    _config: Partial<IServiceBindingConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('service binding');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('service binding');
   }
 }
 

@@ -7,6 +7,7 @@ import type {
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
 import { ACCEPT_SOURCE, CT_SOURCE } from '../../constants/contentTypes';
+import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 import type { IUpdateBehaviorDefinitionParams } from './types';
 
@@ -58,7 +59,7 @@ export async function update(
     throw new Error('lockHandle is required');
   }
 
-  let url = `/sap/bc/adt/bo/behaviordefinitions/${params.name.toLowerCase()}/source/main?lockHandle=${encodeURIComponent(params.lockHandle)}`;
+  let url = `/sap/bc/adt/bo/behaviordefinitions/${encodeSapObjectName(params.name).toLowerCase()}/source/main?lockHandle=${encodeURIComponent(params.lockHandle)}`;
   if (params.transportRequest) {
     url += `&corrNr=${params.transportRequest}`;
   }

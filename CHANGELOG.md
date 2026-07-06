@@ -3,6 +3,123 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.3.1] - 2026-07-04
+
+### Fixed
+- **Message class: wire `corrNr` (transport request) from config**, completing the deferred transport support. `transportRequest` now flows into every mutating call like the other CRUD object types: class create adds `?corrNr=`, class update and the message PUTs add `&corrNr=`, and class delete emits `<del:transportNumber>`. The value comes solely from `config.transportRequest` — local packages send no `corrNr`, transportable systems flow the configured transport.
+
+## [7.3.0] - 2026-07-04
+
+### Added
+- **Message class (MSAG) CRUD.** Two new `IAdtObject` handlers via `AdtClient`: `getMessageClass()` (the class shell — create/read/update/delete/validate, no activation) and `getMessageClassMessage()` (an individual message, read-modify-write over the parent class). New config/state types `IMessageClassConfig`/`IMessageClassState` and `IMessageClassMessageConfig`/`IMessageClassMessageState`; requires `@mcp-abap-adt/interfaces` `^9.2.0` for the param types.
+  - Empirically verified against the ADT contract (SAP trial + Eclipse traces): class delete uses the stateless deletion service (`/sap/bc/adt/deletion/check` + `/delete`); a message is added/updated with a two-level lock (`LOCK_MSG` + class `LOCK …&onSave=X`) then a full-class PUT, and deleted by moving it into `<mc:deletedmessages>` (not by omission or a message-level DELETE); `validate` POSTs to `/messageclass/validation`.
+  - Non-applicable operations throw `AdtOperationError` with `code === UNSUPPORTED_OPERATION`. Message/class attributes round-trip verbatim (including unknown/future namespaces and attributes). Transport (`corrNr`) is not yet wired — local-package path only.
+
+## [7.2.1] - 2026-07-01
+
+### Security
+- **Bump vulnerable dependencies.** Raise `axios` floor to `^1.18.1` (fixes SSRF / prototype-pollution / credential-leak / ReDoS advisories) and `fast-xml-parser` to `^5.9.3` (fixes entity-expansion and injection advisories), refreshing their transitives (`form-data`, `follow-redirects`, `fast-xml-builder`). `npm audit` now reports 0 vulnerabilities. No API changes.
+
+## [7.2.0] - 2026-06-30
+
+### Added
+- **Version history now surfaces the transport request.** `getVersions` (`parseVersionsFeed`) reads each version entry's transport-request `<atom:link>` and populates the new optional `IObjectVersion.transportRequest` (e.g. `'DS4K901917'`) and `transportDescription` (its short text). An entry may carry two such links (sapgui + adt) with the same request — the first wins; versions without a transport leave both undefined. Requires `@mcp-abap-adt/interfaces@^9.1.0`.
+
+## [7.1.0] - 2026-06-28
+
+### Added
+- **Per-group subpath exports.** New entry points let a consumer load only the subgraph it needs instead of the whole barrel: `@mcp-abap-adt/adt-clients/core` (CRUD: `AdtClient`, `createAdtClient`, all object-type types + `AdtUtils`), `./runtime`, `./batch`, `./ws`, `./abapgit`, `./executors`. `AdtClient` has zero static edges into runtime/batch/ws/abapgit/executors, so `/core` never evaluates those barrels. The root `'.'` import is unchanged (re-exports every group barrel) — fully backward compatible.
+
+### Changed
+- `yaml` moved from `dependencies` to `devDependencies` (only a non-shipped `tools/` script used it).
+
+### Fixed
+- **Where-used result parsing is namespace-prefix agnostic.** `getWhereUsedList` now parses the `usageReferences` response whether SAP returns the `usagereferences:` or `usageReferences:` namespace prefix (some systems differ), instead of silently returning zero references (fr0ster/mcp-abap-adt-clients#60).
+
+## [7.0.1] - 2026-06-28
+
+### Fixed
+- **Where-used resilient to systems without `/usageReferences/scope`.** Some S/4 releases answer the `/sap/bc/adt/repository/informationsystem/usageReferences/scope` sub-resource with HTTP 404 for every object type, which aborted the whole search and silently returned zero references (surfacing downstream as `GetStructuresList` reporting 0 append structures). `getWhereUsed` no longer auto-fetches a default scope — with no `scopeXml` it posts the minimal Eclipse-style `usageReferenceRequest` and lets SAP apply its default scope; it never calls `/scope` itself. `getWhereUsedList` still uses the two-step scope flow for server-side type filtering where available, but catches a missing-scope-resource (404/406) and falls back to an unscoped search with client-side type narrowing; auth/network/5xx still propagate (fr0ster/mcp-abap-adt-clients#58).
+
+> Note: 7.0.0 (object version history) was tagged and GitHub-released but not published to npm; 7.0.1 is the first npm release of the 7.x line and includes both 7.0.0 and this fix.
+
+## [7.0.0] - 2026-06-28
+
+### Added
+- **Object version history.** Every object handler now implements `getVersions(config)` (list the SAP version history as `IObjectVersion[]`) and `getVersionSource(contentUri)` (fetch a specific version's source). Each handler owns its own version endpoint: source-bearing types GET `<sourceUri>/versions` (classes use `/includes/{type}/versions`) as an Atom feed; non-source types and types without a version resource throw `AdtOperationError(code = UNSUPPORTED_OPERATION)` — raw HTTP is never surfaced. Trial-verified end-to-end for table, class, interface, and serviceDefinition; other source types build a candidate URL that safely degrades to `UNSUPPORTED_OPERATION` where the endpoint is absent.
+
+### Changed (BREAKING)
+- **Requires `@mcp-abap-adt/interfaces@^9.0.0`** (up from `^7.3.0`), which adds the required `getVersions`/`getVersionSource` methods and `IObjectVersion`/`AdtObjectErrorCodes.UNSUPPORTED_OPERATION` to `IAdtObject`. Consumers that implement `IAdtObject` themselves must add the two methods; consumers pinned to an older `interfaces` major must upgrade. Major bump.
+
+## [6.1.0] - 2026-06-26
+
+### Added
+- **`getWhereUsedList` type filtering** — new `enableOnlyTypes?: string[]` and `disableTypes?: string[]` on `IGetWhereUsedListParams`. `enableOnlyTypes` restricts the where-used search to specific ADT object types (e.g. `['TABL/DS', 'TABL/DT']`), so SAP applies the selection server-side and never searches — nor returns — the unwanted types (e.g. hundreds of `CLAS/OC`). `disableTypes` prunes types from the default scope. `enableOnlyTypes` takes precedence over `enableAllTypes`; `disableTypes` is applied on top.
+
+### Fixed
+- **`modifyWhereUsedScope` attribute-order bug** — the `enableOnly` / `enable` / `disable` options silently never matched, because the implementation assumed the scope XML emits `name` before `isSelected`, whereas SAP emits `isDefault isSelected name` (name LAST). Reworked to flip `isSelected` per `<usagereferences:type>` tag independent of attribute order, preserving tag order and the opaque `payload` blob. `enableAll` was unaffected.
+
+## [6.0.0] - 2026-06-25
+
+### Added
+- **`AdtClient.getScalarFunction()`** — CRUD + lifecycle client for **CDS scalar functions** (`DSFD/SCF`, `/sap/bc/adt/ddic/dsfd/sources`). Source-based object created via the `blue:blueSource` envelope; full create → check → lock → update → unlock → activate chain mirroring `serviceDefinition`. Exposes `IScalarFunctionConfig`/`IScalarFunctionState`.
+- **`AdtClient.getAppendStructure()`** — CRUD + lifecycle client for **append structures** (`TABL/DS`, `/sap/bc/adt/ddic/structures`) that extend a base **table or structure** via the `adtcore:adtTemplate`/`base_structure` create property and `extend type …` source (both base kinds use the same `base_structure` key — verified live). Exposes `IAppendStructureConfig`/`IAppendStructureState`.
+- **`AdtClient.getScalarFunctionImplementation()`** — CRUD + lifecycle client for **scalar function implementations** (`DSFI/SFI`, `/sap/bc/adt/ddic/dsfi`), completing the scalar-function feature (definition + implementation). Created via the blues **v2** envelope + base64 `additionalCreationProperties` (`scalarFunctionName`/`engineValue`: `sqlEngine`|`amdpEngine`). Asymmetric contract: `read()` returns the implementation **JSON** (`/source/main`), `update()` writes that JSON, `updateMetadata()` writes the blues v2 XML object. The DSFD+AMDP+DSFI trio is activated by the consumer via `getUtils().activateObjectsGroup`. Exposes `IScalarFunctionImplementationConfig`/`IScalarFunctionImplementationState`.
+- All three new factory methods are mirrored on **`AdtClientBatch`**.
+- Shared: `escapeXmlAttr` (`src/utils/xml.ts`); `getObjectUri` (checkRun) and `buildObjectUri` (group activation) mappings for `dsfd/scf`, `tabl/ds`/`append_structure`, and `dsfi/sfi`.
+
+### Changed
+- **BREAKING — `View` client renamed to `Ddl`** (fr0ster/mcp-abap-adt#49). The client always targeted the generic DDL-source endpoint `/sap/bc/adt/ddic/ddl/sources/` (CDS views, AMDP table functions, other DDL sources), so the `View` name was misleading. **Migration:** `AdtClient.getView()` → **`getDdl()`**; `AdtView`/`AdtViewLegacy` → `AdtDdl`/`AdtDdlLegacy`; `IViewConfig`/`IViewState` → `IDdlConfig`/`IDdlState`; config field `viewName` → `ddlName`. No endpoint or behaviour changes — mechanical rename only.
+
+## [5.8.0] - 2026-06-17
+
+### Changed
+- **`getFunctionInclude().read()` now returns the include SOURCE**, matching the `IAdtObject` contract and the behaviour of `class`/`program`/`functionModule` `read()`. It previously returned the include's `finclude` metadata XML, which was inconsistent. The metadata is now obtained via **`readMetadata()`** (unchanged). `readSource()` remains available and `read()` is an alias of it. Internal create/update readiness polling and `readMetadata()` use a private metadata read, so the CRUD chain is unchanged. **Migration:** if you called `getFunctionInclude().read()` expecting metadata XML, switch to `readMetadata()`.
+
+## [5.7.1] - 2026-06-16
+
+### Fixed
+- **`getFunctionInclude().delete()` no longer reports a phantom success.** The ADT deletion service answers HTTP 200 even when it refuses to delete (e.g. `<del:object del:isDeleted="false"><del:message del:type="E"><del:text>Only delete function module includes using Function Builder</del:text>`); the low-level `deleteFunctionInclude` previously hardcoded `{ success: true }` and ignored the result. It now parses `del:deletionResult` and throws with the server's message when `isDeleted` is not `true` (verified against a real system). Lets callers distinguish a real delete from a server-refused one (some FUGR includes can only be removed via the Function Builder).
+
+## [5.7.0] - 2026-06-15
+
+### Added
+- **`AdtUtils.listFunctionModules(functionGroupName)`** and **`AdtUtils.listFunctionGroupIncludes(functionGroupName)`** (`getUtils().list…(...)`) — read-only listing of a function group's function modules (`FUGR/FF`) and includes (`FUGR/I` — TOP, UXX collector, custom FORM includes) via an ADT nodestructure drill-down (root → child-type node → names). Both share one core (`listFunctionGroupChildren`). `NODE_ID`s are read as strings (`parseTagValue: false`, so zero-padded ids like `000007` are preserved). Responses are validated in two layers — well-formedness (`XMLValidator`) and expected `asx:abap/asx:values/DATA` envelope (plus `OBJECT_TYPES` on the root) — and a malformed, non-2xx, or wrong-shape response throws rather than silently returning `[]`. Names are deduped by uppercased key (first occurrence wins, order preserved). Additive; `getIncludesList` is unchanged.
+
+## [5.6.0] - 2026-06-13
+
+### Added
+- **`package` create now honours the configurable master language** (fr0ster/mcp-abap-adt#105). `IPackageConfig.masterLanguage` + `ICreatePackageParams.master_language` (interfaces 7.3.0) feed both `adtcore:language` and `adtcore:masterLanguage`; resolves `config.masterLanguage → systemContext.masterLanguage → EN`, with blank (empty/whitespace) treated as unset and surrounding spaces trimmed. Default stays EN. Brings `package` in line with the other object types.
+
+### Changed
+- Bumped `@mcp-abap-adt/interfaces` from `^7.0.0` to `^7.3.0` (adds `ICreatePackageParams.master_language`).
+
+### Fixed
+- **behaviorDefinition: URL-encode namespaced object names in ADT paths** (#37, thanks @eseuve). Namespaced behavior definitions (`/NSP/…`) could not be read/locked/updated/activated/checked/unlocked/deleted because the raw `/` broke the ADT path; names are now wrapped with `encodeSapObjectName(...)` across all path-based operations, matching class/interface/view.
+
+## [5.5.0] - 2026-06-12
+
+### Added
+
+- **Master/original language for newly created objects is now configurable** instead of always hardcoded to `EN`. `IAdtClientOptions.masterLanguage` is carried into `IAdtSystemContext.masterLanguage`, and every language-aware `create` now resolves `config.masterLanguage ?? this.systemContext.masterLanguage` and writes the result to **both** `adtcore:language` and `adtcore:masterLanguage`. Covered: class, program, interface, view, domain, structure, table, table type, data element, function group, service definition, access control, transformation, enhancement, behavior definition, metadata extension. When unset it still defaults to `EN`, so existing behaviour is unchanged. Consumers source this from the logon language (`SAP_LANGUAGE`) with an optional per-call `config.masterLanguage` override. (fr0ster/mcp-abap-adt#105)
+- Optional `masterLanguage?` on each `IXxxConfig` and `ICreate*Params`. Additive; no breaking change.
+
+### Fixed
+
+- **metadata extension** create no longer emits a contradictory payload: `adtcore:language` was hardcoded to `EN` while `adtcore:masterLanguage` honoured the configured language. Both now use the resolved language. It also gained the missing `systemContext` fallback (previously only `config.masterLanguage`).
+- **behavior definition** create now passes the resolved master language (it previously ignored it and always created as `EN`).
+- **ServiceBinding** now receives `systemContext` (`getServiceBinding()` previously constructed it without one), so the global `IAdtClientOptions.masterLanguage`/`masterSystem`/`responsible` are honoured. Resolution order is `params → systemContext → getSystemInformation() auto-detect → default` — an explicit override now wins over auto-detection.
+
+### Note
+
+- `package` is intentionally not covered — its `ICreatePackageParams` lives in `@mcp-abap-adt/interfaces` and will follow once that field is added upstream.
+
+## [5.4.4] - 2026-06-11
+
+### Fixed
+
+- Object writes (update/delete) no longer fail with `423 … not locked (invalid lock handle)` on older ABAP systems (e.g. BASIS 7.55) over HTTP. The handlers acquired the lock in a **stateful** request but then immediately switched the connection back to **stateless** (`setSessionType('stateless')`) before sending the lock-bound PUT, so the lock handle was no longer valid on kernels where it is only honoured inside stateful requests. The connection now stays **stateful for the whole lock→check→update→unlock chain**; `unlock()` (and error/cleanup paths) restores stateless afterwards. Newer kernels (758/816) tolerated the stateless write, which is why this only surfaced on older BASIS. Applied uniformly across all object types — both the standalone `lock()` methods and the inline create/update/delete chains (class, interface, program, function module/group/include, domain, package, table, structure, view, table type, data element, service definition, metadata extension, access control, transformation, behavior definition, enhancement, authorization field, feature toggle). `AdtClassLegacy` already followed this pattern. (#106)
+
 ## [5.4.3] - 2026-05-13
 
 ### Fixed

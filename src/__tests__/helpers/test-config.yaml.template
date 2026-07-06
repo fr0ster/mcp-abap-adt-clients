@@ -36,6 +36,7 @@
 # - TableTypes: ZAC_TTYP01, ZAC_TTYP02, etc.
 # - Structures: ZAC_STRU01, ZAC_STRU02, etc.
 # - Views: ZAC_VIEW01, ZAC_VIEW02, etc.
+# - Scalar Functions: ZADT_SCALAR_FUNC, ZAC_DSFD01, etc.
 # - Service Definitions: ZAC_SRVD01, ZAC_SRVD02, etc.
 # - Service Bindings: ZAC_SRVB01, ZAC_SRVB02, etc.
 # - Packages: ZAC_PKG01, ZAC_PKG02, etc.
@@ -88,6 +89,7 @@ environment:
   default_package: "ZADT_TEST"               # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
   default_master_system: ""                   # ← CHANGE: SAP system ID (on-prem only, cloud gets it automatically)
+  default_master_language: ""                 # Master/original language for created objects (e.g. "DE", "ZH"). "" → EN. Must be a language installed on the system, else SAP normalizes it to the system default.
   skip_cleanup: false    # Skip cleanup after test (objects left for analysis) - can be overridden per test case
   # connection_type: "rfc"  # Transport mechanism: "rfc" or "http". RFC works on any system type.
   # is_legacy: true         # Uncomment for BASIS < 7.50 systems (e.g. E77). Also set SAP_UNICODE=false in .env for non-unicode systems.
@@ -282,14 +284,11 @@ shared_dependencies:
       function_group: "ZAC_SHR_FUGR"
       description: "Shared FM for read-only tests"
       source: |
-        FUNCTION z_ac_shr_fm01.
-        *"----------------------------------------------------------------------
-        *"*"Local Interface:
-        *"  IMPORTING
-        *"     VALUE(IV_INPUT) TYPE  STRING
-        *"  EXPORTING
-        *"     VALUE(EV_OUTPUT) TYPE  STRING
-        *"----------------------------------------------------------------------
+        FUNCTION z_ac_shr_fm01
+          IMPORTING
+            VALUE(IV_INPUT) TYPE STRING
+          EXPORTING
+            VALUE(EV_OUTPUT) TYPE STRING.
           ev_output = |Result: { iv_input }|.
         ENDFUNCTION.
 
@@ -323,6 +322,7 @@ shared_dependencies:
       service_version: "0001"
       binding_type: "ODATA"
       binding_version: "V4"
+      binding_variant: "ODATA_V4_WEB_API"
 
   programs:
     - name: "ZAC_SHR_PROG"
@@ -992,16 +992,16 @@ create_view:
   test_cases:
     - name: "adt_view"
       enabled: true
-      description: "View reserved for AdtView tests"
+      description: "View reserved for AdtDdl tests"
       params:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
         table_name: "ZAC_SHR_VTABL"    # → shared_dependencies.tables
-        view_name: "ZAC_VIEW_DDLS"     # View created/deleted by this test
-        description: "AdtView workflow view"
+        ddl_name: "ZAC_VIEW_DDLS"     # View created/deleted by this test
+        description: "AdtDdl workflow view"
         # transport_request: ""  # Uses environment.default_transport if omitted
         # skip_cleanup: false  # Set to true to skip cleanup after test (objects left for analysis)
         ddl_source: |
-          @EndUserText.label: 'AdtView workflow view'
+          @EndUserText.label: 'AdtDdl workflow view'
           @AccessControl.authorizationCheck: #NOT_REQUIRED
           define view entity ZAC_VIEW_DDLS
             as select from zac_shr_vtabl
@@ -1011,6 +1011,18 @@ create_view:
             fld3,
             fld4
           }
+
+# Read DDL Table Function (AdtClient getDdl)
+# References a pre-existing AMDP table function (adt-clients cannot create extend/AMDP-backed objects)
+read_ddl_table_function:
+  test_cases:
+    - name: "readonly_read_table_function"
+      enabled: true
+      description: "Read an AMDP table function via getDdl (DDL source)"
+      params:
+        # Pre-existing AMDP table function on the target system (adt-clients
+        # cannot create extend/AMDP-backed objects). Leave empty to skip.
+        ddl_name: "ZTOK_TF_ORD_TOTALS"
 
 # Create Service Definition
 create_service_definition:
@@ -1029,6 +1041,87 @@ create_service_definition:
           define service ZAC_SRVD01 {
             expose ZAC_SHR_CDSUT_DDLS;
           }
+
+# Create Message Class (MSAG/N)
+create_message_class:
+  test_cases:
+    - name: "adt_message_class"
+      enabled: true
+      description: "MessageClass lifecycle reserved for AdtMessageClass tests"
+      params:
+        msg_class_name: "ZADT_MSGX01"
+        description: "AdtMessageClass integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        msg_no: "001"
+        msg_text_initial: "ITEST 001"
+        msg_text_updated: "ITEST 001 upd"
+
+# Create Scalar Function (CDS DSFD/SCF)
+# ScalarFunction is a CDS object (DDL source) available on ABAP Cloud and modern
+# on-premise systems that support the /sap/bc/adt/ddic/dsfd/* endpoints.
+# The suite probes discovery + create at runtime and skips on HTTP 404/405/501.
+create_scalar_function:
+  test_cases:
+    - name: "adt_scalar_function"
+      enabled: true
+      # available_in is a hint only; the suite probes discovery + create at runtime
+      description: "Scalar function reserved for AdtScalarFunction tests"
+      params:
+        scalar_function_name: "ZADT_SCALAR_FUNC"  # ← CHANGE if needed
+        description: "AdtScalarFunction integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+        # source_code (OPTIONAL): when set, the suite runs the FULL update→activate
+        # flow. A CDS scalar function only activates when implemented by an AMDP method
+        # that already exists on the target system:
+        #   CLASS-METHODS m FOR SCALAR FUNCTION zadt_scalar_func.
+        #   METHOD m BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT OPTIONS READ-ONLY. ...
+        # Without source_code the suite validates create → read → delete only.
+        # source_code: |
+        #   define scalar function ZADT_SCALAR_FUNC
+        #     with parameters p_input : abap.int4
+        #     returns abap.int4
+        #     implemented by method zcl_your_amdp=>m;
+
+# Create Scalar Function Implementation (DSFI/SFI)
+# SELF-CONTAINED suite: it builds the DSFD signature, the AMDP class
+# (FOR SCALAR FUNCTION, BY DATABASE FUNCTION FOR HDB LANGUAGE SQLSCRIPT), and the
+# DSFI implementation JSON inline from the names below — no source params needed.
+# Flow: create DSFD (+activate) → create AMDP class → create DSFI → update() the
+# implementation JSON (PUT /source/main, sets amdpReference) → group-activate the
+# trio → read/readMetadata → delete all three. Skips on HTTP 404/405/501.
+create_scalar_function_implementation:
+  test_cases:
+    - name: "adt_scalar_function_implementation"
+      enabled: true
+      description: "DSFI reserved for AdtScalarFunctionImplementation tests"
+      params:
+        implementation_name: "ZADT_SCALAR_FUNC_SQL"  # ← CHANGE if needed
+        scalar_function_name: "ZADT_SCALAR_FUNC"     # companion DSFD created by the test
+        amdp_class_name: "ZADT_SCALAR_AMDP"          # AMDP class created by the test
+        engine_value: "sqlEngine"
+        description: "AdtScalarFunctionImplementation integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
+
+# Create Append Structure (TABL/DS append)
+# Append structures extend an existing transparent table or structure with
+# additional fields. The suite creates two variants — one with a structure base
+# and one with a table base — and skips silently on HTTP 404/405/501.
+create_append_structure:
+  test_cases:
+    - name: "adt_append_structure"
+      enabled: true
+      # available_in is a hint only; the suite probes create at runtime and skips on 404/405/501
+      description: "Append structure reserved for AdtAppendStructure tests"
+      params:
+        append_structure_name: "ZADT_S_APPEND"  # ← CHANGE if needed (suffixed _S/_T per variant)
+        base_structure: "ZADT_BASE_STRU"        # ← CHANGE: existing DDIC structure to extend
+        base_table: "ZADT_BASE_TABLE"           # ← CHANGE: existing transparent table to extend
+        description: "AdtAppendStructure integration test"
+        # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
+        # transport_request: ""  # Uses environment.default_transport if omitted
 
 # Create Access Control
 create_access_control:
@@ -1367,7 +1460,7 @@ create_cds_unit_test:
       description: "CDS view with ABAP Unit verification (dependencies auto-created)"
       params:
         # package_name: "ZAC_PKG01"  # Uses environment.default_package if omitted
-        view_name: "ZAC_SHR_CDSUT_DDLS"     # → shared_dependencies.views
+        ddl_name: "ZAC_SHR_CDSUT_DDLS"     # → shared_dependencies.views
         description: "CDS Unit Test for ZAC_SHR_CDSUT_DDLS"
         # transport_request: ""  # Uses environment.default_transport if omitted
         dep_table_name: "ZAC_SHR_VTABL"  # → shared_dependencies.tables
@@ -1655,6 +1748,15 @@ where_used:
         object_type: "table"
         include_raw_xml: true
 
+    - name: "where_used_list_filtered"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Compare enableAllTypes (everything) vs enableOnlyTypes (narrowed to one type). ZAC_SHR_VTABL is referenced by the CDS view ZAC_SHR_CDSUT_DDLS (DDLS/DF)."
+      params:
+        object_name: "ZAC_SHR_VTABL"  # → referenced by ZAC_SHR_CDSUT_DDLS
+        object_type: "table"
+        enable_only_types: ["DDLS/DF"]  # keep only CDS DDL sources
+
 # Read Accept (read methods should return 2xx; 406 is error)
 read_accept:
   test_cases:
@@ -1665,7 +1767,7 @@ read_accept:
       params: {}
         # Optional overrides (if standard_objects registry doesn't cover these)
         # program_name: ""
-        # view_name: ""
+        # ddl_name: ""
         # tabletype_name: ""
         # service_definition_name: ""
         # behavior_definition_name: ""

@@ -57,7 +57,5 @@ jobs:
             ```bash
             npm install -g ./${{ steps.package.outputs.filename }}
             ```
-
-            ## What's Changed
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

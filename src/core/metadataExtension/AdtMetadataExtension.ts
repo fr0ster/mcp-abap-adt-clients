@@ -46,6 +46,10 @@ import { unlockMetadataExtension } from './unlock';
 import { updateMetadataExtension } from './update';
 import { validateMetadataExtension } from './validation';
 
+import {
+  getMetadataExtensionVersionSource,
+  getMetadataExtensionVersions,
+} from './versions';
 export class AdtMetadataExtension
   implements IAdtObject<IMetadataExtensionConfig, IMetadataExtensionState>
 {
@@ -125,7 +129,8 @@ export class AdtMetadataExtension
         packageName: config.packageName,
         transportRequest: config.transportRequest,
         description: config.description,
-        masterLanguage: config.masterLanguage,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
         masterSystem: config.masterSystem ?? this.systemContext.masterSystem,
         responsible: config.responsible ?? this.systemContext.responsible,
       });
@@ -311,7 +316,6 @@ export class AdtMetadataExtension
       this.logger?.info?.('Step 1: Locking metadata extension');
       this.connection.setSessionType('stateful');
       lockHandle = await lockMetadataExtension(this.connection, config.name);
-      this.connection.setSessionType('stateless');
       this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -579,7 +583,6 @@ export class AdtMetadataExtension
       this.connection,
       config.name,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -605,5 +608,13 @@ export class AdtMetadataExtension
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IMetadataExtensionConfig>) {
+    return getMetadataExtensionVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getMetadataExtensionVersionSource(this.connection, contentUri);
   }
 }

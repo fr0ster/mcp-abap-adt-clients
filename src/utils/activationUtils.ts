@@ -118,6 +118,12 @@ export function buildObjectUri(
     case 'DCLS':
       return `/sap/bc/adt/acm/dcl/sources/${lowerName}`;
 
+    case 'DSFD/SCF':
+      return `/sap/bc/adt/ddic/dsfd/sources/${lowerName}`;
+
+    case 'DSFI/SFI':
+      return `/sap/bc/adt/ddic/dsfi/${lowerName}`;
+
     case 'ENHO/ENH':
     case 'ENHO':
       return `/sap/bc/adt/enhancements/${lowerName}`;

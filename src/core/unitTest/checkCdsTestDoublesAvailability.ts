@@ -17,7 +17,7 @@ import { getTimeout } from '../../utils/timeouts';
 /**
  * Check CDS view availability for unit test doubles
  *
- * Endpoint: POST /sap/bc/adt/aunit/dbtestdoubles/cds/validation?ddlName={viewName}
+ * Endpoint: POST /sap/bc/adt/aunit/dbtestdoubles/cds/validation?ddlName={ddlName}
  *
  * What this checks:
  * - Whether the CDS view is active (must be activated before check)
@@ -35,10 +35,10 @@ import { getTimeout } from '../../utils/timeouts';
  */
 export async function checkCdsTestDoublesAvailability(
   connection: IAbapConnection,
-  viewName: string,
+  ddlName: string,
 ): Promise<AxiosResponse> {
   const url = `/sap/bc/adt/aunit/dbtestdoubles/cds/validation`;
-  const encodedName = encodeSapObjectName(viewName);
+  const encodedName = encodeSapObjectName(ddlName);
 
   const queryParams = new URLSearchParams({
     ddlName: encodedName,

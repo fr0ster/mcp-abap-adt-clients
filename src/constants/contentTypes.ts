@@ -185,6 +185,24 @@ export const ACCEPT_VIEW =
 export const ACCEPT_VIEW_METADATA = 'application/vnd.sap.adt.ddlSource+xml';
 export const CT_VIEW = 'application/vnd.sap.adt.ddlSource+xml';
 
+// Scalar Functions (CDS DSFD/SCF) — uses the shared blues envelope
+export const ACCEPT_SCALAR_FUNCTION = 'application/vnd.sap.adt.blues.v1+xml';
+export const CT_SCALAR_FUNCTION = 'application/vnd.sap.adt.blues.v1+xml';
+
+// Scalar Function Implementations (DSFI/SFI) — blues v2 envelope
+export const CT_SCALAR_FUNCTION_IMPL = 'application/vnd.sap.adt.blues.v2+xml';
+export const CT_SCALAR_FUNCTION_IMPL_UPDATE =
+  'application/vnd.sap.adt.blues.v2+xml; charset=utf-8';
+export const ACCEPT_SCALAR_FUNCTION_IMPL =
+  'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.blues.v2+xml';
+// Source endpoint (/source/main) — JSON for both read and implementation update
+export const ACCEPT_SCALAR_FUNCTION_IMPL_SOURCE = 'application/json';
+export const CT_SCALAR_FUNCTION_IMPL_SOURCE = 'application/json';
+
+// Append Structures (TABL/DS) — blues envelope, structures media type for create
+export const ACCEPT_APPEND_STRUCTURE =
+  'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.structures.v2+xml';
+
 // Packages
 export const ACCEPT_PACKAGE =
   'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml';
@@ -246,6 +264,10 @@ export const CT_FEATURE_TOGGLE_TOGGLE_PARAMETERS =
 export const CT_FEATURE_TOGGLE_SOURCE =
   'application/vnd.sap.adt.toggle.content.v2+json';
 export const ACCEPT_FEATURE_TOGGLE_SOURCE = CT_FEATURE_TOGGLE_SOURCE;
+
+// Message Classes (MSAG/N)
+export const MESSAGE_CLASS_UPDATE_CONTENT_TYPE =
+  'application/vnd.sap.adt.mc.messageclass+xml; charset=utf-8';
 
 // abapGit (/sap/bc/adt/abapgit/*)
 // Envelope for the repository entity (sapcli parity: v3; v4 advertised

@@ -24,10 +24,12 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IReadOptions } from '../shared/types';
+import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDataElement } from './activation';
 import { checkDataElement } from './check';
 import { create as createDataElement } from './create';
@@ -38,7 +40,6 @@ import type { IDataElementConfig, IDataElementState } from './types';
 import { unlockDataElement } from './unlock';
 import { updateDataElement } from './update';
 import { validateDataElementName } from './validation';
-
 export class AdtDataElement
   implements IAdtObject<IDataElementConfig, IDataElementState>
 {
@@ -127,6 +128,8 @@ export class AdtDataElement
         set_get_parameter: config.setGetParameter,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
+        masterLanguage:
+          config.masterLanguage ?? this.systemContext.masterLanguage,
       });
       state.createResult = createResponse;
       objectCreated = true;
@@ -318,7 +321,6 @@ export class AdtDataElement
         this.connection,
         config.dataElementName,
       );
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Data element locked, handle:', lockHandle);
 
@@ -649,7 +651,6 @@ export class AdtDataElement
       this.connection,
       config.dataElementName,
     );
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -675,5 +676,15 @@ export class AdtDataElement
       unlockResult: result,
       errors: [],
     };
+  }
+
+  async getVersions(
+    _config: Partial<IDataElementConfig>,
+  ): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('data element');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('data element');
   }
 }

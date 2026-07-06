@@ -46,6 +46,10 @@ import { unlock } from './unlock';
 import { update } from './update';
 import { validate } from './validation';
 
+import {
+  getBehaviorDefinitionVersionSource,
+  getBehaviorDefinitionVersions,
+} from './versions';
 export class AdtBehaviorDefinition
   implements IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState>
 {
@@ -151,6 +155,7 @@ export class AdtBehaviorDefinition
         description: config.description,
         implementationType: config.implementationType,
         transportRequest: config.transportRequest,
+        language: config.masterLanguage ?? this.systemContext.masterLanguage,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
       });
@@ -359,7 +364,6 @@ export class AdtBehaviorDefinition
       this.logger?.info?.('Step 1: Locking behavior definition');
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
-      this.connection.setSessionType('stateless');
       state.lockHandle = lockHandle;
       this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
@@ -634,7 +638,6 @@ export class AdtBehaviorDefinition
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lock(this.connection, config.name);
-    this.connection.setSessionType('stateless');
     return lockHandle;
   }
 
@@ -656,5 +659,13 @@ export class AdtBehaviorDefinition
       unlockResult: result,
       errors: [],
     };
+  }
+
+  getVersions(config: Partial<IBehaviorDefinitionConfig>) {
+    return getBehaviorDefinitionVersions(this.connection, config);
+  }
+
+  getVersionSource(contentUri: string) {
+    return getBehaviorDefinitionVersionSource(this.connection, contentUri);
   }
 }

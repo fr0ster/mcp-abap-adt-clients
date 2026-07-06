@@ -58,10 +58,10 @@ function buildCreateXml(
   return `<?xml version="1.0" encoding="UTF-8"?>
 <enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements" xmlns:adtcore="http://www.sap.com/adt/core"
   adtcore:description="${description}"
-  adtcore:language="EN"
+  adtcore:language="${args.masterLanguage || 'EN'}"
   adtcore:name="${args.enhancement_name}"
   adtcore:type="${typeCode}"
-  adtcore:masterLanguage="EN"${masterSystemAttr}${responsibleAttr}>
+  adtcore:masterLanguage="${args.masterLanguage || 'EN'}"${masterSystemAttr}${responsibleAttr}>
   <adtcore:packageRef adtcore:name="${args.package_name}"/>
   ${enhancementSpecificXml}
 </enh:enhancement>`;

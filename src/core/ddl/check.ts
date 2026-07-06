@@ -1,0 +1,88 @@
+/**
+ * View check operations
+ */
+
+import type {
+  IAdtResponse as AxiosResponse,
+  IAbapConnection,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
+import { parseCheckRunResponse, runCheckRun } from '../../utils/checkRun';
+
+/**
+ * Check view (DDLS) syntax
+ */
+function shouldRetryMissingVersion(
+  checkResult: ReturnType<typeof parseCheckRunResponse>,
+): boolean {
+  if (checkResult.status !== 'notProcessed') {
+    return false;
+  }
+  const message = (checkResult.message || '').toLowerCase();
+  return (
+    message.includes('does not exist') ||
+    message.includes('missing data definition')
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function checkDdl(
+  connection: IAbapConnection,
+  ddlName: string,
+  version: string = 'active',
+  sourceCode?: string,
+  logger?: ILogger,
+): Promise<AxiosResponse> {
+  let attempt = 0;
+  // Allow one retry when system did not materialize inactive version yet
+  while (attempt < 2) {
+    const response = await runCheckRun(
+      connection,
+      'view',
+      ddlName,
+      version,
+      'abapCheckRun',
+      sourceCode,
+    );
+    const checkResult = parseCheckRunResponse(response);
+
+    if (!checkResult.success && checkResult.has_errors) {
+      const errorMessage = checkResult.message || '';
+
+      if (attempt === 0 && shouldRetryMissingVersion(checkResult)) {
+        if (process.env.DEBUG_ADT_LIBS === 'true') {
+          logger?.warn?.(
+            `Check retry for view ${ddlName}: ${errorMessage} (waiting for inactive version)`,
+          );
+        }
+        attempt += 1;
+        await delay(2000);
+        continue;
+      }
+
+      if (shouldRetryMissingVersion(checkResult)) {
+        if (process.env.DEBUG_ADT_LIBS === 'true') {
+          logger?.warn?.(
+            `Check warning for view ${ddlName}: ${errorMessage} (version not available, continue)`,
+          );
+        }
+        return response;
+      }
+
+      const errorMessages = checkResult.errors
+        .map((err) => err.text)
+        .join('; ');
+      throw new Error(`View check failed: ${errorMessages}`);
+    }
+
+    return response;
+  }
+
+  // Should not reach here because loop returns on success
+  throw new Error(
+    `View check failed: Version ${version} not available for ${ddlName}`,
+  );
+}
