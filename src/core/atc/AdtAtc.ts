@@ -20,8 +20,10 @@ import type {
   IAdtObject,
   IAdtOperationOptions,
   ILogger,
+  IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import { throwUnsupportedVersions } from '../shared/versions';
 import {
   buildAtcObjectUri,
   createAtcWorklist,
@@ -387,5 +389,15 @@ export class AdtAtc implements IAdtObject<IAtcConfig, IAtcState> {
       this.logger?.info?.(`Using system default ATC variant: ${variant}`);
     }
     return variant;
+  }
+
+  // ATC runs are transient check executions, not versioned source objects;
+  // the IAdtObject version-history contract does not apply.
+  async getVersions(_config: Partial<IAtcConfig>): Promise<IObjectVersion[]> {
+    throwUnsupportedVersions('ATC');
+  }
+
+  async getVersionSource(_contentUri: string): Promise<string> {
+    throwUnsupportedVersions('ATC');
   }
 }
