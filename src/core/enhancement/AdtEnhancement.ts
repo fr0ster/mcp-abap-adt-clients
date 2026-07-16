@@ -34,6 +34,7 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateEnhancement } from './activation';
 import { check as checkEnhancement } from './check';
@@ -46,6 +47,7 @@ import {
   getEnhancementTransport,
 } from './read';
 import {
+  type EnhancementType,
   type IEnhancementConfig,
   type IEnhancementState,
   supportsSourceCode,
@@ -64,16 +66,46 @@ export class AdtEnhancement
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockRegistry?: LockRegistry;
   public readonly objectType: string = 'Enhancement';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockRegistry = lockRegistry;
+  }
+
+  /** Registry key for a held enhancement lock (e.g. `Enhancement/ZFOO`). */
+  private lockKey(name: string): string {
+    return `${this.objectType}/${name.toUpperCase()}`;
+  }
+
+  /**
+   * Record a held lock. Enhancement unlock needs the enhancement type, so the
+   * unlock thunk captures it alongside the name and handle.
+   */
+  private trackLock(
+    type: EnhancementType | undefined,
+    name: string | undefined,
+    lockHandle: string,
+  ): void {
+    if (!type || !name) return;
+    // Raw unlock — LockRegistry.unlockAll() manages the session for the batch.
+    this.lockRegistry?.track(this.lockKey(name), () =>
+      unlockEnhancement(this.connection, type, name, lockHandle),
+    );
+  }
+
+  /** Drop a lock from the registry after a clean unlock. */
+  private untrackLock(name: string | undefined): void {
+    if (!name) return;
+    this.lockRegistry?.untrack(this.lockKey(name));
   }
 
   /**
@@ -441,6 +473,11 @@ export class AdtEnhancement
         config.enhancementName,
       );
       state.lockHandle = lockHandle;
+      this.trackLock(
+        config.enhancementType,
+        config.enhancementName,
+        lockHandle,
+      );
       this.logger?.info?.('Enhancement locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -509,6 +546,7 @@ export class AdtEnhancement
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.untrackLock(config.enhancementName);
         lockHandle = undefined;
         this.logger?.info?.('Enhancement unlocked');
       }
@@ -582,6 +620,7 @@ export class AdtEnhancement
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.untrackLock(config.enhancementName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -770,6 +809,7 @@ export class AdtEnhancement
       config.enhancementType,
       config.enhancementName,
     );
+    this.trackLock(config.enhancementType, config.enhancementName, lockHandle);
     return lockHandle;
   }
 
@@ -792,6 +832,7 @@ export class AdtEnhancement
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.untrackLock(config.enhancementName);
     return {
       unlockResult: result,
       errors: [],

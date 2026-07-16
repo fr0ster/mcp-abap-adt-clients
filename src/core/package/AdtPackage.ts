@@ -31,6 +31,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { checkPackage } from './check';
@@ -46,16 +51,24 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Package';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (packageName, lockHandle) =>
+        unlockPackage(this.connection, packageName, lockHandle),
+    );
   }
 
   /**
@@ -381,6 +394,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       const lockResult = await lockPackage(this.connection, config.packageName);
       lockHandle = lockResult.lockHandle;
       lockCorrNr = lockResult.corrNr;
+      this.lockTracker.track(config.packageName, lockHandle);
       this.logger?.info?.(
         `Package locked, handle: ${lockHandle}, corrNr: ${lockCorrNr}`,
       );
@@ -448,6 +462,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         this.connection.setSessionType('stateful');
         await unlockPackage(this.connection, config.packageName, lockHandle);
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.packageName);
         lockHandle = undefined;
         this.logger?.info?.('Package unlocked');
       }
@@ -471,6 +486,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           this.connection.setSessionType('stateful');
           await unlockPackage(this.connection, config.packageName, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.packageName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -579,6 +595,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
 
     this.connection.setSessionType('stateful');
     const lockResult = await lockPackage(this.connection, config.packageName);
+    this.lockTracker.track(config.packageName, lockResult.lockHandle);
     return lockResult.lockHandle;
   }
 
@@ -600,6 +617,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.packageName);
     return {
       unlockResult: result,
       errors: [],

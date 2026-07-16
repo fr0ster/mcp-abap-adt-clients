@@ -27,6 +27,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateMetadataExtension } from './activate';
 import { checkMetadataExtension } from './check';
@@ -56,16 +61,24 @@ export class AdtMetadataExtension
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'MetadataExtension';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockMetadataExtension(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -316,6 +329,7 @@ export class AdtMetadataExtension
       this.logger?.info?.('Step 1: Locking metadata extension');
       this.connection.setSessionType('stateful');
       lockHandle = await lockMetadataExtension(this.connection, config.name);
+      this.lockTracker.track(config.name, lockHandle);
       this.logger?.info?.('Metadata extension locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -367,6 +381,7 @@ export class AdtMetadataExtension
         this.connection.setSessionType('stateful');
         await unlockMetadataExtension(this.connection, config.name, lockHandle);
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.name);
         lockHandle = undefined;
         this.logger?.info?.('Metadata extension unlocked');
       }
@@ -437,6 +452,7 @@ export class AdtMetadataExtension
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.name);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -583,6 +599,7 @@ export class AdtMetadataExtension
       this.connection,
       config.name,
     );
+    this.lockTracker.track(config.name, lockHandle);
     return lockHandle;
   }
 
@@ -604,6 +621,7 @@ export class AdtMetadataExtension
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.name);
     return {
       unlockResult: result,
       errors: [],

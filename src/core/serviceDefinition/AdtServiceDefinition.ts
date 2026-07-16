@@ -27,6 +27,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateServiceDefinition } from './activation';
 import { checkServiceDefinition } from './check';
@@ -56,16 +61,24 @@ export class AdtServiceDefinition
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ServiceDefinition';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockServiceDefinition(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -315,6 +328,7 @@ export class AdtServiceDefinition
         this.connection,
         config.serviceDefinitionName,
       );
+      this.lockTracker.track(config.serviceDefinitionName, lockHandle);
       this.logger?.info?.('Service definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -374,6 +388,7 @@ export class AdtServiceDefinition
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.serviceDefinitionName);
         lockHandle = undefined;
         this.logger?.info?.('Service definition unlocked');
       }
@@ -450,6 +465,7 @@ export class AdtServiceDefinition
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.serviceDefinitionName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -586,6 +602,7 @@ export class AdtServiceDefinition
       this.connection,
       config.serviceDefinitionName,
     );
+    this.lockTracker.track(config.serviceDefinitionName, lockHandle);
     return lockHandle;
   }
 
@@ -607,6 +624,7 @@ export class AdtServiceDefinition
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.serviceDefinitionName);
     return {
       unlockResult: result,
       errors: [],

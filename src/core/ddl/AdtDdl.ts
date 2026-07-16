@@ -30,6 +30,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateDDLS } from './activation';
 import { checkDdl } from './check';
@@ -47,16 +52,23 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'View';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (ddlName, lockHandle) => unlockDDLS(this.connection, ddlName, lockHandle),
+    );
   }
 
   /**
@@ -309,6 +321,7 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
       this.logger?.info?.('Step 1: Locking view');
       this.connection.setSessionType('stateful');
       lockHandle = await lockDDLS(this.connection, config.ddlName);
+      this.lockTracker.track(config.ddlName, lockHandle);
       this.logger?.info?.('View locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -361,6 +374,7 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
         this.connection.setSessionType('stateful');
         await unlockDDLS(this.connection, config.ddlName, lockHandle);
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.ddlName);
         lockHandle = undefined;
         this.logger?.info?.('View unlocked');
       }
@@ -436,6 +450,7 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
           this.connection.setSessionType('stateful');
           await unlockDDLS(this.connection, config.ddlName, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.ddlName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -562,6 +577,7 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockDDLS(this.connection, config.ddlName);
+    this.lockTracker.track(config.ddlName, lockHandle);
     return lockHandle;
   }
 
@@ -583,6 +599,7 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.ddlName);
     return {
       unlockResult: result,
       errors: [],

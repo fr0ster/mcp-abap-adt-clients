@@ -25,6 +25,7 @@ import type {
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
+import type { LockRegistry } from '../shared/LockRegistry';
 import { activateFunctionInclude } from './activation';
 import { checkFunctionInclude } from './check';
 import { create as createFunctionInclude } from './create';
@@ -57,6 +58,7 @@ export class AdtFunctionInclude
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   protected readonly contentTypes?: IAdtContentTypes;
+  private readonly lockRegistry?: LockRegistry;
   public readonly objectType: string = 'FunctionInclude';
 
   constructor(
@@ -64,11 +66,40 @@ export class AdtFunctionInclude
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
     this.contentTypes = contentTypes;
+    this.lockRegistry = lockRegistry;
+  }
+
+  /** Registry key for a held lock (nested: group + include). */
+  private lockKey(group: string, includeName: string): string {
+    return `${this.objectType}/${group.toUpperCase()}/${includeName.toUpperCase()}`;
+  }
+
+  /** Record a held lock; the unlock thunk needs the parent function group. */
+  private trackLock(
+    group: string | undefined,
+    includeName: string | undefined,
+    lockHandle: string,
+  ): void {
+    if (!group || !includeName) return;
+    // Raw unlock — LockRegistry.unlockAll() manages the session for the batch.
+    this.lockRegistry?.track(this.lockKey(group, includeName), () =>
+      unlockFunctionInclude(this.connection, group, includeName, lockHandle),
+    );
+  }
+
+  /** Drop a lock from the registry after a clean unlock. */
+  private untrackLock(
+    group: string | undefined,
+    includeName: string | undefined,
+  ): void {
+    if (!group || !includeName) return;
+    this.lockRegistry?.untrack(this.lockKey(group, includeName));
   }
 
   /**
@@ -190,6 +221,11 @@ export class AdtFunctionInclude
           config.includeName,
           this.logger,
         );
+        this.trackLock(
+          config.functionGroupName,
+          config.includeName,
+          lockHandle,
+        );
         state.lockHandle = lockHandle;
         config.onLock?.(lockHandle);
 
@@ -213,6 +249,7 @@ export class AdtFunctionInclude
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.untrackLock(config.functionGroupName, config.includeName);
         lockHandle = undefined;
 
         this.logger?.info?.('Step 5: Activating function include');
@@ -240,6 +277,7 @@ export class AdtFunctionInclude
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.untrackLock(config.functionGroupName, config.includeName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -475,6 +513,11 @@ export class AdtFunctionInclude
         this.logger,
       );
       state.lockHandle = lockHandle;
+      this.trackLock(
+        fullConfig.functionGroupName,
+        fullConfig.includeName,
+        lockHandle,
+      );
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Function include locked, handle:', lockHandle);
 
@@ -548,6 +591,7 @@ export class AdtFunctionInclude
         lockHandle,
       );
       this.connection.setSessionType('stateless');
+      this.untrackLock(fullConfig.functionGroupName, fullConfig.includeName);
       lockHandle = undefined;
 
       // 5. Final check
@@ -613,6 +657,10 @@ export class AdtFunctionInclude
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.untrackLock(
+            fullConfig.functionGroupName,
+            fullConfig.includeName,
+          );
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -764,6 +812,7 @@ export class AdtFunctionInclude
       config.includeName,
       this.logger,
     );
+    this.trackLock(config.functionGroupName, config.includeName, lockHandle);
     return lockHandle;
   }
 
@@ -786,6 +835,7 @@ export class AdtFunctionInclude
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.untrackLock(config.functionGroupName, config.includeName);
     return { errors: [] };
   }
 

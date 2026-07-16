@@ -25,6 +25,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { activateAuthorizationField } from './activation';
 import { checkAuthorizationField } from './check';
@@ -50,16 +55,24 @@ export class AdtAuthorizationField
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AuthorizationField';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockAuthorizationField(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -310,6 +323,7 @@ export class AdtAuthorizationField
         this.logger,
       );
       state.lockHandle = lockHandle;
+      this.lockTracker.track(fullConfig.authorizationFieldName, lockHandle);
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Authorization field locked, handle:', lockHandle);
 
@@ -364,6 +378,7 @@ export class AdtAuthorizationField
         lockHandle,
       );
       this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(fullConfig.authorizationFieldName);
       lockHandle = undefined;
       this.logger?.info?.('Authorization field unlocked');
 
@@ -431,6 +446,7 @@ export class AdtAuthorizationField
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(fullConfig.authorizationFieldName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -573,6 +589,7 @@ export class AdtAuthorizationField
       config.authorizationFieldName,
       this.logger,
     );
+    this.lockTracker.track(config.authorizationFieldName, lockHandle);
     return lockHandle;
   }
 
@@ -594,6 +611,7 @@ export class AdtAuthorizationField
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.authorizationFieldName);
     return { errors: [] };
   }
 

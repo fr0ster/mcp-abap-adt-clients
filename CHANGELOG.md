@@ -3,6 +3,14 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.0] - 2026-07-16
+
+### Added
+- **Session-scoped lock registry with `unlockAll()` safety net.** `AdtClient` now owns one `LockRegistry` shared by every handler it creates, so all enqueue locks held in the session are tracked in one place. New API on `AdtClient`: `unlockAll()` releases every dangling lock in a single call and returns the ones it could not release (`LockFailure[]`); `pendingLocks` lists the keys currently held (e.g. `Domain/ZFOO`, `DataElement/ZBAR`); and `[Symbol.asyncDispose]` enables `await using client = …` cleanup.
+  - This is a **last-resort** safety net for abandoned locks (a forgot-to-unlock, or a managed flow that threw before its unlock). It deliberately does **not** make the lock→unlock critical section non-interruptible — preventing a client timeout from interrupting that section remains the caller's responsibility. On process crash/kill the ultimate backstop is SAP releasing the session's enqueue locks on session-drop.
+  - Every lock-holding handler is wired to track on lock and untrack on clean unlock — across public `lock()`/`unlock()`, the managed `create()`/`update()` chains, and error-cleanup unlock. Nested handlers (`functionModule`/`functionInclude`) use composite `Type/group/name` keys; `enhancement` captures its type in the unlock; class-includes (`LocalTestClass`/`Types`/`Definitions`/`Macros`) inherit the wired `AdtClass` lock/unlock. No-op-lock handlers (`service`/`transport`/`unitTest`/`messageClassMessage`) are excluded — their `lock()` is unsupported.
+  - `unlockAll()` runs the whole batch under a single `stateful`→`stateless` transition, so a per-unlock switch to stateless cannot clear the session mid-batch (as `RfcAbapConnection` does) and invalidate the remaining lock handles. `[Symbol.asyncDispose]` is best-effort: it never throws (so it cannot mask the error that ended the `using` scope), logs a warning for any residual failure, and leaves those locks observable via `pendingLocks`.
+
 ## [7.3.1] - 2026-07-04
 
 ### Fixed
