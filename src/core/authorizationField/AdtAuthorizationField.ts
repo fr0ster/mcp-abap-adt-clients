@@ -423,10 +423,12 @@ export class AdtAuthorizationField
           );
         }
       } else {
+        // No activation happened: return the version just written (inactive),
+        // not the stale active one.
         const readResponse = await readAuthorizationField(
           this.connection,
           fullConfig.authorizationFieldName,
-          'active',
+          'inactive',
         );
         state.readResult = readResponse;
       }

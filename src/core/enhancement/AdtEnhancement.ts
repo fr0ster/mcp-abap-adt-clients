@@ -599,11 +599,15 @@ export class AdtEnhancement
         return state;
       }
 
-      // Read and return result (no stateful needed)
+      // Read and return result (no stateful needed).
+      // No activation happened: return the version just written (inactive,
+      // i.e. workingArea in the enhancement URI dialect), not the stale active
+      // one. getEnhancementSource defaults to 'active', so pass it explicitly.
       const readResponse = await getEnhancementSource(
         this.connection,
         config.enhancementType,
         config.enhancementName,
+        'inactive',
       );
       state.readResult = readResponse;
 
