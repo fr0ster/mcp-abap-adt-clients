@@ -309,9 +309,27 @@ export class AdtClient {
     return this.lockRegistry.pending;
   }
 
-  /** Release all held locks when used with `await using`. */
+  /**
+   * Release all held locks when used with `await using`.
+   *
+   * Best-effort: like {@link unlockAll}, this never throws — a lock whose unlock
+   * fails is retained rather than surfaced as an error, so a disposer failure
+   * cannot mask the error that ended the `using` scope. Any residual failures
+   * are logged as a warning and remain observable via {@link pendingLocks}.
+   * Callers that must react to unlock failures should call `unlockAll()`
+   * explicitly and inspect the returned `LockFailure[]`.
+   */
   async [Symbol.asyncDispose](): Promise<void> {
-    await this.unlockAll();
+    const failures = await this.unlockAll();
+    if (failures.length > 0) {
+      this.logger.warn(
+        `[AdtClient] dispose left ${failures.length} lock(s) unreleased: ${failures
+          .map((f) => f.key)
+          .join(
+            ', ',
+          )}. They remain in pendingLocks; retry unlockAll() or rely on session-drop.`,
+      );
+    }
   }
 
   /**
