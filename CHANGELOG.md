@@ -3,6 +3,16 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.1] - 2026-07-16
+
+### Fixed
+- **Post-update readiness read polled the wrong version.** After `update()` writes source/metadata under a lock, the object exists only as the *inactive* version — but the readiness read (step 3.5) polled the *active* one, so it could never observe the write it was meant to wait for. It now polls the version that was just written.
+  - Verified against a live system: while an activated service definition is updated and not yet reactivated, `version=active` returns the content that predates the update, and `version=inactive` returns what the `PUT` just wrote. For an object that was never activated, the active version is empty.
+  - The step never surfaced as a failure: `read()` maps 404 to `undefined` (and on cloud this endpoint answers `200` with an empty body rather than 404), and the call sits in a `try`/`catch` — so the flow logged `object is ready after update` regardless and tests stayed green. The bug was a silent no-op, not an error.
+  - Applies to the 16 handlers whose `read()` forwards the version: `accessControl`, `authorizationField`, `behaviorDefinition`, `behaviorImplementation`, `class`, `ddl`, `enhancement`, `featureToggle`, `functionInclude`, `functionModule`, `interface`, `package`, `program`, `serviceDefinition`, `structure`, `table`, `transformation`. Unchanged where the version is dropped before the request (`metadataExtension`, `domain`, `dataElement`, `functionGroup`, `tabletype`) — the literal has no effect there. The post-activation read (step 6.5) still reads `active`, which is correct.
+  - No API change: the readiness read is an internal step of `update()`.
+- **`AdtServiceDefinition` docblock corrected.** It described `create()` as running a `validate → … → activate` chain and called the object DDLS. `create()` posts metadata only (SRVD/SRV); the source code is written by a subsequent `update()`, mirroring Eclipse ADT.
+
 ## [7.4.0] - 2026-07-16
 
 ### Added
