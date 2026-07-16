@@ -3,6 +3,14 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.2] - 2026-07-16
+
+### Fixed
+- **Final read in `update()` returned the stale active version instead of the written one.** Follow-up to 7.4.1, which fixed the readiness read (step 3.5); this fixes the *final* read at the end of `update()` in the non-activate path. When `update()` runs without `activateOnUpdate`, it writes the source under a lock and stops, then reads the object back into `readResult` — three handlers read the **active** version there, which (with no activation) holds pre-update content, or nothing for a never-activated object, so the returned `readResult` could not reflect the write.
+  - `authorizationField` and `functionInclude` passed `'active'` explicitly; `enhancement`'s `getEnhancementSource` defaults to `'active'` and now passes `'inactive'` (mapped to `workingArea` in the enhancement URI dialect). The other 12 source-bearing handlers already read `inactive` here.
+  - `package` is deliberately unchanged: verified live that a package returns identical content for `version=active` and `version=inactive` (no distinct inactive version, no activation step), so reading active there is equivalent, not stale.
+  - No API change: the final read is an internal step of `update()`. New unit test asserts the invariant across all 15 source-bearing handlers — `update()` without activation never issues a `version=active` read.
+
 ## [7.4.1] - 2026-07-16
 
 ### Fixed
