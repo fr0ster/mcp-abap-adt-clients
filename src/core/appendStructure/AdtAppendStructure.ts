@@ -59,14 +59,8 @@ export class AdtAppendStructure
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockAppendStructure(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) =>
+        unlockAppendStructure(this.connection, name, lockHandle),
     );
   }
 

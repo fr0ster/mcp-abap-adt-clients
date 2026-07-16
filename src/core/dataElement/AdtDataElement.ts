@@ -66,14 +66,8 @@ export class AdtDataElement
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockDataElement(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) =>
+        unlockDataElement(this.connection, name, lockHandle),
     );
   }
 

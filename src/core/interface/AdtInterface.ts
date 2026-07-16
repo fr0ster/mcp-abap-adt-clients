@@ -74,14 +74,8 @@ export class AdtInterface
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (interfaceName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockInterface(this.connection, interfaceName, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (interfaceName, lockHandle) =>
+        unlockInterface(this.connection, interfaceName, lockHandle),
     );
   }
 

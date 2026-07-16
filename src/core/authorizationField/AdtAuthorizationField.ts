@@ -70,14 +70,8 @@ export class AdtAuthorizationField
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockAuthorizationField(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) =>
+        unlockAuthorizationField(this.connection, name, lockHandle),
     );
   }
 

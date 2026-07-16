@@ -190,7 +190,7 @@ export class AdtClient {
    * Session-scoped registry of locks held by handlers created from this client.
    * All handlers share one stateful session, so all their locks belong here.
    */
-  protected readonly lockRegistry = new LockRegistry();
+  protected readonly lockRegistry: LockRegistry;
 
   constructor(
     connection: IAbapConnection,
@@ -198,6 +198,8 @@ export class AdtClient {
     options?: IAdtClientOptions,
   ) {
     this.connection = connection;
+    // Pass the connection so unlockAll() can keep the whole batch stateful.
+    this.lockRegistry = new LockRegistry(connection);
     this.logger = logger ?? {
       debug: () => {},
       info: () => {},

@@ -64,14 +64,7 @@ export class AdtTable implements IAdtObject<ITableConfig, ITableState> {
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockTable(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) => unlockTable(this.connection, name, lockHandle),
     );
   }
 

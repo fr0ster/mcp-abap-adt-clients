@@ -66,14 +66,7 @@ export class AdtDdicTableType
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockTableType(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) => unlockTableType(this.connection, name, lockHandle),
     );
   }
 

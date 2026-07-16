@@ -75,18 +75,8 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (featureToggleName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockFeatureToggle(
-            this.connection,
-            featureToggleName,
-            lockHandle,
-          );
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (featureToggleName, lockHandle) =>
+        unlockFeatureToggle(this.connection, featureToggleName, lockHandle),
     );
   }
 

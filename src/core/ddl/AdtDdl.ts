@@ -67,14 +67,7 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (ddlName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockDDLS(this.connection, ddlName, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (ddlName, lockHandle) => unlockDDLS(this.connection, ddlName, lockHandle),
     );
   }
 

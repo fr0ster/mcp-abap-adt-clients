@@ -64,14 +64,8 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (domainName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockDomain(this.connection, domainName, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (domainName, lockHandle) =>
+        unlockDomain(this.connection, domainName, lockHandle),
     );
   }
 

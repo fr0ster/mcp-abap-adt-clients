@@ -76,14 +76,7 @@ export class AdtBehaviorDefinition
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlock(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) => unlock(this.connection, name, lockHandle),
     );
   }
 

@@ -67,18 +67,8 @@ export class AdtScalarFunctionImplementation
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockScalarFunctionImplementation(
-            this.connection,
-            name,
-            lockHandle,
-          );
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) =>
+        unlockScalarFunctionImplementation(this.connection, name, lockHandle),
     );
   }
 

@@ -66,14 +66,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (packageName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockPackage(this.connection, packageName, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (packageName, lockHandle) =>
+        unlockPackage(this.connection, packageName, lockHandle),
     );
   }
 

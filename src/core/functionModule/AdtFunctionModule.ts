@@ -85,19 +85,10 @@ export class AdtFunctionModule
     lockHandle: string,
   ): void {
     if (!group || !moduleName) return;
-    this.lockRegistry?.track(this.lockKey(group, moduleName), async () => {
-      this.connection.setSessionType('stateful');
-      try {
-        await unlockFunctionModule(
-          this.connection,
-          group,
-          moduleName,
-          lockHandle,
-        );
-      } finally {
-        this.connection.setSessionType('stateless');
-      }
-    });
+    // Raw unlock — LockRegistry.unlockAll() manages the session for the batch.
+    this.lockRegistry?.track(this.lockKey(group, moduleName), () =>
+      unlockFunctionModule(this.connection, group, moduleName, lockHandle),
+    );
   }
 
   /** Drop a lock from the registry after a clean unlock. */

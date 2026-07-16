@@ -72,18 +72,8 @@ export class AdtFunctionGroup
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (functionGroupName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockFunctionGroup(
-            this.connection,
-            functionGroupName,
-            lockHandle,
-          );
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (functionGroupName, lockHandle) =>
+        unlockFunctionGroup(this.connection, functionGroupName, lockHandle),
     );
   }
 

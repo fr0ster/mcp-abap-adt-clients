@@ -73,18 +73,8 @@ export class AdtTransformation
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (transformationName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockTransformation(
-            this.connection,
-            transformationName,
-            lockHandle,
-          );
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (transformationName, lockHandle) =>
+        unlockTransformation(this.connection, transformationName, lockHandle),
     );
   }
 

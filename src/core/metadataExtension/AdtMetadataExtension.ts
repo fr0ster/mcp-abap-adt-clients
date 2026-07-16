@@ -76,14 +76,8 @@ export class AdtMetadataExtension
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (name, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockMetadataExtension(this.connection, name, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (name, lockHandle) =>
+        unlockMetadataExtension(this.connection, name, lockHandle),
     );
   }
 

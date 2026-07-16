@@ -79,14 +79,8 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (className, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockClass(this.connection, className, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (className, lockHandle) =>
+        unlockClass(this.connection, className, lockHandle),
     );
   }
 

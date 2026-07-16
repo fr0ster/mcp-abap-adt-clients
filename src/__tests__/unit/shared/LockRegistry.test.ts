@@ -104,4 +104,51 @@ describe('LockRegistry', () => {
     logTestSuccess(testsLogger, 'LockRegistry - retains failed unlock');
     logTestEnd(testsLogger, 'LockRegistry - retains failed unlock');
   });
+
+  it('keeps the session stateful for the whole batch (one stateful, one stateless — no mid-batch toggle)', async () => {
+    logTestStart(testsLogger, 'LockRegistry - batch session', {
+      name: 'batch_session',
+      params: { keyA, keyB },
+    });
+    // Some connections (RFC) clear the stateful cookie when switched to
+    // stateless; toggling per-unlock would invalidate the remaining handles.
+    const events: string[] = [];
+    const session = {
+      setSessionType: (t: 'stateful' | 'stateless') => events.push(t),
+    };
+    const registry = new LockRegistry(session);
+
+    registry.track(keyA, async () => {
+      events.push('unlockA');
+    });
+    registry.track(keyB, async () => {
+      events.push('unlockB');
+    });
+
+    await registry.unlockAll();
+
+    // Exactly one stateful at the start, both unlocks, then one stateless.
+    expect(events).toEqual(['stateful', 'unlockA', 'unlockB', 'stateless']);
+    logTestSuccess(testsLogger, 'LockRegistry - batch session');
+    logTestEnd(testsLogger, 'LockRegistry - batch session');
+  });
+
+  it('does not touch the session when there is nothing to unlock', async () => {
+    logTestStart(testsLogger, 'LockRegistry - empty batch', {
+      name: 'empty_batch',
+      params: {},
+    });
+    const events: string[] = [];
+    const session = {
+      setSessionType: (t: 'stateful' | 'stateless') => events.push(t),
+    };
+    const registry = new LockRegistry(session);
+
+    const failures = await registry.unlockAll();
+
+    expect(failures).toEqual([]);
+    expect(events).toEqual([]);
+    logTestSuccess(testsLogger, 'LockRegistry - empty batch');
+    logTestEnd(testsLogger, 'LockRegistry - empty batch');
+  });
 });

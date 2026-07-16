@@ -72,14 +72,8 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     this.lockTracker = createLockTracker(
       lockRegistry,
       this.objectType,
-      async (programName, lockHandle) => {
-        this.connection.setSessionType('stateful');
-        try {
-          await unlockProgram(this.connection, programName, lockHandle);
-        } finally {
-          this.connection.setSessionType('stateless');
-        }
-      },
+      (programName, lockHandle) =>
+        unlockProgram(this.connection, programName, lockHandle),
     );
   }
 

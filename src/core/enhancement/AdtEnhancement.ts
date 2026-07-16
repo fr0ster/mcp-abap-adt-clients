@@ -96,14 +96,10 @@ export class AdtEnhancement
     lockHandle: string,
   ): void {
     if (!type || !name) return;
-    this.lockRegistry?.track(this.lockKey(name), async () => {
-      this.connection.setSessionType('stateful');
-      try {
-        await unlockEnhancement(this.connection, type, name, lockHandle);
-      } finally {
-        this.connection.setSessionType('stateless');
-      }
-    });
+    // Raw unlock — LockRegistry.unlockAll() manages the session for the batch.
+    this.lockRegistry?.track(this.lockKey(name), () =>
+      unlockEnhancement(this.connection, type, name, lockHandle),
+    );
   }
 
   /** Drop a lock from the registry after a clean unlock. */
