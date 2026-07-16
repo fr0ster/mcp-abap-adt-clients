@@ -634,11 +634,13 @@ export class AdtFunctionInclude
           );
         }
       } else {
+        // No activation happened: return the version just written (inactive),
+        // not the stale active one.
         const readResponse = await readFunctionInclude(
           this.connection,
           fullConfig.functionGroupName,
           fullConfig.includeName,
-          'active',
+          'inactive',
         );
         state.readResult = readResponse;
       }
