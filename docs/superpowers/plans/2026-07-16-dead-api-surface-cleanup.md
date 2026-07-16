@@ -4,7 +4,7 @@
 
 **Goal:** Remove two dead/misleading API surfaces — the no-op `source_code` on 5 `ICreateXxxParams`, and the ignored `withLongPolling` plumbing in featureToggle's low-level read — without breaking the published API.
 
-**Architecture:** Two independent cleanups plus a release. `source_code`: delete the field from the 4 internal create-params and their 3 dead pass-throughs, keep + `@deprecate` the one publicly-exported field (`ICreateEnhancementParams`). featureToggle: delete the unused `_options`/local `IReadOptions` from `readFeatureToggle`, keep the public handler signatures (mandated by `IAdtObject`), document that SFW readiness is a plain GET. Guarded by two characterization tests plus the TypeScript build.
+**Architecture:** Two independent cleanups plus a release. `source_code`: delete the field from the 4 internal create-params and their 3 dead pass-throughs, keep + `@deprecated` the one publicly-exported field (`ICreateEnhancementParams`). featureToggle: delete the unused `_options`/local `IReadOptions` from `readFeatureToggle`, keep the public handler signatures (mandated by `IAdtObject`), document that SFW readiness is a plain GET. Guarded by three characterization tests (enhancement public-surface, serviceDefinition create metadata-only, featureToggle no-long-polling) plus the TypeScript build.
 
 **Tech Stack:** TypeScript (strict, CommonJS), Jest + ts-jest, Biome, published types via `@mcp-abap-adt/interfaces`.
 
