@@ -27,6 +27,7 @@
 - `src/core/featureToggle/read.ts` — remove local `IReadOptions` + the unused `_options` param.
 - `src/core/featureToggle/AdtFeatureToggle.ts` — drop the `IReadOptions` import, retype `read()` options inline, stop forwarding options to `readFeatureToggle`, drop the no-op `{ withLongPolling: true }` from the two internal readiness reads, add a doc comment.
 - `src/__tests__/unit/core/enhancementCreateParamsSurface.test.ts` — NEW: public-barrel type guard.
+- `src/__tests__/unit/core/serviceDefinitionCreateMetadataOnly.test.ts` — NEW: representative create() metadata-only wire test.
 - `src/__tests__/unit/core/featureToggleNoLongPolling.test.ts` — NEW: wire guard.
 
 ---
@@ -88,6 +89,7 @@ git commit -m "test(enhancement): guard public ICreateEnhancementParams.source_c
 ### Task 2: Remove dead `source_code` (4 internal fields, 3 pass-throughs) + deprecate the public one
 
 **Files:**
+- Test (create): `src/__tests__/unit/core/serviceDefinitionCreateMetadataOnly.test.ts`
 - Modify: `src/core/accessControl/types.ts` (remove `source_code?` from `ICreateAccessControlParams`, line ~9)
 - Modify: `src/core/functionInclude/types.ts` (remove `source_code?` from `ICreateFunctionIncludeParams`, line ~14)
 - Modify: `src/core/scalarFunction/types.ts` (remove `source_code?` from `ICreateScalarFunctionParams`, line ~12)
@@ -101,7 +103,79 @@ git commit -m "test(enhancement): guard public ICreateEnhancementParams.source_c
 - Consumes: the Task 1 guard test (must stay green — proves the public enhancement field survives).
 - Produces: none consumed by later tasks.
 
-- [ ] **Step 1: Deprecate the public enhancement field**
+- [ ] **Step 1: Write the representative create() metadata-only wire test**
+
+Characterization test for the invariant this whole cleanup rests on: `create()`
+posts metadata only, never source — even when `sourceCode` is supplied. It is
+green before and after the removals (before: the pass-through set `source_code`
+on the low-level params, but `create.ts` ignored it, so the POST body never
+carried source; after: no pass-through at all). It guards against a future
+regression that wires source into `create()`.
+
+```typescript
+/**
+ * create() is metadata-only: the POST to the SRVD create endpoint carries the
+ * object metadata (name, package, description) but never the source code, even
+ * when sourceCode is passed. This is the invariant behind removing the dead
+ * source_code create-param — source is written by update(), as in Eclipse ADT.
+ */
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import { AdtServiceDefinition } from '../../../core/serviceDefinition/AdtServiceDefinition';
+import { createTestsLogger } from '../../helpers/testLogger';
+
+const logger: ILogger = createTestsLogger();
+const UNIQUE_SOURCE = 'define service ZUNIQUE_SRC_MARKER { expose ZFOO; }';
+
+function fakeConn(): { conn: IAbapConnection; calls: any[] } {
+  const calls: any[] = [];
+  const makeAdtRequest = jest.fn(async (req: any) => {
+    calls.push(req);
+    return { status: 201, data: '' };
+  });
+  return {
+    conn: { makeAdtRequest, setSessionType: jest.fn() } as unknown as IAbapConnection,
+    calls,
+  };
+}
+
+describe('AdtServiceDefinition.create is metadata-only', () => {
+  it('does not put source code in the create POST body', async () => {
+    const { conn, calls } = fakeConn();
+    const handler = new AdtServiceDefinition(conn, logger);
+
+    await handler.create(
+      {
+        serviceDefinitionName: 'ZMETA_ONLY',
+        packageName: 'ZPKG',
+        description: 'meta only',
+        sourceCode: UNIQUE_SOURCE,
+      },
+      { sourceCode: UNIQUE_SOURCE },
+    );
+
+    const posts = calls.filter((c) => c.method === 'POST');
+    expect(posts.length).toBeGreaterThan(0);
+    for (const req of posts) {
+      const body = typeof req.data === 'string' ? req.data : JSON.stringify(req.data ?? '');
+      expect(body).not.toContain('ZUNIQUE_SRC_MARKER');
+    }
+  });
+});
+```
+
+- [ ] **Step 2: Run it, verify it passes (green baseline)**
+
+Run: `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/core/serviceDefinitionCreateMetadataOnly.test.ts --runInBand`
+Expected: PASS, 1 test. (create() already never sends source; this pins that.)
+
+- [ ] **Step 3: Commit the characterization test**
+
+```bash
+git add src/__tests__/unit/core/serviceDefinitionCreateMetadataOnly.test.ts
+git commit -m "test(serviceDefinition): pin create() as metadata-only (no source in POST)"
+```
+
+- [ ] **Step 4: Deprecate the public enhancement field**
 
 In `src/core/enhancement/types.ts`, the `ICreateEnhancementParams` interface, change:
 
@@ -117,7 +191,7 @@ to:
   source_code?: string; // For enhoxhh only
 ```
 
-- [ ] **Step 2: Remove the field from the 4 internal create-params**
+- [ ] **Step 5: Remove the field from the 4 internal create-params**
 
 In each of these files, delete the `source_code?: string;` line **inside the `ICreateXxxParams` interface only** (leave any `source_code` on `IUpdateXxxParams` / other interfaces untouched):
 
@@ -126,7 +200,7 @@ In each of these files, delete the `source_code?: string;` line **inside the `IC
 - `src/core/scalarFunction/types.ts` — `ICreateScalarFunctionParams` → delete `  source_code?: string;`
 - `src/core/serviceDefinition/types.ts` — `ICreateServiceDefinitionParams` → delete `  source_code?: string;`
 
-- [ ] **Step 3: Remove the 3 dead create() pass-throughs**
+- [ ] **Step 6: Remove the 3 dead create() pass-throughs**
 
 `src/core/accessControl/AdtAccessControl.ts` — inside `create()`, delete the line:
 ```typescript
@@ -144,22 +218,22 @@ In each of these files, delete the `source_code?: string;` line **inside the `IC
 ```
 (Do NOT touch the separate real source upload later in `create()` that reads `options?.sourceCode || config.sourceCode` and calls `uploadFunctionIncludeSource`.)
 
-- [ ] **Step 4: Build — verify no dangling references to the removed fields**
+- [ ] **Step 7: Build — verify no dangling references to the removed fields**
 
 Run: `npm run build:fast`
 Expected: clean compile (exit 0). A failure here means some code still references a removed `ICreateXxxParams.source_code` — fix that reference (it was dead too).
 
-- [ ] **Step 5: Run the guard test + full unit suite**
+- [ ] **Step 8: Run the guard tests + full unit suite**
 
 Run: `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit --runInBand`
-Expected: all PASS, including `enhancementCreateParamsSurface` (proves the public field survived).
+Expected: all PASS, including `enhancementCreateParamsSurface` (public field survived) and `serviceDefinitionCreateMetadataOnly` (create still metadata-only).
 
-- [ ] **Step 6: Lint**
+- [ ] **Step 9: Lint**
 
 Run: `npm run lint:check`
 Expected: exit 0 (pre-existing warnings in unrelated files are fine; no new errors in the touched files).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add src/core/accessControl src/core/functionInclude src/core/scalarFunction src/core/serviceDefinition src/core/enhancement
@@ -441,6 +515,7 @@ Then commit (`package.json`, `package-lock.json`, `CHANGELOG.md`), open the rele
 - public handler signatures kept per `IAdtObject` → Task 3 Step 5 (inline retype). ✓
 - doc comment on SFW plain-GET → Task 3 Steps 3, 5. ✓
 - API-surface guard imports from public barrel → Task 1 Step 1. ✓
+- representative create() metadata-only POST test → Task 2 Step 1 (serviceDefinition). ✓
 - wire test for no withLongPolling → Task 3 Step 1. ✓
 - offline test runs via MCP_ENV_PATH → all test steps. ✓
 - patch 7.4.3, one PR, established release flow → Tasks 4-5. ✓
