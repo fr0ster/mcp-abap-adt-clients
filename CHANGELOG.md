@@ -3,6 +3,14 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.3] - 2026-07-16
+
+### Changed
+- **Removed dead `source_code` from create-params.** The no-op `source_code` field is removed from 4 internal `ICreateXxxParams` (accessControl, functionInclude, scalarFunction, serviceDefinition) and its 3 dead `create()` pass-throughs (accessControl, serviceDefinition direct; functionInclude `buildCreateParams`). `create()` posts metadata only — source is written by `update()`, mirroring Eclipse ADT. `ICreateEnhancementParams.source_code` is publicly exported, so it is kept and marked `@deprecated` rather than removed (no API break). `program` and the live `IUpdateXxxParams.source_code` fields are untouched.
+- **featureToggle: removed ignored `withLongPolling` plumbing.** The low-level `readFeatureToggle` accepted a `withLongPolling` option (via a featureToggle-local `IReadOptions` duplicate) it never sent. The dead parameter and the duplicate type are removed; the public `read()`/`readMetadata()` keep the option (mandated by `IAdtObject`) but it is documented as not forwarded — SFW readiness is a plain GET (endpoint support unverified, on-prem).
+
+No published-API break: the one public field (`ICreateEnhancementParams.source_code`) is preserved as `@deprecated`; everything else removed is internal.
+
 ## [7.4.2] - 2026-07-16
 
 ### Fixed
