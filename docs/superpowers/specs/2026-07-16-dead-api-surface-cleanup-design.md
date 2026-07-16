@@ -105,7 +105,7 @@ source_code`) is preserved as `@deprecated`, everything else removed is internal
 
 ## Testing
 
-- **`source_code` removal (internal 8):** the TypeScript build is the primary
+- **`source_code` removal (4 internal fields):** the TypeScript build is the primary
   proof — no handler references the removed field. A unit test asserts a
   representative `create()` (e.g. serviceDefinition) issues a metadata-only POST
   with no source in the body.
