@@ -41,7 +41,7 @@ import { create as createFeatureToggle } from './create';
 import { checkDeletion, deleteFeatureToggle } from './delete';
 import { getFeatureToggleState } from './getState';
 import { lockFeatureToggle } from './lock';
-import { type IReadOptions, readFeatureToggle } from './read';
+import { readFeatureToggle } from './read';
 import { readFeatureToggleSource } from './readSource';
 import { toggleFeatureToggle } from './switch';
 import type {
@@ -262,7 +262,9 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
   async read(
     config: Partial<IFeatureToggleConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
+    // withLongPolling accepted per IAdtObject, but not forwarded: SFW readiness
+    // is a plain GET (endpoint support unverified — on-prem only).
+    options?: { withLongPolling?: boolean },
   ): Promise<IFeatureToggleState | undefined> {
     if (!config.featureToggleName) {
       throw new Error('Feature toggle name is required');
@@ -273,7 +275,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         this.connection,
         config.featureToggleName,
         version ?? 'active',
-        options,
       );
       return {
         readResult: response,
@@ -451,7 +452,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         const readState = await this.read(
           { featureToggleName: fullConfig.featureToggleName },
           'inactive',
-          { withLongPolling: true },
         );
         if (readState) {
           state.readResult = readState.readResult;
@@ -504,7 +504,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
           const readState = await this.read(
             { featureToggleName: fullConfig.featureToggleName },
             'active',
-            { withLongPolling: true },
           );
           if (readState) {
             state.readResult = readState.readResult;

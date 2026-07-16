@@ -115,7 +115,6 @@ export class AdtFunctionInclude
       transport_request: config.transportRequest,
       master_system: config.masterSystem ?? this.systemContext.masterSystem,
       responsible: config.responsible ?? this.systemContext.responsible,
-      source_code: config.sourceCode,
     };
   }
 

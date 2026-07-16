@@ -43,6 +43,10 @@ export interface ICreateEnhancementParams {
   transport_request?: string;
   enhancement_spot?: string; // Required for implementations
   badi_definition?: string; // Required for BAdI implementations
+  /**
+   * @deprecated No-op. `create()` posts metadata only; the source is written by
+   * `update()`. Kept for backward compatibility — this field is never read.
+   */
   source_code?: string; // For enhoxhh only
   masterSystem?: string;
   responsible?: string;

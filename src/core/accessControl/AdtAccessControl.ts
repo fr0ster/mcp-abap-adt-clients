@@ -117,7 +117,7 @@ export class AdtAccessControl
    */
   async create(
     config: IAccessControlConfig,
-    options?: IAdtOperationOptions,
+    _options?: IAdtOperationOptions,
   ): Promise<IAccessControlState> {
     const state: IAccessControlState = { errors: [] };
     if (!config.accessControlName) {
@@ -140,7 +140,6 @@ export class AdtAccessControl
         package_name: config.packageName,
         transport_request: config.transportRequest,
         description: config.description,
-        source_code: options?.sourceCode || config.sourceCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
         masterLanguage:

@@ -6,15 +6,14 @@ import { ACCEPT_FEATURE_TOGGLE_METADATA } from '../../constants/contentTypes';
 import { encodeSapObjectName } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
 
-export interface IReadOptions {
-  withLongPolling?: boolean;
-}
-
+// NOTE: withLongPolling is intentionally not accepted here. The SFW feature-
+// toggle endpoint's support for it is unverified (on-prem only), so readiness
+// reads are a plain GET. The public AdtFeatureToggle.read()/readMetadata()
+// still accept withLongPolling to satisfy IAdtObject, but it is not forwarded.
 export async function readFeatureToggle(
   connection: IAbapConnection,
   name: string,
   version: 'active' | 'inactive' = 'active',
-  _options?: IReadOptions,
 ): Promise<AxiosResponse> {
   const encoded = encodeSapObjectName(name.toLowerCase());
   return connection.makeAdtRequest({
