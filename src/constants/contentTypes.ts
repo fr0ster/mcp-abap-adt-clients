@@ -54,12 +54,35 @@ export const CT_TRANSPORT_CHECK =
 // Unit Test
 export const CT_UNIT_TEST_RUN =
   'application/vnd.sap.adt.api.abapunit.run.v2+xml';
+// Synchronous object-based run via /sap/bc/adt/abapunit/testruns — returns the
+// full result in a single response (no run_id polling). This is the endpoint
+// Eclipse ADT uses for "Run As → ABAP Unit Test" and is supported on 7.5x.
+export const CT_UNIT_TEST_RUNS_CONFIG =
+  'application/vnd.sap.adt.abapunit.testruns.config.v4+xml';
+export const ACCEPT_UNIT_TEST_RUNS_RESULT =
+  'application/vnd.sap.adt.abapunit.testruns.result.v2+xml';
 export const ACCEPT_UNIT_TEST_STATUS =
   'application/vnd.sap.adt.api.abapunit.run-status.v1+xml';
 export const ACCEPT_UNIT_TEST_RESULT =
   'application/vnd.sap.adt.api.abapunit.run-result.v1+xml';
 export const ACCEPT_JUNIT_RESULT =
   'application/vnd.sap.adt.api.junit.run-result.v1+xml';
+
+// ATC (ABAP Test Cockpit)
+export const CT_ATC_WORKLIST_CREATE = 'text/plain';
+export const ACCEPT_ATC_WORKLIST_ID = 'text/plain';
+export const CT_ATC_RUN = 'application/xml';
+export const ACCEPT_ATC_RUN_RESPONSE = 'application/xml';
+export const ACCEPT_ATC_RUN_STATUS =
+  'application/vnd.sap.adt.backgroundrun.v1+xml';
+export const ACCEPT_ATC_WORKLIST_XML =
+  'application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml';
+export const ACCEPT_ATC_WORKLIST_CHECKSTYLE =
+  'application/vnd.sap.atc.checkstyle.v1+xml, application/vnd.sap.atc.checkstyle+xml';
+export const ACCEPT_ATC_VARIANTS =
+  'application/vnd.sap.adt.nameditems.v1+xml, application/xml';
+export const ACCEPT_ATC_CUSTOMIZING =
+  'application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml';
 
 // Discovery
 export const ACCEPT_DISCOVERY = 'application/atomsvc+xml';
