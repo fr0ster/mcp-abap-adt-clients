@@ -1,5 +1,5 @@
 /**
- * AdtServiceDefinition - High-level CRUD operations for Service Definition (DDLS) objects
+ * AdtServiceDefinition - High-level CRUD operations for Service Definition (SRVD/SRV) objects
  *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
@@ -13,7 +13,8 @@
  * - activate uses same session/cookies (no stateful needed)
  *
  * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
+ * - Create: create (POST metadata only — creates an empty source; the source
+ *   code is written by a subsequent update(), mirroring what Eclipse ADT does)
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
@@ -361,11 +362,12 @@ export class AdtServiceDefinition
         this.logger?.info?.('Service definition updated');
 
         // 3.5. Read with long polling (wait for object to be ready after update)
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         this.logger?.info?.('read (wait for object ready after update)');
         try {
           await this.read(
             { serviceDefinitionName: config.serviceDefinitionName },
-            'active',
+            'inactive',
             { withLongPolling: true },
           );
           this.logger?.info?.('object is ready after update');

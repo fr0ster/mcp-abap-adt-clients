@@ -444,12 +444,13 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         this.logger?.info?.('Feature toggle source uploaded');
       }
 
+      // Poll the inactive version: the write above produced it; the active version may not exist yet.
       // 3.5. Read with long polling to ensure object is ready after update
       this.logger?.info?.('read (wait for object ready after update)');
       try {
         const readState = await this.read(
           { featureToggleName: fullConfig.featureToggleName },
-          'active',
+          'inactive',
           { withLongPolling: true },
         );
         if (readState) {

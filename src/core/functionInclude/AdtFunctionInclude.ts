@@ -561,6 +561,7 @@ export class AdtFunctionInclude
           fullConfig.transportRequest,
         );
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // Wait for object to be ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
@@ -569,7 +570,7 @@ export class AdtFunctionInclude
               functionGroupName: fullConfig.functionGroupName,
               includeName: fullConfig.includeName,
             },
-            'active',
+            'inactive',
             { withLongPolling: true },
           );
           this.logger?.info?.('object is ready after update');
