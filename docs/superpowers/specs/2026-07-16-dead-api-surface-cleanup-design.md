@@ -2,7 +2,8 @@
 
 ## Problem
 
-Two internal API surfaces claim capabilities the code never delivers:
+Two dead / misleading API surfaces claim capabilities the code never delivers
+(one is internal, one — `ICreateEnhancementParams` — is publicly exported):
 
 1. **`source_code` in `ICreateXxxParams`** — declared in 9 modules
    (accessControl, appendStructure, enhancement, functionInclude, interface,
@@ -29,7 +30,9 @@ Both were deferred from the 7.4.1/7.4.2 readiness-read work.
 - **`source_code`: two distinct removals — the type field, and the dead
   `create()` pass-through — which do NOT cover the same modules.** Verified
   against current code (see table). The low-level `create.ts` of all 9 ignores
-  the field (metadata-only POST); `program`'s does read it and is out of scope.
+  the snake_case `source_code` field (metadata-only POST). `program` is out of
+  scope — it genuinely uploads source, reading the camelCase `sourceCode` config,
+  not this dead `source_code` param.
 
   **(a) Type field `source_code` in `ICreateXxxParams` — 9 modules.** Eight are
   internal (absent from the built `dist/index*.d.ts`): accessControl,
