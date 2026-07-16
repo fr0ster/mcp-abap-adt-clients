@@ -394,10 +394,11 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         );
         this.logger?.info?.('Class updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ className: config.className }, 'active', {
+          await this.read({ className: config.className }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');

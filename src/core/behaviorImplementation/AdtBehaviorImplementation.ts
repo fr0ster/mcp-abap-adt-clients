@@ -418,10 +418,11 @@ ENDCLASS.`;
           'Behavior implementation implementations include updated',
         );
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 5.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ className: config.className }, 'active', {
+          await this.read({ className: config.className }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');

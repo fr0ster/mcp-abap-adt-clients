@@ -347,10 +347,11 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ programName: config.programName }, 'active', {
+          await this.read({ programName: config.programName }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');

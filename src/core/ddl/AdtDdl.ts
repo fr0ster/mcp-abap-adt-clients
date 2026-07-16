@@ -352,10 +352,11 @@ export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
         );
         this.logger?.info?.('View updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ ddlName: config.ddlName }, 'active', {
+          await this.read({ ddlName: config.ddlName }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');
