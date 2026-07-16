@@ -11,7 +11,6 @@ export interface ICreateFunctionIncludeParams {
   transport_request?: string;
   master_system?: string;
   responsible?: string;
-  source_code?: string;
 }
 
 export interface IFunctionIncludeConfig {

@@ -122,7 +122,7 @@ export class AdtServiceDefinition
    */
   async create(
     config: IServiceDefinitionConfig,
-    options?: IAdtOperationOptions,
+    _options?: IAdtOperationOptions,
   ): Promise<IServiceDefinitionState> {
     const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
@@ -145,7 +145,6 @@ export class AdtServiceDefinition
         package_name: config.packageName,
         transport_request: config.transportRequest,
         description: config.description,
-        source_code: options?.sourceCode || config.sourceCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
         masterLanguage:
