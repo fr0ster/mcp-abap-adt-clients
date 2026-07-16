@@ -7,9 +7,11 @@ Two internal API surfaces claim capabilities the code never delivers:
 1. **`source_code` in `ICreateXxxParams`** — declared in 9 modules
    (accessControl, appendStructure, enhancement, functionInclude, interface,
    scalarFunctionImplementation, scalarFunction, serviceDefinition,
-   transformation), never read by any `create.ts`. In 8 of them the high-level
-   `create()` even populates it (`source_code: options?.sourceCode || …`), a
-   dead pass-through. By design `create()` posts metadata only — the source is
+   transformation), never read by any `create.ts`. In three of them
+   (accessControl, serviceDefinition, functionInclude) the high-level `create()`
+   also populates it on the low-level call — a dead pass-through (see Scope for
+   the exact per-module breakdown). By design `create()` posts metadata only —
+   the source is
    written by a later `update()`, mirroring Eclipse ADT (verified live for SRVD
    in 7.4.1). The field is a no-op that misleads callers into thinking `create()`
    uploads source.
@@ -24,32 +26,48 @@ Both were deferred from the 7.4.1/7.4.2 readiness-read work.
 
 ## Scope decisions
 
-- **`source_code`: remove the dead pass-through everywhere; remove the field
-  from the 8 internal types, deprecate it on the 1 public type.**
+- **`source_code`: two distinct removals — the type field, and the dead
+  `create()` pass-through — which do NOT cover the same modules.** Verified
+  against current code (see table). The low-level `create.ts` of all 9 ignores
+  the field (metadata-only POST); `program`'s does read it and is out of scope.
 
-  Of the 9 `ICreateXxxParams`, eight are internal (not exported from
-  `src/index.ts` — confirmed absent from the built `dist/index*.d.ts`):
-  accessControl, appendStructure, functionInclude, interface,
-  scalarFunctionImplementation, scalarFunction, serviceDefinition,
-  transformation. The field is deleted from all eight.
+  **(a) Type field `source_code` in `ICreateXxxParams` — 9 modules.** Eight are
+  internal (absent from the built `dist/index*.d.ts`): accessControl,
+  appendStructure, functionInclude, interface, scalarFunctionImplementation,
+  scalarFunction, serviceDefinition, transformation → field deleted. The ninth,
+  **`ICreateEnhancementParams`, is publicly exported** (`src/index.core.ts:80` →
+  root `src/index.ts:25` → present in `dist/index.core.d.ts`), so deleting
+  `source_code?: string` (`enhancement/types.ts:46`) would break TS consumers.
+  It is **kept and marked `@deprecated`** ("no-op — `create()` posts metadata
+  only; source is written by `update()`").
 
-  The ninth, **`ICreateEnhancementParams`, is publicly exported**
-  (`src/index.core.ts:80` → root `src/index.ts:25` → present in
-  `dist/index.core.d.ts`). Deleting `source_code?: string` there
-  (`src/core/enhancement/types.ts:46`) would be a source-level break for TS
-  consumers referencing the field. To keep the release non-breaking, the public
-  field is **kept and marked `@deprecated`** ("no-op — `create()` posts metadata
-  only; source is written by `update()`"), while its dead runtime pass-through in
-  `AdtEnhancement.create()` is removed like the others.
+  **(b) Dead `create()` pass-through — exactly 3 modules.** Only these set the
+  field on the low-level create call: `accessControl` and `serviceDefinition`
+  (direct `source_code: options?.sourceCode || config.sourceCode`), and
+  `functionInclude` (via `buildCreateParams`,
+  `AdtFunctionInclude.ts:118 → source_code: config.sourceCode`). Removing the
+  type field forces removing these three lines (they would otherwise not
+  compile). The other 6 modules never pass `source_code` in `create()` — nothing
+  to remove there beyond the type field.
 
-  Note: `enhancement/types.ts` also declares `source_code` on the *update* params
-  (`:55`, required) — that one is live (enhancement update writes source) and is
-  NOT touched. Only the create-params field is deprecated.
+  | module | type field (a) | create() pass-through (b) |
+  |---|---|---|
+  | accessControl | remove | remove (direct) |
+  | serviceDefinition | remove | remove (direct) |
+  | functionInclude | remove | remove (`buildCreateParams:118`) |
+  | appendStructure | remove | — none |
+  | interface | remove | — none |
+  | scalarFunction | remove | — none |
+  | scalarFunctionImplementation | remove | — none |
+  | transformation | remove | — none |
+  | enhancement (public) | **deprecate, keep** | — none (already doesn't pass) |
 
-  In all 9 modules the dead pass-through in the high-level `create()` (8 of them
-  set `source_code:` on the low-level call; `interface` does not) is removed.
-  `program` is untouched — it is the only module that genuinely uploads source
-  (as a separate step inside its create flow).
+  **Do NOT touch:** `functionInclude`'s real source upload — its `create()`
+  genuinely uploads source via `uploadFunctionIncludeSource` (like `program`),
+  reading `options?.sourceCode || config.sourceCode`; only the dead
+  `buildCreateParams` field-set is removed. `enhancement/types.ts` also declares
+  `source_code` on the *update* params (`:55`, required) — live, untouched.
+  `program` is entirely out of scope.
 
 - **`withLongPolling`: remove the dead plumbing only.** The published
   `IAdtObject` interface (`@mcp-abap-adt/interfaces`,
@@ -90,10 +108,13 @@ source_code`) is preserved as `@deprecated`, everything else removed is internal
 - **Public API-surface guard (enhancement):** a type-level unit test asserts the
   intended public surface is preserved — `ICreateEnhancementParams` still carries
   an optional `source_code` field (compile-time: a value of the type may set it,
-  and omitting it is valid). This pins the compatibility decision so an
-  accidental future removal fails a test, not just a downstream consumer's build.
-  (`@deprecated` is a doc annotation and is not itself type-checkable; the test
-  guards the field's continued existence.)
+  and omitting it is valid). **The test MUST import `ICreateEnhancementParams`
+  from the published barrel (`src/index` or `src/index.core`), not from
+  `src/core/enhancement/types`** — otherwise it guards the internal type while the
+  public barrel export could still break. This pins the compatibility decision so
+  an accidental future removal (of the field or its re-export) fails a test, not
+  just a downstream consumer's build. (`@deprecated` is a doc annotation and is
+  not itself type-checkable; the test guards the field's continued existence.)
 - **`withLongPolling`:** a wire-level unit test asserts `readFeatureToggle` never
   appends `withLongPolling` to the request, documenting the deliberate choice
   not to send an unverified parameter.
