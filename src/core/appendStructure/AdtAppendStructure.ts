@@ -11,6 +11,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateAppendStructure } from './activation';
 import { checkAppendStructure } from './check';
@@ -39,16 +44,30 @@ export class AdtAppendStructure
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AppendStructure';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      async (name, lockHandle) => {
+        this.connection.setSessionType('stateful');
+        try {
+          await unlockAppendStructure(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+        }
+      },
+    );
   }
 
   async validate(
@@ -194,6 +213,7 @@ export class AdtAppendStructure
         this.connection,
         config.appendStructureName,
       );
+      this.lockTracker.track(config.appendStructureName, lockHandle);
 
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
@@ -237,6 +257,7 @@ export class AdtAppendStructure
         } finally {
           this.connection.setSessionType('stateless');
         }
+        this.lockTracker.untrack(config.appendStructureName);
         lockHandle = undefined;
       }
 
@@ -280,6 +301,7 @@ export class AdtAppendStructure
             config.appendStructureName,
             lockHandle,
           );
+          this.lockTracker.untrack(config.appendStructureName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -361,7 +383,12 @@ export class AdtAppendStructure
     if (!config.appendStructureName)
       throw new Error('Append structure name is required');
     this.connection.setSessionType('stateful');
-    return lockAppendStructure(this.connection, config.appendStructureName);
+    const lockHandle = await lockAppendStructure(
+      this.connection,
+      config.appendStructureName,
+    );
+    this.lockTracker.track(config.appendStructureName, lockHandle);
+    return lockHandle;
   }
 
   async unlock(
@@ -377,6 +404,7 @@ export class AdtAppendStructure
         config.appendStructureName,
         lockHandle,
       );
+      this.lockTracker.untrack(config.appendStructureName);
       return { unlockResult, errors: [] };
     } finally {
       this.connection.setSessionType('stateless');

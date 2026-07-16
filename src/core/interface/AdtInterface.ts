@@ -28,6 +28,11 @@ import type {
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateInterface } from './activation';
 import { checkInterface } from './check';
@@ -52,6 +57,7 @@ export class AdtInterface
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   protected readonly contentTypes?: IAdtContentTypes;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Interface';
 
   constructor(
@@ -59,11 +65,24 @@ export class AdtInterface
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
     this.contentTypes = contentTypes;
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      async (interfaceName, lockHandle) => {
+        this.connection.setSessionType('stateful');
+        try {
+          await unlockInterface(this.connection, interfaceName, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+        }
+      },
+    );
   }
 
   /**
@@ -280,6 +299,7 @@ export class AdtInterface
       );
       lockHandle = lockResult.lockHandle;
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.interfaceName, lockHandle);
       this.logger?.info?.('Interface locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -340,6 +360,7 @@ export class AdtInterface
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.interfaceName);
         lockHandle = undefined;
         this.logger?.info?.('Interface unlocked');
       }
@@ -411,6 +432,7 @@ export class AdtInterface
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.interfaceName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -594,6 +616,7 @@ export class AdtInterface
 
     this.connection.setSessionType('stateful');
     const result = await lockInterface(this.connection, config.interfaceName);
+    this.lockTracker.track(config.interfaceName, result.lockHandle);
     return result.lockHandle;
   }
 
@@ -615,6 +638,7 @@ export class AdtInterface
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.interfaceName);
     return {
       unlockResult: result,
       errors: [],

@@ -28,6 +28,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDomain } from './activation';
@@ -44,16 +49,30 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Domain';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      async (domainName, lockHandle) => {
+        this.connection.setSessionType('stateful');
+        try {
+          await unlockDomain(this.connection, domainName, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+        }
+      },
+    );
   }
 
   /**
@@ -292,6 +311,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.domainName, lockHandle);
       this.logger?.info?.('locked');
 
       // 2. Check inactive with XML for update (if provided)
@@ -362,6 +382,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.domainName);
         lockHandle = undefined;
         this.logger?.info?.('unlocked');
       }
@@ -425,7 +446,10 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
           this.connection.setSessionType('stateful');
           await unlockDomain(this.connection, config.domainName, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.domainName);
         } catch (unlockError) {
+          // Cleanup unlock failed — the lock stays tracked so unlockAll() (or
+          // session-drop) remains the last resort.
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
             safeErrorMessage(unlockError),
@@ -602,6 +626,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockDomain(this.connection, config.domainName);
+    this.lockTracker.track(config.domainName, lockHandle);
     return lockHandle;
   }
 
@@ -623,6 +648,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.domainName);
     return {
       unlockResult: result,
       errors: [],

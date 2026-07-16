@@ -34,6 +34,7 @@ import { safeErrorMessage } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class';
 import { updateClass } from '../class/update';
+import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import {
   getBehaviorImplementationMetadata,
@@ -60,10 +61,22 @@ export class AdtBehaviorImplementation
   private readonly class: AdtClass;
   public readonly objectType: string = 'BehaviorImplementation';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    lockRegistry?: LockRegistry,
+  ) {
     this.connection = connection;
     this.logger = logger;
-    this.class = new AdtClass(connection, logger);
+    // Behavior implementation locks are class locks delegated to this internal
+    // AdtClass — pass the session registry so those locks are tracked too.
+    this.class = new AdtClass(
+      connection,
+      logger,
+      undefined,
+      undefined,
+      lockRegistry,
+    );
   }
 
   /**

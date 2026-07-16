@@ -136,6 +136,7 @@ import {
   type IServiceDefinitionState,
 } from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
+import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import {
   AdtStructure,
   type IStructureConfig,
@@ -185,6 +186,11 @@ export class AdtClient {
   protected logger: ILogger;
   protected systemContext: IAdtSystemContext;
   protected contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
+  /**
+   * Session-scoped registry of locks held by handlers created from this client.
+   * All handlers share one stateful session, so all their locks belong here.
+   */
+  protected readonly lockRegistry = new LockRegistry();
 
   constructor(
     connection: IAbapConnection,
@@ -237,6 +243,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -250,6 +257,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -258,7 +266,13 @@ export class AdtClient {
    * @returns IAdtObject instance for Interface operations
    */
   getInterface(): IAdtObject<IInterfaceConfig, IInterfaceState> {
-    return new AdtInterface(this.connection, this.logger, this.systemContext);
+    return new AdtInterface(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      undefined,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -266,7 +280,38 @@ export class AdtClient {
    * @returns IAdtObject instance for Domain operations
    */
   getDomain(): IAdtObject<IDomainConfig, IDomainState> {
-    return new AdtDomain(this.connection, this.logger, this.systemContext);
+    return new AdtDomain(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
+  }
+
+  /**
+   * Last-resort cleanup: release every lock still held by handlers created from
+   * this client. Returns the locks that could not be released.
+   *
+   * This is a safety net for abandoned locks (a forgot-to-unlock, or a managed
+   * flow that threw before its unlock). Preventing a timeout from interrupting a
+   * lock→unlock critical section remains the caller's responsibility.
+   */
+  async unlockAll(): Promise<LockFailure[]> {
+    return this.lockRegistry.unlockAll();
+  }
+
+  /**
+   * Keys of locks currently held by handlers created from this client
+   * (e.g. `Domain/ZFOO`, `DataElement/ZBAR`). Lets a consumer inspect whether a
+   * session was left with dangling locks before deciding to `unlockAll()`.
+   */
+  get pendingLocks(): string[] {
+    return this.lockRegistry.pending;
+  }
+
+  /** Release all held locks when used with `await using`. */
+  async [Symbol.asyncDispose](): Promise<void> {
+    await this.unlockAll();
   }
 
   /**
@@ -274,7 +319,12 @@ export class AdtClient {
    * @returns IAdtObject instance for DataElement operations
    */
   getDataElement(): IAdtObject<IDataElementConfig, IDataElementState> {
-    return new AdtDataElement(this.connection, this.logger, this.systemContext);
+    return new AdtDataElement(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -289,6 +339,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -297,7 +348,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Structure operations
    */
   getStructure(): IAdtObject<IStructureConfig, IStructureState> {
-    return new AdtStructure(this.connection, this.logger, this.systemContext);
+    return new AdtStructure(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -305,7 +361,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Table operations
    */
   getTable(): IAdtObject<ITableConfig, ITableState> {
-    return new AdtTable(this.connection, this.logger, this.systemContext);
+    return new AdtTable(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -317,6 +378,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -328,7 +390,12 @@ export class AdtClient {
    * @returns IAdtObject instance for DDL source operations
    */
   getDdl(): IAdtObject<IDdlConfig, IDdlState> {
-    return new AdtDdl(this.connection, this.logger, this.systemContext);
+    return new AdtDdl(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -341,6 +408,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -354,6 +422,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -370,6 +439,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -378,7 +448,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Package operations
    */
   getPackage(): IAdtObject<IPackageConfig, IPackageState> {
-    return new AdtPackage(this.connection, this.logger, this.systemContext);
+    return new AdtPackage(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -390,6 +465,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -414,6 +490,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -427,6 +504,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -442,6 +520,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -453,6 +532,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -467,6 +547,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -481,6 +562,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -515,6 +597,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -526,7 +609,11 @@ export class AdtClient {
     IBehaviorImplementationConfig,
     IBehaviorImplementationState
   > {
-    return new AdtBehaviorImplementation(this.connection, this.logger);
+    return new AdtBehaviorImplementation(
+      this.connection,
+      this.logger,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -541,6 +628,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -555,7 +643,12 @@ export class AdtClient {
    * @returns IAdtObject instance for Enhancement operations
    */
   getEnhancement(): IAdtObject<IEnhancementConfig, IEnhancementState> {
-    return new AdtEnhancement(this.connection, this.logger, this.systemContext);
+    return new AdtEnhancement(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -567,6 +660,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -620,6 +714,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -633,6 +728,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -646,6 +742,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -659,6 +756,7 @@ export class AdtClient {
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 }

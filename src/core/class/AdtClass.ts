@@ -31,6 +31,11 @@ import {
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
@@ -57,6 +62,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   protected readonly contentTypes?: IAdtContentTypes;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Class';
 
   constructor(
@@ -64,11 +70,24 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
     this.contentTypes = contentTypes;
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      async (className, lockHandle) => {
+        this.connection.setSessionType('stateful');
+        try {
+          await unlockClass(this.connection, className, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+        }
+      },
+    );
   }
 
   /**
@@ -349,6 +368,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.className, lockHandle);
       this.logger?.info?.('Class locked, handle:', lockHandle);
 
       // 2. Check inactive with code/xml for update (from options or config)
@@ -406,6 +426,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.className);
         lockHandle = undefined;
         this.logger?.info?.('Class unlocked');
       }
@@ -459,6 +480,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           this.connection.setSessionType('stateful');
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.className);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -703,7 +725,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     // is only valid inside stateful requests, so a stateless write between lock
     // and unlock fails with 423.
     this.connection.setSessionType('stateful');
-    return await lockClass(this.connection, config.className);
+    const lockHandle = await lockClass(this.connection, config.className);
+    this.lockTracker.track(config.className, lockHandle);
+    return lockHandle;
   }
 
   /**
@@ -723,6 +747,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.className);
     return {
       unlockResult: result,
       errors: [],
@@ -808,6 +833,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.info?.('Step 1: Locking parent class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
+      this.lockTracker.track(config.className, lockHandle);
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Update test classes (uses parent class lock handle)
@@ -826,6 +852,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.connection.setSessionType('stateful');
       await unlockClass(this.connection, config.className, lockHandle);
       this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(config.className);
       lockHandle = undefined;
 
       return response;
@@ -837,6 +864,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           this.connection.setSessionType('stateful');
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.className);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',

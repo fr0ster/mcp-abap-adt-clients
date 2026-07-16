@@ -27,6 +27,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateStructure } from './activation';
 import { checkStructure } from './check';
@@ -50,16 +55,30 @@ export class AdtStructure
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Structure';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      async (name, lockHandle) => {
+        this.connection.setSessionType('stateful');
+        try {
+          await unlockStructure(this.connection, name, lockHandle);
+        } finally {
+          this.connection.setSessionType('stateless');
+        }
+      },
+    );
   }
 
   /**
@@ -308,6 +327,7 @@ export class AdtStructure
       this.logger?.info?.('Step 1: Locking structure');
       this.connection.setSessionType('stateful');
       lockHandle = await lockStructure(this.connection, config.structureName);
+      this.lockTracker.track(config.structureName, lockHandle);
       this.logger?.info?.('Structure locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -366,6 +386,7 @@ export class AdtStructure
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.structureName);
         lockHandle = undefined;
         this.logger?.info?.('Structure unlocked');
       }
@@ -444,6 +465,7 @@ export class AdtStructure
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.structureName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -574,6 +596,7 @@ export class AdtStructure
       this.connection,
       config.structureName,
     );
+    this.lockTracker.track(config.structureName, lockHandle);
     return lockHandle;
   }
 
@@ -595,6 +618,7 @@ export class AdtStructure
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.structureName);
     return {
       unlockResult: result,
       errors: [],
