@@ -32,14 +32,16 @@ Params + Config/State live in `src/core/<module>/types.ts`. Counts (params / con
 Produces the authoritative per-type diff that drives every later reconciliation task and decides the interfaces version. No product code yet.
 
 **Files:**
-- Create: `~/prj/mcp-abap-adt-interfaces/scripts/type-promotion-diff.mjs` (throwaway tooling; deleted in Task A9)
+- Create: `~/prj/mcp-abap-adt-interfaces/scripts/type-promotion-diff.mjs` (throwaway tooling; deleted in Task A7)
 - Output: `~/prj/mcp-abap-adt-interfaces/type-promotion-diff.md` (git-ignored scratch)
 
 - [ ] **Step 1: Write the diff script**
 
-A Node ESM script that is **bidirectional**:
-- For every exported `interface`/`type` in adt-clients `../mcp-abap-adt-clients/src/core/*/types.ts`, compare to the same-named declaration in `../mcp-abap-adt-interfaces/src/adt/*.ts`. Classify: `ADD` (missing in interfaces), `MATCH`, or `DIFF` (present but structurally different — list the differing lines).
-- **Also enumerate the reverse:** every exported param/config/state/option type in `../mcp-abap-adt-interfaces/src/adt/*.ts` that has NO same-named declaration in any adt-clients `src/core/*/types.ts` → classify `INTERFACES_ONLY`. These are stale interfaces-only exports (confirmed to exist, e.g. `IReadClassParams`, `IUpdateClassParams`, `IReadDomainParams`).
+A Node ESM script that is **bidirectional**. It scans the interfaces side across **all of `../mcp-abap-adt-interfaces/src/**/*.ts`** — not just `src/adt/`, because some shared types live elsewhere (e.g. `IReadOptions` is at `src/shared/IReadOptions.ts`). Otherwise it would misclassify an already-present shared type as `ADD`.
+- For every exported `interface`/`type` in adt-clients `../mcp-abap-adt-clients/src/core/*/types.ts`, compare to the same-named declaration anywhere in `../mcp-abap-adt-interfaces/src/**/*.ts`. Classify: `ADD` (missing in interfaces), `MATCH`, or `DIFF` (present but structurally different — list the differing lines and the interfaces file it was found in).
+- **Also enumerate the reverse:** every exported param/config/state/option type anywhere in `../mcp-abap-adt-interfaces/src/**/*.ts` that has NO same-named declaration in any adt-clients `src/core/*/types.ts` → classify `INTERFACES_ONLY`. These are stale interfaces-only exports (confirmed to exist, e.g. `IReadClassParams`, `IUpdateClassParams`, `IReadDomainParams`).
+
+Because the scan covers all of `src/`, `IReadOptions` resolves to its existing `src/shared/IReadOptions.ts` and is classified `MATCH`/`DIFF` (reconcile in place), not `ADD` — consistent with A5b.
 
 Exclude the `atc` module and the unitTest sync types (`IUnitTestRunSyncOptions`, `IUnitTestSummary`, `IUnitTestAlert`, `IUnitTestMethodResult`, `UnitTestObjectType`, `UnitTestRunScope`). Text-level block comparison (normalize whitespace) is sufficient — this is a worklist, not a compiler.
 
