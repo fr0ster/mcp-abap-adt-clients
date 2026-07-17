@@ -21,7 +21,7 @@
 
 ## Module inventory (30 `types.ts`; ATC/unitTest-sync excluded from promotion content)
 
-Params + Config/State live in `src/core/<module>/types.ts`. Counts (params / config+state): accessControl 3/2, appendStructure 3/2, authorizationField 1/2, behaviorDefinition 1/2 (+9 other type decls), behaviorImplementation 1/2, class 2/2, dataElement 3/2, ddl 3/2, domain 3/2, enhancement 3/2 (**runtime**), featureToggle 2/3 (+ option types), functionGroup 3/2, functionInclude 1/2, functionModule 3/2, interface 3/2, messageClass 2/4, metadataExtension 0/2, package 0/2, program 3/2, scalarFunction 3/2, scalarFunctionImplementation 3/2, serviceDefinition 3/2, service 5/2 (+ many, **runtime**), structure 3/2, table 3/2, tabletype 3/2, transformation 3/2, transport 1/2, unitTest 0/2. `shared/types.ts` holds 25 shared type decls (treated in Task 6).
+Params + Config/State live in `src/core/<module>/types.ts`. Counts (params / config+state): accessControl 3/2, appendStructure 3/2, authorizationField 1/2, behaviorDefinition 1/2 (+9 other type decls), behaviorImplementation 1/2, class 2/2, dataElement 3/2, ddl 3/2, domain 3/2, enhancement 3/2 (**runtime**), featureToggle 2/3 (+ option types), functionGroup 3/2, functionInclude 1/2, functionModule 3/2, interface 3/2, messageClass 2/4, metadataExtension 0/2, package 0/2, program 3/2, scalarFunction 3/2, scalarFunctionImplementation 3/2, serviceDefinition 3/2, service 5/2 (+ many, **runtime**), structure 3/2, table 3/2, tabletype 3/2, transformation 3/2, transport 1/2, unitTest 0/2. `src/core/shared/types.ts` holds 25 cross-cutting consumer-facing type decls (`AdtObjectType`, `IObjectReference`, `IReadOptions`, `ISearchObjectsParams`, `IGetWhereUsedParams`, `IPackageHierarchyNode`, `IWhereUsedListResult`, …) — none currently in interfaces; handled by **Task A5b**.
 
 ---
 
@@ -37,7 +37,11 @@ Produces the authoritative per-type diff that drives every later reconciliation 
 
 - [ ] **Step 1: Write the diff script**
 
-A Node ESM script that, for every `src/core/<module>/types.ts` in adt-clients (path: `../mcp-abap-adt-clients/src/core/*/types.ts`), extracts each exported `interface`/`type` block and compares it to the same-named declaration in `../mcp-abap-adt-interfaces/src/adt/IAdt<Module>.ts` (and `src/adt/*.ts` generally). For each type report one of: `ADD` (missing in interfaces), `MATCH`, `DIFF` (present but structurally different — list the differing lines). Exclude the `atc` module and the unitTest sync types (`IUnitTestRunSyncOptions`, `IUnitTestSummary`, `IUnitTestAlert`, `IUnitTestMethodResult`, `UnitTestObjectType`, `UnitTestRunScope`). Text-level block comparison (normalize whitespace) is sufficient — this is a worklist, not a compiler.
+A Node ESM script that is **bidirectional**:
+- For every exported `interface`/`type` in adt-clients `../mcp-abap-adt-clients/src/core/*/types.ts`, compare to the same-named declaration in `../mcp-abap-adt-interfaces/src/adt/*.ts`. Classify: `ADD` (missing in interfaces), `MATCH`, or `DIFF` (present but structurally different — list the differing lines).
+- **Also enumerate the reverse:** every exported param/config/state/option type in `../mcp-abap-adt-interfaces/src/adt/*.ts` that has NO same-named declaration in any adt-clients `src/core/*/types.ts` → classify `INTERFACES_ONLY`. These are stale interfaces-only exports (confirmed to exist, e.g. `IReadClassParams`, `IUpdateClassParams`, `IReadDomainParams`).
+
+Exclude the `atc` module and the unitTest sync types (`IUnitTestRunSyncOptions`, `IUnitTestSummary`, `IUnitTestAlert`, `IUnitTestMethodResult`, `UnitTestObjectType`, `UnitTestRunScope`). Text-level block comparison (normalize whitespace) is sufficient — this is a worklist, not a compiler.
 
 ```js
 // scripts/type-promotion-diff.mjs — throwaway. Enumerate adt-clients type blocks,
@@ -50,9 +54,14 @@ A Node ESM script that, for every `src/core/<module>/types.ts` in adt-clients (p
 Run: `node scripts/type-promotion-diff.mjs > type-promotion-diff.md`
 Expected: a markdown table per module listing every promoted type as ADD / MATCH / DIFF, with the differing lines for DIFFs. Confirm known cases appear: `IUpdateDomainParams.package_name` optionality DIFF, `IFixedValue` shape DIFF.
 
-- [ ] **Step 3: Decide the interfaces version from the report**
+- [ ] **Step 3: Decide the interfaces version + resolve INTERFACES_ONLY types**
 
-Scan the DIFF entries. If every DIFF is an added optional field (and every ADD is optional) → **minor** (next: 10.1.0). If any DIFF/ADD is a required-field addition, field removal, tightened optionality, or changed nested shape → **major** (next: 11.0.0). Record the decision and the list of incompatible types at the top of `type-promotion-diff.md`.
+Scan DIFF, ADD, and INTERFACES_ONLY entries:
+- If every DIFF/ADD is an added optional field → **minor** (next: 10.1.0).
+- If any DIFF/ADD is a required-field addition, field removal, tightened optionality, or changed nested shape → **major** (next: 11.0.0).
+- For each **INTERFACES_ONLY** type, decide explicitly: (a) adt-clients genuinely needs it (rare — it would already reference it) → keep as-is, no action; (b) it is stale/unused → it should be **removed** from interfaces, which is a breaking change → forces the **major** path. Record each INTERFACES_ONLY disposition. Default disposition for a param that no adt-clients class uses is removal (per the no-dead-surface rule), which means these usually push the release to major.
+
+Record the version decision, the incompatible-type list, and the INTERFACES_ONLY dispositions at the top of `type-promotion-diff.md`. (Task A5b removes the ones marked for removal.)
 
 - [ ] **Step 4: Commit the script (report stays git-ignored)**
 
@@ -205,6 +214,32 @@ git commit -am "feat(promotion): add remaining consumer-facing option/result typ
 
 ---
 
+### Task A5b: Promote `shared/types.ts` cross-cutting types + remove INTERFACES_ONLY
+
+The 25 shared types in adt-clients `src/core/shared/types.ts` are consumer-facing (AdtUtils takes/returns them; they are publicly exported from the root barrel) and do not belong to any single object module. Promote them into a dedicated interfaces file. Also delete the INTERFACES_ONLY types marked for removal in Task A1 Step 3.
+
+**Files:**
+- Create: `~/prj/mcp-abap-adt-interfaces/src/adt/IAdtShared.ts`
+- Modify: `~/prj/mcp-abap-adt-interfaces/src/index.ts` (export the shared types), and the `src/adt/*.ts` files holding INTERFACES_ONLY types to be removed.
+
+**Interfaces:**
+- Consumes: adt-clients `src/core/shared/types.ts` (25 decls), Task A1 INTERFACES_ONLY dispositions.
+- Produces: shared cross-cutting types available from `@mcp-abap-adt/interfaces`; stale interfaces-only params removed.
+
+- [ ] **Step 1: Copy the in-scope shared type declarations verbatim** from `src/core/shared/types.ts` into `src/adt/IAdtShared.ts`. Include the consumer-facing ones (`AdtObjectType`/`AdtObjectTypeLower`/`AdtSourceObjectType`, `IObjectReference`, `IReadOptions`, `ISearchObjectsParams`/`ISearchResult`, `IGetSqlQueryParams`, `IGetTableContentsParams`, `IGetDiscoveryParams`, `IGetWhereUsed*Params`, `IWhereUsedReference`/`IWhereUsedListResult`, `IVirtualFolders*`, `IGetPackageHierarchyOptions`/`PackageHierarchy*`/`IPackageHierarchyNode`, `IGetPackageContentsListOptions`/`IPackageContentItem`, `IInactiveObjectsResponse`). Leave any purely-internal shared type local (note it). Add `export type { … } from './adt/IAdtShared'` to `src/index.ts`.
+
+- [ ] **Step 2: Remove the INTERFACES_ONLY types marked for removal** in Task A1 Step 3 (e.g. `IReadClassParams`, `IUpdateClassParams`, `IReadDomainParams` if adt-clients has no counterpart and they were dispositioned "remove"). Delete their declarations and their `src/index.ts` exports.
+
+- [ ] **Step 3: Build** — `npm run build`, exit 0.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -am "feat(promotion): promote shared cross-cutting types to interfaces; drop stale interfaces-only params"
+```
+
+---
+
 ### Task A6: Version bump, changelog, lockfile
 
 **Files:**
@@ -257,13 +292,22 @@ Merge (squash), sync master, `git tag -a v<v>`, push tag, create the GitHub rele
 
 - [ ] **Step 1: Capture the public-surface baseline from the CURRENT build**
 
-Run (before any change): `npm run build:fast` then enumerate exported type names from each published entry point's `.d.ts`:
-```bash
-for e in index index.core index.runtime index.batch index.ws index.abapgit index.executors; do
-  echo "== $e =="; grep -ohE "export (type )?\{[^}]*\}" dist/$e.d.ts 2>/dev/null;
-done > /tmp/claude-*/…/scratchpad/surface-before.txt
+A grep of `.d.ts` does NOT work — the root `dist/index.d.ts` uses `export * from './index.core'` etc., so a grep misses the fan-out. Use the TypeScript compiler API to resolve each entry point's full exported-symbol set (it follows `export *`). Write this throwaway script:
+
+```js
+// scripts/surface-snapshot.mjs — resolve exported symbol names per entry point via tsc.
+import ts from 'typescript';
+const entries = ['index','index.core','index.runtime','index.batch','index.ws','index.abapgit','index.executors'];
+const prog = ts.createProgram(entries.map(e=>`dist/${e}.d.ts`), { allowJs:true, declaration:true });
+const checker = prog.getTypeChecker();
+for (const e of entries) {
+  const sf = prog.getSourceFile(`dist/${e}.d.ts`);
+  const sym = sf && checker.getSymbolAtLocation(sf);
+  const names = sym ? checker.getExportsOfModule(sym).map(s=>s.getName()).sort() : [];
+  console.log(`== ${e} ==\n${names.join('\n')}`);
+}
 ```
-(Resolve the scratchpad path at run time.) This is the invariant to preserve.
+Run (before any change): `npm run build:fast && node scripts/surface-snapshot.mjs > "$SCRATCH/surface-before.txt"` (resolve `$SCRATCH` to the session scratchpad at run time; the file is not committed). This sorted per-entry identifier set is the invariant to preserve.
 
 - [ ] **Step 2: Bump the dep and force-refresh**
 
@@ -343,9 +387,10 @@ For every module, replace the local `IXxxConfig`/`IXxxState` (and any option/res
 - Modify: `src/core/<module>/types.ts` (all ~28 modules).
 
 - [ ] **Step 1: Per module, replace the local `Config`/`State`/promoted-option declarations with `export type { IXxxConfig, IXxxState, … } from '@mcp-abap-adt/interfaces'`.** Worked example (`serviceDefinition`): the `IServiceDefinitionConfig`/`IServiceDefinitionState` blocks become a re-export line. Leave any type NOT promoted in Phase A as a local declaration (and note it).
-- [ ] **Step 2: Build** — `npm run build:fast`, exit 0.
-- [ ] **Step 3: Full unit suite** — 348 pass.
-- [ ] **Step 4: Commit** — `git commit -am "refactor(types): source Config/State + option types from interfaces"`.
+- [ ] **Step 2: Replace `src/core/shared/types.ts` promoted declarations with re-exports.** The shared cross-cutting types (promoted in A5b) become `export type { AdtObjectType, IObjectReference, IReadOptions, ISearchObjectsParams, IGetWhereUsedParams, IPackageHierarchyNode, … } from '@mcp-abap-adt/interfaces'`. Keep any shared type left local in A5b. Note: `IReadOptions` is imported widely across `src/core/*` from `../shared/types` — the re-export keeps that path working.
+- [ ] **Step 3: Build** — `npm run build:fast`, exit 0.
+- [ ] **Step 4: Full unit suite** — 348 pass.
+- [ ] **Step 5: Commit** — `git commit -am "refactor(types): source Config/State + shared + option types from interfaces"`.
 
 ---
 
@@ -355,14 +400,19 @@ For every module, replace the local `IXxxConfig`/`IXxxState` (and any option/res
 
 - [ ] **Step 1: Rebuild and capture the surface AFTER**
 
-Run: `npm run build:fast` then the same enumeration as B1 Step 1 into `surface-after.txt`.
+Run: `npm run build:fast && node scripts/surface-snapshot.mjs > "$SCRATCH/surface-after.txt"` (same script as B1 Step 1).
 
 - [ ] **Step 2: Diff before/after — must be identical**
 
-Run: `diff <scratchpad>/surface-before.txt <scratchpad>/surface-after.txt`
-Expected: no differences (the re-exports preserved every published type name). Any difference is a regression — fix the offending module's re-export to restore the missing name.
+Run: `diff "$SCRATCH/surface-before.txt" "$SCRATCH/surface-after.txt"`
+Expected: no differences (the re-exports preserved every published exported name across all entry points, `export *` fan-out included). Any difference is a regression — fix the offending module's re-export to restore the missing name.
 
-- [ ] **Step 3: Lint** — `npm run lint:check`, exit 0.
+- [ ] **Step 3: Remove the snapshot script; lint**
+
+```bash
+git rm --cached scripts/surface-snapshot.mjs 2>/dev/null; rm -f scripts/surface-snapshot.mjs
+```
+Run: `npm run lint:check`, exit 0.
 
 ---
 
@@ -394,10 +444,12 @@ Push `feat/consume-promoted-types`, open PR, await review, merge (squash), sync 
 - Preserve verbatim casing (masterSystem) → Global Constraints + A2 pattern. ✓
 - Promote Config/State (local-only → new) → Task A4. ✓
 - Promote option/result types → Task A5. ✓
+- Promote shared/types.ts cross-cutting types (25) → Task A5b; re-export B4 Step 2. ✓
+- Bidirectional diff catches INTERFACES_ONLY (IReadClassParams etc.); dispositioned + removed → A1 Step 1/3, A5b Step 2. ✓
 - Move type declarations only; keep runtime → Global Constraints + A3/B3 notes (enhancement, service). ✓
-- Version from diff (minor vs major) → A1 Step 3, A6 Step 1. ✓
+- Version from diff, incl INTERFACES_ONLY removals forcing major → A1 Step 3, A6 Step 1. ✓
 - adt-clients import + re-export (non-breaking) → B2/B3/B4. ✓
-- Public-surface snapshot against published entry points via .d.ts → B1 Step 1, B5. ✓
+- Public-surface snapshot via tsc compiler API (resolves export * fan-out) → B1 Step 1, B5. ✓
 - Two releases, interfaces-first, user publishes → A7, B6, phase gate. ✓
 - ATC excluded → Global Constraints + A1 exclusions. ✓
 - Force-refresh dep + no link:true → B1 Step 2. ✓
