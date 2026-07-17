@@ -3,6 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.4.4] - 2026-07-17
+
+### Changed
+- **Bump `@mcp-abap-adt/interfaces` to `^10.0.0`.** interfaces 10.0.0 removes the no-op `source_code` from its create-params (completing the 7.4.3 drift resolution — see interfaces CHANGELOG). No adt-clients code change: adt-clients uses its own local param copies and never imported the removed fields. Build, lint, and the full unit suite (348) pass against interfaces 10.0.0.
+
 ## [7.4.3] - 2026-07-16
 
 ### Changed
