@@ -45,8 +45,13 @@ types-only consolidation.
    rewritten to be **structurally identical** to adt-clients' current shape —
    field names, optionality, and nested shapes all copied **verbatim**. The
    reconciliation compares full structure, not just field presence:
-   - Add a field adt-clients has and interfaces lacks (e.g. `ICreateClassParams`
-     12 vs 11) — additive, non-breaking.
+   - Add an **optional** field adt-clients has and interfaces lacks (e.g.
+     `ICreateClassParams` 12 vs 11, where the extra field is `?:`) — additive,
+     non-breaking.
+   - Add a **required** field adt-clients has and interfaces lacks — this is
+     **breaking** for these input param interfaces: a consumer that constructs the
+     object must now supply the field, so it takes the major path (same as the
+     incompatible changes below).
    - **Any incompatible change to an interfaces type is potentially breaking**,
      not only field removals: an optionality change (e.g.
      `IUpdateDomainParams.package_name` is `?: string` in interfaces but required
