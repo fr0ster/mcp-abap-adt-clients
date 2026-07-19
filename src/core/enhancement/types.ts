@@ -9,17 +9,15 @@
  * - enhsxsb: BAdI Enhancement Spot
  */
 
-import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
+import type { EnhancementType } from '@mcp-abap-adt/interfaces';
 
-/**
- * Enhancement type codes used in ADT URLs
- */
-export type EnhancementType =
-  | 'enhoxh'
-  | 'enhoxhb'
-  | 'enhoxhh'
-  | 'enhsxs'
-  | 'enhsxsb';
+// Types defined in @mcp-abap-adt/interfaces
+export type {
+  EnhancementType,
+  IEnhancementConfig,
+  IEnhancementMetadata,
+  IEnhancementState,
+} from '@mcp-abap-adt/interfaces';
 
 /**
  * Enhancement object type codes for ADT
@@ -42,46 +40,6 @@ export type {
   IUpdateEnhancementParams,
   IValidateEnhancementParams,
 } from '@mcp-abap-adt/interfaces';
-
-/**
- * AdtEnhancement configuration (camelCase)
- * Used by high-level IAdtObject implementation
- */
-export interface IEnhancementConfig {
-  enhancementName: string;
-  masterLanguage?: string; // Original/master language for create; falls back to systemContext (SAP_LANGUAGE), then EN
-  enhancementType: EnhancementType;
-  description?: string;
-  packageName?: string;
-  transportRequest?: string;
-  sourceCode?: string;
-  enhancementSpot?: string;
-  badiDefinition?: string;
-}
-
-/**
- * AdtEnhancement state
- * Extends base IAdtObjectState with enhancement-specific fields
- */
-export interface IEnhancementState extends IAdtObjectState {
-  enhancementType?: EnhancementType;
-  sourceCode?: string;
-}
-
-/**
- * Enhancement metadata structure from ADT response
- */
-export interface IEnhancementMetadata {
-  name: string;
-  type: EnhancementType;
-  description?: string;
-  packageName?: string;
-  responsible?: string;
-  masterSystem?: string;
-  version?: string;
-  enhancementSpot?: string;
-  badiDefinition?: string;
-}
 
 /**
  * Get ADT base URL for enhancement type
