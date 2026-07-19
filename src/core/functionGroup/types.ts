@@ -4,28 +4,12 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (camelCase)
-export interface ICreateFunctionGroupParams {
-  functionGroupName: string;
-  description: string;
-  packageName: string;
-  transportRequest?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateFunctionGroupParams {
-  function_group_name: string;
-  description?: string;
-  transport_request?: string;
-  lock_handle?: string;
-}
-
-export interface IDeleteFunctionGroupParams {
-  function_group_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateFunctionGroupParams,
+  IDeleteFunctionGroupParams,
+  IUpdateFunctionGroupParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

@@ -4,16 +4,8 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateBehaviorImplementationParams {
-  class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_system?: string;
-  responsible?: string;
-  behavior_definition: string; // Root entity name (BDEF name)
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type { ICreateBehaviorImplementationParams } from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 export interface IBehaviorImplementationConfig {

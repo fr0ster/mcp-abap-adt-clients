@@ -1,26 +1,11 @@
 import type { IAdtObjectState, IAdtResponse } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateAccessControlParams {
-  access_control_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateAccessControlParams {
-  access_control_name: string;
-  source_code: string;
-  transport_request?: string;
-}
-
-export interface IDeleteAccessControlParams {
-  access_control_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateAccessControlParams,
+  IDeleteAccessControlParams,
+  IUpdateAccessControlParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 export interface IAccessControlConfig {

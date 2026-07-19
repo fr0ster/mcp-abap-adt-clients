@@ -33,53 +33,15 @@ export const ENHANCEMENT_TYPE_CODES: Record<EnhancementType, string> = {
 };
 
 /**
- * Low-level function parameters (snake_case)
+ * Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
  */
-export interface ICreateEnhancementParams {
-  enhancement_name: string;
-  enhancement_type: EnhancementType;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  enhancement_spot?: string; // Required for implementations
-  badi_definition?: string; // Required for BAdI implementations
-  /**
-   * @deprecated No-op. `create()` posts metadata only; the source is written by
-   * `update()`. Kept for backward compatibility — this field is never read.
-   */
-  source_code?: string; // For enhoxhh only
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateEnhancementParams {
-  enhancement_name: string;
-  enhancement_type: EnhancementType;
-  source_code: string;
-  lock_handle: string;
-  transport_request?: string;
-}
-
-export interface IDeleteEnhancementParams {
-  enhancement_name: string;
-  enhancement_type: EnhancementType;
-  transport_request?: string;
-}
-
-export interface ICheckEnhancementParams {
-  enhancement_name: string;
-  enhancement_type: EnhancementType;
-  version?: 'active' | 'inactive';
-  source_code?: string;
-}
-
-export interface IValidateEnhancementParams {
-  enhancement_name: string;
-  enhancement_type: EnhancementType;
-  package_name?: string;
-  description?: string;
-}
+export type {
+  ICheckEnhancementParams,
+  ICreateEnhancementParams,
+  IDeleteEnhancementParams,
+  IUpdateEnhancementParams,
+  IValidateEnhancementParams,
+} from '@mcp-abap-adt/interfaces';
 
 /**
  * AdtEnhancement configuration (camelCase)

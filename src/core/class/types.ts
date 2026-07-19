@@ -7,26 +7,11 @@ import type {
   IAdtObjectState,
 } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateClassParams {
-  class_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  master_system?: string;
-  responsible?: string;
-  masterLanguage?: string;
-  superclass?: string;
-  final?: boolean;
-  abstract?: boolean;
-  create_protected?: boolean;
-  template_xml?: string;
-}
-
-export interface IDeleteClassParams {
-  class_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateClassParams,
+  IDeleteClassParams,
+} from '@mcp-abap-adt/interfaces';
 
 // AdtClass configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

@@ -16,73 +16,12 @@ import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
  * For the reference/predefined variants, use type_kind + data_type/length/refs accordingly.
  */
 
-// Low-level function parameters (snake_case)
-export interface ICreateDataElementParams {
-  data_element_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-  type_kind?:
-    | 'domain'
-    | 'predefinedAbapType'
-    | 'refToPredefinedAbapType'
-    | 'refToDictionaryType'
-    | 'refToClifType';
-  type_name?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  short_label?: string;
-  medium_label?: string;
-  long_label?: string;
-  heading_label?: string;
-  search_help?: string;
-  search_help_parameter?: string;
-  set_get_parameter?: string;
-  default_component_name?: string;
-  deactivate_input_history?: boolean;
-  change_document?: boolean;
-  left_to_right_direction?: boolean;
-  deactivate_bidi_filtering?: boolean;
-}
-
-export interface IUpdateDataElementParams {
-  data_element_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  type_kind?:
-    | 'domain'
-    | 'predefinedAbapType'
-    | 'refToPredefinedAbapType'
-    | 'refToDictionaryType'
-    | 'refToClifType';
-  type_name?: string;
-  data_type?: string;
-  length?: number;
-  decimals?: number;
-  short_label?: string;
-  medium_label?: string;
-  long_label?: string;
-  heading_label?: string;
-  search_help?: string;
-  search_help_parameter?: string;
-  set_get_parameter?: string;
-  default_component_name?: string;
-  deactivate_input_history?: boolean;
-  change_document?: boolean;
-  left_to_right_direction?: boolean;
-  deactivate_bidi_filtering?: boolean;
-  activate?: boolean;
-}
-
-export interface IDeleteDataElementParams {
-  data_element_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateDataElementParams,
+  IDeleteDataElementParams,
+  IUpdateDataElementParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

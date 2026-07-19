@@ -4,30 +4,12 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateDdlParams {
-  ddl_name: string;
-  ddl_source?: string; // Optional - only metadata creation in low-level function
-  package_name: string;
-  transport_request?: string;
-  description?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateDdlSourceParams {
-  ddl_name: string;
-  ddl_source: string;
-  activate?: boolean;
-  lock_handle?: string;
-  transport_request?: string;
-}
-
-export interface IDeleteDdlParams {
-  ddl_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateDdlParams,
+  IDeleteDdlParams,
+  IUpdateDdlSourceParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

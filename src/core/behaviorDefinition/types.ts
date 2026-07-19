@@ -9,21 +9,12 @@ export type BehaviorDefinitionImplementationType =
   | 'Abstract'
   | 'Projection';
 
-/**
- * Parameters for validating a behavior definition before creation
- */
-export interface IBehaviorDefinitionValidationParams {
-  /** Name of the behavior definition object */
-  objname: string;
-  /** Root entity name */
-  rootEntity: string;
-  /** Description of the behavior definition */
-  description: string;
-  /** Package name where the object will be created */
-  package: string;
-  /** Implementation type (Managed, Unmanaged, Abstract, Projection) */
-  implementationType: BehaviorDefinitionImplementationType;
-}
+// Low-level function parameters — defined in @mcp-abap-adt/interfaces
+export type {
+  IBehaviorDefinitionCreateParams,
+  IBehaviorDefinitionValidationParams,
+  IUpdateBehaviorDefinitionParams,
+} from '@mcp-abap-adt/interfaces';
 
 /**
  * Validation result
@@ -32,42 +23,6 @@ export interface IValidationResult {
   severity: 'OK' | 'ERROR' | 'WARNING';
   shortText?: string;
   longText?: string;
-}
-
-/**
- * Parameters for creating a behavior definition
- */
-export interface IBehaviorDefinitionCreateParams {
-  /** Name of the behavior definition */
-  name: string;
-  /** Description */
-  description: string;
-  /** Package name */
-  package: string;
-  /** Implementation type */
-  implementationType: BehaviorDefinitionImplementationType;
-  /** Language (default: EN) */
-  language?: string;
-  /** Responsible user */
-  responsible?: string;
-  /** Master system */
-  masterSystem?: string;
-  /** Transport request number */
-  transportRequest?: string;
-}
-
-/**
- * Parameters for updating a behavior definition
- */
-export interface IUpdateBehaviorDefinitionParams {
-  /** Name of the behavior definition */
-  name: string;
-  /** Source code */
-  sourceCode: string;
-  /** Lock handle from lock operation */
-  lockHandle: string;
-  /** Optional transport request number */
-  transportRequest?: string;
 }
 
 /**

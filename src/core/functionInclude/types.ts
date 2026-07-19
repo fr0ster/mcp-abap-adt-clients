@@ -4,14 +4,8 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-export interface ICreateFunctionIncludeParams {
-  function_group_name: string;
-  include_name: string;
-  description?: string;
-  transport_request?: string;
-  master_system?: string;
-  responsible?: string;
-}
+// Low-level function parameters — defined in @mcp-abap-adt/interfaces
+export type { ICreateFunctionIncludeParams } from '@mcp-abap-adt/interfaces';
 
 export interface IFunctionIncludeConfig {
   functionGroupName: string;
