@@ -3,6 +3,15 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.5.0] - 2026-07-19
+
+### Changed
+- **All public types are now sourced from `@mcp-abap-adt/interfaces` (requires `^11.0.0`).** The library no longer declares its own copies of the types that also exist in the contract package. Every low-level `*Params` interface (83 across 26 modules), every `IXxxConfig`/`IXxxState` pair, the promoted option/result types, and the 25 cross-cutting types in `src/core/shared/types.ts` are now `export type { … } from '@mcp-abap-adt/interfaces'` re-exports. This removes the duplication that had silently drifted between the two packages — there is now a single definition site per type.
+- **No API break.** The public surface was captured before and after the migration across all 7 entry points (`index`, `index.core`, `index.runtime`, `index.batch`, `index.ws`, `index.abapgit`, `index.executors`) — 537 exported names, byte-identical diff. Every promoted type was additionally checked for mutual structural assignability against its interfaces counterpart before the local declaration was removed; zero mismatches. Import paths are unchanged, including the widely-used `../shared/types` route to `IReadOptions`.
+- Runtime exports stay local and untouched: `enhancement` (`ENHANCEMENT_TYPE_CODES`, `getEnhancementBaseUrl`, `getEnhancementUri`, `supportsSourceCode`, `isImplementationType`, `isSpotType`) and `service` (`resolveBindingVariant`, `SERVICE_BINDING_VARIANT_MAP`). `IAdtClientOptions` is deliberately kept local — it describes this client, not the contract.
+
+Consumers are encouraged to import types directly from `@mcp-abap-adt/interfaces` rather than through this package; the re-exports exist so that existing imports keep working.
+
 ## [7.4.4] - 2026-07-17
 
 ### Changed
