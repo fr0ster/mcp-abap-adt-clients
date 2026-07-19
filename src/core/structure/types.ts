@@ -21,27 +21,12 @@ export interface IStructureInclude {
   suffix?: string;
 }
 
-// Low-level function parameters (camelCase)
-export interface ICreateStructureParams {
-  structureName: string;
-  description: string;
-  packageName: string;
-  transportRequest?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateStructureParams {
-  structureName: string;
-  ddlCode: string; // DDL SQL source code for structure
-  transportRequest?: string;
-}
-
-export interface IDeleteStructureParams {
-  structure_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (camelCase) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateStructureParams,
+  IDeleteStructureParams,
+  IUpdateStructureParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName and ddlCode are required for create operations (validated in builder methods)

@@ -4,46 +4,12 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateTableTypeParams {
-  tabletype_name: string;
-  package_name: string;
-  description?: string;
-  transport_request?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateTableTypeParams {
-  tabletype_name: string;
-  description?: string; // Description is required for XML format update
-  // XML-based TableType parameters (TableType is XML-based entity like Domain/DataElement)
-  row_type_name: string; // Structure name for dictionaryType (required)
-  row_type_kind?:
-    | 'dictionaryType'
-    | 'predefinedAbapType'
-    | 'refToPredefinedAbapType'
-    | 'refToDictionaryType'
-    | 'refToClassOrInterfaceType'
-    | 'rangeTypeOnPredefinedType'
-    | 'rangeTypeOnDataelement';
-  access_type?: 'standard' | 'sorted' | 'hashed' | 'index' | 'notSpecified';
-  primary_key_definition?:
-    | 'standard'
-    | 'rowType'
-    | 'keyComponents'
-    | 'empty'
-    | 'notSpecified';
-  primary_key_kind?: 'unique' | 'nonUnique' | 'notSpecified';
-  transport_request?: string;
-  activate?: boolean;
-}
-
-export interface IDeleteTableTypeParams {
-  tabletype_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateTableTypeParams,
+  IDeleteTableTypeParams,
+  IUpdateTableTypeParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

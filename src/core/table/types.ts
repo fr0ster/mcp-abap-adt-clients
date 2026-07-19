@@ -4,28 +4,12 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateTableParams {
-  table_name: string;
-  package_name: string;
-  transport_request?: string;
-  ddl_code?: string; // Optional - can be added via update() later
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateTableParams {
-  table_name: string;
-  ddl_code: string;
-  transport_request?: string;
-  activate?: boolean;
-}
-
-export interface IDeleteTableParams {
-  table_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateTableParams,
+  IDeleteTableParams,
+  IUpdateTableParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

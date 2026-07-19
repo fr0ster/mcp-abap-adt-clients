@@ -1,13 +1,45 @@
 import {
+  type IActivateServiceBindingParams,
   type IAdtObject,
   type IAdtObjectState,
   type IAdtOperationOptions,
   type IAdtResponse,
+  type ICheckServiceBindingParams,
+  type IClassifyServiceBindingParams,
+  type ICreateAndGenerateServiceBindingParams,
+  type ICreateServiceBindingParams,
+  type IDeleteServiceBindingParams,
+  type IGenerateServiceBindingParams,
+  type IGetServiceBindingODataParams,
+  type IPublishODataV2Params,
+  type IReadServiceBindingParams,
+  type ITransportCheckServiceBindingParams,
+  type IUnpublishODataV2Params,
+  type IUpdateServiceBindingParams,
+  type IValidateServiceBindingParams,
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces';
 
-export type { ServiceBindingVariant } from '@mcp-abap-adt/interfaces';
+// Low-level function parameters — defined in @mcp-abap-adt/interfaces
+export type {
+  IActivateServiceBindingParams,
+  ICheckServiceBindingParams,
+  IClassifyServiceBindingParams,
+  ICreateAndGenerateServiceBindingParams,
+  ICreateAndGenerateServiceBindingParamsLegacy,
+  ICreateServiceBindingParams,
+  IDeleteServiceBindingParams,
+  IGenerateServiceBindingParams,
+  IGetServiceBindingODataParams,
+  IPublishODataV2Params,
+  IReadServiceBindingParams,
+  ITransportCheckServiceBindingParams,
+  IUnpublishODataV2Params,
+  IUpdateServiceBindingParams,
+  IValidateServiceBindingParams,
+  ServiceBindingVariant,
+} from '@mcp-abap-adt/interfaces';
 export { SERVICE_BINDING_VARIANT_MAP } from '@mcp-abap-adt/interfaces';
 
 export type ServiceBindingType = 'ODATA' | 'INA' | 'SQL';
@@ -47,102 +79,6 @@ export interface IServiceBindingState extends IAdtObjectState {
   generatedInfoResult?: IAdtResponse;
   activeCheckResult?: IAdtResponse;
 }
-
-export interface IValidateServiceBindingParams {
-  objname: string;
-  serviceDefinition: string;
-  serviceBindingVersion?: string;
-  description?: string;
-  package?: string;
-}
-
-export interface IGetServiceBindingODataParams {
-  objectname: string;
-  servicename?: string;
-  serviceversion?: string;
-  srvdname?: string;
-}
-
-export interface IPublishODataV2Params {
-  servicename: string;
-  serviceversion?: string;
-}
-
-export interface IUnpublishODataV2Params {
-  servicename: string;
-  serviceversion?: string;
-}
-
-export interface IClassifyServiceBindingParams {
-  objectname: string;
-  bindtype?: string;
-  bindtypeversion?: string;
-  repositoryid?: string;
-  servicename?: string;
-  serviceversion?: string;
-}
-
-export interface ITransportCheckServiceBindingParams {
-  objectName: string;
-  packageName: string;
-  description?: string;
-  operation?: 'I' | 'U' | 'D';
-}
-
-export interface ICreateServiceBindingParams {
-  bindingName: string;
-  packageName: string;
-  description: string;
-  serviceDefinitionName: string;
-  serviceName: string;
-  serviceVersion: string;
-  bindingVariant: ServiceBindingVariant;
-  masterLanguage?: string;
-  masterSystem?: string;
-  responsible?: string;
-  transportRequest?: string;
-  runTransportCheck?: boolean;
-  activateAfterCreate?: boolean;
-}
-
-export interface IReadServiceBindingParams {
-  bindingName: string;
-  version?: 'active' | 'inactive';
-}
-
-export interface ICheckServiceBindingParams {
-  bindingName: string;
-  version?: 'active' | 'inactive';
-}
-
-export interface IActivateServiceBindingParams {
-  bindingName: string;
-  preauditRequested?: boolean;
-}
-
-export interface IUpdateServiceBindingParams {
-  bindingName: string;
-  desiredPublicationState: DesiredPublicationState;
-  serviceType: GeneratedServiceType;
-  serviceName: string;
-  serviceVersion?: string;
-}
-
-export interface IDeleteServiceBindingParams {
-  bindingName: string;
-  transportRequest?: string;
-}
-
-export interface IGenerateServiceBindingParams {
-  serviceType: GeneratedServiceType;
-  bindingName: string;
-  serviceName: string;
-  serviceVersion: string;
-  serviceDefinitionName: string;
-}
-
-export interface ICreateAndGenerateServiceBindingParams
-  extends ICreateServiceBindingParams {}
 
 export interface IAdtServiceBinding
   extends IAdtObject<IServiceBindingConfig, IServiceBindingState> {
@@ -202,6 +138,4 @@ export type AdtServiceBindingType = IAdtObject<
 
 // Backward compatibility aliases
 export type IAdtService = IAdtServiceBinding;
-export type ICreateAndGenerateServiceBindingParamsLegacy =
-  ICreateAndGenerateServiceBindingParams;
 export type IAdtServiceOperationOptions = IAdtOperationOptions;

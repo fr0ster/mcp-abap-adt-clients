@@ -4,31 +4,12 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateProgramParams {
-  programName: string;
-  description?: string;
-  packageName: string;
-  transportRequest?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-  programType?: string;
-  application?: string;
-  sourceCode?: string;
-  activate?: boolean;
-}
-
-export interface IUpdateProgramSourceParams {
-  programName: string;
-  sourceCode: string;
-  activate?: boolean;
-}
-
-export interface IDeleteProgramParams {
-  programName: string;
-  transportRequest?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateProgramParams,
+  IDeleteProgramParams,
+  IUpdateProgramSourceParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

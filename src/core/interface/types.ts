@@ -7,27 +7,12 @@ import type {
   IAdtObjectState,
 } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (camelCase)
-export interface ICreateInterfaceParams {
-  interfaceName: string;
-  description: string;
-  packageName: string;
-  transportRequest?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateInterfaceSourceParams {
-  interface_name: string;
-  source_code: string;
-  activate?: boolean;
-}
-
-export interface IDeleteInterfaceParams {
-  interface_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (camelCase) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateInterfaceParams,
+  IDeleteInterfaceParams,
+  IUpdateInterfaceSourceParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName is required for create operations (validated in builder methods)

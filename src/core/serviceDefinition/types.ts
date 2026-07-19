@@ -4,27 +4,12 @@
 
 import type { IAdtObjectState, IAdtResponse } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case)
-export interface ICreateServiceDefinitionParams {
-  service_definition_name: string;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateServiceDefinitionParams {
-  service_definition_name: string;
-  source_code: string;
-  transport_request?: string;
-}
-
-export interface IDeleteServiceDefinitionParams {
-  service_definition_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateServiceDefinitionParams,
+  IDeleteServiceDefinitionParams,
+  IUpdateServiceDefinitionParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 export interface IServiceDefinitionConfig {

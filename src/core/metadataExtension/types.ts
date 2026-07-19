@@ -4,23 +4,11 @@
 
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
-// Validation parameters
-export interface IMetadataExtensionValidationParams {
-  name: string;
-  description: string;
-  packageName: string;
-}
-
-// Low-level function parameters (snake_case would be here if needed)
-export interface IMetadataExtensionCreateParams {
-  name: string;
-  description: string;
-  packageName: string;
-  transportRequest?: string;
-  masterLanguage?: string;
-  masterSystem?: string;
-  responsible?: string;
-}
+// Validation + low-level function parameters — defined in @mcp-abap-adt/interfaces
+export type {
+  IMetadataExtensionCreateParams,
+  IMetadataExtensionValidationParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 // Note: packageName and description are required for create/validate operations (validated in builder methods)

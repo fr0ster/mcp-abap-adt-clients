@@ -5,28 +5,12 @@ import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 export type ScalarFunctionEngine = 'sqlEngine' | 'amdpEngine';
 
-export interface ICreateScalarFunctionImplementationParams {
-  implementation_name: string;
-  scalar_function_name: string;
-  engine_value?: ScalarFunctionEngine;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateScalarFunctionImplementationParams {
-  implementation_name: string;
-  source_code: string;
-  transport_request?: string;
-}
-
-export interface IDeleteScalarFunctionImplementationParams {
-  implementation_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateScalarFunctionImplementationParams,
+  IDeleteScalarFunctionImplementationParams,
+  IUpdateScalarFunctionImplementationParams,
+} from '@mcp-abap-adt/interfaces';
 
 export interface IScalarFunctionImplementationConfig {
   implementationName: string;

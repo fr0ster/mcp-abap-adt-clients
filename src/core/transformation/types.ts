@@ -2,28 +2,12 @@ import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 
 export type TransformationType = 'SimpleTransformation' | 'XSLTProgram';
 
-// Low-level function parameters (snake_case)
-export interface ICreateTransformationParams {
-  transformation_name: string;
-  transformation_type: TransformationType;
-  description?: string;
-  package_name: string;
-  transport_request?: string;
-  masterSystem?: string;
-  responsible?: string;
-  masterLanguage?: string;
-}
-
-export interface IUpdateTransformationParams {
-  transformation_name: string;
-  source_code: string;
-  transport_request?: string;
-}
-
-export interface IDeleteTransformationParams {
-  transformation_name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateTransformationParams,
+  IDeleteTransformationParams,
+  IUpdateTransformationParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Builder configuration (camelCase)
 export interface ITransformationConfig {

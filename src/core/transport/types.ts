@@ -4,22 +4,11 @@
 
 import type { IAdtObjectState, IAdtResponse } from '@mcp-abap-adt/interfaces';
 
-// Low-level function parameters (snake_case) - internal use only
-export interface ICreateTransportParams {
-  transport_type?: string;
-  description: string;
-  target_system?: string;
-  owner?: string;
-}
-
-// Low-level function parameters for listing transports (snake_case) - internal use only
-export interface IListTransportsParams {
-  user: string;
-  status?: string; // D = modifiable, R = released
-  date_range?: string; // e.g. "20260101-20260326"
-  target_system?: string;
-  request_type?: string; // K = workbench, T = customizing
-}
+// Low-level function parameters (snake_case) - internal use only — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateTransportParams,
+  IListTransportsParams,
+} from '@mcp-abap-adt/interfaces';
 
 // Transport request configuration (camelCase)
 export interface ITransportConfig {

@@ -5,19 +5,11 @@
 import type { IAdtObjectState } from '@mcp-abap-adt/interfaces';
 import type { IParsedMessage, IParsedMessageClass } from './xml';
 
-// Low-level function parameters (snake_case)
-export interface ICreateMessageClassParams {
-  name: string;
-  description: string;
-  package_name: string;
-  transport_request?: string;
-  master_language?: string;
-}
-
-export interface IDeleteMessageClassParams {
-  name: string;
-  transport_request?: string;
-}
+// Low-level function parameters (snake_case) — defined in @mcp-abap-adt/interfaces
+export type {
+  ICreateMessageClassParams,
+  IDeleteMessageClassParams,
+} from '@mcp-abap-adt/interfaces';
 
 // High-level configuration (camelCase, public API)
 export interface IMessageClassConfig {
