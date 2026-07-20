@@ -371,25 +371,58 @@ capability implementations** rather than owning bespoke lifecycle code.
 
 ### Capability implementations
 
-A capability implementation is a reusable unit that satisfies one atom for *any* object
-type, parameterized by the only things that actually vary. A survey of six representative
-handlers established that variation precisely: the lifecycle methods
+A capability implementation is a reusable unit that satisfies one atom for object types
+that share its shape, parameterized by the things that vary. A survey of six
+representative handlers established that for the majority of types the lifecycle methods
 (`lock`, `unlock`, `getVersions`, `getVersionSource`, `readTransport`, and the happy path
-of `activate` / `check`) differ **only by object URI and which config field holds the
+of `activate` / `check`) differ **only by endpoint and which config field holds the
 name** — the bodies are otherwise the same, copy-pasted into ~15 near-identical per-type
 files (`lock.ts`, `unlock.ts`, `versions.ts`, `activation.ts`, the transport getter).
 
-So each capability is parameterized by a **URI resolver**, not a bare name field —
-because `AdtEnhancement` is dual-keyed (`type` + `name`) and resolves its URI through
-`getEnhancementUri(type, name)`. The resolver already exists centralized as
-`buildObjectUri(name, typeCode, parentName)` in `src/utils/activationUtils.ts`, mapping
-every type code (`CLAS/OC`, `DOMA/DD`, `SRVD/SRV`, …) to its path.
+Each capability is parameterized by a **per-capability strategy**, not one global URI
+resolver. This correction matters: there is no single URI per object. Behaviour
+definitions activate at `/sap/bc/adt/ddic/bdef/sources/{name}` but lock, read and
+transport at `/sap/bc/adt/bo/behaviordefinitions/{name}`. So `buildObjectUri` in
+`src/utils/activationUtils.ts` is the **activation** endpoint resolver specifically — it
+is the right input for `ActivateCapability` and wrong for `LockCapability`. Each
+capability's strategy supplies the endpoint *it* needs, the config field(s) it reads, and
+how it normalizes the response. `AdtEnhancement` (dual-keyed `type`+`name`, via
+`getEnhancementUri`) is one reason the strategy cannot be a bare name field; the
+per-endpoint divergence above is another.
 
-Extraction therefore **deletes code, not adds it**: a `LockCapability` absorbs the ~15
-`lock.ts`/`unlock.ts` wrapper files; `getVersionSource`, byte-identical today, collapses
-to one function. The forwarding on the handler (`getVersions(c) { return this.#versions... }`)
-replaces a method that was already a one-liner — a wash — while the per-type helper files
-disappear. That is where the win is.
+**The lock normalization contract.** Lock helpers do not return the same shape today:
+`table/lock.ts` returns a bare `string`, `interface/lock.ts` returns
+`{ lockHandle: string; corrNr?: string }`, and `functionModule/lock.ts` carries a
+`ForUpdate` variant. `LockCapability` must define one normalized result —
+`{ lockHandle: string; corrNr?: string }` — and adapt the bare-string helpers up to it.
+Naming this contract is part of the extraction, not an afterthought.
+
+For the types that fit, extraction **deletes code, not adds it**: `LockCapability`
+absorbs their `lock.ts`/`unlock.ts`; `getVersionSource`, byte-identical across
+Class/Table/ServiceDef today, collapses to one function. The handler forwarding
+(`getVersions(c) { return this.#versions.list(c) }`) replaces a method that was already a
+one-liner — a wash — while the per-type helper files disappear. That is where the win is,
+and the survey put the majority of the 35 in this bucket.
+
+### Handlers that do not fit the simple strategy
+
+Three are genuine exceptions the extraction must plan for, not paper over:
+
+- **`AdtFunctionModule`** — lock/read take a *composite* key (`functionGroupName` +
+  `functionModuleName`), so its endpoint is built from two identifiers, not one
+  (`src/core/functionModule/lock.ts:17`). Its strategy supplies a two-part key; it is
+  still a strategy, just not a single-name one.
+- **`AdtBehaviorImplementation`** — does not lock its own URI at all; it delegates to
+  `this.class.lock({ className })` (`AdtBehaviorImplementation.ts:357`). This is not a
+  problem for the model — it is the model: the handler composes *another handler's*
+  lock capability rather than owning one. It validates the composition approach.
+- **`AdtMessageClassMessage`** — uses two locks and message-specific unlock sequencing
+  (`src/core/messageClass/AdtMessageClassMessage.ts`). It either gets a bespoke lock
+  strategy or keeps its own implementation and simply does not compose the shared
+  `LockCapability`. The atom lets it opt out cleanly.
+
+The extraction plan must classify all 35 into fits-the-strategy vs needs-bespoke before
+promising a deletion count, so the estimate is grounded rather than optimistic.
 
 ### Handlers become proxies
 
