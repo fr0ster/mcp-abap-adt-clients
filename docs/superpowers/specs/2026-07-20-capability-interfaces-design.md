@@ -379,16 +379,33 @@ of `activate` / `check`) differ **only by endpoint and which config field holds 
 name** — the bodies are otherwise the same, copy-pasted into ~15 near-identical per-type
 files (`lock.ts`, `unlock.ts`, `versions.ts`, `activation.ts`, the transport getter).
 
-Each capability is parameterized by a **per-capability strategy**, not one global URI
-resolver. This correction matters: there is no single URI per object. Behaviour
-definitions activate at `/sap/bc/adt/ddic/bdef/sources/{name}` but lock, read and
-transport at `/sap/bc/adt/bo/behaviordefinitions/{name}`. So `buildObjectUri` in
-`src/utils/activationUtils.ts` is the **activation** endpoint resolver specifically — it
-is the right input for `ActivateCapability` and wrong for `LockCapability`. Each
-capability's strategy supplies the endpoint *it* needs, the config field(s) it reads, and
-how it normalizes the response. `AdtEnhancement` (dual-keyed `type`+`name`, via
-`getEnhancementUri`) is one reason the strategy cannot be a bare name field; the
-per-endpoint divergence above is another.
+Each capability is parameterized by a **per-capability strategy**, and there is **no
+existing centralized resolver to build it on** — this is the correction that matters
+most, because two earlier drafts got it wrong.
+
+Two facts from the code:
+
+1. There is no single URI per object. Behaviour definitions *lifecycle* endpoints (lock,
+   read, transport, and the handler's own activation) are all
+   `/sap/bc/adt/bo/behaviordefinitions/{name}` — see
+   `src/core/behaviorDefinition/activation.ts:35`, which **hardcodes** that path.
+2. `buildObjectUri` in `src/utils/activationUtils.ts` is **not** the handler activation
+   resolver. Its only callers are group activation and group deletion
+   (`src/core/shared/groupActivation.ts:149`, `groupDeletion.ts`), where it builds the
+   object-reference URI inside a batch payload. For BDEF it returns
+   `/sap/bc/adt/ddic/bdef/sources/{name}` — a **different** path from the one the BDEF
+   handler actually uses to activate. Building `ActivateCapability` on `buildObjectUri`
+   would route BDEF (and any other type whose group URI differs from its lifecycle URI)
+   to the wrong endpoint.
+
+The consequence: **every per-handler activation today hardcodes its own base path**
+(`/oo/classes/`, `/ddic/domains/`, `/ddic/tables/`, `/programs/programs/`,
+`/oo/interfaces/`, `/bo/behaviordefinitions/`, …). There is no shared map to reuse, so a
+capability's strategy supplies its base path **directly from the handler** — the handler
+already knows it — along with the config field(s) it reads and how it normalizes the
+response. `buildObjectUri` stays where it belongs, in the group operations, and is not a
+dependency of this refactor. `AdtEnhancement` (dual-keyed `type`+`name`, via
+`getEnhancementUri`) is a further reason the strategy cannot be a bare name field.
 
 **The lock normalization contract.** Lock helpers do not return the same shape today:
 `table/lock.ts` returns a bare `string`, `interface/lock.ts` returns
