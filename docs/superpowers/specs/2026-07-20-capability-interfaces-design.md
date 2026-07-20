@@ -562,23 +562,25 @@ judged coherence by the *current concrete signatures* and concluded no capabilit
 possible. Absence of a shared concrete shape does not imply absence of a shared
 abstraction — that is what interfaces are for.
 
-The shapes do share a core. All five "an object was found" types carry a **name and a
-type**; `uri`, `packageName` and `description` appear in some but not all (the table
-shows which). `IObjectReference` is the thinnest — name, type, and an optional parent —
-which makes name+type the only truly universal pair and the right base:
+The shapes do share a core — every one carries a **name** and, in some field, the ADT
+**type code** — but the code is stored under different field names with different declared
+types, which is the whole problem:
 
-| Type | Name | Type field | Extras |
+| Type | Name | Where the ADT type code lives | Extras |
 |---|---|---|---|
-| `ISearchResult` | `name` | `type` | `description`, `packageName?`, `uri?` |
-| `IWhereUsedReference` | `name` | `type` | `uri`, `isResult`, `usageInformation?` |
-| `IPackageContentItem` | `name` | `adtType` | `isPackage`, `packageName` |
-| `IPackageHierarchyNode` | `name` | `adtType?` | `is_package`, `children?` |
-| `IObjectReference` | `name` | `type` | `parentName?` |
+| `ISearchResult` | `name` | `type: string` | `description`, `packageName?`, `uri?` |
+| `IWhereUsedReference` | `name` | `type: string` | `uri`, `isResult`, `usageInformation?` |
+| `IPackageContentItem` | `name` | `adtType: string` (its `type` is an unrelated enum) | `isPackage`, `packageName` |
+| `IPackageHierarchyNode` | `name` | `adtType?: string` (its `type` is an unrelated enum) | `is_package`, `children?` |
+| `IObjectReference` | `name` | `type: string` | `parentName?` |
 
-The inconsistency is itself a defect: the object's type is spelled three ways
-(`type`, `adtType`, `adtType?`), and "is this a package" is `isPackage` in one type and
-`is_package` in its sibling — **snake_case and camelCase for the same concept in the
-same file**. A shared base interface removes exactly this.
+The inconsistency is itself a defect, and worse than a naming slip: the field named
+`type` means a `string` code in three of the types and an unrelated
+`PackageHierarchySupportedType` enum in the other two, where the code is instead in
+`adtType`. On top of that, "is this a package" is `isPackage` in one type and
+`is_package` in its sibling — **snake_case and camelCase for the same concept in the same
+file**. A shared base interface removes exactly this, at the cost of a breaking rename
+(below).
 
 ```ts
 /** Anything the repository can hand back as a located object. */
@@ -598,8 +600,20 @@ export interface IAdtSearchable<
 }
 ```
 
-Each existing result type then extends `IAdtObjectHit`. The hierarchy node falls out
-neatly: a tree node is a hit with `children`, not a separate concept.
+Converging the existing types on `IAdtObjectHit` is a **breaking normalization, not a
+clean `extends`** — and the reason is sharper than a rename. In `IPackageContentItem` and
+`IPackageHierarchyNode` the field literally named `type` is not the ADT type code at all;
+it is an unrelated enum (`PackageHierarchySupportedType`), and the code lives in
+`adtType` (`adtType: string` required on `IPackageContentItem`, `adtType?` on the node).
+The other three carry the code as `type: string`. So `IAdtObjectHit { type: string }`
+cannot simply be extended by the package types — their `type` field has an incompatible
+declared type, and the field that *should* map to `IAdtObjectHit.type` is `adtType`.
+
+Convergence therefore requires renaming `adtType` → `type: string` (and retiring or
+renaming the enum field), plus unifying `isPackage` / `is_package`. That is exactly the
+breaking change the appendix already flags — the point here is only that "extends" was
+the wrong verb: it is a migration, and the search spec must carry it as one. Once done,
+the hierarchy node falls out neatly: a tree node is a hit with `children`.
 
 The generic parameters exist so consumers can bring their own types, constrained by the
 contract package rather than dictated by it — consistent with this library's stance of
