@@ -11,8 +11,9 @@
  */
 
 import type {
-  IAdtResponse as AxiosResponse,
   IAbapConnection,
+  ICdsUnitTestConfig,
+  ICdsUnitTestState,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -20,32 +21,19 @@ import {
   safeErrorMessage,
 } from '../../utils/internalUtils';
 import { startClassUnitTestRunByObject } from '../class/run';
-import type { IClassState } from '../class/types';
 import { AdtDdl } from '../ddl/AdtDdl';
 import { AdtUnitTest } from './AdtUnitTest';
 import { checkCdsTestDoublesAvailability } from './checkCdsTestDoublesAvailability';
 import type {
   IClassUnitTestDefinition,
   IClassUnitTestRunOptions,
-  IUnitTestConfig,
-  IUnitTestState,
 } from './types';
 
-export interface ICdsUnitTestConfig extends IUnitTestConfig {
-  // CDS-specific fields
-  className?: string;
-  packageName?: string;
-  cdsViewName?: string;
-  classTemplate?: string;
-  testClassSource?: string;
-  description?: string;
-  transportRequest?: string;
-}
-
-export interface ICdsUnitTestState extends IUnitTestState {
-  testClassState?: IClassState;
-  cdsCheckResponse?: AxiosResponse;
-}
+// Types defined in @mcp-abap-adt/interfaces
+export type {
+  ICdsUnitTestConfig,
+  ICdsUnitTestState,
+} from '@mcp-abap-adt/interfaces';
 
 /**
  * AdtCdsUnitTest - CDS-specific unit test operations

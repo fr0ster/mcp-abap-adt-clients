@@ -8,6 +8,7 @@
 import type {
   HttpError,
   IAdtOperationOptions,
+  ILocalTypesConfig,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
@@ -17,11 +18,8 @@ import { checkClassLocalTypes } from './check';
 import { updateClassLocalTypes } from './includes';
 import type { IClassState } from './types';
 
-export interface ILocalTypesConfig {
-  className: string;
-  localTypesCode?: string;
-  transportRequest?: string;
-}
+// Types defined in @mcp-abap-adt/interfaces
+export type { ILocalTypesConfig } from '@mcp-abap-adt/interfaces';
 
 export class AdtLocalTypes extends AdtClass {
   public readonly objectType: string = 'LocalTypes';
