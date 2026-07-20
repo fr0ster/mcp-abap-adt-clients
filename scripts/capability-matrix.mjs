@@ -46,30 +46,38 @@ function handlerFiles(root) {
   return out.sort();
 }
 
-/**
- * Does this body refuse the operation? A refusal is a throw that is NOT inside a
- * conditional — i.e. the method's whole purpose is to reject. A throw inside an
- * `if` is ordinary error handling and does not count.
- */
-function classify(body, sf) {
-  if (!body || !body.statements.length) return VERDICT.STUB;
-
+/** A top-level throw / `return throwUnsupported*()` means the method refuses. */
+function refuses(body, sf) {
+  if (!body) return false;
   for (const stmt of body.statements) {
-    if (ts.isThrowStatement(stmt)) return VERDICT.REFUSES;
-    // `return throwUnsupportedX(...)` and bare calls to a thrower
-    const text = stmt.getText(sf);
-    if (/^\s*(return\s+)?throwUnsupported\w*\s*\(/.test(text))
-      return VERDICT.REFUSES;
+    if (ts.isThrowStatement(stmt)) return true;
+    if (/^\s*(return\s+)?throwUnsupported\w*\s*\(/.test(stmt.getText(sf)))
+      return true;
   }
+  return false;
+}
 
-  // Real work = it talks to the connection, or delegates to something that does.
+/**
+ * Does the body itself perform real ADT work — directly? "Directly" means it
+ * awaits, calls makeAdtRequest, or hands `this.connection` to something. It does
+ * NOT include plain `this.method(...)` delegation; that is resolved transitively
+ * by the caller, so that a fabricated stub which merely reads `this.state` is not
+ * mistaken for real work.
+ */
+function worksDirectly(body, sf) {
+  if (!body) return false;
   const text = body.getText(sf);
-  const doesWork =
+  return (
     /\bmakeAdtRequest\b/.test(text) ||
-    /\bawait\s+/.test(text) ||
-    /\bthis\.(connection|class|adtClass|utils)\b/.test(text);
+    /\bawait\b/.test(text) ||
+    /\bthis\.connection\b/.test(text)
+  );
+}
 
-  return doesWork ? VERDICT.REAL : VERDICT.STUB;
+/** The `this.<name>(` methods a body delegates to. */
+function delegatesTo(body, sf) {
+  if (!body) return [];
+  return [...body.getText(sf).matchAll(/\bthis\.(\w+)\s*\(/g)].map((m) => m[1]);
 }
 
 const root = 'src/core';
@@ -80,7 +88,16 @@ const program = ts.createProgram(files, {
   target: ts.ScriptTarget.ES2020,
 });
 
-const rows = new Map();
+const CONTRACT_IFACES = new Set([
+  'IAdtObject',
+  'IFeatureToggleObject',
+  'IAdtServiceBinding',
+]);
+
+// Pass 1: collect every Adt* class with its OWN verdicts and its base class name.
+// We defer the contract test and inheritance resolution to pass 2, because a class
+// may promise the contract only through a base we have not parsed yet.
+const candidates = new Map(); // name -> { file, own, base, implementsContract }
 
 for (const file of files) {
   const sf = program.getSourceFile(file);
@@ -90,45 +107,83 @@ for (const file of files) {
     const cls = node.name.text;
     if (!cls.startsWith('Adt')) return;
 
-    // Only classes that actually promise the contract belong in the matrix.
-    // Filtering by heritage (not by name) keeps out facades like AdtService
-    // and utilities like AdtUtils that never claim to implement IAdtObject.
-    // A subclass (e.g. AdtCdsUnitTest extends AdtUnitTest) inherits the
-    // promise, so an `extends Adt*` clause counts too.
-    const CONTRACT_IFACES = new Set([
-      'IAdtObject',
-      'IFeatureToggleObject',
-      'IAdtServiceBinding',
-    ]);
-    const promisesContract = (node.heritageClauses ?? []).some((h) =>
-      h.types.some((t) => {
+    let base = null;
+    let implementsContract = false;
+    for (const h of node.heritageClauses ?? []) {
+      for (const t of h.types) {
         const name = t.expression.getText(sf);
-        if (h.token === ts.SyntaxKind.ImplementsKeyword)
-          return CONTRACT_IFACES.has(name);
-        // extends an Adt* handler => inherits the contract
-        return (
-          h.token === ts.SyntaxKind.ExtendsKeyword && name.startsWith('Adt')
-        );
-      }),
-    );
-    if (!promisesContract) return;
+        if (h.token === ts.SyntaxKind.ImplementsKeyword) {
+          if (CONTRACT_IFACES.has(name)) implementsContract = true;
+        } else if (h.token === ts.SyntaxKind.ExtendsKeyword) {
+          base = name;
+        }
+      }
+    }
 
-    const verdicts = Object.fromEntries(
-      CONTRACT_METHODS.map((m) => [m, VERDICT.ABSENT]),
-    );
+    // Record every method (not only contract ones), so delegation targets like
+    // `_upsertMessage` / `readSource` can be followed transitively.
+    const methods = new Map(); // name -> { refuses, worksDirectly, delegates }
     for (const member of node.members) {
       if (!ts.isMethodDeclaration(member) || !member.name) continue;
       const name = member.name.getText(sf);
-      if (!CONTRACT_METHODS.includes(name)) continue;
-      verdicts[name] = classify(member.body, sf);
+      methods.set(name, {
+        refuses: refuses(member.body, sf),
+        worksDirectly: worksDirectly(member.body, sf),
+        delegates: delegatesTo(member.body, sf),
+      });
     }
-    // A pure alias subclass (e.g. `class AdtService extends AdtServiceBinding {}`)
-    // declares no contract method of its own — every verdict is "absent". Its
-    // behaviour is its parent's, already counted, so drop it to avoid double-counting.
-    if (CONTRACT_METHODS.every((m) => verdicts[m] === VERDICT.ABSENT)) return;
-
-    rows.set(cls, { file, verdicts });
+    candidates.set(cls, { file, methods, base, implementsContract });
   });
+}
+
+/** Resolve a method to its declaring class along the extends chain. */
+function findMethod(cls, method, seen = new Set()) {
+  const c = candidates.get(cls);
+  if (!c || seen.has(cls)) return null;
+  seen.add(cls);
+  if (c.methods.has(method)) return { cls, info: c.methods.get(method) };
+  return c.base ? findMethod(c.base, method, seen) : null;
+}
+
+/** True if `method` on `cls` does real work directly or via any delegation it reaches. */
+function doesRealWork(cls, method, guard = new Set()) {
+  const key = `${cls}.${method}`;
+  if (guard.has(key)) return false; // cycle
+  guard.add(key);
+  const found = findMethod(cls, method);
+  if (!found) return false;
+  if (found.info.worksDirectly) return true;
+  return found.info.delegates.some((d) => doesRealWork(found.cls, d, guard));
+}
+
+/** Contract verdict for a method: absent / refuses / real / stub. */
+function verdictFor(cls, method) {
+  const found = findMethod(cls, method);
+  if (!found) return VERDICT.ABSENT;
+  if (found.info.refuses) return VERDICT.REFUSES;
+  return doesRealWork(cls, method) ? VERDICT.REAL : VERDICT.STUB;
+}
+
+// Does this class promise the contract — directly, or by extending one that does?
+function promisesContract(name, seen = new Set()) {
+  const c = candidates.get(name);
+  if (!c || seen.has(name)) return false;
+  seen.add(name);
+  return (
+    c.implementsContract || (c.base ? promisesContract(c.base, seen) : false)
+  );
+}
+
+const rows = new Map();
+for (const [cls, c] of candidates) {
+  if (!promisesContract(cls)) continue; // excludes AdtUtils and other non-handlers
+  // A pure-alias subclass declaring no method of its own resolves entirely from
+  // its parent; drop it so it does not double-count the parent it merely renames.
+  if (c.methods.size === 0) continue;
+  const verdicts = Object.fromEntries(
+    CONTRACT_METHODS.map((m) => [m, verdictFor(cls, m)]),
+  );
+  rows.set(cls, { file: c.file, verdicts });
 }
 
 const csv = process.argv.includes('--csv');

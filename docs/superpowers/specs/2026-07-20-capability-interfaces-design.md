@@ -33,22 +33,30 @@ AdtServiceBinding {}`) declare no method of their own and are dropped to avoid
 double-counting. `*Legacy.ts` subclasses are likewise excluded — they override
 selectively and would double-count their parents.
 
+The generator resolves both delegation and inheritance: a method that calls a private
+helper doing the real work counts as real (not a stub), and a subclass inherits its
+parent's verdict for any method it does not override. All counts below are on the single
+population of 35.
+
 ### What the matrix shows
 
-- `getVersions` / `getVersionSource`: **19 real, 11 refuse** — identical sets, the
+- `create` / `read` / `readMetadata`: **35 real** — every contract class.
+- `update` / `delete`: **33 real, 2 refuse** (Request, UnitTest — both known defects,
+  see below).
+- `getVersions` / `getVersionSource`: **23 real, 12 refuse** — identical sets, the
   sharpest split in the contract.
-- `lock` / `unlock`: **26 real, 4 refuse** — identical sets, a rigid pair.
-- `activate`: 28 real, 5 refuse. `check`: 30 real, 4 refuse. The sets differ, so these
+- `lock` / `unlock`: **30 real, 5 refuse** — identical sets, a rigid pair.
+- `activate`: 29 real, 6 refuse. `check`: 30 real, 5 refuse. The sets differ, so these
   are distinct capabilities rather than one.
-- `readTransport`: 23 real and **7 not implemented — through two different mechanisms**:
-  three refuse outright (MessageClass, MessageClassMessage, Request) and four return a
-  stub (AuthorizationField, FeatureToggle, FunctionInclude, UnitTest). With no way to
-  say "I don't do transports", implementers invented more than one lie. That
+- `readTransport`: 27 real and **8 not implemented — through two different mechanisms**:
+  three refuse outright (MessageClass, MessageClassMessage, Request) and five return a
+  stub (AuthorizationField, FeatureToggle, FunctionInclude, CdsUnitTest, UnitTest). With
+  no way to say "I don't do transports", implementers invented more than one lie. That
   inconsistency is the clearest symptom of the problem.
-- Handlers where the contract is plainly the wrong fit: `AdtUnitTest` and `AdtRequest`
+- Classes where the contract is plainly the wrong fit: `AdtUnitTest` and `AdtRequest`
   refuse seven methods each; `AdtMessageClassMessage` refuses or stubs nine;
-  `AdtPackageLegacy` (excluded from the count as a subclass) throws on all 13 and exists
-  solely to satisfy the type.
+  `AdtPackageLegacy` (a `*Legacy` subclass, outside this population) throws on all 13 and
+  exists solely to satisfy the type.
 
 The cost is paid by consumers: `AdtClient.getUnitTest()` returns a type promising
 `lock()`, and the promise is false. The compiler cannot help, so the failure surfaces
@@ -77,13 +85,13 @@ Two rules govern the decomposition. Both were derived during review, not assumed
 **Rule 1 — split only on evidence.** An atom is divided only when a class exists that
 has one part without the other. Absent such a class, the methods stay together.
 
-This is why `IAdtCrud` is a single atom: `create`, `read`, `readMetadata`, `update`,
-`delete` are implemented by all 30 handlers. The only two apparent exceptions —
-`AdtRequest` and `AdtUnitTest` — are our own defects, not domain limits (see
-"Known defects"). No ADT object has partial CRUD.
+This is why `IAdtCrud` is a single atom: across all 35 contract classes `create`, `read`
+and `readMetadata` are 35/35, and `update` / `delete` refuse in only two — `AdtRequest`
+and `AdtUnitTest`, both our own defects, not domain limits (see "Known defects"). No ADT
+object has partial CRUD.
 
 It is also why `readMetadata` stays inside `IAdtCrud` despite being conceptually a
-header read rather than a CRUD operation: all 30 handlers implement both `read` and
+header read rather than a CRUD operation: all 35 implement both `read` and
 `readMetadata`, so there is nothing to split on. If an object ever reads a header but
 not a body, we divide then, with grounds.
 
@@ -101,15 +109,17 @@ that is cheap to fix. Encoding our gaps as contract is the worse failure.
 seven atoms, with no overlap. The two specialized interfaces that widen `IAdtObject` are
 handled separately — see "Specialized interfaces" below.
 
+Counts are real/refuse/stub over the 35-class population.
+
 | Atom | Methods | Evidence (generated) |
 |---|---|---|
-| `IAdtCrud` | `create`, `read`, `readMetadata`, `update`, `delete` | no object has partial CRUD — see below |
-| `IAdtValidatable` | `validate` | 31 real / 1 refuses / 2 stub |
-| `IAdtCheckable` | `check` | 30 real / 4 refuse |
-| `IAdtActivatable` | `activate` | 28 real / 5 refuse |
-| `IAdtLockable` | `lock`, `unlock` | 26 / 4, **identical sets** |
-| `IAdtVersionable` | `getVersions`, `getVersionSource` | 19 / 11, **identical sets**, verified domain boundary |
-| `IAdtTransportAware` | `readTransport` | 23 real / 3 refuse / 4 stub |
+| `IAdtCrud` | `create`, `read`, `readMetadata`, `update`, `delete` | 35/35 for read-side; no object has partial CRUD — see below |
+| `IAdtValidatable` | `validate` | 31 / 1 / 3 |
+| `IAdtCheckable` | `check` | 30 / 5 / 0 |
+| `IAdtActivatable` | `activate` | 29 / 6 / 0 |
+| `IAdtLockable` | `lock`, `unlock` | 30 / 5, **identical sets** |
+| `IAdtVersionable` | `getVersions`, `getVersionSource` | 23 / 12, **identical sets**, verified domain boundary |
+| `IAdtTransportAware` | `readTransport` | 27 / 3 / 5 |
 
 `validate`, `check` and `activate` are separate atoms because their sets genuinely
 differ: `AdtPackage` implements `check` but not `activate`; `AdtMessageClass` implements
@@ -122,9 +132,8 @@ co-occur perfectly — no handler has one without the other.
 
 These are different things, and conflating them makes the counts irreproducible.
 
-**Observed**, from the generated matrix: `update` has 2 refusals and `delete` has 2 —
-`AdtRequest` and `AdtUnitTest` in both cases. `create` and `read` each have one stub
-(`AdtMessageClassMessage`, `AdtFunctionInclude`).
+**Observed**, from the generated matrix: `create`, `read` and `readMetadata` are 35/35;
+`update` and `delete` each have exactly 2 refusals — `AdtRequest` and `AdtUnitTest`.
 
 **Intended**, after the known defects are fixed: CRUD is universal. Both refusals are
 our own bugs, not ADT limits — a transport request's description can be changed and an
@@ -136,25 +145,32 @@ so explicitly rather than quietly picking whichever number supports the design.
 
 ### The versioning boundary is real
 
-`getVersions` / `getVersionSource` are absent from 11 handlers for a domain reason,
+`getVersions` / `getVersionSource` are refused by 12 of the 35 for a domain reason,
 confirmed with the maintainer: ADT exposes version history at `<sourceUri>/versions`.
 Objects without a source resource — those represented purely as XML — have no such
-endpoint.
+endpoint. (Eleven of the twelve are primary handlers; the twelfth, CdsUnitTest,
+inherits the refusal.)
 
 The dividing line is "has `/source/main`", **not** "is DDIC": `Table`, `Structure` and
 `TableType` have versions; `Domain`, `DataElement` and `Package` do not.
 
-- **With versions (19):** AccessControl, AppendStructure, BehaviorDefinition,
+Over the full population of 35, the split is **23 with / 12 without**, generated by
+`scripts/capability-matrix.mjs --csv`:
+
+- **With versions (23):** AccessControl, AppendStructure, BehaviorDefinition,
   BehaviorImplementation, Class, DdicTableType, Ddl, Enhancement, FunctionInclude,
   FunctionModule, Interface, MetadataExtension, Program, ScalarFunction,
-  ScalarFunctionImplementation, ServiceDefinition, Structure, Table, Transformation.
-- **Without (11):** AuthorizationField, DataElement, Domain, FeatureToggle,
+  ScalarFunctionImplementation, ServiceDefinition, Structure, Table, Transformation, and
+  the four class-include handlers (LocalDefinitions, LocalMacros, LocalTestClass,
+  LocalTypes — they delegate to `getIncludeVersions` on the parent class, which the
+  generator resolves as real work).
+- **Without (12):** AuthorizationField, DataElement, Domain, FeatureToggle,
   FunctionGroup, MessageClass, MessageClassMessage, Package, Request, ServiceBinding,
-  UnitTest.
+  UnitTest, and CdsUnitTest (which inherits `AdtUnitTest`'s refusal).
 
-Both lists are generated by `scripts/capability-matrix.mjs --csv` and sum to 30. The
-four class-include handlers are excluded: they delegate to `getIncludeVersions` on the
-parent class rather than implementing the contract method themselves.
+Stripped of the four inheriting class-includes and the one inheriting CdsUnitTest, the
+underlying domain boundary among the primary handlers is 19 source-backed to 11 not —
+the same line, viewed on the smaller population.
 
 ## Composition
 
@@ -309,8 +325,12 @@ type _PartitionIsExact<C, R> = [
 type _Check = _PartitionIsExact<IClassConfig, IClassState>;
 ```
 
-The final instantiation is not decoration: an uninstantiated generic type alias is never
-evaluated, so without it the assertion would silently pass no matter what.
+Keep the final instantiation. A generic type alias is only fully checked at the
+argument types it is instantiated with, so instantiating `_PartitionIsExact` at a
+concrete config/state pair guarantees the `Assert` constraints are actually evaluated
+rather than left to depend on where and whether the alias is referenced. It is cheap
+insurance; the implementation step must confirm the assertion fails when a method is
+removed, which is the real proof that it checks anything.
 
 **This proof covers `IAdtObject` only.** It cannot validate
 `IAdtFeatureToggleControl` or the service-binding atoms, because `AllAtoms` is compared
@@ -346,8 +366,9 @@ Each is a separate decision, taken once the atoms have settled:
 
 1. **Redefine `IAdtObject` as the intersection of its atoms.** Safe once the proof
    above passes, but pointless before consumers exist.
-2. **Narrow `AdtClient.getXxx()` return types** for the 11 handlers without versions,
-   so `getDomain()` no longer promises `getVersions()`. This is a **breaking change**
+2. **Narrow `AdtClient.getXxx()` return types** for the handlers without versions (the
+   12 listed above), so `getDomain()` no longer promises `getVersions()`. This is a
+   **breaking change**
    for adt-clients — code calling `client.getDomain().getVersions()` compiles today and
    throws at runtime; afterwards it fails to compile. That converts a runtime error
    into a compile error, which is the point, but it warrants a major bump and a
