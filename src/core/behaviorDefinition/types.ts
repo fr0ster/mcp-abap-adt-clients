@@ -12,7 +12,3 @@ export type {
   IUpdateBehaviorDefinitionParams,
   IValidationResult,
 } from '@mcp-abap-adt/interfaces';
-
-/**
- * State maintained by the Behavior Definition Builder
- */
