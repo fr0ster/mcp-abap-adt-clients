@@ -130,6 +130,75 @@ A handler that also has version history composes further:
 type ISourceObject<C, R> = IAdtCrudObject<C, R> & IAdtVersionable<C>;
 ```
 
+## The behavioural contract
+
+An interface constrains behaviour, not only shape. TypeScript checks the second and
+says nothing about the first, so the partition alone does not solve the problem that
+motivated it — it would merely distribute it across nine interfaces instead of one.
+
+The evidence is already in hand. `readTransport` is "unimplemented" in six handlers by
+three different mechanisms — throwing, returning a fabricated error state, and
+returning an empty `{errors: []}`. Every one of those satisfies the structural
+signature. The type system was never going to catch it.
+
+So each atom carries a behavioural contract, and implementations must satisfy both.
+
+### The rule that makes the split worth doing
+
+**"Not supported" ceases to be a behaviour.** A handler that cannot do something does
+not implement the atom. It must not throw `UNSUPPORTED_OPERATION`, must not return a
+fabricated error state, and must not return an empty stub.
+
+This is the whole point of the partition: `AdtDomain` will not implement
+`IAdtVersionable`, so the question of what its `getVersions` should return disappears
+rather than being answered three ways.
+
+### Per-atom obligations
+
+Contracts common to every atom:
+
+- **Failure is a thrown error**, using `AdtObjectErrorCodes`. Operations do not signal
+  failure by returning a state that happens to contain errors.
+- **The returned state accumulates results**, and `state.errors` records
+  non-fatal diagnostics only. An empty `errors` array must mean "nothing went wrong",
+  never "this operation does not apply here".
+- **Session type is restored** on both the success and failure paths. Any method that
+  sets `stateful` returns the connection to `stateless` before it finishes or throws.
+
+Atom-specific obligations:
+
+- `IAdtCrud` — `read` returns `undefined` for a genuinely absent object; it does not
+  throw for absence. Note the trial-verified caveat that ADT source endpoints answer
+  `200` with an empty body rather than `404`, so absence is determined by content, not
+  status. `create` is not idempotent and must not silently succeed on an existing
+  object.
+- `IAdtLockable` — `lock` returns a handle and leaves the session `stateful`; the
+  caller owns the obligation to `unlock`. `unlock` is idempotent and tolerates an
+  already-released handle. A failure between the two must still restore the session.
+- `IAdtActivatable` — activation of an already-active object is a no-op, not an error.
+- `IAdtVersionable` — implemented only by objects with a source resource. `getVersions`
+  returns an empty array for an object with no history; it does not throw.
+- `IAdtCheckable` / `IAdtValidatable` — a check that *finds problems* has succeeded;
+  problems are reported in the result, not raised as errors. Only a failure of the
+  check mechanism itself throws.
+- `IAdtTransportAware` — implemented only by objects that participate in transports.
+
+### How this is enforced
+
+The compiler cannot verify any of the above, so enforcement is by documentation and
+test:
+
+- Each atom's declaration carries the contract in its docblock, next to the signature,
+  where an implementer will actually read it.
+- The behavioural expectations that can be exercised without a live system belong in
+  the unit suite as shared conformance tests, parameterised over handlers — the same
+  table-driven approach already used for `postUpdateReadinessRead` and
+  `updateNoActivateReadsInactive`.
+
+Writing the contract down is not a guarantee. It is, however, the difference between a
+convention a reviewer can point at and one that has to be inferred from whichever
+handler was read first.
+
 ## Correctness proof
 
 The partition must be provably exact, not exact by inspection. A compile-time
@@ -191,13 +260,96 @@ Each is a separate decision, taken once the atoms have settled:
    meaningful shared operation set — the honest common denominator is a constructor
    whose `logger` parameter 13 of 14 implementations never read. No abstraction is
    proposed for them here.
-4. **`IAdtSearchable` is not proposed.** Seven "find things" operations have seven
-   different input shapes and five different result shapes. `ISearchResult` exists in
-   `IAdtShared.ts:84` and is used by no production code — the one type that would have
-   been the shared search result was declared and abandoned. A search capability would
-   have to be *imposed* by normalizing all seven signatures, and would have zero
-   existing call sites to validate against. That is a design act, not an extraction,
-   and belongs in its own spec if wanted.
+4. **`IAdtSearchable` — viable, but its own spec.** See "Search capability" below.
+
+## Search capability — viable, deferred to its own spec
+
+An earlier draft of this spec claimed no coherent search capability existed. That
+reasoning was wrong and is corrected here, because the mistake is instructive: it
+judged coherence by the *current concrete signatures* and concluded no capability was
+possible. Absence of a shared concrete shape does not imply absence of a shared
+abstraction — that is what interfaces are for.
+
+The shapes do share a core. All five "an object was found" types carry a name, a type,
+and optional `uri` / `packageName` / `description`:
+
+| Type | Name | Type field | Extras |
+|---|---|---|---|
+| `ISearchResult` | `name` | `type` | `description`, `packageName?`, `uri?` |
+| `IWhereUsedReference` | `name` | `type` | `uri`, `isResult`, `usageInformation?` |
+| `IPackageContentItem` | `name` | `adtType` | `isPackage`, `packageName` |
+| `IPackageHierarchyNode` | `name` | `adtType?` | `is_package`, `children?` |
+| `IObjectReference` | `name` | `type` | `parentName?` |
+
+The inconsistency is itself a defect: the object's type is spelled three ways
+(`type`, `adtType`, `adtType?`), and "is this a package" is `isPackage` in one type and
+`is_package` in its sibling — **snake_case and camelCase for the same concept in the
+same file**. A shared base interface removes exactly this.
+
+```ts
+/** Anything the repository can hand back as a located object. */
+export interface IAdtObjectHit {
+  name: string;
+  type: string;
+  uri?: string;
+  packageName?: string;
+  description?: string;
+}
+
+export interface IAdtSearchable<
+  TCriteria extends IAdtSearchCriteria = IAdtSearchCriteria,
+  TResult extends IAdtObjectHit = IAdtObjectHit,
+> {
+  search(criteria: TCriteria): Promise<TResult[]>;
+}
+```
+
+Each existing result type then extends `IAdtObjectHit`. The hierarchy node falls out
+neatly: a tree node is a hit with `children`, not a separate concept.
+
+The generic parameters exist so consumers can bring their own types, constrained by the
+contract package rather than dictated by it — consistent with this library's stance of
+offering options rather than prescribing usage.
+
+### The generic cuts both ways — a caveat to design in from the start
+
+A type parameter behaves differently depending on which side supplies the value, and
+only one direction is sound:
+
+- **Consumer implements the interface** — sound. They produce `MyHit` themselves and
+  the compiler checks it.
+- **Consumer calls our method as `search<MyHit>(...)`** — unsound. We cannot return
+  `MyHit`; we do not know its fields. Such a parameter degrades into a disguised `as`:
+  the type claims `businessArea` while the runtime value has `undefined`.
+
+So library methods must offer an explicit bridge rather than a pass-through type
+parameter:
+
+```ts
+search<T extends IAdtObjectHit = ISearchResult>(
+  criteria: IAdtSearchCriteria,
+  map?: (hit: ISearchResult) => T,
+): Promise<T[]>;
+```
+
+We return our shape; the consumer optionally supplies the transformation and gets
+theirs. Compiler-checked, unlike a bare type argument.
+
+### Why this is a separate spec
+
+The cost is materially different from the atom partition, which is additive and
+risk-free:
+
+1. **Parsers must be written.** Four methods return raw XML today (`searchObjects`,
+   `getWhereUsed`, `getVirtualFoldersContents`, `getAllTypes`). ADT XML parsing is
+   where bugs live — `FeedRepository` already parses so defensively that a malformed
+   feed is indistinguishable from an empty one.
+2. **It is breaking.** Return types change and `is_package` migrates to `isPackage`.
+3. **Still zero call sites.** Nothing in the library consumes a search abstraction, so
+   there is no existing usage to validate the shape against.
+
+Worth doing — it collapses three spellings of one concept into one — but as its own
+scoped piece of work, not folded into the partition.
 
 ## Known defects (not part of this design)
 
