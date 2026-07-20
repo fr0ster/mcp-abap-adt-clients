@@ -53,8 +53,8 @@ population of 35.
   stub (AuthorizationField, FeatureToggle, FunctionInclude, CdsUnitTest, UnitTest). With
   no way to say "I don't do transports", implementers invented more than one lie. That
   inconsistency is the clearest symptom of the problem.
-- Classes where the contract is plainly the wrong fit: `AdtUnitTest` and `AdtRequest`
-  refuse seven methods each; `AdtMessageClassMessage` refuses or stubs nine;
+- Classes where the contract is plainly the wrong fit: `AdtRequest` refuses 9 of 13 and
+  stubs a 10th; `AdtUnitTest` refuses 8 and stubs 2; `AdtMessageClassMessage` refuses 8.
   `AdtPackageLegacy` (a `*Legacy` subclass, outside this population) throws on all 13 and
   exists solely to satisfy the type.
 
@@ -231,8 +231,8 @@ An interface constrains behaviour, not only shape. TypeScript checks the second 
 says nothing about the first, so the partition alone does not solve the problem that
 motivated it — it would merely distribute it across seven interfaces instead of one.
 
-The evidence is already in hand. `readTransport` is "unimplemented" in seven handlers by
-two different mechanisms — three refuse outright, four return a stub. Every one of those
+The evidence is already in hand. `readTransport` is "unimplemented" in eight classes by
+two different mechanisms — three refuse outright, five return a stub. Every one of those
 satisfies the structural signature. The type system was never going to catch it.
 
 So each atom carries a behavioural contract, and implementations must satisfy both.
