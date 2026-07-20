@@ -390,22 +390,36 @@ Two facts from the code:
    `/sap/bc/adt/bo/behaviordefinitions/{name}` — see
    `src/core/behaviorDefinition/activation.ts:35`, which **hardcodes** that path.
 2. `buildObjectUri` in `src/utils/activationUtils.ts` is **not** the handler activation
-   resolver. Its only callers are group activation and group deletion
-   (`src/core/shared/groupActivation.ts:149`, `groupDeletion.ts`), where it builds the
-   object-reference URI inside a batch payload. For BDEF it returns
-   `/sap/bc/adt/ddic/bdef/sources/{name}` — a **different** path from the one the BDEF
-   handler actually uses to activate. Building `ActivateCapability` on `buildObjectUri`
-   would route BDEF (and any other type whose group URI differs from its lifecycle URI)
-   to the wrong endpoint.
+   resolver. Its callers are all group operations — `groupActivation.ts:149`,
+   `groupDeletion.ts`, and the legacy `AdtUtilsLegacy.activateObjectsGroup`
+   (`src/core/shared/AdtUtilsLegacy.ts:40`) — where it builds the object-reference URI
+   inside a batch payload. For BDEF it returns `/sap/bc/adt/ddic/bdef/sources/{name}` — a
+   **different** path from the one the BDEF handler actually uses to activate. Building
+   `ActivateCapability` on `buildObjectUri` would route BDEF (and any other type whose
+   group URI differs from its lifecycle URI) to the wrong endpoint.
 
-The consequence: **every per-handler activation today hardcodes its own base path**
-(`/oo/classes/`, `/ddic/domains/`, `/ddic/tables/`, `/programs/programs/`,
-`/oo/interfaces/`, `/bo/behaviordefinitions/`, …). There is no shared map to reuse, so a
-capability's strategy supplies its base path **directly from the handler** — the handler
-already knows it — along with the config field(s) it reads and how it normalizes the
-response. `buildObjectUri` stays where it belongs, in the group operations, and is not a
-dependency of this refactor. `AdtEnhancement` (dual-keyed `type`+`name`, via
-`getEnhancementUri`) is a further reason the strategy cannot be a bare name field.
+The consequence: the **real, self-activating** handlers each hardcode their own base
+path (`/oo/classes/`, `/ddic/domains/`, `/ddic/tables/`, `/programs/programs/`,
+`/oo/interfaces/`, `/bo/behaviordefinitions/`, …) — there is no shared map to reuse, so a
+capability's strategy supplies its base path **directly from the handler**, along with
+the config field(s) it reads and how it normalizes the response.
+
+But not every handler is self-activating, and the extraction must classify them into
+three kinds, not one:
+
+- **Self-activating** (the majority) — hardcode a lifecycle base path; these compose the
+  shared `ActivateCapability` with a base-path strategy.
+- **Delegating** — activate through another handler: `AdtBehaviorImplementation.activate`
+  calls `this.class.activate` (`AdtBehaviorImplementation.ts:591`); the class-include
+  handlers call `super.activate` (`AdtLocalDefinitions.ts:318`). These compose *nothing
+  new* — they reuse the class handler's capability, which is the composition model
+  working as intended.
+- **Refusing** — `AdtPackage.activate` throws (`AdtPackage.ts:559`); such handlers simply
+  do not compose `ActivateCapability` and do not implement `IAdtActivatable`.
+
+`AdtEnhancement` (dual-keyed `type`+`name`, via `getEnhancementUri`) is a further reason
+the strategy cannot be a bare name field. `buildObjectUri` stays in the group operations
+and is not a dependency of this refactor.
 
 **The lock normalization contract.** Lock helpers do not return the same shape today:
 `table/lock.ts` returns a bare `string`, `interface/lock.ts` returns
