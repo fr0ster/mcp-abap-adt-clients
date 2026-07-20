@@ -253,11 +253,18 @@ rather than being answered three ways.
 ### Per-atom obligations
 
 These are **required behaviours the implementation must meet**, not descriptions of what
-every handler does today. Where an obligation is not already backed by the current code,
-it is a target to be secured by a conformance test — and any obligation that depends on
-how SAP responds (idempotency, no-op-on-repeat) must be verified by probing a real system
-before it is relied on, not asserted. The trial-verified caveats below are marked as such;
-the rest are targets.
+every handler does today. Two things must not be confused when reading them:
+
+- **"Current code does otherwise" is not an objection.** These are targets; the point of
+  the refactor is that current behaviour is inconsistent. A contract that only restated
+  what the code already does would justify no work. So a mismatch with today's handlers
+  is expected, and is what the conformance tests will close.
+- **A claim about what *SAP* returns is different** — that is an external fact, and it
+  must be probed, never asserted. Where reaching a target depends on SAP's response
+  (which status means "already released" / "already active"), the target still stands;
+  what needs evidence is the *mechanism* — which status the capability may treat as
+  success. Trial-verified facts below are marked as such; unverified SAP behaviour is
+  flagged as needing a probe.
 
 Contracts common to every atom:
 
@@ -281,18 +288,18 @@ Atom-specific obligations:
   object.
 - `IAdtLockable` — `lock` returns a handle and leaves the session `stateful`; the
   caller owns the obligation to `unlock`. A failure between the two must still restore
-  the session. `unlock` is **best-effort release; repeated- or stale-unlock semantics
-  are endpoint-specific.** This is deliberately weaker than "idempotent": the current
-  helpers POST `_action=UNLOCK` directly and some turn an ADT failure into a thrown
-  error (`src/core/interface/unlock.ts:33`), so no idempotency exists to promise today.
-  If `LockCapability` is to guarantee idempotent unlock, that is an added requirement,
-  not an observation — it must be backed by probing what SAP returns for a repeated or
-  expired handle (per endpoint) and an explicit adaptation rule for which statuses count
-  as already-released success. Until that evidence exists, the contract promises only
-  best-effort release, and a conformance test asserts the weaker guarantee.
-- `IAdtActivatable` — the target is that activating an already-active object is a no-op
-  rather than an error; like the unlock case this depends on what SAP returns and must be
-  confirmed by probing before it is relied on.
+  the session. **Target: `unlock` is idempotent** — releasing an already-released or
+  expired handle succeeds rather than throwing. This is intended *new* behaviour: today
+  the helpers POST `_action=UNLOCK` directly and some turn an ADT failure into a throw
+  (`src/core/interface/unlock.ts:33`). That mismatch is the thing being fixed, not an
+  argument against the target. The one genuine unknown is external — *what SAP returns*
+  for a repeated or expired handle — because that determines whether the capability can
+  distinguish "already released" (swallow as success) from a real error (rethrow). That
+  status must be probed per endpoint before the idempotency rule is finalized; the target
+  stands, the mechanism to reach it is what needs the evidence.
+- `IAdtActivatable` — **target: activating an already-active object is a no-op**, not an
+  error. Same shape as unlock: the goal holds regardless of current behaviour; which SAP
+  status signals "already active" must be probed so the capability can treat it as success.
 - `IAdtVersionable` — implemented only by objects with a source resource. `getVersions`
   returns an empty array for an object with no history; it does not throw.
 - `IAdtCheckable` / `IAdtValidatable` — a check that *finds problems* has succeeded;
