@@ -383,14 +383,23 @@ export interface INormalizedLock {
  * Per-handler strategy for LockCapability. The handler supplies its own
  * endpoint knowledge — there is no centralized lifecycle-URI resolver
  * (buildObjectUri is for group operations only).
+ *
+ * `release` returns the handler's OWN state shape (e.g. `{ unlockResult,
+ * errors: [] }`), not void — the current handlers put the ADT unlock response
+ * into `state.unlockResult`, and dropping it would change observable behaviour.
+ * The capability owns only the session toggling around it.
  */
-export interface ILockStrategy<TConfig> {
+export interface ILockStrategy<TConfig, TReadResult> {
   /** Extract the object name from config, or throw if missing. */
   nameOf(config: Partial<TConfig>): string;
   /** POST _action=LOCK, return the normalized handle. */
   acquire(ctx: ICapabilityContext, name: string): Promise<INormalizedLock>;
-  /** POST _action=UNLOCK with the handle. */
-  release(ctx: ICapabilityContext, name: string, lockHandle: string): Promise<void>;
+  /** POST _action=UNLOCK with the handle; build and return the handler state. */
+  release(
+    ctx: ICapabilityContext,
+    name: string,
+    lockHandle: string,
+  ): Promise<TReadResult>;
 }
 
 /** Per-handler strategy for VersionsCapability. */
@@ -424,7 +433,7 @@ git commit -m "feat(capabilities): strategy types for lock and versions"
 
 **Interfaces:**
 - Consumes: `ICapabilityContext`, `INormalizedLock`, `ILockStrategy` from `./types`.
-- Produces: `class LockCapability<TConfig> implements IAdtLockable<TConfig, TReadResult>` with constructor `(ctx: ICapabilityContext, strategy: ILockStrategy<TConfig>, buildState: () => TReadResult)`. Methods: `lock(config): Promise<string>`, `unlock(config, lockHandle): Promise<TReadResult>`.
+- Produces: `class LockCapability<TConfig, TReadResult> implements IAdtLockable<TConfig, TReadResult>` with constructor `(ctx: ICapabilityContext, strategy: ILockStrategy<TConfig, TReadResult>)`. Methods: `lock(config): Promise<string>`, `unlock(config, lockHandle): Promise<TReadResult>`. The state is built by `strategy.release`, so there is no `buildState` constructor param.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -450,7 +459,9 @@ function fakeCtx(): ICapabilityContext & { calls: string[] } {
   };
 }
 
-const strategy: ILockStrategy<Cfg> = {
+type State = { unlockResult?: string; errors: string[] };
+
+const strategy: ILockStrategy<Cfg, State> = {
   nameOf: (c) => {
     if (!c.name) throw new Error('name is required');
     return c.name;
@@ -461,40 +472,36 @@ const strategy: ILockStrategy<Cfg> = {
   },
   release: async (ctx, name, h) => {
     (ctx as any).calls.push(`release:${name}:${h}`);
+    return { unlockResult: `R:${name}`, errors: [] };
   },
 };
 
 describe('LockCapability', () => {
   it('lock sets stateful, acquires, returns the handle', async () => {
     const ctx = fakeCtx();
-    const cap = new LockCapability<Cfg, { errors: string[] }>(
-      ctx,
-      strategy,
-      () => ({ errors: [] }),
-    );
+    const cap = new LockCapability<Cfg, State>(ctx, strategy);
     const handle = await cap.lock({ name: 'ZFOO' });
     expect(handle).toBe('H1');
     expect(ctx.calls).toEqual(['session:stateful', 'acquire:ZFOO']);
   });
 
-  it('unlock releases then restores stateless', async () => {
+  it('unlock is stateful during release, restores stateless, returns state', async () => {
     const ctx = fakeCtx();
-    const cap = new LockCapability<Cfg, { errors: string[] }>(
-      ctx,
-      strategy,
-      () => ({ errors: [] }),
-    );
-    await cap.unlock({ name: 'ZFOO' }, 'H1');
-    expect(ctx.calls).toEqual(['release:ZFOO:H1', 'session:stateless']);
+    const cap = new LockCapability<Cfg, State>(ctx, strategy);
+    const state = await cap.unlock({ name: 'ZFOO' }, 'H1');
+    // stateful BEFORE the UNLOCK (older BASIS), stateless AFTER.
+    expect(ctx.calls).toEqual([
+      'session:stateful',
+      'release:ZFOO:H1',
+      'session:stateless',
+    ]);
+    // the ADT unlock response is preserved in state.
+    expect(state.unlockResult).toBe('R:ZFOO');
   });
 
   it('lock rethrows a missing name from the strategy', async () => {
     const ctx = fakeCtx();
-    const cap = new LockCapability<Cfg, { errors: string[] }>(
-      ctx,
-      strategy,
-      () => ({ errors: [] }),
-    );
+    const cap = new LockCapability<Cfg, State>(ctx, strategy);
     await expect(cap.lock({})).rejects.toThrow('name is required');
   });
 });
@@ -515,18 +522,20 @@ import type { ICapabilityContext, ILockStrategy } from './types';
 
 /**
  * Shared lock/unlock for handlers whose lock differs only by endpoint and
- * name field. `lock` leaves the session stateful (the caller must unlock);
- * `unlock` restores stateless. See the spec's IAdtLockable obligations —
- * idempotent unlock is a TARGET, not implemented here, and is left to the
- * per-endpoint probe + adaptation rule of the full-migration plan.
+ * name field. `lock` leaves the session stateful (the caller must unlock).
+ * `unlock` runs the release inside a stateful request — older BASIS (#106)
+ * only accepts UNLOCK while stateful — then restores stateless. The handler's
+ * state shape (including the ADT `unlockResult`) is built by `strategy.release`
+ * and returned unchanged. See the spec's IAdtLockable obligations — idempotent
+ * unlock is a TARGET, not implemented here, and is left to the per-endpoint
+ * probe + adaptation rule of the full-migration plan.
  */
 export class LockCapability<TConfig, TReadResult>
   implements IAdtLockable<TConfig, TReadResult>
 {
   constructor(
     private readonly ctx: ICapabilityContext,
-    private readonly strategy: ILockStrategy<TConfig>,
-    private readonly buildState: () => TReadResult,
+    private readonly strategy: ILockStrategy<TConfig, TReadResult>,
   ) {}
 
   async lock(config: Partial<TConfig>): Promise<string> {
@@ -542,9 +551,11 @@ export class LockCapability<TConfig, TReadResult>
     lockHandle: string,
   ): Promise<TReadResult> {
     const name = this.strategy.nameOf(config);
-    await this.strategy.release(this.ctx, name, lockHandle);
+    // UNLOCK must run stateful (older BASIS #106); restore stateless after.
+    this.ctx.connection.setSessionType('stateful');
+    const state = await this.strategy.release(this.ctx, name, lockHandle);
     this.ctx.connection.setSessionType('stateless');
-    return this.buildState();
+    return state;
   }
 }
 ```
@@ -714,10 +725,10 @@ private readonly lockCap = new LockCapability<IClassConfig, IClassState>(
       lockHandle: await lockClass(ctx.connection, name),
     }),
     release: async (ctx, name, handle) => {
-      await unlockClass(ctx.connection, name, handle);
+      const result = await unlockClass(ctx.connection, name, handle);
+      return { unlockResult: result, errors: [] };
     },
   },
-  () => ({ errors: [] }),
 );
 
 private readonly versionsCap = new VersionsCapability<IClassConfig>(
@@ -764,7 +775,12 @@ getVersionSource(contentUri: string): Promise<string> {
 }
 ```
 
-(Confirm the exact current `unlock` body first with `sed -n '/async unlock(/,/^  }/p' src/core/class/AdtClass.ts` and preserve any `untrack` / stateless call semantics — the capability already restores stateless, so remove a duplicate `setSessionType('stateless')` from the handler if present.)
+The current `unlock` body (`src/core/class/AdtClass.ts`) is
+`stateful → unlockClass → stateless → untrack → return { unlockResult, errors: [] }`.
+The capability now owns `stateful → release(builds { unlockResult, errors }) → stateless`,
+so the handler wrapper only adds the `untrack`. The state shape is identical; the
+duplicate `setSessionType('stateless')` and the name-guard now live in the capability
+and its strategy, so remove them from the handler body.
 
 - [ ] **Step 3: Build**
 
@@ -819,14 +835,14 @@ private readonly lockCap = new LockCapability<IDomainConfig, IDomainState>(
       lockHandle: await lockDomain(ctx.connection, name),
     }),
     release: async (ctx, name, handle) => {
-      await unlockDomain(ctx.connection, name, handle);
+      const result = await unlockDomain(ctx.connection, name, handle);
+      return { unlockResult: result, errors: [] };
     },
   },
-  () => ({ errors: [] }),
 );
 ```
 
-(Confirm `lockDomain`/`unlockDomain` signatures first: `sed -n '/export async function lockDomain/,/{/p' src/core/domain/lock.ts` and `.../unlockDomain/.../ src/core/domain/unlock.ts`. If `lockDomain` returns `{ lockHandle }` rather than a bare string, adapt `acquire` to return it directly.)
+(Confirm `lockDomain`/`unlockDomain` signatures first: `grep -n "export async function lockDomain" src/core/domain/lock.ts` and `.../unlockDomain .../ src/core/domain/unlock.ts` — both are `(connection, domainName, [lockHandle])`. If `lockDomain` returns `{ lockHandle }` rather than a bare string, adapt `acquire` to return it directly.)
 
 - [ ] **Step 2: Replace lock/unlock, leave getVersions untouched**
 
@@ -903,10 +919,10 @@ private readonly lockCap = new LockCapability<IServiceDefinitionConfig, IService
       lockHandle: await lockServiceDefinition(ctx.connection, name),
     }),
     release: async (ctx, name, handle) => {
-      await unlockServiceDefinition(ctx.connection, name, handle);
+      const result = await unlockServiceDefinition(ctx.connection, name, handle);
+      return { unlockResult: result, errors: [] };
     },
   },
-  () => ({ errors: [] }),
 );
 
 private readonly versionsCap = new VersionsCapability<IServiceDefinitionConfig>(
@@ -916,7 +932,13 @@ private readonly versionsCap = new VersionsCapability<IServiceDefinitionConfig>(
       if (!c.serviceDefinitionName) throw new Error('serviceDefinitionName is required');
       return c.serviceDefinitionName;
     },
-    list: (ctx, name) => getServiceDefinitionVersions(ctx.connection, name),
+    // NOTE: getServiceDefinitionVersions takes a config, not a bare name —
+    // the strategy re-wraps. (getClassIncludeVersions, by contrast, takes a
+    // name; the two low-level shapes differ and the strategy absorbs that.)
+    list: (ctx, name) =>
+      getServiceDefinitionVersions(ctx.connection, {
+        serviceDefinitionName: name,
+      }),
     source: (ctx, uri) => getServiceDefinitionVersionSource(ctx.connection, uri),
   },
 );
