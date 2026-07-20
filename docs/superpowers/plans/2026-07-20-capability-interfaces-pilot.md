@@ -1089,7 +1089,7 @@ Then read `/tmp/b8.log`. Expected: 6 passed.
 - [ ] **Step 3: Full unit suite**
 
 Run: `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit --runInBand 2>&1 | tee /tmp/b8-unit.log`
-Then read `/tmp/b8-unit.log`. Expected: all pass (~356).
+Then read `/tmp/b8-unit.log`. Expected: all pass — the prior 348, plus 6 capability tests (Tasks B3+B4), plus 6 conformance tests (2 `it.each` over 3 handlers) = 360. Read the actual total from the log; the point is zero failures, not the exact number.
 
 - [ ] **Step 4: Public surface unchanged**
 
