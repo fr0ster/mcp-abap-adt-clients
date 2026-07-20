@@ -64,8 +64,11 @@ at runtime against a live SAP system.
 
 ## Goal and non-goal
 
-**Goal: contract honesty.** A handler should declare only what it does, and
-`AdtClient.getXxx()` should return a type that does not lie.
+**Goal: contract honesty, realized in both the types and the implementation.** A handler
+should declare only what it does, `AdtClient.getXxx()` should return a type that does not
+lie, and the operation chain should run only the steps a handler actually supports rather
+than calling methods that throw. The atoms are step 1; the composition architecture that
+delivers the second half is described under "Implementation architecture".
 
 **Explicit non-goal for now: parameter polymorphism.** An exhaustive search found
 **no production code that accepts `IAdtObject` as a parameter or holds a collection of
@@ -359,6 +362,88 @@ Explicitly NOT in step 1:
 
 Version: **minor** (11.2.0), shipping alongside the ATC contract types already on
 `feat/atc-unittest-types`. Nothing breaks; consumers may adopt atoms when they choose.
+
+## Implementation architecture (adt-clients)
+
+The atoms are only types. This section is how they are realized in adt-clients, and it is
+the larger half of the work. The end state: each handler is a thin proxy that **composes
+capability implementations** rather than owning bespoke lifecycle code.
+
+### Capability implementations
+
+A capability implementation is a reusable unit that satisfies one atom for *any* object
+type, parameterized by the only things that actually vary. A survey of six representative
+handlers established that variation precisely: the lifecycle methods
+(`lock`, `unlock`, `getVersions`, `getVersionSource`, `readTransport`, and the happy path
+of `activate` / `check`) differ **only by object URI and which config field holds the
+name** — the bodies are otherwise the same, copy-pasted into ~15 near-identical per-type
+files (`lock.ts`, `unlock.ts`, `versions.ts`, `activation.ts`, the transport getter).
+
+So each capability is parameterized by a **URI resolver**, not a bare name field —
+because `AdtEnhancement` is dual-keyed (`type` + `name`) and resolves its URI through
+`getEnhancementUri(type, name)`. The resolver already exists centralized as
+`buildObjectUri(name, typeCode, parentName)` in `src/utils/activationUtils.ts`, mapping
+every type code (`CLAS/OC`, `DOMA/DD`, `SRVD/SRV`, …) to its path.
+
+Extraction therefore **deletes code, not adds it**: a `LockCapability` absorbs the ~15
+`lock.ts`/`unlock.ts` wrapper files; `getVersionSource`, byte-identical today, collapses
+to one function. The forwarding on the handler (`getVersions(c) { return this.#versions... }`)
+replaces a method that was already a one-liner — a wash — while the per-type helper files
+disappear. That is where the win is.
+
+### Handlers become proxies
+
+A handler declares which atoms it has and holds a capability instance for each:
+
+```ts
+class AdtClass implements IAdtObject<IClassConfig, IClassState> {
+  #lock = new LockCapability(this.ctx);
+  #versions = new VersionsCapability(this.ctx);
+  // create/read/update stay per-type: they carry the XML/Accept/URI knowledge
+  lock(c) { return this.#lock.lock(c); }
+  getVersions(c) { return this.#versions.list(c); }
+}
+```
+
+`create`, `read`, `update` stay per-type — that is where the genuine per-object knowledge
+lives (XML bodies, Accept headers). The lifecycle methods delegate.
+
+### The operation chain orchestrates over *present* capabilities
+
+The standard SAP flow is `validate → create → lock → check → update → unlock → activate`,
+but not every object has every step — some have no `activate`, some no `lock`. Today that
+absence is expressed as a method that throws. Under this architecture it is expressed
+structurally: the chain runs a step **only if the handler composes that capability**. A
+handler without `IAdtLockable` skips lock/unlock; one without `IAdtActivatable` skips
+activation. Absence becomes "no step", not "a step that refuses" — which is the whole
+point of the partition, now realized in the orchestration and not just the type.
+
+### Error envelopes: unified on purpose
+
+The survey found `activate` and `check` already share their happy path
+(`activateObjectInSession`, `checkRun`) but wrap errors **differently per handler** — not
+by object type, by inconsistent authoring (elaborate `AdtOperationError` on `AdtClass`,
+bare log-and-rethrow on `AdtDomain`). Moving that into a shared capability **changes the
+observable error shape for some types**. This is intended: it is exactly the behavioural
+contract above, and the payoff is uniform, informative errors instead of whichever
+envelope each method's author happened to write. It is a behavioural change, so it must
+be covered by the conformance tests, and the CHANGELOG must name it.
+
+### ATC is the pilot
+
+ATC is greenfield — no legacy handler to preserve — so it is built on this scheme from
+the start and proves the mechanism (capability implementation + proxy + chain-over-present-
+capabilities) on a small surface before the 35 existing handlers are touched. ATC's own
+operations do not map to the `IAdtObject` atoms, so it pilots the *pattern*, not the atom
+set: it composes its own small ATC capabilities the same way.
+
+### Deprecation path
+
+The migration is non-breaking until the final flip. Existing handlers keep their public
+surface while their internals move to composed capabilities; `IAdtObject` stays intact.
+Only once the new scheme is proven across all handlers do the fat contract and the
+lying return types get marked `@deprecated`, with the narrowed capability-based types
+promoted as the supported API — the breaking flip below.
 
 ## Later steps, deliberately deferred
 
