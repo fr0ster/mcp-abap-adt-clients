@@ -532,14 +532,20 @@ import type { ICapabilityContext, ILockStrategy } from './types';
  *
  * DELIBERATELY byte-identical to the current handlers, including the failure
  * path: if `acquire`/`release` throws, the session is left as-is (stateful) and
- * the error propagates — exactly as today. In the current architecture,
- * failure cleanup is the OPERATION CHAIN's job (its create/update catch blocks
- * call setSessionType('stateless')), NOT lock()/unlock()'s. Adding a
- * try/finally here would change behaviour and move that responsibility, so the
- * atom-level "restore stateless on failure" contract is deferred to the
- * behavioural-conformance work (same bucket as activate/check error
- * unification), where the chain interaction is reconciled rather than
- * double-cleaned.
+ * the error propagates — exactly as today. Failure/abandonment handling is
+ * DISTRIBUTED and this capability owns none of it:
+ *   - the consumer largely owns lock/unlock atomicity (it decides when to lock
+ *     and unlock);
+ *   - adt-clients' `LockRegistry.unlockAll()` is a disposal safety net that
+ *     raw-releases abandoned locks — deliberately WITHOUT toggling the session,
+ *     because `unlockAll()` manages the session once for the whole batch;
+ *   - the operation chain's create/update catch blocks also call
+ *     setSessionType('stateless').
+ * Adding a try/finally here would change behaviour and relocate responsibility
+ * across those layers, so the atom-level "restore stateless on failure"
+ * contract is deferred to the behavioural-conformance work (same bucket as
+ * activate/check error unification), where all three layers are reconciled
+ * rather than double-cleaned.
  */
 export class LockCapability<TConfig, TReadResult>
   implements IAdtLockable<TConfig, TReadResult>
@@ -756,6 +762,15 @@ private readonly versionsCap = new VersionsCapability<IClassConfig>(
 ```
 
 Note: `AdtClass.lock` currently also calls `this.lockTracker.track(...)`. Preserve that — keep it in the handler `lock` wrapper (Step 2), not the capability, because the tracker is handler state.
+
+**DO NOT TOUCH the constructor's `createLockTracker(...)` setup.** It passes a
+raw-unlock thunk `(name, handle) => unlockClass(this.connection, name, handle)`
+that deliberately does NOT toggle the session — it is the `LockRegistry.unlockAll()`
+disposal safety net, and `unlockAll()` manages the session for the whole batch.
+This is a SEPARATE unlock path from the `unlock()` method (which goes through the
+capability and DOES toggle). Both must survive: only the lock/unlock/versions
+method BODIES change; the constructor's tracker wiring stays exactly as it is.
+The same applies to `AdtDomain` and `AdtServiceDefinition` in Tasks B6 and B7.
 
 - [ ] **Step 2: Replace the four method bodies with capability delegation, preserving lock tracking**
 
@@ -1174,7 +1189,7 @@ Report to the user: PR opened, ready for review + merge + tag + GitHub release; 
 
 - The remaining 32 handlers — a separate migration plan, using the classification (fits-strategy vs bespoke) the spec requires; includes `AdtFunctionModule` (composite key), `AdtBehaviorImplementation` (delegates to `AdtClass`), `AdtMessageClassMessage` (double-lock).
 - `ActivateCapability` / `CheckCapability` with error-envelope unification — a deliberate behavioural change; its own plan with conformance tests and a CHANGELOG note naming the changed error shapes.
-- **The atom-level failure-path contract** (lock/unlock restore stateless on a thrown error). Today that cleanup lives in the operation chain's catch blocks, not in lock()/unlock(); this pilot preserves that exactly. Moving it into the capabilities is a deliberate behavioural change that must reconcile with the chain's existing cleanup (to avoid double-restore), so it belongs with the error-unification work, not here.
+- **The atom-level failure-path contract** (lock/unlock restore stateless on a thrown error). Today failure/abandonment handling is distributed — the consumer owns lock/unlock atomicity, `LockRegistry.unlockAll()` is a disposal safety net (raw release, no session toggle), and the operation chain's catch blocks also restore stateless. This pilot preserves all three exactly. Moving restoration into the capabilities is a deliberate behavioural change that must reconcile with all three layers (to avoid double-restore), so it belongs with the error-unification work, not here.
 - `TransportCapability` extraction.
 - Narrowing `AdtClient.getXxx()` return types (the breaking flip) and deprecating the fat contract.
 - The ATC client + `runSync` + MCP tools, built on this architecture once proven.
