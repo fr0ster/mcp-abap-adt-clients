@@ -529,6 +529,17 @@ import type { ICapabilityContext, ILockStrategy } from './types';
  * and returned unchanged. See the spec's IAdtLockable obligations — idempotent
  * unlock is a TARGET, not implemented here, and is left to the per-endpoint
  * probe + adaptation rule of the full-migration plan.
+ *
+ * DELIBERATELY byte-identical to the current handlers, including the failure
+ * path: if `acquire`/`release` throws, the session is left as-is (stateful) and
+ * the error propagates — exactly as today. In the current architecture,
+ * failure cleanup is the OPERATION CHAIN's job (its create/update catch blocks
+ * call setSessionType('stateless')), NOT lock()/unlock()'s. Adding a
+ * try/finally here would change behaviour and move that responsibility, so the
+ * atom-level "restore stateless on failure" contract is deferred to the
+ * behavioural-conformance work (same bucket as activate/check error
+ * unification), where the chain interaction is reconciled rather than
+ * double-cleaned.
  */
 export class LockCapability<TConfig, TReadResult>
   implements IAdtLockable<TConfig, TReadResult>
@@ -965,7 +976,7 @@ git commit -m "refactor(serviceDefinition): compose LockCapability + VersionsCap
 
 **Interfaces:**
 - Consumes: the three converted handlers (constructed with a fake connection).
-- Produces: a table-driven test asserting the shared behavioural obligations hold identically across the three, plus a verified-unchanged public surface.
+- Produces: a table-driven test asserting the shared behavioural obligations hold identically across the three — specifically the older-BASIS ordering (stateful precedes the LOCK/UNLOCK request, stateless follows the UNLOCK) — plus a verified-unchanged public surface. The failure-path contract is deliberately NOT tested here (it is deferred; see LockCapability's docstring).
 
 - [ ] **Step 1: Write the conformance test**
 
@@ -976,17 +987,27 @@ import { AdtClass } from '../../../../core/class/AdtClass';
 import { AdtDomain } from '../../../../core/domain/AdtDomain';
 import { AdtServiceDefinition } from '../../../../core/serviceDefinition/AdtServiceDefinition';
 
+/**
+ * Records session toggles AND requests in ONE ordered trace, so the test can
+ * assert the older-BASIS ordering (stateful must precede the UNLOCK request,
+ * stateless must follow it) rather than only the final session state.
+ */
 function recordingConnection() {
-  const sessions: string[] = [];
+  const trace: string[] = [];
   return {
-    sessions,
-    setSessionType: (t: string) => sessions.push(t),
-    makeAdtRequest: async () => ({
-      status: 200,
-      headers: {},
-      // minimal LOCK response shape the low-level parsers accept
-      data: `<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>`,
-    }),
+    trace,
+    setSessionType: (t: string) => trace.push(`session:${t}`),
+    makeAdtRequest: async (req: any) => {
+      const url: string = req?.url ?? '';
+      const action = /_action=(\w+)/.exec(url)?.[1] ?? 'GET';
+      trace.push(`request:${action}`);
+      return {
+        status: 200,
+        headers: {},
+        // minimal LOCK response shape the low-level parsers accept
+        data: `<?xml version="1.0"?><asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><LOCK_HANDLE>H1</LOCK_HANDLE></DATA></asx:values></asx:abap>`,
+      };
+    },
   } as any;
 }
 
@@ -1003,18 +1024,28 @@ const cases = [
 ];
 
 describe('LockCapability conformance across handlers', () => {
-  it.each(cases)('$name: lock leaves session stateful', async ({ make, cfg }) => {
+  it.each(cases)('$name: lock sets stateful before the LOCK request', async ({ make, cfg }) => {
     const conn = recordingConnection();
     const handler = make(conn);
     await handler.lock(cfg);
-    expect(conn.sessions[conn.sessions.length - 1]).toBe('stateful');
+    const iSession = conn.trace.indexOf('session:stateful');
+    const iRequest = conn.trace.findIndex((e: string) => e.startsWith('request:'));
+    expect(iSession).toBeGreaterThanOrEqual(0);
+    expect(iRequest).toBeGreaterThan(iSession); // stateful BEFORE the request
+    // and the session is left stateful (the lock is held).
+    expect(conn.trace.filter((e: string) => e.startsWith('session:')).pop()).toBe('session:stateful');
   });
 
-  it.each(cases)('$name: unlock restores stateless', async ({ make, cfg }) => {
+  it.each(cases)('$name: unlock is stateful → UNLOCK → stateless, in order', async ({ make, cfg }) => {
     const conn = recordingConnection();
     const handler = make(conn);
     await handler.unlock(cfg, 'H1');
-    expect(conn.sessions[conn.sessions.length - 1]).toBe('stateless');
+    const iStateful = conn.trace.indexOf('session:stateful');
+    const iUnlock = conn.trace.indexOf('request:UNLOCK');
+    const iStateless = conn.trace.indexOf('session:stateless');
+    expect(iStateful).toBeGreaterThanOrEqual(0);
+    expect(iUnlock).toBeGreaterThan(iStateful); // stateful BEFORE unlock (older BASIS)
+    expect(iStateless).toBeGreaterThan(iUnlock); // stateless AFTER unlock
   });
 });
 ```
@@ -1143,6 +1174,7 @@ Report to the user: PR opened, ready for review + merge + tag + GitHub release; 
 
 - The remaining 32 handlers — a separate migration plan, using the classification (fits-strategy vs bespoke) the spec requires; includes `AdtFunctionModule` (composite key), `AdtBehaviorImplementation` (delegates to `AdtClass`), `AdtMessageClassMessage` (double-lock).
 - `ActivateCapability` / `CheckCapability` with error-envelope unification — a deliberate behavioural change; its own plan with conformance tests and a CHANGELOG note naming the changed error shapes.
+- **The atom-level failure-path contract** (lock/unlock restore stateless on a thrown error). Today that cleanup lives in the operation chain's catch blocks, not in lock()/unlock(); this pilot preserves that exactly. Moving it into the capabilities is a deliberate behavioural change that must reconcile with the chain's existing cleanup (to avoid double-restore), so it belongs with the error-unification work, not here.
 - `TransportCapability` extraction.
 - Narrowing `AdtClient.getXxx()` return types (the breaking flip) and deprecating the fat contract.
 - The ATC client + `runSync` + MCP tools, built on this architecture once proven.
