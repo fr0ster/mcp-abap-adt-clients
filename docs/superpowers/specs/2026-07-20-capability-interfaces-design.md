@@ -10,18 +10,38 @@
 provide. Most handlers cannot provide all of them, so they lie — and they lie
 inconsistently.
 
-A survey of all 30 primary handlers in `src/core/*/Adt*.ts` established:
+### How the numbers here were obtained
 
-- Only `create`, `read`, `readMetadata` are implemented by every handler.
-- `getVersions` / `getVersionSource` throw in 11 of 30.
-- `activate`, `check`, `lock`, `unlock` throw in 4–5.
-- `readTransport` is unimplemented in 6 handlers **via three different mechanisms**:
-  three throw, three return a fabricated error state, one returns an empty
-  `{errors: []}`. With no way to say "I don't do transports", implementers invented
-  three different lies. That inconsistency is the clearest symptom of the problem.
-- Four handlers are 0–4 of 13: `AdtPackageLegacy` (0/13 — every method throws, the
-  class exists solely to satisfy the type), `AdtUnitTest` (3/13), `AdtRequest` (3/13),
-  `AdtMessageClassMessage` (4/13).
+Every count below is **generated**, not transcribed. `scripts/capability-matrix.mjs`
+walks the handler classes with the TypeScript compiler API and classifies each contract
+method as *real work*, *refuses* (an unconditional throw or a `throwUnsupported*` call),
+*stub*, or *absent*. Run `node scripts/capability-matrix.mjs` to reproduce; `--csv` for
+the raw matrix.
+
+This matters because earlier drafts of this spec carried hand-copied counts that were
+wrong in three separate places — one of them an arithmetic impossibility. Numbers in a
+design document must be derivable, or they will drift from the code they describe.
+
+**Denominator: 37 classes** — the 30 primary handlers plus `AdtServiceBinding`, the four
+class-include handlers and `AdtCdsUnitTest`. `*Legacy.ts` subclasses are excluded: they
+override selectively and would double-count their parents.
+
+### What the matrix shows
+
+- `getVersions` / `getVersionSource`: **19 real, 11 refuse** — identical sets, the
+  sharpest split in the contract.
+- `lock` / `unlock`: **26 real, 4 refuse** — identical sets, a rigid pair.
+- `activate`: 28 real, 5 refuse. `check`: 30 real, 4 refuse. The sets differ, so these
+  are distinct capabilities rather than one.
+- `readTransport`: 23 real and **7 not implemented — through two different mechanisms**:
+  three refuse outright (MessageClass, MessageClassMessage, Request) and four return a
+  stub (AuthorizationField, FeatureToggle, FunctionInclude, UnitTest). With no way to
+  say "I don't do transports", implementers invented more than one lie. That
+  inconsistency is the clearest symptom of the problem.
+- Handlers where the contract is plainly the wrong fit: `AdtUnitTest` and `AdtRequest`
+  refuse seven methods each; `AdtMessageClassMessage` refuses or stubs nine;
+  `AdtPackageLegacy` (excluded from the count as a subclass) throws on all 13 and exists
+  solely to satisfy the type.
 
 The cost is paid by consumers: `AdtClient.getUnitTest()` returns a type promising
 `lock()`, and the promise is false. The compiler cannot help, so the failure surfaces
@@ -70,27 +90,42 @@ that is cheap to fix. Encoding our gaps as contract is the worse failure.
 
 ## The partition
 
-Every method of every "big" interface belongs to **exactly one** atom. Nine atoms
-cover 20 methods with no overlap.
+**Scope: the 13 methods of `IAdtObject`.** Every one of them belongs to exactly one of
+seven atoms, with no overlap. The two specialized interfaces that widen `IAdtObject` are
+handled separately — see "Specialized interfaces" below.
 
-| Atom | Methods | Evidence |
+| Atom | Methods | Evidence (generated) |
 |---|---|---|
-| `IAdtCrud` | `create`, `read`, `readMetadata`, `update`, `delete` | 30/30 — universal; no partial-CRUD object exists |
-| `IAdtValidatable` | `validate` | 27/30 |
-| `IAdtCheckable` | `check` | 26/30 |
-| `IAdtActivatable` | `activate` | 25/30 |
-| `IAdtLockable` | `lock`, `unlock` | rigid pair — 0 handlers have one without the other |
-| `IAdtVersionable` | `getVersions`, `getVersionSource` | 19 vs 11, verified domain boundary |
-| `IAdtTransportAware` | `readTransport` | 24/30 |
-| `IAdtFeatureToggleControl` | `switchOn`, `switchOff`, `getRuntimeState`, `checkState`, `readSource` | single implementer |
-| `IAdtServiceBindingOps` | `validateServiceBinding`, `updateServiceBinding` | single implementer |
+| `IAdtCrud` | `create`, `read`, `readMetadata`, `update`, `delete` | no object has partial CRUD — see below |
+| `IAdtValidatable` | `validate` | 31 real / 1 refuses / 2 stub |
+| `IAdtCheckable` | `check` | 30 real / 4 refuse |
+| `IAdtActivatable` | `activate` | 28 real / 5 refuse |
+| `IAdtLockable` | `lock`, `unlock` | 26 / 4, **identical sets** |
+| `IAdtVersionable` | `getVersions`, `getVersionSource` | 19 / 11, **identical sets**, verified domain boundary |
+| `IAdtTransportAware` | `readTransport` | 23 real / 3 refuse / 4 stub |
 
 `validate`, `check` and `activate` are separate atoms because their sets genuinely
-differ: `AdtPackage` implements `check` but not `activate`; `AdtMessageClass`
-implements `validate` but neither `check` nor `activate`.
+differ: `AdtPackage` implements `check` but not `activate`; `AdtMessageClass` implements
+`validate` but neither `check` nor `activate`.
 
 `IAdtLockable` and `IAdtVersionable` are each one atom because their member methods
-co-occur perfectly across all 30 handlers.
+co-occur perfectly — no handler has one without the other.
+
+### Observed implementation vs intended capability
+
+These are different things, and conflating them makes the counts irreproducible.
+
+**Observed**, from the generated matrix: `update` has 2 refusals and `delete` has 2 —
+`AdtRequest` and `AdtUnitTest` in both cases. `create` and `read` each have one stub
+(`AdtMessageClassMessage`, `AdtFunctionInclude`).
+
+**Intended**, after the known defects are fixed: CRUD is universal. Both refusals are
+our own bugs, not ADT limits — a transport request's description can be changed and an
+empty request deleted, and `AdtUnitTest` should not implement `IAdtObject` at all (see
+"Known defects"). Under Rule 2 both classes stay inside `IAdtCrud`.
+
+The partition is built on **intended** capability. Where the two diverge, this spec says
+so explicitly rather than quietly picking whichever number supports the design.
 
 ### The versioning boundary is real
 
@@ -102,12 +137,17 @@ endpoint.
 The dividing line is "has `/source/main`", **not** "is DDIC": `Table`, `Structure` and
 `TableType` have versions; `Domain`, `DataElement` and `Package` do not.
 
-- **With versions (19):** Class, Interface, Program, Ddl, Table, Structure, TableType,
-  Enhancement, MetadataExtension, BehaviorDefinition, BehaviorImplementation,
-  AccessControl, AppendStructure, ScalarFunction, ScalarFunctionImplementation,
-  ServiceDefinition, Transformation, FunctionInclude.
-- **Without (11):** Domain, DataElement, Package, FunctionGroup, AuthorizationField,
-  FeatureToggle, MessageClass, MessageClassMessage, Request, Service, UnitTest.
+- **With versions (19):** AccessControl, AppendStructure, BehaviorDefinition,
+  BehaviorImplementation, Class, DdicTableType, Ddl, Enhancement, FunctionInclude,
+  FunctionModule, Interface, MetadataExtension, Program, ScalarFunction,
+  ScalarFunctionImplementation, ServiceDefinition, Structure, Table, Transformation.
+- **Without (11):** AuthorizationField, DataElement, Domain, FeatureToggle,
+  FunctionGroup, MessageClass, MessageClassMessage, Package, Request, ServiceBinding,
+  UnitTest.
+
+Both lists are generated by `scripts/capability-matrix.mjs --csv` and sum to 30. The
+four class-include handlers are excluded: they delegate to `getIncludeVersions` on the
+parent class rather than implementing the contract method themselves.
 
 ## Composition
 
@@ -130,11 +170,39 @@ A handler that also has version history composes further:
 type ISourceObject<C, R> = IAdtCrudObject<C, R> & IAdtVersionable<C>;
 ```
 
+## Specialized interfaces
+
+Two interfaces widen `IAdtObject`. Their methods are **out of scope for step 1**, and
+the "exactly one atom" guarantee applies only to `IAdtObject`'s 13.
+
+`IFeatureToggleObject` adds five: `switchOn`, `switchOff`, `getRuntimeState`,
+`checkState`, `readSource`. One implementer, cohesive, and a single
+`IAdtFeatureToggleControl` atom would cover them cleanly. Low risk, but no reason to
+rush it into step 1.
+
+`IAdtServiceBinding` adds **twelve**, not two as an earlier draft of this spec claimed:
+`getServiceBindingTypes`, `createServiceBinding`, `readServiceBinding`,
+`updateServiceBinding`, `deleteServiceBinding`, `validateServiceBinding`,
+`checkServiceBinding`, `activateServiceBinding`, `transportCheckServiceBinding`,
+`generateServiceBinding`, `createAndGenerateServiceBinding`, `classifyServiceBinding`.
+
+That list is itself a finding worth recording. Eight of the twelve are binding-suffixed
+restatements of operations the base contract already has — create, read, update, delete,
+validate, check, activate, transport-check. `AdtServiceBinding` therefore carries **two
+parallel vocabularies for the same lifecycle**, and separately refuses `lock`, `unlock`
+and both version methods from the base contract.
+
+Deciding whether those eight should collapse into the base atoms, or whether the binding
+genuinely needs its own lifecycle vocabulary, requires understanding why the duplication
+was introduced. That is its own investigation, not a detail of this partition. Until it
+is done, no service-binding atom is proposed — inventing one now would freeze a
+duplication we do not yet understand.
+
 ## The behavioural contract
 
 An interface constrains behaviour, not only shape. TypeScript checks the second and
 says nothing about the first, so the partition alone does not solve the problem that
-motivated it — it would merely distribute it across nine interfaces instead of one.
+motivated it — it would merely distribute it across seven interfaces instead of one.
 
 The evidence is already in hand. `readTransport` is "unimplemented" in six handlers by
 three different mechanisms — throwing, returning a fabricated error state, and
@@ -201,23 +269,40 @@ handler was read first.
 
 ## Correctness proof
 
-The partition must be provably exact, not exact by inspection. A compile-time
-assertion checks assignability in **both** directions between `IAdtObject` and the
-intersection of its ten constituent atoms:
+The partition must be provably exact, not exact by inspection. A compile-time assertion
+checks assignability in **both** directions between `IAdtObject` and the intersection of
+its **seven** constituent atoms. The generic parameters must be bound — an earlier draft
+of this section referenced free `C` / `R` and would not have compiled:
 
 ```ts
 type Assert<T extends true> = T;
 
 type AllAtoms<C, R> =
-  & IAdtCrud<C, R> & IAdtValidatable<C, R> & IAdtCheckable<C, R>
-  & IAdtActivatable<C, R> & IAdtLockable<C, R> & IAdtVersionable<C>
+  & IAdtCrud<C, R>
+  & IAdtValidatable<C, R>
+  & IAdtCheckable<C, R>
+  & IAdtActivatable<C, R>
+  & IAdtLockable<C, R>
+  & IAdtVersionable<C>
   & IAdtTransportAware<C, R>;
 
-type _PartitionIsExact = [
+/** Bound the parameters so the assertion is a closed type expression. */
+type _PartitionIsExact<C, R> = [
   Assert<IAdtObject<C, R> extends AllAtoms<C, R> ? true : false>,
   Assert<AllAtoms<C, R> extends IAdtObject<C, R> ? true : false>,
 ];
+
+/** Instantiate it, or nothing is checked. */
+type _Check = _PartitionIsExact<IClassConfig, IClassState>;
 ```
+
+The final instantiation is not decoration: an uninstantiated generic type alias is never
+evaluated, so without it the assertion would silently pass no matter what.
+
+**This proof covers `IAdtObject` only.** It cannot validate
+`IAdtFeatureToggleControl` or the service-binding atoms, because `AllAtoms` is compared
+against `IAdtObject` alone. Each specialized interface needs its own assertion of the
+same shape, comparing it against the intersection of *its* atoms.
 
 A dropped method, a mistyped parameter or a missing generic argument fails the build.
 
