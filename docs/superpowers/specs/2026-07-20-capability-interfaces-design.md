@@ -22,9 +22,16 @@ This matters because earlier drafts of this spec carried hand-copied counts that
 wrong in three separate places — one of them an arithmetic impossibility. Numbers in a
 design document must be derivable, or they will drift from the code they describe.
 
-**Denominator: 37 classes** — the 30 primary handlers plus `AdtServiceBinding`, the four
-class-include handlers and `AdtCdsUnitTest`. `*Legacy.ts` subclasses are excluded: they
-override selectively and would double-count their parents.
+**Denominator: 35 classes** — 29 primary `IAdtObject` handlers, plus `AdtServiceBinding`,
+`AdtCdsUnitTest`, and the four class-include handlers. The generator selects classes by
+their **heritage clause**, not by name: a class is counted only if it implements a
+contract interface (`IAdtObject`, `IFeatureToggleObject`, `IAdtServiceBinding`) or
+extends a handler that does. This deliberately excludes the `AdtService` facade and
+`AdtUtils` — neither claims the contract; `AdtUtils` says so at
+`src/core/shared/AdtUtils.ts:4`. Pure-alias subclasses (`class AdtService extends
+AdtServiceBinding {}`) declare no method of their own and are dropped to avoid
+double-counting. `*Legacy.ts` subclasses are likewise excluded — they override
+selectively and would double-count their parents.
 
 ### What the matrix shows
 
@@ -180,17 +187,21 @@ the "exactly one atom" guarantee applies only to `IAdtObject`'s 13.
 `IAdtFeatureToggleControl` atom would cover them cleanly. Low risk, but no reason to
 rush it into step 1.
 
-`IAdtServiceBinding` adds **twelve**, not two as an earlier draft of this spec claimed:
-`getServiceBindingTypes`, `createServiceBinding`, `readServiceBinding`,
-`updateServiceBinding`, `deleteServiceBinding`, `validateServiceBinding`,
-`checkServiceBinding`, `activateServiceBinding`, `transportCheckServiceBinding`,
-`generateServiceBinding`, `createAndGenerateServiceBinding`, `classifyServiceBinding`.
+`IAdtServiceBinding` adds **sixteen** (an earlier draft undercounted this twice — first
+as two, then as twelve): `getServiceBindingTypes`, `createServiceBinding`,
+`readServiceBinding`, `updateServiceBinding`, `deleteServiceBinding`,
+`validateServiceBinding`, `checkServiceBinding`, `activateServiceBinding`,
+`transportCheckServiceBinding`, `generateServiceBinding`, `createAndGenerateServiceBinding`,
+`classifyServiceBinding`, `getODataV2ServiceBinding`, `getODataV4ServiceBinding`,
+`publishODataV2`, `unpublishODataV2`.
 
-That list is itself a finding worth recording. Eight of the twelve are binding-suffixed
-restatements of operations the base contract already has — create, read, update, delete,
-validate, check, activate, transport-check. `AdtServiceBinding` therefore carries **two
-parallel vocabularies for the same lifecycle**, and separately refuses `lock`, `unlock`
-and both version methods from the base contract.
+That list is itself a finding worth recording. Eight are binding-suffixed restatements of
+operations the base contract already has — create, read, update, delete, validate, check,
+activate, transport-check. The other eight are binding-specific: type discovery,
+generation (two forms), classification, OData service reads (v2/v4), and OData
+publish/unpublish. So `AdtServiceBinding` carries **two parallel vocabularies for the
+shared lifecycle**, plus a genuine binding-only surface — and separately refuses `lock`,
+`unlock` and both version methods from the base contract.
 
 Deciding whether those eight should collapse into the base atoms, or whether the binding
 genuinely needs its own lifecycle vocabulary, requires understanding why the duplication
@@ -204,10 +215,9 @@ An interface constrains behaviour, not only shape. TypeScript checks the second 
 says nothing about the first, so the partition alone does not solve the problem that
 motivated it — it would merely distribute it across seven interfaces instead of one.
 
-The evidence is already in hand. `readTransport` is "unimplemented" in six handlers by
-three different mechanisms — throwing, returning a fabricated error state, and
-returning an empty `{errors: []}`. Every one of those satisfies the structural
-signature. The type system was never going to catch it.
+The evidence is already in hand. `readTransport` is "unimplemented" in seven handlers by
+two different mechanisms — three refuse outright, four return a stub. Every one of those
+satisfies the structural signature. The type system was never going to catch it.
 
 So each atom carries a behavioural contract, and implementations must satisfy both.
 
@@ -231,7 +241,10 @@ Contracts common to every atom:
   non-fatal diagnostics only. An empty `errors` array must mean "nothing went wrong",
   never "this operation does not apply here".
 - **Session type is restored** on both the success and failure paths. Any method that
-  sets `stateful` returns the connection to `stateless` before it finishes or throws.
+  sets `stateful` returns the connection to `stateless` before it finishes or throws —
+  with one deliberate exception, `lock` (see `IAdtLockable` below), whose whole purpose
+  is to leave the session `stateful` for the caller. A `lock` that *fails* still restores
+  `stateless`; only a `lock` that *succeeds* leaves it open.
 
 Atom-specific obligations:
 
@@ -355,8 +368,10 @@ judged coherence by the *current concrete signatures* and concluded no capabilit
 possible. Absence of a shared concrete shape does not imply absence of a shared
 abstraction — that is what interfaces are for.
 
-The shapes do share a core. All five "an object was found" types carry a name, a type,
-and optional `uri` / `packageName` / `description`:
+The shapes do share a core. All five "an object was found" types carry a **name and a
+type**; `uri`, `packageName` and `description` appear in some but not all (the table
+shows which). `IObjectReference` is the thinnest — name, type, and an optional parent —
+which makes name+type the only truly universal pair and the right base:
 
 | Type | Name | Type field | Extras |
 |---|---|---|---|

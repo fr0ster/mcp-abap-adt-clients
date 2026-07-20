@@ -90,6 +90,29 @@ for (const file of files) {
     const cls = node.name.text;
     if (!cls.startsWith('Adt')) return;
 
+    // Only classes that actually promise the contract belong in the matrix.
+    // Filtering by heritage (not by name) keeps out facades like AdtService
+    // and utilities like AdtUtils that never claim to implement IAdtObject.
+    // A subclass (e.g. AdtCdsUnitTest extends AdtUnitTest) inherits the
+    // promise, so an `extends Adt*` clause counts too.
+    const CONTRACT_IFACES = new Set([
+      'IAdtObject',
+      'IFeatureToggleObject',
+      'IAdtServiceBinding',
+    ]);
+    const promisesContract = (node.heritageClauses ?? []).some((h) =>
+      h.types.some((t) => {
+        const name = t.expression.getText(sf);
+        if (h.token === ts.SyntaxKind.ImplementsKeyword)
+          return CONTRACT_IFACES.has(name);
+        // extends an Adt* handler => inherits the contract
+        return (
+          h.token === ts.SyntaxKind.ExtendsKeyword && name.startsWith('Adt')
+        );
+      }),
+    );
+    if (!promisesContract) return;
+
     const verdicts = Object.fromEntries(
       CONTRACT_METHODS.map((m) => [m, VERDICT.ABSENT]),
     );
@@ -99,6 +122,11 @@ for (const file of files) {
       if (!CONTRACT_METHODS.includes(name)) continue;
       verdicts[name] = classify(member.body, sf);
     }
+    // A pure alias subclass (e.g. `class AdtService extends AdtServiceBinding {}`)
+    // declares no contract method of its own — every verdict is "absent". Its
+    // behaviour is its parent's, already counted, so drop it to avoid double-counting.
+    if (CONTRACT_METHODS.every((m) => verdicts[m] === VERDICT.ABSENT)) return;
+
     rows.set(cls, { file, verdicts });
   });
 }
