@@ -252,6 +252,13 @@ rather than being answered three ways.
 
 ### Per-atom obligations
 
+These are **required behaviours the implementation must meet**, not descriptions of what
+every handler does today. Where an obligation is not already backed by the current code,
+it is a target to be secured by a conformance test — and any obligation that depends on
+how SAP responds (idempotency, no-op-on-repeat) must be verified by probing a real system
+before it is relied on, not asserted. The trial-verified caveats below are marked as such;
+the rest are targets.
+
 Contracts common to every atom:
 
 - **Failure is a thrown error**, using `AdtObjectErrorCodes`. Operations do not signal
@@ -273,9 +280,19 @@ Atom-specific obligations:
   status. `create` is not idempotent and must not silently succeed on an existing
   object.
 - `IAdtLockable` — `lock` returns a handle and leaves the session `stateful`; the
-  caller owns the obligation to `unlock`. `unlock` is idempotent and tolerates an
-  already-released handle. A failure between the two must still restore the session.
-- `IAdtActivatable` — activation of an already-active object is a no-op, not an error.
+  caller owns the obligation to `unlock`. A failure between the two must still restore
+  the session. `unlock` is **best-effort release; repeated- or stale-unlock semantics
+  are endpoint-specific.** This is deliberately weaker than "idempotent": the current
+  helpers POST `_action=UNLOCK` directly and some turn an ADT failure into a thrown
+  error (`src/core/interface/unlock.ts:33`), so no idempotency exists to promise today.
+  If `LockCapability` is to guarantee idempotent unlock, that is an added requirement,
+  not an observation — it must be backed by probing what SAP returns for a repeated or
+  expired handle (per endpoint) and an explicit adaptation rule for which statuses count
+  as already-released success. Until that evidence exists, the contract promises only
+  best-effort release, and a conformance test asserts the weaker guarantee.
+- `IAdtActivatable` — the target is that activating an already-active object is a no-op
+  rather than an error; like the unlock case this depends on what SAP returns and must be
+  confirmed by probing before it is relied on.
 - `IAdtVersionable` — implemented only by objects with a source resource. `getVersions`
   returns an empty array for an object with no history; it does not throw.
 - `IAdtCheckable` / `IAdtValidatable` — a check that *finds problems* has succeeded;
