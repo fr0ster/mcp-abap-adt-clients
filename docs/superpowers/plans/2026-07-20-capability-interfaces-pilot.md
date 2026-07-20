@@ -433,7 +433,7 @@ git commit -m "feat(capabilities): strategy types for lock and versions"
 
 **Interfaces:**
 - Consumes: `ICapabilityContext`, `INormalizedLock`, `ILockStrategy` from `./types`.
-- Produces: `class LockCapability<TConfig, TReadResult> implements IAdtLockable<TConfig, TReadResult>` with constructor `(ctx: ICapabilityContext, strategy: ILockStrategy<TConfig, TReadResult>)`. Methods: `lock(config): Promise<string>`, `unlock(config, lockHandle): Promise<TReadResult>`. The state is built by `strategy.release`, so there is no `buildState` constructor param.
+- Produces: `class LockCapability<TConfig, TReadResult> implements IAdtLockable<TConfig, TReadResult>` with constructor `(getCtx: () => ICapabilityContext, strategy: ILockStrategy<TConfig, TReadResult>)`. Methods: `lock(config): Promise<string>`, `unlock(config, lockHandle): Promise<TReadResult>`. The context is a LAZY thunk — read at method-call time, not construction — so a handler can build the capability as a class field even though `this.connection` is assigned later in the constructor body. The state is built by `strategy.release`, so there is no `buildState` constructor param.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -479,7 +479,7 @@ const strategy: ILockStrategy<Cfg, State> = {
 describe('LockCapability', () => {
   it('lock sets stateful, acquires, returns the handle', async () => {
     const ctx = fakeCtx();
-    const cap = new LockCapability<Cfg, State>(ctx, strategy);
+    const cap = new LockCapability<Cfg, State>(() => ctx, strategy);
     const handle = await cap.lock({ name: 'ZFOO' });
     expect(handle).toBe('H1');
     expect(ctx.calls).toEqual(['session:stateful', 'acquire:ZFOO']);
@@ -487,7 +487,7 @@ describe('LockCapability', () => {
 
   it('unlock is stateful during release, restores stateless, returns state', async () => {
     const ctx = fakeCtx();
-    const cap = new LockCapability<Cfg, State>(ctx, strategy);
+    const cap = new LockCapability<Cfg, State>(() => ctx, strategy);
     const state = await cap.unlock({ name: 'ZFOO' }, 'H1');
     // stateful BEFORE the UNLOCK (older BASIS), stateless AFTER.
     expect(ctx.calls).toEqual([
@@ -501,7 +501,7 @@ describe('LockCapability', () => {
 
   it('lock rethrows a missing name from the strategy', async () => {
     const ctx = fakeCtx();
-    const cap = new LockCapability<Cfg, State>(ctx, strategy);
+    const cap = new LockCapability<Cfg, State>(() => ctx, strategy);
     await expect(cap.lock({})).rejects.toThrow('name is required');
   });
 });
@@ -551,15 +551,18 @@ export class LockCapability<TConfig, TReadResult>
   implements IAdtLockable<TConfig, TReadResult>
 {
   constructor(
-    private readonly ctx: ICapabilityContext,
+    // LAZY: read at method-call time, so the handler can build this capability
+    // as a class field before its constructor assigns this.connection.
+    private readonly getCtx: () => ICapabilityContext,
     private readonly strategy: ILockStrategy<TConfig, TReadResult>,
   ) {}
 
   async lock(config: Partial<TConfig>): Promise<string> {
+    const ctx = this.getCtx();
     const name = this.strategy.nameOf(config);
     // Stay stateful while the lock is held; the caller releases via unlock().
-    this.ctx.connection.setSessionType('stateful');
-    const { lockHandle } = await this.strategy.acquire(this.ctx, name);
+    ctx.connection.setSessionType('stateful');
+    const { lockHandle } = await this.strategy.acquire(ctx, name);
     return lockHandle;
   }
 
@@ -567,11 +570,12 @@ export class LockCapability<TConfig, TReadResult>
     config: Partial<TConfig>,
     lockHandle: string,
   ): Promise<TReadResult> {
+    const ctx = this.getCtx();
     const name = this.strategy.nameOf(config);
     // UNLOCK must run stateful (older BASIS #106); restore stateless after.
-    this.ctx.connection.setSessionType('stateful');
-    const state = await this.strategy.release(this.ctx, name, lockHandle);
-    this.ctx.connection.setSessionType('stateless');
+    ctx.connection.setSessionType('stateful');
+    const state = await this.strategy.release(ctx, name, lockHandle);
+    ctx.connection.setSessionType('stateless');
     return state;
   }
 }
@@ -599,7 +603,7 @@ git commit -m "feat(capabilities): LockCapability with normalized lock result"
 
 **Interfaces:**
 - Consumes: `ICapabilityContext`, `IVersionsStrategy` from `./types`; `IObjectVersion` from `@mcp-abap-adt/interfaces`.
-- Produces: `class VersionsCapability<TConfig> implements IAdtVersionable<TConfig>` with constructor `(ctx, strategy)`. Methods: `getVersions(config): Promise<IObjectVersion[]>`, `getVersionSource(contentUri): Promise<string>`.
+- Produces: `class VersionsCapability<TConfig> implements IAdtVersionable<TConfig>` with constructor `(getCtx: () => ICapabilityContext, strategy)`. Methods: `getVersions(config): Promise<IObjectVersion[]>`, `getVersionSource(contentUri): Promise<string>`. The context is a lazy thunk, same reason as `LockCapability`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -614,6 +618,7 @@ import type {
 
 type Cfg = { name?: string };
 const ctx: ICapabilityContext = { connection: {} as any, logger: undefined };
+const getCtx = () => ctx;
 
 const strategy: IVersionsStrategy<Cfg> = {
   nameOf: (c) => {
@@ -628,19 +633,19 @@ const strategy: IVersionsStrategy<Cfg> = {
 
 describe('VersionsCapability', () => {
   it('getVersions delegates to the strategy', async () => {
-    const cap = new VersionsCapability<Cfg>(ctx, strategy);
+    const cap = new VersionsCapability<Cfg>(getCtx, strategy);
     const v = await cap.getVersions({ name: 'ZBAR' });
     expect(v).toHaveLength(1);
     expect(v[0].versionTitle).toBe('ZBAR');
   });
 
   it('getVersionSource delegates to the strategy', async () => {
-    const cap = new VersionsCapability<Cfg>(ctx, strategy);
+    const cap = new VersionsCapability<Cfg>(getCtx, strategy);
     expect(await cap.getVersionSource('/uri/1')).toBe('source-of:/uri/1');
   });
 
   it('getVersions rethrows a missing name', async () => {
-    const cap = new VersionsCapability<Cfg>(ctx, strategy);
+    const cap = new VersionsCapability<Cfg>(getCtx, strategy);
     await expect(cap.getVersions({})).rejects.toThrow('name is required');
   });
 });
@@ -668,17 +673,18 @@ export class VersionsCapability<TConfig>
   implements IAdtVersionable<TConfig>
 {
   constructor(
-    private readonly ctx: ICapabilityContext,
+    // LAZY: see LockCapability — read at call time so it can be a class field.
+    private readonly getCtx: () => ICapabilityContext,
     private readonly strategy: IVersionsStrategy<TConfig>,
   ) {}
 
   getVersions(config: Partial<TConfig>): Promise<IObjectVersion[]> {
     const name = this.strategy.nameOf(config);
-    return this.strategy.list(this.ctx, name);
+    return this.strategy.list(this.getCtx(), name);
   }
 
   getVersionSource(contentUri: string): Promise<string> {
-    return this.strategy.source(this.ctx, contentUri);
+    return this.strategy.source(this.getCtx(), contentUri);
   }
 }
 ```
@@ -726,10 +732,14 @@ import {
   type ICapabilityContext,
 } from '../shared/capabilities';
 
-// inside the class body
-private get capCtx(): ICapabilityContext {
-  return { connection: this.connection, logger: this.logger };
-}
+// inside the class body — a LAZY thunk, not a getter that snapshots.
+// As a field arrow it captures `this` but reads this.connection only when
+// invoked (at a capability method call, after the constructor has run), so
+// building the capabilities as class fields below is safe.
+private readonly capCtx = (): ICapabilityContext => ({
+  connection: this.connection,
+  logger: this.logger,
+});
 
 private readonly lockCap = new LockCapability<IClassConfig, IClassState>(
   this.capCtx,
@@ -846,9 +856,11 @@ import {
   type ICapabilityContext,
 } from '../shared/capabilities';
 
-private get capCtx(): ICapabilityContext {
-  return { connection: this.connection, logger: this.logger };
-}
+// LAZY thunk (see Task B5) — read at call time, safe as a class field.
+private readonly capCtx = (): ICapabilityContext => ({
+  connection: this.connection,
+  logger: this.logger,
+});
 
 private readonly lockCap = new LockCapability<IDomainConfig, IDomainState>(
   this.capCtx,
@@ -930,9 +942,11 @@ import {
   type ICapabilityContext,
 } from '../shared/capabilities';
 
-private get capCtx(): ICapabilityContext {
-  return { connection: this.connection, logger: this.logger };
-}
+// LAZY thunk (see Task B5) — read at call time, safe as a class field.
+private readonly capCtx = (): ICapabilityContext => ({
+  connection: this.connection,
+  logger: this.logger,
+});
 
 private readonly lockCap = new LockCapability<IServiceDefinitionConfig, IServiceDefinitionState>(
   this.capCtx,
