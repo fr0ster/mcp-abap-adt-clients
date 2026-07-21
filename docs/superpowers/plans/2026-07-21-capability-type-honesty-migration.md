@@ -31,22 +31,27 @@ From `node scripts/capability-matrix.mjs`, each handler's honest atom set. Two p
 
 **Named composite `IAdtNonVersionedObject<C,S>`** = the six atoms without `IAdtVersionable`. **3 handlers:** DataElement, Domain, FunctionGroup.
 
-**Inline-intersection handlers** (distinct profiles, declared inline):
+**Inline-list handlers** (distinct profiles). NOTE on syntax: a class's `implements`
+clause takes a **comma-separated list** of interfaces, NOT an intersection —
+`implements A & B` is a syntax error (TS1005). Use `implements A<...>, B<...>, ...`.
+(Intersections are only valid in a *type position* — e.g. the `AdtClient` return
+types in Task B4, and the `Adt<Type>Type` aliases, where `A & B` is fine.)
 
-| Handler | Honest composite (inline) | Missing vs full |
+| Handler | Honest capability set (implements A, B, …) | Missing vs full |
 |---|---|---|
-| FunctionInclude | Crud & Validatable & Checkable & Activatable & Lockable & Versionable | TransportAware |
-| AuthorizationField, FeatureToggle | Crud & Validatable & Checkable & Activatable & Lockable | Versionable, TransportAware |
-| Package | Crud & Validatable & Checkable & Lockable & TransportAware | Activatable, Versionable |
-| MessageClass | Crud & Validatable & Lockable | Checkable, Activatable, Versionable, TransportAware |
+| FunctionInclude | Crud, Validatable, Checkable, Activatable, Lockable, Versionable | TransportAware |
+| AuthorizationField | Crud, Validatable, Checkable, Activatable, Lockable | Versionable, TransportAware |
+| Package | Crud, Validatable, Checkable, Lockable, TransportAware | Activatable, Versionable |
+| MessageClass | Crud, Validatable, Lockable | Checkable, Activatable, Versionable, TransportAware |
 | MessageClassMessage | Crud | everything else |
 
-**Special / deferred (NOT in this migration):**
-- **ServiceBinding** — implements the widening `IAdtServiceBinding` (its own interface), not plain `IAdtObject`. Its honest atoms are Crud & Validatable & Checkable & Activatable & TransportAware (no Lockable/Versionable), but the widening interface needs its own reconciliation. **Deferred** to a follow-up.
+**Special / deferred (NOT in this migration) — all implement a widening interface or are wrong-contract:**
+- **ServiceBinding** — implements the widening `IAdtServiceBinding` (which `extends IAdtObject`), not plain `IAdtObject`. Reconciling the widening interface with the atoms is its own work. **Deferred.**
+- **FeatureToggle** — implements `IFeatureToggleObject`, which `extends IAdtObject<IFeatureToggleConfig, IFeatureToggleState>` (verified `node_modules/@mcp-abap-adt/interfaces/.../IAdtFeatureToggle.d.ts:103`). Same situation as ServiceBinding: the widening interface would have to be updated in interfaces to extend the honest atoms instead of `IAdtObject`. **Deferred.**
 - **Request (`AdtRequest`)** — matrix shows no complete atom; but its `update`/`delete` throws are DEFECTS, not domain limits: transport-request `update` = change the description, `delete` = only for empty requests (see memory `reference_transport_request_update_delete`). Honest profile requires fixing those first. **Deferred.**
 - **UnitTest (`AdtUnitTest`)** and **CdsUnitTest** (extends it) — a test runner, wrong contract entirely. **Deferred.**
 
-The 33 in-scope handlers are the 22 full + 3 non-versioned + 6 inline + MessageClass + MessageClassMessage.
+The **30 in-scope handlers** are the 22 full + 3 non-versioned + 5 inline (FunctionInclude, AuthorizationField, Package, MessageClass, MessageClassMessage). FeatureToggle moved to deferred.
 
 ---
 
@@ -59,6 +64,7 @@ The 33 in-scope handlers are the 22 full + 3 non-versioned + 6 inline + MessageC
 
 **Phase B — adt-clients:**
 - Modify each in-scope `src/core/<type>/Adt<Type>.ts` — swap the `implements` clause (class body otherwise unchanged; throwing stubs stay, marked `@deprecated`).
+- Modify each in-scope `src/core/<type>/index.ts` — the public `export type Adt<Type>Type = IAdtObject<IXxxConfig, IXxxState>;` alias must narrow to the same honest composite the handler now implements (consumers can use these aliases directly, so they must not keep exposing unsupported capabilities).
 - Modify `src/clients/AdtClient.ts` — narrow each in-scope `getXxx()` return type.
 - Modify `src/clients/AdtClientLegacy.ts` if it re-declares any narrowed return type.
 
@@ -251,7 +257,17 @@ Branch `feat/capability-type-honesty` off **main**.
 
 - [ ] **Step 1:** `git checkout main && git pull && git checkout -b feat/capability-type-honesty`; set `"@mcp-abap-adt/interfaces": "^11.3.0"`; `rm -rf node_modules/@mcp-abap-adt/interfaces && npm install @mcp-abap-adt/interfaces@11.3.0`; confirm `grep -c '"link": true' package-lock.json` = 0.
 - [ ] **Step 2:** `npm run build:fast` — exit 0.
-- [ ] **Step 3:** capture baseline: `node _surface-snapshot.mjs > /tmp/surface-before.txt && wc -l /tmp/surface-before.txt`. (Unlike the pilot, this migration WILL change the surface — the baseline is for the diff in B7 to confirm the change is EXACTLY the expected narrowing.)
+- [ ] **Step 3:** capture baseline. `_surface-snapshot.mjs` lives in the project root but is **git-excluded** (`.git/info/exclude`) — it will be absent on a fresh checkout. If `test -f _surface-snapshot.mjs` fails, recreate it first:
+
+```js
+import ts from 'typescript';
+const entries=['index','index.core','index.runtime','index.batch','index.ws','index.abapgit','index.executors'];
+const prog=ts.createProgram(entries.map(e=>`dist/${e}.d.ts`),{allowJs:true});
+const ch=prog.getTypeChecker();
+for(const e of entries){const sf=prog.getSourceFile(`dist/${e}.d.ts`);const s=sf&&ch.getSymbolAtLocation(sf);const names=s?ch.getExportsOfModule(s).map(x=>x.getName()).sort():[];console.log(`== ${e} ==`);console.log(names.join('\n'));}
+```
+
+Then: `node _surface-snapshot.mjs > /tmp/surface-before.txt && wc -l /tmp/surface-before.txt`. (Unlike the pilot, this migration WILL change the surface — the baseline is for the diff in B5 to confirm the change is EXACTLY the expected narrowing.)
 - [ ] **Step 4:** commit `package.json` + `package-lock.json` — `chore: consume @mcp-abap-adt/interfaces ^11.3.0 (pre-migration)`.
 
 ---
@@ -273,6 +289,15 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
 
 Update the import: replace `IAdtObject` with `IAdtSourceObject` from `@mcp-abap-adt/interfaces` (drop the `IAdtObject` import if now unused). Do NOT touch method bodies. For the 4 class-include handlers that `extends AdtClass`, they inherit — change only if they independently declare `implements IAdtObject` (check each; most just `extends AdtClass`).
 
+Also update the sibling public alias in `src/core/<type>/index.ts` for each of the 22:
+```ts
+// BEFORE
+export type AdtClassType = IAdtObject<IClassConfig, IClassState>;
+// AFTER
+export type AdtClassType = IAdtSourceObject<IClassConfig, IClassState>;
+```
+(import `IAdtSourceObject`, drop `IAdtObject` if now unused).
+
 - [ ] **Step 2: Build** — `npm run build:fast`, exit 0. Because `IAdtSourceObject ≡ IAdtObject`, all 22 still satisfy their declared type. A failure means a handler was NOT actually full (matrix disagreement) → STOP and report which.
 - [ ] **Step 3: Full unit suite** — `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit --runInBand 2>&1 | tee /tmp/b2.log`, read it; all pass.
 - [ ] **Step 4: Commit** — `refactor(types): 22 full handlers implement IAdtSourceObject`.
@@ -281,7 +306,7 @@ Update the import: replace `IAdtObject` with `IAdtSourceObject` from `@mcp-abap-
 
 ### Task B3: Switch the non-versioned + inline-profile handlers
 
-**Files:** DataElement, Domain, FunctionGroup (→ `IAdtNonVersionedObject`); FunctionInclude, AuthorizationField, FeatureToggle, Package, MessageClass, MessageClassMessage (→ inline intersections per the table above).
+**Files:** DataElement, Domain, FunctionGroup (→ `IAdtNonVersionedObject`); FunctionInclude, AuthorizationField, Package, MessageClass, MessageClassMessage (→ comma-separated implements per the table above). NOTE: FeatureToggle is NOT here — it is deferred (widening `IFeatureToggleObject`).
 
 **Interfaces:** Consumes `IAdtNonVersionedObject` + the seven atoms (for inline intersections). Produces handlers whose declared type omits the capabilities they lack — so their throwing stubs are no longer part of the declared contract.
 
@@ -294,11 +319,16 @@ getVersions(config: Partial<IDomainConfig>): Promise<IObjectVersion[]> {
 }
 ```
 
-- [ ] **Step 2: Inline-profile handlers.** For each, replace the implements clause with the inline intersection from the table, importing the needed atoms. Example (`AdtPackage.ts`):
+Also update each sibling alias in `src/core/<type>/index.ts`:
+```ts
+// AdtDomain/index.ts — BEFORE / AFTER
+export type AdtDomainType = IAdtNonVersionedObject<IDomainConfig, IDomainState>;
+```
+
+- [ ] **Step 2: Inline-list handlers.** For each (FunctionInclude, AuthorizationField, Package, MessageClass, MessageClassMessage), replace the implements clause with the **comma-separated list** from the table (NOT `&` — that is a syntax error in an `implements` clause). Example (`AdtPackage.ts`):
 
 ```ts
 import type {
-  IAdtActivatable, // still imported only if referenced elsewhere; else omit
   IAdtCheckable,
   IAdtCrud,
   IAdtLockable,
@@ -308,15 +338,27 @@ import type {
 
 export class AdtPackage
   implements
-    IAdtCrud<IPackageConfig, IPackageState> &
-      IAdtValidatable<IPackageConfig, IPackageState> &
-      IAdtCheckable<IPackageConfig, IPackageState> &
-      IAdtLockable<IPackageConfig, IPackageState> &
-      IAdtTransportAware<IPackageConfig, IPackageState>
+    IAdtCrud<IPackageConfig, IPackageState>,
+    IAdtValidatable<IPackageConfig, IPackageState>,
+    IAdtCheckable<IPackageConfig, IPackageState>,
+    IAdtLockable<IPackageConfig, IPackageState>,
+    IAdtTransportAware<IPackageConfig, IPackageState>
 {
 ```
 
 Mark the unsupported-capability stubs (`activate`/`getVersions`/… whichever the profile omits) `@deprecated`. Method bodies unchanged.
+
+Then update the sibling alias in `src/core/<type>/index.ts`. Here a **type position** — so an intersection `&` IS valid (and matches the AdtClient return type in B4):
+```ts
+// AdtPackage/index.ts — BEFORE
+export type AdtPackageType = IAdtObject<IPackageConfig, IPackageState>;
+// AFTER
+export type AdtPackageType = IAdtCrud<IPackageConfig, IPackageState> &
+  IAdtValidatable<IPackageConfig, IPackageState> &
+  IAdtCheckable<IPackageConfig, IPackageState> &
+  IAdtLockable<IPackageConfig, IPackageState> &
+  IAdtTransportAware<IPackageConfig, IPackageState>;
+```
 
 - [ ] **Step 3: Build** — `npm run build:fast`, exit 0. Here the build MUST still pass: the class still HAS the extra throwing methods (they just are not in the declared type), which is legal — a class may have more members than its `implements` clause requires.
 - [ ] **Step 4: Full unit suite** — `... | tee /tmp/b3.log`, read it; all pass.
@@ -341,7 +383,7 @@ getDomain(): IAdtNonVersionedObject<IDomainConfig, IDomainState> { return new Ad
 getPackage(): IAdtCrud<IPackageConfig, IPackageState> & IAdtValidatable<...> & IAdtCheckable<...> & IAdtLockable<...> & IAdtTransportAware<...> { return new AdtPackage(...); }
 ```
 
-Leave the deferred ones (`getRequest`, `getUnitTest`, `getCdsUnitTest`, `getServiceBinding`) returning their CURRENT type (`IAdtObject` / `IAdtServiceBinding`) unchanged.
+Leave the deferred ones (`getRequest`, `getUnitTest`, `getCdsUnitTest`, `getServiceBinding`, `getFeatureToggle`) returning their CURRENT type (`IAdtObject` / `IAdtServiceBinding` / `IFeatureToggleObject`) unchanged.
 
 - [ ] **Step 2: Build** — `npm run build:fast`, exit 0.
 - [ ] **Step 3: Add a compile-time guard test** proving the narrowing bites. Create `src/__tests__/unit/clients/returnTypeNarrowing.test.ts`:
