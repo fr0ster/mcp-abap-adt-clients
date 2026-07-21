@@ -438,9 +438,10 @@ find dist -name '*.d.ts' | sort | while read f; do echo "=== $f ==="; cat "$f"; 
   - (a) an `AdtClient`/`AdtClientLegacy` `getXxx()` return type changing from `IAdtObject<...>` to the handler's honest composite;
   - (b) **`dist/batch/AdtClientBatch.d.ts`** `getXxx()` return types changing the same way — `AdtClientBatch.getXxx()` is `return this.innerClient.getXxx()` with **no explicit return type**, so its inferred type follows `AdtClient` and its `.d.ts` narrows automatically (it is a public `./batch` entrypoint, so this IS part of the intended surface change — no code change to AdtClientBatch itself);
   - (c) an `Adt<Type>Type` alias changing from `IAdtObject<...>` to the honest composite;
-  - (d) an added `IAdtSourceObject`/`IAdtNonVersionedObject`/atom import in a `.d.ts`.
+  - (d) an added `IAdtSourceObject`/`IAdtNonVersionedObject`/atom import in a `.d.ts`;
+  - (e) a **handler class declaration's `implements` clause** changing — `.d.ts` emits it, so `dist/core/<type>/Adt<Type>.d.ts` will show `export declare class AdtDomain implements IAdtObject<...>` → `implements IAdtNonVersionedObject<...>` (or the comma-separated atom list for inline handlers). This is the source change from B2/B3 surfacing in the declarations — expected.
 
-  There must be **no** change to any handler's own method signatures, and **no** `getXxx()` for a deferred handler (getRequest/getUnitTest/getCdsUnitTest/getServiceBinding/getFeatureToggle) changing — in `AdtClient` OR `AdtClientBatch`. Anything else in the diff → STOP and report.
+  There must be **no** change to any handler's own **method signatures** (only the `implements` clause on the class line may change; the members below it stay identical), and **no** `getXxx()` for a deferred handler (getRequest/getUnitTest/getCdsUnitTest/getServiceBinding/getFeatureToggle) changing — in `AdtClient` OR `AdtClientBatch`. Anything else in the diff → STOP and report.
 - [ ] **Step 3: Full unit suite** — `... | tee /tmp/b5-unit.log`, read it; all pass (prior count + the new narrowing guard).
 - [ ] **Step 4: Lint** — `npm run lint:check 2>&1 | tee /tmp/b5-lint.log`, read it; 0 errors, ≤ 45/25.
 - [ ] **Step 5: Commit** — `test(types): return-type narrowing guard; surface reflects honest capability sets`.
