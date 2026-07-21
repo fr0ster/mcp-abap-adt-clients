@@ -299,7 +299,7 @@ export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
 
 Update the import: replace `IAdtObject` with `IAdtSourceObject` from `@mcp-abap-adt/interfaces` (drop the `IAdtObject` import if now unused). Do NOT touch method bodies. For the 4 class-include handlers that `extends AdtClass`, they inherit — change only if they independently declare `implements IAdtObject` (check each; most just `extends AdtClass`).
 
-Also update the sibling public alias in `src/core/<type>/index.ts` for each of the 22:
+Also update the sibling public alias in `src/core/<type>/index.ts` — but **only where one already exists**:
 ```ts
 // BEFORE
 export type AdtClassType = IAdtObject<IClassConfig, IClassState>;
@@ -307,6 +307,8 @@ export type AdtClassType = IAdtObject<IClassConfig, IClassState>;
 export type AdtClassType = IAdtSourceObject<IClassConfig, IClassState>;
 ```
 (import `IAdtSourceObject`, drop `IAdtObject` if now unused).
+
+**The 4 class-include handlers (LocalDefinitions, LocalMacros, LocalTestClass, LocalTypes) have NO `Adt*Type` alias** — `src/core/class/index.ts` exports only `AdtClassType`; the includes are exported as classes + config types. Do NOT add new `AdtLocal*Type` aliases — that would add exports and break B5's "export names unchanged" check. So the alias update is for the ~18 standalone full handlers that have one; the 4 includes get their honesty solely from the narrowed `AdtClient`/`AdtClientBatch` return types (and, since they `extends AdtClass`, they inherit its `implements` — change their own `implements` only if a class independently declares `implements IAdtObject`).
 
 - [ ] **Step 2: Build** — `npm run build:fast`, exit 0. Because `IAdtSourceObject ≡ IAdtObject`, all 22 still satisfy their declared type. A failure means a handler was NOT actually full (matrix disagreement) → STOP and report which.
 - [ ] **Step 3: Full unit suite** — `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit --runInBand 2>&1 | tee /tmp/b2.log`, read it; all pass.
