@@ -64,7 +64,7 @@ The **30 in-scope handlers** are the 22 full + 3 non-versioned + 5 inline (Funct
 
 **Phase B — adt-clients:**
 - Modify each in-scope `src/core/<type>/Adt<Type>.ts` — swap the `implements` clause (class body otherwise unchanged; throwing stubs stay, marked `@deprecated`).
-- Modify each in-scope `src/core/<type>/index.ts` — the public `export type Adt<Type>Type = IAdtObject<IXxxConfig, IXxxState>;` alias must narrow to the same honest composite the handler now implements (consumers can use these aliases directly, so they must not keep exposing unsupported capabilities).
+- Modify `src/core/<type>/index.ts` **where an `export type Adt<Type>Type = IAdtObject<...>` alias already exists** (most standalone handlers; NOT the 4 class-includes, NOT FunctionInclude/AuthorizationField) — narrow it to the same honest composite the handler now implements. Do NOT add new aliases (that changes the export-name surface). Handlers without an alias get their honesty from the class `implements` + the narrowed `AdtClient`/`AdtClientBatch` return types.
 - Modify `src/clients/AdtClient.ts` — narrow each in-scope `getXxx()` return type.
 - Modify `src/clients/AdtClientLegacy.ts` if it re-declares any narrowed return type.
 
