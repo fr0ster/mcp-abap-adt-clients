@@ -67,10 +67,17 @@ function refuses(body, sf) {
 function worksDirectly(body, sf) {
   if (!body) return false;
   const text = body.getText(sf);
+  // Delegation to a composed member's method — `this.<field>.<method>(...)`,
+  // e.g. `this.versionsCap.getVersions(config)` or `this.class.lock(...)` — is
+  // real work. Exclude `this.logger.*` so a stub that only logs is not counted.
+  const delegatesToMember = [...text.matchAll(/\bthis\.(\w+)\.\w+\s*\(/g)].some(
+    (m) => m[1] !== 'logger',
+  );
   return (
     /\bmakeAdtRequest\b/.test(text) ||
     /\bawait\b/.test(text) ||
-    /\bthis\.connection\b/.test(text)
+    /\bthis\.connection\b/.test(text) ||
+    delegatesToMember
   );
 }
 
