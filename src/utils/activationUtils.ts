@@ -10,9 +10,103 @@ import type {
   IAdtResponse as AxiosResponse,
   IAbapConnection,
 } from '@mcp-abap-adt/interfaces';
+import { XMLParser } from 'fast-xml-parser';
 import { CT_ACTIVATION } from '../constants/contentTypes';
 import { encodeSapObjectName } from './internalUtils';
 import { getTimeout } from './timeouts';
+
+/**
+ * Extract a human-readable text from a single ADT `<msg>` node.
+ */
+function extractActivationMsgText(msg: {
+  shortText?: { txt?: unknown } | string;
+  objDescr?: unknown;
+}): string {
+  const shortText = msg?.shortText;
+  if (shortText && typeof shortText === 'object' && 'txt' in shortText) {
+    const txt = (shortText as { txt?: unknown }).txt;
+    if (typeof txt === 'string' && txt.trim()) {
+      return txt.trim();
+    }
+  }
+  if (typeof shortText === 'string' && shortText.trim()) {
+    return shortText.trim();
+  }
+  if (typeof msg?.objDescr === 'string' && msg.objDescr.trim()) {
+    return msg.objDescr.trim();
+  }
+  return 'activation error';
+}
+
+/**
+ * Inspect an ADT activation response body for an **explicit failure signal**.
+ *
+ * ADT's `/sap/bc/adt/activation` endpoint returns HTTP 200 even when activation
+ * fails (object locked by another session, syntax errors), carrying a
+ * `<chkl:messages>` body with `chkl:properties activationExecuted="false"` and/or
+ * `<msg type="E">` entries. Treating "no HTTP error" as success masks these
+ * failures (issue #78).
+ *
+ * Conservative by design: returns a failure detail string ONLY on a positive
+ * error signal. Empty, unparseable, or unrecognized bodies return `null`
+ * (success) so the many object types whose success-body shape differs are never
+ * regressed into false failures.
+ *
+ * @returns failure detail text, or `null` when no failure signal is present
+ */
+function detectActivationFailure(responseData: unknown): string | null {
+  if (typeof responseData !== 'string' || responseData.trim() === '') {
+    return null;
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+    });
+    parsed = parser.parse(responseData) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+
+  const messages = parsed?.['chkl:messages'] as
+    | {
+        'chkl:properties'?: { activationExecuted?: unknown };
+        msg?: unknown;
+      }
+    | undefined;
+  if (!messages) {
+    return null;
+  }
+
+  const activationExecuted = messages['chkl:properties']?.activationExecuted;
+  const executedFalse =
+    activationExecuted === 'false' || activationExecuted === false;
+
+  const rawMsg = messages.msg;
+  const msgList = Array.isArray(rawMsg) ? rawMsg : rawMsg ? [rawMsg] : [];
+  const errorTexts = msgList
+    .filter((m) => {
+      const severity =
+        (m as { type?: unknown; severity?: unknown })?.type ??
+        (m as { severity?: unknown })?.severity;
+      return typeof severity === 'string' && severity.toUpperCase() === 'E';
+    })
+    .map((m) =>
+      extractActivationMsgText(
+        m as Parameters<typeof extractActivationMsgText>[0],
+      ),
+    );
+
+  if (executedFalse || errorTexts.length > 0) {
+    return errorTexts.length > 0
+      ? errorTexts.join('; ')
+      : 'activationExecuted=false';
+  }
+
+  return null;
+}
 
 /**
  * Build object URI from name and type
@@ -163,11 +257,21 @@ export async function activateObjectInSession(
     Accept: 'application/xml',
   };
 
-  return await connection.makeAdtRequest({
+  const response = await connection.makeAdtRequest({
     url,
     method: 'POST',
     timeout: getTimeout('default'),
     data: activationXml,
     headers,
   });
+
+  // ADT returns HTTP 200 even on failed activation (locked object, syntax
+  // errors). Surface an explicit failure signal as a thrown error instead of
+  // letting callers report a false success (issue #78).
+  const failure = detectActivationFailure(response.data);
+  if (failure) {
+    throw new Error(`Activation of ${objectName} failed: ${failure}`);
+  }
+
+  return response;
 }
