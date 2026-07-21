@@ -267,7 +267,17 @@ const ch=prog.getTypeChecker();
 for(const e of entries){const sf=prog.getSourceFile(`dist/${e}.d.ts`);const s=sf&&ch.getSymbolAtLocation(sf);const names=s?ch.getExportsOfModule(s).map(x=>x.getName()).sort():[];console.log(`== ${e} ==`);console.log(names.join('\n'));}
 ```
 
-Then: `node _surface-snapshot.mjs > /tmp/surface-before.txt && wc -l /tmp/surface-before.txt`. (Unlike the pilot, this migration WILL change the surface — the baseline is for the diff in B5 to confirm the change is EXACTLY the expected narrowing.)
+Capture TWO baselines:
+
+1. **Export-name snapshot** (sanity — nothing should be added/removed): `node _surface-snapshot.mjs > /tmp/surface-before.txt`. This lists exported symbol *names* only.
+2. **Declaration-surface baseline** (the one that matters — this migration changes SIGNATURES, not names, so a name diff would be empty). Concatenate every emitted `.d.ts` with its path so the diff has context:
+
+```bash
+find dist -name '*.d.ts' | sort | while read f; do echo "=== $f ==="; cat "$f"; done > /tmp/decl-before.txt
+wc -l /tmp/surface-before.txt /tmp/decl-before.txt
+```
+
+`/tmp/decl-before.txt` contains the actual `.d.ts` signatures — `AdtClient.getDomain(): IAdtObject<...>`, `AdtDomainType = IAdtObject<...>`, etc. B5 diffs this to prove the return types and aliases narrowed exactly as intended. (`dist/` is gitignored, so we snapshot to `/tmp`, not git.)
 - [ ] **Step 4:** commit `package.json` + `package-lock.json` — `chore: consume @mcp-abap-adt/interfaces ^11.3.0 (pre-migration)`.
 
 ---
@@ -407,15 +417,20 @@ import { AdtClient } from '../../../clients/AdtClient';
 it('return-type narrowing compiles as asserted', () => expect(true).toBe(true));
 ```
 
-- [ ] **Step 4: Build + run the guard** — `npm run build:fast` (the `@ts-expect-error` lines are validated at compile time) then `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/clients/returnTypeNarrowing.test.ts --runInBand 2>&1 | tee /tmp/b4.log`, read it; passes.
+- [ ] **Step 4: Type-check the guard, then run it.** `build:fast` (`tsc -p tsconfig.json`) EXCLUDES `src/__tests__/**`, so it does NOT validate the `@ts-expect-error` lines. Use the test tsconfig: `npm run test:check 2>&1 | tee /tmp/b4-check.log`, read it — exit 0 means every `@ts-expect-error` matched a real error (if the narrowing regressed, an `@ts-expect-error` with no error becomes `TS2578: Unused '@ts-expect-error'` and this fails). Then run it: `MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/clients/returnTypeNarrowing.test.ts --runInBand 2>&1 | tee /tmp/b4.log`, read it; passes.
 - [ ] **Step 5: Commit** — `feat(client)!: narrow getXxx() return types to honest capability composites`.
 
 ---
 
-### Task B5: Surface verification + full suite + lint
+### Task B5: Declaration-surface verification + full suite + lint
 
-- [ ] **Step 1: Regenerate the surface** — `npm run build:fast && node _surface-snapshot.mjs > /tmp/surface-after.txt`.
-- [ ] **Step 2: Diff and CONFIRM the change is exactly the expected narrowing** — `diff /tmp/surface-before.txt /tmp/surface-after.txt | tee /tmp/surface-diff.txt`, read it. Expected: the diff shows the composites now referenced and the narrowed return types; it must NOT show any capability method vanishing from a handler that should still expose it, nor any unrelated export appearing/disappearing. If the diff contains anything beyond the intended narrowing, STOP and report.
+- [ ] **Step 1: Regenerate both surfaces** — `npm run build:fast` then:
+```bash
+node _surface-snapshot.mjs > /tmp/surface-after.txt
+find dist -name '*.d.ts' | sort | while read f; do echo "=== $f ==="; cat "$f"; done > /tmp/decl-after.txt
+```
+- [ ] **Step 2a: Export names unchanged** — `diff /tmp/surface-before.txt /tmp/surface-after.txt`, read it. Expected: **EMPTY** — this migration narrows signatures, it does not add or remove any exported symbol. A non-empty name diff means something was unexpectedly added/removed → STOP and report.
+- [ ] **Step 2b: Declaration surface — exactly the intended narrowing** — `diff /tmp/decl-before.txt /tmp/decl-after.txt | tee /tmp/decl-diff.txt`, read the WHOLE file. This is the load-bearing check: every changed line must be one of (a) an `AdtClient`/`AdtClientLegacy` `getXxx()` return type changing from `IAdtObject<...>` to the handler's honest composite, or (b) an `Adt<Type>Type` alias changing the same way, or (c) an added `IAdtSourceObject`/`IAdtNonVersionedObject`/atom import in a `.d.ts`. There must be **no** change to any handler's own method signatures, and **no** `getXxx()` for a deferred handler (getRequest/getUnitTest/getCdsUnitTest/getServiceBinding/getFeatureToggle) changing. Anything else in the diff → STOP and report.
 - [ ] **Step 3: Full unit suite** — `... | tee /tmp/b5-unit.log`, read it; all pass (prior count + the new narrowing guard).
 - [ ] **Step 4: Lint** — `npm run lint:check 2>&1 | tee /tmp/b5-lint.log`, read it; 0 errors, ≤ 45/25.
 - [ ] **Step 5: Commit** — `test(types): return-type narrowing guard; surface reflects honest capability sets`.
