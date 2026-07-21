@@ -3,6 +3,13 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.6.0] - 2026-07-21
+
+### Changed
+- **Pilot of the capability-composition architecture.** `AdtClass`, `AdtDomain` and `AdtServiceDefinition` now route lock/unlock (and, for the two source-backed types, version history) through shared `LockCapability` / `VersionsCapability` implementations parameterized by a per-handler strategy, instead of bespoke per-type wrappers. `AdtDomain` composes no `VersionsCapability` — it has no `/source/main`, so the absence is structural rather than a throwing stub. Requires `@mcp-abap-adt/interfaces ^11.2.0` (the capability atom interfaces `IAdtCrud`, `IAdtLockable`, `IAdtVersionable`, …).
+
+No API change from the composition work: the `IAdtObject` public surface is byte-identical (verified across all seven entry points — empty diff) and behaviour is unchanged (full unit suite, including cross-handler lock/unlock ordering conformance). This release also carries the 7.5.1 activation fix below.
+
 ## [7.5.1] - 2026-07-21
 
 ### Fixed
