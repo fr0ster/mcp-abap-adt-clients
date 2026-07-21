@@ -3,6 +3,11 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.5.1] - 2026-07-21
+
+### Fixed
+- **`activateObjectInSession` no longer masks a failed activation as success (#78).** ADT's `/sap/bc/adt/activation` endpoint returns HTTP 200 even when activation fails (object locked by another session, syntax errors), carrying a `<chkl:messages>` body with `chkl:properties activationExecuted="false"` and/or `<msg type="E">` entries. The shared helper previously returned that response unchecked, so every object type built on it (domain, program, table, structure, class, interface, ddl, tabletype, functionModule, functionInclude, metadataExtension, behaviorDefinition, enhancement, unitTest — 15 in total) reported a false success on a locked/failed activation. This is the root cause of the downstream false `success:true` in fr0ster/mcp-abap-adt#154 (`UpdateDomain` on a locked domain). The helper now inspects the body and throws on an **explicit** failure signal only (`activationExecuted="false"` or error-severity `<msg>`), collecting the ADT error text into the thrown message. Empty, unparseable, or unrecognized bodies are still treated as success, so the differing success-body shapes across the 15 types are never regressed into false failures. The 9 object types that already parse their own activation response (dataElement, serviceDefinition, accessControl, scalarFunction, scalarFunctionImplementation, transformation, appendStructure, authorizationField, featureToggle) are unaffected — they do not route through the shared helper.
+
 ## [7.5.0] - 2026-07-19
 
 ### Changed
