@@ -644,9 +644,12 @@ describe('VersionsCapability', () => {
     expect(await cap.getVersionSource('/uri/1')).toBe('source-of:/uri/1');
   });
 
-  it('getVersions rethrows a missing name', async () => {
+  it('getVersions rethrows a missing name', () => {
     const cap = new VersionsCapability<Cfg>(getCtx, strategy);
-    await expect(cap.getVersions({})).rejects.toThrow('name is required');
+    // getVersions is NOT async (byte-identical to the current handlers, whose
+    // getVersions throws synchronously on a missing name), so nameOf's throw
+    // propagates synchronously — assert a sync throw, not a rejection.
+    expect(() => cap.getVersions({})).toThrow('name is required');
   });
 });
 ```
