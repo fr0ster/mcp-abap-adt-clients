@@ -50,7 +50,7 @@
 
 # PHASE A — interfaces (release 11.2.0)
 
-Branch: `feat/capability-atoms`, created from `main` (NOT from `feat/atc-unittest-types`; the ATC types stay on their own branch and are released separately when their client lands).
+Branch: `feat/capability-atoms`, created from `master` (the interfaces repo's default branch is **master**, not main — confirmed HEAD `68a5e7b`, ATC-free; NOT from `feat/atc-unittest-types`; the ATC types stay on their own branch and are released separately when their client lands).
 
 ### Task A1: Declare the seven capability atom interfaces
 
@@ -65,7 +65,7 @@ Branch: `feat/capability-atoms`, created from `main` (NOT from `feat/atc-unittes
 
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt-interfaces
-git checkout main && git pull
+git checkout master && git pull
 git checkout -b feat/capability-atoms
 ```
 
