@@ -1130,22 +1130,26 @@ npm test -- integration/core/class integration/core/domain integration/core/serv
 ```
 Then read `integration-pilot.log` — read the summary block (`Test Suites:` … onward). Expected: the previously-passing tests for these three still pass; any pre-existing skips remain skips. A NEW failure that was passing before the refactor is a regression to investigate before release.
 
-- [ ] **Step 2: Verify the consumer still builds and type-checks against the pilot build**
+- [ ] **Step 2: Consumer verification happens AFTER publish — not via a local tarball**
 
-The consumer (`~/prj/mcp-abap-adt`) pins `@mcp-abap-adt/adt-clients` and exercises the `IAdtObject` surface. To prove transparency without publishing, point it at the local pilot build in a throwaway way (do NOT commit the consumer lockfile change):
+Do NOT `npm pack` the pilot and install it into the consumer. That is the "local
+tarball/file bridge" the project rule forbids — consumer work is blocked until the
+dependency is on npm (see the publish-interfaces-first / no-local-bridge rule). The pilot's
+correctness is already established without the consumer: the empty public-surface diff
+(Task B8) plus the full unit suite proves the `IAdtObject` surface and behaviour are
+unchanged, so the consumer that compiles against the current published adt-clients will
+compile against this one.
 
-```bash
-cd /home/okyslytsia/prj/mcp-abap-adt-clients && npm run build && npm pack
-# produces mcp-abap-adt-adt-clients-<ver>.tgz
-cd /home/okyslytsia/prj/mcp-abap-adt
-npm install --no-save /home/okyslytsia/prj/mcp-abap-adt-clients/mcp-abap-adt-adt-clients-*.tgz
-npm run build 2>&1 | tee /tmp/consumer-build.log
-```
-Then read `/tmp/consumer-build.log`. Expected: the consumer compiles clean against the pilot build — proof the `IAdtObject` surface is transparent. Restore the consumer's dependency afterward: `cd ~/prj/mcp-abap-adt && npm install` (re-pulls the published version; confirm no `"link": true` and no tarball path left in its lockfile).
+Consumer verification, if wanted, is a POST-publish step: once the user has published the
+new adt-clients version to npm, bump `~/prj/mcp-abap-adt`'s `@mcp-abap-adt/adt-clients`
+dependency to it and run its build — resolving from the registry, never a local tarball.
+That is outside this task and this branch.
 
 - [ ] **Step 3: Record the verification outcome**
 
-No commit. Summarize for the user: unit (count), trial integration (pass/skip/fail per suite with the actual numbers from the log), surface diff (empty), consumer build (clean). If anything regressed, STOP and report rather than proceeding to release.
+No commit. Summarize for the user: unit (count), trial integration (pass/skip/fail per suite
+with the actual numbers from the log, if run), and the empty surface diff. If anything
+regressed, STOP and report rather than proceeding to release.
 
 ---
 
