@@ -430,7 +430,13 @@ node _surface-snapshot.mjs > /tmp/surface-after.txt
 find dist -name '*.d.ts' | sort | while read f; do echo "=== $f ==="; cat "$f"; done > /tmp/decl-after.txt
 ```
 - [ ] **Step 2a: Export names unchanged** — `diff /tmp/surface-before.txt /tmp/surface-after.txt`, read it. Expected: **EMPTY** — this migration narrows signatures, it does not add or remove any exported symbol. A non-empty name diff means something was unexpectedly added/removed → STOP and report.
-- [ ] **Step 2b: Declaration surface — exactly the intended narrowing** — `diff /tmp/decl-before.txt /tmp/decl-after.txt | tee /tmp/decl-diff.txt`, read the WHOLE file. This is the load-bearing check: every changed line must be one of (a) an `AdtClient`/`AdtClientLegacy` `getXxx()` return type changing from `IAdtObject<...>` to the handler's honest composite, or (b) an `Adt<Type>Type` alias changing the same way, or (c) an added `IAdtSourceObject`/`IAdtNonVersionedObject`/atom import in a `.d.ts`. There must be **no** change to any handler's own method signatures, and **no** `getXxx()` for a deferred handler (getRequest/getUnitTest/getCdsUnitTest/getServiceBinding/getFeatureToggle) changing. Anything else in the diff → STOP and report.
+- [ ] **Step 2b: Declaration surface — exactly the intended narrowing** — `diff /tmp/decl-before.txt /tmp/decl-after.txt | tee /tmp/decl-diff.txt`, read the WHOLE file. This is the load-bearing check: every changed line must be one of
+  - (a) an `AdtClient`/`AdtClientLegacy` `getXxx()` return type changing from `IAdtObject<...>` to the handler's honest composite;
+  - (b) **`dist/batch/AdtClientBatch.d.ts`** `getXxx()` return types changing the same way — `AdtClientBatch.getXxx()` is `return this.innerClient.getXxx()` with **no explicit return type**, so its inferred type follows `AdtClient` and its `.d.ts` narrows automatically (it is a public `./batch` entrypoint, so this IS part of the intended surface change — no code change to AdtClientBatch itself);
+  - (c) an `Adt<Type>Type` alias changing from `IAdtObject<...>` to the honest composite;
+  - (d) an added `IAdtSourceObject`/`IAdtNonVersionedObject`/atom import in a `.d.ts`.
+
+  There must be **no** change to any handler's own method signatures, and **no** `getXxx()` for a deferred handler (getRequest/getUnitTest/getCdsUnitTest/getServiceBinding/getFeatureToggle) changing — in `AdtClient` OR `AdtClientBatch`. Anything else in the diff → STOP and report.
 - [ ] **Step 3: Full unit suite** — `... | tee /tmp/b5-unit.log`, read it; all pass (prior count + the new narrowing guard).
 - [ ] **Step 4: Lint** — `npm run lint:check 2>&1 | tee /tmp/b5-lint.log`, read it; 0 errors, ≤ 45/25.
 - [ ] **Step 5: Commit** — `test(types): return-type narrowing guard; surface reflects honest capability sets`.
@@ -441,7 +447,7 @@ find dist -name '*.d.ts' | sort | while read f; do echo "=== $f ==="; cat "$f"; 
 
 - [ ] **Step 1: Ask the user for the version** — recommend **major 8.0.0** (return-type narrowing is a breaking API change, even though it only breaks always-throwing usage). Wait for confirmation.
 - [ ] **Step 2:** `npm version <chosen> --no-git-tag-version && npm install --package-lock-only`; confirm link:true 0.
-- [ ] **Step 3: CHANGELOG** — a `### Changed` (BREAKING) entry: handlers now declare honest capability sets; `AdtClient.getXxx()` return types narrowed so calling an unsupported capability (e.g. `getDomain().getVersions()`) is now a compile error instead of a runtime throw — this only breaks code that referenced methods that always threw. Deferred: ServiceBinding, Request, UnitTest/CdsUnitTest. Requires interfaces `^11.3.0`.
+- [ ] **Step 3: CHANGELOG** — a `### Changed` (BREAKING) entry: handlers now declare honest capability sets; `AdtClient.getXxx()` (and, by inference, `AdtClientBatch.getXxx()`) return types narrowed so calling an unsupported capability (e.g. `getDomain().getVersions()`) is now a compile error instead of a runtime throw — this only breaks code that referenced methods that always threw. **Still wide (deferred, unchanged this release): `getFeatureToggle`, `getServiceBinding`, `getRequest`, `getUnitTest`, `getCdsUnitTest`** — these implement widening interfaces or are wrong-contract and will be narrowed in a follow-up. Requires interfaces `^11.3.0`.
 - [ ] **Step 4: Commit, PR** — `git push -u origin feat/capability-type-honesty`; `gh pr create --base main --title "release(<chosen>): honest capability types (BREAKING)" --body "..."`. Report: PR ready for the user's external review; then merge + tag + GitHub release; **user publishes**.
 
 ---
