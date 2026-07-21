@@ -29,6 +29,10 @@ import type {
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import {
+  type ICapabilityContext,
+  LockCapability,
+} from '../shared/capabilities';
+import {
   createLockTracker,
   type LockRegistry,
   type LockTracker,
@@ -51,6 +55,31 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
   private readonly systemContext: IAdtSystemContext;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Domain';
+
+  // LAZY thunk (not a getter that snapshots): captures `this` but reads
+  // this.connection/this.logger only when invoked, after the constructor has
+  // run — so building the capability below as a class field is safe.
+  private readonly capCtx = (): ICapabilityContext => ({
+    connection: this.connection,
+    logger: this.logger,
+  });
+
+  private readonly lockCap = new LockCapability<IDomainConfig, IDomainState>(
+    this.capCtx,
+    {
+      nameOf: (c) => {
+        if (!c.domainName) throw new Error('Domain name is required');
+        return c.domainName;
+      },
+      acquire: async (ctx, name) => ({
+        lockHandle: await lockDomain(ctx.connection, name),
+      }),
+      release: async (ctx, name, handle) => {
+        const result = await unlockDomain(ctx.connection, name, handle);
+        return { unlockResult: result, errors: [] };
+      },
+    },
+  );
 
   constructor(
     connection: IAbapConnection,
@@ -614,14 +643,9 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
    * Lock domain for modification
    */
   async lock(config: Partial<IDomainConfig>): Promise<string> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockDomain(this.connection, config.domainName);
-    this.lockTracker.track(config.domainName, lockHandle);
-    return lockHandle;
+    const handle = await this.lockCap.lock(config);
+    this.lockTracker.track(config.domainName as string, handle);
+    return handle;
   }
 
   /**
@@ -631,22 +655,9 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     config: Partial<IDomainConfig>,
     lockHandle: string,
   ): Promise<IDomainState> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const result = await unlockDomain(
-      this.connection,
-      config.domainName,
-      lockHandle,
-    );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.domainName);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
+    const state = await this.lockCap.unlock(config, lockHandle);
+    this.lockTracker.untrack(config.domainName as string);
+    return state;
   }
 
   async getVersions(
