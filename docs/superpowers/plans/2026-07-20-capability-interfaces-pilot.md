@@ -625,9 +625,7 @@ const strategy: IVersionsStrategy<Cfg> = {
     if (!c.name) throw new Error('name is required');
     return c.name;
   },
-  list: async (_ctx, name) => [
-    { version: '000001', versionTitle: name } as any,
-  ],
+  list: async (_ctx, name) => [{ versionId: '000001', title: name } as any],
   source: async (_ctx, uri) => `source-of:${uri}`,
 };
 
@@ -636,7 +634,7 @@ describe('VersionsCapability', () => {
     const cap = new VersionsCapability<Cfg>(getCtx, strategy);
     const v = await cap.getVersions({ name: 'ZBAR' });
     expect(v).toHaveLength(1);
-    expect(v[0].versionTitle).toBe('ZBAR');
+    expect(v[0].title).toBe('ZBAR');
   });
 
   it('getVersionSource delegates to the strategy', async () => {
