@@ -360,7 +360,7 @@ export class AdtPackage
 
 Mark the unsupported-capability stubs (`activate`/`getVersions`/… whichever the profile omits) `@deprecated`. Method bodies unchanged.
 
-Then update the sibling alias in `src/core/<type>/index.ts`. Here a **type position** — so an intersection `&` IS valid (and matches the AdtClient return type in B4):
+Then update the sibling alias in `src/core/<type>/index.ts` — **only where one already exists.** A type position, so an intersection `&` IS valid (and matches the AdtClient return type in B4):
 ```ts
 // AdtPackage/index.ts — BEFORE
 export type AdtPackageType = IAdtObject<IPackageConfig, IPackageState>;
@@ -371,6 +371,8 @@ export type AdtPackageType = IAdtCrud<IPackageConfig, IPackageState> &
   IAdtLockable<IPackageConfig, IPackageState> &
   IAdtTransportAware<IPackageConfig, IPackageState>;
 ```
+
+Alias presence among the 5 inline handlers (verified): **Package, MessageClass, MessageClassMessage HAVE** an alias (update it); **FunctionInclude and AuthorizationField have NONE** — do NOT add one (it would add an export and break B5's export-names-unchanged check). Those two get their honesty from the `implements` clause plus the narrowed `AdtClient`/`AdtClientBatch` return types.
 
 - [ ] **Step 3: Build** — `npm run build:fast`, exit 0. Here the build MUST still pass: the class still HAS the extra throwing methods (they just are not in the declared type), which is legal — a class may have more members than its `implements` clause requires.
 - [ ] **Step 4: Full unit suite** — `... | tee /tmp/b3.log`, read it; all pass.
