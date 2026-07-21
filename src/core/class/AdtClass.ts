@@ -30,6 +30,11 @@ import {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
+import {
+  type ICapabilityContext,
+  LockCapability,
+  VersionsCapability,
+} from '../shared/capabilities';
 import type { IAdtContentTypes } from '../shared/contentTypes';
 import {
   createLockTracker,
@@ -64,6 +69,44 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   protected readonly contentTypes?: IAdtContentTypes;
   private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Class';
+
+  // LAZY thunk (not a getter that snapshots): captures `this` but reads
+  // this.connection/this.logger only when invoked, after the constructor has
+  // run — so building the capabilities below as class fields is safe.
+  private readonly capCtx = (): ICapabilityContext => ({
+    connection: this.connection,
+    logger: this.logger,
+  });
+
+  private readonly lockCap = new LockCapability<IClassConfig, IClassState>(
+    this.capCtx,
+    {
+      nameOf: (c) => {
+        if (!c.className) throw new Error('Class name is required');
+        return c.className;
+      },
+      acquire: async (ctx, name) => ({
+        lockHandle: await lockClass(ctx.connection, name),
+      }),
+      release: async (ctx, name, handle) => {
+        const result = await unlockClass(ctx.connection, name, handle);
+        return { unlockResult: result, errors: [] };
+      },
+    },
+  );
+
+  private readonly versionsCap = new VersionsCapability<IClassConfig>(
+    this.capCtx,
+    {
+      nameOf: (c) => {
+        if (!c.className) throw new Error('className is required');
+        return c.className;
+      },
+      list: (ctx, name) =>
+        getClassIncludeVersions(ctx.connection, name, 'main'),
+      source: (ctx, uri) => getClassVersionSource(ctx.connection, uri),
+    },
+  );
 
   constructor(
     connection: IAbapConnection,
@@ -711,18 +754,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
    * Lock class
    */
   async lock(config: Partial<IClassConfig>): Promise<string> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
-    // Stay stateful while the lock is held — the caller must release it via
-    // unlock(), which restores stateless. On older BASIS (#106) the lock handle
-    // is only valid inside stateful requests, so a stateless write between lock
-    // and unlock fails with 423.
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockClass(this.connection, config.className);
-    this.lockTracker.track(config.className, lockHandle);
-    return lockHandle;
+    const handle = await this.lockCap.lock(config);
+    this.lockTracker.track(config.className as string, handle);
+    return handle;
   }
 
   /**
@@ -732,21 +766,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     config: Partial<IClassConfig>,
     lockHandle: string,
   ): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    this.connection.setSessionType('stateful');
-    const result = await unlockClass(
-      this.connection,
-      config.className,
-      lockHandle,
-    );
-    this.connection.setSessionType('stateless');
-    this.lockTracker.untrack(config.className);
-    return {
-      unlockResult: result,
-      errors: [],
-    };
+    const state = await this.lockCap.unlock(config, lockHandle);
+    this.lockTracker.untrack(config.className as string);
+    return state;
   }
 
   /**
@@ -933,12 +955,11 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   }
 
   getVersions(config: Partial<IClassConfig>): Promise<IObjectVersion[]> {
-    if (!config.className) throw new Error('className is required');
-    return getClassIncludeVersions(this.connection, config.className, 'main');
+    return this.versionsCap.getVersions(config);
   }
 
   getVersionSource(contentUri: string): Promise<string> {
-    return getClassVersionSource(this.connection, contentUri);
+    return this.versionsCap.getVersionSource(contentUri);
   }
 
   /** Shared by local-include subclasses to target their own include. */
