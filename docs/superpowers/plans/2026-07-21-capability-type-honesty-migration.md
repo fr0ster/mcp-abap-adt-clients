@@ -434,14 +434,15 @@ node _surface-snapshot.mjs > /tmp/surface-after.txt
 find dist -name '*.d.ts' | sort | while read f; do echo "=== $f ==="; cat "$f"; done > /tmp/decl-after.txt
 ```
 - [ ] **Step 2a: Export names unchanged** — `diff /tmp/surface-before.txt /tmp/surface-after.txt`, read it. Expected: **EMPTY** — this migration narrows signatures, it does not add or remove any exported symbol. A non-empty name diff means something was unexpectedly added/removed → STOP and report.
-- [ ] **Step 2b: Declaration surface — exactly the intended narrowing** — `diff /tmp/decl-before.txt /tmp/decl-after.txt | tee /tmp/decl-diff.txt`, read the WHOLE file. This is the load-bearing check: every changed line must be one of
-  - (a) an `AdtClient`/`AdtClientLegacy` `getXxx()` return type changing from `IAdtObject<...>` to the handler's honest composite;
-  - (b) **`dist/batch/AdtClientBatch.d.ts`** `getXxx()` return types changing the same way — `AdtClientBatch.getXxx()` is `return this.innerClient.getXxx()` with **no explicit return type**, so its inferred type follows `AdtClient` and its `.d.ts` narrows automatically (it is a public `./batch` entrypoint, so this IS part of the intended surface change — no code change to AdtClientBatch itself);
-  - (c) an `Adt<Type>Type` alias changing from `IAdtObject<...>` to the honest composite;
-  - (d) an added `IAdtSourceObject`/`IAdtNonVersionedObject`/atom import in a `.d.ts`;
-  - (e) a **handler class declaration's `implements` clause** changing — `.d.ts` emits it, so `dist/core/<type>/Adt<Type>.d.ts` will show `export declare class AdtDomain implements IAdtObject<...>` → `implements IAdtNonVersionedObject<...>` (or the comma-separated atom list for inline handlers). This is the source change from B2/B3 surfacing in the declarations — expected.
+- [ ] **Step 2b: Declaration surface — exactly the intended narrowing** — `diff /tmp/decl-before.txt /tmp/decl-after.txt | tee /tmp/decl-diff.txt`, read the WHOLE file. This is the load-bearing check. Rather than enumerate every file, apply ONE **pattern** — every changed line must be one of:
 
-  There must be **no** change to any handler's own **method signatures** (only the `implements` clause on the class line may change; the members below it stay identical), and **no** `getXxx()` for a deferred handler (getRequest/getUnitTest/getCdsUnitTest/getServiceBinding/getFeatureToggle) changing — in `AdtClient` OR `AdtClientBatch`. Anything else in the diff → STOP and report.
+  1. **A `IAdtObject<C,S>` reference replaced by the honest composite** for that config/state pair — the honest composite being `IAdtSourceObject`, `IAdtNonVersionedObject`, or the inline atom intersection. This is the ONLY substantive change, and it appears in exactly these forms wherever `IAdtObject` was written or inferred:
+     - a handler class line: `declare class AdtX implements IAdtObject<...>` → `implements <composite>` (`.d.ts` emits the `implements` clause);
+     - an `AdtClient`/`AdtClientLegacy`/`AdtClientBatch` `getXxx(): IAdtObject<...>` return type → `<composite>` (AdtClientBatch's is inferred from `innerClient`, so it narrows with no source change);
+     - an `Adt<Type>Type = IAdtObject<...>` alias → `<composite>`.
+  2. **An added `import` of `IAdtSourceObject`/`IAdtNonVersionedObject`/an atom** in a `.d.ts` (and a dropped `IAdtObject` import).
+
+  STOP and report if the diff contains ANYTHING else — in particular: any change to a **member/method signature** (the lines *inside* a class body must be byte-identical; only the class's `implements` line may change), or any narrowing of a **deferred** handler (`getFeatureToggle`/`getServiceBinding`/`getRequest`/`getUnitTest`/`getCdsUnitTest`, and the `AdtRequest`/`AdtUnitTest`/`AdtCdsUnitTest`/`AdtServiceBinding`/`AdtFeatureToggle` class lines + their aliases), which must still read `IAdtObject`/`IAdtServiceBinding`/`IFeatureToggleObject`.
 - [ ] **Step 3: Full unit suite** — `... | tee /tmp/b5-unit.log`, read it; all pass (prior count + the new narrowing guard).
 - [ ] **Step 4: Lint** — `npm run lint:check 2>&1 | tee /tmp/b5-lint.log`, read it; 0 errors, ≤ 45/25.
 - [ ] **Step 5: Commit** — `test(types): return-type narrowing guard; surface reflects honest capability sets`.
