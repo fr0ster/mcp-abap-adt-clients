@@ -13,7 +13,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type {
@@ -88,7 +92,12 @@ describe('FunctionGroup (using AdtClient)', () => {
       hasConfig = true;
 
       tester = new BaseTester(
-        client.getFunctionGroup(),
+        // getFunctionGroup() is narrowed to IAdtNonVersionedObject (no
+        // getVersions/getVersionSource); cast through the full interface.
+        client.getFunctionGroup() as unknown as IAdtObject<
+          IFunctionGroupConfig,
+          IFunctionGroupState
+        >,
         'FunctionGroup',
         'create_function_group',
         'adt_function_group',
