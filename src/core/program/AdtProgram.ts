@@ -21,8 +21,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -50,7 +50,9 @@ import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 
 import { getProgramVersionSource, getProgramVersions } from './versions';
-export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
+export class AdtProgram
+  implements IAdtSourceObject<IProgramConfig, IProgramState>
+{
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;

@@ -15,7 +15,16 @@
 
 import type {
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
+  IAdtNonVersionedObject,
   IAdtObject,
+  IAdtSourceObject,
+  IAdtTransportAware,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -239,7 +248,7 @@ export class AdtClient {
    * Get high-level operations for Class objects
    * @returns IAdtObject instance for Class operations
    */
-  getClass(): IAdtObject<IClassConfig, IClassState> {
+  getClass(): IAdtSourceObject<IClassConfig, IClassState> {
     return new AdtClass(
       this.connection,
       this.logger,
@@ -253,7 +262,7 @@ export class AdtClient {
    * Get high-level operations for Program objects
    * @returns IAdtObject instance for Program operations
    */
-  getProgram(): IAdtObject<IProgramConfig, IProgramState> {
+  getProgram(): IAdtSourceObject<IProgramConfig, IProgramState> {
     return new AdtProgram(
       this.connection,
       this.logger,
@@ -267,7 +276,7 @@ export class AdtClient {
    * Get high-level operations for Interface objects
    * @returns IAdtObject instance for Interface operations
    */
-  getInterface(): IAdtObject<IInterfaceConfig, IInterfaceState> {
+  getInterface(): IAdtSourceObject<IInterfaceConfig, IInterfaceState> {
     return new AdtInterface(
       this.connection,
       this.logger,
@@ -281,7 +290,7 @@ export class AdtClient {
    * Get high-level operations for Domain objects
    * @returns IAdtObject instance for Domain operations
    */
-  getDomain(): IAdtObject<IDomainConfig, IDomainState> {
+  getDomain(): IAdtNonVersionedObject<IDomainConfig, IDomainState> {
     return new AdtDomain(
       this.connection,
       this.logger,
@@ -338,7 +347,10 @@ export class AdtClient {
    * Get high-level operations for DataElement objects
    * @returns IAdtObject instance for DataElement operations
    */
-  getDataElement(): IAdtObject<IDataElementConfig, IDataElementState> {
+  getDataElement(): IAdtNonVersionedObject<
+    IDataElementConfig,
+    IDataElementState
+  > {
     return new AdtDataElement(
       this.connection,
       this.logger,
@@ -351,10 +363,14 @@ export class AdtClient {
    * Get high-level operations for AuthorizationField objects
    * @returns IAdtObject instance for AuthorizationField operations
    */
-  getAuthorizationField(): IAdtObject<
+  getAuthorizationField(): IAdtCrud<
     IAuthorizationFieldConfig,
     IAuthorizationFieldState
-  > {
+  > &
+    IAdtValidatable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
+    IAdtCheckable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
+    IAdtActivatable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
+    IAdtLockable<IAuthorizationFieldConfig, IAuthorizationFieldState> {
     return new AdtAuthorizationField(
       this.connection,
       this.logger,
@@ -367,7 +383,7 @@ export class AdtClient {
    * Get high-level operations for Structure objects
    * @returns IAdtObject instance for Structure operations
    */
-  getStructure(): IAdtObject<IStructureConfig, IStructureState> {
+  getStructure(): IAdtSourceObject<IStructureConfig, IStructureState> {
     return new AdtStructure(
       this.connection,
       this.logger,
@@ -380,7 +396,7 @@ export class AdtClient {
    * Get high-level operations for Table objects
    * @returns IAdtObject instance for Table operations
    */
-  getTable(): IAdtObject<ITableConfig, ITableState> {
+  getTable(): IAdtSourceObject<ITableConfig, ITableState> {
     return new AdtTable(
       this.connection,
       this.logger,
@@ -393,7 +409,7 @@ export class AdtClient {
    * Get high-level operations for TableType (DDIC Table Type) objects
    * @returns IAdtObject instance for TableType operations
    */
-  getTableType(): IAdtObject<ITableTypeConfig, ITableTypeState> {
+  getTableType(): IAdtSourceObject<ITableTypeConfig, ITableTypeState> {
     return new AdtDdicTableType(
       this.connection,
       this.logger,
@@ -409,7 +425,7 @@ export class AdtClient {
    * (`/ddic/dsfd/sources/`) have their own clients.
    * @returns IAdtObject instance for DDL source operations
    */
-  getDdl(): IAdtObject<IDdlConfig, IDdlState> {
+  getDdl(): IAdtSourceObject<IDdlConfig, IDdlState> {
     return new AdtDdl(
       this.connection,
       this.logger,
@@ -422,7 +438,10 @@ export class AdtClient {
    * Get high-level operations for FunctionGroup objects
    * @returns IAdtObject instance for FunctionGroup operations
    */
-  getFunctionGroup(): IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
+  getFunctionGroup(): IAdtNonVersionedObject<
+    IFunctionGroupConfig,
+    IFunctionGroupState
+  > {
     return new AdtFunctionGroup(
       this.connection,
       this.logger,
@@ -436,7 +455,10 @@ export class AdtClient {
    * Get high-level operations for FunctionModule objects
    * @returns IAdtObject instance for FunctionModule operations
    */
-  getFunctionModule(): IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
+  getFunctionModule(): IAdtSourceObject<
+    IFunctionModuleConfig,
+    IFunctionModuleState
+  > {
     return new AdtFunctionModule(
       this.connection,
       this.logger,
@@ -450,10 +472,15 @@ export class AdtClient {
    * Get high-level operations for FunctionInclude objects
    * @returns IAdtObject instance for FunctionInclude operations
    */
-  getFunctionInclude(): IAdtObject<
+  getFunctionInclude(): IAdtCrud<
     IFunctionIncludeConfig,
     IFunctionIncludeState
-  > {
+  > &
+    IAdtValidatable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtCheckable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtActivatable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtLockable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtVersionable<IFunctionIncludeConfig> {
     return new AdtFunctionInclude(
       this.connection,
       this.logger,
@@ -467,7 +494,11 @@ export class AdtClient {
    * Get high-level operations for Package objects
    * @returns IAdtObject instance for Package operations
    */
-  getPackage(): IAdtObject<IPackageConfig, IPackageState> {
+  getPackage(): IAdtCrud<IPackageConfig, IPackageState> &
+    IAdtValidatable<IPackageConfig, IPackageState> &
+    IAdtCheckable<IPackageConfig, IPackageState> &
+    IAdtLockable<IPackageConfig, IPackageState> &
+    IAdtTransportAware<IPackageConfig, IPackageState> {
     return new AdtPackage(
       this.connection,
       this.logger,
@@ -480,7 +511,9 @@ export class AdtClient {
    * Get high-level operations for MessageClass (MSAG/N) objects
    * @returns IAdtObject instance for MessageClass operations
    */
-  getMessageClass(): IAdtObject<IMessageClassConfig, IMessageClassState> {
+  getMessageClass(): IAdtCrud<IMessageClassConfig, IMessageClassState> &
+    IAdtValidatable<IMessageClassConfig, IMessageClassState> &
+    IAdtLockable<IMessageClassConfig, IMessageClassState> {
     return new AdtMessageClass(
       this.connection,
       this.logger,
@@ -494,7 +527,7 @@ export class AdtClient {
    * Supports read, create/update (upsert), and delete of individual messages.
    * @returns IAdtObject instance for MessageClassMessage operations
    */
-  getMessageClassMessage(): IAdtObject<
+  getMessageClassMessage(): IAdtCrud<
     IMessageClassMessageConfig,
     IMessageClassMessageState
   > {
@@ -505,7 +538,10 @@ export class AdtClient {
    * Get high-level operations for AccessControl objects
    * @returns IAdtObject instance for AccessControl operations
    */
-  getAccessControl(): IAdtObject<IAccessControlConfig, IAccessControlState> {
+  getAccessControl(): IAdtSourceObject<
+    IAccessControlConfig,
+    IAccessControlState
+  > {
     return new AdtAccessControl(
       this.connection,
       this.logger,
@@ -519,7 +555,10 @@ export class AdtClient {
    * Supports both SimpleTransformation and XSLTProgram types
    * @returns IAdtObject instance for Transformation operations
    */
-  getTransformation(): IAdtObject<ITransformationConfig, ITransformationState> {
+  getTransformation(): IAdtSourceObject<
+    ITransformationConfig,
+    ITransformationState
+  > {
     return new AdtTransformation(
       this.connection,
       this.logger,
@@ -532,7 +571,7 @@ export class AdtClient {
    * Get high-level operations for ServiceDefinition objects
    * @returns IAdtObject instance for ServiceDefinition operations
    */
-  getServiceDefinition(): IAdtObject<
+  getServiceDefinition(): IAdtSourceObject<
     IServiceDefinitionConfig,
     IServiceDefinitionState
   > {
@@ -547,7 +586,10 @@ export class AdtClient {
   /**
    * Get high-level operations for CDS Scalar Function (DSFD/SCF) objects
    */
-  getScalarFunction(): IAdtObject<IScalarFunctionConfig, IScalarFunctionState> {
+  getScalarFunction(): IAdtSourceObject<
+    IScalarFunctionConfig,
+    IScalarFunctionState
+  > {
     return new AdtScalarFunction(
       this.connection,
       this.logger,
@@ -559,7 +601,7 @@ export class AdtClient {
   /**
    * Get high-level operations for Scalar Function Implementation (DSFI/SFI) objects
    */
-  getScalarFunctionImplementation(): IAdtObject<
+  getScalarFunctionImplementation(): IAdtSourceObject<
     IScalarFunctionImplementationConfig,
     IScalarFunctionImplementationState
   > {
@@ -574,7 +616,7 @@ export class AdtClient {
   /**
    * Get high-level operations for Append Structure (TABL/DS) objects
    */
-  getAppendStructure(): IAdtObject<
+  getAppendStructure(): IAdtSourceObject<
     IAppendStructureConfig,
     IAppendStructureState
   > {
@@ -609,7 +651,7 @@ export class AdtClient {
    * Get high-level operations for BehaviorDefinition objects
    * @returns IAdtObject instance for BehaviorDefinition operations
    */
-  getBehaviorDefinition(): IAdtObject<
+  getBehaviorDefinition(): IAdtSourceObject<
     IBehaviorDefinitionConfig,
     IBehaviorDefinitionState
   > {
@@ -625,7 +667,7 @@ export class AdtClient {
    * Get high-level operations for BehaviorImplementation objects
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
-  getBehaviorImplementation(): IAdtObject<
+  getBehaviorImplementation(): IAdtSourceObject<
     IBehaviorImplementationConfig,
     IBehaviorImplementationState
   > {
@@ -640,7 +682,7 @@ export class AdtClient {
    * Get high-level operations for MetadataExtension objects
    * @returns IAdtObject instance for MetadataExtension operations
    */
-  getMetadataExtension(): IAdtObject<
+  getMetadataExtension(): IAdtSourceObject<
     IMetadataExtensionConfig,
     IMetadataExtensionState
   > {
@@ -662,7 +704,7 @@ export class AdtClient {
    * - BAdI Enhancement Spot
    * @returns IAdtObject instance for Enhancement operations
    */
-  getEnhancement(): IAdtObject<IEnhancementConfig, IEnhancementState> {
+  getEnhancement(): IAdtSourceObject<IEnhancementConfig, IEnhancementState> {
     return new AdtEnhancement(
       this.connection,
       this.logger,
@@ -728,7 +770,7 @@ export class AdtClient {
    * Get high-level operations for LocalTestClass objects
    * @returns IAdtObject instance for LocalTestClass operations
    */
-  getLocalTestClass(): IAdtObject<ILocalTestClassConfig, IClassState> {
+  getLocalTestClass(): IAdtSourceObject<ILocalTestClassConfig, IClassState> {
     return new AdtLocalTestClass(
       this.connection,
       this.logger,
@@ -742,7 +784,7 @@ export class AdtClient {
    * Get high-level operations for LocalTypes objects
    * @returns IAdtObject instance for LocalTypes operations
    */
-  getLocalTypes(): IAdtObject<ILocalTypesConfig, IClassState> {
+  getLocalTypes(): IAdtSourceObject<ILocalTypesConfig, IClassState> {
     return new AdtLocalTypes(
       this.connection,
       this.logger,
@@ -756,7 +798,10 @@ export class AdtClient {
    * Get high-level operations for LocalDefinitions objects
    * @returns IAdtObject instance for LocalDefinitions operations
    */
-  getLocalDefinitions(): IAdtObject<ILocalDefinitionsConfig, IClassState> {
+  getLocalDefinitions(): IAdtSourceObject<
+    ILocalDefinitionsConfig,
+    IClassState
+  > {
     return new AdtLocalDefinitions(
       this.connection,
       this.logger,
@@ -770,7 +815,7 @@ export class AdtClient {
    * Get high-level operations for LocalMacros objects
    * @returns IAdtObject instance for LocalMacros operations
    */
-  getLocalMacros(): IAdtObject<ILocalMacrosConfig, IClassState> {
+  getLocalMacros(): IAdtSourceObject<ILocalMacrosConfig, IClassState> {
     return new AdtLocalMacros(
       this.connection,
       this.logger,

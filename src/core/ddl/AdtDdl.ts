@@ -24,8 +24,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -48,7 +48,7 @@ import { updateDdl } from './update';
 import { validateDdlName } from './validation';
 
 import { getDdlVersionSource, getDdlVersions } from './versions';
-export class AdtDdl implements IAdtObject<IDdlConfig, IDdlState> {
+export class AdtDdl implements IAdtSourceObject<IDdlConfig, IDdlState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;

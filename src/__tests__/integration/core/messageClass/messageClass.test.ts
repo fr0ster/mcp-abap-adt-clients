@@ -18,7 +18,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type {
@@ -97,7 +101,14 @@ describe('MessageClass (using AdtClient)', () => {
       hasConfig = true;
 
       tester = new BaseTester(
-        client.getMessageClass(),
+        // getMessageClass() is narrowed to Crud & Validatable & Lockable
+        // (no activate/check/readTransport/getVersions); BaseTester's
+        // flowTest still exercises activate/check, which the concrete
+        // handler implements at runtime — cast through the full interface.
+        client.getMessageClass() as unknown as IAdtObject<
+          IMessageClassConfig,
+          IMessageClassState
+        >,
         'MessageClass',
         'create_message_class',
         'adt_message_class',

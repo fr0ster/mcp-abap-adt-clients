@@ -24,7 +24,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtNonVersionedObject,
   IAdtOperationOptions,
   ILogger,
   IObjectVersion,
@@ -49,7 +49,7 @@ import type { IFunctionGroupConfig, IFunctionGroupState } from './types';
 import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';
 export class AdtFunctionGroup
-  implements IAdtObject<IFunctionGroupConfig, IFunctionGroupState>
+  implements IAdtNonVersionedObject<IFunctionGroupConfig, IFunctionGroupState>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -770,12 +770,14 @@ export class AdtFunctionGroup
     };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IFunctionGroupConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('function group');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('function group');
   }

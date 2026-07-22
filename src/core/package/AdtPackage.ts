@@ -24,8 +24,12 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtTransportAware,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -47,7 +51,14 @@ import type { IPackageConfig, IPackageState } from './types';
 import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
-export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
+export class AdtPackage
+  implements
+    IAdtCrud<IPackageConfig, IPackageState>,
+    IAdtValidatable<IPackageConfig, IPackageState>,
+    IAdtCheckable<IPackageConfig, IPackageState>,
+    IAdtLockable<IPackageConfig, IPackageState>,
+    IAdtTransportAware<IPackageConfig, IPackageState>
+{
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
@@ -555,6 +566,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   /**
    * Activate package
    * Note: Packages don't have activate operation - this is a stub
+   *
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
    */
   async activate(_config: Partial<IPackageConfig>): Promise<IPackageState> {
     throw new Error(
@@ -625,12 +638,14 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
     };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IPackageConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('package');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('package');
   }

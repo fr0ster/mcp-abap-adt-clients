@@ -26,8 +26,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
@@ -54,7 +54,10 @@ import {
 } from './versions';
 export class AdtBehaviorImplementation
   implements
-    IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState>
+    IAdtSourceObject<
+      IBehaviorImplementationConfig,
+      IBehaviorImplementationState
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

@@ -2,7 +2,7 @@
  * Metadata Extension (DDLX) operations - exports
  */
 
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IAdtSourceObject } from '@mcp-abap-adt/interfaces';
 import type {
   IMetadataExtensionConfig,
   IMetadataExtensionState,
@@ -12,7 +12,7 @@ export { AdtMetadataExtension } from './AdtMetadataExtension';
 export * from './types';
 
 // Type alias for AdtMetadataExtension
-export type AdtMetadataExtensionType = IAdtObject<
+export type AdtMetadataExtensionType = IAdtSourceObject<
   IMetadataExtensionConfig,
   IMetadataExtensionState
 >;

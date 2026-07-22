@@ -28,8 +28,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -61,7 +61,7 @@ import {
   getEnhancementVersions,
 } from './versions';
 export class AdtEnhancement
-  implements IAdtObject<IEnhancementConfig, IEnhancementState>
+  implements IAdtSourceObject<IEnhancementConfig, IEnhancementState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

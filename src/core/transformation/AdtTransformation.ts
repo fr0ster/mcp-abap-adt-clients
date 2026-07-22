@@ -21,8 +21,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -53,7 +53,7 @@ import {
   getTransformationVersions,
 } from './versions';
 export class AdtTransformation
-  implements IAdtObject<ITransformationConfig, ITransformationState>
+  implements IAdtSourceObject<ITransformationConfig, ITransformationState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

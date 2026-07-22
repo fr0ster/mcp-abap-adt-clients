@@ -23,8 +23,8 @@ import {
   type IAdtResponse as AxiosResponse,
   type HttpError,
   type IAbapConnection,
-  type IAdtObject,
   type IAdtOperationOptions,
+  type IAdtSourceObject,
   type ILogger,
   type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -62,7 +62,7 @@ import {
   getClassVersionSource,
 } from './versions';
 
-export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
+export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;

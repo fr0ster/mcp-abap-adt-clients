@@ -21,8 +21,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -53,7 +53,7 @@ import {
   getAccessControlVersions,
 } from './versions';
 export class AdtAccessControl
-  implements IAdtObject<IAccessControlConfig, IAccessControlState>
+  implements IAdtSourceObject<IAccessControlConfig, IAccessControlState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

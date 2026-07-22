@@ -18,8 +18,13 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -52,7 +57,13 @@ import {
   getFunctionIncludeVersions,
 } from './versions';
 export class AdtFunctionInclude
-  implements IAdtObject<IFunctionIncludeConfig, IFunctionIncludeState>
+  implements
+    IAdtCrud<IFunctionIncludeConfig, IFunctionIncludeState>,
+    IAdtValidatable<IFunctionIncludeConfig, IFunctionIncludeState>,
+    IAdtCheckable<IFunctionIncludeConfig, IFunctionIncludeState>,
+    IAdtActivatable<IFunctionIncludeConfig, IFunctionIncludeState>,
+    IAdtLockable<IFunctionIncludeConfig, IFunctionIncludeState>,
+    IAdtVersionable<IFunctionIncludeConfig>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
@@ -789,6 +800,8 @@ export class AdtFunctionInclude
 
   /**
    * Read transport info — not supported for FUGR/I (transport tracked at group level).
+   *
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
    */
   async readTransport(): Promise<IFunctionIncludeState> {
     const error = new Error(
