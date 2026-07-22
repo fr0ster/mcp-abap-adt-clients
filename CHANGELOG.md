@@ -3,6 +3,16 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.0] - 2026-07-22
+
+### Changed (BREAKING)
+- **Handlers now declare their honest capability set.** Each object handler `implements` only the capability atom interfaces it genuinely supports (e.g. `AdtDomain` implements everything except `IAdtVersionable`, since it has no `/source/main`), instead of the fat `IAdtObject`. Correspondingly, `AdtClient.getXxx()` — and, by inference, `AdtClientBatch.getXxx()` — return types are **narrowed** to that honest set.
+- **Consequence:** calling a capability a handler does not have is now a **compile error** instead of a runtime throw. For example `client.getDomain().getVersions(...)` no longer type-checks. This **only** breaks code that referenced methods which always threw at runtime (`ADT_UNSUPPORTED_OPERATION`); no working code is affected. Requires `@mcp-abap-adt/interfaces ^11.3.0` (the capability composites).
+- The removed-from-contract methods remain on the classes at runtime, marked `@deprecated`, and will be deleted in a later major.
+
+### Deferred (still return the wide type this release)
+- `getFeatureToggle`, `getServiceBinding` (implement widening interfaces `IFeatureToggleObject` / `IAdtServiceBinding` that extend `IAdtObject`), and `getRequest`, `getUnitTest`, `getCdsUnitTest` (wrong-contract / test-runner — `AdtRequest.update`/`delete` are known defects to fix first). These will be narrowed in a follow-up.
+
 ## [7.6.0] - 2026-07-21
 
 ### Changed
