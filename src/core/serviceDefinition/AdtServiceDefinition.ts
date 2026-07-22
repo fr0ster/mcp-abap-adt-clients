@@ -22,8 +22,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -62,7 +62,7 @@ import {
   getServiceDefinitionVersions,
 } from './versions';
 export class AdtServiceDefinition
-  implements IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState>
+  implements IAdtSourceObject<IServiceDefinitionConfig, IServiceDefinitionState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

@@ -1,4 +1,4 @@
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IAdtSourceObject } from '@mcp-abap-adt/interfaces';
 import type {
   IScalarFunctionImplementationConfig,
   IScalarFunctionImplementationState,
@@ -7,7 +7,7 @@ import type {
 export { AdtScalarFunctionImplementation } from './AdtScalarFunctionImplementation';
 export * from './types';
 
-export type AdtScalarFunctionImplementationType = IAdtObject<
+export type AdtScalarFunctionImplementationType = IAdtSourceObject<
   IScalarFunctionImplementationConfig,
   IScalarFunctionImplementationState
 >;

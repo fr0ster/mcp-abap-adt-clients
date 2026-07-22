@@ -21,8 +21,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -46,7 +46,7 @@ import { validateTableTypeName } from './validation';
 
 import { getTableTypeVersionSource, getTableTypeVersions } from './versions';
 export class AdtDdicTableType
-  implements IAdtObject<ITableTypeConfig, ITableTypeState>
+  implements IAdtSourceObject<ITableTypeConfig, ITableTypeState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

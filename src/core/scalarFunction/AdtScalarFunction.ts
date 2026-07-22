@@ -5,8 +5,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -39,7 +39,7 @@ import {
   getScalarFunctionVersions,
 } from './versions';
 export class AdtScalarFunction
-  implements IAdtObject<IScalarFunctionConfig, IScalarFunctionState>
+  implements IAdtSourceObject<IScalarFunctionConfig, IScalarFunctionState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;

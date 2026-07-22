@@ -21,8 +21,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -50,7 +50,7 @@ import {
   getFunctionModuleVersions,
 } from './versions';
 export class AdtFunctionModule
-  implements IAdtObject<IFunctionModuleConfig, IFunctionModuleState>
+  implements IAdtSourceObject<IFunctionModuleConfig, IFunctionModuleState>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;

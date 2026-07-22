@@ -21,8 +21,8 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
@@ -50,7 +50,7 @@ import { validateStructureName } from './validation';
 
 import { getStructureVersionSource, getStructureVersions } from './versions';
 export class AdtStructure
-  implements IAdtObject<IStructureConfig, IStructureState>
+  implements IAdtSourceObject<IStructureConfig, IStructureState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
