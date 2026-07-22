@@ -21,7 +21,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtNonVersionedObject,
   IAdtOperationOptions,
   ILogger,
   IObjectVersion,
@@ -49,7 +49,9 @@ import type { IDomainConfig, IDomainState } from './types';
 import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';
-export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
+export class AdtDomain
+  implements IAdtNonVersionedObject<IDomainConfig, IDomainState>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
@@ -660,12 +662,14 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     return state;
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IDomainConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('domain');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('domain');
   }

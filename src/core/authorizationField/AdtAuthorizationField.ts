@@ -18,8 +18,12 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -50,7 +54,12 @@ import { unlockAuthorizationField } from './unlock';
 import { updateAuthorizationField } from './update';
 import { validateAuthorizationFieldName } from './validation';
 export class AdtAuthorizationField
-  implements IAdtObject<IAuthorizationFieldConfig, IAuthorizationFieldState>
+  implements
+    IAdtCrud<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtValidatable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtCheckable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtActivatable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtLockable<IAuthorizationFieldConfig, IAuthorizationFieldState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -568,6 +577,8 @@ export class AdtAuthorizationField
 
   /**
    * Read transport info — not supported by the APS IAM endpoint yet.
+   *
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
    */
   async readTransport(): Promise<IAuthorizationFieldState> {
     const error = new Error(
@@ -618,12 +629,14 @@ export class AdtAuthorizationField
     return { errors: [] };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IAuthorizationFieldConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('authorization field');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('authorization field');
   }

@@ -21,7 +21,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtNonVersionedObject,
   IAdtOperationOptions,
   ILogger,
   IObjectVersion,
@@ -46,7 +46,7 @@ import { unlockDataElement } from './unlock';
 import { updateDataElement } from './update';
 import { validateDataElementName } from './validation';
 export class AdtDataElement
-  implements IAdtObject<IDataElementConfig, IDataElementState>
+  implements IAdtNonVersionedObject<IDataElementConfig, IDataElementState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -696,12 +696,14 @@ export class AdtDataElement
     };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IDataElementConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('data element');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('data element');
   }

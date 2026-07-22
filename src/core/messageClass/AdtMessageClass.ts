@@ -17,8 +17,10 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
@@ -43,7 +45,10 @@ import { parseMessageClass } from './xml';
 const VALIDATE_BASE = '/sap/bc/adt/messageclass/validation';
 
 export class AdtMessageClass
-  implements IAdtObject<IMessageClassConfig, IMessageClassState>
+  implements
+    IAdtCrud<IMessageClassConfig, IMessageClassState>,
+    IAdtValidatable<IMessageClassConfig, IMessageClassState>,
+    IAdtLockable<IMessageClassConfig, IMessageClassState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -284,6 +289,8 @@ export class AdtMessageClass
   /**
    * Read transport request information.
    * Transport endpoint is not confirmed for message classes — always throws.
+   *
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
    */
   async readTransport(
     config: Partial<IMessageClassConfig>,
@@ -327,7 +334,10 @@ export class AdtMessageClass
     return { unlockResult, errors: [] };
   }
 
-  /** Message classes are not activated — always throws. */
+  /**
+   * Message classes are not activated — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async activate(
     _config: Partial<IMessageClassConfig>,
   ): Promise<IMessageClassState> {
@@ -337,14 +347,20 @@ export class AdtMessageClass
     );
   }
 
-  /** Syntax check is not applicable to message classes — always throws. */
+  /**
+   * Syntax check is not applicable to message classes — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async check(
     _config: Partial<IMessageClassConfig>,
   ): Promise<IMessageClassState> {
     throwUnsupportedOperation('check', `message class ${_config.name ?? ''}`);
   }
 
-  /** Version history is not supported for message classes — always throws. */
+  /**
+   * Version history is not supported for message classes — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async getVersions(
     _config: Partial<IMessageClassConfig>,
   ): Promise<IObjectVersion[]> {
@@ -354,7 +370,10 @@ export class AdtMessageClass
     );
   }
 
-  /** Version source retrieval is not supported for message classes — always throws. */
+  /**
+   * Version source retrieval is not supported for message classes — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedOperation('getVersionSource', 'message class');
   }
