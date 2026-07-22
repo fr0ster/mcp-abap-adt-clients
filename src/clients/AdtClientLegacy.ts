@@ -15,7 +15,14 @@
 
 import type {
   IAbapConnection,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
+  IAdtNonVersionedObject,
   IAdtObject,
+  IAdtSourceObject,
+  IAdtTransportAware,
+  IAdtValidatable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IClassConfig, IClassState } from '../core/class';
@@ -75,7 +82,7 @@ export class AdtClientLegacy extends AdtClient {
 
   // --- Supported types with legacy overrides ---
 
-  override getProgram(): IAdtObject<IProgramConfig, IProgramState> {
+  override getProgram(): IAdtSourceObject<IProgramConfig, IProgramState> {
     return new AdtProgramLegacy(
       this.connection,
       this.logger,
@@ -84,7 +91,7 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getClass(): IAdtObject<IClassConfig, IClassState> {
+  override getClass(): IAdtSourceObject<IClassConfig, IClassState> {
     return new AdtClassLegacy(
       this.connection,
       this.logger,
@@ -93,7 +100,7 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getInterface(): IAdtObject<IInterfaceConfig, IInterfaceState> {
+  override getInterface(): IAdtSourceObject<IInterfaceConfig, IInterfaceState> {
     return new AdtInterfaceLegacy(
       this.connection,
       this.logger,
@@ -102,7 +109,7 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getFunctionGroup(): IAdtObject<
+  override getFunctionGroup(): IAdtNonVersionedObject<
     IFunctionGroupConfig,
     IFunctionGroupState
   > {
@@ -114,7 +121,7 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getFunctionModule(): IAdtObject<
+  override getFunctionModule(): IAdtSourceObject<
     IFunctionModuleConfig,
     IFunctionModuleState
   > {
@@ -126,7 +133,11 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getPackage(): IAdtObject<IPackageConfig, IPackageState> {
+  override getPackage(): IAdtCrud<IPackageConfig, IPackageState> &
+    IAdtValidatable<IPackageConfig, IPackageState> &
+    IAdtCheckable<IPackageConfig, IPackageState> &
+    IAdtLockable<IPackageConfig, IPackageState> &
+    IAdtTransportAware<IPackageConfig, IPackageState> {
     return new AdtPackageLegacy(
       this.connection,
       this.logger,
@@ -134,7 +145,7 @@ export class AdtClientLegacy extends AdtClient {
     );
   }
 
-  override getDdl(): IAdtObject<IDdlConfig, IDdlState> {
+  override getDdl(): IAdtSourceObject<IDdlConfig, IDdlState> {
     return new AdtDdlLegacy(this.connection, this.logger, this.systemContext);
   }
 

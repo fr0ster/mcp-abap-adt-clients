@@ -1,5 +1,5 @@
 /**
- * AdtServiceDefinition - High-level CRUD operations for Service Definition (DDLS) objects
+ * AdtServiceDefinition - High-level CRUD operations for Service Definition (SRVD/SRV) objects
  *
  * Implements IAdtObject interface with automatic operation chains,
  * error handling, and resource cleanup.
@@ -13,7 +13,8 @@
  * - activate uses same session/cookies (no stateful needed)
  *
  * Operation chains:
- * - Create: validate → create → check → lock → check(inactive) → update → unlock → check → activate
+ * - Create: create (POST metadata only — creates an empty source; the source
+ *   code is written by a subsequent update(), mirroring what Eclipse ADT does)
  * - Update: lock → check(inactive) → update → unlock → check → activate
  * - Delete: check(deletion) → delete
  */
@@ -21,12 +22,22 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  type ICapabilityContext,
+  LockCapability,
+  VersionsCapability,
+} from '../shared/capabilities';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateServiceDefinition } from './activation';
 import { checkServiceDefinition } from './check';
@@ -51,21 +62,77 @@ import {
   getServiceDefinitionVersions,
 } from './versions';
 export class AdtServiceDefinition
-  implements IAdtObject<IServiceDefinitionConfig, IServiceDefinitionState>
+  implements IAdtSourceObject<IServiceDefinitionConfig, IServiceDefinitionState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ServiceDefinition';
+
+  // LAZY thunk (not a getter that snapshots): captures `this` but reads
+  // this.connection/this.logger only when invoked, after the constructor has
+  // run — so building the capabilities below as class fields is safe.
+  private readonly capCtx = (): ICapabilityContext => ({
+    connection: this.connection,
+    logger: this.logger,
+  });
+
+  private readonly lockCap = new LockCapability<
+    IServiceDefinitionConfig,
+    IServiceDefinitionState
+  >(this.capCtx, {
+    nameOf: (c) => {
+      if (!c.serviceDefinitionName)
+        throw new Error('Service definition name is required');
+      return c.serviceDefinitionName;
+    },
+    acquire: async (ctx, name) => ({
+      lockHandle: await lockServiceDefinition(ctx.connection, name),
+    }),
+    release: async (ctx, name, handle) => {
+      const result = await unlockServiceDefinition(
+        ctx.connection,
+        name,
+        handle,
+      );
+      return { unlockResult: result, errors: [] };
+    },
+  });
+
+  private readonly versionsCap =
+    new VersionsCapability<IServiceDefinitionConfig>(this.capCtx, {
+      nameOf: (c) => {
+        if (!c.serviceDefinitionName)
+          throw new Error('serviceDefinitionName is required');
+        return c.serviceDefinitionName;
+      },
+      // NOTE: getServiceDefinitionVersions takes a config, not a bare name —
+      // the strategy re-wraps. (getClassIncludeVersions, by contrast, takes a
+      // name; the two low-level shapes differ and the strategy absorbs that.)
+      list: (ctx, name) =>
+        getServiceDefinitionVersions(ctx.connection, {
+          serviceDefinitionName: name,
+        }),
+      source: (ctx, uri) =>
+        getServiceDefinitionVersionSource(ctx.connection, uri),
+    });
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockServiceDefinition(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -108,7 +175,7 @@ export class AdtServiceDefinition
    */
   async create(
     config: IServiceDefinitionConfig,
-    options?: IAdtOperationOptions,
+    _options?: IAdtOperationOptions,
   ): Promise<IServiceDefinitionState> {
     const state: IServiceDefinitionState = { errors: [] };
     if (!config.serviceDefinitionName) {
@@ -131,7 +198,6 @@ export class AdtServiceDefinition
         package_name: config.packageName,
         transport_request: config.transportRequest,
         description: config.description,
-        source_code: options?.sourceCode || config.sourceCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
         masterLanguage:
@@ -315,6 +381,7 @@ export class AdtServiceDefinition
         this.connection,
         config.serviceDefinitionName,
       );
+      this.lockTracker.track(config.serviceDefinitionName, lockHandle);
       this.logger?.info?.('Service definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -347,11 +414,12 @@ export class AdtServiceDefinition
         this.logger?.info?.('Service definition updated');
 
         // 3.5. Read with long polling (wait for object to be ready after update)
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         this.logger?.info?.('read (wait for object ready after update)');
         try {
           await this.read(
             { serviceDefinitionName: config.serviceDefinitionName },
-            'active',
+            'inactive',
             { withLongPolling: true },
           );
           this.logger?.info?.('object is ready after update');
@@ -374,6 +442,7 @@ export class AdtServiceDefinition
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.serviceDefinitionName);
         lockHandle = undefined;
         this.logger?.info?.('Service definition unlocked');
       }
@@ -450,6 +519,7 @@ export class AdtServiceDefinition
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.serviceDefinitionName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -577,15 +647,8 @@ export class AdtServiceDefinition
    * Lock service definition for modification
    */
   async lock(config: Partial<IServiceDefinitionConfig>): Promise<string> {
-    if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockServiceDefinition(
-      this.connection,
-      config.serviceDefinitionName,
-    );
+    const lockHandle = await this.lockCap.lock(config);
+    this.lockTracker.track(config.serviceDefinitionName as string, lockHandle);
     return lockHandle;
   }
 
@@ -596,28 +659,16 @@ export class AdtServiceDefinition
     config: Partial<IServiceDefinitionConfig>,
     lockHandle: string,
   ): Promise<IServiceDefinitionState> {
-    if (!config.serviceDefinitionName) {
-      throw new Error('Service definition name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const result = await unlockServiceDefinition(
-      this.connection,
-      config.serviceDefinitionName,
-      lockHandle,
-    );
-    this.connection.setSessionType('stateless');
-    return {
-      unlockResult: result,
-      errors: [],
-    };
+    const state = await this.lockCap.unlock(config, lockHandle);
+    this.lockTracker.untrack(config.serviceDefinitionName as string);
+    return state;
   }
 
   getVersions(config: Partial<IServiceDefinitionConfig>) {
-    return getServiceDefinitionVersions(this.connection, config);
+    return this.versionsCap.getVersions(config);
   }
 
   getVersionSource(contentUri: string) {
-    return getServiceDefinitionVersionSource(this.connection, contentUri);
+    return this.versionsCap.getVersionSource(contentUri);
   }
 }

@@ -26,14 +26,15 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { getSystemInformation } from '../../utils/systemInfo';
 import { AdtClass } from '../class';
 import { updateClass } from '../class/update';
+import type { LockRegistry } from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import {
   getBehaviorImplementationMetadata,
@@ -53,17 +54,32 @@ import {
 } from './versions';
 export class AdtBehaviorImplementation
   implements
-    IAdtObject<IBehaviorImplementationConfig, IBehaviorImplementationState>
+    IAdtSourceObject<
+      IBehaviorImplementationConfig,
+      IBehaviorImplementationState
+    >
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly class: AdtClass;
   public readonly objectType: string = 'BehaviorImplementation';
 
-  constructor(connection: IAbapConnection, logger?: ILogger) {
+  constructor(
+    connection: IAbapConnection,
+    logger?: ILogger,
+    lockRegistry?: LockRegistry,
+  ) {
     this.connection = connection;
     this.logger = logger;
-    this.class = new AdtClass(connection, logger);
+    // Behavior implementation locks are class locks delegated to this internal
+    // AdtClass — pass the session registry so those locks are tracked too.
+    this.class = new AdtClass(
+      connection,
+      logger,
+      undefined,
+      undefined,
+      lockRegistry,
+    );
   }
 
   /**
@@ -405,10 +421,11 @@ ENDCLASS.`;
           'Behavior implementation implementations include updated',
         );
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 5.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ className: config.className }, 'active', {
+          await this.read({ className: config.className }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');

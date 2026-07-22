@@ -17,14 +17,21 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import { getTimeout } from '../../utils/timeouts';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import { throwUnsupportedOperation } from '../shared/unsupported';
 import { createMessageClass } from './create';
 import { checkDeletion, deleteMessageClass } from './delete';
@@ -38,21 +45,32 @@ import { parseMessageClass } from './xml';
 const VALIDATE_BASE = '/sap/bc/adt/messageclass/validation';
 
 export class AdtMessageClass
-  implements IAdtObject<IMessageClassConfig, IMessageClassState>
+  implements
+    IAdtCrud<IMessageClassConfig, IMessageClassState>,
+    IAdtValidatable<IMessageClassConfig, IMessageClassState>,
+    IAdtLockable<IMessageClassConfig, IMessageClassState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'MessageClass';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockMessageClass(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -171,6 +189,7 @@ export class AdtMessageClass
       this.logger?.info?.('lock');
       this.connection.setSessionType('stateful');
       lockHandle = await lockMessageClass(this.connection, config.name);
+      this.lockTracker.track(config.name, lockHandle);
       this.logger?.info?.('locked');
 
       this.logger?.info?.('update');
@@ -190,6 +209,7 @@ export class AdtMessageClass
         lockHandle,
       );
       this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(config.name);
       lockHandle = undefined;
       this.logger?.info?.('unlocked');
 
@@ -200,6 +220,7 @@ export class AdtMessageClass
         try {
           this.logger?.warn?.('Unlocking message class during error cleanup');
           await unlockMessageClass(this.connection, config.name, lockHandle);
+          this.lockTracker.untrack(config.name);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -268,6 +289,8 @@ export class AdtMessageClass
   /**
    * Read transport request information.
    * Transport endpoint is not confirmed for message classes — always throws.
+   *
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
    */
   async readTransport(
     config: Partial<IMessageClassConfig>,
@@ -286,7 +309,9 @@ export class AdtMessageClass
       throw new Error('Message class name is required');
     }
     this.connection.setSessionType('stateful');
-    return lockMessageClass(this.connection, config.name);
+    const lockHandle = await lockMessageClass(this.connection, config.name);
+    this.lockTracker.track(config.name, lockHandle);
+    return lockHandle;
   }
 
   /**
@@ -305,10 +330,14 @@ export class AdtMessageClass
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.name);
     return { unlockResult, errors: [] };
   }
 
-  /** Message classes are not activated — always throws. */
+  /**
+   * Message classes are not activated — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async activate(
     _config: Partial<IMessageClassConfig>,
   ): Promise<IMessageClassState> {
@@ -318,14 +347,20 @@ export class AdtMessageClass
     );
   }
 
-  /** Syntax check is not applicable to message classes — always throws. */
+  /**
+   * Syntax check is not applicable to message classes — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async check(
     _config: Partial<IMessageClassConfig>,
   ): Promise<IMessageClassState> {
     throwUnsupportedOperation('check', `message class ${_config.name ?? ''}`);
   }
 
-  /** Version history is not supported for message classes — always throws. */
+  /**
+   * Version history is not supported for message classes — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async getVersions(
     _config: Partial<IMessageClassConfig>,
   ): Promise<IObjectVersion[]> {
@@ -335,7 +370,10 @@ export class AdtMessageClass
     );
   }
 
-  /** Version source retrieval is not supported for message classes — always throws. */
+  /**
+   * Version source retrieval is not supported for message classes — always throws.
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
+   */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedOperation('getVersionSource', 'message class');
   }

@@ -15,7 +15,16 @@
 
 import type {
   IAbapConnection,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
+  IAdtNonVersionedObject,
   IAdtObject,
+  IAdtSourceObject,
+  IAdtTransportAware,
+  IAdtValidatable,
+  IAdtVersionable,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import {
@@ -137,6 +146,7 @@ import {
   type IServiceDefinitionState,
 } from '../core/serviceDefinition';
 import { AdtUtils } from '../core/shared/AdtUtils';
+import { type LockFailure, LockRegistry } from '../core/shared/LockRegistry';
 import {
   AdtStructure,
   type IStructureConfig,
@@ -186,6 +196,11 @@ export class AdtClient {
   protected logger: ILogger;
   protected systemContext: IAdtSystemContext;
   protected contentTypes?: import('../core/shared/contentTypes').IAdtContentTypes;
+  /**
+   * Session-scoped registry of locks held by handlers created from this client.
+   * All handlers share one stateful session, so all their locks belong here.
+   */
+  protected readonly lockRegistry: LockRegistry;
 
   constructor(
     connection: IAbapConnection,
@@ -193,6 +208,8 @@ export class AdtClient {
     options?: IAdtClientOptions,
   ) {
     this.connection = connection;
+    // Pass the connection so unlockAll() can keep the whole batch stateful.
+    this.lockRegistry = new LockRegistry(connection);
     this.logger = logger ?? {
       debug: () => {},
       info: () => {},
@@ -232,12 +249,13 @@ export class AdtClient {
    * Get high-level operations for Class objects
    * @returns IAdtObject instance for Class operations
    */
-  getClass(): IAdtObject<IClassConfig, IClassState> {
+  getClass(): IAdtSourceObject<IClassConfig, IClassState> {
     return new AdtClass(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -245,12 +263,13 @@ export class AdtClient {
    * Get high-level operations for Program objects
    * @returns IAdtObject instance for Program operations
    */
-  getProgram(): IAdtObject<IProgramConfig, IProgramState> {
+  getProgram(): IAdtSourceObject<IProgramConfig, IProgramState> {
     return new AdtProgram(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -258,38 +277,106 @@ export class AdtClient {
    * Get high-level operations for Interface objects
    * @returns IAdtObject instance for Interface operations
    */
-  getInterface(): IAdtObject<IInterfaceConfig, IInterfaceState> {
-    return new AdtInterface(this.connection, this.logger, this.systemContext);
+  getInterface(): IAdtSourceObject<IInterfaceConfig, IInterfaceState> {
+    return new AdtInterface(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      undefined,
+      this.lockRegistry,
+    );
   }
 
   /**
    * Get high-level operations for Domain objects
    * @returns IAdtObject instance for Domain operations
    */
-  getDomain(): IAdtObject<IDomainConfig, IDomainState> {
-    return new AdtDomain(this.connection, this.logger, this.systemContext);
+  getDomain(): IAdtNonVersionedObject<IDomainConfig, IDomainState> {
+    return new AdtDomain(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
+  }
+
+  /**
+   * Last-resort cleanup: release every lock still held by handlers created from
+   * this client. Returns the locks that could not be released.
+   *
+   * This is a safety net for abandoned locks (a forgot-to-unlock, or a managed
+   * flow that threw before its unlock). Preventing a timeout from interrupting a
+   * lock→unlock critical section remains the caller's responsibility.
+   */
+  async unlockAll(): Promise<LockFailure[]> {
+    return this.lockRegistry.unlockAll();
+  }
+
+  /**
+   * Keys of locks currently held by handlers created from this client
+   * (e.g. `Domain/ZFOO`, `DataElement/ZBAR`). Lets a consumer inspect whether a
+   * session was left with dangling locks before deciding to `unlockAll()`.
+   */
+  get pendingLocks(): string[] {
+    return this.lockRegistry.pending;
+  }
+
+  /**
+   * Release all held locks when used with `await using`.
+   *
+   * Best-effort: like {@link unlockAll}, this never throws — a lock whose unlock
+   * fails is retained rather than surfaced as an error, so a disposer failure
+   * cannot mask the error that ended the `using` scope. Any residual failures
+   * are logged as a warning and remain observable via {@link pendingLocks}.
+   * Callers that must react to unlock failures should call `unlockAll()`
+   * explicitly and inspect the returned `LockFailure[]`.
+   */
+  async [Symbol.asyncDispose](): Promise<void> {
+    const failures = await this.unlockAll();
+    if (failures.length > 0) {
+      this.logger.warn(
+        `[AdtClient] dispose left ${failures.length} lock(s) unreleased: ${failures
+          .map((f) => f.key)
+          .join(
+            ', ',
+          )}. They remain in pendingLocks; retry unlockAll() or rely on session-drop.`,
+      );
+    }
   }
 
   /**
    * Get high-level operations for DataElement objects
    * @returns IAdtObject instance for DataElement operations
    */
-  getDataElement(): IAdtObject<IDataElementConfig, IDataElementState> {
-    return new AdtDataElement(this.connection, this.logger, this.systemContext);
+  getDataElement(): IAdtNonVersionedObject<
+    IDataElementConfig,
+    IDataElementState
+  > {
+    return new AdtDataElement(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
    * Get high-level operations for AuthorizationField objects
    * @returns IAdtObject instance for AuthorizationField operations
    */
-  getAuthorizationField(): IAdtObject<
+  getAuthorizationField(): IAdtCrud<
     IAuthorizationFieldConfig,
     IAuthorizationFieldState
-  > {
+  > &
+    IAdtValidatable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
+    IAdtCheckable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
+    IAdtActivatable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
+    IAdtLockable<IAuthorizationFieldConfig, IAuthorizationFieldState> {
     return new AdtAuthorizationField(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -297,27 +384,38 @@ export class AdtClient {
    * Get high-level operations for Structure objects
    * @returns IAdtObject instance for Structure operations
    */
-  getStructure(): IAdtObject<IStructureConfig, IStructureState> {
-    return new AdtStructure(this.connection, this.logger, this.systemContext);
+  getStructure(): IAdtSourceObject<IStructureConfig, IStructureState> {
+    return new AdtStructure(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
    * Get high-level operations for Table objects
    * @returns IAdtObject instance for Table operations
    */
-  getTable(): IAdtObject<ITableConfig, ITableState> {
-    return new AdtTable(this.connection, this.logger, this.systemContext);
+  getTable(): IAdtSourceObject<ITableConfig, ITableState> {
+    return new AdtTable(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
    * Get high-level operations for TableType (DDIC Table Type) objects
    * @returns IAdtObject instance for TableType operations
    */
-  getTableType(): IAdtObject<ITableTypeConfig, ITableTypeState> {
+  getTableType(): IAdtSourceObject<ITableTypeConfig, ITableTypeState> {
     return new AdtDdicTableType(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -328,20 +426,29 @@ export class AdtClient {
    * (`/ddic/dsfd/sources/`) have their own clients.
    * @returns IAdtObject instance for DDL source operations
    */
-  getDdl(): IAdtObject<IDdlConfig, IDdlState> {
-    return new AdtDdl(this.connection, this.logger, this.systemContext);
+  getDdl(): IAdtSourceObject<IDdlConfig, IDdlState> {
+    return new AdtDdl(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
    * Get high-level operations for FunctionGroup objects
    * @returns IAdtObject instance for FunctionGroup operations
    */
-  getFunctionGroup(): IAdtObject<IFunctionGroupConfig, IFunctionGroupState> {
+  getFunctionGroup(): IAdtNonVersionedObject<
+    IFunctionGroupConfig,
+    IFunctionGroupState
+  > {
     return new AdtFunctionGroup(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -349,12 +456,16 @@ export class AdtClient {
    * Get high-level operations for FunctionModule objects
    * @returns IAdtObject instance for FunctionModule operations
    */
-  getFunctionModule(): IAdtObject<IFunctionModuleConfig, IFunctionModuleState> {
+  getFunctionModule(): IAdtSourceObject<
+    IFunctionModuleConfig,
+    IFunctionModuleState
+  > {
     return new AdtFunctionModule(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -362,15 +473,21 @@ export class AdtClient {
    * Get high-level operations for FunctionInclude objects
    * @returns IAdtObject instance for FunctionInclude operations
    */
-  getFunctionInclude(): IAdtObject<
+  getFunctionInclude(): IAdtCrud<
     IFunctionIncludeConfig,
     IFunctionIncludeState
-  > {
+  > &
+    IAdtValidatable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtCheckable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtActivatable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtLockable<IFunctionIncludeConfig, IFunctionIncludeState> &
+    IAdtVersionable<IFunctionIncludeConfig> {
     return new AdtFunctionInclude(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -378,19 +495,31 @@ export class AdtClient {
    * Get high-level operations for Package objects
    * @returns IAdtObject instance for Package operations
    */
-  getPackage(): IAdtObject<IPackageConfig, IPackageState> {
-    return new AdtPackage(this.connection, this.logger, this.systemContext);
+  getPackage(): IAdtCrud<IPackageConfig, IPackageState> &
+    IAdtValidatable<IPackageConfig, IPackageState> &
+    IAdtCheckable<IPackageConfig, IPackageState> &
+    IAdtLockable<IPackageConfig, IPackageState> &
+    IAdtTransportAware<IPackageConfig, IPackageState> {
+    return new AdtPackage(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
    * Get high-level operations for MessageClass (MSAG/N) objects
    * @returns IAdtObject instance for MessageClass operations
    */
-  getMessageClass(): IAdtObject<IMessageClassConfig, IMessageClassState> {
+  getMessageClass(): IAdtCrud<IMessageClassConfig, IMessageClassState> &
+    IAdtValidatable<IMessageClassConfig, IMessageClassState> &
+    IAdtLockable<IMessageClassConfig, IMessageClassState> {
     return new AdtMessageClass(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -399,7 +528,7 @@ export class AdtClient {
    * Supports read, create/update (upsert), and delete of individual messages.
    * @returns IAdtObject instance for MessageClassMessage operations
    */
-  getMessageClassMessage(): IAdtObject<
+  getMessageClassMessage(): IAdtCrud<
     IMessageClassMessageConfig,
     IMessageClassMessageState
   > {
@@ -410,11 +539,15 @@ export class AdtClient {
    * Get high-level operations for AccessControl objects
    * @returns IAdtObject instance for AccessControl operations
    */
-  getAccessControl(): IAdtObject<IAccessControlConfig, IAccessControlState> {
+  getAccessControl(): IAdtSourceObject<
+    IAccessControlConfig,
+    IAccessControlState
+  > {
     return new AdtAccessControl(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -423,11 +556,15 @@ export class AdtClient {
    * Supports both SimpleTransformation and XSLTProgram types
    * @returns IAdtObject instance for Transformation operations
    */
-  getTransformation(): IAdtObject<ITransformationConfig, ITransformationState> {
+  getTransformation(): IAdtSourceObject<
+    ITransformationConfig,
+    ITransformationState
+  > {
     return new AdtTransformation(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -435,7 +572,7 @@ export class AdtClient {
    * Get high-level operations for ServiceDefinition objects
    * @returns IAdtObject instance for ServiceDefinition operations
    */
-  getServiceDefinition(): IAdtObject<
+  getServiceDefinition(): IAdtSourceObject<
     IServiceDefinitionConfig,
     IServiceDefinitionState
   > {
@@ -443,24 +580,29 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
   /**
    * Get high-level operations for CDS Scalar Function (DSFD/SCF) objects
    */
-  getScalarFunction(): IAdtObject<IScalarFunctionConfig, IScalarFunctionState> {
+  getScalarFunction(): IAdtSourceObject<
+    IScalarFunctionConfig,
+    IScalarFunctionState
+  > {
     return new AdtScalarFunction(
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
   /**
    * Get high-level operations for Scalar Function Implementation (DSFI/SFI) objects
    */
-  getScalarFunctionImplementation(): IAdtObject<
+  getScalarFunctionImplementation(): IAdtSourceObject<
     IScalarFunctionImplementationConfig,
     IScalarFunctionImplementationState
   > {
@@ -468,13 +610,14 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
   /**
    * Get high-level operations for Append Structure (TABL/DS) objects
    */
-  getAppendStructure(): IAdtObject<
+  getAppendStructure(): IAdtSourceObject<
     IAppendStructureConfig,
     IAppendStructureState
   > {
@@ -482,6 +625,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -508,7 +652,7 @@ export class AdtClient {
    * Get high-level operations for BehaviorDefinition objects
    * @returns IAdtObject instance for BehaviorDefinition operations
    */
-  getBehaviorDefinition(): IAdtObject<
+  getBehaviorDefinition(): IAdtSourceObject<
     IBehaviorDefinitionConfig,
     IBehaviorDefinitionState
   > {
@@ -516,6 +660,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -523,18 +668,22 @@ export class AdtClient {
    * Get high-level operations for BehaviorImplementation objects
    * @returns IAdtObject instance for BehaviorImplementation operations
    */
-  getBehaviorImplementation(): IAdtObject<
+  getBehaviorImplementation(): IAdtSourceObject<
     IBehaviorImplementationConfig,
     IBehaviorImplementationState
   > {
-    return new AdtBehaviorImplementation(this.connection, this.logger);
+    return new AdtBehaviorImplementation(
+      this.connection,
+      this.logger,
+      this.lockRegistry,
+    );
   }
 
   /**
    * Get high-level operations for MetadataExtension objects
    * @returns IAdtObject instance for MetadataExtension operations
    */
-  getMetadataExtension(): IAdtObject<
+  getMetadataExtension(): IAdtSourceObject<
     IMetadataExtensionConfig,
     IMetadataExtensionState
   > {
@@ -542,6 +691,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -555,8 +705,13 @@ export class AdtClient {
    * - BAdI Enhancement Spot
    * @returns IAdtObject instance for Enhancement operations
    */
-  getEnhancement(): IAdtObject<IEnhancementConfig, IEnhancementState> {
-    return new AdtEnhancement(this.connection, this.logger, this.systemContext);
+  getEnhancement(): IAdtSourceObject<IEnhancementConfig, IEnhancementState> {
+    return new AdtEnhancement(
+      this.connection,
+      this.logger,
+      this.systemContext,
+      this.lockRegistry,
+    );
   }
 
   /**
@@ -568,6 +723,7 @@ export class AdtClient {
       this.connection,
       this.logger,
       this.systemContext,
+      this.lockRegistry,
     );
   }
 
@@ -631,12 +787,13 @@ export class AdtClient {
    * Get high-level operations for LocalTestClass objects
    * @returns IAdtObject instance for LocalTestClass operations
    */
-  getLocalTestClass(): IAdtObject<ILocalTestClassConfig, IClassState> {
+  getLocalTestClass(): IAdtSourceObject<ILocalTestClassConfig, IClassState> {
     return new AdtLocalTestClass(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -644,12 +801,13 @@ export class AdtClient {
    * Get high-level operations for LocalTypes objects
    * @returns IAdtObject instance for LocalTypes operations
    */
-  getLocalTypes(): IAdtObject<ILocalTypesConfig, IClassState> {
+  getLocalTypes(): IAdtSourceObject<ILocalTypesConfig, IClassState> {
     return new AdtLocalTypes(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -657,12 +815,16 @@ export class AdtClient {
    * Get high-level operations for LocalDefinitions objects
    * @returns IAdtObject instance for LocalDefinitions operations
    */
-  getLocalDefinitions(): IAdtObject<ILocalDefinitionsConfig, IClassState> {
+  getLocalDefinitions(): IAdtSourceObject<
+    ILocalDefinitionsConfig,
+    IClassState
+  > {
     return new AdtLocalDefinitions(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 
@@ -670,12 +832,13 @@ export class AdtClient {
    * Get high-level operations for LocalMacros objects
    * @returns IAdtObject instance for LocalMacros operations
    */
-  getLocalMacros(): IAdtObject<ILocalMacrosConfig, IClassState> {
+  getLocalMacros(): IAdtSourceObject<ILocalMacrosConfig, IClassState> {
     return new AdtLocalMacros(
       this.connection,
       this.logger,
       this.systemContext,
       this.contentTypes,
+      this.lockRegistry,
     );
   }
 }

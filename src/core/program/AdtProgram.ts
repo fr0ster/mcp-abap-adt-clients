@@ -21,13 +21,18 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateProgram } from './activation';
 import { checkProgram } from './check';
@@ -45,11 +50,14 @@ import { uploadProgramSource } from './update';
 import { validateProgramName } from './validation';
 
 import { getProgramVersionSource, getProgramVersions } from './versions';
-export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
+export class AdtProgram
+  implements IAdtSourceObject<IProgramConfig, IProgramState>
+{
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   protected readonly contentTypes?: IAdtContentTypes;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Program';
 
   constructor(
@@ -57,11 +65,18 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
     this.contentTypes = contentTypes;
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (programName, lockHandle) =>
+        unlockProgram(this.connection, programName, lockHandle),
+    );
   }
 
   /**
@@ -300,6 +315,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       this.connection.setSessionType('stateful');
       lockHandle = await lockProgram(this.connection, config.programName);
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.programName, lockHandle);
       this.logger?.info?.('Program locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -333,10 +349,11 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         state.updateResult = updateResponse;
         this.logger?.info?.('Program updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ programName: config.programName }, 'active', {
+          await this.read({ programName: config.programName }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');
@@ -360,6 +377,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.programName);
         lockHandle = undefined;
         this.logger?.info?.('Program unlocked');
       }
@@ -417,6 +435,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
           this.connection.setSessionType('stateful');
           await unlockProgram(this.connection, config.programName, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.programName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -618,6 +637,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lockProgram(this.connection, config.programName);
+    this.lockTracker.track(config.programName, lockHandle);
     return lockHandle;
   }
 
@@ -639,6 +659,7 @@ export class AdtProgram implements IAdtObject<IProgramConfig, IProgramState> {
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.programName);
     return {
       unlockResult: result,
       errors: [],

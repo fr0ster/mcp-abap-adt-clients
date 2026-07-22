@@ -27,7 +27,7 @@
 
 import type {
   IAbapConnection,
-  IAdtObject,
+  IAdtCrud,
   IAdtOperationOptions,
   ILogger,
   IObjectVersion,
@@ -55,7 +55,7 @@ import { buildMessageClassXml, parseMessageClass } from './xml';
 const BASE = '/sap/bc/adt/messageclass';
 
 export class AdtMessageClassMessage
-  implements IAdtObject<IMessageClassMessageConfig, IMessageClassMessageState>
+  implements IAdtCrud<IMessageClassMessageConfig, IMessageClassMessageState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
@@ -371,34 +371,40 @@ export class AdtMessageClassMessage
 
   // ── unsupported operations ─────────────────────────────────────────────────
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async validate(
     _config: Partial<IMessageClassMessageConfig>,
   ): Promise<IMessageClassMessageState> {
     throwUnsupportedOperation('validate', 'message class message');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async activate(
     _config: Partial<IMessageClassMessageConfig>,
   ): Promise<IMessageClassMessageState> {
     throwUnsupportedOperation('activate', 'message class message');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async check(
     _config: Partial<IMessageClassMessageConfig>,
   ): Promise<IMessageClassMessageState> {
     throwUnsupportedOperation('check', 'message class message');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async readTransport(
     _config: Partial<IMessageClassMessageConfig>,
   ): Promise<IMessageClassMessageState> {
     throwUnsupportedOperation('readTransport', 'message class message');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async lock(_config: Partial<IMessageClassMessageConfig>): Promise<string> {
     throwUnsupportedOperation('lock', 'message class message');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async unlock(
     _config: Partial<IMessageClassMessageConfig>,
     _lockHandle: string,
@@ -406,12 +412,14 @@ export class AdtMessageClassMessage
     throwUnsupportedOperation('unlock', 'message class message');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IMessageClassMessageConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedOperation('getVersions', 'message class message');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedOperation('getVersionSource', 'message class message');
   }

@@ -21,13 +21,18 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateInterface } from './activation';
 import { checkInterface } from './check';
@@ -46,12 +51,13 @@ import { validateInterfaceName } from './validation';
 
 import { getInterfaceVersionSource, getInterfaceVersions } from './versions';
 export class AdtInterface
-  implements IAdtObject<IInterfaceConfig, IInterfaceState>
+  implements IAdtSourceObject<IInterfaceConfig, IInterfaceState>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   protected readonly contentTypes?: IAdtContentTypes;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Interface';
 
   constructor(
@@ -59,11 +65,18 @@ export class AdtInterface
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
     this.contentTypes = contentTypes;
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (interfaceName, lockHandle) =>
+        unlockInterface(this.connection, interfaceName, lockHandle),
+    );
   }
 
   /**
@@ -280,6 +293,7 @@ export class AdtInterface
       );
       lockHandle = lockResult.lockHandle;
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.interfaceName, lockHandle);
       this.logger?.info?.('Interface locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -313,10 +327,11 @@ export class AdtInterface
         // upload() returns void, so we don't store it in state
         this.logger?.info?.('Interface updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ interfaceName: config.interfaceName }, 'active', {
+          await this.read({ interfaceName: config.interfaceName }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');
@@ -340,6 +355,7 @@ export class AdtInterface
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.interfaceName);
         lockHandle = undefined;
         this.logger?.info?.('Interface unlocked');
       }
@@ -411,6 +427,7 @@ export class AdtInterface
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.interfaceName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -594,6 +611,7 @@ export class AdtInterface
 
     this.connection.setSessionType('stateful');
     const result = await lockInterface(this.connection, config.interfaceName);
+    this.lockTracker.track(config.interfaceName, result.lockHandle);
     return result.lockHandle;
   }
 
@@ -615,6 +633,7 @@ export class AdtInterface
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.interfaceName);
     return {
       unlockResult: result,
       errors: [],

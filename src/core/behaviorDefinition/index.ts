@@ -2,7 +2,7 @@
  * Behavior Definition operations - exports
  */
 
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IAdtSourceObject } from '@mcp-abap-adt/interfaces';
 import type {
   IBehaviorDefinitionConfig,
   IBehaviorDefinitionState,
@@ -12,7 +12,7 @@ export { AdtBehaviorDefinition } from './AdtBehaviorDefinition';
 export * from './types';
 
 // Type alias for AdtBehaviorDefinition
-export type AdtBehaviorDefinitionType = IAdtObject<
+export type AdtBehaviorDefinitionType = IAdtSourceObject<
   IBehaviorDefinitionConfig,
   IBehaviorDefinitionState
 >;

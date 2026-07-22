@@ -23,14 +23,24 @@ import {
   type IAdtResponse as AxiosResponse,
   type HttpError,
   type IAbapConnection,
-  type IAdtObject,
   type IAdtOperationOptions,
+  type IAdtSourceObject,
   type ILogger,
   type IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage, safeStringify } from '../../utils/internalUtils';
+import {
+  type ICapabilityContext,
+  LockCapability,
+  VersionsCapability,
+} from '../shared/capabilities';
 import type { IAdtContentTypes } from '../shared/contentTypes';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateClass } from './activation';
 import { checkClass, checkClassLocalTestClass } from './check';
@@ -52,23 +62,69 @@ import {
   getClassVersionSource,
 } from './versions';
 
-export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
+export class AdtClass implements IAdtSourceObject<IClassConfig, IClassState> {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   protected readonly contentTypes?: IAdtContentTypes;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Class';
+
+  // LAZY thunk (not a getter that snapshots): captures `this` but reads
+  // this.connection/this.logger only when invoked, after the constructor has
+  // run — so building the capabilities below as class fields is safe.
+  private readonly capCtx = (): ICapabilityContext => ({
+    connection: this.connection,
+    logger: this.logger,
+  });
+
+  private readonly lockCap = new LockCapability<IClassConfig, IClassState>(
+    this.capCtx,
+    {
+      nameOf: (c) => {
+        if (!c.className) throw new Error('Class name is required');
+        return c.className;
+      },
+      acquire: async (ctx, name) => ({
+        lockHandle: await lockClass(ctx.connection, name),
+      }),
+      release: async (ctx, name, handle) => {
+        const result = await unlockClass(ctx.connection, name, handle);
+        return { unlockResult: result, errors: [] };
+      },
+    },
+  );
+
+  private readonly versionsCap = new VersionsCapability<IClassConfig>(
+    this.capCtx,
+    {
+      nameOf: (c) => {
+        if (!c.className) throw new Error('className is required');
+        return c.className;
+      },
+      list: (ctx, name) =>
+        getClassIncludeVersions(ctx.connection, name, 'main'),
+      source: (ctx, uri) => getClassVersionSource(ctx.connection, uri),
+    },
+  );
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
     this.contentTypes = contentTypes;
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (className, lockHandle) =>
+        unlockClass(this.connection, className, lockHandle),
+    );
   }
 
   /**
@@ -349,6 +405,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.className, lockHandle);
       this.logger?.info?.('Class locked, handle:', lockHandle);
 
       // 2. Check inactive with code/xml for update (from options or config)
@@ -380,10 +437,11 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
         );
         this.logger?.info?.('Class updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling to ensure object is ready after update
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ className: config.className }, 'active', {
+          await this.read({ className: config.className }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');
@@ -406,6 +464,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.className);
         lockHandle = undefined;
         this.logger?.info?.('Class unlocked');
       }
@@ -459,6 +518,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           this.connection.setSessionType('stateful');
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.className);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -694,16 +754,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
    * Lock class
    */
   async lock(config: Partial<IClassConfig>): Promise<string> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-
-    // Stay stateful while the lock is held — the caller must release it via
-    // unlock(), which restores stateless. On older BASIS (#106) the lock handle
-    // is only valid inside stateful requests, so a stateless write between lock
-    // and unlock fails with 423.
-    this.connection.setSessionType('stateful');
-    return await lockClass(this.connection, config.className);
+    const handle = await this.lockCap.lock(config);
+    this.lockTracker.track(config.className as string, handle);
+    return handle;
   }
 
   /**
@@ -713,20 +766,9 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
     config: Partial<IClassConfig>,
     lockHandle: string,
   ): Promise<IClassState> {
-    if (!config.className) {
-      throw new Error('Class name is required');
-    }
-    this.connection.setSessionType('stateful');
-    const result = await unlockClass(
-      this.connection,
-      config.className,
-      lockHandle,
-    );
-    this.connection.setSessionType('stateless');
-    return {
-      unlockResult: result,
-      errors: [],
-    };
+    const state = await this.lockCap.unlock(config, lockHandle);
+    this.lockTracker.untrack(config.className as string);
+    return state;
   }
 
   /**
@@ -808,6 +850,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.logger?.info?.('Step 1: Locking parent class');
       this.connection.setSessionType('stateful');
       lockHandle = await lockClass(this.connection, config.className);
+      this.lockTracker.track(config.className, lockHandle);
       this.logger?.info?.('Parent class locked, handle:', lockHandle);
 
       // 2. Update test classes (uses parent class lock handle)
@@ -826,6 +869,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
       this.connection.setSessionType('stateful');
       await unlockClass(this.connection, config.className, lockHandle);
       this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(config.className);
       lockHandle = undefined;
 
       return response;
@@ -837,6 +881,7 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
           this.connection.setSessionType('stateful');
           await unlockClass(this.connection, config.className, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.className);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock parent class after error:',
@@ -910,12 +955,11 @@ export class AdtClass implements IAdtObject<IClassConfig, IClassState> {
   }
 
   getVersions(config: Partial<IClassConfig>): Promise<IObjectVersion[]> {
-    if (!config.className) throw new Error('className is required');
-    return getClassIncludeVersions(this.connection, config.className, 'main');
+    return this.versionsCap.getVersions(config);
   }
 
   getVersionSource(contentUri: string): Promise<string> {
-    return getClassVersionSource(this.connection, contentUri);
+    return this.versionsCap.getVersionSource(contentUri);
   }
 
   /** Shared by local-include subclasses to target their own include. */

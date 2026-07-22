@@ -98,8 +98,7 @@ export class AdtAtc implements IAdtObject<IAtcConfig, IAtcState> {
 
     try {
       const checkVariant =
-        config.options?.checkVariant ??
-        (await this.resolveCheckVariant());
+        config.options?.checkVariant ?? (await this.resolveCheckVariant());
       if (!checkVariant) {
         throw new Error(
           'No check variant provided and no system default check variant configured',
@@ -121,10 +120,7 @@ export class AdtAtc implements IAdtObject<IAtcConfig, IAtcState> {
       }
 
       this.logger?.info?.(`ATC worklist created: ${worklistId}`);
-      const objectUri = buildAtcObjectUri(
-        config.objectType,
-        config.objectName,
-      );
+      const objectUri = buildAtcObjectUri(config.objectType, config.objectName);
       const runResponse = await startAtcRun(
         this.connection,
         worklistId,
@@ -309,8 +305,7 @@ export class AdtAtc implements IAdtObject<IAtcConfig, IAtcState> {
         await new Promise((resolve) => setTimeout(resolve, interval));
       }
       const response = await getAtcRunStatus(this.connection, runId, true);
-      const body =
-        typeof response.data === 'string' ? response.data : '';
+      const body = typeof response.data === 'string' ? response.data : '';
       if (body.includes('status="finished"')) {
         return;
       }

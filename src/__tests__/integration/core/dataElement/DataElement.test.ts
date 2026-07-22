@@ -13,9 +13,17 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import type {
+  IDataElementConfig,
+  IDataElementState,
+} from '../../../../core/dataElement';
 import { getDataElement } from '../../../../core/dataElement/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -367,7 +375,13 @@ describe('DataElement (using AdtClient)', () => {
 
         // Create BaseTester instance
         const tester = new BaseTester(
-          client.getDataElement(),
+          // getDataElement() is narrowed to IAdtNonVersionedObject (no
+          // getVersions/getVersionSource); BaseTester's generic type still
+          // requires the full interface — cast through it.
+          client.getDataElement() as unknown as IAdtObject<
+            IDataElementConfig,
+            IDataElementState
+          >,
           'DataElement',
           'create_data_element',
           'adt_data_element',
@@ -460,7 +474,12 @@ describe('DataElement (using AdtClient)', () => {
         try {
           // Create BaseTester instance
           const tester = new BaseTester(
-            client.getDataElement(),
+            // getDataElement() is narrowed to IAdtNonVersionedObject (no
+            // getVersions/getVersionSource); cast through the full interface.
+            client.getDataElement() as unknown as IAdtObject<
+              IDataElementConfig,
+              IDataElementState
+            >,
             'DataElement',
             'create_data_element',
             'adt_data_element',

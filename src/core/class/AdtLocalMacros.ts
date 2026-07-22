@@ -9,6 +9,7 @@
 import type {
   HttpError,
   IAdtOperationOptions,
+  ILocalMacrosConfig,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
@@ -18,11 +19,8 @@ import { checkClassMacros } from './check';
 import { updateClassMacros } from './includes';
 import type { IClassState } from './types';
 
-export interface ILocalMacrosConfig {
-  className: string;
-  macrosCode?: string;
-  transportRequest?: string;
-}
+// Types defined in @mcp-abap-adt/interfaces
+export type { ILocalMacrosConfig } from '@mcp-abap-adt/interfaces';
 
 export class AdtLocalMacros extends AdtClass {
   public readonly objectType: string = 'LocalMacros';

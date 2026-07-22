@@ -5,12 +5,17 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateScalarFunctionImplementation } from './activation';
 import { checkScalarFunctionImplementation } from './check';
@@ -39,7 +44,7 @@ import {
 } from './versions';
 export class AdtScalarFunctionImplementation
   implements
-    IAdtObject<
+    IAdtSourceObject<
       IScalarFunctionImplementationConfig,
       IScalarFunctionImplementationState
     >
@@ -47,16 +52,24 @@ export class AdtScalarFunctionImplementation
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ScalarFunctionImplementation';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockScalarFunctionImplementation(this.connection, name, lockHandle),
+    );
   }
 
   async validate(
@@ -211,6 +224,7 @@ export class AdtScalarFunctionImplementation
         this.connection,
         config.implementationName,
       );
+      this.lockTracker.track(config.implementationName, lockHandle);
       const updateResult = await updateScalarFunctionImplementation(
         this.connection,
         {
@@ -225,6 +239,7 @@ export class AdtScalarFunctionImplementation
         config.implementationName,
         lockHandle,
       );
+      this.lockTracker.untrack(config.implementationName);
       lockHandle = undefined;
       return { updateResult, errors: [] };
     } catch (error) {
@@ -235,6 +250,7 @@ export class AdtScalarFunctionImplementation
             config.implementationName,
             lockHandle,
           );
+          this.lockTracker.untrack(config.implementationName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -284,6 +300,7 @@ export class AdtScalarFunctionImplementation
         this.connection,
         config.implementationName,
       );
+      this.lockTracker.track(config.implementationName, lockHandle);
       const updateResult = await updateScalarFunctionImplementationMetadata(
         this.connection,
         {
@@ -298,6 +315,7 @@ export class AdtScalarFunctionImplementation
         config.implementationName,
         lockHandle,
       );
+      this.lockTracker.untrack(config.implementationName);
       lockHandle = undefined;
       return { updateResult, errors: [] };
     } catch (error) {
@@ -308,6 +326,7 @@ export class AdtScalarFunctionImplementation
             config.implementationName,
             lockHandle,
           );
+          this.lockTracker.untrack(config.implementationName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -379,10 +398,12 @@ export class AdtScalarFunctionImplementation
     if (!config.implementationName)
       throw new Error('Implementation name is required');
     this.connection.setSessionType('stateful');
-    return lockScalarFunctionImplementation(
+    const lockHandle = await lockScalarFunctionImplementation(
       this.connection,
       config.implementationName,
     );
+    this.lockTracker.track(config.implementationName, lockHandle);
+    return lockHandle;
   }
 
   async unlock(
@@ -398,6 +419,7 @@ export class AdtScalarFunctionImplementation
         config.implementationName,
         lockHandle,
       );
+      this.lockTracker.untrack(config.implementationName);
       return { unlockResult, errors: [] };
     } finally {
       this.connection.setSessionType('stateless');

@@ -21,13 +21,22 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtNonVersionedObject,
   IAdtOperationOptions,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  type ICapabilityContext,
+  LockCapability,
+} from '../shared/capabilities';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDomain } from './activation';
@@ -40,20 +49,55 @@ import type { IDomainConfig, IDomainState } from './types';
 import { unlockDomain } from './unlock';
 import { updateDomain } from './update';
 import { validateDomainName } from './validation';
-export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
+export class AdtDomain
+  implements IAdtNonVersionedObject<IDomainConfig, IDomainState>
+{
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Domain';
+
+  // LAZY thunk (not a getter that snapshots): captures `this` but reads
+  // this.connection/this.logger only when invoked, after the constructor has
+  // run — so building the capability below as a class field is safe.
+  private readonly capCtx = (): ICapabilityContext => ({
+    connection: this.connection,
+    logger: this.logger,
+  });
+
+  private readonly lockCap = new LockCapability<IDomainConfig, IDomainState>(
+    this.capCtx,
+    {
+      nameOf: (c) => {
+        if (!c.domainName) throw new Error('Domain name is required');
+        return c.domainName;
+      },
+      acquire: async (ctx, name) => ({
+        lockHandle: await lockDomain(ctx.connection, name),
+      }),
+      release: async (ctx, name, handle) => {
+        const result = await unlockDomain(ctx.connection, name, handle);
+        return { unlockResult: result, errors: [] };
+      },
+    },
+  );
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (domainName, lockHandle) =>
+        unlockDomain(this.connection, domainName, lockHandle),
+    );
   }
 
   /**
@@ -292,6 +336,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
       this.connection.setSessionType('stateful');
       lockHandle = await lockDomain(this.connection, config.domainName);
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.domainName, lockHandle);
       this.logger?.info?.('locked');
 
       // 2. Check inactive with XML for update (if provided)
@@ -362,6 +407,7 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.domainName);
         lockHandle = undefined;
         this.logger?.info?.('unlocked');
       }
@@ -425,7 +471,10 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
           this.connection.setSessionType('stateful');
           await unlockDomain(this.connection, config.domainName, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.domainName);
         } catch (unlockError) {
+          // Cleanup unlock failed — the lock stays tracked so unlockAll() (or
+          // session-drop) remains the last resort.
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
             safeErrorMessage(unlockError),
@@ -596,13 +645,9 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
    * Lock domain for modification
    */
   async lock(config: Partial<IDomainConfig>): Promise<string> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const lockHandle = await lockDomain(this.connection, config.domainName);
-    return lockHandle;
+    const handle = await this.lockCap.lock(config);
+    this.lockTracker.track(config.domainName as string, handle);
+    return handle;
   }
 
   /**
@@ -612,29 +657,19 @@ export class AdtDomain implements IAdtObject<IDomainConfig, IDomainState> {
     config: Partial<IDomainConfig>,
     lockHandle: string,
   ): Promise<IDomainState> {
-    if (!config.domainName) {
-      throw new Error('Domain name is required');
-    }
-
-    this.connection.setSessionType('stateful');
-    const result = await unlockDomain(
-      this.connection,
-      config.domainName,
-      lockHandle,
-    );
-    this.connection.setSessionType('stateless');
-    return {
-      unlockResult: result,
-      errors: [],
-    };
+    const state = await this.lockCap.unlock(config, lockHandle);
+    this.lockTracker.untrack(config.domainName as string);
+    return state;
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IDomainConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('domain');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('domain');
   }

@@ -185,12 +185,28 @@ Common behaviors in implementations:
 
 ## Type System and Exports
 
+**Types are defined once, in `@mcp-abap-adt/interfaces` (`^11.0.0`).** As of 7.5.0 this package declares no type it shares with the contract package. Each `src/core/<object>/types.ts` is a re-export surface:
+
+```ts
+export type {
+  ICreateClassParams,
+  IClassConfig,
+  IClassState,
+} from '@mcp-abap-adt/interfaces';
+```
+
+Rationale: the two packages previously held independent copies of the same interfaces, and they drifted silently — a field required on one side and optional on the other produced no error anywhere. A single definition site makes that class of bug impossible.
+
 Package root (`src/index.ts`) exports:
 - client classes (`AdtClient`, runtime/ws/executor clients),
 - selected runtime/debugger types,
-- object config/state/type definitions,
-- shared utility type unions (`AdtObjectType`, `AdtSourceObjectType`, ...),
+- object config/state/type definitions (re-exported from interfaces),
+- shared utility type unions (`AdtObjectType`, `AdtSourceObjectType`, ...) — likewise re-exported,
 - core interfaces re-exported from `@mcp-abap-adt/interfaces`.
+
+What stays declared locally, and why:
+- **Runtime (value) exports** — these are code, not contract: `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers (`src/core/enhancement/types.ts`), `resolveBindingVariant` / `SERVICE_BINDING_VARIANT_MAP` (`src/core/service/types.ts`).
+- **`IAdtClientOptions`** — describes this client's constructor, not the wire contract.
 
 Internal low-level helpers are intentionally not part of root API.
 
@@ -221,12 +237,13 @@ Runtime coverage snapshot:
 ## Extension Rules for New Features
 
 When adding a new ADT object type:
-1. Create `src/core/<object>/` low-level endpoint modules and types.
-2. Implement `Adt<Object>.ts` as `IAdtObject` facade.
-3. Add factory method in `AdtClient`.
-4. Export public types in `src/index.ts`.
-5. Add integration tests under `src/__tests__/integration/core/<object>/`.
-6. Keep stateful/lock cleanup semantics consistent.
+1. **Define the types in `@mcp-abap-adt/interfaces` first**, release it, then consume it here. Do not declare params/config/state locally — that is what caused the drift resolved in 7.5.0. `src/core/<object>/types.ts` should contain only re-exports (plus any genuine runtime helpers).
+2. Create `src/core/<object>/` low-level endpoint modules.
+3. Implement `Adt<Object>.ts` as `IAdtObject` facade.
+4. Add factory method in `AdtClient`.
+5. Export public types in `src/index.ts`.
+6. Add integration tests under `src/__tests__/integration/core/<object>/`.
+7. Keep stateful/lock cleanup semantics consistent.
 
 When adding runtime APIs:
 1. Add pure functions in `src/runtime/<domain>/`.
