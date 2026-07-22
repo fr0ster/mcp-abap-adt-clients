@@ -13,9 +13,17 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
+import type {
+  IAuthorizationFieldConfig,
+  IAuthorizationFieldState,
+} from '../../../../core/authorizationField';
 import { readAuthorizationField } from '../../../../core/authorizationField/read';
 import { isCloudEnvironment } from '../../../../utils/systemInfo';
 import { BaseTester } from '../../../helpers/BaseTester';
@@ -289,7 +297,13 @@ describe('AuthorizationField (using AdtClient)', () => {
         const config = buildConfig(testCase, resolver);
 
         const tester = new BaseTester(
-          client.getAuthorizationField(),
+          // getAuthorizationField() is narrowed to Crud & Validatable &
+          // Checkable & Activatable & Lockable (no readTransport/
+          // getVersions/getVersionSource); cast through the full interface.
+          client.getAuthorizationField() as unknown as IAdtObject<
+            IAuthorizationFieldConfig,
+            IAuthorizationFieldState
+          >,
           'AuthorizationField',
           'create_authorization_field',
           'adt_authorization_field',

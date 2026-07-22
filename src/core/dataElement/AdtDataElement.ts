@@ -21,13 +21,18 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtNonVersionedObject,
   IAdtOperationOptions,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { activateDataElement } from './activation';
@@ -41,21 +46,29 @@ import { unlockDataElement } from './unlock';
 import { updateDataElement } from './update';
 import { validateDataElementName } from './validation';
 export class AdtDataElement
-  implements IAdtObject<IDataElementConfig, IDataElementState>
+  implements IAdtNonVersionedObject<IDataElementConfig, IDataElementState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'DataElement';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockDataElement(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -322,6 +335,7 @@ export class AdtDataElement
         config.dataElementName,
       );
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.dataElementName, lockHandle);
       this.logger?.info?.('Data element locked, handle:', lockHandle);
 
       // 2. Check inactive with XML for update (if provided)
@@ -398,6 +412,7 @@ export class AdtDataElement
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.dataElementName);
         lockHandle = undefined;
         this.logger?.info?.('Data element unlocked');
       }
@@ -467,6 +482,7 @@ export class AdtDataElement
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.dataElementName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -651,6 +667,7 @@ export class AdtDataElement
       this.connection,
       config.dataElementName,
     );
+    this.lockTracker.track(config.dataElementName, lockHandle);
     return lockHandle;
   }
 
@@ -672,18 +689,21 @@ export class AdtDataElement
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.dataElementName);
     return {
       unlockResult: result,
       errors: [],
     };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IDataElementConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('data element');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('data element');
   }

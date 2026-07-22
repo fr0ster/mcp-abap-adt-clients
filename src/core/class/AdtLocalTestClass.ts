@@ -8,6 +8,7 @@
 import type {
   HttpError,
   IAdtOperationOptions,
+  ILocalTestClassConfig,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import { safeErrorMessage } from '../../utils/internalUtils';
@@ -17,12 +18,8 @@ import { checkClassLocalTestClass } from './check';
 import { updateClassTestInclude } from './testclasses';
 import type { IClassState } from './types';
 
-export interface ILocalTestClassConfig {
-  className: string;
-  testClassCode?: string;
-  testClassName?: string;
-  transportRequest?: string;
-}
+// Types defined in @mcp-abap-adt/interfaces
+export type { ILocalTestClassConfig } from '@mcp-abap-adt/interfaces';
 
 export class AdtLocalTestClass extends AdtClass {
   public readonly objectType: string = 'LocalTestClass';

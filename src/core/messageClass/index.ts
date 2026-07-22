@@ -2,7 +2,11 @@
  * Message class operations - public exports
  */
 
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtCrud,
+  IAdtLockable,
+  IAdtValidatable,
+} from '@mcp-abap-adt/interfaces';
 import type {
   IMessageClassConfig,
   IMessageClassMessageConfig,
@@ -17,13 +21,15 @@ export type { IParsedMessage, IParsedMessageClass } from './xml';
 export { buildMessageClassXml, parseMessageClass } from './xml';
 
 // Type alias for AdtMessageClass
-export type AdtMessageClassType = IAdtObject<
+export type AdtMessageClassType = IAdtCrud<
   IMessageClassConfig,
   IMessageClassState
->;
+> &
+  IAdtValidatable<IMessageClassConfig, IMessageClassState> &
+  IAdtLockable<IMessageClassConfig, IMessageClassState>;
 
 // Type alias for AdtMessageClassMessage
-export type AdtMessageClassMessageType = IAdtObject<
+export type AdtMessageClassMessageType = IAdtCrud<
   IMessageClassMessageConfig,
   IMessageClassMessageState
 >;

@@ -3,6 +3,76 @@
 All notable changes to this package are documented here.  
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the package follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.0] - 2026-07-22
+
+### Changed (BREAKING)
+- **Handlers now declare their honest capability set.** Each object handler `implements` only the capability atom interfaces it genuinely supports (e.g. `AdtDomain` implements everything except `IAdtVersionable`, since it has no `/source/main`), instead of the fat `IAdtObject`. Correspondingly, `AdtClient.getXxx()` — and, by inference, `AdtClientBatch.getXxx()` — return types are **narrowed** to that honest set.
+- **Consequence:** calling a capability a handler does not have is now a **compile error** instead of a runtime throw. For example `client.getDomain().getVersions(...)` no longer type-checks. This **only** breaks code that referenced methods which always threw at runtime (`ADT_UNSUPPORTED_OPERATION`); no working code is affected. Requires `@mcp-abap-adt/interfaces ^11.3.0` (the capability composites).
+- The removed-from-contract methods remain on the classes at runtime, marked `@deprecated`, and will be deleted in a later major.
+
+### Deferred (still return the wide type this release)
+- `getFeatureToggle`, `getServiceBinding` (implement widening interfaces `IFeatureToggleObject` / `IAdtServiceBinding` that extend `IAdtObject`), and `getRequest`, `getUnitTest`, `getCdsUnitTest` (wrong-contract / test-runner — `AdtRequest.update`/`delete` are known defects to fix first). These will be narrowed in a follow-up.
+
+## [7.6.0] - 2026-07-21
+
+### Changed
+- **Pilot of the capability-composition architecture.** `AdtClass`, `AdtDomain` and `AdtServiceDefinition` now route lock/unlock (and, for the two source-backed types, version history) through shared `LockCapability` / `VersionsCapability` implementations parameterized by a per-handler strategy, instead of bespoke per-type wrappers. `AdtDomain` composes no `VersionsCapability` — it has no `/source/main`, so the absence is structural rather than a throwing stub. Requires `@mcp-abap-adt/interfaces ^11.2.0` (the capability atom interfaces `IAdtCrud`, `IAdtLockable`, `IAdtVersionable`, …).
+
+No API change from the composition work: the `IAdtObject` public surface is byte-identical (verified across all seven entry points — empty diff) and behaviour is unchanged (full unit suite, including cross-handler lock/unlock ordering conformance). This release also carries the 7.5.1 activation fix below.
+
+## [7.5.1] - 2026-07-21
+
+### Fixed
+- **`activateObjectInSession` no longer masks a failed activation as success (#78).** ADT's `/sap/bc/adt/activation` endpoint returns HTTP 200 even when activation fails (object locked by another session, syntax errors), carrying a `<chkl:messages>` body with `chkl:properties activationExecuted="false"` and/or `<msg type="E">` entries. The shared helper previously returned that response unchecked, so every object type built on it (domain, program, table, structure, class, interface, ddl, tabletype, functionModule, functionInclude, metadataExtension, behaviorDefinition, enhancement, unitTest — 15 in total) reported a false success on a locked/failed activation. This is the root cause of the downstream false `success:true` in fr0ster/mcp-abap-adt#154 (`UpdateDomain` on a locked domain). The helper now inspects the body and throws on an **explicit** failure signal only (`activationExecuted="false"` or error-severity `<msg>`), collecting the ADT error text into the thrown message. Empty, unparseable, or unrecognized bodies are still treated as success, so the differing success-body shapes across the 15 types are never regressed into false failures. The 9 object types that already parse their own activation response (dataElement, serviceDefinition, accessControl, scalarFunction, scalarFunctionImplementation, transformation, appendStructure, authorizationField, featureToggle) are unaffected — they do not route through the shared helper.
+
+## [7.5.0] - 2026-07-19
+
+### Changed
+- **All public types are now sourced from `@mcp-abap-adt/interfaces` (requires `^11.0.0`).** The library no longer declares its own copies of the types that also exist in the contract package. Every low-level `*Params` interface (83 across 26 modules), every `IXxxConfig`/`IXxxState` pair, the promoted option/result types, and the 25 cross-cutting types in `src/core/shared/types.ts` are now `export type { … } from '@mcp-abap-adt/interfaces'` re-exports. This removes the duplication that had silently drifted between the two packages — there is now a single definition site per type.
+- **No API break.** The public surface was captured before and after the migration across all 7 entry points (`index`, `index.core`, `index.runtime`, `index.batch`, `index.ws`, `index.abapgit`, `index.executors`) — 537 exported names, byte-identical diff. Every promoted type was additionally checked for mutual structural assignability against its interfaces counterpart before the local declaration was removed; zero mismatches. Import paths are unchanged, including the widely-used `../shared/types` route to `IReadOptions`.
+- Runtime exports stay local and untouched: `enhancement` (`ENHANCEMENT_TYPE_CODES`, `getEnhancementBaseUrl`, `getEnhancementUri`, `supportsSourceCode`, `isImplementationType`, `isSpotType`) and `service` (`resolveBindingVariant`, `SERVICE_BINDING_VARIANT_MAP`). `IAdtClientOptions` is deliberately kept local — it describes this client, not the contract.
+
+Consumers are encouraged to import types directly from `@mcp-abap-adt/interfaces` rather than through this package; the re-exports exist so that existing imports keep working.
+
+## [7.4.4] - 2026-07-17
+
+### Changed
+- **Bump `@mcp-abap-adt/interfaces` to `^10.0.0`.** interfaces 10.0.0 removes the no-op `source_code` from its create-params (completing the 7.4.3 drift resolution — see interfaces CHANGELOG). No adt-clients code change: adt-clients uses its own local param copies and never imported the removed fields. Build, lint, and the full unit suite (348) pass against interfaces 10.0.0.
+
+## [7.4.3] - 2026-07-16
+
+### Changed
+- **Removed dead `source_code` from create-params.** The no-op `source_code` field is removed from 4 internal `ICreateXxxParams` (accessControl, functionInclude, scalarFunction, serviceDefinition) and its 3 dead `create()` pass-throughs (accessControl, serviceDefinition direct; functionInclude `buildCreateParams`). `create()` posts metadata only — source is written by `update()`, mirroring Eclipse ADT. `ICreateEnhancementParams.source_code` is publicly exported, so it is kept and marked `@deprecated` rather than removed (no API break). `program` and the live `IUpdateXxxParams.source_code` fields are untouched.
+- **featureToggle: removed ignored `withLongPolling` plumbing.** The low-level `readFeatureToggle` accepted a `withLongPolling` option (via a featureToggle-local `IReadOptions` duplicate) it never sent. The dead parameter and the duplicate type are removed; the public `read()`/`readMetadata()` keep the option (mandated by `IAdtObject`) but it is documented as not forwarded — SFW readiness is a plain GET (endpoint support unverified, on-prem).
+
+No published-API break: the one public field (`ICreateEnhancementParams.source_code`) is preserved as `@deprecated`; everything else removed is internal.
+
+## [7.4.2] - 2026-07-16
+
+### Fixed
+- **Final read in `update()` returned the stale active version instead of the written one.** Follow-up to 7.4.1, which fixed the readiness read (step 3.5); this fixes the *final* read at the end of `update()` in the non-activate path. When `update()` runs without `activateOnUpdate`, it writes the source under a lock and stops, then reads the object back into `readResult` — three handlers read the **active** version there, which (with no activation) holds pre-update content, or nothing for a never-activated object, so the returned `readResult` could not reflect the write.
+  - `authorizationField` and `functionInclude` passed `'active'` explicitly; `enhancement`'s `getEnhancementSource` defaults to `'active'` and now passes `'inactive'` (mapped to `workingArea` in the enhancement URI dialect). The other 12 source-bearing handlers already read `inactive` here.
+  - `package` is deliberately unchanged: verified live that a package returns identical content for `version=active` and `version=inactive` (no distinct inactive version, no activation step), so reading active there is equivalent, not stale.
+  - No API change: the final read is an internal step of `update()`. New unit test asserts the invariant across all 15 source-bearing handlers — `update()` without activation never issues a `version=active` read.
+
+## [7.4.1] - 2026-07-16
+
+### Fixed
+- **Post-update readiness read polled the wrong version.** After `update()` writes source/metadata under a lock, the object exists only as the *inactive* version — but the readiness read (step 3.5) polled the *active* one, so it could never observe the write it was meant to wait for. It now polls the version that was just written.
+  - Verified against a live system: while an activated service definition is updated and not yet reactivated, `version=active` returns the content that predates the update, and `version=inactive` returns what the `PUT` just wrote. For an object that was never activated, the active version is empty.
+  - The step never surfaced as a failure: `read()` maps 404 to `undefined` (and on cloud this endpoint answers `200` with an empty body rather than 404), and the call sits in a `try`/`catch` — so the flow logged `object is ready after update` regardless and tests stayed green. The bug was a silent no-op, not an error.
+  - Applies to the 16 handlers whose `read()` forwards the version: `accessControl`, `authorizationField`, `behaviorDefinition`, `behaviorImplementation`, `class`, `ddl`, `enhancement`, `featureToggle`, `functionInclude`, `functionModule`, `interface`, `package`, `program`, `serviceDefinition`, `structure`, `table`, `transformation`. Unchanged where the version is dropped before the request (`metadataExtension`, `domain`, `dataElement`, `functionGroup`, `tabletype`) — the literal has no effect there. The post-activation read (step 6.5) still reads `active`, which is correct.
+  - No API change: the readiness read is an internal step of `update()`.
+- **`AdtServiceDefinition` docblock corrected.** It described `create()` as running a `validate → … → activate` chain and called the object DDLS. `create()` posts metadata only (SRVD/SRV); the source code is written by a subsequent `update()`, mirroring Eclipse ADT.
+
+## [7.4.0] - 2026-07-16
+
+### Added
+- **Session-scoped lock registry with `unlockAll()` safety net.** `AdtClient` now owns one `LockRegistry` shared by every handler it creates, so all enqueue locks held in the session are tracked in one place. New API on `AdtClient`: `unlockAll()` releases every dangling lock in a single call and returns the ones it could not release (`LockFailure[]`); `pendingLocks` lists the keys currently held (e.g. `Domain/ZFOO`, `DataElement/ZBAR`); and `[Symbol.asyncDispose]` enables `await using client = …` cleanup.
+  - This is a **last-resort** safety net for abandoned locks (a forgot-to-unlock, or a managed flow that threw before its unlock). It deliberately does **not** make the lock→unlock critical section non-interruptible — preventing a client timeout from interrupting that section remains the caller's responsibility. On process crash/kill the ultimate backstop is SAP releasing the session's enqueue locks on session-drop.
+  - Every lock-holding handler is wired to track on lock and untrack on clean unlock — across public `lock()`/`unlock()`, the managed `create()`/`update()` chains, and error-cleanup unlock. Nested handlers (`functionModule`/`functionInclude`) use composite `Type/group/name` keys; `enhancement` captures its type in the unlock; class-includes (`LocalTestClass`/`Types`/`Definitions`/`Macros`) inherit the wired `AdtClass` lock/unlock. No-op-lock handlers (`service`/`transport`/`unitTest`/`messageClassMessage`) are excluded — their `lock()` is unsupported.
+  - `unlockAll()` runs the whole batch under a single `stateful`→`stateless` transition, so a per-unlock switch to stateless cannot clear the session mid-batch (as `RfcAbapConnection` does) and invalidate the remaining lock handles. `[Symbol.asyncDispose]` is best-effort: it never throws (so it cannot mask the error that ended the `using` scope), logs a warning for any residual failure, and leaves those locks observable via `pendingLocks`.
+
 ## [7.3.1] - 2026-07-04
 
 ### Fixed

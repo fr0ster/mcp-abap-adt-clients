@@ -1,0 +1,699 @@
+# Capability interfaces — design
+
+**Date:** 2026-07-20
+**Status:** approved for planning
+**Repos:** `@mcp-abap-adt/interfaces` (step 1), `@mcp-abap-adt/adt-clients` (later steps)
+
+## Problem
+
+`IAdtObject<TConfig, TReadResult>` declares 13 methods that every object handler must
+provide. Most handlers cannot provide all of them, so they lie — and they lie
+inconsistently.
+
+### How the numbers here were obtained
+
+Every count below is **generated**, not transcribed. `scripts/capability-matrix.mjs`
+walks the handler classes with the TypeScript compiler API and classifies each contract
+method as *real work*, *refuses* (an unconditional throw or a `throwUnsupported*` call),
+*stub*, or *absent*. Run `node scripts/capability-matrix.mjs` to reproduce; `--csv` for
+the raw matrix.
+
+This matters because earlier drafts of this spec carried hand-copied counts that were
+wrong in three separate places — one of them an arithmetic impossibility. Numbers in a
+design document must be derivable, or they will drift from the code they describe.
+
+**Denominator: 35 classes** — 29 primary `IAdtObject` handlers, plus `AdtServiceBinding`,
+`AdtCdsUnitTest`, and the four class-include handlers. The generator selects classes by
+their **heritage clause**, not by name: a class is counted only if it implements a
+contract interface (`IAdtObject`, `IFeatureToggleObject`, `IAdtServiceBinding`) or
+extends a handler that does. This deliberately excludes the `AdtService` facade and
+`AdtUtils` — neither claims the contract; `AdtUtils` says so at
+`src/core/shared/AdtUtils.ts:4`. Pure-alias subclasses (`class AdtService extends
+AdtServiceBinding {}`) declare no method of their own and are dropped to avoid
+double-counting. `*Legacy.ts` subclasses are likewise excluded — they override
+selectively and would double-count their parents.
+
+The generator resolves both delegation and inheritance: a method that calls a private
+helper doing the real work counts as real (not a stub), and a subclass inherits its
+parent's verdict for any method it does not override. All counts below are on the single
+population of 35.
+
+### What the matrix shows
+
+- `create` / `read` / `readMetadata`: **35 real** — every contract class.
+- `update` / `delete`: **33 real, 2 refuse** (Request, UnitTest — both known defects,
+  see below).
+- `getVersions` / `getVersionSource`: **23 real, 12 refuse** — identical sets, the
+  sharpest split in the contract.
+- `lock` / `unlock`: **30 real, 5 refuse** — identical sets, a rigid pair.
+- `activate`: 29 real, 6 refuse. `check`: 30 real, 5 refuse. The sets differ, so these
+  are distinct capabilities rather than one.
+- `readTransport`: 27 real and **8 not implemented — through two different mechanisms**:
+  three refuse outright (MessageClass, MessageClassMessage, Request) and five return a
+  stub (AuthorizationField, FeatureToggle, FunctionInclude, CdsUnitTest, UnitTest). With
+  no way to say "I don't do transports", implementers invented more than one lie. That
+  inconsistency is the clearest symptom of the problem.
+- Classes where the contract is plainly the wrong fit: `AdtRequest` refuses 9 of 13 and
+  stubs a 10th; `AdtUnitTest` refuses 8 and stubs 2; `AdtMessageClassMessage` refuses 8.
+  `AdtPackageLegacy` (a `*Legacy` subclass, outside this population) throws on all 13 and
+  exists solely to satisfy the type.
+
+The cost is paid by consumers: `AdtClient.getUnitTest()` returns a type promising
+`lock()`, and the promise is false. The compiler cannot help, so the failure surfaces
+at runtime against a live SAP system.
+
+## Goal and non-goal
+
+**Goal: contract honesty, realized in both the types and the implementation.** A handler
+should declare only what it does, `AdtClient.getXxx()` should return a type that does not
+lie, and the operation chain should run only the steps a handler actually supports rather
+than calling methods that throw. The atoms are step 1; the composition architecture that
+delivers the second half is described under "Implementation architecture".
+
+**Explicit non-goal for now: parameter polymorphism.** An exhaustive search found
+**no production code that accepts `IAdtObject` as a parameter or holds a collection of
+them** — only the test harness `BaseTester` (`src/__tests__/helpers/BaseTester.ts:88`),
+which already uses just 7 of the 13 methods. Group activation
+(`src/core/shared/groupActivation.ts:138`) operates on `IObjectReference[]`, not on
+handlers, so it would not consume a capability interface either.
+
+Narrow capability interfaces do enable such call sites later, and TypeScript's
+structural typing makes them compose without ceremony. But that is a future benefit,
+not present justification. Claiming otherwise would overstate the case.
+
+## Design rules
+
+Two rules govern the decomposition. Both were derived during review, not assumed.
+
+**Rule 1 — split only on evidence.** An atom is divided only when a class exists that
+has one part without the other. Absent such a class, the methods stay together.
+
+This is why `IAdtCrud` is a single atom: across all 35 contract classes `create`, `read`
+and `readMetadata` are 35/35, and `update` / `delete` refuse in only two — `AdtRequest`
+and `AdtUnitTest`, both our own defects, not domain limits (see "Known defects"). No ADT
+object has partial CRUD.
+
+It is also why `readMetadata` stays inside `IAdtCrud` despite being conceptually a
+header read rather than a CRUD operation: all 35 implement both `read` and
+`readMetadata`, so there is nothing to split on. If an object ever reads a header but
+not a body, we divide then, with grounds.
+
+**Rule 2 — exclude only on verified domain limits.** A class is left out of a
+capability only when the limitation is confirmed to be ADT's, not ours. When unsure,
+the class stays in and the throwing stub is treated as a bug.
+
+The asymmetry is deliberate. A wrong exclusion enters the type system and is read by
+the next developer as truth about SAP; a redundant method that throws is a visible bug
+that is cheap to fix. Encoding our gaps as contract is the worse failure.
+
+## The partition
+
+**Scope: the 13 methods of `IAdtObject`.** Every one of them belongs to exactly one of
+seven atoms, with no overlap. The two specialized interfaces that widen `IAdtObject` are
+handled separately — see "Specialized interfaces" below.
+
+Counts are real/refuse/stub over the 35-class population.
+
+| Atom | Methods | Evidence (generated) |
+|---|---|---|
+| `IAdtCrud` | `create`, `read`, `readMetadata`, `update`, `delete` | 35/35 for read-side; no object has partial CRUD — see below |
+| `IAdtValidatable` | `validate` | 31 / 1 / 3 |
+| `IAdtCheckable` | `check` | 30 / 5 / 0 |
+| `IAdtActivatable` | `activate` | 29 / 6 / 0 |
+| `IAdtLockable` | `lock`, `unlock` | 30 / 5, **identical sets** |
+| `IAdtVersionable` | `getVersions`, `getVersionSource` | 23 / 12, **identical sets**, verified domain boundary |
+| `IAdtTransportAware` | `readTransport` | 27 / 3 / 5 |
+
+`validate`, `check` and `activate` are separate atoms because their sets genuinely
+differ: `AdtPackage` implements `check` but not `activate`; `AdtMessageClass` implements
+`validate` but neither `check` nor `activate`.
+
+`IAdtLockable` and `IAdtVersionable` are each one atom because their member methods
+co-occur perfectly — no handler has one without the other.
+
+### Observed implementation vs intended capability
+
+These are different things, and conflating them makes the counts irreproducible.
+
+**Observed**, from the generated matrix: `create`, `read` and `readMetadata` are 35/35;
+`update` and `delete` each have exactly 2 refusals — `AdtRequest` and `AdtUnitTest`.
+
+**Intended**, after the known defects are fixed: CRUD is universal. Both refusals are
+our own bugs, not ADT limits — a transport request's description can be changed and an
+empty request deleted, and `AdtUnitTest` should not implement `IAdtObject` at all (see
+"Known defects"). Under Rule 2 both classes stay inside `IAdtCrud`.
+
+The partition is built on **intended** capability. Where the two diverge, this spec says
+so explicitly rather than quietly picking whichever number supports the design.
+
+### The versioning boundary is real
+
+`getVersions` / `getVersionSource` are refused by 12 of the 35 for a domain reason,
+confirmed with the maintainer: ADT exposes version history at `<sourceUri>/versions`.
+Objects without a source resource — those represented purely as XML — have no such
+endpoint. (Eleven of the twelve are primary handlers; the twelfth, CdsUnitTest,
+inherits the refusal.)
+
+The dividing line is "has `/source/main`", **not** "is DDIC": `Table`, `Structure` and
+`TableType` have versions; `Domain`, `DataElement` and `Package` do not.
+
+Over the full population of 35, the split is **23 with / 12 without**, generated by
+`scripts/capability-matrix.mjs --csv`:
+
+- **With versions (23):** AccessControl, AppendStructure, BehaviorDefinition,
+  BehaviorImplementation, Class, DdicTableType, Ddl, Enhancement, FunctionInclude,
+  FunctionModule, Interface, MetadataExtension, Program, ScalarFunction,
+  ScalarFunctionImplementation, ServiceDefinition, Structure, Table, Transformation, and
+  the four class-include handlers (LocalDefinitions, LocalMacros, LocalTestClass,
+  LocalTypes — they delegate to `getIncludeVersions` on the parent class, which the
+  generator resolves as real work).
+- **Without (12):** AuthorizationField, DataElement, Domain, FeatureToggle,
+  FunctionGroup, MessageClass, MessageClassMessage, Package, Request, ServiceBinding,
+  UnitTest, and CdsUnitTest (which inherits `AdtUnitTest`'s refusal).
+
+Stripped of the four inheriting class-includes and the one inheriting CdsUnitTest, the
+underlying domain boundary among the primary handlers is 19 source-backed to 11 not —
+the same line, viewed on the smaller population.
+
+## Composition
+
+Composite interfaces are intersections of atoms. They define no methods of their own —
+that is what keeps the partition a partition.
+
+```ts
+export type IAdtCrudObject<TConfig, TReadResult = TConfig> =
+  & IAdtCrud<TConfig, TReadResult>
+  & IAdtValidatable<TConfig, TReadResult>
+  & IAdtCheckable<TConfig, TReadResult>
+  & IAdtActivatable<TConfig, TReadResult>
+  & IAdtLockable<TConfig, TReadResult>
+  & IAdtTransportAware<TConfig, TReadResult>;
+```
+
+A handler that also has version history composes further:
+
+```ts
+type ISourceObject<C, R> = IAdtCrudObject<C, R> & IAdtVersionable<C>;
+```
+
+## Specialized interfaces
+
+Two interfaces widen `IAdtObject`. Their methods are **out of scope for step 1**, and
+the "exactly one atom" guarantee applies only to `IAdtObject`'s 13.
+
+`IFeatureToggleObject` adds five: `switchOn`, `switchOff`, `getRuntimeState`,
+`checkState`, `readSource`. One implementer, cohesive, and a single
+`IAdtFeatureToggleControl` atom would cover them cleanly. Low risk, but no reason to
+rush it into step 1.
+
+`IAdtServiceBinding` adds **sixteen** (an earlier draft undercounted this twice — first
+as two, then as twelve): `getServiceBindingTypes`, `createServiceBinding`,
+`readServiceBinding`, `updateServiceBinding`, `deleteServiceBinding`,
+`validateServiceBinding`, `checkServiceBinding`, `activateServiceBinding`,
+`transportCheckServiceBinding`, `generateServiceBinding`, `createAndGenerateServiceBinding`,
+`classifyServiceBinding`, `getODataV2ServiceBinding`, `getODataV4ServiceBinding`,
+`publishODataV2`, `unpublishODataV2`.
+
+That list is itself a finding worth recording. Eight are binding-suffixed restatements of
+operations the base contract already has — create, read, update, delete, validate, check,
+activate, transport-check. The other eight are binding-specific: type discovery,
+generation (two forms), classification, OData service reads (v2/v4), and OData
+publish/unpublish. So `AdtServiceBinding` carries **two parallel vocabularies for the
+shared lifecycle**, plus a genuine binding-only surface — and separately refuses `lock`,
+`unlock` and both version methods from the base contract.
+
+Deciding whether those eight should collapse into the base atoms, or whether the binding
+genuinely needs its own lifecycle vocabulary, requires understanding why the duplication
+was introduced. That is its own investigation, not a detail of this partition. Until it
+is done, no service-binding atom is proposed — inventing one now would freeze a
+duplication we do not yet understand.
+
+## The behavioural contract
+
+An interface constrains behaviour, not only shape. TypeScript checks the second and
+says nothing about the first, so the partition alone does not solve the problem that
+motivated it — it would merely distribute it across seven interfaces instead of one.
+
+The evidence is already in hand. `readTransport` is "unimplemented" in eight classes by
+two different mechanisms — three refuse outright, five return a stub. Every one of those
+satisfies the structural signature. The type system was never going to catch it.
+
+So each atom carries a behavioural contract, and implementations must satisfy both.
+
+### The rule that makes the split worth doing
+
+**"Not supported" ceases to be a behaviour.** A handler that cannot do something does
+not implement the atom. It must not throw `UNSUPPORTED_OPERATION`, must not return a
+fabricated error state, and must not return an empty stub.
+
+This is the whole point of the partition: `AdtDomain` will not implement
+`IAdtVersionable`, so the question of what its `getVersions` should return disappears
+rather than being answered three ways.
+
+### Per-atom obligations
+
+These are **required behaviours the implementation must meet**, not descriptions of what
+every handler does today. Two things must not be confused when reading them:
+
+- **"Current code does otherwise" is not an objection.** These are targets; the point of
+  the refactor is that current behaviour is inconsistent. A contract that only restated
+  what the code already does would justify no work. So a mismatch with today's handlers
+  is expected, and is what the conformance tests will close.
+- **A claim about what *SAP* returns is different** — that is an external fact, and it
+  must be probed, never asserted. Where reaching a target depends on SAP's response
+  (which status means "already released" / "already active"), the target still stands;
+  what needs evidence is the *mechanism* — which status the capability may treat as
+  success. Trial-verified facts below are marked as such; unverified SAP behaviour is
+  flagged as needing a probe.
+
+Contracts common to every atom:
+
+- **Failure is a thrown error**, using `AdtObjectErrorCodes`. Operations do not signal
+  failure by returning a state that happens to contain errors.
+- **The returned state accumulates results**, and `state.errors` records
+  non-fatal diagnostics only. An empty `errors` array must mean "nothing went wrong",
+  never "this operation does not apply here".
+- **Session type is restored** on both the success and failure paths. Any method that
+  sets `stateful` returns the connection to `stateless` before it finishes or throws —
+  with one deliberate exception, `lock` (see `IAdtLockable` below), whose whole purpose
+  is to leave the session `stateful` for the caller. A `lock` that *fails* still restores
+  `stateless`; only a `lock` that *succeeds* leaves it open.
+
+Atom-specific obligations:
+
+- `IAdtCrud` — `read` returns `undefined` for a genuinely absent object; it does not
+  throw for absence. Note the trial-verified caveat that ADT source endpoints answer
+  `200` with an empty body rather than `404`, so absence is determined by content, not
+  status. `create` is not idempotent and must not silently succeed on an existing
+  object.
+- `IAdtLockable` — `lock` returns a handle and leaves the session `stateful`; the
+  caller owns the obligation to `unlock`. A failure between the two must still restore
+  the session. **Target: `unlock` is idempotent** — releasing an already-released or
+  expired handle succeeds rather than throwing. This is intended *new* behaviour: today
+  the helpers POST `_action=UNLOCK` directly and some turn an ADT failure into a throw
+  (`src/core/interface/unlock.ts:33`). That mismatch is the thing being fixed, not an
+  argument against the target. The one genuine unknown is external — *what SAP returns*
+  for a repeated or expired handle — because that determines whether the capability can
+  distinguish "already released" (swallow as success) from a real error (rethrow). That
+  status must be probed per endpoint before the idempotency rule is finalized; the target
+  stands, the mechanism to reach it is what needs the evidence.
+- `IAdtActivatable` — **target: activating an already-active object is a no-op**, not an
+  error. Same shape as unlock: the goal holds regardless of current behaviour; which SAP
+  status signals "already active" must be probed so the capability can treat it as success.
+- `IAdtVersionable` — implemented only by objects with a source resource. `getVersions`
+  returns an empty array for an object with no history; it does not throw.
+- `IAdtCheckable` / `IAdtValidatable` — a check that *finds problems* has succeeded;
+  problems are reported in the result, not raised as errors. Only a failure of the
+  check mechanism itself throws.
+- `IAdtTransportAware` — implemented only by objects that participate in transports.
+
+### How this is enforced
+
+The compiler cannot verify any of the above, so enforcement is by documentation and
+test:
+
+- Each atom's declaration carries the contract in its docblock, next to the signature,
+  where an implementer will actually read it.
+- The behavioural expectations that can be exercised without a live system belong in
+  the unit suite as shared conformance tests, parameterised over handlers — the same
+  table-driven approach already used for `postUpdateReadinessRead` and
+  `updateNoActivateReadsInactive`.
+
+Writing the contract down is not a guarantee. It is, however, the difference between a
+convention a reviewer can point at and one that has to be inferred from whichever
+handler was read first.
+
+## Correctness proof
+
+The partition must be provably exact, not exact by inspection. A compile-time assertion
+checks assignability in **both** directions between `IAdtObject` and the intersection of
+its **seven** constituent atoms. The generic parameters must be bound — an earlier draft
+of this section referenced free `C` / `R` and would not have compiled:
+
+```ts
+type Assert<T extends true> = T;
+
+type AllAtoms<C, R> =
+  & IAdtCrud<C, R>
+  & IAdtValidatable<C, R>
+  & IAdtCheckable<C, R>
+  & IAdtActivatable<C, R>
+  & IAdtLockable<C, R>
+  & IAdtVersionable<C>
+  & IAdtTransportAware<C, R>;
+
+/** Bound the parameters so the assertion is a closed type expression. */
+type _PartitionIsExact<C, R> = [
+  Assert<IAdtObject<C, R> extends AllAtoms<C, R> ? true : false>,
+  Assert<AllAtoms<C, R> extends IAdtObject<C, R> ? true : false>,
+];
+
+/** Instantiate it, or nothing is checked. */
+type _Check = _PartitionIsExact<IClassConfig, IClassState>;
+```
+
+Keep the final instantiation. A generic type alias is only fully checked at the
+argument types it is instantiated with, so instantiating `_PartitionIsExact` at a
+concrete config/state pair guarantees the `Assert` constraints are actually evaluated
+rather than left to depend on where and whether the alias is referenced. It is cheap
+insurance; the implementation step must confirm the assertion fails when a method is
+removed, which is the real proof that it checks anything.
+
+**This proof covers `IAdtObject` only.** It cannot validate
+`IAdtFeatureToggleControl` or the service-binding atoms, because `AllAtoms` is compared
+against `IAdtObject` alone. Each specialized interface needs its own assertion of the
+same shape, comparing it against the intersection of *its* atoms.
+
+A dropped method, a mistyped parameter or a missing generic argument fails the build.
+
+Both directions are required: one alone would permit the intersection to be a strict
+superset or subset. The assertion must itself be verified by temporarily removing a
+method and confirming the build fails — the same discipline used for the ATC
+vocabulary guard, where an `Extract`-based check turned out to degrade silently
+instead of erroring.
+
+## Scope of step 1
+
+Step 1 is **purely additive**. The atoms are declared as a parallel branch in
+`@mcp-abap-adt/interfaces`.
+
+Explicitly NOT in step 1:
+
+- `IAdtObject` is not redefined as an intersection. It stays byte-for-byte as it is.
+- No handler class is modified.
+- No `AdtClient.getXxx()` return type is narrowed.
+- No composite is applied to any existing declaration.
+
+Version: **minor** (11.2.0), shipping alongside the ATC contract types already on
+`feat/atc-unittest-types`. Nothing breaks; consumers may adopt atoms when they choose.
+
+## Implementation architecture (adt-clients)
+
+The atoms are only types. This section is how they are realized in adt-clients, and it is
+the larger half of the work. The end state: each handler is a thin proxy that **composes
+capability implementations** rather than owning bespoke lifecycle code.
+
+### Capability implementations
+
+A capability implementation is a reusable unit that satisfies one atom for object types
+that share its shape, parameterized by the things that vary. A survey of six
+representative handlers established that for the majority of types the lifecycle methods
+(`lock`, `unlock`, `getVersions`, `getVersionSource`, `readTransport`, and the happy path
+of `activate` / `check`) differ **only by endpoint and which config field holds the
+name** — the bodies are otherwise the same, copy-pasted into ~15 near-identical per-type
+files (`lock.ts`, `unlock.ts`, `versions.ts`, `activation.ts`, the transport getter).
+
+Each capability is parameterized by a **per-capability strategy**, and there is **no
+existing centralized resolver to build it on** — this is the correction that matters
+most, because two earlier drafts got it wrong.
+
+Two facts from the code:
+
+1. There is no single URI per object. Behaviour definitions *lifecycle* endpoints (lock,
+   read, transport, and the handler's own activation) are all
+   `/sap/bc/adt/bo/behaviordefinitions/{name}` — see
+   `src/core/behaviorDefinition/activation.ts:35`, which **hardcodes** that path.
+2. `buildObjectUri` in `src/utils/activationUtils.ts` is **not** the handler activation
+   resolver. Its callers are all group operations — `groupActivation.ts:149`,
+   `groupDeletion.ts`, and the legacy `AdtUtilsLegacy.activateObjectsGroup`
+   (`src/core/shared/AdtUtilsLegacy.ts:40`) — where it builds the object-reference URI
+   inside a batch payload. For BDEF it returns `/sap/bc/adt/ddic/bdef/sources/{name}` — a
+   **different** path from the one the BDEF handler actually uses to activate. Building
+   `ActivateCapability` on `buildObjectUri` would route BDEF (and any other type whose
+   group URI differs from its lifecycle URI) to the wrong endpoint.
+
+The consequence: the **real, self-activating** handlers each hardcode their own base
+path (`/oo/classes/`, `/ddic/domains/`, `/ddic/tables/`, `/programs/programs/`,
+`/oo/interfaces/`, `/bo/behaviordefinitions/`, …) — there is no shared map to reuse, so a
+capability's strategy supplies its base path **directly from the handler**, along with
+the config field(s) it reads and how it normalizes the response.
+
+But not every handler is self-activating, and the extraction must classify them into
+three kinds, not one:
+
+- **Self-activating** (the majority) — hardcode a lifecycle base path; these compose the
+  shared `ActivateCapability` with a base-path strategy.
+- **Delegating** — activate through another handler: `AdtBehaviorImplementation.activate`
+  calls `this.class.activate` (`AdtBehaviorImplementation.ts:591`); the class-include
+  handlers call `super.activate` (`AdtLocalDefinitions.ts:318`). These compose *nothing
+  new* — they reuse the class handler's capability, which is the composition model
+  working as intended.
+- **Refusing** — `AdtPackage.activate` throws (`AdtPackage.ts:559`); such handlers simply
+  do not compose `ActivateCapability` and do not implement `IAdtActivatable`.
+
+`AdtEnhancement` (dual-keyed `type`+`name`, via `getEnhancementUri`) is a further reason
+the strategy cannot be a bare name field. `buildObjectUri` stays in the group operations
+and is not a dependency of this refactor.
+
+**The lock normalization contract.** Lock helpers do not return the same shape today:
+`table/lock.ts` returns a bare `string`, `interface/lock.ts` returns
+`{ lockHandle: string; corrNr?: string }`, and `functionModule/lock.ts` carries a
+`ForUpdate` variant. `LockCapability` must define one normalized result —
+`{ lockHandle: string; corrNr?: string }` — and adapt the bare-string helpers up to it.
+Naming this contract is part of the extraction, not an afterthought.
+
+For the types that fit, extraction **deletes code, not adds it**: `LockCapability`
+absorbs their `lock.ts`/`unlock.ts`; `getVersionSource`, byte-identical across
+Class/Table/ServiceDef today, collapses to one function. The handler forwarding
+(`getVersions(c) { return this.#versions.list(c) }`) replaces a method that was already a
+one-liner — a wash — while the per-type helper files disappear. That is where the win is,
+and the survey put the majority of the 35 in this bucket.
+
+### Handlers that do not fit the simple strategy
+
+Three are genuine exceptions the extraction must plan for, not paper over:
+
+- **`AdtFunctionModule`** — lock/read take a *composite* key (`functionGroupName` +
+  `functionModuleName`), so its endpoint is built from two identifiers, not one
+  (`src/core/functionModule/lock.ts:17`). Its strategy supplies a two-part key; it is
+  still a strategy, just not a single-name one.
+- **`AdtBehaviorImplementation`** — does not lock its own URI at all; it delegates to
+  `this.class.lock({ className })` (`AdtBehaviorImplementation.ts:357`). This is not a
+  problem for the model — it is the model: the handler composes *another handler's*
+  lock capability rather than owning one. It validates the composition approach.
+- **`AdtMessageClassMessage`** — uses two locks and message-specific unlock sequencing
+  (`src/core/messageClass/AdtMessageClassMessage.ts`). It either gets a bespoke lock
+  strategy or keeps its own implementation and simply does not compose the shared
+  `LockCapability`. The atom lets it opt out cleanly.
+
+The extraction plan must classify all 35 into fits-the-strategy vs needs-bespoke before
+promising a deletion count, so the estimate is grounded rather than optimistic.
+
+### Handlers become proxies
+
+A handler declares which atoms it has and holds a capability instance for each:
+
+```ts
+class AdtClass implements IAdtObject<IClassConfig, IClassState> {
+  #lock = new LockCapability(this.ctx);
+  #versions = new VersionsCapability(this.ctx);
+  // create/read/update stay per-type: they carry the XML/Accept/URI knowledge
+  lock(c) { return this.#lock.lock(c); }
+  getVersions(c) { return this.#versions.list(c); }
+}
+```
+
+`create`, `read`, `update` stay per-type — that is where the genuine per-object knowledge
+lives (XML bodies, Accept headers). The lifecycle methods delegate.
+
+### The operation chain orchestrates over *present* capabilities
+
+The standard SAP flow is `validate → create → lock → check → update → unlock → activate`,
+but not every object has every step — some have no `activate`, some no `lock`. Today that
+absence is expressed as a method that throws. Under this architecture it is expressed
+structurally: the chain runs a step **only if the handler composes that capability**. A
+handler without `IAdtLockable` skips lock/unlock; one without `IAdtActivatable` skips
+activation. Absence becomes "no step", not "a step that refuses" — which is the whole
+point of the partition, now realized in the orchestration and not just the type.
+
+### Error envelopes: unified on purpose
+
+The survey found `activate` and `check` already share their happy path
+(`activateObjectInSession`, `checkRun`) but wrap errors **differently per handler** — not
+by object type, by inconsistent authoring (elaborate `AdtOperationError` on `AdtClass`,
+bare log-and-rethrow on `AdtDomain`). Moving that into a shared capability **changes the
+observable error shape for some types**. This is intended: it is exactly the behavioural
+contract above, and the payoff is uniform, informative errors instead of whichever
+envelope each method's author happened to write. It is a behavioural change, so it must
+be covered by the conformance tests, and the CHANGELOG must name it.
+
+### ATC is the pilot
+
+ATC is greenfield — no legacy handler to preserve — so it is built on this scheme from
+the start and proves the mechanism (capability implementation + proxy + chain-over-present-
+capabilities) on a small surface before the 35 existing handlers are touched. ATC's own
+operations do not map to the `IAdtObject` atoms, so it pilots the *pattern*, not the atom
+set: it composes its own small ATC capabilities the same way.
+
+### Deprecation path
+
+The migration is non-breaking until the final flip. Existing handlers keep their public
+surface while their internals move to composed capabilities; `IAdtObject` stays intact.
+Only once the new scheme is proven across all handlers do the fat contract and the
+lying return types get marked `@deprecated`, with the narrowed capability-based types
+promoted as the supported API — the breaking flip below.
+
+## Later steps, deliberately deferred
+
+Each is a separate decision, taken once the atoms have settled:
+
+1. **Redefine `IAdtObject` as the intersection of its atoms.** Safe once the proof
+   above passes, but pointless before consumers exist.
+2. **Narrow `AdtClient.getXxx()` return types** for the handlers without versions (the
+   12 listed above), so `getDomain()` no longer promises `getVersions()`. This is a
+   **breaking change**
+   for adt-clients — code calling `client.getDomain().getVersions()` compiles today and
+   throws at runtime; afterwards it fails to compile. That converts a runtime error
+   into a compile error, which is the point, but it warrants a major bump and a
+   CHANGELOG entry naming exactly what breaks.
+3. **Non-CRUD / runtime clients.** A separate survey found the 14 runtime classes are
+   already uniform: identical `(connection, logger)` constructors, stateless, raw
+   `IAdtResponse` returns, no locks, no polling. There is a de-facto convention but no
+   meaningful shared operation set — the honest common denominator is a constructor
+   whose `logger` parameter 13 of 14 implementations never read. No abstraction is
+   proposed for them here.
+4. **`IAdtSearchable` — viable, but its own spec.** See "Search capability" below.
+
+## Search capability — viable, deferred to its own spec
+
+An earlier draft of this spec claimed no coherent search capability existed. That
+reasoning was wrong and is corrected here, because the mistake is instructive: it
+judged coherence by the *current concrete signatures* and concluded no capability was
+possible. Absence of a shared concrete shape does not imply absence of a shared
+abstraction — that is what interfaces are for.
+
+The shapes do share a core — every one carries a **name** and, in some field, the ADT
+**type code** — but the code is stored under different field names with different declared
+types, which is the whole problem:
+
+| Type | Name | Where the ADT type code lives | Extras |
+|---|---|---|---|
+| `ISearchResult` | `name` | `type: string` | `description`, `packageName?`, `uri?` |
+| `IWhereUsedReference` | `name` | `type: string` | `uri`, `isResult`, `usageInformation?` |
+| `IPackageContentItem` | `name` | `adtType: string` (its `type` is an unrelated enum) | `isPackage`, `packageName` |
+| `IPackageHierarchyNode` | `name` | `adtType?: string` (its `type` is an unrelated enum) | `is_package`, `children?` |
+| `IObjectReference` | `name` | `type: string` | `parentName?` |
+
+The inconsistency is itself a defect, and worse than a naming slip: the field named
+`type` means a `string` code in three of the types and an unrelated
+`PackageHierarchySupportedType` enum in the other two, where the code is instead in
+`adtType`. On top of that, "is this a package" is `isPackage` in one type and
+`is_package` in its sibling — **snake_case and camelCase for the same concept in the same
+file**. A shared base interface removes exactly this, at the cost of a breaking rename
+(below).
+
+```ts
+/** Anything the repository can hand back as a located object. */
+export interface IAdtObjectHit {
+  name: string;
+  type: string;
+  uri?: string;
+  packageName?: string;
+  description?: string;
+}
+
+export interface IAdtSearchable<
+  TCriteria extends IAdtSearchCriteria = IAdtSearchCriteria,
+  TResult extends IAdtObjectHit = IAdtObjectHit,
+> {
+  search(criteria: TCriteria): Promise<TResult[]>;
+}
+```
+
+Converging the existing types on `IAdtObjectHit` is a **breaking normalization, not a
+clean `extends`** — and the reason is sharper than a rename. In `IPackageContentItem` and
+`IPackageHierarchyNode` the field literally named `type` is not the ADT type code at all;
+it is an unrelated enum (`PackageHierarchySupportedType`), and the code lives in
+`adtType` (`adtType: string` required on `IPackageContentItem`, `adtType?` on the node).
+The other three carry the code as `type: string`. So `IAdtObjectHit { type: string }`
+cannot simply be extended by the package types — their `type` field has an incompatible
+declared type, and the field that *should* map to `IAdtObjectHit.type` is `adtType`.
+
+Convergence therefore requires renaming `adtType` → `type: string` (and retiring or
+renaming the enum field), plus unifying `isPackage` / `is_package`. That is exactly the
+breaking change the appendix already flags — the point here is only that "extends" was
+the wrong verb: it is a migration, and the search spec must carry it as one. Once done,
+the hierarchy node falls out neatly: a tree node is a hit with `children`.
+
+The generic parameters exist so consumers can bring their own types, constrained by the
+contract package rather than dictated by it — consistent with this library's stance of
+offering options rather than prescribing usage.
+
+### The generic cuts both ways — a caveat to design in from the start
+
+A type parameter behaves differently depending on which side supplies the value, and
+only one direction is sound:
+
+- **Consumer implements the interface** — sound. They produce `MyHit` themselves and
+  the compiler checks it.
+- **Consumer calls our method as `search<MyHit>(...)`** — unsound. We cannot return
+  `MyHit`; we do not know its fields. Such a parameter degrades into a disguised `as`:
+  the type claims `businessArea` while the runtime value has `undefined`.
+
+So library methods must offer an explicit bridge rather than a pass-through type
+parameter:
+
+```ts
+search<T extends IAdtObjectHit = ISearchResult>(
+  criteria: IAdtSearchCriteria,
+  map?: (hit: ISearchResult) => T,
+): Promise<T[]>;
+```
+
+We return our shape; the consumer optionally supplies the transformation and gets
+theirs. Compiler-checked, unlike a bare type argument.
+
+### Why this is a separate spec
+
+The cost is materially different from the atom partition, which is additive and
+risk-free:
+
+1. **Parsers must be written.** Four methods return raw XML today (`searchObjects`,
+   `getWhereUsed`, `getVirtualFoldersContents`, `getAllTypes`). ADT XML parsing is
+   where bugs live — `FeedRepository` already parses so defensively that a malformed
+   feed is indistinguishable from an empty one.
+2. **It is breaking.** Return types change and `is_package` migrates to `isPackage`.
+3. **Still zero call sites.** Nothing in the library consumes a search abstraction, so
+   there is no existing usage to validate the shape against.
+
+Worth doing — it collapses three spellings of one concept into one — but as its own
+scoped piece of work, not folded into the partition.
+
+## Known defects (not part of this design)
+
+Found while building the matrix. Both are bugs to fix, and under Rule 2 neither
+affects the partition — the classes stay in their capabilities.
+
+1. **`AdtRequest.update()` and `.delete()` throw** with the claim that ADT does not
+   support them (`src/core/transport/AdtRequest.ts:190,203`). A transport request's
+   description can be changed, and an empty request can be deleted. The comment states
+   something about ADT that is not true. Could not be verified on the cloud trial: the
+   user has no transport requests there, so `FIND` returns an empty tree, and discovery
+   declares content types but not methods. Treated as a defect on the maintainer's
+   domain knowledge, flagged as unverified.
+2. **`AdtUnitTest` implements `IAdtObject` with 3 of 13 methods.** It is a test-run
+   executor, not an object; a test class is a variant of a class. The contract is
+   simply the wrong one for it.
+
+Related, from the same surveys but out of scope here:
+
+- `FeedRepository` reaches the same three endpoints as `SystemMessages`,
+  `GatewayErrorLog` and `RuntimeDumps` with the opposite contract — parsed objects
+  instead of raw, silent empty results instead of throwing. Two access paths to one
+  endpoint with opposite semantics; new callers choose arbitrarily.
+- Eight core modules construct `new AdtUtils(connection, noopLogger)` inside their own
+  `read.ts` to call `readObjectMetadata` — an inverted dependency, typed modules
+  reaching back into the facade for what should be their own read logic.
+- `src/utils/managementOperations.ts:43` is a second, duplicate group-activation
+  implementation with a different object shape than
+  `src/core/shared/groupActivation.ts`.
+
+## Testing
+
+The partition proof is a compile-time assertion in the interfaces package; it needs no
+runtime test and is validated by deliberately breaking it once.
+
+Step 1 changes no behaviour, so the adt-clients unit suite (348 tests) and the public
+surface must both be unchanged. The surface is captured across all seven entry points
+with the TypeScript compiler API, as in the 7.5.0 migration — a `diff` of before and
+after must be empty.

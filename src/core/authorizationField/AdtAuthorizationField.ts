@@ -18,13 +18,22 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtActivatable,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { activateAuthorizationField } from './activation';
 import { checkAuthorizationField } from './check';
@@ -45,21 +54,34 @@ import { unlockAuthorizationField } from './unlock';
 import { updateAuthorizationField } from './update';
 import { validateAuthorizationFieldName } from './validation';
 export class AdtAuthorizationField
-  implements IAdtObject<IAuthorizationFieldConfig, IAuthorizationFieldState>
+  implements
+    IAdtCrud<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtValidatable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtCheckable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtActivatable<IAuthorizationFieldConfig, IAuthorizationFieldState>,
+    IAdtLockable<IAuthorizationFieldConfig, IAuthorizationFieldState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AuthorizationField';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockAuthorizationField(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -310,6 +332,7 @@ export class AdtAuthorizationField
         this.logger,
       );
       state.lockHandle = lockHandle;
+      this.lockTracker.track(fullConfig.authorizationFieldName, lockHandle);
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Authorization field locked, handle:', lockHandle);
 
@@ -339,12 +362,13 @@ export class AdtAuthorizationField
       );
       this.logger?.info?.('Authorization field updated');
 
+      // Poll the inactive version: the write above produced it; the active version may not exist yet.
       // 3.5. Read with long polling to ensure object is ready after update
       this.logger?.info?.('read (wait for object ready after update)');
       try {
         await this.read(
           { authorizationFieldName: fullConfig.authorizationFieldName },
-          'active',
+          'inactive',
           { withLongPolling: true },
         );
         this.logger?.info?.('object is ready after update');
@@ -364,6 +388,7 @@ export class AdtAuthorizationField
         lockHandle,
       );
       this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(fullConfig.authorizationFieldName);
       lockHandle = undefined;
       this.logger?.info?.('Authorization field unlocked');
 
@@ -407,10 +432,12 @@ export class AdtAuthorizationField
           );
         }
       } else {
+        // No activation happened: return the version just written (inactive),
+        // not the stale active one.
         const readResponse = await readAuthorizationField(
           this.connection,
           fullConfig.authorizationFieldName,
-          'active',
+          'inactive',
         );
         state.readResult = readResponse;
       }
@@ -431,6 +458,7 @@ export class AdtAuthorizationField
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(fullConfig.authorizationFieldName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -549,6 +577,8 @@ export class AdtAuthorizationField
 
   /**
    * Read transport info — not supported by the APS IAM endpoint yet.
+   *
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
    */
   async readTransport(): Promise<IAuthorizationFieldState> {
     const error = new Error(
@@ -573,6 +603,7 @@ export class AdtAuthorizationField
       config.authorizationFieldName,
       this.logger,
     );
+    this.lockTracker.track(config.authorizationFieldName, lockHandle);
     return lockHandle;
   }
 
@@ -594,15 +625,18 @@ export class AdtAuthorizationField
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.authorizationFieldName);
     return { errors: [] };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IAuthorizationFieldConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('authorization field');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('authorization field');
   }

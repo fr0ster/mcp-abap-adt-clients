@@ -21,12 +21,17 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activate } from './activation';
 import { check as checkBehaviorDefinition } from './check';
@@ -51,21 +56,29 @@ import {
   getBehaviorDefinitionVersions,
 } from './versions';
 export class AdtBehaviorDefinition
-  implements IAdtObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState>
+  implements
+    IAdtSourceObject<IBehaviorDefinitionConfig, IBehaviorDefinitionState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'BehaviorDefinition';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) => unlock(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -365,6 +378,7 @@ export class AdtBehaviorDefinition
       this.connection.setSessionType('stateful');
       lockHandle = await lock(this.connection, config.name);
       state.lockHandle = lockHandle;
+      this.lockTracker.track(config.name, lockHandle);
       this.logger?.info?.('Behavior definition locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -397,10 +411,11 @@ export class AdtBehaviorDefinition
         state.updateResult = updateResponse;
         this.logger?.info?.('Behavior definition updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ name: config.name }, 'active', {
+          await this.read({ name: config.name }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');
@@ -424,6 +439,7 @@ export class AdtBehaviorDefinition
         );
         state.unlockResult = unlockResponse;
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.name);
         lockHandle = undefined;
         this.logger?.info?.('Behavior definition unlocked');
       }
@@ -489,6 +505,7 @@ export class AdtBehaviorDefinition
           this.connection.setSessionType('stateful');
           await unlock(this.connection, config.name, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.name);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -638,6 +655,7 @@ export class AdtBehaviorDefinition
 
     this.connection.setSessionType('stateful');
     const lockHandle = await lock(this.connection, config.name);
+    this.lockTracker.track(config.name, lockHandle);
     return lockHandle;
   }
 
@@ -655,6 +673,7 @@ export class AdtBehaviorDefinition
     this.connection.setSessionType('stateful');
     const result = await unlock(this.connection, config.name, lockHandle);
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.name);
     return {
       unlockResult: result,
       errors: [],

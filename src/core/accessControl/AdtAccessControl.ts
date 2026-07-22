@@ -21,12 +21,17 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateAccessControl } from './activation';
 import { checkAccessControl } from './check';
@@ -48,21 +53,29 @@ import {
   getAccessControlVersions,
 } from './versions';
 export class AdtAccessControl
-  implements IAdtObject<IAccessControlConfig, IAccessControlState>
+  implements IAdtSourceObject<IAccessControlConfig, IAccessControlState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'AccessControl';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockAccessControl(this.connection, name, lockHandle),
+    );
   }
 
   /**
@@ -104,7 +117,7 @@ export class AdtAccessControl
    */
   async create(
     config: IAccessControlConfig,
-    options?: IAdtOperationOptions,
+    _options?: IAdtOperationOptions,
   ): Promise<IAccessControlState> {
     const state: IAccessControlState = { errors: [] };
     if (!config.accessControlName) {
@@ -127,7 +140,6 @@ export class AdtAccessControl
         package_name: config.packageName,
         transport_request: config.transportRequest,
         description: config.description,
-        source_code: options?.sourceCode || config.sourceCode,
         masterSystem: this.systemContext.masterSystem,
         responsible: this.systemContext.responsible,
         masterLanguage:
@@ -309,6 +321,7 @@ export class AdtAccessControl
         this.connection,
         config.accessControlName,
       );
+      this.lockTracker.track(config.accessControlName, lockHandle);
       this.logger?.info?.('Access control locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -341,12 +354,13 @@ export class AdtAccessControl
         );
         this.logger?.info?.('Access control updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
           await this.read(
             { accessControlName: config.accessControlName },
-            'active',
+            'inactive',
             { withLongPolling: true },
           );
           this.logger?.info?.('object is ready after update');
@@ -369,6 +383,7 @@ export class AdtAccessControl
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.accessControlName);
         lockHandle = undefined;
         this.logger?.info?.('Access control unlocked');
       }
@@ -441,6 +456,7 @@ export class AdtAccessControl
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.accessControlName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -579,6 +595,7 @@ export class AdtAccessControl
       this.connection,
       config.accessControlName,
     );
+    this.lockTracker.track(config.accessControlName, lockHandle);
     return lockHandle;
   }
 
@@ -600,6 +617,7 @@ export class AdtAccessControl
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.accessControlName);
     return {
       unlockResult: result,
       errors: [],

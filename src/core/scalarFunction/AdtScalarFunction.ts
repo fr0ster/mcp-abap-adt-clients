@@ -5,12 +5,17 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateScalarFunction } from './activation';
 import { checkScalarFunction } from './check';
@@ -34,21 +39,29 @@ import {
   getScalarFunctionVersions,
 } from './versions';
 export class AdtScalarFunction
-  implements IAdtObject<IScalarFunctionConfig, IScalarFunctionState>
+  implements IAdtSourceObject<IScalarFunctionConfig, IScalarFunctionState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'ScalarFunction';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (name, lockHandle) =>
+        unlockScalarFunction(this.connection, name, lockHandle),
+    );
   }
 
   async validate(
@@ -192,6 +205,7 @@ export class AdtScalarFunction
         this.connection,
         config.scalarFunctionName,
       );
+      this.lockTracker.track(config.scalarFunctionName, lockHandle);
 
       const codeToCheck = options?.sourceCode || config.sourceCode;
       if (codeToCheck) {
@@ -235,6 +249,7 @@ export class AdtScalarFunction
         } finally {
           this.connection.setSessionType('stateless');
         }
+        this.lockTracker.untrack(config.scalarFunctionName);
         lockHandle = undefined;
       }
 
@@ -278,6 +293,7 @@ export class AdtScalarFunction
             config.scalarFunctionName,
             lockHandle,
           );
+          this.lockTracker.untrack(config.scalarFunctionName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -359,7 +375,12 @@ export class AdtScalarFunction
     if (!config.scalarFunctionName)
       throw new Error('Scalar function name is required');
     this.connection.setSessionType('stateful');
-    return lockScalarFunction(this.connection, config.scalarFunctionName);
+    const lockHandle = await lockScalarFunction(
+      this.connection,
+      config.scalarFunctionName,
+    );
+    this.lockTracker.track(config.scalarFunctionName, lockHandle);
+    return lockHandle;
   }
 
   async unlock(
@@ -375,6 +396,7 @@ export class AdtScalarFunction
         config.scalarFunctionName,
         lockHandle,
       );
+      this.lockTracker.untrack(config.scalarFunctionName);
       return { unlockResult, errors: [] };
     } finally {
       this.connection.setSessionType('stateless');

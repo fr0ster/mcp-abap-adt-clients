@@ -24,7 +24,7 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtNonVersionedObject,
   IAdtOperationOptions,
   ILogger,
   IObjectVersion,
@@ -32,6 +32,11 @@ import type {
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
 import type { IAdtContentTypes } from '../shared/contentTypes';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { activateFunctionGroup } from './activation';
@@ -44,12 +49,13 @@ import type { IFunctionGroupConfig, IFunctionGroupState } from './types';
 import { updateFunctionGroup } from './update';
 import { validateFunctionGroupName } from './validation';
 export class AdtFunctionGroup
-  implements IAdtObject<IFunctionGroupConfig, IFunctionGroupState>
+  implements IAdtNonVersionedObject<IFunctionGroupConfig, IFunctionGroupState>
 {
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
   protected readonly contentTypes?: IAdtContentTypes;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'FunctionGroup';
 
   constructor(
@@ -57,11 +63,18 @@ export class AdtFunctionGroup
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
     contentTypes?: IAdtContentTypes,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
     this.contentTypes = contentTypes;
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (functionGroupName, lockHandle) =>
+        unlockFunctionGroup(this.connection, functionGroupName, lockHandle),
+    );
   }
 
   /**
@@ -479,6 +492,7 @@ export class AdtFunctionGroup
         config.functionGroupName,
         sessionId,
       );
+      this.lockTracker.track(config.functionGroupName, lockHandle);
       this.logger?.info?.('Function group locked, handle:', lockHandle);
 
       // 2. Update metadata (description)
@@ -523,6 +537,7 @@ export class AdtFunctionGroup
           sessionId,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.functionGroupName);
         lockHandle = undefined;
         this.logger?.info?.('Function group unlocked');
       }
@@ -599,6 +614,7 @@ export class AdtFunctionGroup
             sessionId,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.functionGroupName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -725,6 +741,7 @@ export class AdtFunctionGroup
       this.connection,
       config.functionGroupName,
     );
+    this.lockTracker.track(config.functionGroupName, lockHandle);
     return lockHandle;
   }
 
@@ -746,18 +763,21 @@ export class AdtFunctionGroup
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.functionGroupName);
     return {
       unlockResult: result,
       errors: [],
     };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IFunctionGroupConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('function group');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('function group');
   }

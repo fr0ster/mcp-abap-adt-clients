@@ -233,9 +233,7 @@ export function parseSystemDefaultVariant(
  * Extract the runId from an ATC run response.
  * SAP returns the run path via the Location header; the runId is the final segment.
  */
-export function extractAtcRunId(
-  response: AxiosResponse,
-): string | undefined {
+export function extractAtcRunId(response: AxiosResponse): string | undefined {
   const headers = response.headers ?? {};
   const location =
     (typeof headers.location === 'string' ? headers.location : undefined) ??

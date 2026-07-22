@@ -21,12 +21,17 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
   IAdtOperationOptions,
+  IAdtSourceObject,
   ILogger,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { activateTransformation } from './activation';
 import { checkTransformation } from './check';
@@ -48,21 +53,29 @@ import {
   getTransformationVersions,
 } from './versions';
 export class AdtTransformation
-  implements IAdtObject<ITransformationConfig, ITransformationState>
+  implements IAdtSourceObject<ITransformationConfig, ITransformationState>
 {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Transformation';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (transformationName, lockHandle) =>
+        unlockTransformation(this.connection, transformationName, lockHandle),
+    );
   }
 
   /**
@@ -321,6 +334,7 @@ export class AdtTransformation
         this.connection,
         config.transformationName,
       );
+      this.lockTracker.track(config.transformationName, lockHandle);
       this.logger?.info?.('Transformation locked, handle:', lockHandle);
 
       // 2. Check inactive with code for update (from options or config)
@@ -352,12 +366,13 @@ export class AdtTransformation
         );
         this.logger?.info?.('Transformation updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
           await this.read(
             { transformationName: config.transformationName },
-            'active',
+            'inactive',
             { withLongPolling: true },
           );
           this.logger?.info?.('object is ready after update');
@@ -380,6 +395,7 @@ export class AdtTransformation
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.transformationName);
         lockHandle = undefined;
         this.logger?.info?.('Transformation unlocked');
       }
@@ -450,6 +466,7 @@ export class AdtTransformation
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.transformationName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -586,6 +603,7 @@ export class AdtTransformation
       this.connection,
       config.transformationName,
     );
+    this.lockTracker.track(config.transformationName, lockHandle);
     return lockHandle;
   }
 
@@ -607,6 +625,7 @@ export class AdtTransformation
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.transformationName);
     return {
       unlockResult: result,
       errors: [],

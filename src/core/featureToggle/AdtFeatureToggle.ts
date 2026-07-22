@@ -28,6 +28,11 @@ import type {
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { activateFeatureToggle } from './activation';
 import { checkFeatureToggle } from './check';
@@ -36,7 +41,7 @@ import { create as createFeatureToggle } from './create';
 import { checkDeletion, deleteFeatureToggle } from './delete';
 import { getFeatureToggleState } from './getState';
 import { lockFeatureToggle } from './lock';
-import { type IReadOptions, readFeatureToggle } from './read';
+import { readFeatureToggle } from './read';
 import { readFeatureToggleSource } from './readSource';
 import { toggleFeatureToggle } from './switch';
 import type {
@@ -55,16 +60,24 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
   private readonly connection: IAbapConnection;
   private readonly logger?: ILogger;
   private readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'FeatureToggle';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (featureToggleName, lockHandle) =>
+        unlockFeatureToggle(this.connection, featureToggleName, lockHandle),
+    );
   }
 
   /**
@@ -161,6 +174,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
           this.logger,
         );
         state.lockHandle = lockHandle;
+        this.lockTracker.track(config.featureToggleName, lockHandle);
         config.onLock?.(lockHandle);
         this.logger?.info?.('Feature toggle locked, handle:', lockHandle);
 
@@ -182,6 +196,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
           lockHandle,
         );
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.featureToggleName);
         lockHandle = undefined;
         this.logger?.info?.('Feature toggle unlocked');
 
@@ -211,6 +226,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
             config.featureToggleName,
             lockHandle,
           );
+          this.lockTracker.untrack(config.featureToggleName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -246,7 +262,9 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
   async read(
     config: Partial<IFeatureToggleConfig>,
     version?: 'active' | 'inactive',
-    options?: IReadOptions,
+    // withLongPolling accepted per IAdtObject, but not forwarded: SFW readiness
+    // is a plain GET (endpoint support unverified — on-prem only).
+    options?: { withLongPolling?: boolean },
   ): Promise<IFeatureToggleState | undefined> {
     if (!config.featureToggleName) {
       throw new Error('Feature toggle name is required');
@@ -257,7 +275,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         this.connection,
         config.featureToggleName,
         version ?? 'active',
-        options,
       );
       return {
         readResult: response,
@@ -385,6 +402,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         this.logger,
       );
       state.lockHandle = lockHandle;
+      this.lockTracker.track(fullConfig.featureToggleName, lockHandle);
       fullConfig.onLock?.(lockHandle);
       this.logger?.info?.('Feature toggle locked, handle:', lockHandle);
 
@@ -427,13 +445,13 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         this.logger?.info?.('Feature toggle source uploaded');
       }
 
+      // Poll the inactive version: the write above produced it; the active version may not exist yet.
       // 3.5. Read with long polling to ensure object is ready after update
       this.logger?.info?.('read (wait for object ready after update)');
       try {
         const readState = await this.read(
           { featureToggleName: fullConfig.featureToggleName },
-          'active',
-          { withLongPolling: true },
+          'inactive',
         );
         if (readState) {
           state.readResult = readState.readResult;
@@ -455,6 +473,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
         lockHandle,
       );
       this.connection.setSessionType('stateless');
+      this.lockTracker.untrack(fullConfig.featureToggleName);
       lockHandle = undefined;
       this.logger?.info?.('Feature toggle unlocked');
 
@@ -485,7 +504,6 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
           const readState = await this.read(
             { featureToggleName: fullConfig.featureToggleName },
             'active',
-            { withLongPolling: true },
           );
           if (readState) {
             state.readResult = readState.readResult;
@@ -513,6 +531,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
             lockHandle,
           );
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(fullConfig.featureToggleName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -663,6 +682,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
       config.featureToggleName,
       this.logger,
     );
+    this.lockTracker.track(config.featureToggleName, lockHandle);
     return lockHandle;
   }
 
@@ -684,6 +704,7 @@ export class AdtFeatureToggle implements IFeatureToggleObject {
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.featureToggleName);
     return { errors: [] };
   }
 

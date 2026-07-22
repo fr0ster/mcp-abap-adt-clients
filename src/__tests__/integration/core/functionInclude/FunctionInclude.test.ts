@@ -13,7 +13,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type {
+  IAbapConnection,
+  IAdtObject,
+  ILogger,
+} from '@mcp-abap-adt/interfaces';
 import * as dotenv from 'dotenv';
 import type { AdtClient } from '../../../../clients/AdtClient';
 import type {
@@ -80,7 +84,12 @@ describe('FunctionInclude (using AdtClient)', () => {
       hasConfig = true;
 
       tester = new BaseTester<IFunctionIncludeConfig, IFunctionIncludeState>(
-        client.getFunctionInclude(),
+        // getFunctionInclude() is narrowed to its honest capability composite
+        // (no readTransport); cast through the full interface.
+        client.getFunctionInclude() as unknown as IAdtObject<
+          IFunctionIncludeConfig,
+          IFunctionIncludeState
+        >,
         'FunctionInclude',
         'create_function_include',
         'adt_function_include',

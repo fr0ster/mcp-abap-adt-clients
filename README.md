@@ -68,8 +68,9 @@ This package is responsible for:
 
 This package interacts with external packages **ONLY through interfaces**:
 
-- **`@mcp-abap-adt/connection`**: Uses `AbapConnection` interface for HTTP requests - does not know about concrete connection implementation
-- **No direct dependencies on other packages**: All interactions happen through well-defined interfaces
+- **`@mcp-abap-adt/interfaces`** (`^11.0.0`): The contract package — the single definition site for every public type this package exposes (see [Type System](#type-system)). This is the one runtime dependency whose *types* are part of this package's public API.
+- **`@mcp-abap-adt/connection`**: Uses the `IAbapConnection` interface for HTTP requests — does not know about the concrete connection implementation. It is a **dev** dependency; consumers supply their own implementation.
+- **No other direct package dependencies**: all remaining interactions happen through well-defined interfaces
 
 ## Installation
 
@@ -515,18 +516,32 @@ Refer to the TypeScript typings (`src/index.ts`) for the full API surface.
 
 ## Type System
 
-### Centralized Type Definitions
+### Single Definition Site: `@mcp-abap-adt/interfaces`
 
-All type definitions are centralized in module-specific `types.ts` files:
+Since **7.5.0**, every public type is **defined once**, in `@mcp-abap-adt/interfaces` (`^11.0.0`). This package no longer declares its own copies — the low-level `*Params` interfaces, every `IXxxConfig`/`IXxxState` pair, the option/result types, and the cross-cutting types in `src/core/shared/types.ts` are all re-exports.
+
+**Prefer importing types straight from the contract package:**
 
 ```typescript
-// Import types from module exports
+// Recommended — import types from the contract package
 import type {
   IClassConfig,
   IClassState,
   IProgramConfig
-} from '@mcp-abap-adt/adt-clients';
+} from '@mcp-abap-adt/interfaces';
+
+// Still works — this package re-exports the same types unchanged
+import type { IClassConfig } from '@mcp-abap-adt/adt-clients';
 ```
+
+Both forms resolve to the identical type. The re-exports exist so that existing code keeps compiling; new code should depend on `@mcp-abap-adt/interfaces` directly, so that types travel independently of this client's release cycle.
+
+Two categories deliberately remain local, because they describe *this client* rather than the wire contract:
+
+- Runtime (value) exports: `ENHANCEMENT_TYPE_CODES` and the enhancement URL helpers, `resolveBindingVariant` / `SERVICE_BINDING_VARIANT_MAP`.
+- `IAdtClientOptions` — constructor options for `AdtClient` itself.
+
+> **Version pairing.** Because the types are now sourced rather than copied, `@mcp-abap-adt/interfaces` is a hard peer of this package's public API. A major bump there implies a bump here; keep the two in step rather than letting a resolver pick a mismatched pair.
 
 ### Naming Conventions
 
@@ -556,7 +571,7 @@ This dual convention:
 - Provides familiar camelCase for JavaScript/TypeScript consumers
 - Enables proper type checking at each layer
 
-See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-organization) for details.
+See [Architecture Documentation](docs/architecture/ARCHITECTURE.md#type-system-and-exports) for details.
 
 ## Migration Guide
 

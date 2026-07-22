@@ -24,13 +24,22 @@
 import type {
   HttpError,
   IAbapConnection,
-  IAdtObject,
+  IAdtCheckable,
+  IAdtCrud,
+  IAdtLockable,
   IAdtOperationOptions,
+  IAdtTransportAware,
+  IAdtValidatable,
   ILogger,
   IObjectVersion,
 } from '@mcp-abap-adt/interfaces';
 import type { IAdtSystemContext } from '../../clients/AdtClient';
 import { safeErrorMessage } from '../../utils/internalUtils';
+import {
+  createLockTracker,
+  type LockRegistry,
+  type LockTracker,
+} from '../shared/LockRegistry';
 import type { IReadOptions } from '../shared/types';
 import { throwUnsupportedVersions } from '../shared/versions';
 import { checkPackage } from './check';
@@ -42,20 +51,35 @@ import type { IPackageConfig, IPackageState } from './types';
 import { unlockPackage } from './unlock';
 import { updatePackage } from './update';
 import { validatePackageBasic } from './validation';
-export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
+export class AdtPackage
+  implements
+    IAdtCrud<IPackageConfig, IPackageState>,
+    IAdtValidatable<IPackageConfig, IPackageState>,
+    IAdtCheckable<IPackageConfig, IPackageState>,
+    IAdtLockable<IPackageConfig, IPackageState>,
+    IAdtTransportAware<IPackageConfig, IPackageState>
+{
   protected readonly connection: IAbapConnection;
   protected readonly logger?: ILogger;
   protected readonly systemContext: IAdtSystemContext;
+  private readonly lockTracker: LockTracker;
   public readonly objectType: string = 'Package';
 
   constructor(
     connection: IAbapConnection,
     logger?: ILogger,
     systemContext?: IAdtSystemContext,
+    lockRegistry?: LockRegistry,
   ) {
     this.connection = connection;
     this.logger = logger;
     this.systemContext = systemContext ?? {};
+    this.lockTracker = createLockTracker(
+      lockRegistry,
+      this.objectType,
+      (packageName, lockHandle) =>
+        unlockPackage(this.connection, packageName, lockHandle),
+    );
   }
 
   /**
@@ -381,6 +405,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       const lockResult = await lockPackage(this.connection, config.packageName);
       lockHandle = lockResult.lockHandle;
       lockCorrNr = lockResult.corrNr;
+      this.lockTracker.track(config.packageName, lockHandle);
       this.logger?.info?.(
         `Package locked, handle: ${lockHandle}, corrNr: ${lockCorrNr}`,
       );
@@ -426,10 +451,11 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         );
         this.logger?.info?.('Package updated');
 
+        // Poll the inactive version: the write above produced it; the active version may not exist yet.
         // 3.5. Read with long polling (wait for object to be ready after update)
         this.logger?.info?.('read (wait for object ready after update)');
         try {
-          await this.read({ packageName: config.packageName }, 'active', {
+          await this.read({ packageName: config.packageName }, 'inactive', {
             withLongPolling: true,
           });
           this.logger?.info?.('object is ready after update');
@@ -448,6 +474,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
         this.connection.setSessionType('stateful');
         await unlockPackage(this.connection, config.packageName, lockHandle);
         this.connection.setSessionType('stateless');
+        this.lockTracker.untrack(config.packageName);
         lockHandle = undefined;
         this.logger?.info?.('Package unlocked');
       }
@@ -471,6 +498,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
           this.connection.setSessionType('stateful');
           await unlockPackage(this.connection, config.packageName, lockHandle);
           this.connection.setSessionType('stateless');
+          this.lockTracker.untrack(config.packageName);
         } catch (unlockError) {
           this.logger?.warn?.(
             'Failed to unlock during cleanup:',
@@ -538,6 +566,8 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
   /**
    * Activate package
    * Note: Packages don't have activate operation - this is a stub
+   *
+   * @deprecated Not part of this handler's capability set; throws. Removed in a later major.
    */
   async activate(_config: Partial<IPackageConfig>): Promise<IPackageState> {
     throw new Error(
@@ -579,6 +609,7 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
 
     this.connection.setSessionType('stateful');
     const lockResult = await lockPackage(this.connection, config.packageName);
+    this.lockTracker.track(config.packageName, lockResult.lockHandle);
     return lockResult.lockHandle;
   }
 
@@ -600,18 +631,21 @@ export class AdtPackage implements IAdtObject<IPackageConfig, IPackageState> {
       lockHandle,
     );
     this.connection.setSessionType('stateless');
+    this.lockTracker.untrack(config.packageName);
     return {
       unlockResult: result,
       errors: [],
     };
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersions(
     _config: Partial<IPackageConfig>,
   ): Promise<IObjectVersion[]> {
     throwUnsupportedVersions('package');
   }
 
+  /** @deprecated Not part of this handler's capability set; throws. Removed in a later major. */
   async getVersionSource(_contentUri: string): Promise<string> {
     throwUnsupportedVersions('package');
   }
