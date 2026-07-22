@@ -197,6 +197,8 @@ export type {
 
 Rationale: the two packages previously held independent copies of the same interfaces, and they drifted silently — a field required on one side and optional on the other produced no error anywhere. A single definition site makes that class of bug impossible.
 
+**Honest capability types (8.0.0).** The fat `IAdtObject` contract is split into capability atoms in `@mcp-abap-adt/interfaces` (`IAdtCrud`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware`), plus composites `IAdtSourceObject` (all seven) and `IAdtNonVersionedObject` (all but versions). Each `Adt<Object>` class `implements` only the atoms it genuinely supports — a handler that lacks a capability no longer carries a throwing stub in its declared type — and `AdtClient.getXxx()` return types are narrowed to that honest set. Calling a capability a handler lacks (`getDomain().getVersions()`) is a compile error, not a runtime `ADT_UNSUPPORTED_OPERATION` throw. `IAdtObject` stays as a `@deprecated` full-capability composite for backward compatibility. Deferred (still return the wide type): `getFeatureToggle`/`getServiceBinding` (widening interfaces) and `getRequest`/`getUnitTest`/`getCdsUnitTest` (wrong-contract).
+
 Package root (`src/index.ts`) exports:
 - client classes (`AdtClient`, runtime/ws/executor clients),
 - selected runtime/debugger types,

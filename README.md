@@ -427,7 +427,7 @@ See [Tools Documentation](tools/README.md) for complete details and options.
 ### AdtClient Overview
 
 - Factory accessors for ADT objects: `client.getClass()`, `client.getProgram()`, `client.getDdl()` (DDL sources — CDS views, AMDP table functions; formerly `getView()`), `client.getTable()`, `client.getScalarFunction()`, `client.getScalarFunctionImplementation()`, `client.getAppendStructure()`, `client.getRequest()`, `client.getUtils()`, etc.
-- Each accessor returns an `Adt*` object implementing `IAdtObject` operations.
+- Each accessor returns an `Adt*` object typed to its **honest capability set** (since 8.0.0). A full source-backed object (e.g. `getClass()`) returns `IAdtSourceObject`; one with no version history (e.g. `getDomain()`) returns `IAdtNonVersionedObject`; others return the intersection of the capability atoms they actually support. Calling a capability a handler lacks — e.g. `client.getDomain().getVersions(...)` — is now a **compile error** rather than a runtime throw. See the [Type System](#type-system) section.
 - See `src/index.ts` for the full type exports and object configs.
 
 ### AdtObject Methods (with Long Polling Support)
@@ -535,6 +535,21 @@ import type { IClassConfig } from '@mcp-abap-adt/adt-clients';
 ```
 
 Both forms resolve to the identical type. The re-exports exist so that existing code keeps compiling; new code should depend on `@mcp-abap-adt/interfaces` directly, so that types travel independently of this client's release cycle.
+
+### Honest capability types (since 8.0.0)
+
+`@mcp-abap-adt/interfaces` (`^11.2.0`) splits the fat `IAdtObject` contract into **capability atoms** — `IAdtCrud`, `IAdtValidatable`, `IAdtCheckable`, `IAdtActivatable`, `IAdtLockable`, `IAdtVersionable`, `IAdtTransportAware` — each covering one slice of the lifecycle, plus two named composites (`^11.3.0`): `IAdtSourceObject` (all seven) and `IAdtNonVersionedObject` (all but versions).
+
+Since **8.0.0**, each handler `implements` only the atoms it genuinely supports, and `AdtClient.getXxx()` (and `AdtClientBatch.getXxx()`) return types are narrowed to match:
+
+```typescript
+client.getClass().getVersions({ className: 'ZCL_X' });   // ✅ classes have version history
+client.getDomain().getVersions({ domainName: 'ZD_X' });  // ❌ compile error — domains have no /source/main
+```
+
+Previously the second call compiled and threw `ADT_UNSUPPORTED_OPERATION` at runtime; now the type system rejects it. This is why 8.0.0 is a major: it is breaking **only** for code that called a capability a handler never had (i.e. code that always threw).
+
+`IAdtObject` remains available but is **`@deprecated`** — it is the full-capability composite, structurally identical to `IAdtSourceObject`, kept for backward compatibility and removed in a later major. A handful of accessors still return the wide type pending follow-up work: `getFeatureToggle`, `getServiceBinding` (widening interfaces), and `getRequest`, `getUnitTest`, `getCdsUnitTest` (contract still being reconsidered).
 
 Two categories deliberately remain local, because they describe *this client* rather than the wire contract:
 
