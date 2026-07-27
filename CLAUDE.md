@@ -96,6 +96,7 @@ Error handling in chains: automatic unlock + `setSessionType('stateless')` on an
 - All dependencies must resolve from npm registry only. No local links or symlinks (`"link": true`) in `package-lock.json`. Sibling repos exist in parent directory — npm may auto-link them. Always verify after `npm install`.
 - Biome config: single quotes, semicolons always, indent 2 spaces
 - `noExplicitAny: warn` in production code, relaxed in tests
+- **All diagnostic output goes through an injected `ILogger` — never `console.*`.** This holds for test helpers and stubs as much as for library code: a logger stays silent unless the caller asks for output, so runs stay clean and one helper serves both quiet and verbose use, while a `console.*` call cannot be turned off by the caller. Give a helper an optional `logger?: ILogger` parameter and call `logger?.debug('message', { meta })`. Enforced by `noConsole` — `error` in production code, `warn` in tests (existing test occurrences are debt, not a precedent)
 
 ## Testing Notes
 
