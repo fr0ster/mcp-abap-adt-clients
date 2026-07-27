@@ -317,7 +317,16 @@ session it was given no longer exists — the E19 shape was HTTP 400 with
 `statusText: "Session not found"`, arriving in ~60 ms with the cookie present —
 the connector classifies it as a lost session and surfaces
 `SESSION_REPLACED` semantics: the lock handle is dead, and no internal retry is
-attempted. The exact status/text match is landscape-specific, so the probe
+attempted.
+
+**On that classification the connector marks the lifecycle disconnected**, the
+same as for a known replacement. This is load-bearing, not bookkeeping: a dead
+session leaves the cookie — and therefore the fingerprint — completely unchanged,
+so identity comparison cannot see it. Only the state can. Anything downstream
+that needs to know whether a session is still usable must ask the connector, and
+must never infer usability from an unchanged fingerprint.
+
+The exact status/text match is landscape-specific, so the probe
 listed under Testing must record what the target systems actually return before
 this classification is relied upon; until then it is a documented gap rather than
 a silent one.
@@ -361,15 +370,27 @@ Two consequences drawn from the E19 log:
   `validate` and `create`, once the object already exists. Checking
   `connection.isConnected()` before the first `IAdtObject` operation turns
   "object created, then an error" into "nothing happened".
-- **`LockRegistry`** captures the fingerprint alongside the handle at `lock()` and
-  compares before unlocking. On a mismatch it does **not** send the unlock — a
-  dead session has nothing to unlock with, and the request would fail
-  predictably. The lock is returned in `LockFailure[]` (the structure already
-  exists) with "session replaced, lock left on the server". `unlockAll()` stops
-  producing noise and starts telling the truth.
-- **Operation chains** currently attempt an unconditional unlock in their catch
-  blocks. That becomes conditional on the same comparison: same session → unlock
-  as before; replaced → leave it and record a dangling lock.
+- **`LockRegistry`** captures the fingerprint alongside the handle at `lock()`.
+  Before unlocking it evaluates a precondition with **two** parts, and both are
+  required:
+
+  ```
+  send UNLOCK  iff  connection.isConnected()  AND  identity === captured identity
+  ```
+
+  The state comes first on purpose. A dead ABAP session leaves the cookie — and
+  therefore the fingerprint — unchanged, so comparison alone would happily send
+  an UNLOCK into a session that no longer exists, which is precisely the internal
+  retry this design forbids. When the precondition fails, the lock is returned in
+  `LockFailure[]` (the structure already exists) with "session lost, lock left on
+  the server". `unlockAll()` stops producing noise and starts telling the truth.
+- **Operation chains** decide from the **error in hand**, not from a comparison.
+  If the failure that entered the catch block carries `code === SESSION_REPLACED`
+  or `code === NOT_CONNECTED`, the unlock is skipped unconditionally and a
+  dangling lock is recorded. Only for any other failure does the chain fall
+  through to the `LockRegistry` precondition above. Inferring "the session is
+  probably fine" from an unchanged fingerprint is exactly the mistake this rule
+  exists to prevent. Today those catch blocks attempt an unconditional unlock.
 
 ## Testing
 
@@ -377,7 +398,7 @@ Two consequences drawn from the E19 log:
 |---|---|---|
 | `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule** | not needed |
 | connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
-| adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session | not needed |
+| adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged** | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
 distinct session per discovery fetch, which is what makes "replacement while
@@ -395,6 +416,11 @@ they matter more than the rest of the set:
 3. **Credential renewal under `stateful` throws before teardown.** Do it in the
    other order and `SESSION_REPLACED` can never fire on paths C and E — the very
    paths the rule exists for.
+4. **A dead session sends no UNLOCK, with the fingerprint unchanged.** The stub
+   answers the in-window request with the dead-session shape while leaving every
+   cookie in place. Decide from the comparison alone and the cleanup path posts an
+   UNLOCK into a session that no longer exists — the internal retry this design
+   forbids, arriving through the back door.
 
 **Needs a live system — three items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
