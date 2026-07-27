@@ -280,12 +280,20 @@ class SessionLifecycle {
   ): Promise<void>;
   /**
    * Marks the session unusable synchronously, before a teardown's first await.
-   * `origin: 'caller'` also bumps the teardown epoch, cancelling any queued
-   * recovery; `origin: 'internal'` (a cleanup started from inside request
-   * handling) must not, or a recovery would cancel itself.
+   * `origin: 'caller'` also bumps the teardown epoch, which cancels any recovery
+   * belonging to a request admitted earlier — whether that recovery is already
+   * queued, still being prepared, or has not yet failed. `origin: 'internal'`
+   * (a cleanup started from inside request handling) must not bump, or a
+   * recovery would cancel itself.
    */
   beginTeardown(origin: 'caller' | 'internal'): void;
-  /** Epoch to capture when queueing a recovery; a change means "abandon". */
+  /**
+   * The CURRENT epoch, read at a recovery's turn and compared against the
+   * baseline its RequestLease captured at admission; a difference means
+   * "abandon". Never capture a baseline from here — reading it when the
+   * recovery is queued reopens the window this rule closes, because a teardown
+   * requested between the failure and the queueing would already be reflected.
+   */
   get teardownEpoch(): number;
   /**
    * Admits a request: asserts usability and counts it in, in ONE synchronous
