@@ -271,8 +271,15 @@ class SessionLifecycle {
     kind: 'connect' | 'disconnect' | 'recover',
     run: () => Promise<void>,
   ): Promise<void>;
-  /** Marks the session unusable synchronously, before a teardown's first await. */
-  beginTeardown(): void;
+  /**
+   * Marks the session unusable synchronously, before a teardown's first await.
+   * `origin: 'caller'` also bumps the teardown epoch, cancelling any queued
+   * recovery; `origin: 'internal'` (a cleanup started from inside request
+   * handling) must not, or a recovery would cancel itself.
+   */
+  beginTeardown(origin: 'caller' | 'internal'): void;
+  /** Epoch to capture when queueing a recovery; a change means "abandon". */
+  get teardownEpoch(): number;
   /**
    * Admits a request: asserts usability and counts it in, in ONE synchronous
    * step. Returns the completion callback the caller must invoke on settle.
@@ -357,7 +364,8 @@ other; it says nothing about a transition against a request already in progress.
 
 So `disconnect()` has three steps, in this order:
 
-1. mark the session unusable — synchronously, before any await, so no further
+1. mark the session unusable **and bump the teardown epoch** — synchronously, at
+   call time, before any await, so no further
    request enters;
 2. **await the in-flight requests to settle** (the drain);
 3. only then release the transport resource and clear the state.
@@ -439,12 +447,33 @@ no longer is. With it gone from the set, the cleanup drains and runs, and the
 ring is open.
 
 **Recovery re-establishment is its own transition kind (`recover`), and it yields
-to a caller's teardown.** On its turn it checks whether a caller-initiated
-`disconnect()` has run since it was queued. If so it does **not** connect, and
-the request fails; the retry never happens. A caller who said "I am done" must
-not have a session resurrected under them by a retry they never saw — requests do
-not outrank the lifecycle. Otherwise it re-establishes, the request re-admits,
-and the retry proceeds.
+to a caller's teardown.** A caller who said "I am done" must not have a session
+resurrected under them by a retry they never saw — requests do not outrank the
+lifecycle.
+
+Checking whether a teardown *has run* cannot express this, because FIFO puts a
+`disconnect()` called after `recover` was queued **behind** it: at `recover`'s
+turn that teardown has not run, and never will have. What matters is whether one
+was **requested**, not whether it has executed.
+
+So the lifecycle carries a **teardown epoch**:
+
+- a caller-initiated teardown increments it **synchronously at call time**, in
+  the same step that marks the session unusable — before anything is queued and
+  long before that teardown's turn arrives;
+- `recover` **captures the epoch when it is queued**, and on its turn abandons —
+  no re-establishment, the request fails — if the epoch has moved.
+
+The distinction that keeps this from eating itself: **only caller-initiated
+teardown bumps the epoch.** A cleanup queued from inside request handling —
+`reset()` called by a recovery path, `onCredentialRenewed()` on C and E — does
+not. Were it to bump, a recovery would cancel itself on the very teardown it just
+initiated, which is the deadlock's mirror image: not a hang, but a retry that can
+never happen. The seam is the same one drawn earlier — caller-initiated versus
+initiated from within an admitted request.
+
+Otherwise `recover` re-establishes, the request re-admits, and the retry
+proceeds.
 
 ### Why the guard's disconnect half is load-bearing
 
@@ -782,10 +811,16 @@ they matter more than the rest of the set:
     waits for its re-establishment, the re-establishment waits behind the cleanup.
     Give the test a hard timeout so the failure reads as a deadlock rather than a
     slow test.
-12. **A caller's `disconnect()` beats a recovery to the queue.** Same setup, but
-    `disconnect()` is called while the recovery is queued. The recovery must not
-    re-establish and the request must fail — never a session resurrected under a
-    caller who asked for teardown.
+12. **A caller's `disconnect()` beats a recovery it queued behind.** Same setup,
+    but `disconnect()` is called **after** the recovery is already queued — the
+    order FIFO cannot resolve on its own. The recovery must still abandon: no
+    re-establishment, the request fails. An implementation that asks "has a
+    teardown run?" passes a weaker test and fails this one, because at the
+    recovery's turn that teardown is still sitting behind it in the queue.
+13. **An internal cleanup does not cancel its own recovery.** Path E again, with
+    no caller teardown anywhere. The recovery must complete. An implementation
+    that bumps the epoch from an internally-initiated cleanup cancels the retry it
+    just set up — the mirror of the deadlock, silent instead of hanging.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
