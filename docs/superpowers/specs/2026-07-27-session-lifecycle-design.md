@@ -55,7 +55,7 @@ Each of these was a fork with a real alternative; the alternative and the reason
 for rejecting it are recorded so the choice can be revisited on evidence rather
 than reopened from scratch.
 
-### D1 — A forced session replacement is fatal only inside a stateful window
+### D1 — A forced session replacement is fatal while a lock is held
 
 Two kinds of recovery already exist in the connector and must not be treated
 alike:
@@ -66,7 +66,7 @@ alike:
   after a fresh login form or a fresh JWT the old ABAP session cannot be kept.
 
 The second kind cannot be forbidden. It is made explicit instead: transparent
-outside a stateful window, fatal inside one.
+transparent while no lock is held, fatal while one is.
 
 Rejected: throwing on every forced replacement. It would break the automatic
 recovery that read-only consumers rely on today and see no problem with.
@@ -74,8 +74,15 @@ Rejected: never throwing and only exposing identity — that relies on every
 caller remembering to check, and forgetting to check is what produced the
 orphaned lock.
 
-`stateful` mode is the signal for "a lock is held". It needs no new API and our
-chains already keep the whole lock window stateful.
+**"A lock is held" means `openWindows.length > 0`, not `sessionMode ===
+'stateful'`.** An earlier draft used the mode, which reads naturally and is
+wrong: this design keeps `openWindows` precisely because a mode flag cannot
+represent windows — a second window opening inside the first is invisible in it,
+and the mode can be flipped back to `stateless` by another handler, or never set
+at all by a batch, while a lock is genuinely open. Deciding a fatal-or-not
+question on the weaker signal means a replacement passes as harmless and the
+recovery quietly retries an operation whose lock is gone. The lifecycle already
+tracks the real thing; D1 asks it.
 
 ### D2 — `disconnect()` sends no ADT session-close; it does release transport resources
 
@@ -792,8 +799,8 @@ this request    → waits for its internal re-establishment
 re-establishment → queued behind the cleanup
 ```
 
-Nothing in that ring can move. Note it applies only **outside** a stateful
-window: inside one, `onCredentialRenewed()` throws `SESSION_REPLACED` and there
+Nothing in that ring can move. Note it applies only when **no lock is held**:
+with a window open, `onCredentialRenewed()` throws `SESSION_REPLACED` and there
 is no recovery to deadlock.
 
 Two rules break the ring, and both are needed:
@@ -946,8 +953,8 @@ accepted, so the connection is connected with a `null` identity.
 
 The unit knows nothing about session mode, locks or auth. The connection asks
 `observe(newIdentity)` and applies the D1 policy in one readable place. Result
-`'replaced'` **and** mode `stateful` is a lost session, so it raises one — the
-throw alone is not the whole answer:
+`'replaced'` **while a lock window is open** is a lost session, so it raises one
+— the throw alone is not the whole answer:
 
 ```ts
 this.lifecycle.beginTeardown({ origin: 'internal', sessionLost: true });
@@ -960,8 +967,8 @@ while the old one's lock can no longer be reached through it, and a later
 graceful `disconnect()` then spends the whole ceiling waiting on a window
 belonging to a session that is gone.
 
-Outside a stateful window the same `'replaced'` is not a loss: nothing was being
-held, so the new identity simply becomes the current one and work continues.
+With no window open the same `'replaced'` is not a loss: nothing was being held,
+so the new identity simply becomes the current one and work continues.
 That is the transparent recovery D1 keeps.
 
 ### The three raisers of a session-lost teardown
@@ -994,7 +1001,7 @@ every re-establishment:
   `NOT_CONNECTED`. The connector never connects on a caller's behalf.
 - Inside a **recovery it is already performing** — a bounded, logged reaction to
   a request that has already failed (paths C, D-second-branch, E) — the connector
-  may re-establish, and only when the mode is not `stateful`. This is the
+  may re-establish, and only when no lock window is open. This is the
   transparent recovery D1 keeps; it is bounded to one in-flight request, and the
   new identity becomes the one `getSessionIdentity()` reports, so a caller that
   captured the old one sees the change rather than being told about it.
@@ -1015,7 +1022,7 @@ something a future provider supplies. The lifecycle must not branch on it:
  * already know the old session is gone.
  */
 protected onCredentialRenewed(): void {
-  const wasStateful = this.sessionMode === 'stateful';
+  const holdsLock = this.lifecycle.openWindows.length > 0;
 
   // Synchronous: admit nothing further. 'internal' because this teardown comes
   // from inside request handling — bumping the epoch here would cancel the very
@@ -1028,7 +1035,7 @@ protected onCredentialRenewed(): void {
   // so it can never re-establish on top of stale transport state.
   this.lifecycle.transition('cleanup', () => this.cleanupSession());
 
-  if (wasStateful) {
+  if (holdsLock) {
     throw sessionError(ADT_SESSION_ERROR.SESSION_REPLACED);
   }
 }
@@ -1178,14 +1185,14 @@ a silent one.
 ## Recovery paths under the new rules
 
 One rule: **recovery that preserves session identity is untouched; recovery that
-must replace it is transparent outside a stateful window and fatal inside one.**
+must replace it is transparent while no lock is held and fatal while one is.**
 
 | path | today | after |
 |---|---|---|
 | **LOCK itself** | — | the lock response may add a second identifier for the same session. Additive rule → `established`, **not** `replaced`. Acquiring a lock must never throw |
 | **A.** first token on a mutation | implicit `connect()` | not connected → `NOT_CONNECTED`. Connected but no token → fetch allowed; cookies alive, identity `unchanged` |
 | **B.** CSRF retry on 403 | fetch with cookies, retry | **unchanged.** The fingerprint ignores `sap-XSRF_*`, so `unchanged` — the path works as before |
-| **C.** login-form 401 (basic) | `invalidateSession()` → new session, silently | credential renewal → `onCredentialRenewed()`. Outside stateful: the attempt leaves the drain accounting, a `recover` transition re-establishes, the request re-admits and retries; replacement logged. Inside stateful: `SESSION_REPLACED`, no recovery |
+| **C.** login-form 401 (basic) | `invalidateSession()` → new session, silently | credential renewal → `onCredentialRenewed()`. No lock held: the attempt leaves the drain accounting, a `recover` transition re-establishes, the request re-admits and retries; replacement logged. Lock held: `SESSION_REPLACED`, no recovery |
 | **D.** 401 on GET | cookies present → retry; absent → fetch | first branch unchanged (same identity); the second means the session is already gone → as C |
 | **E.** JWT 401/403 | `tryRefreshToken()` → `reset()` → silent retry in a new session | the same `onCredentialRenewed()` and the same fork; no JWT-specific code |
 
@@ -1359,12 +1366,12 @@ Two consequences drawn from the E19 log:
 | level | covers | SAP |
 |---|---|---|
 | `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule**, **serialization: tail-only joining, opposite calls queue and re-evaluate**, **admit/drain accounting** | not needed |
-| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; **a failed close retains the client, and `connect()` neither overwrites it nor proceeds past it: it retries the release and rejects with `RELEASE_PENDING` if that fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
+| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal while a lock is held throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; **a failed close retains the client, and `connect()` neither overwrites it nor proceeds past it: it retries the release and rejects with `RELEASE_PENDING` if that fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
 | adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged**; **batch: recorder window calls stay local, a payload with an unmatched `LOCK` throws at build time, and a submission carrying a `LOCK` keeps a real window open unless the response proves the `UNLOCK` ran** | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
 distinct session per discovery fetch, which is what makes "replacement while
-stateful throws" testable without SAP. For the additive rule it needs one
+a lock is held throws" testable without SAP. For the additive rule it needs one
 addition: a LOCK response that sets a *second* session-ish cookie alongside the
 first.
 
@@ -1375,7 +1382,7 @@ they matter more than the rest of the set:
    errors appear where nothing is wrong.
 2. **A LOCK that adds a second identifier does not throw.** Get the additive rule
    wrong and every lock acquisition fails immediately after succeeding.
-3. **Credential renewal under `stateful` throws before teardown.** Do it in the
+3. **Credential renewal while a lock is held throws before teardown.** Do it in the
    other order and `SESSION_REPLACED` can never fire on paths C and E — the very
    paths the rule exists for.
 4. **A dead session sends no UNLOCK, with the fingerprint unchanged.** The stub
@@ -1422,7 +1429,7 @@ they matter more than the rest of the set:
     anything — an implementation that awaits the drain here deadlocks against its
     own caller, since `reset()` is invoked from inside request handling.
 11. **Path E completes rather than deadlocking.** Drive the real recovery, not an
-    external `reset()`: a JWT connection outside a stateful window, a 401 on a
+    external `reset()`: a JWT connection with no lock held, a 401 on a
     request, a refresher that succeeds. The request must re-establish and retry to
     completion. An implementation that keeps the failed attempt in the drain
     accounting hangs here forever — the cleanup waits for the request, the request
@@ -1597,6 +1604,14 @@ they matter more than the rest of the set:
     discarded. Pair with test 13, which requires the opposite for the internal
     path — the two entry points exist precisely because one answer cannot serve
     both.
+35. **A replacement is fatal on the window, not on the mode.** Open a lock
+    window, then set the session type back to `stateless` — the cross-handler
+    flip this spec lists as a separate defect, and the state a batch is in
+    anyway — and rotate the authoritative cookie. It must still throw
+    `SESSION_REPLACED` and raise a session-lost teardown. An implementation
+    checking `sessionMode` treats this as harmless and lets the recovery retry an
+    operation whose lock is already gone, which is the failure D1 exists to
+    prevent, reached through the signal D1 used to trust.
 
 
 **Needs a live system — four items, all preconditions for releasing the
