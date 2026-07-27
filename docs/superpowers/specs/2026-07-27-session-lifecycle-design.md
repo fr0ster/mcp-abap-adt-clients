@@ -129,6 +129,45 @@ surfaces. Widening the interface to carry a release outcome was considered and
 rejected — it would put a transport-specific concern into a contract that four
 other implementations do not have.
 
+### A pending release must survive, and must block reconnection
+
+"Retriable" is empty unless the thing to retry still exists, and today it does
+not. Two facts in `RfcAbapConnection` make a pending release unreachable:
+
+- `close()` sets `this.rfcClient = null` **outside** the catch, so a failed close
+  drops the only reference to a client that is still open;
+- `connect()` assigns `this.rfcClient = new Client(...)` unconditionally, so a
+  reconnect overwrites whatever was there.
+
+Either one alone loses an open ABAP session together with its locks — permanently
+and silently, which is the exact failure class this design exists to remove. Both
+are therefore part of this change:
+
+1. **A failed close retains the client.** It stays in a dedicated pending slot
+   that `connect()` never assigns to. Only a successful close clears it.
+2. **`connect()` with a pending release retries that release first.** On success
+   it proceeds normally. On failure it **rejects** with `RELEASE_PENDING`, leaving
+   the state `disconnected` and the pending client untouched — refusing to open a
+   second session while the first is still held.
+
+Rejected: letting `connect()` proceed and keeping the leaked clients in a list.
+That is bookkeeping without a mechanism — nothing would ever retry them, and the
+list would only record how many sessions we have abandoned.
+
+The cost is real and worth stating: a landscape where close permanently fails
+leaves the connector unusable. That is preferable to a connector that quietly
+accumulates open ABAP sessions holding enqueue locks, and in the common cause of
+a failed close — the network is gone — `connect()` would fail anyway.
+
+`reset()` needs the same treatment for a different reason: it is synchronous
+(`reset(): void { this.close(); }`) and cannot await the close, so it currently
+drops the promise on the floor. Under this design it marks the state
+`disconnected` and the release **pending**, rather than pretending the teardown
+finished.
+
+None of this applies to HTTP, which holds no session-owning resource and can
+never have a release pending.
+
 **Consequence to state plainly: over HTTP, `disconnect()` does not release
 locks.** The ABAP session lives on until its timeout, along with whatever enqueue
 locks it held. Callers unlock first — `unlockAll()` remains the mechanism — and
@@ -198,6 +237,8 @@ getSessionIdentity(): string | null;
 export const ADT_SESSION_ERROR = {
   NOT_CONNECTED: 'ADT_NOT_CONNECTED',
   SESSION_REPLACED: 'ADT_SESSION_REPLACED',
+  /** connect() refused: a previous transport release has not completed (D2). */
+  RELEASE_PENDING: 'ADT_RELEASE_PENDING',
 } as const;
 ```
 
@@ -232,7 +273,10 @@ States: `disconnected` (initial) → `connected` → `disconnected`. `connect()`
 connected connection is a no-op; `disconnect()` on a disconnected one is a no-op
 **only when no release is pending** (D2);
 `connect()` after `disconnect()` is allowed and starts a fresh session with a new
-identity — explicit, therefore unproblematic.
+identity — explicit, therefore unproblematic — **except while a release is
+pending**, where it first retries that release and rejects with
+`RELEASE_PENDING` if the retry fails (D2). Reconnection must never abandon a
+transport resource that is still held.
 
 ### connect() failure semantics
 
@@ -483,7 +527,7 @@ Two consequences drawn from the E19 log:
 | level | covers | SAP |
 |---|---|---|
 | `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule** | not needed |
-| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
+| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; **a failed close retains the client, and `connect()` neither overwrites it nor proceeds past it: it retries the release and rejects with `RELEASE_PENDING` if that fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
 | adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged** | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
@@ -507,6 +551,12 @@ they matter more than the rest of the set:
    cookie in place. Decide from the comparison alone and the cleanup path posts an
    UNLOCK into a session that no longer exists — the internal retry this design
    forbids, arriving through the back door.
+5. **A reconnect never orphans a pending RFC client.** With a close forced to
+   fail, `connect()` must not assign over the retained client: it retries the
+   release, and rejects with `RELEASE_PENDING` when that retry fails. Get this
+   wrong and an open ABAP session holding enqueue locks becomes unreachable —
+   silently, and with no way back through the contract. Testable with a fake RFC
+   client whose `close()` rejects; no SAP and no RFC SDK involved.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
