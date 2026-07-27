@@ -271,6 +271,13 @@ class SessionLifecycle {
   transition(kind: 'connect' | 'disconnect', run: () => Promise<void>): Promise<void>;
   /** Marks the session unusable synchronously, before a teardown's first await. */
   beginTeardown(): void;
+  /**
+   * Admits a request: asserts usability and counts it in, in ONE synchronous
+   * step. Returns the completion callback the caller must invoke on settle.
+   */
+  admitRequest(): () => void;
+  /** Resolves when every admitted request has settled. */
+  drain(): Promise<void>;
   /** Classifies a freshly observed identity. */
   observe(identity: string | null): 'unchanged' | 'established' | 'replaced';
   /** Throws with code NOT_CONNECTED. */
@@ -338,7 +345,43 @@ side.
 | `connect()` | `false` — usability is granted only once establishment succeeds | `NOT_CONNECTED` |
 | `disconnect()` | `false` — **synchronously, before the first await** | `NOT_CONNECTED` |
 
-The `disconnect()` half is the load-bearing one. Reporting the pre-transition
+### Teardown drains in-flight requests
+
+Refusing new requests is only half of "a teardown never overlaps use of the
+resource". A long `makeAdtRequest()` that passed the guard *before*
+`disconnect()` began keeps running, and the teardown would clear its cookies or
+close the RFC client underneath it. Serialization orders transitions against each
+other; it says nothing about a transition against a request already in progress.
+
+So `disconnect()` has three steps, in this order:
+
+1. mark the session unusable — synchronously, before any await, so no further
+   request enters;
+2. **await the in-flight requests to settle** (the drain);
+3. only then release the transport resource and clear the state.
+
+**The drain needs no timeout of its own.** Every request already carries an
+explicit timeout, and one inside a critical section carries the large ceiling
+instead — which is the behaviour we want, since waiting for a lock-window request
+is strictly better than tearing down underneath it. Adding a separate teardown
+timeout would invent a second deadline that could only ever contradict the first.
+
+Requests are counted in, not sampled: the guard check and the increment happen in
+the **same synchronous step**, before any await. Anything else leaves a window
+where a request has been admitted but is not yet visible to the drain — which is
+this very defect, one level down.
+
+Rejected: cancelling in-flight requests instead of draining. It would need abort
+plumbing through five HTTP connection classes, and RFC cannot generally cancel a
+call already in flight — so the guarantee would hold for one transport and not
+the other, which is worse than waiting on both.
+
+`disconnect()` still never throws: a request that fails during the drain settles
+it just as well as one that succeeds.
+
+### Why the guard's disconnect half is load-bearing
+
+Reporting the pre-transition
 state there would let a request pass the guard and run **concurrently with the
 teardown** — against cookies being cleared, or an RFC client being closed
 underneath it. That is precisely the overlap between a transition and use of the
@@ -602,7 +645,7 @@ Two consequences drawn from the E19 log:
 
 | level | covers | SAP |
 |---|---|---|
-| `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule**, **serialization: identical calls join, opposite calls queue and re-evaluate** | not needed |
+| `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule**, **serialization: tail-only joining, opposite calls queue and re-evaluate**, **admit/drain accounting** | not needed |
 | connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; **a failed close retains the client, and `connect()` neither overwrites it nor proceeds past it: it retries the release and rejects with `RELEASE_PENDING` if that fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
 | adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged** | not needed |
 
@@ -650,6 +693,12 @@ they matter more than the rest of the set:
    Assert the observable consequence, not the internals: when the last
    `connect()` resolves, `isConnected()` is `true` — never a resolved connect
    whose session the queue then destroys.
+9. **A slow request that started first is drained, not cut.** Mirror of test 7:
+   the request is admitted, then `disconnect()` is called. The teardown must not
+   release the resource until that request settles, and the request must complete
+   normally rather than fail. Assert the order — request settles, then the
+   release happens — rather than timing. Without this, refusing new requests only
+   narrows the window instead of closing it.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
