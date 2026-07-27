@@ -476,8 +476,9 @@ be allowed to race a caller's `disconnect()`.
   waiting. A `connect()` queued behind a `disconnect()` sees the settled outcome,
   including a release left pending, and applies the `RELEASE_PENDING` rule to a
   known state rather than to a guess. A transition whose turn comes when its work
-  is already done is a no-op: a `connect()` reaching the front while connected, a
-  `disconnect()` reaching it while disconnected with nothing pending.
+  is already done does nothing: a `connect()` reaching the front while connected,
+  a `disconnect()` reaching it with nothing left to tear down — the latter still
+  resolving with a report of what it found.
 
 **Joining is restricted to the tail on purpose, and "same kind" alone is not
 enough.** Take `connect()` in flight, a `disconnect()` queued behind it, then a
@@ -848,9 +849,10 @@ is why only one had it.
 
 **The aborted `connect()` cleans up itself, rather than delegating.** Leaving the
 resources for the queued teardown reads reasonable and does not work: the state
-stays `disconnected`, and a `disconnect()` in that state is a no-op unless a
+stays `disconnected`, and a `disconnect()` in that state skips its work unless a
 release is pending — a notion HTTP does not have, so cookies and a token from a
-successful establishment would simply stay behind, and the next `connect()`
+successful establishment would simply stay behind, reported by nothing because
+nothing tracks them, and the next `connect()`
 would find a jar it did not fill. Locality settles it: whoever created the
 resources releases them, and no "cleanup pending" marker has to exist to carry
 the obligation across a queue.
@@ -1090,10 +1092,9 @@ Two consequences drawn from the E19 log:
 ## adt-clients adaptation
 
 - **`BatchRecordingConnection`** implements all five. `isConnected()` and
-  `getSessionIdentity()` proxy the real connection; `disconnect()` is a logged
-  no-op, since a batch holds no session.
-
-  `disconnect()` resolves with an explicitly empty report —
+  `getSessionIdentity()` proxy the real connection; `disconnect()` does no work,
+  since a batch holds no session, and says so rather than staying silent:
+  it resolves with an explicitly empty report —
   `{ abandonedWindows: [], releasePending: false }` — rather than anything
   inherited from the real connection: a recorder abandons nothing because it
   holds nothing.
