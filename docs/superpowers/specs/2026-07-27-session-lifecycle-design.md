@@ -743,17 +743,31 @@ own. Awaiting the drain there would wait for a request that is waiting for
 
 So `reset()` splits along the same seam as `disconnect()`:
 
-- **synchronously**, it marks the session unusable —
-  `beginTeardown({ origin: 'internal', sessionLost: true })` — so no further
-  request is admitted. Both axes are deliberate: `internal` because `reset()` is
-  called from inside request handling and must not cancel the recovery that
-  called it, and `sessionLost` because it is discarding the session state, so
-  nothing can finish over what it is throwing away. A caller reaching for
-  `reset()` on the concrete class gets the same treatment — it is not part of
-  `IAbapConnection`, and "throw the session away" means the same thing whoever
-  says it;
+- **synchronously**, it marks the session unusable, so no further request is
+  admitted, with `sessionLost: true` in both cases — it is discarding the session
+  state, and nothing can finish over what is being thrown away;
 - **the cleanup is queued** as a lifecycle transition, which drains first and only
   then clears state and releases the resource.
+
+**But `origin` differs by caller, and there are two entry points rather than a
+parameter.** An earlier draft gave both the same `internal` origin, reasoning
+that "throw the session away" means the same thing whoever says it. That is what
+the words mean and not what `origin` decides: it decides whether a *caller asked
+to stop*, and therefore whether queued recoveries are cancelled. An external
+`reset()` is exactly such a request, so treating it as internal lets a recovery
+admitted beforehand finish later and re-establish the session the caller had just
+discarded.
+
+- `reset()` — public on the concrete class — raises `{ origin: 'caller',
+  sessionLost: true }`;
+- `discardSession()` — protected, and what the recovery paths call instead —
+  raises `{ origin: 'internal', sessionLost: true }`, so a recovery does not
+  cancel itself.
+
+Two entry points rather than `reset(origin)` for the reason the window label is
+required rather than optional: a distinction that matters is worse as a parameter
+someone can omit or pass by habit. Here the internal path has to be *reached for*
+by name.
 
 `reset()` returns immediately, having guaranteed the part that must be immediate.
 The serializing tail guarantees the rest: any `connect()` arriving afterwards
@@ -1043,7 +1057,9 @@ Replacement is thus detected by two independent mechanisms, and both are needed:
   restart). This is what identity comparison is for.
 
 This removes two special cases instead of adding a third: `JwtAbapConnection`
-calls the hook after a successful `tryRefreshToken()` instead of `reset()`, and
+calls the hook after a successful `tryRefreshToken()` instead of `reset()` — the
+public one, whose caller origin would cancel the very recovery it is preparing —
+and
 the basic login-form-401 path calls the same hook instead of
 `invalidateSession()`.
 
@@ -1573,6 +1589,14 @@ they matter more than the rest of the set:
     waiting out the ceiling. An implementation that only throws leaves the
     connector usable on the new session and makes that `disconnect()` wait the
     full ceiling on a window whose session no longer exists.
+34. **An external `reset()` cancels a queued recovery.** Admit a request, let it
+    enter recovery so a `recover` is queued, then call `reset()` from outside.
+    The recovery must abandon: no re-establishment, the request fails. An
+    implementation that routes the public `reset()` through the internal origin
+    lets that recovery finish and hands the caller back the session they just
+    discarded. Pair with test 13, which requires the opposite for the internal
+    path — the two entry points exist precisely because one answer cannot serve
+    both.
 
 
 **Needs a live system — four items, all preconditions for releasing the
