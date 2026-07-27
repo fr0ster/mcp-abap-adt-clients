@@ -267,7 +267,10 @@ class SessionLifecycle {
    * overtaking anything queued behind it. Otherwise it is appended and
    * re-evaluates its precondition on its turn.
    */
-  transition(kind: 'connect' | 'disconnect', run: () => Promise<void>): Promise<void>;
+  transition(
+    kind: 'connect' | 'disconnect' | 'recover',
+    run: () => Promise<void>,
+  ): Promise<void>;
   /** Marks the session unusable synchronously, before a teardown's first await. */
   beginTeardown(): void;
   /**
@@ -408,6 +411,40 @@ This generalises: **any teardown initiated from inside an admitted request marks
 state synchronously and queues its cleanup; it never awaits the drain from
 within.** That covers `onCredentialRenewed()` on paths C and E as well, which is
 likewise called from within request handling.
+
+### Recovery must not wait on itself
+
+Returning immediately is not enough for paths C and E, because the request does
+not stop there: after the credential is renewed it must re-establish and retry.
+That closes a cycle through the queue:
+
+```
+queued cleanup  → waits for drain, which includes this request
+this request    → waits for its internal re-establishment
+re-establishment → queued behind the cleanup
+```
+
+Nothing in that ring can move. Note it applies only **outside** a stateful
+window: inside one, `onCredentialRenewed()` throws `SESSION_REPLACED` and there
+is no recovery to deadlock.
+
+Two rules break the ring, and both are needed:
+
+**The failed attempt leaves the drain accounting before recovery starts.** The
+request calls its completion callback, does the bounded recovery, and re-admits
+before the retry. This is not a trick to dodge the drain: between attempts the
+request holds nothing — its session is gone, the credential under it was
+replaced. The drain protects requests *actively using* the session, and this one
+no longer is. With it gone from the set, the cleanup drains and runs, and the
+ring is open.
+
+**Recovery re-establishment is its own transition kind (`recover`), and it yields
+to a caller's teardown.** On its turn it checks whether a caller-initiated
+`disconnect()` has run since it was queued. If so it does **not** connect, and
+the request fails; the retry never happens. A caller who said "I am done" must
+not have a session resurrected under them by a retry they never saw — requests do
+not outrank the lifecycle. Otherwise it re-establishes, the request re-admits,
+and the retry proceeds.
 
 ### Why the guard's disconnect half is load-bearing
 
@@ -622,7 +659,7 @@ must replace it is transparent outside a stateful window and fatal inside one.**
 | **LOCK itself** | — | the lock response may add a second identifier for the same session. Additive rule → `established`, **not** `replaced`. Acquiring a lock must never throw |
 | **A.** first token on a mutation | implicit `connect()` | not connected → `NOT_CONNECTED`. Connected but no token → fetch allowed; cookies alive, identity `unchanged` |
 | **B.** CSRF retry on 403 | fetch with cookies, retry | **unchanged.** The fingerprint ignores `sap-XSRF_*`, so `unchanged` — the path works as before |
-| **C.** login-form 401 (basic) | `invalidateSession()` → new session, silently | credential renewal → `onCredentialRenewed()`. Outside stateful: explicit internal `connect()`, continue, replacement logged. Inside stateful: `SESSION_REPLACED` |
+| **C.** login-form 401 (basic) | `invalidateSession()` → new session, silently | credential renewal → `onCredentialRenewed()`. Outside stateful: the attempt leaves the drain accounting, a `recover` transition re-establishes, the request re-admits and retries; replacement logged. Inside stateful: `SESSION_REPLACED`, no recovery |
 | **D.** 401 on GET | cookies present → retry; absent → fetch | first branch unchanged (same identity); the second means the session is already gone → as C |
 | **E.** JWT 401/403 | `tryRefreshToken()` → `reset()` → silent retry in a new session | the same `onCredentialRenewed()` and the same fork; no JWT-specific code |
 
@@ -737,6 +774,18 @@ they matter more than the rest of the set:
     must complete normally, and `reset()` itself must return without awaiting
     anything — an implementation that awaits the drain here deadlocks against its
     own caller, since `reset()` is invoked from inside request handling.
+11. **Path E completes rather than deadlocking.** Drive the real recovery, not an
+    external `reset()`: a JWT connection outside a stateful window, a 401 on a
+    request, a refresher that succeeds. The request must re-establish and retry to
+    completion. An implementation that keeps the failed attempt in the drain
+    accounting hangs here forever — the cleanup waits for the request, the request
+    waits for its re-establishment, the re-establishment waits behind the cleanup.
+    Give the test a hard timeout so the failure reads as a deadlock rather than a
+    slow test.
+12. **A caller's `disconnect()` beats a recovery to the queue.** Same setup, but
+    `disconnect()` is called while the recovery is queued. The recovery must not
+    re-establish and the request must fail — never a session resurrected under a
+    caller who asked for teardown.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
