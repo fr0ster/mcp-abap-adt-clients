@@ -390,8 +390,9 @@ class SessionLifecycle {
   admitRequest(): RequestLease;
   /**
    * Resolves when every admitted request has settled AND every lock window has
-   * closed. Bounded by the critical-section ceiling measured from the last
-   * settled request.
+   * closed. Bounded by the critical-section ceiling measured from the moment the
+   * teardown was requested — absolute, never extended by request activity, or a
+   * steady trickle of short requests would postpone expiry forever.
    *
    * On expiry, before resolving and without yielding in between: marks the
    * session unusable so nothing further is admitted, then waits once more for
@@ -603,11 +604,25 @@ the marker and `stateful` the fallback; nothing else in this design changes.)
 drain over requests needs no timeout because every request carries one; a window
 with gaps carries nothing. Waiting unboundedly would let a caller that crashed
 between PUT and UNLOCK hang `disconnect()` forever. So: the wait is bounded by
-the critical-section ceiling (`SAP_TIMEOUT_CRITICAL`) measured from the **last
-settled request**, and on expiry the teardown proceeds and records a dangling
-lock — the same reporting path as `SESSION_REPLACED`, since the consequence is
+the critical-section ceiling (`SAP_TIMEOUT_CRITICAL`) measured **from the moment
+the teardown was requested** — an absolute deadline, not a sliding one — and on
+expiry the teardown proceeds and records a dangling lock — the same reporting path as `SESSION_REPLACED`, since the consequence is
 the same: the object stays locked on the server and needs a new session or an
 administrator.
+
+**Absolute, because activity must not extend a deadline whose purpose is to
+bound activity.** Measuring from the last settled request looks kinder — it
+would never cut off a chain that is visibly progressing — but ordinary requests
+stay admitted while a window is open, so a steady trickle of short ones pushes
+the deadline forward indefinitely and `disconnect()` never reaches expiry at
+all. "Never hang forever" would then be false in exactly the situation it was
+written for: a busy consumer with an orphaned window. A chain that cannot close
+its window within the ceiling is already pathological, and waiting longer does
+not make it less so.
+
+The second wait, after the gate closes, keeps needing no deadline of its own for
+the reason the sliding one failed: nothing more can be admitted, so the set it
+waits on only shrinks, and every member of it carries a timeout.
 
 **Expiry closes the gate before it reports, and inside `drain()`.** Until the
 ceiling runs out the gate is open — that is what lets the chain finish — so
@@ -1279,6 +1294,12 @@ they matter more than the rest of the set:
     resolves `drain()` first and closes the gate afterwards passes every other
     test and loses here, because the gap is only a few microseconds wide and
     exists on every run.
+26. **A steady stream of requests cannot postpone expiry.** An orphaned window
+    plus a loop issuing short requests for longer than the shortened ceiling.
+    `disconnect()` must still complete at roughly the deadline and report the
+    window. A deadline measured from the last settled request never fires here —
+    and this is the shape it fails on: a busy consumer, which is the case the
+    bound exists for.
 
 
 **Needs a live system — four items, all preconditions for releasing the
