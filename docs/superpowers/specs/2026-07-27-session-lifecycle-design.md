@@ -250,19 +250,31 @@ getSessionIdentity(): string | null;
  * opt out of naming. adt-clients passes the lock key LockRegistry already
  * computes (`Class/ZCL_FOO`); any other consumer names its own window.
  *
- * Labels are tracked per window, not counted, so the report can list exactly
- * what stayed open. endWindow() takes the same label it was opened with.
+ * A label names a window; it does NOT identify one. Two windows can legitimately
+ * carry the same label — the same object locked by two flows, and in any case
+ * beginWindow() runs BEFORE the LOCK succeeds, so nothing has made it unique
+ * yet. Closing by label would let one flow's endWindow() retire an entry the
+ * other still holds, after which the drain completes and the teardown proceeds
+ * under a live operation. So beginWindow() returns a token identifying THAT
+ * window, and endWindow() takes the token. The token also makes a double close
+ * or a mismatched close detectable instead of silently decrementing something.
  */
-beginWindow(label: string): void;
-endWindow(label: string): void;
+beginWindow(label: string): WindowToken;
+endWindow(token: WindowToken): void;
 ```
 
 ```ts
+/** Opaque handle for one open lock window. Only the lifecycle constructs it. */
+declare const windowBrand: unique symbol;
+type WindowToken = { readonly [windowBrand]: true };
+
 interface TeardownReport {
   /**
-   * Labels of lock windows still open when the bounded wait expired. Empty when
-   * nothing was abandoned — every entry is a real, named window, because
-   * beginWindow() requires a label.
+   * Labels of lock windows still open when the bounded wait expired,
+   * deduplicated — instances are tracked separately inside, but two abandoned
+   * windows over one object say the same thing to a reader. Empty when nothing
+   * was abandoned; every entry is a real, named window, because beginWindow()
+   * requires a label.
    */
   abandonedWindows: string[];
   /** A transport release did not complete and stays pending (D2). */
@@ -337,10 +349,14 @@ class SessionLifecycle {
    * teardown is pending — a lock outlives the request that takes it, so it is
    * the one thing a pending teardown must refuse outright.
    */
-  beginWindow(label: string): void;
-  /** Closes a lock window. The drain completes when none are left open. */
-  endWindow(label: string): void;
-  /** Labels of the windows currently open; the drain waits for this to empty. */
+  beginWindow(label: string): WindowToken;
+  /**
+   * Closes the window that token identifies. The drain completes when none are
+   * left open. Closing by label instead would let one flow retire another
+   * flow's window when both carry the same name.
+   */
+  endWindow(token: WindowToken): void;
+  /** Labels of the windows currently open, one entry per open instance. */
   get openWindows(): readonly string[];
   /**
    * The CURRENT epoch, read at a recovery's turn and compared against the
@@ -523,11 +539,12 @@ The lifecycle cannot infer window boundaries from `sessionMode`: a second window
 opening inside the first is invisible there. It needs them declared:
 
 ```ts
-/** Opens a lock window under a required label. Throws NOT_CONNECTED if a
- *  teardown is pending. */
-beginWindow(label: string): void;
-/** Closes it. The drain completes when no window is left open. */
-endWindow(label: string): void;
+/** Opens a lock window under a required label, returning a token that
+ *  identifies this one. Throws NOT_CONNECTED if a teardown is pending. */
+beginWindow(label: string): WindowToken;
+/** Closes the window the token identifies. The drain completes when none are
+ *  left open. */
+endWindow(token: WindowToken): void;
 ```
 
 The connector already has this shape as
@@ -940,8 +957,8 @@ Two consequences drawn from the E19 log:
   inherited from the real connection: a recorder abandons nothing because it
   holds nothing.
 
-  `beginWindow()`/`endWindow()` are **no-ops that do not reach the real
-  connection**, and the reason is that during recording nothing has been sent: a
+  `beginWindow()` returns a local token that `endWindow()` accepts and discards;
+  neither reaches the real connection. They are **no-ops**, and the reason is that during recording nothing has been sent: a
   "lock window" opened here is a note in a payload, not an ABAP lock. Proxying it
   would open a real window at recording time and hold a teardown hostage for as
   long as the caller keeps assembling the batch — a wait for a lock that does not
@@ -968,8 +985,10 @@ Two consequences drawn from the E19 log:
   `connection.isConnected()` before the first `IAdtObject` operation turns
   "object created, then an error" into "nothing happened".
 - **`LockRegistry`** passes its lock key as the window label, so an abandoned
-  window arrives back named (`Class/ZCL_FOO`) rather than counted, and captures
-  the fingerprint alongside the handle at `lock()`.
+  window arrives back named (`Class/ZCL_FOO`) rather than counted, and stores the
+  returned `WindowToken` next to the lock handle and the fingerprint at `lock()`.
+  The token is what `endWindow()` needs — the key alone would not do, since two
+  flows locking the same object share a key but hold different windows.
   Before unlocking it evaluates a precondition with **two** parts, and both are
   required:
 
@@ -1113,6 +1132,12 @@ they matter more than the rest of the set:
     while the mode is already stateful, so it produces no edge, and the teardown
     would later abandon a lock it never saw — a fresh orphan created by the
     cleanup itself.
+19. **Two windows with the same label close independently.** Open two windows
+    under one label — the same object taken by two flows — and close only the
+    first. The drain must NOT complete: one window is still open. Then close the
+    second and it completes. An implementation keyed on labels retires the shared
+    entry on the first close and tears down under a live operation; one keyed on
+    tokens cannot.
 
 
 **Needs a live system — four items, all preconditions for releasing the
