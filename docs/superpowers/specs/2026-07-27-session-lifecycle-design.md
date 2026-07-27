@@ -77,19 +77,43 @@ orphaned lock.
 `stateful` mode is the signal for "a lock is held". It needs no new API and our
 chains already keep the whole lock window stateful.
 
-### D2 — `disconnect()` is a local teardown
+### D2 — `disconnect()` sends no ADT session-close; it does release transport resources
 
-It clears cookies, the CSRF token and the session state, and never touches the
-network. Rejected: sending an ADT session-close signal
-(`x-sap-adt-sessiontype: stateless`) — that header value has **never** been
+`disconnect()` never sends an **ADT session-close request**. Rejected: the
+`x-sap-adt-sessiontype: stateless` signal — that header value has **never** been
 observed in Eclipse logs, so there is no evidence it ends a session, and
 inventing a protocol move against the only reference implementation we have is a
 bad bet. Eclipse simply unlocks and lets the session idle out.
 
-**Consequence to state plainly: `disconnect()` does not release locks.** The
-ABAP session lives on until its timeout, along with whatever enqueue locks it
-held. Callers unlock first — `unlockAll()` remains the mechanism — and only then
-disconnect.
+That prohibition is about the ADT protocol, **not** about a transport releasing
+what it owns. The two transports therefore differ, and the difference is
+observable to callers, so it is stated rather than left implied:
+
+| | HTTP | RFC |
+|---|---|---|
+| what `disconnect()` does | clears cookies, CSRF token, session state | the same, **plus closes the RFC client** |
+| touches the network | no | yes — closing the client is a network operation |
+| does the ABAP session end | no; it idles out | yes; the client *is* the session |
+| do its locks survive | **yes** — see below | no; ending the session releases them |
+
+For HTTP there is no session-owning resource to release: sockets belong to the
+agent, and the session lives on the server. For RFC the ABAP session **is** the
+open client, so leaving it open would leak both a socket and a server-side
+session. `RfcAbapConnection.close()` is therefore called from `disconnect()`.
+
+`disconnect()` still **never throws**, on either transport: a failing RFC close
+is logged and swallowed, and the state is marked disconnected regardless.
+Teardown must always complete.
+
+**Consequence to state plainly: over HTTP, `disconnect()` does not release
+locks.** The ABAP session lives on until its timeout, along with whatever enqueue
+locks it held. Callers unlock first — `unlockAll()` remains the mechanism — and
+only then disconnect. Do not generalise the RFC behaviour to HTTP; the whole
+point of the table above is that this is the one place they genuinely differ.
+
+That RFC's session end releases its enqueue locks is standard SAP behaviour but
+we have not exercised it here; it joins the live-probe list rather than being
+assumed.
 
 ### D3 — The contract gains identity, not an error class
 
@@ -119,9 +143,20 @@ out of it.
 ## Contract surface
 
 ```ts
-/** Idempotent: a second call on a connected connection is a no-op. */
+/**
+ * Establish the session. Idempotent: a second call on a connected connection is
+ * a no-op.
+ *
+ * REJECTS if the session could not be established, and the connection is then
+ * guaranteed to be left disconnected — isConnected() === false. A resolved
+ * promise means, and is the only thing that means, that a session exists.
+ */
 connect(): Promise<void>;            // signature unchanged, semantics tightened
-/** Local teardown. Never throws. Idempotent. Does NOT release locks. */
+/**
+ * Tear the session down. Never throws. Idempotent. Sends no ADT session-close;
+ * releases transport resources (RFC closes its client). Over HTTP it does NOT
+ * release locks — see D2.
+ */
 disconnect(): Promise<void>;
 isConnected(): boolean;
 /**
@@ -171,6 +206,28 @@ States: `disconnected` (initial) → `connected` → `disconnected`. `connect()`
 connected connection is a no-op; `disconnect()` on a disconnected one is a no-op;
 `connect()` after `disconnect()` is allowed and starts a fresh session with a new
 identity — explicit, therefore unproblematic.
+
+### connect() failure semantics
+
+`markConnected()` is called **only after** a session has actually been
+established — the credential accepted and the token/cookies obtained. If
+establishment fails, `connect()` **rejects** and the state stays `disconnected`.
+There is no third outcome: no "connected but unusable", no resolved promise over
+an empty jar.
+
+This is a behavioural change to existing code, not a restatement, and it is the
+change most likely to surprise a consumer. `BaseAbapConnection.connect()`
+currently **swallows** the failure — it logs `Could not connect to SAP system
+upfront: … Will retry on first request` and resolves anyway, deferring
+establishment to the first request. That is precisely the implicit connect this
+design removes: with the lazy path gone, a swallowed failure would leave a
+connector that reports success, holds nothing, and then refuses every request
+with `NOT_CONNECTED` — the least informative failure available. Every `connect()`
+implementation (basic, JWT, SAML, certificate, Kerberos, RFC) either marks
+connected after a verified establishment or rejects.
+
+A server that issues no session cookie is **not** a failure: the credential was
+accepted, so the connection is connected with a `null` identity.
 
 The unit knows nothing about session mode, locks or auth. The connection asks
 `observe(newIdentity)`, and applies the D1 policy in one readable place: result
@@ -308,7 +365,9 @@ nothing is ever tracked, every classification is `unchanged`, and nothing throws
 Read-only consumers see no change.
 
 For RFC: one ABAP session per connection, so the identity is set at `connect()`
-and cleared in `close()`.
+and cleared when the client closes — which `disconnect()` performs (D2). The
+identity and the open client have the same lifetime, which is why RFC needs no
+separate teardown of the two.
 
 ### Detecting a dead session
 
@@ -397,7 +456,7 @@ Two consequences drawn from the E19 log:
 | level | covers | SAP |
 |---|---|---|
 | `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule** | not needed |
-| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
+| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
 | adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged** | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
@@ -422,7 +481,7 @@ they matter more than the rest of the set:
    UNLOCK into a session that no longer exists — the internal retry this design
    forbids, arriving through the back door.
 
-**Needs a live system — three items, all preconditions for releasing the
+**Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
 
 1. **Which cookie carries the stateful ABAP session** on each target landscape.
@@ -433,6 +492,10 @@ connection package.** The stub cannot settle any of them:
    out of the fingerprint.
 3. **What a dead session returns.** E19 gave HTTP 400 / "Session not found"; the
    dead-session classification must match what the target systems really send.
+4. **Whether closing the RFC client releases its enqueue locks.** Standard SAP
+   behaviour says an ending session releases them, which is what makes RFC's
+   `disconnect()` differ from HTTP's, but we have not exercised it. Needs a
+   legacy/RFC-capable system, so it is the one probe this box cannot run.
 
 ## Releases
 
@@ -440,12 +503,18 @@ Order: interfaces → connection → adt-clients, each published to npm before t
 next consumes it. Version numbers are the user's call at each step.
 
 - **interfaces** — BREAKING: three required methods break every implementor.
-- **connection** — BREAKING: implicit connect disappears; requests are refused
-  after `disconnect()`/`reset()`.
+- **connection** — BREAKING, on three counts: implicit connect disappears;
+  requests are refused after `disconnect()`/`reset()`; and `connect()` now
+  rejects on failure where `BaseAbapConnection` used to log a warning and resolve
+  anyway.
 - **adt-clients** — needs both new versions. Its own API barely changes, but the
   "connect() first" requirement propagates to its consumers, so it belongs at the
   top of the CHANGELOG entry rather than among the details.
 
-**Rollout risk to name:** consumers relying on implicit connect break at their
-first request. That is intended — which is exactly why it must be the first line
-of the connection CHANGELOG, not a conclusion someone reaches in production.
+**Rollout risks to name, both intended and both belonging at the top of the
+connection CHANGELOG rather than among the details:**
+
+- consumers relying on implicit connect break at their first request;
+- a `connect()` that used to resolve through a broken connection now rejects, so
+  a consumer that never checked its result will start failing at startup instead
+  of at the first request. That is the better failure, but it is a new one.
