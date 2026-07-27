@@ -999,10 +999,25 @@ Two consequences drawn from the E19 log:
   shared window can only be closed too early or reported too little.
 
   The pairing is fixed at build time, where `buildBatchPayload` already walks the
-  parts to validate them: the *n*-th `LOCK` for a key pairs with the next
-  `UNLOCK` for that key after it, by occurrence rather than by key, so repeated
-  keys stay distinguishable. The recorded pairing is what the response parser
-  resolves against.
+  parts to validate them: a `LOCK` pairs with the next `UNLOCK` for the same key
+  after it, by occurrence rather than by key, so a key locked and unlocked twice
+  in one payload stays distinguishable.
+
+  That is only unambiguous if occurrences for one key never overlap. For
+  `LOCK A, LOCK A, UNLOCK A, UNLOCK A` the rule as stated maps **both** locks to
+  the first `UNLOCK`, and a single confirmed success would close both windows,
+  losing the second lock entirely. So overlapping occurrences of one key are
+  **rejected at build time**: a `LOCK` for a key whose previous `LOCK` has no
+  intervening `UNLOCK` is a build error. `LOCK A, UNLOCK A, LOCK A, UNLOCK A`
+  stays valid — nothing overlaps there.
+
+  Rejected: resolving the ambiguity with a consuming FIFO or stack. It would be
+  well defined, but it would bless a payload shape the server rejects anyway —
+  one session cannot hold two locks on the same object at once — so the error
+  belongs at build time, where it names the mistake, rather than at execution,
+  where it arrives as a puzzling failure on the second `LOCK` part.
+
+  The recorded pairing is what the response parser resolves against.
 
   What a window tracks is **"a lock may be held"**, not "an unlock happened" —
   which matters, because there are two different proofs that nothing is held:
@@ -1034,9 +1049,9 @@ Two consequences drawn from the E19 log:
   the honest outcome — a lock we cannot prove was released is reported, not
   assumed away.
 
-  `buildBatchPayload` still validates that **each** `LOCK` occurrence has a
-  matching `UNLOCK`, throwing at build time otherwise — the same walk that
-  produces the pairing. That check keeps its value — it catches the
+  `buildBatchPayload` therefore throws at build time on two shapes, in the same
+  walk that produces the pairing: a `LOCK` occurrence with no matching `UNLOCK`,
+  and a second `LOCK` for a key whose previous one is still unclosed. That check keeps its value — it catches the
   design error of locking across batches — but it is a check on the payload, and
   the bracket above is what covers execution.
 - **`AdtClient`** gains an early check. Calling `connect()` stays the consumer's
@@ -1224,6 +1239,14 @@ they matter more than the rest of the set:
     nor name an object that was never locked. An implementation keyed on "did the
     UNLOCK succeed" reports a lock that does not exist — and a report that cries
     wolf is worth less than no report.
+24. **Overlapping locks on one key are rejected at build time.**
+    `LOCK A, LOCK A, UNLOCK A, UNLOCK A` must throw from `buildBatchPayload`.
+    The pairing rule cannot express it — both locks would claim the first
+    `UNLOCK`, one confirmed success would close both windows, and the second lock
+    would vanish from the accounting. Note that test 22's `LOCK A, UNLOCK A,
+    LOCK A, UNLOCK A` is the shape where the ambiguity does *not* arise, so it
+    passes on an implementation that has this bug: the two cases must both be
+    present.
 
 
 **Needs a live system — four items, all preconditions for releasing the
