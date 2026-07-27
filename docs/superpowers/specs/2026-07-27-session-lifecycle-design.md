@@ -308,8 +308,14 @@ class SessionLifecycle {
    * recovery for this request compares against.
    */
   admitRequest(): RequestLease;
-  /** Resolves when every admitted request has settled. */
-  drain(): Promise<void>;
+  /**
+   * Resolves when every admitted request has settled AND no lock window is
+   * open (`sessionMode !== 'stateful'`). Bounded by the critical-section
+   * ceiling measured from the last settled request: on expiry it resolves
+   * anyway, reporting that a lock window was still open so the teardown can
+   * record a dangling lock.
+   */
+  drain(): Promise<{ lockWindowAbandoned: boolean }>;
   /** Classifies a freshly observed identity. */
   observe(identity: string | null): 'unchanged' | 'established' | 'replaced';
   /** Throws with code NOT_CONNECTED. */
@@ -392,7 +398,8 @@ So `disconnect()` has three steps, in this order:
 1. mark the session unusable **and bump the teardown epoch** — synchronously, at
    call time, before any await, so no further
    request enters;
-2. **await the in-flight requests to settle** (the drain);
+2. **await the drain** — no request in flight **and** no open lock window
+   (bounded; see below);
 3. only then release the transport resource and clear the state.
 
 **The drain needs no timeout of its own.** Every request already carries an
@@ -413,6 +420,42 @@ the other, which is worse than waiting on both.
 
 `disconnect()` still never throws: a request that fails during the drain settles
 it just as well as one that succeeds.
+
+### The drain must cover the lock window, not only single requests
+
+Counting requests is not enough. A lock window spans several of them —
+`LOCK … PUT … UNLOCK` — with gaps in between where **the in-flight count is
+zero**. A `disconnect()` landing in such a gap drains instantly, tears the
+session down, and orphans the lock: object locked and inactive, which is the
+exact outcome this whole design exists to prevent, reached through the one door
+we had left open.
+
+So the drain waits on two things: **no request in flight, and no open lock
+window.** The marker for the window is `sessionMode === 'stateful'` — the same
+signal D1 already uses for "a lock is held", set by our chains across the whole
+window and cleared after unlock. No new API adoption is required for it to work.
+
+(`beginCriticalSection()`/`endCriticalSection()` would be a more precise marker,
+being explicit rather than inferred, but adt-clients does not call them today —
+they are absent from `IAbapConnection`. If they are adopted later, they become
+the marker and `stateful` the fallback; nothing else in this design changes.)
+
+**This wait needs a bound, and the earlier argument does not supply one.** The
+drain over requests needs no timeout because every request carries one; a window
+with gaps carries nothing. Waiting unboundedly would let a caller that crashed
+between PUT and UNLOCK hang `disconnect()` forever. So: the wait is bounded by
+the critical-section ceiling (`SAP_TIMEOUT_CRITICAL`) measured from the **last
+settled request**, and on expiry the teardown proceeds and records a dangling
+lock — the same reporting path as `SESSION_REPLACED`, since the consequence is
+the same: the object stays locked on the server and needs a new session or an
+administrator.
+
+Never hang forever, and never orphan silently. Callers still unlock before
+disconnecting — `unlockAll()` remains the mechanism, and this bound is a backstop
+for the case where they could not, not a licence to skip it.
+
+A consumer that holds no locks never enters a stateful window, so for it this
+rule does not exist.
 
 ### A synchronous reset() must not tear down under a live request
 
@@ -896,6 +939,15 @@ they matter more than the rest of the set:
     abandon and the current one must proceed. Coalesce them by kind and one
     inherits the other's answer, so assert **both** outcomes in the same test: an
     implementation that joins gets one of them right by luck.
+16. **`disconnect()` in the gap between PUT and UNLOCK waits for the window.**
+    Run a lock chain, let the PUT settle, and call `disconnect()` while the
+    session is still stateful and nothing is in flight. The teardown must not
+    release until the window closes; the UNLOCK must still go out on a live
+    session. A request-counting drain passes every earlier test and fails this
+    one, because at that instant the count is legitimately zero.
+17. **A window that never closes is abandoned, not waited on forever.** Same
+    setup, but the UNLOCK never comes. With the ceiling shortened for the test,
+    `disconnect()` must complete and report a dangling lock rather than hang.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
