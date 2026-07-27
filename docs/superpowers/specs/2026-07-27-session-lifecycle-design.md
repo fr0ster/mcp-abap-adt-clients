@@ -391,9 +391,16 @@ class SessionLifecycle {
   /**
    * Resolves when every admitted request has settled AND every lock window has
    * closed. Bounded by the critical-section ceiling measured from the last
-   * settled request: on expiry it resolves anyway and returns the LABELS of the
-   * windows still open, which is what lets the teardown name the locks it is
-   * abandoning instead of logging a count.
+   * settled request.
+   *
+   * On expiry, before resolving and without yielding in between: marks the
+   * session unusable so nothing further is admitted, then waits once more for
+   * the already-admitted requests to settle (no extra ceiling — they are
+   * requests, and each carries a timeout). Only then does it resolve, with the
+   * LABELS of the windows still open, which is what lets the teardown name the
+   * locks it abandons instead of logging a count. Closing the gate here rather
+   * than in the caller removes the gap a two-step version would have by
+   * construction.
    */
   drain(): Promise<{ abandonedWindows: string[] }>;
   /** Classifies a freshly observed identity. */
@@ -601,6 +608,24 @@ settled request**, and on expiry the teardown proceeds and records a dangling
 lock — the same reporting path as `SESSION_REPLACED`, since the consequence is
 the same: the object stays locked on the server and needs a new session or an
 administrator.
+
+**Expiry closes the gate before it reports, and inside `drain()`.** Until the
+ceiling runs out the gate is open — that is what lets the chain finish — so
+giving up has to shut it, and shutting it late is the same hole in miniature: a
+request admitted between `drain()` resolving and the release would run against a
+resource being freed. Expiry therefore does three things in order, without
+yielding between the first two:
+
+1. mark the session unusable **synchronously**, so nothing more is admitted —
+   the marking that was deferred to a window edge that will now never come;
+2. wait once more for the requests already admitted to settle. This second wait
+   needs no ceiling of its own: they are requests, and every request carries a
+   timeout;
+3. resolve with the labels of the windows still open.
+
+Keeping this inside `drain()` rather than leaving it to the caller is deliberate:
+"resolve, then the caller closes the gate" has a gap between the two steps by
+construction, and a caller that forgets reintroduces the whole defect.
 
 Never hang forever, and never orphan silently. Callers still unlock before
 disconnecting — `unlockAll()` remains the mechanism, and this bound is a backstop
@@ -1247,6 +1272,13 @@ they matter more than the rest of the set:
     LOCK A, UNLOCK A` is the shape where the ambiguity does *not* arise, so it
     passes on an implementation that has this bug: the two cases must both be
     present.
+25. **No request slips through at the expiry edge.** With a window held open and
+    the ceiling shortened, issue a request at the moment the ceiling runs out: it
+    must be refused. And a request admitted just BEFORE expiry must settle before
+    the release happens — assert that order, not timing. An implementation that
+    resolves `drain()` first and closes the gate afterwards passes every other
+    test and loses here, because the gap is only a few microseconds wide and
+    exists on every run.
 
 
 **Needs a live system — four items, all preconditions for releasing the
