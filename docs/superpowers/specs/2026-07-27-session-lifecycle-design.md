@@ -1093,12 +1093,26 @@ the connector classifies it as a lost session and surfaces
 `SESSION_REPLACED` semantics: the lock handle is dead, and no internal retry is
 attempted.
 
-**On that classification the connector marks the lifecycle disconnected**, the
-same as for a known replacement. This is load-bearing, not bookkeeping: a dead
-session leaves the cookie — and therefore the fingerprint — completely unchanged,
-so identity comparison cannot see it. Only the state can. Anything downstream
-that needs to know whether a session is still usable must ask the connector, and
-must never infer usability from an unchanged fingerprint.
+**On that classification the connector raises a session-lost teardown**, by the
+same explicit path as the credential-renewal hook and for the same reason — the
+session is gone, so nothing can finish over it:
+
+```ts
+this.lifecycle.beginTeardown({ origin: 'internal', sessionLost: true });
+this.lifecycle.transition('cleanup', () => this.cleanupSession());
+```
+
+"Marks the lifecycle disconnected" is what an earlier draft said, and it no
+longer expresses the transition: closing admission at once, dropping the identity
+immediately, marking open windows abandoned rather than waiting on them, and
+queueing the cleanup are four things, and the flag is one of them.
+
+Dropping the identity immediately matters most here, because a dead session is
+the case where comparison is blind: the cookie — and therefore the fingerprint —
+is completely unchanged, so nothing downstream could tell. Only the state can,
+and it has to say so at once. Anything that needs to know whether a session is
+still usable asks the connector, and never infers usability from an unchanged
+fingerprint.
 
 The exact status/text match is landscape-specific, so the probe
 listed under Testing must record what the target systems actually return before
@@ -1504,6 +1518,14 @@ they matter more than the rest of the set:
     failure to warn it. Pair with test 30, which requires the opposite answer for
     a graceful teardown: an implementation with a single teardown kind cannot
     pass both.
+32. **A dead-session response abandons the open window immediately.** With a
+    window open, have the server answer a request with the dead-session shape.
+    The window must be marked abandoned there and then, and the next
+    `disconnect()` must return its label **without waiting out the ceiling** —
+    there is nothing that could close it. An implementation that only flips the
+    lifecycle flag here waits the full ceiling first, and one that also leaves
+    the identity in place lets a later `unlockAll()` unlock over the dead
+    session.
 
 
 **Needs a live system — four items, all preconditions for releasing the
