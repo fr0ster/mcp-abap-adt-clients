@@ -201,31 +201,102 @@ Authentication is injected — the consumer decides whether it is JWT, basic, or
 something a future provider supplies. The lifecycle must not branch on it:
 
 ```ts
-/** The credential backing this session was renewed — no session survives it. */
+/**
+ * The credential backing this session was renewed — no ABAP session survives
+ * it. This is a KNOWN replacement: it needs no identity comparison, because we
+ * already know the old session is gone.
+ */
 protected onCredentialRenewed(): void {
+  const wasStateful = this.sessionMode === 'stateful';
   this.lifecycle.markDisconnected();
+  if (wasStateful) {
+    throw sessionError(ADT_SESSION_ERROR.SESSION_REPLACED);
+  }
 }
 ```
 
+The order matters and is normative. `markDisconnected()` drops the identity, so
+a later `connect()` would classify the new session as `established`, never as
+`replaced` — comparing identities across a credential renewal cannot work, and an
+earlier draft of this spec promised exactly that. The stateful check therefore
+happens **before** the teardown and does not depend on any comparison. State is
+still marked disconnected first, so the connector is never left `connected` with
+a dead credential, whichever way the throw goes.
+
+Replacement is thus detected by two independent mechanisms, and both are needed:
+
+- **known** — a credential renewal (the code above). No comparison involved.
+- **observed** — a tracked session cookie changes value under us, with no
+  credential renewal in play (a proxy landing us on another app server, a server
+  restart). This is what identity comparison is for.
+
 This removes two special cases instead of adding a third: `JwtAbapConnection`
-calls it after a successful `tryRefreshToken()` instead of `reset()`, and the
-basic login-form-401 path calls the same hook instead of `invalidateSession()`.
+calls the hook after a successful `tryRefreshToken()` instead of `reset()`, and
+the basic login-form-401 path calls the same hook instead of
+`invalidateSession()`.
 
 ## Session identity
 
-For HTTP the fingerprint is built from the session-bearing cookies:
+### Two different sessions
+
+These are separate things and the design must not conflate them:
+
+- the **HTTP/REST session**, carried by cookies;
+- the **ABAP session** on the server, which is what holds the enqueue lock.
+
+A cookie is the *carrier* that binds a request to an ABAP session. Its presence
+is not proof the ABAP session is alive: in the E19 incident the session cookie
+was in the jar and the server still answered 400 "Session not found". So identity
+comparison detects a **swap** (the carrier now points somewhere else) and cannot
+detect a **death** (same carrier, dead ABAP session). Death is only observable
+from the server's answer — see "Detecting a dead session" below. Both lead to the
+same conclusion for a caller holding a lock, and must be reported alike.
+
+`SAP_SESSIONID_<SID>_<CLNT>` is the cookie through which the stateful ABAP
+session is kept; it is the authoritative source for the fingerprint.
 
 | cookie | in the fingerprint | why |
 |---|---|---|
-| `sap-contextid` | yes | issued by LOCK; holds the stateful session (seen in the E19 log) |
-| `SAP_SESSIONID_<SID>_<CLNT>` | yes, when `sap-contextid` is absent | the ICF session cookie |
+| `SAP_SESSIONID_<SID>_<CLNT>` | yes — authoritative | the carrier of the stateful ABAP session |
 | `sap-XSRF_*` | **no** | changes on a token refresh **within the same session** |
 | `sap-usercontext` | **no** | we overwrite it ourselves with the configured client |
+| `sap-contextid` | **unverified — do not rely on it** | see below |
 
 Excluding `sap-XSRF_*` is a correctness condition, not cosmetics: were it
-included, an ordinary token refresh with live cookies would read as a
-replacement and would fail exactly where nothing is wrong. The fingerprint must
-react to a session change and must not react to a token change.
+included, an ordinary token refresh with live cookies would read as a replacement
+and would fail exactly where nothing is wrong. The fingerprint must react to a
+session change and must not react to a token change.
+
+**On `sap-contextid`.** It appears in the E19 raw log
+(`"setCookieNames":["sap-contextid"]` on the LOCK response, and in `jarAfter`),
+which is where this spec first took it from — not from documentation. Whether it
+is an ADT/ICF cookie at all, a Gateway soft-state artifact, or something the
+proxy in that landscape injected, is **unverified**. It must not be given a role
+until a probe says what it is. An earlier draft made it the primary fingerprint
+source, which was wrong twice over: unverified, and it broke the additive rule
+below.
+
+### Additive rule
+
+The fingerprint is a map of tracked cookie name → value, not a single string
+picked by priority. Classification:
+
+- a tracked name whose **value changes** → `replaced`;
+- a name **appearing** where none was tracked → `established`, never `replaced`;
+- nothing tracked and nothing appearing → `unchanged`.
+
+Without this rule the first LOCK breaks the design: a second identifier for the
+same session shows up mid-window, a priority-based fingerprint switches source,
+the value changes, the mode is already `stateful` — and the connector throws
+`SESSION_REPLACED` immediately after successfully acquiring the lock. A
+fingerprint must stay stable when an additional identifier for the same session
+appears.
+
+The same rule covers RFC, where the identity starts as the fact of an open RFC
+client and a captured cookie may appear later
+(`RfcAbapConnection.ts:326`): the appearance is `established`, not a swap.
+
+### Where it is computed
 
 `updateCookiesFromResponse` computes the fingerprint after every response and
 returns the classification. It throws nothing — `makeAdtRequest` applies the
@@ -233,13 +304,23 @@ policy after the response and before returning it, so cookie parsing stays free
 of policy and no exception fires mid-state-update.
 
 When the server issues no session cookie at all (a purely stateless consumer),
-the fingerprint stays `null`, `observe(null)` is `unchanged`, and nothing ever
-throws. Read-only consumers see no change.
+nothing is ever tracked, every classification is `unchanged`, and nothing throws.
+Read-only consumers see no change.
 
 For RFC: one ABAP session per connection, so the identity is set at `connect()`
-and cleared in `close()`. The cookie captured from the LOCK response
-(`RfcAbapConnection.ts:326`) serves as the value; before it exists, the fact of
-an open RFC client does.
+and cleared in `close()`.
+
+### Detecting a dead session
+
+A swap is observable locally; a death is not. When the server reports that the
+session it was given no longer exists — the E19 shape was HTTP 400 with
+`statusText: "Session not found"`, arriving in ~60 ms with the cookie present —
+the connector classifies it as a lost session and surfaces
+`SESSION_REPLACED` semantics: the lock handle is dead, and no internal retry is
+attempted. The exact status/text match is landscape-specific, so the probe
+listed under Testing must record what the target systems actually return before
+this classification is relied upon; until then it is a documented gap rather than
+a silent one.
 
 ## Recovery paths under the new rules
 
@@ -248,6 +329,7 @@ must replace it is transparent outside a stateful window and fatal inside one.**
 
 | path | today | after |
 |---|---|---|
+| **LOCK itself** | — | the lock response may add a second identifier for the same session. Additive rule → `established`, **not** `replaced`. Acquiring a lock must never throw |
 | **A.** first token on a mutation | implicit `connect()` | not connected → `NOT_CONNECTED`. Connected but no token → fetch allowed; cookies alive, identity `unchanged` |
 | **B.** CSRF retry on 403 | fetch with cookies, retry | **unchanged.** The fingerprint ignores `sap-XSRF_*`, so `unchanged` — the path works as before |
 | **C.** login-form 401 (basic) | `invalidateSession()` → new session, silently | credential renewal → `onCredentialRenewed()`. Outside stateful: explicit internal `connect()`, continue, replacement logged. Inside stateful: `SESSION_REPLACED` |
@@ -293,22 +375,38 @@ Two consequences drawn from the E19 log:
 
 | level | covers | SAP |
 |---|---|---|
-| `SessionLifecycle` | states, idempotence, `observe()` classification | not needed |
-| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
+| `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule** | not needed |
+| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
 | adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
 distinct session per discovery fetch, which is what makes "replacement while
-stateful throws" testable without SAP.
+stateful throws" testable without SAP. For the additive rule it needs one
+addition: a LOCK response that sets a *second* session-ish cookie alongside the
+first.
 
-The `sap-XSRF_*` exclusion test is the most important in the set: if that cookie
-is ever folded into the fingerprint, path B breaks, and it breaks **quietly** —
-errors appear where nothing is wrong.
+Three tests guard the ways this design can fail quietly rather than loudly, and
+they matter more than the rest of the set:
 
-**Needs a live system — one item.** Whether a real SAP issues the session cookie
-we fingerprint. On-prem gave `sap-contextid` in the E19 log; on cloud we expect
-`SAP_SESSIONID_*`, but that is an assumption. The stub cannot settle it, so it is
-a precondition for releasing the connection package.
+1. **`sap-XSRF_*` stays out of the fingerprint.** Fold it in and path B breaks —
+   errors appear where nothing is wrong.
+2. **A LOCK that adds a second identifier does not throw.** Get the additive rule
+   wrong and every lock acquisition fails immediately after succeeding.
+3. **Credential renewal under `stateful` throws before teardown.** Do it in the
+   other order and `SESSION_REPLACED` can never fire on paths C and E — the very
+   paths the rule exists for.
+
+**Needs a live system — three items, all preconditions for releasing the
+connection package.** The stub cannot settle any of them:
+
+1. **Which cookie carries the stateful ABAP session** on each target landscape.
+   `SAP_SESSIONID_<SID>_<CLNT>` is the assumption this design is built on.
+2. **What `sap-contextid` actually is** — an ADT/ICF cookie, a Gateway soft-state
+   artifact, or something a proxy injected. It appears in the E19 log and nowhere
+   in our code or in any documentation we have checked. Until answered it stays
+   out of the fingerprint.
+3. **What a dead session returns.** E19 gave HTTP 400 / "Session not found"; the
+   dead-session classification must match what the target systems really send.
 
 ## Releases
 

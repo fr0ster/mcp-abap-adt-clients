@@ -8,8 +8,11 @@
  *  - This connector never sends the header with value `stateless` — outside a
  *    stateful window it simply omits it, which is wire-identical to an ordinary
  *    Eclipse call. Omission is therefore NOT what closes a session.
- *  - Session membership rides on the cookie (`sap-contextid` / SAP_SESSIONID),
- *    with `sap-adt-connection-id` identifying the conversation.
+ *  - The HTTP session (cookies) and the ABAP session on the server are different
+ *    things: `SAP_SESSIONID_<SID>_<CLNT>` is the cookie that carries the stateful
+ *    ABAP session, while `sap-adt-connection-id` identifies the conversation. A
+ *    live cookie is not proof of a live ABAP session — E19 answered 400 "Session
+ *    not found" with the cookie present.
  *
  * What these tests pin: the connector's own housekeeping requests (CSRF fetch,
  * retry probes) are built by a separate code path that consults neither the
