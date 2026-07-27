@@ -256,6 +256,13 @@ them is what made the defect invisible.
 ## SessionLifecycle
 
 ```ts
+interface RequestLease {
+  /** Teardown epoch at admission — the baseline for this request's recovery. */
+  readonly epoch: number;
+  /** Call once the request settles. Safe to call twice. */
+  release(): void;
+}
+
 class SessionLifecycle {
   get connected(): boolean;
   get identity(): string | null;
@@ -282,9 +289,10 @@ class SessionLifecycle {
   get teardownEpoch(): number;
   /**
    * Admits a request: asserts usability and counts it in, in ONE synchronous
-   * step. Returns the completion callback the caller must invoke on settle.
+   * step. The lease carries the teardown epoch at admission — the baseline a
+   * recovery for this request compares against.
    */
-  admitRequest(): () => void;
+  admitRequest(): RequestLease;
   /** Resolves when every admitted request has settled. */
   drain(): Promise<void>;
   /** Classifies a freshly observed identity. */
@@ -439,8 +447,9 @@ is no recovery to deadlock.
 Two rules break the ring, and both are needed:
 
 **The failed attempt leaves the drain accounting before recovery starts.** The
-request calls its completion callback, does the bounded recovery, and re-admits
-before the retry. This is not a trick to dodge the drain: between attempts the
+request releases its lease, does the bounded recovery, and re-admits before the
+retry — keeping the **original** lease's epoch as its baseline, since re-admitting
+would otherwise capture a fresh epoch and forget that a teardown was requested. This is not a trick to dodge the drain: between attempts the
 request holds nothing — its session is gone, the credential under it was
 replaced. The drain protects requests *actively using* the session, and this one
 no longer is. With it gone from the set, the cleanup drains and runs, and the
@@ -461,8 +470,23 @@ So the lifecycle carries a **teardown epoch**:
 - a caller-initiated teardown increments it **synchronously at call time**, in
   the same step that marks the session unusable — before anything is queued and
   long before that teardown's turn arrives;
-- `recover` **captures the epoch when it is queued**, and on its turn abandons —
-  no re-establishment, the request fails — if the epoch has moved.
+- the baseline is captured **when the request is admitted**, not when `recover`
+  is queued, and `recover` abandons on its turn — no re-establishment, the
+  request fails — if the epoch has moved since.
+
+**The baseline belongs at admission because queueing is too late.** A recovery
+begins the moment the attempt fails and only reaches the queue some steps later;
+a `disconnect()` landing in between would bump the epoch *before* the capture, so
+`recover` would compare the new value against itself, see no change, and
+re-establish a session the caller had already asked to close. Capturing at
+admission leaves no such window: the request entered while the session was
+usable, so **any** caller teardown afterwards — before the failure, during the
+recovery, or after `recover` is queued — moves the epoch away from the baseline
+and cancels the retry.
+
+That is also the right meaning rather than merely the safe one: the retry belongs
+to the admitted request, so the question it must answer is "has the caller asked
+to stop since this request began", not "since some later bookkeeping step".
 
 The distinction that keeps this from eating itself: **only caller-initiated
 teardown bumps the epoch.** A cleanup queued from inside request handling —
@@ -821,6 +845,13 @@ they matter more than the rest of the set:
     no caller teardown anywhere. The recovery must complete. An implementation
     that bumps the epoch from an internally-initiated cleanup cancels the retry it
     just set up — the mirror of the deadlock, silent instead of hanging.
+14. **A teardown between the failure and the queueing still cancels.** Mirror of
+    test 12 on the other side: `disconnect()` is called after the recovery has
+    begun but **before** `recover` reaches the queue. An implementation that
+    captures the baseline at queueing time compares the new epoch against itself,
+    sees no change, and re-establishes — passing tests 12 and 13 while still
+    resurrecting a session the caller closed. Only a baseline taken at admission
+    fails this test when it is wrong.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
