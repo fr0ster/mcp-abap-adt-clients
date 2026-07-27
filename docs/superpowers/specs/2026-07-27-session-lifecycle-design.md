@@ -230,6 +230,14 @@ isConnected(): boolean;
  * null never means "the session changed".
  */
 getSessionIdentity(): string | null;
+/**
+ * Open a lock window. Throws NOT_CONNECTED when a teardown is pending: a lock
+ * outlives the request that takes it, so it is the one thing a pending teardown
+ * must refuse outright. Reference-counted, and paired with endWindow() in a
+ * finally after unlocking — a teardown waits for the count to reach zero.
+ */
+beginWindow(): void;
+endWindow(): void;
 ```
 
 ```ts
@@ -295,12 +303,15 @@ class SessionLifecycle {
    */
   beginTeardown(origin: 'caller' | 'internal'): void;
   /**
-   * Observes every session-mode change. When a teardown is pending and the mode
-   * goes stateful → stateless, this marks the session unusable in the SAME
-   * synchronous step — the window's closing edge — so a new LOCK cannot be
-   * admitted after it. No per-request ownership is involved.
+   * Opens a lock window. Throws NOT_CONNECTED if a teardown is pending — a lock
+   * outlives the request that takes it, so it is the one thing a pending
+   * teardown must refuse outright.
    */
-  onSessionModeChanged(mode: 'stateful' | 'stateless'): void;
+  beginWindow(): void;
+  /** Closes a lock window. The drain completes when the count reaches zero. */
+  endWindow(): void;
+  /** Open lock windows; the drain waits for this to reach zero. */
+  get openWindows(): number;
   /**
    * The CURRENT epoch, read at a recovery's turn and compared against the
    * baseline its RequestLease captured at admission; a difference means
@@ -391,7 +402,7 @@ side.
 |---|---|---|
 | `connect()` | `false` — usability is granted only once establishment succeeds | `NOT_CONNECTED` |
 | `disconnect()`, no lock window was open when it was requested | `false` — **synchronously, before the first await** | `NOT_CONNECTED` |
-| `disconnect()`, a lock window **was** open | `false` | admitted until the window's closing edge, so the chain can finish; refused from that edge on |
+| `disconnect()`, a lock window **was** open | `false` | ordinary requests admitted until the last window closes, so the chain can finish; a new window refused outright |
 
 `isConnected()` reports `false` in every teardown case: a caller asking "may I
 start work" must hear no. Admissions during an open window are the finishing of
@@ -410,8 +421,9 @@ So `disconnect()` has three steps, in this order:
 
 1. mark the session unusable **and bump the teardown epoch** — synchronously, at
    call time, before any await — **unless a lock window was open at that
-   instant**, in which case the marking is deferred to that window's closing edge
-   so the chain can finish (see below);
+   instant**, in which case ordinary requests stay admitted until the last window
+   closes so the chain can finish, while opening a new window is refused
+   outright (see below);
 2. **await the drain** — no request in flight **and** no open lock window
    (bounded; see below);
 3. only then release the transport resource and clear the state.
@@ -445,9 +457,9 @@ exact outcome this whole design exists to prevent, reached through the one door
 we had left open.
 
 So the drain waits on two things: **no request in flight, and no open lock
-window.** The marker for the window is `sessionMode === 'stateful'` — the same
-signal D1 already uses for "a lock is held", set by our chains across the whole
-window and cleared after unlock. No new API adoption is required for it to work.
+window.** Windows are declared by the chains rather than inferred from
+`sessionMode`, for the reason given below: a second window opening inside the
+first is invisible in a mode flag.
 
 #### The window must be allowed to finish
 
@@ -457,35 +469,53 @@ with `NOT_CONNECTED`, and step 2 waits for a `stateful` flag that only that
 UNLOCK would clear. The teardown would always sit out the ceiling and record a
 dangling lock it caused itself.
 
-So the refusal is **deferred, not scoped**. At the instant a caller teardown is
-requested the lifecycle records whether a lock window was open:
+#### What must be refused is what outlives the request
 
-- **no window was open** → the session is marked unusable immediately, exactly as
-  before: everything is refused, including a `LOCK` that would start one;
-- **a window was open** → the marking is **postponed to the window's closing
-  edge**. Until then nothing is refused and the chain finishes normally; the
-  moment the mode goes `stateful → stateless`, the lifecycle marks the session
-  unusable **in that same synchronous step**, before anything else can be
-  admitted.
+Refusing everything deadlocks; refusing nothing lets a second handler take a new
+lock during the wait, which the teardown then abandons — a fresh orphan created
+by the very operation meant to clean up. The line runs between them, and it is
+not "which request belongs to the window":
 
-**No per-request ownership is needed, and that is the point.** Deciding whether a
-given request "belongs to" the open window would require a lease created before
-`LOCK` and threaded through every request until `UNLOCK` — an API the chains do
-not have, and adopting it would mean touching every low-level function in every
-object module. A closing **edge** is available today: our chains always call
-`setSessionType('stateless')` after unlocking, so the lifecycle observes that
-call and shuts the door on it. A new `LOCK` would first have to set `stateful`
-again, which happens strictly after the marking, so its request is refused.
+- **a request is ephemeral.** Whatever it does, it settles, and the drain waits
+  for it before anything is released. Admitting it during the wait is safe.
+- **a lock window outlives the request that opened it.** A `LOCK` admitted during
+  a pending teardown leaves state behind that nobody will release.
 
-Rejected: a real window lease. It is more precise — it would also refuse an
-unrelated request from another handler during the window — but that costs an API
-change plus adoption across every module, to fix something the drain already
-covers: unrelated in-flight requests settle before step 3 releases anything.
+So during a pending teardown, **ordinary requests are admitted until the last
+open window closes; opening a new window is refused outright.** That refusal is
+what the earlier closing-edge rule could not express, because a second handler
+opening a window while the mode is already `stateful` produces no edge at all —
+its `setSessionType('stateful')` is a no-op transition.
 
-The limit of the edge, stated rather than hidden: it trusts a chain to flip the
-mode back. One that leaves the session `stateful` forever — a crash between PUT
-and UNLOCK — never produces the edge, and the ceiling below is what ends the
-wait.
+#### Windows are counted, not inferred
+
+The lifecycle cannot infer window boundaries from `sessionMode`: a second window
+opening inside the first is invisible there. It needs them declared:
+
+```ts
+/** Opens a lock window. Throws NOT_CONNECTED if a teardown is pending. */
+beginWindow(): void;
+/** Closes it. The drain completes when the count reaches zero. */
+endWindow(): void;
+```
+
+The connector already has this shape as
+`beginCriticalSection()`/`endCriticalSection()` (1.9.0+), which this design
+promotes into `IAbapConnection` and makes mandatory rather than optional. Chains
+call the pair around the lock window — at the very call sites that already toggle
+`setSessionType`, so adoption is mechanical and bounded to those places rather
+than threaded through every request.
+
+That is the difference from a per-request lease, which was rejected: a lease
+would have to be created before `LOCK` and passed to every low-level function
+until `UNLOCK`, touching every object module — to refuse unrelated requests the
+drain already covers. Counting windows costs two calls per chain and refuses the
+only thing that actually persists.
+
+The teardown therefore waits for the **window count to reach zero**, not for a
+mode flag, and no new window can appear while it waits. A chain that crashes
+between `PUT` and `UNLOCK` never calls `endWindow()`; the ceiling below ends the
+wait and records the dangling lock.
 
 This is not a weakening of the earlier invariant. Nothing is released in steps 1
 and 2 — the teardown is only *waiting* there — so no request ever runs against a
@@ -1012,12 +1042,13 @@ they matter more than the rest of the set:
 17. **A window that never closes is abandoned, not waited on forever.** Same
     setup, but the UNLOCK never comes. With the ceiling shortened for the test,
     `disconnect()` must complete and report a dangling lock rather than hang.
-18. **A new `LOCK` after the window's closing edge is refused.** Same setup: with
-    a teardown pending, let the chain unlock and flip the mode to stateless, then
-    have it try to open a *new* window. The `LOCK` must get `NOT_CONNECTED`. The
-    edge is what makes this testable — an implementation that merely admits
-    "while stateful" cannot tell the new `LOCK` from the old `UNLOCK` and lets it
-    through.
+18. **A second handler cannot take a lock during a pending teardown.** With one
+    window open and `disconnect()` requested, a *different* handler calls
+    `beginWindow()` before the first chain unlocks. It must get `NOT_CONNECTED`.
+    This is the case a closing-edge rule cannot catch: the second window opens
+    while the mode is already stateful, so it produces no edge, and the teardown
+    would later abandon a lock it never saw — a fresh orphan created by the
+    cleanup itself.
 
 
 **Needs a live system — four items, all preconditions for releasing the
@@ -1041,14 +1072,21 @@ connection package.** The stub cannot settle any of them:
 Order: interfaces → connection → adt-clients, each published to npm before the
 next consumes it. Version numbers are the user's call at each step.
 
-- **interfaces** — BREAKING: three required methods break every implementor.
+- **interfaces** — BREAKING: five required methods break every implementor
+  (`disconnect`, `isConnected`, `getSessionIdentity`, `beginWindow`,
+  `endWindow`). The last two are the critical-section pair the connector has
+  carried since 1.9.0, promoted into the contract and made mandatory.
 - **connection** — BREAKING, on three counts: implicit connect disappears;
   requests are refused after `disconnect()`/`reset()`; and `connect()` now
   rejects on failure where `BaseAbapConnection` used to log a warning and resolve
   anyway.
-- **adt-clients** — needs both new versions. Its own API barely changes, but the
-  "connect() first" requirement propagates to its consumers, so it belongs at the
-  top of the CHANGELOG entry rather than among the details.
+- **adt-clients** — needs both new versions. Its own API barely changes, but two
+  things propagate to its consumers and belong at the top of the CHANGELOG rather
+  than among the details: the "connect() first" requirement, and the fact that
+  every chain now brackets its lock window with `beginWindow()`/`endWindow()`.
+  That bracketing is mechanical — it goes at the call sites that already toggle
+  `setSessionType` — but it is not optional: a chain that skips it takes locks a
+  pending teardown cannot see.
 
 **Rollout risks to name, both intended and both belonging at the top of the
 connection CHANGELOG rather than among the details:**
