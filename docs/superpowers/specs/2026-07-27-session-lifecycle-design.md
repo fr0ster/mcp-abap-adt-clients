@@ -93,17 +93,41 @@ observable to callers, so it is stated rather than left implied:
 |---|---|---|
 | what `disconnect()` does | clears cookies, CSRF token, session state | the same, **plus closes the RFC client** |
 | touches the network | no | yes — closing the client is a network operation |
-| does the ABAP session end | no; it idles out | yes; the client *is* the session |
-| do its locks survive | **yes** — see below | no; ending the session releases them |
+| does the ABAP session end | no; it idles out | yes, **once the close succeeds** |
+| do its locks survive | **yes** — see below | no, once the close succeeds |
 
 For HTTP there is no session-owning resource to release: sockets belong to the
 agent, and the session lives on the server. For RFC the ABAP session **is** the
 open client, so leaving it open would leak both a socket and a server-side
 session. `RfcAbapConnection.close()` is therefore called from `disconnect()`.
 
-`disconnect()` still **never throws**, on either transport: a failing RFC close
-is logged and swallowed, and the state is marked disconnected regardless.
-Teardown must always complete.
+### Teardown has two outcomes, not one
+
+`disconnect()` **never throws**, on either transport. But "never throws" must not
+be allowed to mean "always succeeded", so the two things it does are settled
+separately:
+
+- **Session state — unconditional.** The lifecycle goes `disconnected` whatever
+  happens. A torn-down connection must never serve another request, and that
+  guarantee cannot depend on a network call.
+- **Transport resource — best effort, and retriable.** If the RFC close fails,
+  the release stays **pending**: the client may still be open and its locks still
+  held. The failure is logged at warn level.
+
+Consequently **idempotence means "safe to call repeatedly", not "a no-op after
+the first call"**: `disconnect()` on an already-disconnected connection retries a
+pending release, and is a true no-op only when nothing is left to release.
+Without that rule a swallowed close error would be unrecoverable through the
+contract — the state would say disconnected, the second call would do nothing,
+and an open client with live locks would sit there unreachable.
+
+The contract owes the caller honesty about the limit here: a failed release is
+**not** reported through the return value, since `disconnect()` resolves either
+way. A caller that needs certainty either calls `disconnect()` again, or uses
+`RfcAbapConnection.close()` directly on the concrete class, where the error
+surfaces. Widening the interface to carry a release outcome was considered and
+rejected — it would put a transport-specific concern into a contract that four
+other implementations do not have.
 
 **Consequence to state plainly: over HTTP, `disconnect()` does not release
 locks.** The ABAP session lives on until its timeout, along with whatever enqueue
@@ -153,9 +177,11 @@ out of it.
  */
 connect(): Promise<void>;            // signature unchanged, semantics tightened
 /**
- * Tear the session down. Never throws. Idempotent. Sends no ADT session-close;
- * releases transport resources (RFC closes its client). Over HTTP it does NOT
- * release locks — see D2.
+ * Tear the session down. Never throws — which is not a claim that it always
+ * succeeded: the state always goes disconnected, while releasing a transport
+ * resource (the RFC client) is best effort. Idempotent in the sense of "safe to
+ * call repeatedly": a repeat call retries a release that previously failed.
+ * Sends no ADT session-close. Over HTTP it does NOT release locks — see D2.
  */
 disconnect(): Promise<void>;
 isConnected(): boolean;
@@ -203,7 +229,8 @@ class SessionLifecycle {
 ```
 
 States: `disconnected` (initial) → `connected` → `disconnected`. `connect()` on a
-connected connection is a no-op; `disconnect()` on a disconnected one is a no-op;
+connected connection is a no-op; `disconnect()` on a disconnected one is a no-op
+**only when no release is pending** (D2);
 `connect()` after `disconnect()` is allowed and starts a fresh session with a new
 identity — explicit, therefore unproblematic.
 
@@ -456,7 +483,7 @@ Two consequences drawn from the E19 log:
 | level | covers | SAP |
 |---|---|---|
 | `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule** | not needed |
-| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
+| connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
 | adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged** | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
