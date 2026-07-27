@@ -345,14 +345,18 @@ class SessionLifecycle {
    * re-evaluates its precondition on its turn.
    */
   /**
-   * `connect` and `disconnect` may join the queue tail of the same kind.
-   * `recover` NEVER joins and is never joined: each one carries the baseline of
-   * its own request, so sharing a promise would either propagate one request's
-   * cancellation to another or let a stale request ride a valid recovery past
-   * its own epoch check.
+   * `connect` and `disconnect` may join the queue tail of the same kind — two
+   * callers wanting the same thing get one execution and the same answer.
+   *
+   * `recover` and `cleanup` NEVER join and are never joined. A `recover` carries
+   * the baseline of its own request, so a shared promise would propagate one
+   * request's cancellation to another. A `cleanup` is an internal teardown that
+   * owes its result to nobody, while a caller's `disconnect()` owes a
+   * TeardownReport — join them and the caller's own execution is skipped and its
+   * report never produced.
    */
   transition(
-    kind: 'connect' | 'disconnect' | 'recover',
+    kind: 'connect' | 'disconnect' | 'recover' | 'cleanup',
     run: () => Promise<void>,
   ): Promise<void>;
   /**
@@ -448,8 +452,11 @@ be allowed to race a caller's `disconnect()`.
   transition of the same kind** — that is, when nothing is queued behind it.
   Two concurrent `connect()`s with an empty queue resolve from one
   establishment, and critically from one client. **Joining applies to `connect`
-  and `disconnect` only; a `recover` never joins anything and nothing joins a
-  `recover`** — see below.
+  and `disconnect` only. A `recover` and a `cleanup` never join anything and
+  nothing joins them** — a recovery because it carries its own request's
+  baseline, an internal cleanup because a caller's `disconnect()` joined to it
+  would have its own execution skipped and would never produce the
+  `TeardownReport` it owes.
 - **Otherwise the call is appended to the tail** and **re-evaluates its
   precondition on its turn**, rather than acting on what it observed before
   waiting. A `connect()` queued behind a `disconnect()` sees the settled outcome,
@@ -642,6 +649,14 @@ yielding between the first two:
    needs no ceiling of its own: they are requests, and every request carries a
    timeout;
 3. resolve with the labels of the windows still open.
+
+**An abandoned window stays open, but is not waited on twice.** Giving up marks
+that window abandoned; it remains in `openWindows`, because the lock may still be
+held and the next teardown must still name it, but the drain does not spend the
+ceiling on it again. Without that flag a teardown following an internal cleanup
+that already gave up — the caller's `disconnect()` right after a credential
+renewal, say — would sit out a second full ceiling to reach a conclusion already
+reached, and a third after that. Waiting is for windows that might still close.
 
 Keeping this inside `drain()` rather than leaving it to the caller is deliberate:
 "resolve, then the caller closes the gate" has a gap between the two steps by
@@ -897,7 +912,7 @@ protected onCredentialRenewed(): void {
   // transport resources — and marks disconnected. The renewed credential is not
   // touched; it is the one thing that survives. A recovery queues behind this,
   // so it can never re-establish on top of stale transport state.
-  this.lifecycle.transition('disconnect', () => this.cleanupSession());
+  this.lifecycle.transition('cleanup', () => this.cleanupSession());
 
   if (wasStateful) {
     throw sessionError(ADT_SESSION_ERROR.SESSION_REPLACED);
@@ -1372,6 +1387,15 @@ they matter more than the rest of the set:
     only the flag: no cookies, no token, and for RFC a closed client. An
     implementation that merely skips `markConnected()` passes every observable
     check here while leaving a live session behind it.
+28. **A caller's `disconnect()` after an internal teardown still gets its own
+    report.** Trigger a credential renewal — which queues a `cleanup` — with an
+    orphaned window open and, separately, with a failing RFC close, then call
+    `disconnect()` immediately. It must run its own teardown and resolve with a
+    report naming the abandoned window and flagging `releasePending`. An
+    implementation that lets the caller join the queued cleanup skips that
+    execution and resolves with nothing, losing both facts. Assert also that the
+    second teardown does not wait out another full ceiling for a window already
+    abandoned.
 
 
 **Needs a live system — four items, all preconditions for releasing the
