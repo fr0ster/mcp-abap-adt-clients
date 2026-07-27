@@ -295,12 +295,12 @@ class SessionLifecycle {
    */
   beginTeardown(origin: 'caller' | 'internal'): void;
   /**
-   * True while a lock window that was already open when a teardown was requested
-   * is still finishing. Its requests are admitted; everything else is refused.
-   * Decided at the teardown request and never re-evaluated, so a chain cannot
-   * open a new window afterwards.
+   * Observes every session-mode change. When a teardown is pending and the mode
+   * goes stateful → stateless, this marks the session unusable in the SAME
+   * synchronous step — the window's closing edge — so a new LOCK cannot be
+   * admitted after it. No per-request ownership is involved.
    */
-  get grandfatheredWindowOpen(): boolean;
+  onSessionModeChanged(mode: 'stateful' | 'stateless'): void;
   /**
    * The CURRENT epoch, read at a recovery's turn and compared against the
    * baseline its RequestLease captured at admission; a difference means
@@ -391,11 +391,12 @@ side.
 |---|---|---|
 | `connect()` | `false` — usability is granted only once establishment succeeds | `NOT_CONNECTED` |
 | `disconnect()`, no lock window was open when it was requested | `false` — **synchronously, before the first await** | `NOT_CONNECTED` |
-| `disconnect()`, a lock window **was** open | `false` | admitted while that window lasts, so it can finish; refused once it closes |
+| `disconnect()`, a lock window **was** open | `false` | admitted until the window's closing edge, so the chain can finish; refused from that edge on |
 
 `isConnected()` reports `false` in every teardown case: a caller asking "may I
-start work" must hear no. The grandfathered admissions are the finishing of work
-already started, not a licence to begin more.
+start work" must hear no. Admissions during an open window are the finishing of
+work already started, not a licence to begin more — and they end at the edge, not
+at some later observation.
 
 ### Teardown drains in-flight requests
 
@@ -408,9 +409,9 @@ other; it says nothing about a transition against a request already in progress.
 So `disconnect()` has three steps, in this order:
 
 1. mark the session unusable **and bump the teardown epoch** — synchronously, at
-   call time, before any await. "Unusable" is scoped: if a lock window was open
-   at that instant, that window's requests are still admitted so it can finish
-   (see below); everything else is refused;
+   call time, before any await — **unless a lock window was open at that
+   instant**, in which case the marking is deferred to that window's closing edge
+   so the chain can finish (see below);
 2. **await the drain** — no request in flight **and** no open lock window
    (bounded; see below);
 3. only then release the transport resource and clear the state.
@@ -456,16 +457,35 @@ with `NOT_CONNECTED`, and step 2 waits for a `stateful` flag that only that
 UNLOCK would clear. The teardown would always sit out the ceiling and record a
 dangling lock it caused itself.
 
-So the refusal is **scoped, not global**. At the instant a caller teardown is
+So the refusal is **deferred, not scoped**. At the instant a caller teardown is
 requested the lifecycle records whether a lock window was open:
 
-- **a window was open** → requests continue to be admitted under that window's
-  lease until the window closes (the mode goes back to stateless). This is how
-  `PUT` and `UNLOCK` finish;
-- **no window was open** → every request is refused with `NOT_CONNECTED`,
-  including a `LOCK` that would start a new one. A chain that sets `stateful`
-  after the teardown request cannot sneak a window in, because the grandfathering
-  is decided at that instant and never re-evaluated.
+- **no window was open** → the session is marked unusable immediately, exactly as
+  before: everything is refused, including a `LOCK` that would start one;
+- **a window was open** → the marking is **postponed to the window's closing
+  edge**. Until then nothing is refused and the chain finishes normally; the
+  moment the mode goes `stateful → stateless`, the lifecycle marks the session
+  unusable **in that same synchronous step**, before anything else can be
+  admitted.
+
+**No per-request ownership is needed, and that is the point.** Deciding whether a
+given request "belongs to" the open window would require a lease created before
+`LOCK` and threaded through every request until `UNLOCK` — an API the chains do
+not have, and adopting it would mean touching every low-level function in every
+object module. A closing **edge** is available today: our chains always call
+`setSessionType('stateless')` after unlocking, so the lifecycle observes that
+call and shuts the door on it. A new `LOCK` would first have to set `stateful`
+again, which happens strictly after the marking, so its request is refused.
+
+Rejected: a real window lease. It is more precise — it would also refuse an
+unrelated request from another handler during the window — but that costs an API
+change plus adoption across every module, to fix something the drain already
+covers: unrelated in-flight requests settle before step 3 releases anything.
+
+The limit of the edge, stated rather than hidden: it trusts a chain to flip the
+mode back. One that leaves the session `stateful` forever — a crash between PUT
+and UNLOCK — never produces the edge, and the ceiling below is what ends the
+wait.
 
 This is not a weakening of the earlier invariant. Nothing is released in steps 1
 and 2 — the teardown is only *waiting* there — so no request ever runs against a
@@ -992,10 +1012,12 @@ they matter more than the rest of the set:
 17. **A window that never closes is abandoned, not waited on forever.** Same
     setup, but the UNLOCK never comes. With the ceiling shortened for the test,
     `disconnect()` must complete and report a dangling lock rather than hang.
-18. **A new `LOCK` after a teardown request is refused.** Same setup, but the
-    chain tries to open a *new* window after `disconnect()` was called. It must
-    get `NOT_CONNECTED` — grandfathering covers the window that was already open,
-    decided at the teardown request and never re-evaluated.
+18. **A new `LOCK` after the window's closing edge is refused.** Same setup: with
+    a teardown pending, let the chain unlock and flip the mode to stateless, then
+    have it try to open a *new* window. The `LOCK` must get `NOT_CONNECTED`. The
+    edge is what makes this testable — an implementation that merely admits
+    "while stateful" cannot tell the new `LOCK` from the old `UNLOCK` and lets it
+    through.
 
 
 **Needs a live system — four items, all preconditions for releasing the
