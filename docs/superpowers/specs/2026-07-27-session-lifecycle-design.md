@@ -262,6 +262,12 @@ class SessionLifecycle {
   get identity(): string | null;
   markConnected(identity: string | null): void;
   markDisconnected(): void;
+  /**
+   * Runs a lifecycle transition on the serializing tail. Concurrent calls with
+   * the same `kind` join the in-flight promise instead of starting a second
+   * transition; an opposite `kind` queues and re-evaluates on its turn.
+   */
+  transition(kind: 'connect' | 'disconnect', run: () => Promise<void>): Promise<void>;
   /** Classifies a freshly observed identity. */
   observe(identity: string | null): 'unchanged' | 'established' | 'replaced';
   /** Throws with code NOT_CONNECTED. */
@@ -277,6 +283,47 @@ identity — explicit, therefore unproblematic — **except while a release is
 pending**, where it first retries that release and rejects with
 `RELEASE_PENDING` if the retry fails (D2). Reconnection must never abandon a
 transport resource that is still held.
+
+### Lifecycle transitions are serialized
+
+Every rule above reads as if transitions happen one at a time. Nothing so far
+made that true, and without it the pending-slot rule protects only against
+sequential overwriting, not concurrent overwriting:
+
+- two `connect()` calls racing both observe `disconnected`, both open a client,
+  and one assignment silently discards the other — an open ABAP session with
+  live locks, unreachable, exactly the outcome the pending slot was added to
+  prevent;
+- a `connect()` starting while a `disconnect()` still awaits a slow close finds
+  a release already pending whose outcome is not yet known, so its retry can run
+  concurrently with the close it is retrying — two operations on one resource.
+
+**All lifecycle transitions run through one serializing tail: no two overlap.**
+This covers `connect()`, `disconnect()`, and the bounded internal
+re-establishment inside a recovery (paths C, D-second-branch, E), which must not
+be allowed to race a caller's `disconnect()`.
+
+- **Concurrent identical calls join the in-flight promise** rather than starting
+  a second transition. Two concurrent `connect()`s resolve from one
+  establishment — and, critically, from one client; two concurrent
+  `disconnect()`s from one teardown.
+- **An opposite call queues** behind the in-flight one and **re-evaluates its
+  precondition on its turn**, rather than acting on what it observed before
+  waiting. A `connect()` queued behind a `disconnect()` therefore sees the
+  settled outcome, including a release left pending, and applies the
+  `RELEASE_PENDING` rule to a known state rather than to a guess.
+
+Requests do **not** join lifecycle transitions. A request arriving while a
+`connect()` is in flight sees the pre-transition state and fails with
+`NOT_CONNECTED`; it never waits. Awaiting `connect()` is the caller's job, and
+making requests block on it would reintroduce implicit connect through the back
+door — a request that succeeds because it happened to arrive during someone
+else's connect is exactly the non-determinism this design removes.
+
+No `connecting`/`disconnecting` states are added. The guard asks one question —
+"is there a usable session right now" — and during a transition the honest answer
+is the pre-transition one. Adding transitional states would put that question in
+three places instead of one.
 
 ### connect() failure semantics
 
@@ -526,7 +573,7 @@ Two consequences drawn from the E19 log:
 
 | level | covers | SAP |
 |---|---|---|
-| `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule** | not needed |
+| `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule**, **serialization: identical calls join, opposite calls queue and re-evaluate** | not needed |
 | connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; **a failed close retains the client, and `connect()` neither overwrites it nor proceeds past it: it retries the release and rejects with `RELEASE_PENDING` if that fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
 | adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged** | not needed |
 
@@ -557,6 +604,13 @@ they matter more than the rest of the set:
    wrong and an open ABAP session holding enqueue locks becomes unreachable —
    silently, and with no way back through the contract. Testable with a fake RFC
    client whose `close()` rejects; no SAP and no RFC SDK involved.
+6. **Races open exactly one client.** Two `connect()` calls started without
+   awaiting the first must produce **one** establishment, both resolving from it;
+   and a `connect()` started while a slow `disconnect()` is still closing must run
+   strictly after it and re-evaluate the pending release then, not before waiting.
+   Without serialization the pending-slot rule holds only for sequential calls,
+   which is the easy half of the problem. Testable with a fake client whose
+   `open()`/`close()` resolve on a deferred the test controls.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
