@@ -1196,19 +1196,30 @@ Two consequences drawn from the E19 log:
   returned `WindowToken` next to the lock handle and the fingerprint at `lock()`.
   The token is what `endWindow()` needs — the key alone would not do, since two
   flows locking the same object share a key but hold different windows.
-  Before unlocking it evaluates a precondition with **two** parts, and both are
-  required:
+  Before unlocking it checks only what it can know better than the connection:
 
   ```
-  send UNLOCK  iff  connection.isConnected()  AND  identity === captured identity
+  skip UNLOCK  iff  identity !== captured identity
+                    OR the error in hand is SESSION_REPLACED / NOT_CONNECTED
+  otherwise    attempt it and let the connection's admission guard decide
   ```
 
-  The state comes first on purpose. A dead ABAP session leaves the cookie — and
-  therefore the fingerprint — unchanged, so comparison alone would happily send
-  an UNLOCK into a session that no longer exists, which is precisely the internal
-  retry this design forbids. When the precondition fails, the lock is returned in
-  `LockFailure[]` (the structure already exists) with "session lost, lock left on
-  the server". `unlockAll()` stops producing noise and starts telling the truth.
+  **`isConnected()` is deliberately not part of this.** An earlier draft gated the
+  unlock on it, which breaks the case the window rule exists for: during a pending
+  teardown `isConnected()` is normatively `false` while an open window's requests
+  are still admitted, so the registry would refuse to send the very UNLOCK the
+  teardown is waiting for, the window would run to the ceiling, and the teardown
+  would manufacture the orphan it was trying to avoid. It is the same shape as the
+  deadlock that made the teardown refuse the chain's own unlock — a rule blocking
+  the finishing request that would let it finish.
+
+  The property that gate was protecting is kept, and by a better route: on a dead
+  session the connector has already marked itself unusable, so the attempt is
+  refused there. Nothing goes on the wire, the refusal comes back as an error, and
+  the lock is returned in `LockFailure[]` (the structure already exists) with
+  "session lost, lock left on the server". Asking the connection is stronger than
+  guessing from a flag, and it is the connection's question to answer.
+  `unlockAll()` stops producing noise and starts telling the truth.
 - **Operation chains close their window on evidence, not in a `finally`.** The
   rule the batch path spells out is not a batch peculiarity — it is what a window
   means, so an ordinary chain follows it too:
@@ -1438,6 +1449,13 @@ they matter more than the rest of the set:
     all. The window must remain open in both, so the next teardown names the
     lock. A `finally` passes every happy-path test and fails these two — and it
     is the shape most implementations reach for first.
+30. **`unlockAll()` can still unlock during a pending teardown.** The registry
+    holds a lock, a window is open, `disconnect()` is requested, and
+    `unlockAll()` runs. The UNLOCK must reach the server and the window must
+    close, letting the teardown proceed. A registry gated on `isConnected()`
+    skips it — the flag is false throughout a pending teardown — and the window
+    then runs to the ceiling, so the teardown produces the very orphan it was
+    called to avoid. This is test 16 seen from the registry's side.
 
 
 **Needs a live system — four items, all preconditions for releasing the
