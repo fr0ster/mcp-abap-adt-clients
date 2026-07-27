@@ -121,13 +121,19 @@ Without that rule a swallowed close error would be unrecoverable through the
 contract — the state would say disconnected, the second call would do nothing,
 and an open client with live locks would sit there unreachable.
 
-The contract owes the caller honesty about the limit here: a failed release is
-**not** reported through the return value, since `disconnect()` resolves either
-way. A caller that needs certainty either calls `disconnect()` again, or uses
-`RfcAbapConnection.close()` directly on the concrete class, where the error
-surfaces. Widening the interface to carry a release outcome was considered and
-rejected — it would put a transport-specific concern into a contract that four
-other implementations do not have.
+**Revised decision, recorded rather than smoothed over.** An earlier draft had
+`disconnect()` return `void` and rejected reporting the release outcome, on the
+grounds that a transport-specific concern did not belong in a contract four
+other implementations do not share. That reasoning was sound for a
+release-outcome flag alone; it stopped being sufficient once this design
+promised to record an abandoned lock window on timeout, which is **not**
+transport-specific and needs a channel that "never throws, returns nothing"
+cannot provide.
+
+`disconnect()` therefore resolves with a `TeardownReport`. It still never
+throws: the report describes what did not finish rather than failing. A caller
+who wants certainty about a pending release can also call `disconnect()` again
+or use `RfcAbapConnection.close()` directly, where the error surfaces.
 
 ### A pending release must survive, and must block reconnection
 
@@ -217,11 +223,12 @@ connect(): Promise<void>;            // signature unchanged, semantics tightened
 /**
  * Tear the session down. Never throws — which is not a claim that it always
  * succeeded: the state always goes disconnected, while releasing a transport
- * resource (the RFC client) is best effort. Idempotent in the sense of "safe to
- * call repeatedly": a repeat call retries a release that previously failed.
- * Sends no ADT session-close. Over HTTP it does NOT release locks — see D2.
+ * resource (the RFC client) is best effort. The report says what did not
+ * finish. Idempotent in the sense of "safe to call repeatedly": a repeat call
+ * retries a release that previously failed. Sends no ADT session-close. Over
+ * HTTP it does NOT release locks — see D2.
  */
-disconnect(): Promise<void>;
+disconnect(): Promise<TeardownReport>;
 isConnected(): boolean;
 /**
  * Fingerprint of the SAP-side session, or null when no fingerprint is
@@ -233,11 +240,25 @@ getSessionIdentity(): string | null;
 /**
  * Open a lock window. Throws NOT_CONNECTED when a teardown is pending: a lock
  * outlives the request that takes it, so it is the one thing a pending teardown
- * must refuse outright. Reference-counted, and paired with endWindow() in a
- * finally after unlocking — a teardown waits for the count to reach zero.
+ * must refuse outright. Paired with endWindow() in a finally after unlocking —
+ * a teardown waits for every window to close.
+ *
+ * `label` is an opaque string used only for reporting an abandoned window; the
+ * connector attaches no meaning to it. adt-clients passes the lock key it
+ * already computes (`Class/ZCL_FOO`), so a teardown that gives up can name what
+ * it left behind.
  */
-beginWindow(): void;
-endWindow(): void;
+beginWindow(label?: string): void;
+endWindow(label?: string): void;
+```
+
+```ts
+interface TeardownReport {
+  /** Labels of lock windows still open when the bounded wait expired. */
+  abandonedWindows: string[];
+  /** A transport release did not complete and stays pending (D2). */
+  releasePending: boolean;
+}
 ```
 
 ```ts
@@ -327,13 +348,13 @@ class SessionLifecycle {
    */
   admitRequest(): RequestLease;
   /**
-   * Resolves when every admitted request has settled AND no lock window is
-   * open (`sessionMode !== 'stateful'`). Bounded by the critical-section
-   * ceiling measured from the last settled request: on expiry it resolves
-   * anyway, reporting that a lock window was still open so the teardown can
-   * record a dangling lock.
+   * Resolves when every admitted request has settled AND every lock window has
+   * closed. Bounded by the critical-section ceiling measured from the last
+   * settled request: on expiry it resolves anyway and returns the LABELS of the
+   * windows still open, which is what lets the teardown name the locks it is
+   * abandoning instead of logging a count.
    */
-  drain(): Promise<{ lockWindowAbandoned: boolean }>;
+  drain(): Promise<{ abandonedWindows: string[] }>;
   /** Classifies a freshly observed identity. */
   observe(identity: string | null): 'unchanged' | 'established' | 'replaced';
   /** Throws with code NOT_CONNECTED. */
@@ -515,7 +536,8 @@ only thing that actually persists.
 The teardown therefore waits for the **window count to reach zero**, not for a
 mode flag, and no new window can appear while it waits. A chain that crashes
 between `PUT` and `UNLOCK` never calls `endWindow()`; the ceiling below ends the
-wait and records the dangling lock.
+wait, and the labels of the windows still open travel out through the
+`TeardownReport` so the caller can name what was abandoned.
 
 This is not a weakening of the earlier invariant. Nothing is released in steps 1
 and 2 — the teardown is only *waiting* there — so no request ever runs against a
@@ -930,7 +952,9 @@ Two consequences drawn from the E19 log:
   `validate` and `create`, once the object already exists. Checking
   `connection.isConnected()` before the first `IAdtObject` operation turns
   "object created, then an error" into "nothing happened".
-- **`LockRegistry`** captures the fingerprint alongside the handle at `lock()`.
+- **`LockRegistry`** passes its lock key as the window label, so an abandoned
+  window arrives back named (`Class/ZCL_FOO`) rather than counted, and captures
+  the fingerprint alongside the handle at `lock()`.
   Before unlocking it evaluates a precondition with **two** parts, and both are
   required:
 
@@ -1061,9 +1085,12 @@ they matter more than the rest of the set:
     the ceiling. Assert that the UNLOCK actually reached the server, not merely
     that `disconnect()` returned.
 
-17. **A window that never closes is abandoned, not waited on forever.** Same
-    setup, but the UNLOCK never comes. With the ceiling shortened for the test,
-    `disconnect()` must complete and report a dangling lock rather than hang.
+17. **A window that never closes is abandoned, and named.** Same setup, but the
+    UNLOCK never comes. With the ceiling shortened for the test, `disconnect()`
+    must complete rather than hang, and its `TeardownReport.abandonedWindows`
+    must contain the **label** the chain passed to `beginWindow()`. Asserting
+    only "it completed" would pass on an implementation that logs a count, which
+    is the silent orphan this design exists to prevent.
 18. **A second handler cannot take a lock during a pending teardown.** With one
     window open and `disconnect()` requested, a *different* handler calls
     `beginWindow()` before the first chain unlocks. It must get `NOT_CONNECTED`.
