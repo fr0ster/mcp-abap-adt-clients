@@ -263,11 +263,14 @@ class SessionLifecycle {
   markConnected(identity: string | null): void;
   markDisconnected(): void;
   /**
-   * Runs a lifecycle transition on the serializing tail. Concurrent calls with
-   * the same `kind` join the in-flight promise instead of starting a second
-   * transition; an opposite `kind` queues and re-evaluates on its turn.
+   * Runs a lifecycle transition on the serializing tail. A call joins the
+   * in-flight promise only when the queue TAIL is the same `kind` — never
+   * overtaking anything queued behind it. Otherwise it is appended and
+   * re-evaluates its precondition on its turn.
    */
   transition(kind: 'connect' | 'disconnect', run: () => Promise<void>): Promise<void>;
+  /** Marks the session unusable synchronously, before a teardown's first await. */
+  beginTeardown(): void;
   /** Classifies a freshly observed identity. */
   observe(identity: string | null): 'unchanged' | 'established' | 'replaced';
   /** Throws with code NOT_CONNECTED. */
@@ -303,27 +306,53 @@ This covers `connect()`, `disconnect()`, and the bounded internal
 re-establishment inside a recovery (paths C, D-second-branch, E), which must not
 be allowed to race a caller's `disconnect()`.
 
-- **Concurrent identical calls join the in-flight promise** rather than starting
-  a second transition. Two concurrent `connect()`s resolve from one
-  establishment — and, critically, from one client; two concurrent
-  `disconnect()`s from one teardown.
-- **An opposite call queues** behind the in-flight one and **re-evaluates its
+- **A call joins the in-flight transition only when the queue tail is a
+  transition of the same kind** — that is, when nothing is queued behind it.
+  Two concurrent `connect()`s with an empty queue resolve from one
+  establishment, and critically from one client.
+- **Otherwise the call is appended to the tail** and **re-evaluates its
   precondition on its turn**, rather than acting on what it observed before
-  waiting. A `connect()` queued behind a `disconnect()` therefore sees the
-  settled outcome, including a release left pending, and applies the
-  `RELEASE_PENDING` rule to a known state rather than to a guess.
+  waiting. A `connect()` queued behind a `disconnect()` sees the settled outcome,
+  including a release left pending, and applies the `RELEASE_PENDING` rule to a
+  known state rather than to a guess. A transition whose turn comes when its work
+  is already done is a no-op: a `connect()` reaching the front while connected, a
+  `disconnect()` reaching it while disconnected with nothing pending.
 
-Requests do **not** join lifecycle transitions. A request arriving while a
-`connect()` is in flight sees the pre-transition state and fails with
-`NOT_CONNECTED`; it never waits. Awaiting `connect()` is the caller's job, and
-making requests block on it would reintroduce implicit connect through the back
-door — a request that succeeds because it happened to arrive during someone
-else's connect is exactly the non-determinism this design removes.
+**Joining is restricted to the tail on purpose, and "same kind" alone is not
+enough.** Take `connect()` in flight, a `disconnect()` queued behind it, then a
+second `connect()`. Were the second to join the first by kind, it would overtake
+the queued `disconnect()` and resolve — telling its caller a session is ready
+moments before the queue tears that very session down. FIFO order with tail-only
+joining keeps every caller's answer true at the moment it is given.
 
-No `connecting`/`disconnecting` states are added. The guard asks one question —
-"is there a usable session right now" — and during a transition the honest answer
-is the pre-transition one. Adding transitional states would put that question in
-three places instead of one.
+### Usability during a transition
+
+Requests never join lifecycle transitions and never wait for one. Which state the
+guard reports mid-transition is **asymmetric**, and the asymmetry follows one
+rule: *a transition that removes usability takes effect at its start; a
+transition that grants it takes effect at its end.* Always answer on the safe
+side.
+
+| in flight | `isConnected()` during it | a request then |
+|---|---|---|
+| `connect()` | `false` — usability is granted only once establishment succeeds | `NOT_CONNECTED` |
+| `disconnect()` | `false` — **synchronously, before the first await** | `NOT_CONNECTED` |
+
+The `disconnect()` half is the load-bearing one. Reporting the pre-transition
+state there would let a request pass the guard and run **concurrently with the
+teardown** — against cookies being cleared, or an RFC client being closed
+underneath it. That is precisely the overlap between a transition and use of the
+resource that serialization exists to forbid, and it would arrive through the
+guard rather than through the queue.
+
+Awaiting `connect()` remains the caller's job. Making requests block on an
+in-flight transition would reintroduce implicit connect through the back door —
+a request that succeeds because it happened to arrive during someone else's
+connect is exactly the non-determinism this design removes.
+
+No `connecting`/`disconnecting` states are added. The guard still asks one
+question — "is there a usable session right now" — and the table above is its
+answer, not a second state machine.
 
 ### connect() failure semantics
 
@@ -611,6 +640,16 @@ they matter more than the rest of the set:
    Without serialization the pending-slot rule holds only for sequential calls,
    which is the easy half of the problem. Testable with a fake client whose
    `open()`/`close()` resolve on a deferred the test controls.
+7. **A request during a slow `disconnect()` gets `NOT_CONNECTED`.** With the
+   teardown held open on a deferred, a request issued mid-teardown must be
+   refused rather than run against cookies being cleared or a client being
+   closed. This is the one guard answer that cannot be derived from the
+   pre-transition state.
+8. **`connect()` → `disconnect()` → `connect()` resolves in order.** The second
+   `connect()` must not join the first and overtake the queued `disconnect()`.
+   Assert the observable consequence, not the internals: when the last
+   `connect()` resolves, `isConnected()` is `true` — never a resolved connect
+   whose session the queue then destroys.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
