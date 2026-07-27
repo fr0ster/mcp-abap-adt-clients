@@ -264,9 +264,24 @@ endWindow(token: WindowToken): void;
 ```
 
 ```ts
-/** Opaque handle for one open lock window. Only the lifecycle constructs it. */
-declare const windowBrand: unique symbol;
-type WindowToken = { readonly [windowBrand]: true };
+/**
+ * Opaque handle for one open lock window: `Symbol(label)`.
+ *
+ * A symbol, not a branded object, because EVERY implementation of
+ * IAbapConnection has to be able to make one — the batch recorder included —
+ * and a brand only the lifecycle can construct forces everyone else into a type
+ * assertion, which is a cast pretending to be a guarantee. A symbol is unique by
+ * construction, cannot be confused with a label, needs no factory in a contract
+ * package that holds no functions, and carries the label as its description for
+ * debugging.
+ *
+ * Provenance is not what the type has to prove: endWindow() checks membership at
+ * runtime, so a token from elsewhere, or a second close of the same window, is
+ * a token that matches no open window — logged and ignored. That check is
+ * stronger than a brand, since it also catches a token this very connection
+ * issued and already retired.
+ */
+type WindowToken = symbol;
 
 interface TeardownReport {
   /**
@@ -351,9 +366,10 @@ class SessionLifecycle {
    */
   beginWindow(label: string): WindowToken;
   /**
-   * Closes the window that token identifies. The drain completes when none are
-   * left open. Closing by label instead would let one flow retire another
-   * flow's window when both carry the same name.
+   * Closes the window that token identifies; a token matching no open window is
+   * logged and ignored, which covers a double close and a foreign token alike.
+   * The drain completes when none are left open. Closing by label instead would
+   * let one flow retire another flow's window when both carry the same name.
    */
   endWindow(token: WindowToken): void;
   /** Labels of the windows currently open, one entry per open instance. */
@@ -957,8 +973,10 @@ Two consequences drawn from the E19 log:
   inherited from the real connection: a recorder abandons nothing because it
   holds nothing.
 
-  `beginWindow()` returns a local token that `endWindow()` accepts and discards;
-  neither reaches the real connection. They are **no-ops**, and the reason is that during recording nothing has been sent: a
+  `beginWindow()` returns its own `Symbol(label)` that `endWindow()` accepts and
+  discards; neither reaches the real connection. This is possible precisely
+  because `WindowToken` is a symbol rather than a type only the lifecycle can
+  construct. They are **no-ops**, and the reason is that during recording nothing has been sent: a
   "lock window" opened here is a note in a payload, not an ABAP lock. Proxying it
   would open a real window at recording time and hold a teardown hostage for as
   long as the caller keeps assembling the batch — a wait for a lock that does not
@@ -1138,6 +1156,11 @@ they matter more than the rest of the set:
     second and it completes. An implementation keyed on labels retires the shared
     entry on the first close and tears down under a live operation; one keyed on
     tokens cannot.
+20. **An unknown or already-used token is ignored, not obeyed.** Close a window
+    twice, and close one with a token from another connection. Neither may
+    reduce the open set — the second close of a window that was already retired
+    must not retire a *different* window that happens to be open, which is what
+    a bare counter would do.
 
 
 **Needs a live system — four items, all preconditions for releasing the
