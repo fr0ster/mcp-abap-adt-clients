@@ -1004,14 +1004,26 @@ Two consequences drawn from the E19 log:
   keys stay distinguishable. The recorded pairing is what the response parser
   resolves against.
 
-  What closes each window is evidence, not intent:
+  What a window tracks is **"a lock may be held"**, not "an unlock happened" —
+  which matters, because there are two different proofs that nothing is held:
 
-  - the parsed response confirms **that pair's** `UNLOCK` part succeeded →
-    `endWindow(token)` for that occurrence alone;
-  - anything else — an error on that pair, an error earlier that stopped
-    execution, a transport failure, a response that cannot be parsed → **that
-    window stays open**, because its lock may be held and we do not know that it
-    is not.
+  | that pair's `LOCK` | that pair's `UNLOCK` | window |
+  |---|---|---|
+  | confirmed **failed** | — | **closed** — no lock was ever taken |
+  | confirmed succeeded | confirmed succeeded | **closed** — released |
+  | confirmed succeeded, or unknown | not confirmed | **open** — it may be held |
+
+  Closing on a confirmed `LOCK` failure is not a relaxation, it is the same rule
+  applied honestly. An earlier draft kept the window open for everything except a
+  confirmed `UNLOCK`, so a batch whose `LOCK` was rejected outright would stall
+  the next teardown for the full ceiling and then report an abandoned lock that
+  never existed — noise that trains a reader to ignore exactly the report this
+  design exists to produce.
+
+  Uncertainty alone keeps a window open: an error later in the pair, an error
+  earlier that stopped execution, a transport failure, a response that cannot be
+  parsed. In each of those the `LOCK` may have succeeded, and not knowing is
+  treated as held.
 
   Partial success is therefore ordinary rather than exceptional: two pairs where
   one `UNLOCK` succeeded and the other did not leave exactly one window open, and
@@ -1206,6 +1218,12 @@ they matter more than the rest of the set:
     again in one payload, confirming only the first `UNLOCK`: pairing by key
     rather than by occurrence closes the wrong window here and still leaves the
     open set the right size, so assert which label remains, never how many.
+23. **A confirmed `LOCK` failure closes the window.** A payload whose `LOCK` the
+    stub rejects outright. The window must close on the parsed response, not
+    linger: no lock was taken, so a teardown must neither wait out the ceiling
+    nor name an object that was never locked. An implementation keyed on "did the
+    UNLOCK succeed" reports a lock that does not exist — and a report that cries
+    wolf is worth less than no report.
 
 
 **Needs a live system — four items, all preconditions for releasing the
