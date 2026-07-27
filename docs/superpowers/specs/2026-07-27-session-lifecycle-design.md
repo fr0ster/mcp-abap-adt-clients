@@ -116,7 +116,8 @@ separately:
 
 Consequently **idempotence means "safe to call repeatedly", not "a no-op after
 the first call"**: `disconnect()` on an already-disconnected connection retries a
-pending release, and is a true no-op only when nothing is left to release.
+pending release, and skips work only when nothing is left to release and no
+window is waiting — while still reporting what it found either way.
 Without that rule a swallowed close error would be unrecoverable through the
 contract — the state would say disconnected, the second call would do nothing,
 and an open client with live locks would sit there unreachable.
@@ -421,8 +422,21 @@ class SessionLifecycle {
 ```
 
 States: `disconnected` (initial) → `connected` → `disconnected`. `connect()` on a
-connected connection is a no-op; `disconnect()` on a disconnected one is a no-op
-**only when no release is pending** (D2);
+connected connection is a no-op.
+
+For `disconnect()`, **"no-op" governs the work, never the answer.** It always
+resolves with a `TeardownReport` built from the current facts — windows still
+open or already abandoned, and whether a release is pending — and skips only the
+*work* when there is none: the state is already `disconnected`, no release is
+pending, no window is waiting. Anything else and it runs.
+
+Stated the other way round, because that is how it went wrong: a caller reaching
+the queue after an internal cleanup has already torn everything down finds
+nothing to do, and an earlier draft let that make the whole call a no-op —
+resolving with an empty report and swallowing the abandoned lock the cleanup had
+left for it to announce. Skipping work is an optimisation; skipping the report is
+a false statement about the session.
+
 `connect()` after `disconnect()` is allowed and starts a fresh session with a new
 identity — explicit, therefore unproblematic — **except while a release is
 pending**, where it first retries that release and rejects with
@@ -1393,7 +1407,8 @@ they matter more than the rest of the set:
     `disconnect()` immediately. It must run its own teardown and resolve with a
     report naming the abandoned window and flagging `releasePending`. An
     implementation that lets the caller join the queued cleanup skips that
-    execution and resolves with nothing, losing both facts. Assert also that the
+    execution and resolves with nothing, losing both facts — and so does one that
+    treats "already disconnected, nothing to do" as licence to skip the report. Assert also that the
     second teardown does not wait out another full ceiling for a window already
     abandoned.
 
