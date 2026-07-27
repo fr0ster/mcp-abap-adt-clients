@@ -11,6 +11,7 @@
  */
 
 import { createServer, type Server } from 'node:http';
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 
 export interface StubRequest {
   method: string;
@@ -32,13 +33,19 @@ export interface AdtStub {
   sessionsOpened(): number;
 }
 
-export async function startAdtStub(): Promise<AdtStub> {
+/**
+ * @param logger Optional injected logger for request tracing. Omit it and the
+ *   stub stays silent — diagnostics go through the logger, never to the console,
+ *   so a test run prints nothing unless a caller asked for it.
+ */
+export async function startAdtStub(logger?: ILogger): Promise<AdtStub> {
   const requests: StubRequest[] = [];
   const failures: Array<{ match: string; status: number }> = [];
   let sessionsOpened = 0;
 
   const server: Server = createServer((req, res) => {
     const url = req.url ?? '';
+    logger?.debug('stub request', { method: req.method, url });
     requests.push({
       method: req.method ?? 'GET',
       url,
@@ -94,8 +101,9 @@ export async function startAdtStub(): Promise<AdtStub> {
     matching: (match) => requests.filter((r) => r.url.includes(match)),
     sessionsOpened: () => sessionsOpened,
     close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((err) => (err ? reject(err) : resolve())),
-      ),
+      new Promise<void>((resolve, reject) => {
+        server.close((err) => (err ? reject(err) : resolve()));
+        server.closeAllConnections();
+      }),
   };
 }
