@@ -866,8 +866,9 @@ every re-establishment:
 - Inside a **recovery it is already performing** — a bounded, logged reaction to
   a request that has already failed (paths C, D-second-branch, E) — the connector
   may re-establish, and only when the mode is not `stateful`. This is the
-  transparent recovery D1 keeps; it is bounded to one in-flight request, it is
-  logged, and the resulting identity change is recorded.
+  transparent recovery D1 keeps; it is bounded to one in-flight request, and the
+  new identity becomes the one `getSessionIdentity()` reports, so a caller that
+  captured the old one sees the change rather than being told about it.
 
 Both readings of "no lazy re-establishment" would otherwise be defensible, so
 the distinction is normative: bounded recovery of a failed request, yes; opening
@@ -1157,8 +1158,9 @@ Two consequences drawn from the E19 log:
   the server". `unlockAll()` stops producing noise and starts telling the truth.
 - **Operation chains** decide from the **error in hand**, not from a comparison.
   If the failure that entered the catch block carries `code === SESSION_REPLACED`
-  or `code === NOT_CONNECTED`, the unlock is skipped unconditionally and a
-  dangling lock is recorded. Only for any other failure does the chain fall
+  or `code === NOT_CONNECTED`, the unlock is skipped unconditionally and the lock
+  is left in the registry's `pendingLocks`, so `unlockAll()` returns it as a
+  `LockFailure` rather than the chain swallowing it. Only for any other failure does the chain fall
   through to the `LockRegistry` precondition above. Inferring "the session is
   probably fine" from an unchanged fingerprint is exactly the mistake this rule
   exists to prevent. Today those catch blocks attempt an unconditional unlock.
