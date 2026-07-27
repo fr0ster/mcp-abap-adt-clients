@@ -295,6 +295,13 @@ class SessionLifecycle {
    */
   beginTeardown(origin: 'caller' | 'internal'): void;
   /**
+   * True while a lock window that was already open when a teardown was requested
+   * is still finishing. Its requests are admitted; everything else is refused.
+   * Decided at the teardown request and never re-evaluated, so a chain cannot
+   * open a new window afterwards.
+   */
+  get grandfatheredWindowOpen(): boolean;
+  /**
    * The CURRENT epoch, read at a recovery's turn and compared against the
    * baseline its RequestLease captured at admission; a difference means
    * "abandon". Never capture a baseline from here — reading it when the
@@ -383,7 +390,12 @@ side.
 | in flight | `isConnected()` during it | a request then |
 |---|---|---|
 | `connect()` | `false` — usability is granted only once establishment succeeds | `NOT_CONNECTED` |
-| `disconnect()` | `false` — **synchronously, before the first await** | `NOT_CONNECTED` |
+| `disconnect()`, no lock window was open when it was requested | `false` — **synchronously, before the first await** | `NOT_CONNECTED` |
+| `disconnect()`, a lock window **was** open | `false` | admitted while that window lasts, so it can finish; refused once it closes |
+
+`isConnected()` reports `false` in every teardown case: a caller asking "may I
+start work" must hear no. The grandfathered admissions are the finishing of work
+already started, not a licence to begin more.
 
 ### Teardown drains in-flight requests
 
@@ -396,8 +408,9 @@ other; it says nothing about a transition against a request already in progress.
 So `disconnect()` has three steps, in this order:
 
 1. mark the session unusable **and bump the teardown epoch** — synchronously, at
-   call time, before any await, so no further
-   request enters;
+   call time, before any await. "Unusable" is scoped: if a lock window was open
+   at that instant, that window's requests are still admitted so it can finish
+   (see below); everything else is refused;
 2. **await the drain** — no request in flight **and** no open lock window
    (bounded; see below);
 3. only then release the transport resource and clear the state.
@@ -434,6 +447,30 @@ So the drain waits on two things: **no request in flight, and no open lock
 window.** The marker for the window is `sessionMode === 'stateful'` — the same
 signal D1 already uses for "a lock is held", set by our chains across the whole
 window and cleared after unlock. No new API adoption is required for it to work.
+
+#### The window must be allowed to finish
+
+Waiting for the window while refusing every new request would deadlock on
+itself: step 1 makes the session unusable, so the chain's own UNLOCK is refused
+with `NOT_CONNECTED`, and step 2 waits for a `stateful` flag that only that
+UNLOCK would clear. The teardown would always sit out the ceiling and record a
+dangling lock it caused itself.
+
+So the refusal is **scoped, not global**. At the instant a caller teardown is
+requested the lifecycle records whether a lock window was open:
+
+- **a window was open** → requests continue to be admitted under that window's
+  lease until the window closes (the mode goes back to stateless). This is how
+  `PUT` and `UNLOCK` finish;
+- **no window was open** → every request is refused with `NOT_CONNECTED`,
+  including a `LOCK` that would start a new one. A chain that sets `stateful`
+  after the teardown request cannot sneak a window in, because the grandfathering
+  is decided at that instant and never re-evaluated.
+
+This is not a weakening of the earlier invariant. Nothing is released in steps 1
+and 2 — the teardown is only *waiting* there — so no request ever runs against a
+resource being freed. The release happens in step 3, after both the window and
+the in-flight requests have settled.
 
 (`beginCriticalSection()`/`endCriticalSection()` would be a more precise marker,
 being explicit rather than inferred, but adt-clients does not call them today —
@@ -885,11 +922,14 @@ they matter more than the rest of the set:
    Without serialization the pending-slot rule holds only for sequential calls,
    which is the easy half of the problem. Testable with a fake client whose
    `open()`/`close()` resolve on a deferred the test controls.
-7. **A request during a slow `disconnect()` gets `NOT_CONNECTED`.** With the
-   teardown held open on a deferred, a request issued mid-teardown must be
-   refused rather than run against cookies being cleared or a client being
-   closed. This is the one guard answer that cannot be derived from the
-   pre-transition state.
+7. **A request during a slow `disconnect()` gets `NOT_CONNECTED`** — with **no
+   lock window open** when the teardown was requested. With the teardown held on
+   a deferred, a request issued mid-teardown must be refused rather than run
+   against cookies being cleared or a client being closed. This is the one guard
+   answer that cannot be derived from the pre-transition state. Pair it with test
+   16, which is the same situation with a window open and the opposite required
+   answer; an implementation with a global refusal passes this one and deadlocks
+   there.
 8. **`connect()` → `disconnect()` → `connect()` resolves in order.** The second
    `connect()` must not join the first and overtake the queued `disconnect()`.
    Assert the observable consequence, not the internals: when the last
@@ -939,15 +979,24 @@ they matter more than the rest of the set:
     abandon and the current one must proceed. Coalesce them by kind and one
     inherits the other's answer, so assert **both** outcomes in the same test: an
     implementation that joins gets one of them right by luck.
-16. **`disconnect()` in the gap between PUT and UNLOCK waits for the window.**
-    Run a lock chain, let the PUT settle, and call `disconnect()` while the
-    session is still stateful and nothing is in flight. The teardown must not
-    release until the window closes; the UNLOCK must still go out on a live
-    session. A request-counting drain passes every earlier test and fails this
-    one, because at that instant the count is legitimately zero.
+16. **`disconnect()` in the gap between PUT and UNLOCK waits for the window, and
+    lets the UNLOCK through.** Run a lock chain, let the PUT settle, and call
+    `disconnect()` while the session is still stateful and nothing is in flight.
+    The UNLOCK must be **admitted** and go out on a live session; only then may
+    the teardown release. Two implementations fail here for opposite reasons: a
+    request-counting drain tears down immediately (the count is legitimately
+    zero), and a global refusal blocks the UNLOCK it is waiting for and sits out
+    the ceiling. Assert that the UNLOCK actually reached the server, not merely
+    that `disconnect()` returned.
+
 17. **A window that never closes is abandoned, not waited on forever.** Same
     setup, but the UNLOCK never comes. With the ceiling shortened for the test,
     `disconnect()` must complete and report a dangling lock rather than hang.
+18. **A new `LOCK` after a teardown request is refused.** Same setup, but the
+    chain tries to open a *new* window after `disconnect()` was called. It must
+    get `NOT_CONNECTED` — grandfathering covers the window that was already open,
+    decided at the teardown request and never re-evaluated.
+
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
