@@ -243,18 +243,27 @@ getSessionIdentity(): string | null;
  * must refuse outright. Paired with endWindow() in a finally after unlocking —
  * a teardown waits for every window to close.
  *
- * `label` is an opaque string used only for reporting an abandoned window; the
- * connector attaches no meaning to it. adt-clients passes the lock key it
- * already computes (`Class/ZCL_FOO`), so a teardown that gives up can name what
- * it left behind.
+ * `label` is REQUIRED and opaque — the connector attaches no meaning to it,
+ * but it must exist. An unnamed window cannot be reported: it would either
+ * vanish from the teardown report or appear as an empty string, and a
+ * guarantee that names what was abandoned is worth nothing if a caller can
+ * opt out of naming. adt-clients passes the lock key LockRegistry already
+ * computes (`Class/ZCL_FOO`); any other consumer names its own window.
+ *
+ * Labels are tracked per window, not counted, so the report can list exactly
+ * what stayed open. endWindow() takes the same label it was opened with.
  */
-beginWindow(label?: string): void;
-endWindow(label?: string): void;
+beginWindow(label: string): void;
+endWindow(label: string): void;
 ```
 
 ```ts
 interface TeardownReport {
-  /** Labels of lock windows still open when the bounded wait expired. */
+  /**
+   * Labels of lock windows still open when the bounded wait expired. Empty when
+   * nothing was abandoned — every entry is a real, named window, because
+   * beginWindow() requires a label.
+   */
   abandonedWindows: string[];
   /** A transport release did not complete and stays pending (D2). */
   releasePending: boolean;
@@ -324,15 +333,15 @@ class SessionLifecycle {
    */
   beginTeardown(origin: 'caller' | 'internal'): void;
   /**
-   * Opens a lock window. Throws NOT_CONNECTED if a teardown is pending — a lock
-   * outlives the request that takes it, so it is the one thing a pending
-   * teardown must refuse outright.
+   * Opens a lock window under a required label. Throws NOT_CONNECTED if a
+   * teardown is pending — a lock outlives the request that takes it, so it is
+   * the one thing a pending teardown must refuse outright.
    */
-  beginWindow(): void;
-  /** Closes a lock window. The drain completes when the count reaches zero. */
-  endWindow(): void;
-  /** Open lock windows; the drain waits for this to reach zero. */
-  get openWindows(): number;
+  beginWindow(label: string): void;
+  /** Closes a lock window. The drain completes when none are left open. */
+  endWindow(label: string): void;
+  /** Labels of the windows currently open; the drain waits for this to empty. */
+  get openWindows(): readonly string[];
   /**
    * The CURRENT epoch, read at a recovery's turn and compared against the
    * baseline its RequestLease captured at admission; a difference means
@@ -514,10 +523,11 @@ The lifecycle cannot infer window boundaries from `sessionMode`: a second window
 opening inside the first is invisible there. It needs them declared:
 
 ```ts
-/** Opens a lock window. Throws NOT_CONNECTED if a teardown is pending. */
-beginWindow(): void;
-/** Closes it. The drain completes when the count reaches zero. */
-endWindow(): void;
+/** Opens a lock window under a required label. Throws NOT_CONNECTED if a
+ *  teardown is pending. */
+beginWindow(label: string): void;
+/** Closes it. The drain completes when no window is left open. */
+endWindow(label: string): void;
 ```
 
 The connector already has this shape as
@@ -924,6 +934,11 @@ Two consequences drawn from the E19 log:
 - **`BatchRecordingConnection`** implements all five. `isConnected()` and
   `getSessionIdentity()` proxy the real connection; `disconnect()` is a logged
   no-op, since a batch holds no session.
+
+  `disconnect()` resolves with an explicitly empty report —
+  `{ abandonedWindows: [], releasePending: false }` — rather than anything
+  inherited from the real connection: a recorder abandons nothing because it
+  holds nothing.
 
   `beginWindow()`/`endWindow()` are **no-ops that do not reach the real
   connection**, and the reason is that during recording nothing has been sent: a
