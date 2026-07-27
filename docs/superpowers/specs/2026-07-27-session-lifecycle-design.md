@@ -367,13 +367,25 @@ class SessionLifecycle {
   ): Promise<void>;
   /**
    * Marks the session unusable synchronously, before a teardown's first await.
-   * `origin: 'caller'` also bumps the teardown epoch, which cancels any recovery
-   * belonging to a request admitted earlier — whether that recovery is already
-   * queued, still being prepared, or has not yet failed. `origin: 'internal'`
-   * (a cleanup started from inside request handling) must not bump, or a
-   * recovery would cancel itself.
+   * Two independent axes, and conflating them was a defect:
+   *
+   * `origin` decides the EPOCH. 'caller' bumps it, cancelling any recovery
+   * belonging to a request admitted earlier — queued, being prepared, or not yet
+   * failed. 'internal' (a cleanup from inside request handling) must not bump,
+   * or a recovery would cancel itself.
+   *
+   * `sessionLost` decides ADMISSION. false — the session is alive and the caller
+   * simply wants out — defers the close so an open window's requests can finish
+   * (its UNLOCK is worth sending). true — the credential was replaced, or the
+   * server said the session is gone — closes admission at once regardless of
+   * open windows, and drops the identity immediately, because there is nothing
+   * left to finish and an UNLOCK sent over a replaced session is the internal
+   * retry this design forbids.
    */
-  beginTeardown(origin: 'caller' | 'internal'): void;
+  beginTeardown(opts: {
+    origin: 'caller' | 'internal';
+    sessionLost: boolean;
+  }): void;
   /**
    * Opens a lock window under a required label. Throws NOT_CONNECTED if a
    * teardown is pending — a lock outlives the request that takes it, so it is
@@ -505,6 +517,7 @@ side.
 | `connect()` | `false` — usability is granted only once establishment succeeds | `NOT_CONNECTED` |
 | `disconnect()`, no lock window was open when it was requested | `false` — **synchronously, before the first await** | `NOT_CONNECTED` |
 | `disconnect()`, a lock window **was** open | `false` | ordinary requests admitted until the last window closes, so the chain can finish; a new window refused outright |
+| a **session-lost** teardown | `false` | everything refused at once — no window can finish over a session that is gone |
 
 `isConnected()` reports `false` in every teardown case: a caller asking "may I
 start work" must hear no. Admissions during an open window are the finishing of
@@ -570,6 +583,32 @@ itself: step 1 makes the session unusable, so the chain's own UNLOCK is refused
 with `NOT_CONNECTED`, and step 2 waits for a `stateful` flag that only that
 UNLOCK would clear. The teardown would always sit out the ceiling and record a
 dangling lock it caused itself.
+
+#### Two teardowns, not one
+
+Everything below about letting an open window finish assumes the session is
+still there. That holds for a caller's `disconnect()` — the caller wants out,
+the ABAP session is alive, and the chain's `UNLOCK` is worth sending. It does
+not hold when the session is already gone: a replaced credential, or a server
+that answered "session not found". Then there is nothing to finish, and an
+`UNLOCK` sent over the replacement is exactly the internal retry this design
+forbids.
+
+So a teardown declares which it is:
+
+| | graceful (`sessionLost: false`) | session lost (`sessionLost: true`) |
+|---|---|---|
+| raised by | a caller's `disconnect()` | credential renewal, dead-session detection |
+| admission | deferred while a window is open, so it can finish | closed **at once**, whatever is open |
+| identity | dropped by the queued cleanup | dropped **immediately** |
+| open windows | waited on, then abandoned at the ceiling | abandoned immediately — nothing can close them |
+
+Dropping the identity immediately is what makes the rest consistent without a
+special case: a later `unlockAll()` compares against the captured fingerprint,
+sees it changed, skips the `UNLOCK` and records a `LockFailure`. Leave the
+identity in place until the queued cleanup and that same call sees a match and
+sends an `UNLOCK` over a session that no longer exists — with no error in hand
+to warn it, because nothing had failed in *its* flow.
 
 #### What must be refused is what outlives the request
 
@@ -927,7 +966,7 @@ protected onCredentialRenewed(): void {
   // Synchronous: admit nothing further. 'internal' because this teardown comes
   // from inside request handling — bumping the epoch here would cancel the very
   // recovery this hook exists to enable.
-  this.lifecycle.beginTeardown('internal');
+  this.lifecycle.beginTeardown({ origin: 'internal', sessionLost: true });
 
   // Queued: drains first, then clears the OLD session — cookies, CSRF token,
   // transport resources — and marks disconnected. The renewed credential is not
@@ -1456,6 +1495,15 @@ they matter more than the rest of the set:
     skips it — the flag is false throughout a pending teardown — and the window
     then runs to the ceiling, so the teardown produces the very orphan it was
     called to avoid. This is test 16 seen from the registry's side.
+31. **After a credential renewal, `unlockAll()` sends nothing.** Renew the
+    credential inside a stateful window, then call `unlockAll()` from a flow that
+    has no error in hand. It must send no `UNLOCK` and return the lock as a
+    `LockFailure`. An implementation that drops the identity only in the queued
+    cleanup lets this call see an unchanged fingerprint and unlock over the
+    replaced session — the internal retry, arriving through the one door with no
+    failure to warn it. Pair with test 30, which requires the opposite answer for
+    a graceful teardown: an implementation with a single teardown kind cannot
+    pass both.
 
 
 **Needs a live system — four items, all preconditions for releasing the
