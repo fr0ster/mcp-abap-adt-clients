@@ -899,9 +899,31 @@ Two consequences drawn from the E19 log:
 
 ## adt-clients adaptation
 
-- **`BatchRecordingConnection`** implements the three new methods: `isConnected()`
-  and `getSessionIdentity()` proxy the real connection; `disconnect()` is a
-  logged no-op, since a batch holds no session.
+- **`BatchRecordingConnection`** implements all five. `isConnected()` and
+  `getSessionIdentity()` proxy the real connection; `disconnect()` is a logged
+  no-op, since a batch holds no session.
+
+  `beginWindow()`/`endWindow()` are **no-ops that do not reach the real
+  connection**, and the reason is that during recording nothing has been sent: a
+  "lock window" opened here is a note in a payload, not an ABAP lock. Proxying it
+  would open a real window at recording time and hold a teardown hostage for as
+  long as the caller keeps assembling the batch — a wait for a lock that does not
+  exist yet.
+
+  What the real connection does see is the **batch submission: one request**,
+  which the drain already waits for. That is only sufficient while a batch is
+  self-contained — every `LOCK` it opens is closed by an `UNLOCK` in the same
+  payload — because then no lock survives the request that carried it, which is
+  exactly the criterion the window rule is built on.
+
+  So the constraint is made explicit rather than assumed: **a batch must not
+  leave a lock open across batches.** `buildBatchPayload` validates it, throwing
+  at build time when the payload contains a `LOCK` without a matching `UNLOCK`.
+  A silent violation would be invisible in the worst way — the teardown would
+  count zero windows, tear the session down, and orphan a lock nobody ever
+  declared. If cross-batch locking is ever needed, the batch client must bracket
+  the submission with the real connection's `beginWindow()`/`endWindow()` and keep
+  the window open across batches, which is a design change, not a detail.
 - **`AdtClient`** gains an early check. Calling `connect()` stays the consumer's
   job — the library does not own the connection and must not connect on its
   behalf. But a missing connect would otherwise surface mid-chain, after
@@ -936,7 +958,7 @@ Two consequences drawn from the E19 log:
 |---|---|---|
 | `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule**, **serialization: tail-only joining, opposite calls queue and re-evaluate**, **admit/drain accounting** | not needed |
 | connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; **a failed close retains the client, and `connect()` neither overwrites it nor proceeds past it: it retries the release and rejects with `RELEASE_PENDING` if that fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
-| adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged** | not needed |
+| adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged**; **batch: window calls stay local, and a payload with an unmatched `LOCK` throws at build time** | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
 distinct session per discovery fetch, which is what makes "replacement while
