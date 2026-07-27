@@ -983,19 +983,32 @@ Two consequences drawn from the E19 log:
   exist yet.
 
   What the real connection does see is the **batch submission: one request**,
-  which the drain already waits for. That is only sufficient while a batch is
-  self-contained — every `LOCK` it opens is closed by an `UNLOCK` in the same
-  payload — because then no lock survives the request that carried it, which is
-  exactly the criterion the window rule is built on.
+  which the drain already waits for. That alone is not enough, and the reason is
+  worth stating because an earlier draft got it wrong: a payload containing both
+  `LOCK` and `UNLOCK` is only **syntactically** self-contained. Execution can
+  stop in between — an error on an intermediate part, a transport failure, a lost
+  response — and then the request settles, the recorder holds nothing, and a real
+  server-side lock outlives it unseen. "The UNLOCK is in the payload" is a claim
+  about the text we sent, not about what the server did.
 
-  So the constraint is made explicit rather than assumed: **a batch must not
-  leave a lock open across batches.** `buildBatchPayload` validates it, throwing
-  at build time when the payload contains a `LOCK` without a matching `UNLOCK`.
-  A silent violation would be invisible in the worst way — the teardown would
-  count zero windows, tear the session down, and orphan a lock nobody ever
-  declared. If cross-batch locking is ever needed, the batch client must bracket
-  the submission with the real connection's `beginWindow()`/`endWindow()` and keep
-  the window open across batches, which is a design change, not a detail.
+  So **a submission whose payload contains a `LOCK` is bracketed with a real
+  window** on the real connection, opened before sending under the lock's key as
+  label. What closes it is evidence, not intent:
+
+  - the parsed response confirms the `UNLOCK` part **succeeded** → `endWindow()`;
+  - anything else — an error before the `UNLOCK`, a transport failure, a response
+    that cannot be parsed → **the window stays open**, because the lock may be
+    held and we do not know that it is not.
+
+  A window left open that way behaves like any other dangling lock: it blocks the
+  teardown until the ceiling and then arrives named in `TeardownReport`. That is
+  the honest outcome — a lock we cannot prove was released is reported, not
+  assumed away.
+
+  `buildBatchPayload` still validates that a `LOCK` has a matching `UNLOCK`,
+  throwing at build time otherwise. That check keeps its value — it catches the
+  design error of locking across batches — but it is a check on the payload, and
+  the bracket above is what covers execution.
 - **`AdtClient`** gains an early check. Calling `connect()` stays the consumer's
   job — the library does not own the connection and must not connect on its
   behalf. But a missing connect would otherwise surface mid-chain, after
@@ -1034,7 +1047,7 @@ Two consequences drawn from the E19 log:
 |---|---|---|
 | `SessionLifecycle` | states, idempotence, `observe()` classification, **the additive rule**, **serialization: tail-only joining, opposite calls queue and re-evaluate**, **admit/drain accounting** | not needed |
 | connector | the `NOT_CONNECTED` guard; `reset()` → `disconnected`; **the fingerprint ignores `sap-XSRF_*`**; **a LOCK adding a second identifier does not throw**; **credential renewal under `stateful` throws before teardown**; **a failing `connect()` rejects and leaves `isConnected() === false`**; **`disconnect()` never throws, including when the RFC close fails — and a repeat call retries that failed close instead of being a no-op**; **a failed close retains the client, and `connect()` neither overwrites it nor proceeds past it: it retries the release and rejects with `RELEASE_PENDING` if that fails**; all five recovery paths; no internal retry on `SESSION_REPLACED` | not needed |
-| adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged**; **batch: window calls stay local, and a payload with an unmatched `LOCK` throws at build time** | not needed |
+| adt-clients | the two shields flipped; `LockRegistry` sends no unlock into a replaced session; **no unlock into a DEAD session either, where the fingerprint is unchanged**; **batch: recorder window calls stay local, a payload with an unmatched `LOCK` throws at build time, and a submission carrying a `LOCK` keeps a real window open unless the response proves the `UNLOCK` ran** | not needed |
 
 The stub in `src/__tests__/unit/session/adtStubServer.ts` already hands out a
 distinct session per discovery fetch, which is what makes "replacement while
@@ -1161,6 +1174,13 @@ they matter more than the rest of the set:
     reduce the open set — the second close of a window that was already retired
     must not retire a *different* window that happens to be open, which is what
     a bare counter would do.
+21. **A batch that dies between LOCK and UNLOCK leaves its window open.** Submit
+    a payload containing both, and have the stub fail an intermediate part so the
+    `UNLOCK` never executes. The request settles — with an error — and the window
+    must still be open, so a teardown reports the lock by name instead of passing
+    over it. Pair it with the success case, where a confirmed `UNLOCK` closes the
+    window: an implementation that closes on "request settled" passes that one
+    and fails this one.
 
 
 **Needs a live system — four items, all preconditions for releasing the
