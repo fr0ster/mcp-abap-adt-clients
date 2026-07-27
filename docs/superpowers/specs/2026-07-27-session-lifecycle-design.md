@@ -241,8 +241,13 @@ getSessionIdentity(): string | null;
 /**
  * Open a lock window. Throws NOT_CONNECTED when a teardown is pending: a lock
  * outlives the request that takes it, so it is the one thing a pending teardown
- * must refuse outright. Paired with endWindow() in a finally after unlocking —
- * a teardown waits for every window to close.
+ * must refuse outright. A teardown waits for every window to close.
+ *
+ * NOT paired with endWindow() in a bare finally, however habitual that is: a
+ * window says "a lock may be held", so it closes on EVIDENCE — a confirmed
+ * UNLOCK, or a confirmed failure of the LOCK itself. A finally would close it
+ * after an unlock that failed, was never sent, or whose outcome is unknown,
+ * which is precisely when the lock is most likely still there.
  *
  * `label` is REQUIRED and opaque — the connector attaches no meaning to it,
  * but it must exist. An unnamed window cannot be reported: it would either
@@ -1204,6 +1209,22 @@ Two consequences drawn from the E19 log:
   retry this design forbids. When the precondition fails, the lock is returned in
   `LockFailure[]` (the structure already exists) with "session lost, lock left on
   the server". `unlockAll()` stops producing noise and starts telling the truth.
+- **Operation chains close their window on evidence, not in a `finally`.** The
+  rule the batch path spells out is not a batch peculiarity — it is what a window
+  means, so an ordinary chain follows it too:
+
+  | that chain's `LOCK` | its `UNLOCK` | window |
+  |---|---|---|
+  | confirmed failed | — | `endWindow(token)` — nothing was taken |
+  | confirmed succeeded | confirmed succeeded | `endWindow(token)` — released |
+  | succeeded, or unknown | failed, not sent, or unknown | **left open** |
+
+  The third row is every path where the chain skips its unlock — a
+  `SESSION_REPLACED` or `NOT_CONNECTED` in hand — and every path where the unlock
+  went out and did not come back. Those are exactly the cases a `finally` would
+  close, and exactly the cases where the lock is most likely still held. When
+  `unlockAll()` later releases such a lock for real, it closes the window then.
+
 - **Operation chains** decide from the **error in hand**, not from a comparison.
   If the failure that entered the catch block carries `code === SESSION_REPLACED`
   or `code === NOT_CONNECTED`, the unlock is skipped unconditionally and the lock
@@ -1412,6 +1433,11 @@ they matter more than the rest of the set:
     treats "already disconnected, nothing to do" as licence to skip the report. Assert also that the
     second teardown does not wait out another full ceiling for a window already
     abandoned.
+29. **A failed `UNLOCK` outside a batch leaves the window open.** An ordinary
+    chain whose unlock returns an error, and a variant where it never goes out at
+    all. The window must remain open in both, so the next teardown names the
+    lock. A `finally` passes every happy-path test and fails these two — and it
+    is the shape most implementations reach for first.
 
 
 **Needs a live system — four items, all preconditions for releasing the
