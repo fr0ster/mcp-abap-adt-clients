@@ -887,17 +887,35 @@ something a future provider supplies. The lifecycle must not branch on it:
  */
 protected onCredentialRenewed(): void {
   const wasStateful = this.sessionMode === 'stateful';
-  this.lifecycle.markDisconnected();
+
+  // Synchronous: admit nothing further. 'internal' because this teardown comes
+  // from inside request handling — bumping the epoch here would cancel the very
+  // recovery this hook exists to enable.
+  this.lifecycle.beginTeardown('internal');
+
+  // Queued: drains first, then clears the OLD session — cookies, CSRF token,
+  // transport resources — and marks disconnected. The renewed credential is not
+  // touched; it is the one thing that survives. A recovery queues behind this,
+  // so it can never re-establish on top of stale transport state.
+  this.lifecycle.transition('disconnect', () => this.cleanupSession());
+
   if (wasStateful) {
     throw sessionError(ADT_SESSION_ERROR.SESSION_REPLACED);
   }
 }
 ```
 
-The order matters and is normative. `markDisconnected()` drops the identity, so
-a later `connect()` would classify the new session as `established`, never as
-`replaced` — comparing identities across a credential renewal cannot work, and an
-earlier draft of this spec promised exactly that. The stateful check therefore
+Both halves are normative, and an earlier draft had only the flag: a hook that
+merely marks the lifecycle disconnected leaves the old cookies, token and
+transport in place, so the recovery re-establishes over stale state and the
+cleanup → recover ordering this design relies on never exists. Marking the state
+and clearing what the state described are two different jobs.
+
+The order matters too. `markDisconnected()`, which the queued cleanup performs at
+its turn, drops the identity, so a later `connect()` would classify the new
+session as `established`, never as `replaced` — comparing identities across a
+credential renewal cannot work, and an earlier draft of this spec promised
+exactly that. The stateful check therefore
 happens **before** the teardown and does not depend on any comparison. State is
 still marked disconnected first, so the connector is never left `connected` with
 a dead credential, whichever way the throw goes.
@@ -1246,8 +1264,12 @@ they matter more than the rest of the set:
     re-establishment, the request fails. An implementation that asks "has a
     teardown run?" passes a weaker test and fails this one, because at the
     recovery's turn that teardown is still sitting behind it in the queue.
-13. **An internal cleanup does not cancel its own recovery.** Path E again, with
-    no caller teardown anywhere. The recovery must complete. An implementation
+13. **An internal cleanup does not cancel its own recovery, and runs before it.**
+    Path E again, with no caller teardown anywhere. The recovery must complete —
+    and the re-establishment must observe a cleared jar, proving the queued
+    cleanup ran first. An implementation whose hook only flips the lifecycle flag
+    re-establishes over the old cookies and token, which no assertion on the
+    final result would catch. An implementation
     that bumps the epoch from an internally-initiated cleanup cancels the retry it
     just set up — the mirror of the deadlock, silent instead of hanging.
 14. **A teardown between the failure and the queueing still cancels.** Mirror of
