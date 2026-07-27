@@ -274,6 +274,13 @@ class SessionLifecycle {
    * overtaking anything queued behind it. Otherwise it is appended and
    * re-evaluates its precondition on its turn.
    */
+  /**
+   * `connect` and `disconnect` may join the queue tail of the same kind.
+   * `recover` NEVER joins and is never joined: each one carries the baseline of
+   * its own request, so sharing a promise would either propagate one request's
+   * cancellation to another or let a stale request ride a valid recovery past
+   * its own epoch check.
+   */
   transition(
     kind: 'connect' | 'disconnect' | 'recover',
     run: () => Promise<void>,
@@ -341,7 +348,9 @@ be allowed to race a caller's `disconnect()`.
 - **A call joins the in-flight transition only when the queue tail is a
   transition of the same kind** — that is, when nothing is queued behind it.
   Two concurrent `connect()`s with an empty queue resolve from one
-  establishment, and critically from one client.
+  establishment, and critically from one client. **Joining applies to `connect`
+  and `disconnect` only; a `recover` never joins anything and nothing joins a
+  `recover`** — see below.
 - **Otherwise the call is appended to the tail** and **re-evaluates its
   precondition on its turn**, rather than acting on what it observed before
   waiting. A `connect()` queued behind a `disconnect()` sees the settled outcome,
@@ -506,6 +515,26 @@ initiated from within an admitted request.
 
 Otherwise `recover` re-establishes, the request re-admits, and the retry
 proceeds.
+
+**A `recover` is never coalesced with another one.** Kind alone does not make two
+recoveries interchangeable: each carries the baseline of *its own* request. Two
+of them landing side by side is not exotic — an older request whose baseline is
+`e0` stalls before queueing, a caller teardown moves the epoch to `e1` and a
+reconnect completes, and a newer request admitted at `e1` also needs recovery.
+Joining those two produces one of two wrong answers, depending on which promise
+wins: the valid `e1` recovery inherits the stale one's cancellation, or the stale
+`e0` request rides the successful `e1` recovery and skips the epoch check that
+exists to stop it.
+
+So every `recover` runs its own transition and performs its own baseline check on
+its turn. Two adjacent recoveries execute in sequence — the stale one abandoning,
+the current one proceeding — and neither learns anything from the other's
+outcome.
+
+Rejected: joining on a compound key of `(kind, baseline epoch)`. It is sound,
+since equal baselines do decide alike, but it buys one saved re-establishment in
+a rare interleaving at the price of a coalescing rule subtle enough that the next
+reader has to re-derive this whole paragraph to trust it.
 
 ### Why the guard's disconnect half is load-bearing
 
@@ -860,6 +889,13 @@ they matter more than the rest of the set:
     sees no change, and re-establishes — passing tests 12 and 13 while still
     resurrecting a session the caller closed. Only a baseline taken at admission
     fails this test when it is wrong.
+15. **Two adjacent recoveries with different baselines decide independently.** An
+    older request holding baseline `e0`, a caller teardown moving the epoch to
+    `e1` with a reconnect completing, then a newer request admitted at `e1` that
+    also needs recovery — both recoveries queued back to back. The stale one must
+    abandon and the current one must proceed. Coalesce them by kind and one
+    inherits the other's answer, so assert **both** outcomes in the same test: an
+    implementation that joins gets one of them right by luck.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
