@@ -331,6 +331,11 @@ interface RequestLease {
 class SessionLifecycle {
   get connected(): boolean;
   get identity(): string | null;
+  /**
+   * Publishes usability. The caller must first check that the teardown epoch has
+   * not moved since its transition started: a connect that finished after a
+   * teardown was requested must not republish usability.
+   */
   markConnected(identity: string | null): void;
   markDisconnected(): void;
   /**
@@ -796,6 +801,25 @@ established — the credential accepted and the token/cookies obtained. If
 establishment fails, `connect()` **rejects** and the state stays `disconnected`.
 There is no third outcome: no "connected but unusable", no resolved promise over
 an empty jar.
+
+**Success is not enough on its own: the commit phase also checks the teardown
+epoch.** `connect()` captures the epoch when it starts, and before publishing
+usability compares it. If a caller requested a teardown while the establishment
+was in flight, `markConnected()` is **not** called: the session goes straight to
+the queued teardown for release, and `connect()` rejects with `NOT_CONNECTED`.
+
+Without that check a slow `connect()` running ahead of a queued `disconnect()`
+would publish usability *after* the caller asked to stop, and a request could
+slip in during the gap before the teardown's turn — breaking the table above,
+which promises `isConnected()` is false in every teardown case. It is the same
+capture-at-start, check-at-commit shape that recovery already uses, applied to
+the other transition that can grant usability; the two were written apart, which
+is why only one had it.
+
+Rejecting rather than resolving keeps `connect()`'s own contract intact: a
+resolved promise means there is a usable session. Here there is not, and the
+established resources are handed to the teardown rather than dropped, so nothing
+leaks.
 
 This is a behavioural change to existing code, not a restatement, and it is the
 change most likely to surprise a consumer. `BaseAbapConnection.connect()`
@@ -1300,6 +1324,13 @@ they matter more than the rest of the set:
     window. A deadline measured from the last settled request never fires here —
     and this is the shape it fails on: a busy consumer, which is the case the
     bound exists for.
+27. **A `disconnect()` during a slow `connect()` is never overtaken.** Start a
+    `connect()` held on a deferred, call `disconnect()` while it is establishing,
+    then let the establishment succeed. `isConnected()` must never once be true,
+    a request issued right after the establishment must be refused, and
+    `connect()` must reject. Poll the flag across the whole sequence rather than
+    checking it at the end: the defect is a gap that opens and closes on its own,
+    so a single observation afterwards misses it.
 
 
 **Needs a live system — four items, all preconditions for releasing the
