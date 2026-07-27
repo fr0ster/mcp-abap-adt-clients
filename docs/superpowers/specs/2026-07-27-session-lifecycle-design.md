@@ -743,8 +743,15 @@ own. Awaiting the drain there would wait for a request that is waiting for
 
 So `reset()` splits along the same seam as `disconnect()`:
 
-- **synchronously**, it marks the session unusable (`beginTeardown()`), so no
-  further request is admitted;
+- **synchronously**, it marks the session unusable —
+  `beginTeardown({ origin: 'internal', sessionLost: true })` — so no further
+  request is admitted. Both axes are deliberate: `internal` because `reset()` is
+  called from inside request handling and must not cancel the recovery that
+  called it, and `sessionLost` because it is discarding the session state, so
+  nothing can finish over what it is throwing away. A caller reaching for
+  `reset()` on the concrete class gets the same treatment — it is not part of
+  `IAbapConnection`, and "throw the session away" means the same thing whoever
+  says it;
 - **the cleanup is queued** as a lifecycle transition, which drains first and only
   then clears state and releases the resource.
 
@@ -924,8 +931,41 @@ A server that issues no session cookie is **not** a failure: the credential was
 accepted, so the connection is connected with a `null` identity.
 
 The unit knows nothing about session mode, locks or auth. The connection asks
-`observe(newIdentity)`, and applies the D1 policy in one readable place: result
-`'replaced'` **and** mode `stateful` → throw `SESSION_REPLACED`.
+`observe(newIdentity)` and applies the D1 policy in one readable place. Result
+`'replaced'` **and** mode `stateful` is a lost session, so it raises one — the
+throw alone is not the whole answer:
+
+```ts
+this.lifecycle.beginTeardown({ origin: 'internal', sessionLost: true });
+this.lifecycle.transition('cleanup', () => this.cleanupSession());
+throw sessionError(ADT_SESSION_ERROR.SESSION_REPLACED);
+```
+
+Throwing without the teardown leaves the connector usable **on the new session**
+while the old one's lock can no longer be reached through it, and a later
+graceful `disconnect()` then spends the whole ceiling waiting on a window
+belonging to a session that is gone.
+
+Outside a stateful window the same `'replaced'` is not a loss: nothing was being
+held, so the new identity simply becomes the current one and work continues.
+That is the transparent recovery D1 keeps.
+
+### The three raisers of a session-lost teardown
+
+Written apart, these drifted apart — each was found separately, in three
+consecutive review rounds, after being introduced correctly in one place and
+forgotten in the others. They are one rule with three triggers:
+
+| trigger | how it learns |
+|---|---|
+| credential renewed | `onCredentialRenewed()`, told by the injected auth |
+| server says the session is gone | the dead-session classifier, from a response |
+| the tracked cookie changed under us, inside a window | `observe()` returning `'replaced'` |
+
+All three do the same two things before anything else — `beginTeardown({ origin:
+'internal', sessionLost: true })` and a queued `cleanup` — and only then throw or
+return. A fourth trigger, if one appears, joins this list rather than inventing
+its own sequence.
 
 **`reset()` now transitions to `disconnected`.** Today it clears cookies and the
 token while leaving the connector usable, which is the hole itself. Afterwards a
@@ -1526,6 +1566,13 @@ they matter more than the rest of the set:
     lifecycle flag here waits the full ceiling first, and one that also leaves
     the identity in place lets a later `unlockAll()` unlock over the dead
     session.
+33. **A changed authoritative cookie inside a window abandons it at once.** With
+    a window open, have the server rotate `SAP_SESSIONID_*` mid-flight. The
+    request must fail with `SESSION_REPLACED`, the window must be abandoned
+    immediately, and the next `disconnect()` must return its label without
+    waiting out the ceiling. An implementation that only throws leaves the
+    connector usable on the new session and makes that `disconnect()` wait the
+    full ceiling on a window whose session no longer exists.
 
 
 **Needs a live system — four items, all preconditions for releasing the
