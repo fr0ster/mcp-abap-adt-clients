@@ -991,22 +991,40 @@ Two consequences drawn from the E19 log:
   server-side lock outlives it unseen. "The UNLOCK is in the payload" is a claim
   about the text we sent, not about what the server did.
 
-  So **a submission whose payload contains a `LOCK` is bracketed with a real
-  window** on the real connection, opened before sending under the lock's key as
-  label. What closes it is evidence, not intent:
+  So **every `LOCK` occurrence in the payload gets its own real window** on the
+  real connection, opened before sending, labelled with that lock's key and
+  holding its own token. One window per submission would be wrong for the same
+  reason one token per label was: a payload may carry several pairs, for
+  different objects or for the same key locked, unlocked and locked again, and a
+  shared window can only be closed too early or reported too little.
 
-  - the parsed response confirms the `UNLOCK` part **succeeded** → `endWindow()`;
-  - anything else — an error before the `UNLOCK`, a transport failure, a response
-    that cannot be parsed → **the window stays open**, because the lock may be
-    held and we do not know that it is not.
+  The pairing is fixed at build time, where `buildBatchPayload` already walks the
+  parts to validate them: the *n*-th `LOCK` for a key pairs with the next
+  `UNLOCK` for that key after it, by occurrence rather than by key, so repeated
+  keys stay distinguishable. The recorded pairing is what the response parser
+  resolves against.
+
+  What closes each window is evidence, not intent:
+
+  - the parsed response confirms **that pair's** `UNLOCK` part succeeded →
+    `endWindow(token)` for that occurrence alone;
+  - anything else — an error on that pair, an error earlier that stopped
+    execution, a transport failure, a response that cannot be parsed → **that
+    window stays open**, because its lock may be held and we do not know that it
+    is not.
+
+  Partial success is therefore ordinary rather than exceptional: two pairs where
+  one `UNLOCK` succeeded and the other did not leave exactly one window open, and
+  the report names exactly that object.
 
   A window left open that way behaves like any other dangling lock: it blocks the
   teardown until the ceiling and then arrives named in `TeardownReport`. That is
   the honest outcome — a lock we cannot prove was released is reported, not
   assumed away.
 
-  `buildBatchPayload` still validates that a `LOCK` has a matching `UNLOCK`,
-  throwing at build time otherwise. That check keeps its value — it catches the
+  `buildBatchPayload` still validates that **each** `LOCK` occurrence has a
+  matching `UNLOCK`, throwing at build time otherwise — the same walk that
+  produces the pairing. That check keeps its value — it catches the
   design error of locking across batches — but it is a check on the payload, and
   the bracket above is what covers execution.
 - **`AdtClient`** gains an early check. Calling `connect()` stays the consumer's
@@ -1181,6 +1199,13 @@ they matter more than the rest of the set:
     over it. Pair it with the success case, where a confirmed `UNLOCK` closes the
     window: an implementation that closes on "request settled" passes that one
     and fails this one.
+22. **Partial success in a multi-pair batch closes only what was confirmed.** Two
+    `LOCK`/`UNLOCK` pairs over different objects, with one `UNLOCK` succeeding and
+    the other failing. Exactly one window closes, and the report names the other
+    object and only it. Repeat with the same key locked, unlocked and locked
+    again in one payload, confirming only the first `UNLOCK`: pairing by key
+    rather than by occurrence closes the wrong window here and still leaves the
+    open set the right size, so assert which label remains, never how many.
 
 
 **Needs a live system — four items, all preconditions for releasing the
