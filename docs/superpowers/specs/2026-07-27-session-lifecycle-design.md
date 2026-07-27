@@ -161,9 +161,8 @@ a failed close — the network is gone — `connect()` would fail anyway.
 
 `reset()` needs the same treatment for a different reason: it is synchronous
 (`reset(): void { this.close(); }`) and cannot await the close, so it currently
-drops the promise on the floor. Under this design it marks the state
-`disconnected` and the release **pending**, rather than pretending the teardown
-finished.
+drops the promise on the floor. Its full semantics are settled under
+"A synchronous reset() must not tear down under a live request" below.
 
 None of this applies to HTTP, which holds no session-owning resource and can
 never have a release pending.
@@ -379,6 +378,37 @@ the other, which is worse than waiting on both.
 `disconnect()` still never throws: a request that fails during the drain settles
 it just as well as one that succeeds.
 
+### A synchronous reset() must not tear down under a live request
+
+`reset()` returns `void`, so it cannot await anything — yet it clears cookies and
+the token, and on RFC releases the client. Called while a request is in flight it
+reproduces exactly the race the drain just closed.
+
+It cannot be fixed by making it await the drain, and the reason is not
+inconvenience but **self-deadlock**: `reset()` is called from *inside* request
+handling (`JwtAbapConnection` calls it in its own `makeAdtRequest` error path
+before retrying), so by construction there is an admitted request in flight — its
+own. Awaiting the drain there would wait for a request that is waiting for
+`reset()` to return.
+
+So `reset()` splits along the same seam as `disconnect()`:
+
+- **synchronously**, it marks the session unusable (`beginTeardown()`), so no
+  further request is admitted;
+- **the cleanup is queued** as a lifecycle transition, which drains first and only
+  then clears state and releases the resource.
+
+`reset()` returns immediately, having guaranteed the part that must be immediate.
+The serializing tail guarantees the rest: any `connect()` arriving afterwards
+queues **behind** the queued cleanup and therefore runs on a settled state — with
+`RELEASE_PENDING` applying if that cleanup's release failed. There is no window
+in which a reconnect races a cleanup that `reset()` started.
+
+This generalises: **any teardown initiated from inside an admitted request marks
+state synchronously and queues its cleanup; it never awaits the drain from
+within.** That covers `onCredentialRenewed()` on paths C and E as well, which is
+likewise called from within request handling.
+
 ### Why the guard's disconnect half is load-bearing
 
 Reporting the pre-transition
@@ -425,7 +455,9 @@ The unit knows nothing about session mode, locks or auth. The connection asks
 
 **`reset()` now transitions to `disconnected`.** Today it clears cookies and the
 token while leaving the connector usable, which is the hole itself. Afterwards a
-request fails with `NOT_CONNECTED` until `connect()` is called.
+request fails with `NOT_CONNECTED` until `connect()` is called. The state change
+is synchronous; the cleanup behind it is queued and drains first — see "A
+synchronous reset() must not tear down under a live request".
 
 **Who may re-establish, precisely.** The rule bans a *silent session swap*, not
 every re-establishment:
@@ -699,6 +731,12 @@ they matter more than the rest of the set:
    normally rather than fail. Assert the order — request settles, then the
    release happens — rather than timing. Without this, refusing new requests only
    narrows the window instead of closing it.
+10. **`reset()` under a live request queues its cleanup instead of running it.**
+    Admit a slow request, call `reset()`, then `connect()`. Assert the order: the
+    request settles, then the cleanup runs, then the establishment. The request
+    must complete normally, and `reset()` itself must return without awaiting
+    anything — an implementation that awaits the drain here deadlocks against its
+    own caller, since `reset()` is invoked from inside request handling.
 
 **Needs a live system — four items, all preconditions for releasing the
 connection package.** The stub cannot settle any of them:
