@@ -261,19 +261,24 @@ export class AdtClient {
    * Only asked of a connection that ANSWERS the question. `isConnected()` lives
    * on `ISessionLifecycleAware`, not on `IAbapConnection`: an RFC connection has
    * no HTTP session and no such method, and a transport that cannot answer must
-   * not be blocked on its silence. The check covers the whole atom, because
-   * narrowing promises the whole atom — a partial implementation must fail it
-   * rather than pass and break later.
+   * not be blocked on its silence. This is a real limit, not an oversight — a
+   * transport with no session has no "not connected" state to catch, so the
+   * promise this guard makes is necessarily narrower than "every
+   * `IAbapConnection`".
+   *
+   * It checks ONLY `isConnected`, which is the only method it calls. That is a
+   * different rule from the one for a type predicate, and the difference is
+   * worth stating because the two look alike: a predicate narrows to the WHOLE
+   * interface, so it must verify the whole interface or its caller will invoke a
+   * method that is not there. This asks one question and calls one method, so
+   * demanding the other two would only make it step aside for a connection that
+   * could have answered — refusing evidence it was offered.
    */
   private assertConnected(): void {
     const candidate = this.connection as Partial<ISessionLifecycleAware>;
-    const answers =
-      typeof candidate.isConnected === 'function' &&
-      typeof candidate.disconnect === 'function' &&
-      typeof candidate.getSessionIdentity === 'function';
-    if (!answers) return;
+    if (typeof candidate.isConnected !== 'function') return;
 
-    if (!candidate.isConnected?.()) {
+    if (!candidate.isConnected()) {
       const error = new Error(
         'AdtClient: the connection is not connected. Call connect() on it before ' +
           'requesting a handler — this library does not connect on your behalf.',

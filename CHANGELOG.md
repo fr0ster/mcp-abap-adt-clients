@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 ### Added
 - **`AdtClient` refuses a handler over a connection nobody connected.** Every `getXxx()` factory checks first, and throws with `code: ADT_NOT_CONNECTED`. Connecting stays the **consumer's** job — this library does not own the connection and must not connect on anyone's behalf — but a connector injected without `connect()` used to surface deep inside an operation chain: the handlers collect failures into `state.errors` rather than stopping, so the result was a state object full of `ADT_NOT_CONNECTED` after the chain had walked its whole length. It now fails before anything happens.
 
-  Only asked of a connection that **answers the question**. `isConnected()` lives on `ISessionLifecycleAware`, not on `IAbapConnection`: an RFC connection has no HTTP session and no such method, and a transport that cannot answer is not blocked on its silence. The check covers the whole atom, because narrowing promises the whole atom — a partial implementation is ignored rather than trusted.
+  Only asked of a connection that **answers the question** — `isConnected()` lives on `ISessionLifecycleAware`, not on `IAbapConnection`. An RFC connection has no HTTP session and no such method, and a transport that cannot answer is not blocked on its silence. That is a real limit rather than an oversight: a transport with no session has no "not connected" state to catch, so the guarantee is narrower than "every `IAbapConnection`".
+
+  The check looks for `isConnected` alone, which is the only method it calls. Deliberately *not* the whole atom: a type **predicate** narrows to the whole interface and so must verify all of it, but this asks one question, and demanding the other two would only make it step aside for a connection that could have answered.
 
 ### Changed
 - Requires `@mcp-abap-adt/interfaces` **^11.5.0** (connection capability atoms), and the dev-time connector moves to **^2.0.0**.

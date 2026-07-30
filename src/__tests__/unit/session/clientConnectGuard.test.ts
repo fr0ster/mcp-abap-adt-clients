@@ -70,41 +70,50 @@ describe('AdtClient connect guard', () => {
     expect(client.getClass()).toBeDefined();
   });
 
-  // Narrowing promises the WHOLE atom, so a partial implementation must not be
-  // trusted with it. Here isConnected() would say false, and the guard still
-  // steps aside — because an object with one of the three methods is not a
-  // session-aware connection, and guessing from a fragment is how a test double
-  // ends up steering production behaviour.
-  it('ignores a connection that implements only part of the atom', () => {
+  // A connection carrying isConnected() and nothing else IS asked, because the
+  // guard calls only isConnected(). Demanding the whole atom would make it step
+  // aside for a connection that could have answered — refusing evidence it was
+  // offered. That is the opposite rule from a type PREDICATE, which narrows to
+  // the whole interface and so must verify the whole interface.
+  it('asks a connection that implements only the method it calls', () => {
     const partial = {
       ...baseConnection(),
       isConnected: () => false,
     } as IAbapConnection;
     const client = new AdtClient(partial, undefined);
-    expect(client.getClass()).toBeDefined();
+    expect(() => client.getClass()).toThrow(/connect\(\)/i);
   });
 
-  it('guards every factory, not just the first one', () => {
+  /**
+   * EVERY factory, discovered rather than listed.
+   *
+   * An earlier version named seven by hand, which pinned seven and said nothing
+   * about the rest — a guard missing from any other factory would have passed.
+   * Enumerating the prototype means a factory added later is covered on the day
+   * it is added, and one that loses its guard fails here.
+   */
+  it('guards every factory', () => {
     const client = new AdtClient(sessionAware(false), undefined);
-    const factories = [
-      () => client.getClass(),
-      () => client.getProgram(),
-      () => client.getInterface(),
-      () => client.getPackage(),
-      () => client.getTable(),
-      () => client.getDomain(),
-      () => client.getDdl(),
-    ];
-    for (const make of factories) {
-      // toThrow(string) matches the MESSAGE, so the code has to be read off the
-      // error itself — the whole point of a code is that it survives rewording.
+    const factories = Object.getOwnPropertyNames(AdtClient.prototype).filter(
+      (name) => /^get[A-Z]/.test(name),
+    );
+
+    // A floor, so that a refactor renaming the factories into oblivion cannot
+    // turn this into a test that asserts nothing.
+    expect(factories.length).toBeGreaterThanOrEqual(36);
+
+    const unguarded: string[] = [];
+    for (const name of factories) {
       let code: string | undefined;
       try {
-        make();
+        (client as unknown as Record<string, () => unknown>)[name]();
       } catch (error) {
+        // toThrow(string) matches the MESSAGE, so the code is read off the error
+        // itself — the point of a code is that it survives rewording.
         code = (error as { code?: string }).code;
       }
-      expect(code).toBe(ADT_SESSION_ERROR.NOT_CONNECTED);
+      if (code !== ADT_SESSION_ERROR.NOT_CONNECTED) unguarded.push(name);
     }
+    expect(unguarded).toEqual([]);
   });
 });
