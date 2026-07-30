@@ -8,7 +8,7 @@
  * rather than "you never connected".
  *
  * No SAP, no HTTP:
- *   MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/session
+ *   npx jest src/__tests__/unit/session
  */
 import {
   ADT_SESSION_ERROR,

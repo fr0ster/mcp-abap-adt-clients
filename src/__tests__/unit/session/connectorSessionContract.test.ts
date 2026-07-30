@@ -21,7 +21,7 @@
  * from the header question above.
  *
  * Local HTTP stub — no SAP, no credentials:
- *   MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/session
+ *   npx jest src/__tests__/unit/session
  */
 
 import { createAbapConnection } from '@mcp-abap-adt/connection';

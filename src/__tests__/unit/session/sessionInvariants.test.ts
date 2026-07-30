@@ -8,7 +8,7 @@
  * an "object is locked and inactive" incident on a live system.
  *
  * Run without SAP credentials:
- *   MCP_ENV_PATH=/tmp/nonexistent-env npx jest src/__tests__/unit/session
+ *   npx jest src/__tests__/unit/session
  */
 
 import { AdtClass } from '../../../core/class/AdtClass';

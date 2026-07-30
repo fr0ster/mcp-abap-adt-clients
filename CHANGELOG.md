@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) 
 
 ### Changed
 - Requires `@mcp-abap-adt/interfaces` **^11.5.0** (connection capability atoms), and the dev-time connector moves to **^2.0.0**.
+- **Unit tests run without SAP, with the plain command.** `globalSetup`'s connectivity preflight now skips a unit-only run, and is bounded by a timeout (`SAP_PREFLIGHT_TIMEOUT_MS`, default 20s) when it does run. Before, `npx jest src/__tests__/unit` demanded a reachable SAP: with a stale `.env` it aborted the whole suite, and against a host that accepts a socket then says nothing it simply waited — and since `testTimeout` is 15 minutes, that was indistinguishable from a hung test, with the blame landing on whichever test was next. Running unit tests needed an undocumented `MCP_ENV_PATH=/tmp/nonexistent-env` to sidestep it; that trick is no longer necessary.
 - **Test contract updated to the 2.0.0 lifecycle.** `connectorSessionContract.test.ts` had a test documenting the old defect — a request on a never-connected connector opened a session on the fly, and `reset()` was followed by a silent new session under the same conversation id. It now pins the fix from the other side: the request is refused, and **nothing reaches the server**, which is the part that matters — a refusal after the LOCK landed would still have left a lock behind.
 
 ## [8.0.0] - 2026-07-22
