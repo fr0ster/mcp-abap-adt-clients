@@ -193,10 +193,31 @@ assumed.
 
 ### D3 — The contract gains identity, not an error class
 
-`IAbapConnection` gains `disconnect()`, `isConnected()` and
-`getSessionIdentity()`. Error signalling uses string-code constants in
-interfaces, not a class: the contract package holds types, interfaces and
-constants only.
+The contract gains `disconnect()`, `isConnected()` and `getSessionIdentity()`.
+Error signalling uses string-code constants in interfaces, not a class: the
+contract package holds types, interfaces and constants only.
+
+> **SUPERSEDED, 2026-07-30, by what shipped in interfaces 11.5.0.** This section
+> and the release plan below said the methods become **required on
+> `IAbapConnection`**, breaking every implementor. They did not. They landed as
+> **additive capability atoms** — `ISessionLifecycleAware`
+> (`disconnect`/`isConnected`/`getSessionIdentity`) and `ILockWindowAware`
+> (`beginWindow`/`endWindow`) — alongside an unchanged `IAbapConnection`, which
+> made the release a **minor** rather than a major.
+>
+> The reason is the one this document argues everywhere else: `IAbapConnection` is
+> the minimum every transport can honour, and these are the things only some can.
+> `RfcAbapConnection` owns no HTTP session and can open no lock window — on RFC
+> the session *is* the open client. `BatchRecordingConnection` holds no session
+> while recording. Requiring these of every implementor would force each of them
+> to implement a lie, and would break them for a capability they do not have.
+>
+> The consequence, stated plainly because it is a real weakening: a connection
+> that does not implement `ISessionLifecycleAware` **cannot be asked** whether it
+> is connected, so nothing can guard on its behalf. That is not a hole to be
+> plugged — a transport with no session has no "not connected" state to catch.
+> Anything narrowing to an atom must therefore handle the absent case rather than
+> assume it away, which the `adt-clients` guard does explicitly.
 
 Rejected: the minimum without identity — then D1 is unverifiable, since a caller
 could only catch an exception and never ask "is this still the same session?".
@@ -327,9 +348,12 @@ server session am I talking to" and changes on replacement; the second returns
 our client-side conversation id, stable by construction. Both stay — conflating
 them is what made the defect invisible.
 
-**Breaking-change surface:** adding required methods breaks every implementor of
-`IAbapConnection`. In this repo there is exactly one, and it is easy to miss:
-`src/batch/BatchRecordingConnection.ts:13`.
+**Breaking-change surface:** ~~adding required methods breaks every implementor of
+`IAbapConnection`~~ — see the superseded note in D3. Nothing breaks, because the
+methods are additive atoms. The one implementor in this repo,
+`src/batch/BatchRecordingConnection.ts:13`, still gains them, not because the
+compiler forces it to but because it can honestly answer: it proxies the identity
+of the connection it records against.
 
 ## SessionLifecycle
 
@@ -1635,10 +1659,13 @@ connection package.** The stub cannot settle any of them:
 Order: interfaces → connection → adt-clients, each published to npm before the
 next consumes it. Version numbers are the user's call at each step.
 
-- **interfaces** — BREAKING: five required methods break every implementor
-  (`disconnect`, `isConnected`, `getSessionIdentity`, `beginWindow`,
-  `endWindow`). The last two are the critical-section pair the connector has
-  carried since 1.9.0, promoted into the contract and made mandatory.
+- **interfaces** — ~~BREAKING: five required methods break every implementor~~.
+  Shipped as **11.5.0, a minor**: the five arrived as additive capability atoms
+  (`ISessionLifecycleAware`, `ILockWindowAware`) with `IAbapConnection`
+  unchanged, so no implementor broke. See the superseded note in D3. The last two
+  are the critical-section pair the connector has carried since 1.9.0, promoted
+  into the contract — available to any implementation that can honour them,
+  required of none.
 - **connection** — BREAKING, on three counts: implicit connect disappears;
   requests are refused after `disconnect()`/`reset()`; and `connect()` now
   rejects on failure where `BaseAbapConnection` used to log a warning and resolve
