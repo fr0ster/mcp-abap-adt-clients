@@ -66,7 +66,7 @@ alike:
   after a fresh login form or a fresh JWT the old ABAP session cannot be kept.
 
 The second kind cannot be forbidden. It is made explicit instead: transparent
-transparent while no lock is held, fatal while one is.
+while no lock is held, fatal while one is.
 
 Rejected: throwing on every forced replacement. It would break the automatic
 recovery that read-only consumers rely on today and see no problem with.
