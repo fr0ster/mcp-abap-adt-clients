@@ -230,6 +230,16 @@ in a package that deliberately has none.
 `AbstractAbapConnection`. A `SessionLifecycle` unit is therefore composed by
 both rather than inherited by one.
 
+> **AMENDED, 2026-07-30, alongside the superseded note in D3.** Only the HTTP
+> side composes `SessionLifecycle`. Once the lifecycle became an optional atom
+> rather than a required method set, there was nothing left for RFC to compose:
+> it implements neither `ISessionLifecycleAware` nor `ILockWindowAware`, because
+> on RFC the session *is* the open client and there is no window to hold. The
+> "composed twice" argument still holds for why composition beat inheritance —
+> RFC does not extend `AbstractAbapConnection`, so a base class was never
+> available — but the second composition never happened, and demanding it would
+> reintroduce exactly the forced implementation D3 now rejects.
+
 Rejected: implementing the state machine twice — two copies of one contract
 diverge at the first edit. Rejected: HTTP only, RFC later — then `isConnected()`
 means different things per transport and the contract becomes a half-truth.
@@ -675,7 +685,9 @@ endWindow(token: WindowToken): void;
 
 The connector already has this shape as
 `beginCriticalSection()`/`endCriticalSection()` (1.9.0+), which this design
-promotes into `IAbapConnection` and makes mandatory rather than optional. Chains
+promotes into the contract — ~~into `IAbapConnection`, mandatory rather than
+optional~~. As shipped in interfaces 11.5.0 it is the optional `ILockWindowAware`
+atom instead; see the superseded note in D3. Chains
 call the pair around the lock window — at the very call sites that already toggle
 `setSessionType`, so adoption is mechanical and bounded to those places rather
 than threaded through every request.
