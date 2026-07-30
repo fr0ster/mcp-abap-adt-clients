@@ -26,7 +26,9 @@ import type {
   IAdtValidatable,
   IAdtVersionable,
   ILogger,
+  ISessionLifecycleAware,
 } from '@mcp-abap-adt/interfaces';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces';
 import {
   AdtAccessControl,
   type IAccessControlConfig,
@@ -245,10 +247,48 @@ export class AdtClient {
   }
 
   /**
+   * Refuses to hand out a handler over a connection nobody connected.
+   *
+   * Connecting is the CONSUMER's job and stays that way — this library does not
+   * own the connection and must not connect on anyone's behalf. What it can do
+   * is catch the case where a connector was injected and `connect()` was never
+   * called, which otherwise surfaces deep in an operation chain: the handlers
+   * collect failures into `state.errors` rather than stopping, so a missing
+   * connection arrives as a state object full of `ADT_NOT_CONNECTED` after the
+   * chain has walked its whole length. Failing here turns that into nothing
+   * having happened at all.
+   *
+   * Only asked of a connection that ANSWERS the question. `isConnected()` lives
+   * on `ISessionLifecycleAware`, not on `IAbapConnection`: an RFC connection has
+   * no HTTP session and no such method, and a transport that cannot answer must
+   * not be blocked on its silence. The check covers the whole atom, because
+   * narrowing promises the whole atom — a partial implementation must fail it
+   * rather than pass and break later.
+   */
+  private assertConnected(): void {
+    const candidate = this.connection as Partial<ISessionLifecycleAware>;
+    const answers =
+      typeof candidate.isConnected === 'function' &&
+      typeof candidate.disconnect === 'function' &&
+      typeof candidate.getSessionIdentity === 'function';
+    if (!answers) return;
+
+    if (!candidate.isConnected?.()) {
+      const error = new Error(
+        'AdtClient: the connection is not connected. Call connect() on it before ' +
+          'requesting a handler — this library does not connect on your behalf.',
+      ) as Error & { code: string };
+      error.code = ADT_SESSION_ERROR.NOT_CONNECTED;
+      throw error;
+    }
+  }
+
+  /**
    * Get high-level operations for Class objects
    * @returns IAdtObject instance for Class operations
    */
   getClass(): IAdtSourceObject<IClassConfig, IClassState> {
+    this.assertConnected();
     return new AdtClass(
       this.connection,
       this.logger,
@@ -263,6 +303,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Program operations
    */
   getProgram(): IAdtSourceObject<IProgramConfig, IProgramState> {
+    this.assertConnected();
     return new AdtProgram(
       this.connection,
       this.logger,
@@ -277,6 +318,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Interface operations
    */
   getInterface(): IAdtSourceObject<IInterfaceConfig, IInterfaceState> {
+    this.assertConnected();
     return new AdtInterface(
       this.connection,
       this.logger,
@@ -291,6 +333,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Domain operations
    */
   getDomain(): IAdtNonVersionedObject<IDomainConfig, IDomainState> {
+    this.assertConnected();
     return new AdtDomain(
       this.connection,
       this.logger,
@@ -351,6 +394,7 @@ export class AdtClient {
     IDataElementConfig,
     IDataElementState
   > {
+    this.assertConnected();
     return new AdtDataElement(
       this.connection,
       this.logger,
@@ -371,6 +415,7 @@ export class AdtClient {
     IAdtCheckable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
     IAdtActivatable<IAuthorizationFieldConfig, IAuthorizationFieldState> &
     IAdtLockable<IAuthorizationFieldConfig, IAuthorizationFieldState> {
+    this.assertConnected();
     return new AdtAuthorizationField(
       this.connection,
       this.logger,
@@ -384,6 +429,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Structure operations
    */
   getStructure(): IAdtSourceObject<IStructureConfig, IStructureState> {
+    this.assertConnected();
     return new AdtStructure(
       this.connection,
       this.logger,
@@ -397,6 +443,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Table operations
    */
   getTable(): IAdtSourceObject<ITableConfig, ITableState> {
+    this.assertConnected();
     return new AdtTable(
       this.connection,
       this.logger,
@@ -410,6 +457,7 @@ export class AdtClient {
    * @returns IAdtObject instance for TableType operations
    */
   getTableType(): IAdtSourceObject<ITableTypeConfig, ITableTypeState> {
+    this.assertConnected();
     return new AdtDdicTableType(
       this.connection,
       this.logger,
@@ -426,6 +474,7 @@ export class AdtClient {
    * @returns IAdtObject instance for DDL source operations
    */
   getDdl(): IAdtSourceObject<IDdlConfig, IDdlState> {
+    this.assertConnected();
     return new AdtDdl(
       this.connection,
       this.logger,
@@ -442,6 +491,7 @@ export class AdtClient {
     IFunctionGroupConfig,
     IFunctionGroupState
   > {
+    this.assertConnected();
     return new AdtFunctionGroup(
       this.connection,
       this.logger,
@@ -459,6 +509,7 @@ export class AdtClient {
     IFunctionModuleConfig,
     IFunctionModuleState
   > {
+    this.assertConnected();
     return new AdtFunctionModule(
       this.connection,
       this.logger,
@@ -481,6 +532,7 @@ export class AdtClient {
     IAdtActivatable<IFunctionIncludeConfig, IFunctionIncludeState> &
     IAdtLockable<IFunctionIncludeConfig, IFunctionIncludeState> &
     IAdtVersionable<IFunctionIncludeConfig> {
+    this.assertConnected();
     return new AdtFunctionInclude(
       this.connection,
       this.logger,
@@ -499,6 +551,7 @@ export class AdtClient {
     IAdtCheckable<IPackageConfig, IPackageState> &
     IAdtLockable<IPackageConfig, IPackageState> &
     IAdtTransportAware<IPackageConfig, IPackageState> {
+    this.assertConnected();
     return new AdtPackage(
       this.connection,
       this.logger,
@@ -514,6 +567,7 @@ export class AdtClient {
   getMessageClass(): IAdtCrud<IMessageClassConfig, IMessageClassState> &
     IAdtValidatable<IMessageClassConfig, IMessageClassState> &
     IAdtLockable<IMessageClassConfig, IMessageClassState> {
+    this.assertConnected();
     return new AdtMessageClass(
       this.connection,
       this.logger,
@@ -531,6 +585,7 @@ export class AdtClient {
     IMessageClassMessageConfig,
     IMessageClassMessageState
   > {
+    this.assertConnected();
     return new AdtMessageClassMessage(this.connection, this.logger);
   }
 
@@ -542,6 +597,7 @@ export class AdtClient {
     IAccessControlConfig,
     IAccessControlState
   > {
+    this.assertConnected();
     return new AdtAccessControl(
       this.connection,
       this.logger,
@@ -559,6 +615,7 @@ export class AdtClient {
     ITransformationConfig,
     ITransformationState
   > {
+    this.assertConnected();
     return new AdtTransformation(
       this.connection,
       this.logger,
@@ -575,6 +632,7 @@ export class AdtClient {
     IServiceDefinitionConfig,
     IServiceDefinitionState
   > {
+    this.assertConnected();
     return new AdtServiceDefinition(
       this.connection,
       this.logger,
@@ -590,6 +648,7 @@ export class AdtClient {
     IScalarFunctionConfig,
     IScalarFunctionState
   > {
+    this.assertConnected();
     return new AdtScalarFunction(
       this.connection,
       this.logger,
@@ -605,6 +664,7 @@ export class AdtClient {
     IScalarFunctionImplementationConfig,
     IScalarFunctionImplementationState
   > {
+    this.assertConnected();
     return new AdtScalarFunctionImplementation(
       this.connection,
       this.logger,
@@ -620,6 +680,7 @@ export class AdtClient {
     IAppendStructureConfig,
     IAppendStructureState
   > {
+    this.assertConnected();
     return new AdtAppendStructure(
       this.connection,
       this.logger,
@@ -633,6 +694,7 @@ export class AdtClient {
    * @returns IAdtServiceBinding instance for ServiceBinding CRUD and lifecycle operations
    */
   getServiceBinding(): IAdtServiceBinding {
+    this.assertConnected();
     return new AdtServiceBinding(
       this.connection,
       this.logger,
@@ -655,6 +717,7 @@ export class AdtClient {
     IBehaviorDefinitionConfig,
     IBehaviorDefinitionState
   > {
+    this.assertConnected();
     return new AdtBehaviorDefinition(
       this.connection,
       this.logger,
@@ -671,6 +734,7 @@ export class AdtClient {
     IBehaviorImplementationConfig,
     IBehaviorImplementationState
   > {
+    this.assertConnected();
     return new AdtBehaviorImplementation(
       this.connection,
       this.logger,
@@ -686,6 +750,7 @@ export class AdtClient {
     IMetadataExtensionConfig,
     IMetadataExtensionState
   > {
+    this.assertConnected();
     return new AdtMetadataExtension(
       this.connection,
       this.logger,
@@ -705,6 +770,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Enhancement operations
    */
   getEnhancement(): IAdtSourceObject<IEnhancementConfig, IEnhancementState> {
+    this.assertConnected();
     return new AdtEnhancement(
       this.connection,
       this.logger,
@@ -718,6 +784,7 @@ export class AdtClient {
    * @returns IFeatureToggleObject instance for FeatureToggle operations
    */
   getFeatureToggle(): IFeatureToggleObject {
+    this.assertConnected();
     return new AdtFeatureToggle(
       this.connection,
       this.logger,
@@ -731,6 +798,7 @@ export class AdtClient {
    * @returns IAdtObject instance for UnitTest operations
    */
   getUnitTest(): IAdtObject<IUnitTestConfig, IUnitTestState> {
+    this.assertConnected();
     return new AdtUnitTest(this.connection, this.logger);
   }
 
@@ -739,6 +807,7 @@ export class AdtClient {
    * @returns IAdtObject instance for CDS UnitTest operations (extends AdtUnitTest with CDS-specific methods)
    */
   getCdsUnitTest(): IAdtObject<ICdsUnitTestConfig, ICdsUnitTestState> {
+    this.assertConnected();
     return new AdtCdsUnitTest(this.connection, this.logger);
   }
 
@@ -747,6 +816,7 @@ export class AdtClient {
    * @returns IAdtObject instance for Request operations
    */
   getRequest(): AdtRequest {
+    this.assertConnected();
     return new AdtRequest(this.connection, this.logger, this.systemContext);
   }
 
@@ -763,6 +833,7 @@ export class AdtClient {
    * @returns AdtUtils instance for utility operations
    */
   getUtils(): AdtUtils {
+    this.assertConnected();
     return new AdtUtils(this.connection, this.logger);
   }
 
@@ -771,6 +842,7 @@ export class AdtClient {
    * @returns IAdtObject instance for LocalTestClass operations
    */
   getLocalTestClass(): IAdtSourceObject<ILocalTestClassConfig, IClassState> {
+    this.assertConnected();
     return new AdtLocalTestClass(
       this.connection,
       this.logger,
@@ -785,6 +857,7 @@ export class AdtClient {
    * @returns IAdtObject instance for LocalTypes operations
    */
   getLocalTypes(): IAdtSourceObject<ILocalTypesConfig, IClassState> {
+    this.assertConnected();
     return new AdtLocalTypes(
       this.connection,
       this.logger,
@@ -802,6 +875,7 @@ export class AdtClient {
     ILocalDefinitionsConfig,
     IClassState
   > {
+    this.assertConnected();
     return new AdtLocalDefinitions(
       this.connection,
       this.logger,
@@ -816,6 +890,7 @@ export class AdtClient {
    * @returns IAdtObject instance for LocalMacros operations
    */
   getLocalMacros(): IAdtSourceObject<ILocalMacrosConfig, IClassState> {
+    this.assertConnected();
     return new AdtLocalMacros(
       this.connection,
       this.logger,
