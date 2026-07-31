@@ -137,13 +137,40 @@ Epoch keeps its existing job untouched.
 - Every side effect on shared state — cookie update, identity policy, CSRF cache,
   the recovery paths — is skipped when the lease's generation is not the current
   one.
-- **Except for the request that raised the teardown.** A request detecting a lost
-  session raises an internal teardown, which bumps the generation and would
-  therefore make its own lease stale on the spot — leaving it fenced out of the
-  recovery it just triggered, with nobody else able to run it. The raiser is
-  rebased onto the generation it created and may proceed; every other lease from
-  the old session stays fenced. Being the one who noticed is what earns the
-  permit, and only one request can be that.
+- **Except for the request that raised the teardown**, which holds a permit.
+
+#### The permit is held for a transition, not for a generation number
+
+A request detecting a lost session raises an internal teardown, which bumps the
+generation and would otherwise make its own lease stale on the spot — fencing it
+out of the recovery it just triggered, with nobody else able to run it.
+
+Rebasing it onto the generation the teardown created is not enough, and an
+earlier draft stopped there. A successful recovery calls `markConnected()`, which
+bumps the generation **again** — so the raiser goes stale a second time, now in
+the middle of the retry it exists to perform. Chasing the number does not work:
+the permit has to outlive every generation change the recovery itself causes.
+
+So the permit is scoped to the recovery **transition**. It is granted when the
+teardown is raised, it survives whatever the transition does to the counter, and
+it ends when the transition does — at which point the holder is rebased onto the
+generation that was actually published, and continues as an ordinary lease of the
+new session. Everything else from the dead session stays fenced throughout.
+
+#### Only one raiser, and that has to be enforced
+
+"Only one request can be the raiser" was an assertion, not a mechanism. Two
+responses can arrive together and both detect the loss; each would take a permit
+and each would invalidate the other's, which is worse than having no permit at
+all.
+
+Raising is therefore a compare-and-set: the first request to move the lifecycle
+into the session-lost state takes the permit, and every later detector is told the
+teardown is already under way and is fenced like any other stale lease. It does
+not raise a second teardown and does not attempt a second recovery.
+
+Test with two concurrent detectors, because one detector cannot distinguish an
+assertion from a rule.
 - The request still resolves or rejects normally to **its own caller**. Fencing
   suppresses its effects on the connection, not its result.
 
@@ -160,6 +187,12 @@ Tests, both orderings, because only the second distinguishes the two counters:
   request B is in flight from the same dead session. A completes its recovery; B
   is fenced. Without the carve-out A fences itself and the recovery never happens
   — this test fails on the rule as first written.
+- **the permit survives `markConnected()`**: A's recovery publishes a new session,
+  and A's own retry still proceeds. Fails if the permit is a generation number
+  rather than a scope.
+- **two detectors**: A and B both see the loss at once. Exactly one teardown is
+  raised, exactly one recovery runs, and the loser is fenced rather than holding a
+  competing permit.
 
 ### adt-clients
 
@@ -247,20 +280,37 @@ interface ICloseReport {
   unresolvedIntents: string[];
   /** Whether the barrier stopped waiting rather than running out of work. */
   timedOut: boolean;
+  /** What the connection's own teardown could not finish. Carried, not swallowed. */
+  teardown: ITeardownReport;
 }
 
 close(options?: { deadlineMs?: number }): Promise<ICloseReport>;
 ```
 
-Three facts, three fields, because collapsing them loses the distinction that
-matters to whoever reads the report: "this lock is definitely held and I could
-not free it" calls for a retry, while "I do not know whether this lock exists"
-calls for a look. `LockFailure` cannot carry the second — it describes an
-attempt, and for an unresolved intent no attempt was made.
+Four facts, four fields, because collapsing any of them loses a distinction that
+matters to whoever reads the report. "This lock is definitely held and I could
+not free it" calls for a retry; "I do not know whether this lock exists" calls
+for a look. `LockFailure` cannot carry the second — it describes an attempt, and
+for an unresolved intent no attempt was made.
 
-`deadlineMs` in milliseconds, to match every other timeout in these packages, and
-a finite default. `close()` resolves in all cases; it never rejects for a lock it
-could not release, since the report is the answer. The barrier and the intent declaration are the new parts, and they need four
+The fourth exists because step 4 calls `disconnect()`, which returns an
+`ITeardownReport` of its own, and an earlier draft simply dropped it. That would
+be worst on RFC, where `releasePending` says a transport resource did not close:
+the caller would see a successful `close()` and never learn that something is
+still held open. A wrapper that discards its inner result reports success it did
+not verify.
+
+`deadlineMs` is in milliseconds, matching every other timeout in these packages.
+The default is **60 000 ms**, from `SAP_CLOSE_DEADLINE_MS`, alongside the existing
+`SAP_TIMEOUT_*` family. Named rather than left to each implementation, because a
+default nobody wrote down is a different default in every test. The value is
+chosen against what step 2 is waiting for: a chain's remaining requests, each of
+which allows 45s by default, so a shorter deadline would routinely cut short work
+that was about to finish, and a much longer one would turn a stuck close into a
+hang by another name.
+
+`close()` resolves in all cases; it never rejects for a lock it could not
+release, since the report is the answer. The barrier and the intent declaration are the new parts, and they need four
 concurrency tests — including two chains attempting `DOMA/Z` at once, where the
 loser's failure must not disturb the winner's bookkeeping: a chain interrupted mid-`LOCK`, asserting the lock was
 released rather than stranded; a chain that never settles, asserting `close()`
