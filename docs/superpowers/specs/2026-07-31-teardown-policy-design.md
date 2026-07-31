@@ -1,147 +1,129 @@
-# Teardown policy belongs to the consumer
+# disconnect() must settle, because we said it does
 
-Continuation of `2026-07-27-session-lifecycle-design.md`. That design gave the
-connection a teardown that drains before it clears anything. This one is about
-who gets to decide **how long** that drain waits, and what happens when it runs
-out.
+Continuation of `2026-07-27-session-lifecycle-design.md`.
 
-## Problem
+## The defect
 
-`AbstractAbapConnection` composes the lifecycle with no options:
+The contract we publish says:
 
 ```ts
-protected readonly lifecycle = new SessionLifecycle();
+/**
+ * Tears the session down and reports what could not be finished.
+ *
+ * Resolves rather than throws — the report carries the failures.
+ */
+disconnect(): Promise<ITeardownReport>;
 ```
 
-`SessionLifecycle` already accepts `ceilingMs` and `now`. The composition site
-passes neither, so the 600-second ceiling is fixed at the point where a consumer
-cannot reach it — not in config, not in `SapConfig`, not as an argument to
-`disconnect()`.
-
-The behaviour *after* the ceiling expires is not expressible at all:
+There is a path where it never resolves. After the ceiling expires,
+`SessionLifecycle.drain()` waits for in-flight requests with no bound:
 
 ```ts
-// Expiry. Synchronous, before any await: no request may enter after this.
-this.admissionForcedShut = true;
-for (const entry of this.windows.values()) entry.abandoned = true;
-
 while (this.inFlight > 0) {
-  await this.changed();          // no bound, and no way to ask for one
+  await this.changed();
 }
 ```
 
-So a teardown can wait indefinitely, and the caller has no way to say it would
-rather not.
+`changed()` with no timeout resolves only when something wakes the lifecycle. If
+a request never settles, nothing does. The transition never completes, and since
+transitions are serialized, every later `connect()` queues behind it forever.
 
-## What this is NOT
+That is the whole of it: **we declare that this settles, and it can fail to.**
+The declaration is wrong, or the implementation is — one of the two has to move.
 
-**Not a defect in a request without a timeout.** Outside a critical section the
-connector passes the caller's timeout verbatim:
+## What this is not
 
-```ts
-const effectiveTimeout = this.inCriticalSection
-  ? Math.max(timeout ?? 0, getCriticalSectionTimeout())
-  : timeout;
-```
+Not a judgement about how anyone uses the library.
 
-A consumer that passes none has *chosen* "as long as it takes" — a legitimate
-choice for a long poll. Inventing a default would overrule it.
+Outside a critical section the connector passes the caller's timeout verbatim, so
+a caller may pass none and mean it. That is a legitimate choice — a long poll
+looks exactly like that — and the connector honouring it is correct. Responsibility
+for that choice sits with the caller.
 
-**Not a defect in waiting for that request.** A teardown that waits for a request
-the consumer declared unbounded is behaving consistently. The problem is only
-that the caller of `disconnect()` cannot express a different preference.
-
-Both of the obvious "fixes" were rejected for the same reason: they replace the
-consumer's decision with ours.
+So the following were considered and rejected, both for the same reason: each
+answers a question nobody asked us, by overruling a decision that is not ours.
 
 | rejected | why |
 |---|---|
-| default timeout outside a critical section | cancels the consumer's explicit choice on **every** request |
-| a bound we pick for the post-expiry wait | we decide how long their teardown may take |
+| a default timeout outside a critical section | cancels an explicit choice on every request |
+| aborting in-flight requests at the ceiling | aborting mid-flight is what drops a stateful session and orphans a lock — the failure this design exists to prevent |
+| refusing `disconnect()` while a request is unbounded | a prohibition invented to protect the caller from itself |
 
-The rule this follows: **we may decide FOR our consumers — that is what a default
-is — but we may not cut off the client's ability to choose otherwise.** Today's
-behaviour is a decision that became unchangeable, which is the part that is wrong.
-
-## Reach, across consumers
-
-The connector has more than one consumer, and the exposure is not where this was
-first noticed.
-
-| consumer | `makeAdtRequest` call sites | without a timeout |
-|---|---|---|
-| `@mcp-abap-adt/adt-clients` | ~480 | effectively none — it passes an explicit 45s |
-| `mcp-abap-adt` (server) | 4 in production code | **1** (`handleGetObjectNodeFromCache.ts`) |
-
-So `adt-clients`, where this was found, is the consumer already protected by its
-own convention. The one that can issue an unbounded request is the server.
-
-Evidence of an actual hang: **none**. The report that started this turned out to
-be a sandbox artefact — a stub server denied `listen(127.0.0.1)`, hidden behind a
-15-minute jest timeout. This is a robustness gap and a policy-ownership problem,
-not a live incident, and it should be sized accordingly.
+A library declares a contract and keeps it. It does not police the calls.
 
 ## Goal
 
-Let a consumer state its own teardown policy. Change nothing for a consumer that
-does not.
+`disconnect()` settles. Always. Whatever is still outstanding is reported rather
+than waited on indefinitely.
 
 ## Design
 
-A teardown policy, injected, with a default that reproduces today's behaviour
-exactly.
+At the ceiling, the drain stops waiting and returns. Nothing is aborted, nothing
+is cancelled, nothing is forbidden — the in-flight request goes on exactly as the
+caller arranged. What changes is that the teardown no longer holds its own
+promise hostage to it.
 
-Two decisions belong to it:
+The report is the right place to say so, since it already exists to carry "what
+could not be finished". It needs one more fact:
 
-1. **How long the drain waits** — today's fixed 600s ceiling becomes the
-   default value of a policy field.
-2. **What happens when that expires while requests are still in flight** —
-   currently an unbounded wait, which becomes one named option among others
-   rather than the only behaviour.
+```ts
+interface ITeardownReport {
+  abandonedWindows: string[];
+  releasePending: boolean;
+  /** Requests admitted before the teardown were still running when it gave up. */
+  requestsInFlight: boolean;
+}
+```
 
-The shape of the second is the substantive question for review:
+Not folded into `releasePending`: that one is about a transport resource, and a
+report that conflates two different facts is a report that lies about both.
 
-| option | teardown resolves | in-flight requests |
-|---|---|---|
-| `wait` (today's behaviour, the default) | when the last one settles | run to completion |
-| `report` | at the ceiling | left running; the report says so |
+### Consequences to state plainly
 
-`report` needs a field on `ITeardownReport` — the existing `releasePending` is
-about a transport release, not about requests, so conflating them would make the
-report lie. A new boolean (`requestsInFlight`) keeps each fact its own.
+- **Session state is cleared while a request may still be running.** Today's
+  unbounded wait exists to avoid exactly that. The trade is deliberate: a request
+  that outlives the ceiling is already beyond what the connection can manage, and
+  a teardown that never returns is worse than one that returns with a warning.
+  The request fails on its own terms rather than being cut off.
+- The caller learns this happened and can act — that is what the new field is for.
 
-`report` does **not** abort anything. Aborting a request mid-flight is what drops
-a stateful session and orphans a lock — the failure the whole lifecycle design
-exists to prevent. It resolves the teardown and leaves the request alone.
+### The ceiling itself
 
-### What must not change
+Currently fixed at the composition site:
 
-- A consumer that passes nothing gets exactly today's behaviour, including the
-  600s ceiling. Verified by the existing lifecycle tests, unchanged.
-- No new required member on `IAbapConnection` or on either capability atom; the
-  policy is configuration, not contract surface.
-- The ceiling stays **absolute**, measured from the teardown request. Making it
-  configurable must not make it sliding.
-- Admission still shuts before any await at expiry, and windows are still
-  abandoned there. Only the wait that follows becomes a choice.
+```ts
+protected readonly lifecycle = new SessionLifecycle();   // no options
+```
+
+`SessionLifecycle` already accepts `ceilingMs`. Nothing reaches it. Since the
+value now decides when a teardown gives up, a caller that wants a different one
+should be able to say so — a default we choose is fine, a default nobody can
+change is not.
+
+Kept **absolute**, measured from the teardown request, not from the last activity.
+Making it configurable must not make it sliding.
+
+## What must not change
+
+- A caller that configures nothing sees today's behaviour up to the ceiling.
+- No new required member on `IAbapConnection` or on either capability atom.
+- Admission still shuts before any await at expiry; windows are still abandoned
+  there.
+- No request is ever aborted by the teardown.
 
 ## Tests
 
-- default construction ⇒ ceiling 600s, post-expiry wait unbounded (pins that the
-  default is today's behaviour, not merely "some default")
-- explicit ceiling honoured, and still absolute — a request settling late does
-  not extend it
-- `report`: teardown resolves at the ceiling with `requestsInFlight: true` while
-  a request is still outstanding; that request is neither aborted nor errored
-- `wait`: unchanged from today, including the report's fields
-- a policy given to one connection does not leak to another
+All at `SessionLifecycle` level — no server, which is what makes them possible.
 
-All of this is `SessionLifecycle`-level and needs no server, which is what makes
-it testable at all.
+- a request that never settles: `drain()` resolves at the ceiling, reports
+  `requestsInFlight`, and the request is neither aborted nor errored
+- `connect()` after such a teardown is not blocked — the regression this exists
+  to prevent
+- the ceiling stays absolute: a request settling late does not extend it
+- everything settling before the ceiling: report unchanged from today
+- a configured ceiling is honoured; an unconfigured one is 600s
 
 ## Release
 
-Additive and default-preserving, so a **minor** on `@mcp-abap-adt/connection`.
-Version is the user's call. No `interfaces` change is required unless
-`requestsInFlight` is added to `ITeardownReport`, which lives there — in which
-case interfaces ships first, as always.
+Additive except for the new report field, which lands in `interfaces` first as a
+minor, then the connector consumes it. Version numbers are the user's call.
