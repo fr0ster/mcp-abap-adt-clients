@@ -282,8 +282,10 @@ change, and always resolves:
 - chains that finish inside it are unlocked normally;
 - a chain still running at the deadline is **not** aborted — the barrier stops
   waiting, not the work — and `unlockAll()` proceeds over whatever is registered;
-- a chain still running at the deadline is named in the result, by the object it
-  was working on.
+- a **lock-capable** chain still running at the deadline is named in the result,
+  by the object it was working on. A read-only one is not — it appears only as
+  `timedOut: true`, since naming it would put an object in `unresolvedIntents`
+  that no `LOCK` could have touched.
 
 That last point cannot be done by watching the registry, and an earlier draft
 promised exactly that: "a lock registered after the snapshot is reported by
@@ -536,6 +538,7 @@ rather than coerced:
 | finite, `>= 0` | used as given |
 | `0` | valid and meaningful: do not wait at all. Step 2 is skipped, step 3 runs over whatever is registered now |
 | `Infinity`, `NaN`, negative | **rejected** — `close()` throws before doing anything |
+| beyond `MAX_SAFE_INTEGER - Date.now()` | **rejected** — the absolute deadline would not be exactly representable; see below |
 
 Rejected loudly rather than silently repaired, because every silent repair here is
 wrong in a way the caller cannot see. Coercing `Infinity` to a default hides that
@@ -543,10 +546,20 @@ they asked for something the contract cannot provide; treating it as unbounded
 discards the guarantee outright; clamping a negative to `0` turns "I made a
 mistake" into "close immediately", which is destructive.
 
-**No maximum, but the wait must be built to honour one.** Any finite value is
-bounded, which is what the guarantee requires, and capping someone's patience
-during their own shutdown would be the overreach this document rejects everywhere
-else. That obliges the implementation rather than the caller: a single
+**No cap on patience — but the value must be representable.** Capping how long
+someone waits during their own shutdown is the overreach this document rejects
+everywhere else, and that is not what this is. "Finite" turned out to be too weak
+a test: the absolute deadline is `now + deadlineMs`, and past `MAX_SAFE_INTEGER`
+that sum stops being exact — `Date.now() + Number.MAX_VALUE` is still finite and
+still useless, since the addition is absorbed entirely and the deadline can never
+be reached in any run of any program.
+
+So the accepted range is `0 <= deadlineMs <= Number.MAX_SAFE_INTEGER - Date.now()`,
+which is still about 285,000 years and rejects nothing anyone means. Outside it,
+`close()` throws with the rest of the invalid input. The rejection is about
+arithmetic, not about preference: a value that cannot be added to a clock without
+losing precision is not a longer wait, it is an unrepresentable one, and accepting
+it would be promising a bound we cannot compute. That obliges the implementation rather than the caller: a single
 `setTimeout` cannot carry an arbitrary finite value — anything past the runtime's
 32-bit range overflows and fires almost immediately, turning a very patient close
 into an instant one, which is the opposite of what was asked and fails silently.
@@ -632,6 +645,8 @@ Tests:
   on the second call
 - `close()` returns `timedOut: true` → a second `close()` with a longer deadline
   waits again and picks up what finished in between
+- a **read-only** chain outstanding at the deadline → `timedOut: true` with
+  `unresolvedIntents` empty; it is not named, because it could not have locked
 - `disconnect()` reports `releasePending: true` → a later
   `close({ disconnect: true })` retries the release rather than reporting the
   teardown as done
