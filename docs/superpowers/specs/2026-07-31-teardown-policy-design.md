@@ -15,9 +15,14 @@ They belong to different layers, and so do their risks:
 | `@mcp-abap-adt/connection` | the REST session | losing or silently replacing the HTTP conversation |
 | `@mcp-abap-adt/adt-clients` | the ABAP session's semantics — stateful mode, lock handles, the registry | leaving a lock on the server |
 
-**The server does not end the session.** Every teardown originates on our side of
-the wire, from the consumer — which means that at teardown the ABAP session is
-still alive and an `UNLOCK` can simply be sent. Releasing a lock during shutdown
+**The server does not end the session.** In an orderly shutdown — the consumer
+deciding it is done — the teardown starts on our side of the wire, which means
+the ABAP session is still alive and an `UNLOCK` can simply be sent.
+
+That is a claim about orderly shutdown only, and it needs to be: teardowns also
+arise *internally*, when a lost session is detected and cleaned up before a
+recovery. Those are neither the consumer's doing nor a case where an `UNLOCK` can
+be sent, and they are what makes the fencing below non-optional. Releasing a lock during shutdown
 is an ordinary operation, not a best-effort gamble. That is the case we handle,
 and handling it is cheap.
 
@@ -65,7 +70,7 @@ This is the connection handling its own risk and stopping there — but only onc
 the next section holds. Removing the wait without it is not a simplification, it
 is a hazard.
 
-### Removing the wait requires epoch fencing
+### Removing the wait requires generation fencing
 
 The wait had a second effect nobody designed but everybody relied on: it
 guaranteed that no request outlived the session it was issued against. Drop it
@@ -167,19 +172,38 @@ change, and always resolves:
 - chains that finish inside it are unlocked normally;
 - a chain still running at the deadline is **not** aborted — the barrier stops
   waiting, not the work — and `unlockAll()` proceeds over whatever is registered;
-- a lock that such a chain registers *after* the snapshot is reported as not
-  released, by object name, because that is the one case `close()` cannot fix and
-  the caller must know about.
+- a chain still running at the deadline is named in the result, by the object it
+  was working on.
+
+That last point cannot be done by watching the registry, and an earlier draft
+promised exactly that: "a lock registered after the snapshot is reported by
+name". Impossible. At the moment `close()` returns, that lock is not in the
+registry yet — and once it returns it cannot amend a result it has already
+handed back. `LockFailure` would misdescribe it too: that means an `UNLOCK` was
+attempted and failed, and here none was attempted at all.
+
+**So the registry records intent, not only possession.** A chain declares the key
+it is about to lock *before* it sends the `LOCK`, and resolves that declaration
+when the outcome is known — held, or confirmed not taken. `close()` then reports
+the declarations still unresolved at its deadline, which it *can* know, because
+they were made before it stopped waiting.
+
+This is the rule the session-lifecycle spec already arrived at for windows —
+*"what it tracks is 'a lock may be held', not 'an unlock happened'"* — applied at
+the layer that can act on it. Uncertainty is reported as uncertainty. A chain
+whose `LOCK` was confirmed to have failed resolves its declaration and is not
+reported, because nothing was taken.
 
 The choice of a bound belongs to the caller. What is not optional is that there
 *is* one: a close path that can hang is not a close path.
 
 `unlockAll()` already returns `LockFailure[]` for whatever it could not release;
-nothing new is needed there. The barrier is the new part, and it needs two
-concurrency tests: one that starts a chain, calls `close()` mid-`LOCK`, and
-asserts the lock was released rather than stranded — and one with a chain that
-never settles, asserting `close()` returns at its deadline and names what it
-could not release. The details belong to that repository's
+nothing new is needed there. The barrier and the intent declaration are the new parts, and they need three
+concurrency tests: a chain interrupted mid-`LOCK`, asserting the lock was
+released rather than stranded; a chain that never settles, asserting `close()`
+returns at its deadline and names the object it was working on; and a chain whose
+`LOCK` is confirmed to have failed, asserting it is NOT named — uncertainty is
+reported, a known non-event is not. The details belong to that repository's
 own design, not here.
 
 ## Decision: what a window is for
@@ -313,9 +337,11 @@ longer exists. No type changes. Correcting an earlier draft of this spec, which
 claimed no `interfaces` change was needed — a field whose documentation describes
 a mechanism we removed is a contract that lies, and prose is part of the contract.
 
-Then `@mcp-abap-adt/connection`: `disconnect()` stops waiting, and the epoch
-fencing that makes that safe lands in the same release — they are one change, not
-two, and shipping the first without the second would be a regression.
+Then `@mcp-abap-adt/connection`: `disconnect()` stops waiting, and the **session
+generation** fencing that makes that safe lands in the same release — they are one
+change, not two, and shipping the first without the second would be a regression.
+Generation, not epoch: an earlier draft of this plan said epoch, which is the
+variant the body of this spec rejects for missing every internal teardown.
 
 Then `adt-clients`, with its close barrier.
 
