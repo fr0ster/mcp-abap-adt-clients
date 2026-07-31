@@ -115,12 +115,21 @@ Two counters answering two different questions:
 | counter | question | changes when |
 |---|---|---|
 | `epoch` (exists) | did the caller ask to stop? | a caller-initiated teardown |
-| **session generation** (new) | is this still the session you were issued against? | every `markConnected()` — however the session came to be |
+| **session generation** (new) | is this still the session you were issued against? | every `markConnected()` **and** every `beginTeardown()` |
 
 `markConnected()` currently increments nothing. It is the one place a session
 becomes current, whatever brought it there — first connect, reconnect, or
-recovery — which makes it the honest place to count generations. Epoch keeps its
-existing job untouched.
+recovery — which makes it the honest place to count generations.
+
+**Counting only there leaves a gap**, and an earlier draft had it: between a
+`disconnect()` and the next `connect()` there is no new generation, so a lease
+taken before the teardown still matches. A response arriving in that window would
+write cookies and a CSRF token into the state `disconnect()` has just cleared,
+and the next `connect()` would begin over that debris. So a teardown starts a
+generation too: the moment the session stops being the current one is the moment
+leases against it go stale, whether or not a replacement exists yet.
+
+Epoch keeps its existing job untouched.
 
 #### The rule
 
@@ -134,6 +143,9 @@ existing job untouched.
 Tests, both orderings, because only the second distinguishes the two counters:
 
 - explicit: request A → `disconnect()` → `connect()` → A settles
+- **the gap**: request A → `disconnect()` → A settles → `connect()`. No new
+  session exists when A lands, and the cleared state must stay cleared — this is
+  the ordering that fails if generations are counted only at `markConnected()`
 - **internal**: request A → session-lost teardown → recovery establishes a new
   session → A settles. Same epoch throughout; the new session's identity and
   cookies must still be untouched and no teardown raised.
@@ -197,8 +209,34 @@ reported, because nothing was taken.
 The choice of a bound belongs to the caller. What is not optional is that there
 *is* one: a close path that can hang is not a close path.
 
-`unlockAll()` already returns `LockFailure[]` for whatever it could not release;
-nothing new is needed there. The barrier and the intent declaration are the new parts, and they need three
+### The shape of `close()`
+
+`unlockAll()` returns `LockFailure[]`, which is not enough: the barrier now has
+two different things to report, and one of them is not a failure at all.
+
+```ts
+interface ICloseReport {
+  /** UNLOCK was attempted and rejected. The lock is known to be held. */
+  unlockFailures: LockFailure[];
+  /** Declared before the LOCK went out, still unresolved when waiting stopped.
+   *  The outcome is UNKNOWN — it may be held, it may never have been taken. */
+  unresolvedIntents: string[];
+  /** Whether the barrier stopped waiting rather than running out of work. */
+  timedOut: boolean;
+}
+
+close(options?: { deadlineMs?: number }): Promise<ICloseReport>;
+```
+
+Three facts, three fields, because collapsing them loses the distinction that
+matters to whoever reads the report: "this lock is definitely held and I could
+not free it" calls for a retry, while "I do not know whether this lock exists"
+calls for a look. `LockFailure` cannot carry the second — it describes an
+attempt, and for an unresolved intent no attempt was made.
+
+`deadlineMs` in milliseconds, to match every other timeout in these packages, and
+a finite default. `close()` resolves in all cases; it never rejects for a lock it
+could not release, since the report is the answer. The barrier and the intent declaration are the new parts, and they need three
 concurrency tests: a chain interrupted mid-`LOCK`, asserting the lock was
 released rather than stranded; a chain that never settles, asserting `close()`
 returns at its deadline and names the object it was working on; and a chain whose
@@ -210,9 +248,28 @@ own design, not here.
 
 **A window marks a span in which a short per-request timeout must not abort a
 request.** That is its whole purpose, and it is squarely the connection's own
-risk: aborting mid-flight tears down the socket, which drops the stateful ABAP
-session and orphans whatever it held. Deciding how long its own requests may run
-is the connection's business, and nobody else's.
+risk: deciding how long its own requests may run is its business and nobody
+else's.
+
+The risk is **an operation whose outcome is unknown**, not a session presumed
+dead. A `LOCK` that times out client-side may well have succeeded on the server;
+we simply stopped listening. The lock is then held by a session we are still in,
+by a handle we never received — unreachable and unreleasable, which is the
+orphan. A `PUT` aborted the same way leaves us unable to say whether it landed.
+
+An earlier draft justified this differently — "aborting tears down the socket,
+which drops the stateful ABAP session" — and that claim does not hold. The socket
+belongs to the local agent; the ABAP session lives on the server and is carried
+by a cookie, which is why it survives a local `disconnect()` and why a
+reconnect can find it again. Dropping one TCP connection does not demonstrate the
+end of a cookie-backed session, and this repository has already retracted one
+belief of that family: *"a stateless request kills a stateful session"* turned out
+to be false when checked against Eclipse's actual traffic.
+
+The corrected reasoning does not weaken the case for a window; it sharpens it.
+An operation with an unknown outcome is dangerous precisely *because* the session
+survives — the lock outlives our uncertainty about it. If the session died on
+every timeout, the lock would die with it and there would be less to protect.
 
 **A window is not lock bookkeeping.** Say a caller locks five objects, works on
 them, unlocks them. The window model can *represent* that — `Symbol(label)` is
