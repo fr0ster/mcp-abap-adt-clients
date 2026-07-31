@@ -323,8 +323,8 @@ two different things to report, and one of them is not a failure at all.
 
 ```ts
 interface ICloseReport {
-  /** UNLOCK was attempted and rejected. The lock is known to be held. */
-  unlockFailures: LockFailure[];
+  /** UNLOCK was attempted and did not confirm release. Each entry says which. */
+  unlockFailures: Array<LockFailure & { outcome: 'refused' | 'unknown' }>;
   /** Declared before the LOCK went out, still unresolved when waiting stopped.
    *  The outcome is UNKNOWN — it may be held, it may never have been taken. */
   unresolvedIntents: string[];
@@ -356,8 +356,21 @@ The two fields record two different observations, and nothing more:
 
 | field | what was observed |
 |---|---|
-| `unlockFailures` | the server answered the `UNLOCK`, and refused it. Carries the error it gave |
-| `unresolvedIntents` | no answer was obtained — the intent was declared and never resolved. The outcome is unknown |
+| `unlockFailures`, `outcome: 'refused'` | the server answered the `UNLOCK` and refused it. Carries the error it gave |
+| `unlockFailures`, `outcome: 'unknown'` | the `UNLOCK` went out and no answer came back — timeout, reset, DNS. It may well have released the lock |
+| `unresolvedIntents` | the `LOCK` itself never resolved, so there is nothing to have unlocked. The outcome is unknown from further back |
+
+The `outcome` discriminator is new, and it exists because an earlier draft
+declared that every entry meant "the server refused, the lock is known held".
+`unlockAll()` records a `LockFailure` for **any** exception — a timeout, a
+connection reset, a DNS failure — and in those cases the `UNLOCK` may have
+arrived and worked. Claiming otherwise would state as fact something we did not
+observe, which is the same error the `unresolvedIntents` field was introduced to
+avoid, made on the unlock side after being fixed on the lock side.
+
+Distinguishing them is mechanical rather than a guess: a response with a status
+is a refusal, and a failure with no response is unknown. `isNetworkError` already
+exists in `interfaces` for this.
 
 **What to do about either is the consumer's call.** Earlier drafts of this section
 told them: first that a failure "calls for a retry", then — after that turned out
@@ -369,9 +382,10 @@ tolerate, none of which we know. We report what happened and hand it over.
 Two facts are worth stating because they are ours to know, and they are facts, not
 instructions:
 
-- A refused `UNLOCK` usually means the handle is no longer valid — the session
+- A **refused** `UNLOCK` usually means the handle is no longer valid — the session
   moved, its type was toggled, the handle expired. The same call with the same
-  handle will then get the same answer.
+  handle will then get the same answer. This does not apply to an `unknown` one,
+  where nothing was learned about the handle at all.
 - That kind of disturbance is usually caused by something on our side, between
   `LOCK` and `UNLOCK`. `unlockAll()` already holds the session stateful across the
   whole batch for exactly this reason.
@@ -430,6 +444,38 @@ down is a different default in every test.
 
 `close()` resolves in all cases; it never rejects for a lock it could not
 release, since the report is the answer.
+
+### Calling it more than once
+
+Unavoidable now that the disposer delegates to it: `await using` will call
+`close()` on a client the caller has already closed by hand. Two concurrent
+`close()` calls are equally ordinary. So the semantics have to be written down
+rather than discovered.
+
+`close()` is **idempotent and serialized**. Calls queue; none is dropped.
+
+- **The barrier closes once.** Step 1 has no meaning a second time — new work is
+  already refused — and step 2 has nothing left to wait for.
+- **Cleanup runs again**, because cleanup stays admissible after `close()`: a
+  second call re-attempts `unlockAll()` over whatever is still registered. This is
+  what makes an explicit `close()` followed by a disposer harmless, and it is also
+  how a caller re-attempts an `unknown` unlock without a separate API.
+- **`disconnect: true` is honoured whenever it is first asked for**, including on
+  a later call after a default `close()`. A caller may reasonably close the client
+  now and decide about the connection afterwards. Once a teardown has happened it
+  is not repeated.
+- **Each call reports what that call did**, not a cached copy of the first. A
+  second `close()` over a fully released registry returns empty arrays and
+  `timedOut: false`, which is the truth about that call.
+
+Concurrent callers are the one case where "what that call did" needs care: they
+are serialized, so the second runs after the first and sees its effects. It does
+not join and receive a copy — joining would silently discard a `disconnect: true`
+that the first call never requested.
+
+Test: explicit `close()` → `Symbol.asyncDispose` → no throw, second report empty.
+And: default `close()` → `close({ disconnect: true })` → the connection is torn
+down on the second call.
 
 ### `Symbol.asyncDispose` must go through it
 
