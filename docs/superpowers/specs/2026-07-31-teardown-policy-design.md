@@ -229,7 +229,35 @@ So the close path is a barrier, in this order:
 2. **Wait for running chains, up to a deadline**, so a `LOCK` already in flight
    lands and registers rather than appearing after the snapshot.
 3. **`unlockAll()`**, now over a registry that cannot grow.
-4. **`disconnect()`**.
+4. **`disconnect()` — only if asked.**
+
+#### The connection is injected, so closing it is not ours
+
+`AdtClient` is handed an `IAbapConnection`. It did not create it and cannot know
+who else holds it — one connection may be shared by several clients, and an
+earlier draft had the first `close()` tear down the session underneath the
+second's running chains and held locks. Its barrier and its registry are its own;
+the connection is not.
+
+We already refuse to `connect()` on the consumer's behalf, for exactly this
+reason. Disconnecting on their behalf is the same overreach with the sign
+flipped, and worse, because it destroys state instead of creating it.
+
+So step 4 is **opt-in**:
+
+```ts
+close(options?: { deadlineMs?: number; disconnect?: boolean }): Promise<ICloseReport>;
+```
+
+Default `false`. `close()` releases what this client holds and stops there,
+leaving the connection exactly as it found it. A caller that owns the connection
+and wants it gone says so — and by saying so takes responsibility for the other
+clients it may be shared with, which is a judgement only they can make.
+
+Rejected: a refcount on the connection so the last client out turns off the
+lights. It puts the library back in charge of a lifetime it was lent, and it fails
+the moment a consumer holds the connection itself without an `AdtClient` around
+it.
 
 Step 2 needs a deadline, and saying so is not a detail. An earlier draft said
 "let running chains finish" with no policy for a chain that never settles —
@@ -308,7 +336,17 @@ close(options?: { deadlineMs?: number }): Promise<ICloseReport>;
 Four facts, four fields, because collapsing any of them loses a distinction that
 matters to whoever reads the report. "This lock is definitely held and I could
 not free it" calls for a retry; "I do not know whether this lock exists" calls
-for a look. `LockFailure` cannot carry the second — it describes an attempt, and
+for a look.
+
+**A retry is only meaningful while the session lives**, and that is the second
+reason step 4 is opt-in. A lock handle belongs to the ABAP session that issued
+it: tear the session down and reconnect, and the new one cannot use the old
+handle — the lock is then beyond any code, and clearing it becomes SM12. So a
+`close()` that disconnected by default would hand back `unlockFailures` labelled
+retryable while having just destroyed the only session in which a retry could
+work. With the default, the session is still there and the advice is true. If the
+caller does pass `disconnect: true` and `unlockFailures` is non-empty, those locks
+are **not** retryable and the report should be read as operator cleanup. `LockFailure` cannot carry the second — it describes an attempt, and
 for an unresolved intent no attempt was made.
 
 The fourth exists because step 4 calls `disconnect()`, which returns an
@@ -333,21 +371,26 @@ Test: `close()` over a connection that implements no lifecycle atom still
 unlocks, still reports, and does not throw.
 
 `deadlineMs` is in milliseconds, matching every other timeout in these packages.
-The default is **`SAP_TIMEOUT_CRITICAL`, i.e. 600 000 ms**, and it is deliberately
-the same number as the window ceiling rather than a value of its own.
+The default is **600 000 ms**, from `SAP_CLOSE_DEADLINE_MS`.
 
-An earlier draft picked 60 000 ms, reasoning from a single request's 45s. That is
-the wrong reference. Step 2 waits for *chains*, and a chain inside a lock window
-is permitted to run to the critical ceiling — 600s — precisely because we decided
-its requests must not be cut short. A close deadline below that would routinely
-guillotine work the connection was told to protect, turning `unresolvedIntents`
-into the normal outcome of an ordinary shutdown rather than the exception it is
-meant to flag. Two numbers governing the same wait must agree; if they disagree,
-the smaller silently overrides the larger and the larger becomes a lie.
+It is a shutdown policy, not a bound derived from anything. Two earlier drafts
+tried to derive it and both were wrong: 60s from a single request's 45s, then
+600s by equating it with `SAP_TIMEOUT_CRITICAL`. The second is no better than the
+first, because that ceiling applies **per request** — a chain runs several in
+sequence, so nothing caps a chain's total duration, and matching the numbers
+reconciles nothing.
 
-It sounds long for a shutdown, and in practice it is not reached: the barrier
-waits only while chains are actually outstanding, and returns immediately when
-none are. The deadline bounds a pathology, it does not pace the normal path.
+Stated honestly instead: **`close()` may stop waiting while a legitimate chain is
+still working.** That is what a shutdown deadline is for. The chain is not
+aborted, its intent is reported as unresolved, and the caller learns that
+something was still in progress when they asked to stop. 600s is chosen as
+patience — long enough that reaching it means something is wrong rather than
+merely slow — and it is configurable because how patient to be during shutdown is
+the caller's judgement, not ours.
+
+In practice it is not reached: the barrier waits only while chains are actually
+outstanding and returns immediately when none are. The deadline bounds a
+pathology; it does not pace the normal path.
 
 Named rather than left to each implementation, because a default nobody wrote
 down is a different default in every test.
