@@ -572,31 +572,40 @@ same uncertain state — an operation whose outcome we do not know — during a 
 someone declared sensitive precisely to avoid that. The raise is a property of the
 session, not of a span, and the span is only what turns it on.
 
-**But an earlier draft said "accepted rather than fixed", and that was me keeping
-a decision that is not mine.** A caller who set a short timeout on an unrelated
-request has stated a preference, and the raise silently overrules it for as long
-as somebody else's window is open. There is currently no way to say otherwise.
-That is the exact shape this document criticises everywhere else: a default is
-ours to choose, a default nobody can escape is not.
+**No per-request opt-out**, and this is the one place in this document where a
+caller's stated preference is overruled with no escape. It is worth being explicit
+about why that is not the same error as the others.
 
-So the raise stays as the **default** — it is the safer side, and the caller who
-wants it has to do nothing — and a request may opt out of it:
+A draft did add one — `honourTimeout: true`, "apply my timeout as given, even
+inside a window" — on the grounds that a caller may know their request is
+unrelated to what is locked. It reinstates precisely the hazard the window exists
+to remove. A request aborted mid-flight leaves an operation whose outcome is
+unknown, and that outcome lands in the **shared** ABAP session, not in the
+caller's private corner of it. "Unrelated" is a judgement about the object; the
+damage is to the session. A caller can be right about the first and still cause
+the second.
 
-```ts
-makeAdtRequest({ ..., honourTimeout: true })
-```
+The choice is not removed, it is made **earlier and once**: at `beginWindow()`.
+Opening a window is opt-in, and it is a statement that this session must not have
+requests torn out from under it for the duration. Everything that follows is the
+consequence the caller asked for. A per-request escape would let one caller
+withdraw a guarantee another one is relying on, over a session neither of them
+owns alone — which is not that caller's decision to make.
 
-Meaning "apply my timeout as given, even inside a window". The caller then owns
-what follows, which is the point: they may know their request is unrelated to
-whatever is locked, and we do not.
+This is the connection defending its own risk, which is the same rule applied
+consistently: the REST session and its state belong to this layer, so protecting
+them is its job. Elsewhere in this document the connection is told to stop
+interpreting locks, stop waiting on windows and stop closing a connection it was
+lent — all cases of it reaching into someone else's business. This is the
+opposite case, and the boundary works in both directions.
 
-Rejected: binding every request to a window token. It threads a token through
-every call site to express something almost no caller needs to say, when a single
-opt-out says it where it is actually needed.
+Rejected too: binding every request to a window token. Beyond threading a token
+through every call site, it would encode the same false premise — that the
+protection is per span, when the thing being protected is shared.
 
 What the default costs, stated so it is a decision rather than a surprise: an
 unrelated slow request waits for the ceiling instead of its own short timeout,
-unless it opts out. A test covers both sides.
+for as long as any window is open. A test pins it.
 
 The teardown does not wait on windows either way — which leaves
 `ITeardownReport.abandonedWindows` needing a meaning it no longer has.
@@ -636,8 +645,9 @@ but it is still a change there, so the earlier claim that this work needs no
   the caller's value is passed verbatim, including none. The window ceiling is a
   different thing and it *does* override a caller's value — it raises rather than
   shortens, which is milder, but a caller who wanted a short timeout does not get
-  one. That is why it now has an opt-out. The ceiling itself is a real default —
-  600s, `SAP_TIMEOUT_CRITICAL` — and it predates this spec.
+  one while a window is open. Deliberately, and with no per-request escape: the
+  choice is made once, by opening the window. The ceiling itself is a real default
+  — 600s, `SAP_TIMEOUT_CRITICAL` — and it predates this spec.
 - **Nothing is aborted.** A teardown does not abort a request; `close()` does not
   abort a chain. Both stop waiting; neither cancels work.
 
@@ -658,8 +668,7 @@ Connection, on the window's actual job:
 - a request issued inside a window is not aborted by a short per-request timeout
 - **an unrelated request, issued while someone else's window is open, also gets
   the raised ceiling** — the connection-wide effect, pinned as a decision
-- **the same request with `honourTimeout: true` keeps its own timeout** — the
-  escape from that default, which is what keeps it a default rather than a rule
+  There is deliberately no per-request escape from it
 - five concurrent windows: the ceiling holds until the last one closes, and
   closing them out of order works — this is the case that exposed the old
   reading
