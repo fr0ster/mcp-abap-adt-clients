@@ -149,15 +149,37 @@ So the close path is a barrier, in this order:
 
 1. **Refuse new work** — further operations and lock acquisitions are rejected
    from this point, so the set of outstanding chains can only shrink.
-2. **Let running chains finish**, so a `LOCK` already in flight lands and
-   registers rather than appearing after the snapshot.
+2. **Wait for running chains, up to a deadline**, so a `LOCK` already in flight
+   lands and registers rather than appearing after the snapshot.
 3. **`unlockAll()`**, now over a registry that cannot grow.
 4. **`disconnect()`**.
 
+Step 2 needs a deadline, and saying so is not a detail. An earlier draft said
+"let running chains finish" with no policy for a chain that never settles —
+which would move the very defect this spec exists to remove one layer up:
+`disconnect()` guaranteed to return, and `close()` free to hang forever before
+reaching it. That is the same mistake twice, and it is worth recording rather
+than quietly fixing.
+
+`close()` therefore takes a deadline, with a finite default the caller can
+change, and always resolves:
+
+- chains that finish inside it are unlocked normally;
+- a chain still running at the deadline is **not** aborted — the barrier stops
+  waiting, not the work — and `unlockAll()` proceeds over whatever is registered;
+- a lock that such a chain registers *after* the snapshot is reported as not
+  released, by object name, because that is the one case `close()` cannot fix and
+  the caller must know about.
+
+The choice of a bound belongs to the caller. What is not optional is that there
+*is* one: a close path that can hang is not a close path.
+
 `unlockAll()` already returns `LockFailure[]` for whatever it could not release;
-nothing new is needed there. The barrier is the new part, and it needs a
-concurrency test that starts a chain, calls `close()` mid-`LOCK`, and asserts the
-lock was released rather than stranded. The details belong to that repository's
+nothing new is needed there. The barrier is the new part, and it needs two
+concurrency tests: one that starts a chain, calls `close()` mid-`LOCK`, and
+asserts the lock was released rather than stranded — and one with a chain that
+never settles, asserting `close()` returns at its deadline and names what it
+could not release. The details belong to that repository's
 own design, not here.
 
 ## Decision: what a window is for
@@ -248,7 +270,14 @@ but it is still a change there, so the earlier claim that this work needs no
   and it is the connection's own.
 - **No request is aborted** by a teardown.
 - **`disconnect()` is never refused** because something is open.
-- **No default timeout** anywhere.
+- **No default timeout is introduced for an ordinary request.** Outside a window
+  the caller's value is passed verbatim, including none. This says nothing about
+  the window ceiling above, which is a different thing: it only ever *raises* an
+  effective timeout (`Math.max(caller, ceiling)`) and never shortens one, so it
+  extends a caller's choice rather than overruling it. That ceiling is a real
+  default — 600s, `SAP_TIMEOUT_CRITICAL` — and it predates this spec.
+- **Nothing is aborted.** A teardown does not abort a request; `close()` does not
+  abort a chain. Both stop waiting; neither cancels work.
 
 ## Tests
 
