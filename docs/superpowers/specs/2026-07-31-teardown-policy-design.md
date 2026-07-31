@@ -356,8 +356,8 @@ The two fields record two different observations, and nothing more:
 
 | field | what was observed |
 |---|---|
-| `unlockFailures`, `outcome: 'refused'` | the server answered the `UNLOCK` and refused it. Carries the error it gave |
-| `unlockFailures`, `outcome: 'unknown'` | the `UNLOCK` went out and no answer came back — timeout, reset, DNS. It may well have released the lock |
+| `unlockFailures`, `outcome: 'refused'` | SAP answered this `UNLOCK` at application level and refused it. Carries the error it gave |
+| `unlockFailures`, `outcome: 'unknown'` | no application-level answer was obtained — a timeout, a reset, or a gateway status that says nothing about what SAP did. It may well have released the lock |
 | `unresolvedIntents` | the `LOCK` itself never resolved, so there is nothing to have unlocked. The outcome is unknown from further back |
 
 The `outcome` discriminator is new, and it exists because an earlier draft
@@ -368,9 +368,21 @@ arrived and worked. Claiming otherwise would state as fact something we did not
 observe, which is the same error the `unresolvedIntents` field was introduced to
 avoid, made on the unlock side after being fixed on the lock side.
 
-Distinguishing them is mechanical rather than a guess: a response with a status
-is a refusal, and a failure with no response is unknown. `isNetworkError` already
-exists in `interfaces` for this.
+Distinguishing them is deliberately conservative, and "a response with a status
+means refused" is **not** the rule — an earlier draft said it was. A 502, 503 or
+504 comes from a proxy or gateway and says nothing about what SAP did with the
+`UNLOCK`; the request may have reached the server and worked. `isNetworkError`
+separates transport failures from responses, which is useful and not sufficient:
+a response is not by itself an answer from the application.
+
+So `refused` requires an **application-level answer about this operation** — an
+ADT error payload, or a status the ADT layer attributes to SAP's handling of the
+call. Everything else is `unknown`: gateway and proxy statuses, transport
+failures, timeouts, anything unparseable.
+
+The asymmetry is intended. Misfiling an unknown as a refusal asserts something we
+did not observe; misfiling a refusal as unknown only understates our certainty.
+When the classification is itself uncertain, it goes to `unknown`.
 
 **What to do about either is the consumer's call.** Earlier drafts of this section
 told them: first that a failure "calls for a retry", then — after that turned out
@@ -379,8 +391,25 @@ Both were the same error. Whether to retry, wait for the session to end, escalat
 to an operator, or ignore it depends on what the caller was doing and what it can
 tolerate, none of which we know. We report what happened and hand it over.
 
-Two facts are worth stating because they are ours to know, and they are facts, not
-instructions:
+**When there is nothing to do.** The report is also a statement of absence, and
+that is worth spelling out, because otherwise every close looks like it might
+need following up:
+
+- `unlockFailures` empty **and** `unresolvedIntents` empty means every lock this
+  client took was confirmed released. Nothing is outstanding; no retry is needed
+  and none would find anything.
+- A `LOCK` confirmed to have **failed** is deliberately absent from both fields.
+  Nothing was taken, so there is nothing to release — absence here is a positive
+  result, not a gap in the record.
+- `timedOut: false` means the barrier ran out of work rather than out of patience,
+  so the two emptiness checks above cover everything this client was doing.
+
+Only `unknown` outcomes and unresolved intents describe something that might
+still exist. Those are the entries where another look could change the answer;
+everywhere else the answer is already final.
+
+Two more facts are worth stating because they are ours to know, and they are
+facts, not instructions:
 
 - A **refused** `UNLOCK` usually means the handle is no longer valid — the session
   moved, its type was toggled, the handle expired. The same call with the same
@@ -471,6 +500,24 @@ rather than discovered.
   a later call after a default `close()` — a caller may reasonably close the client
   now and decide about the connection afterwards.
 
+  **A timeout plus `disconnect: true` can strand a lock, and this is where.** If
+  step 2 hit its deadline, chains are still running; step 4 then clears the REST
+  session, and a `LOCK` those chains complete afterwards produces a handle that
+  belongs to a session no longer reachable. A later `close()` will wait again as
+  promised, but its `unlockAll()` has nothing usable to unlock with. The lock is
+  then beyond this library.
+
+  We do it anyway. The caller asked to disconnect and owns that decision; refusing
+  it because we timed out would be us overruling them on the basis of our own
+  impatience. What we owe them is that it is not a surprise: `timedOut: true`
+  together with a present `teardown` is exactly this situation, stated here and
+  visible in the report.
+
+  The safe order exists and costs nothing, because `close()` is idempotent: call
+  it **without** `disconnect`, read the report, and ask for the teardown once
+  `timedOut` is false and the intents are resolved. A caller who cannot wait keeps
+  the combined call and accepts the trade knowingly.
+
   A teardown counts as finished only when it **released**. `disconnect()` reports
   `releasePending: true` when a transport or session resource did not close, and
   its own contract says a repeat call retries that release. So while
@@ -497,6 +544,10 @@ Tests:
 - `disconnect()` reports `releasePending: true` → a later
   `close({ disconnect: true })` retries the release rather than reporting the
   teardown as done
+- `close({ disconnect: true })` that times out → the teardown still happens, the
+  report shows `timedOut: true` with a `teardown` present, and a lock completing
+  afterwards is **not** recoverable by a later `close()` — the documented cost,
+  pinned so it cannot be mistaken for a bug
 
 ### `Symbol.asyncDispose` must go through it
 
