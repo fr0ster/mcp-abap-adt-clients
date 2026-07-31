@@ -516,8 +516,9 @@ reconciles nothing.
 
 Stated honestly instead: **`close()` may stop waiting while a legitimate chain is
 still working.** That is what a shutdown deadline is for. The chain is not
-aborted, its intent is reported as unresolved, and the caller learns that
-something was still in progress when they asked to stop. 600s is chosen as
+aborted. Any outstanding chain shows up as `timedOut: true`; a **lock-capable** one
+also appears in `unresolvedIntents`, since only those declare. Either way the
+caller learns that something was still in progress when they asked to stop. 600s is chosen as
 patience — long enough that reaching it means something is wrong rather than
 merely slow — and it is configurable because how patient to be during shutdown is
 the caller's judgement, not ours.
@@ -538,7 +539,7 @@ rather than coerced:
 | finite, `>= 0` | used as given |
 | `0` | valid and meaningful: do not wait at all. Step 2 is skipped, step 3 runs over whatever is registered now |
 | `Infinity`, `NaN`, negative | **rejected** — `close()` throws before doing anything |
-| beyond `MAX_SAFE_INTEGER - Date.now()` | **rejected** — the absolute deadline would not be exactly representable; see below |
+| beyond `MAX_SAFE_INTEGER - <monotonic now>` | **rejected** — the absolute deadline would not be exactly representable; see below |
 
 Rejected loudly rather than silently repaired, because every silent repair here is
 wrong in a way the caller cannot see. Coercing `Infinity` to a default hides that
@@ -554,7 +555,7 @@ that sum stops being exact — `Date.now() + Number.MAX_VALUE` is still finite a
 still useless, since the addition is absorbed entirely and the deadline can never
 be reached in any run of any program.
 
-So the accepted range is `0 <= deadlineMs <= Number.MAX_SAFE_INTEGER - <clock now>`,
+So the accepted range is `0 <= deadlineMs <= Number.MAX_SAFE_INTEGER - <monotonic now>`,
 which is still about 285,000 years and rejects nothing anyone means. Outside it,
 `close()` throws with the rest of the invalid input. The rejection is about
 arithmetic, not about preference: a value that cannot be added to a clock without
@@ -660,8 +661,12 @@ Tests:
   waits again and picks up what finished in between
 - a **read-only** chain outstanding at the deadline → `timedOut: true` with
   `unresolvedIntents` empty; it is not named, because it could not have locked
-- the clock moves **backwards** mid-wait → `close()` still returns within the
-  requested duration; a wall-clock implementation fails this one
+- the **wall** clock moves backwards mid-wait while the monotonic clock keeps
+  advancing normally → `close()` still returns within the requested duration. It
+  has to be posed this way round: winding back the injected monotonic clock would
+  break that clock's own contract and prove nothing about the implementation. What
+  is under test is which source the wait reads, so only the source that can
+  legitimately move must move.
 - `disconnect()` reports `releasePending: true` → a later
   `close({ disconnect: true })` retries the release rather than reporting the
   teardown as done
